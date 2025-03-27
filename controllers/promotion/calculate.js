@@ -125,8 +125,11 @@ async function applyPromotion(order) {
                 proType: promo.proType,
                 proQty: selectedProduct.productQty,
                 discount: promoDiscount,
+                // test:"dawd",
                 // ...(selectedProduct && { ...selectedProduct })
                 listProduct: [{
+                    proId: promo.proId,
+                    // proName: 'dawd',
                     id: selectedProduct.productId,
                     name: selectedProduct.productName,
                     group: selectedProduct.productGroup,
@@ -170,6 +173,8 @@ async function getRewardProduct(proId) {
     if (!products.length) return []
 
     return products.map(product => ({
+        proId: promotion.proId,
+        productId: product.id,
         id: product.id,
         name: product.name,
         group: product.group,
