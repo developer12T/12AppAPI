@@ -48,7 +48,7 @@ async function summaryOrder (cart) {
 
       return {
         id: cartItem.id,
-        // test: cartItem.id,
+        test: cartItem.id,
         name: cartItem.name,
         group: productInfo.group || '',
         brand: productInfo.brand || '',

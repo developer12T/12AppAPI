@@ -125,7 +125,7 @@ async function applyPromotion(order) {
                 proType: promo.proType,
                 proQty: selectedProduct.productQty,
                 discount: promoDiscount,
-                // test:"dawd",
+                test:"dawd",
                 // ...(selectedProduct && { ...selectedProduct })
                 listProduct: [{
                     proId: promo.proId,
