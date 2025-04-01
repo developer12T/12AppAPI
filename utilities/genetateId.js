@@ -2,7 +2,7 @@ const moment = require('moment')
 const { Order } = require('../models/cash/sale')
 const { Refund } = require('../models/cash/refund')
 const { Distribution } = require('../models/cash/distribution')
-const { Giveaways, Givetype } = require('../models/cash/give')
+const { Giveaway, Givetype } = require('../models/cash/give')
 const { Promotion } = require('../models/cash/promotion')
 
 const generateOrderId = async (area, warehouse) => {
@@ -66,7 +66,7 @@ const generateGiveawaysId = async (area, warehouse) => {
     const currentYear = new Date().getFullYear() + 543
     const currentMonth = (new Date().getMonth() + 1).toString().padStart(2, '0')
 
-    const latestOrder = await Giveaways.findOne({
+    const latestOrder = await Giveaway.findOne({
         "store.area": area,
         createdAt: {
             $gte: new Date(`${new Date().getFullYear()}-${currentMonth}-01`),
