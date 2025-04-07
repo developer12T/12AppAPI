@@ -104,16 +104,20 @@ async function getStockMovement(area, period) {
                 }
 
                 results[type].listProduct[conditionKey].qtyPcs += item.qtyPcs || 0
+                // console.log("results",JSON.stringify(results[type], null, 2))
+
             })
         }
+        
         const productIds = [...new Set(Object.values(results).flatMap(group => Object.values(group.listProduct).map(p => p.product.id)))]
         const productDetails = await Product.find({ id: { $in: productIds } }).lean()
         
         for (const type in results) {
             const stockMovements = []
-
+            
             for (const productKey in results[type].listProduct) {
                 const productData = results[type].listProduct[productKey]
+                console.log("results[type].listProduct",results[type].listProduct[productKey])
                 const productInfo = productDetails.find(p => p.id === productData.product.id)
                 if (!productInfo) continue
 
