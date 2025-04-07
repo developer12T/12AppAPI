@@ -23,8 +23,11 @@ const getStockAvailable = async (area, period) => {
     stockMovements.forEach(record => {
       // console.log("record",record)
       const { type, listProduct } = record
+      // console.log("listProduct",listProduct)
       listProduct.forEach(item => {
         const { product, qtyPcs, condition } = item
+
+        
         if (!product || !product.id) return
         if (!(product.id in netStock)) {
           netStock[product.id] = 0
@@ -42,6 +45,7 @@ const getStockAvailable = async (area, period) => {
   }
 
   const allProductIds = Object.keys(netStock)
+  console.log("netStock",Object.keys(netStock))
   const productDetails = await Product.find({
     id: { $in: allProductIds }
   }).lean()
