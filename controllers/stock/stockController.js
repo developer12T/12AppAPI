@@ -40,6 +40,7 @@ exports.addStock = async (req, res) => {
                 })
             }
 
+            
             if (enrichedListProduct.length > 0) {
                 const stockDoc = new Stock({
                     area,
@@ -47,14 +48,18 @@ exports.addStock = async (req, res) => {
                     period,
                     listProduct: enrichedListProduct
                 })
-                await stockDoc.save()
+                // await stockDoc.save()
+                res.status(200).json({
+                    status: 200,
+                    message: stockDoc,
+                })
             }
         }
 
-        res.status(200).json({
-            status: 200,
-            message: 'Stock added successfully',
-        })
+        // res.status(200).json({
+        //     status: 200,
+        //     message: stockDoc,
+        // })
 
     } catch (error) {
         console.error('Error adding stock:', error)

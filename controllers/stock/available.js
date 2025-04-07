@@ -15,10 +15,13 @@ const getStockAvailable = async (area, period) => {
     )
     netStock[productId] = baseQty
   })
+  // คำนวณสินค้าที่มีอยู่ใน baseQty
+  // console.log(JSON.stringify(netStock, null, 2));
 
   const stockMovements = await getStockMovement(area, period)
   if (stockMovements && stockMovements.length) {
     stockMovements.forEach(record => {
+      // console.log("record",record)
       const { type, listProduct } = record
       listProduct.forEach(item => {
         const { product, qtyPcs, condition } = item
@@ -47,7 +50,7 @@ const getStockAvailable = async (area, period) => {
   productDetails.forEach(prod => {
     productDetailsMap[prod.id] = prod
   })
-
+  // console.log(productDetailsMap)
   const products = allProductIds
     .map(productId => {
       const finalQty = Math.max(netStock[productId], 0)

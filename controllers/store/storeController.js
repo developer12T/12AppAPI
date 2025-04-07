@@ -7,9 +7,9 @@ const upload = multer({ storage: multer.memoryStorage() }).array('storeImages', 
 const path = require('path')
 
 exports.getStore = async (req, res) => {
-    try {
+    try {   
         const { area, type, route } = req.query
-
+        console.log("getStore req.query",req.query)
         const currentDate = new Date()
         const startMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
         const NextMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1)

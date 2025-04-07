@@ -4,7 +4,7 @@ const { User } = require('../../models/cash/user')
 const { Product } = require('../../models/cash/product')
 const { Route } = require('../../models/cash/route')
 const { generateOrderId } = require('../../utilities/genetateId')
-const { summaryOrder,summaryOrderProStatusOne } = require('../../utilities/summary')
+const { summaryOrder } = require('../../utilities/summary')
 const { rangeDate } = require('../../utilities/datetime')
 const { uploadFiles } = require('../../utilities/upload')
 const { checkInRoute } = require('../route/checkIn')
@@ -23,13 +23,8 @@ exports.checkout = async (req, res) => {
       latitude,
       longitude,
       shipping,
-      payment,
-      changePromotionStatus,
-      listPromotion = []
-
+      payment
     } = req.body
-
-
 
     if (!type || !area || !storeId || !shipping || !payment) {
       return res
@@ -51,10 +46,7 @@ exports.checkout = async (req, res) => {
         .json({ status: 404, message: 'Sale user not found!' })
     }
 
-    let summary = ''
-    if (changePromotionStatus == 0) {
-      summary = await summaryOrder(cart)
-      // console.log(summary)
+    const summary = await summaryOrder(cart)
 
     // const shippingData = store.shippingAddress.find(s => s.shippingId === shipping)
     // if (!shippingData) {
@@ -148,8 +140,8 @@ exports.checkout = async (req, res) => {
       createdBy: sale.username
     })
 
-    // await newOrder.save()
-    // await Cart.deleteOne({ type, area, storeId })
+    await newOrder.save()
+    await Cart.deleteOne({ type, area, storeId })
 
     const checkIn = await checkInRoute({
       storeId: storeId,
@@ -160,130 +152,13 @@ exports.checkout = async (req, res) => {
       longitude: longitude
     })
 
-    // console.log('checkin', checkIn)
+    console.log('checkin', checkIn)
 
     res.status(200).json({
       status: 200,
       message: 'Checkout successful!',
-      data: newOrder
+      data: { orderId, total: subtotal }
     })
-
-    }
-    else if (changePromotionStatus == 1) {
-      summary = await summaryOrderProStatusOne(cart,listPromotion)
-      // console.log("summaryOrderProStatusOne")
-      // console.log(summary)
-
-      const productIds = cart.listProduct.map(p => p.id)
-      const products = await Product.find({ id: { $in: productIds } }).select(
-        'id name group brand size flavour listUnit'
-      )
-  
-      let subtotal = 0
-      let listProduct = cart.listProduct.map(item => {
-        const product = products.find(p => p.id === item.id)
-        if (!product) return null
-  
-        const unitData = product.listUnit.find(u => u.unit === item.unit)
-        if (!unitData) {
-          return res
-            .status(400)
-            .json({ status: 400, message: `Invalid unit for product ${item.id}` })
-        }
-  
-        const totalPrice = item.qty * unitData.price.sale
-        subtotal += totalPrice
-  
-        return {
-          id: product.id,
-          name: product.name,
-          group: product.group,
-          brand: product.brand,
-          size: product.size,
-          flavour: product.flavour,
-          qty: item.qty,
-          unit: item.unit,
-          unitName: unitData.name,
-          price: unitData.price.sale,
-          subtotal: parseFloat(totalPrice.toFixed(2)),
-          discount: 0,
-          netTotal: parseFloat(totalPrice.toFixed(2))
-        }
-      })
-  
-      if (listProduct.includes(null)) return
-      const orderId = await generateOrderId(area, sale.warehouse)
-  
-      const newOrder = new Order({
-        orderId,
-        type,
-        status: 'pending',
-        sale: {
-          saleCode: sale.saleCode,
-          salePayer: sale.salePayer,
-          name: `${sale.firstName} ${sale.surName}`,
-          tel: sale.tel || '',
-          warehouse: sale.warehouse
-        },
-        store: {
-          storeId: summary.store.storeId,
-          name: summary.store.name,
-          type: summary.store.type,
-          address: summary.store.address,
-          taxId: summary.store.taxId,
-          tel: summary.store.tel,
-          area: summary.store.area,
-          zone: summary.store.zone
-        },
-        note,
-        latitude,
-        longitude,
-        listProduct,
-        listPromotions: summary.listPromotion,
-        subtotal,
-        discount: 0,
-        discountProduct: 0,
-        vat: 0,
-        totalExVat: 0,
-        total: subtotal,
-        // shipping: {
-        //     shippingId: shippingData.shippingId,
-        //     address: shippingData.address,
-        //     dateRequest: shipping.dateRequest,
-        //     note: shipping.note
-        // },
-        shipping: {
-          shippingId: '',
-          address: ''
-        },
-        paymentMethod: 'cash',
-        paymentStatus: 'paid',
-        createdBy: sale.username
-      })
-  
-      await newOrder.save()
-      await Cart.deleteOne({ type, area, storeId })
-  
-      const checkIn = await checkInRoute({
-        storeId: storeId,
-        routeId: routeId,
-        orderId: orderId,
-        note: note,
-        latitude: latitude,
-        longitude: longitude
-      })
-  
-      // console.log('checkin', checkIn)
-  
-      res.status(200).json({
-        status: 200,
-        message: 'Checkout successful!',
-        data: newOrder
-      })
-
-    }
-    
-
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })

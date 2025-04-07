@@ -6,6 +6,7 @@ const { Product } = require('../models/cash/product')
 const { User } = require('../models/cash/user')
 const { rangeDate } = require('../utilities/datetime')
 
+
 async function getStockMovement(area, period) {
     try {
         if (!area || !period) throw new Error('Area and period are required')
@@ -14,6 +15,7 @@ async function getStockMovement(area, period) {
 
         const users = await User.find({ area }).select('saleCode').lean()
         const saleCode = users.map(user => user.saleCode)
+        // console.log(users)
         if (saleCode.length === 0) return { message: 'No saleCode found for area' }
 
         const modules = [
@@ -22,7 +24,8 @@ async function getStockMovement(area, period) {
             { model: Giveaway },
             { model: Receive }
         ]
-
+        
+        
         let allModuleData = []
 
         for (const module of modules) {
@@ -39,16 +42,19 @@ async function getStockMovement(area, period) {
                     query['store.area'] = area
                     query['sale.saleCode'] = saleCode
                 }
-
+                // query ของแต่ล่ะเงื่อนไขมาหา
                 const moduleData = await module.model.find(query).lean()
                 if (moduleData.length > 0) {
                     allModuleData.push(...moduleData)
                 }
+                // console.log("module",module.model.find(query))
             } catch (err) {
                 console.error(`Error fetching data from ${module.model.modelName}:`, err)
             }
         }
+        // console.log("allModuleData", JSON.stringify(allModuleData, null, 2));
 
+        
         if (allModuleData.length === 0) {
             return { message: `No data found for area: ${area}` }
         }
@@ -69,7 +75,8 @@ async function getStockMovement(area, period) {
             }
 
             const allProducts = [...(doc.listProduct || [])]
-
+            // console.log("allProducts",allProducts)
+            
             if (doc.listPromotions) {
                 doc.listPromotions.forEach(promo => {
                     if (promo.listProduct) {
@@ -77,10 +84,10 @@ async function getStockMovement(area, period) {
                     }
                 })
             }
-
+            // console.log("results",results)
+            
             allProducts.forEach(item => {
                 const conditionKey = doc.type === 'refund' && item.condition ? `${item.id}_${item.condition}` : item.id
-
                 if (!results[type].listProduct[conditionKey]) {
                     results[type].listProduct[conditionKey] = {
                         product: {
@@ -99,10 +106,9 @@ async function getStockMovement(area, period) {
                 results[type].listProduct[conditionKey].qtyPcs += item.qtyPcs || 0
             })
         }
-
         const productIds = [...new Set(Object.values(results).flatMap(group => Object.values(group.listProduct).map(p => p.product.id)))]
         const productDetails = await Product.find({ id: { $in: productIds } }).lean()
-
+        
         for (const type in results) {
             const stockMovements = []
 
@@ -154,6 +160,8 @@ async function getStockMovement(area, period) {
 
             results[type].listProduct = stockMovements
         }
+        // console.dir(Object.values(results), { depth: null });
+
 
         return Object.values(results)
     } catch (error) {

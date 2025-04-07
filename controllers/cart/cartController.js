@@ -6,6 +6,7 @@ const { summaryOrder, summaryWithdraw, summaryRefund, summaryGive } = require('.
 
 exports.getCart = async (req, res) => {
     try {
+        console.log("req.query",req.query)
         const { type, area, storeId } = req.query
 
         if (!type || !area) {
