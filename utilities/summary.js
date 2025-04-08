@@ -480,6 +480,7 @@ async function summaryOrderProStatusOne(cart, listPromotion) {
         id: product.id,
         name: product.name,
         group: product.group,
+        size:product.size,
         flavour: product.flavour,
         brand: product.brand,
         qty: product.qty,

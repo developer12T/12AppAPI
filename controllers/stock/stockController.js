@@ -106,26 +106,37 @@ exports.getProductAndStock = async (req, res) => {
             period:period ,
         }
     )  
+        // console.log("stock", JSON.stringify(stock, null, 2));
         let productIDs = []
         stock.forEach(stockItem  => {
-            // productIDs.push(product.productId)
-            // console.log(product)
+
+            
             stockItem.listProduct.forEach(product => {
-                productIDs.push(product.productId)
+                
+                product.available.forEach(availableItem => {
+                    productIDs.push({
+                        id: product.productId,
+                        lot: availableItem.lot,
+                        qtyPcs: availableItem.qtyPcs,
+                        qtyCtn: availableItem.qtyCtn
+                    });
+                }
+                    
+                )
             })
         })
         // console.log("productIDs",productIDs)
 
-        const stocks  = stock.map(stockItem =>{
-            stockItem.listProduct.map(product => {
-                // console.log(product)
-                product.available.map(available => {
-                    console.log(available.qtyPcs)
-                })
-            })
-        })
+        // const stocks  = stock.map(stockItem =>{
+        //     stockItem.listProduct.map(product => {
+        //         // console.log(product)
+        //         product.available.map(available => {
+        //             console.log(available.qtyPcs)
+        //         })
+        //     })
+        // })
 
-
+        
 
 
         if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
@@ -164,7 +175,7 @@ exports.getProductAndStock = async (req, res) => {
 
         let products = await Product.find({
             ...filter,  // ขยายเงื่อนไขใน filter ที่มีอยู่
-            id: { $in: productIDs }  // เพิ่มเงื่อนไขค้นหาว่า id อยู่ใน productIDs
+            id: { $in: productIDs.map(item => item.id) }  // เพิ่มเงื่อนไขค้นหาว่า id อยู่ใน productIDs
           }).lean();
 
           products.forEach(item => {
@@ -173,30 +184,81 @@ exports.getProductAndStock = async (req, res) => {
             });
           });
 
-          const dataProducts = products.map(product => ({
-            _id:product._id,
-            id:product.id,
-            name:product.name,
-            group:product.group,
-            brand:product.brand,
-            size:product.size,
-            flavour:product.flavour,
-            type:product.type,
-            weightGross:product.weightGross,
-            weightNet:product.weightNet,
-            statusSale:product.statusSale,
-            statusWithdraw:product.statusWithdraw,
-            statusRefund:product.statusRefund,
-            image:product.image,
-            // listUnit:,
-            listUnit: product.listUnit.map(listUnit =>({
-                unit: listUnit.unit,
-                name: listUnit.name,
-                factor: listUnit.price.factor,
-                price : listUnit.price.sale,
-                // available : listUnit.price
-            }))
-          })) 
+          console.log('productIDs',productIDs)
+
+          let dataProducts = [];
+          productIDs.forEach(product => {
+            const data = products.find(item => item.id === product.id);
+            if (data) {
+                // console.log("data", JSON.stringify(data, null, 2));
+
+              
+              // สร้าง object ใหม่จาก data ที่พบ
+              const dataProduct = {
+                _id: data._id,
+                id: data.id,
+                name: data.name,
+                group: data.group,
+                brand: data.brand,
+                size: data.size,
+                flavour: data.flavour,
+                type: data.type,
+                weightGross: data.weightGross,
+                weightNet: data.weightNet,
+                statusSale: data.statusSale,
+                statusWithdraw: data.statusWithdraw,
+                statusRefund: data.statusRefund,
+                image: data.image,
+                listUnit: data.listUnit.map(listUnit => ({
+                  unit: listUnit.unit,
+                  name: listUnit.name,
+                  factor: listUnit.price.factor,
+                  price: listUnit.price.sale,
+                //   available : listUnit.available.map(avail =>({
+                //     qtyPcs : avail.qtyPcs,
+                //     lot : avail.lot
+                // }))
+                }))
+              };
+          
+              // เพิ่มข้อมูลลงใน dataProducts
+              dataProducts.push(dataProduct);
+            }
+          });
+          
+        //   console.log(dataProducts);
+          
+
+    
+
+        //   const dataProducts = products.map(product => ({
+        //     _id:product._id,
+        //     id:product.id,
+        //     name:product.name,
+        //     group:product.group,
+        //     brand:product.brand,
+        //     size:product.size,
+        //     flavour:product.flavour,
+        //     type:product.type,
+        //     weightGross:product.weightGross,
+        //     weightNet:product.weightNet,
+        //     statusSale:product.statusSale,
+        //     statusWithdraw:product.statusWithdraw,
+        //     statusRefund:product.statusRefund,
+        //     image:product.image,
+        //     // listUnit:,
+        //     listUnit: product.listUnit.map(listUnit =>({
+        //         unit: listUnit.unit,
+        //         name: listUnit.name,
+        //         factor: listUnit.price.factor,
+        //         price : listUnit.price.sale,
+        //         // available : listUnit.price
+        //         // available : listUnit.available.map(avail =>({
+        //         //     qtyPcs : avail.qtyPcs,
+        //         //     lot : avail.lot
+        //         // }))
+        //     }))
+        //   })) 
 
 
 
@@ -205,7 +267,7 @@ exports.getProductAndStock = async (req, res) => {
         res.status(200).json({
             status: "200",
             message: "Products fetched successfully!",
-            data : stocks
+            data : dataProducts
         })
  
 
@@ -216,4 +278,10 @@ exports.getProductAndStock = async (req, res) => {
     // res.status(200).json({
     //     data:"getProductAndStock"
     // })
+}
+
+exports.addStock_new = async (req, res) => {
+    res.status.json({
+        message: "Add Stock New"
+    })
 }

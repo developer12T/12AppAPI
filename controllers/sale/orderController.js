@@ -148,7 +148,7 @@ exports.checkout = async (req, res) => {
       createdBy: sale.username
     })
 
-    // await newOrder.save()
+    await newOrder.save()
     // await Cart.deleteOne({ type, area, storeId })
 
     const checkIn = await checkInRoute({
@@ -261,7 +261,7 @@ exports.checkout = async (req, res) => {
         createdBy: sale.username
       })
   
-      // await newOrder.save()
+      await newOrder.save()
       // await Cart.deleteOne({ type, area, storeId })
   
       const checkIn = await checkInRoute({
