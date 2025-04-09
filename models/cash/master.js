@@ -1,4 +1,4 @@
-const { sequelize, DataTypes } = require('../config/m3db')
+const { sequelize, DataTypes } = require('../../config/m3db')
 
 
 const Locate = sequelize.define(

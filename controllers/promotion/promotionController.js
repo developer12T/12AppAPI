@@ -114,9 +114,11 @@ exports.getPromotionProduct = async (req, res) => {
 
       groupedProducts[key].product.push({
         id: product.id,
-        // group: product.group,
-        // flavour : product.flavour,
-        // unit: product.unit,
+        group: product.group,
+        flavour : product.flavour,
+        brand : product.brand, 
+        size : product.size,
+        unit: product.unit,
         name: product.name
       })
     })

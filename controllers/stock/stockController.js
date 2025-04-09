@@ -1,8 +1,70 @@
 const { Stock } = require('../../models/cash/stock')
 const { User } = require('../../models/cash/user')
 const { Product } = require('../../models/cash/product')
+const path = require('path')
+const errorEndpoint = require('../../middleware/errorEndpoint')
+const currentFilePath = path.basename(__filename)
 const { getStockAvailable } = require('./available')
 const { getStockMovement } = require('../../utilities/movement')
+const { Warehouse,Locate,Balance } = require('../../models/cash/master')
+const { Op } = require("sequelize");
+// const { fetchArea } = require('./fetchArea')
+
+const fetchArea = async () => {
+    try {
+      // const { warehouseCode } = req.body
+      const WarehouseData = await Warehouse.findAll({
+        where: {
+          coNo: 410,
+        //   warehouse: "211"
+        }
+      })
+
+      warehouses = []
+
+      WarehouseData.forEach((warehouseInstance) => {
+        // เข้าถึง dataValues ของแต่ละอินสแตนซ์
+        const warehouse = warehouseInstance.dataValues;
+        
+        // พิมพ์ข้อมูลจาก dataValues
+        warehouses.push(warehouse);
+
+      });
+
+// แปลงข้อมูล warehouse ให้เป็น areaData
+    const areaData = warehouses.map((warehouse) => {
+    // ใช้ RegEx เพื่อตรวจจับแค่ 2 ตัวแรก A-Z และ 3 ตัวหลัง 0-9
+    const area = String(warehouse.warehouseName).replace(/[^A-Z0-9]/g, '').slice(0, 5); // ลบทุกตัวที่ไม่ใช่ A-Z และ 0-9
+  
+    // ตรวจสอบว่าได้รูปแบบที่ถูกต้อง A-Z 2 ตัวแรก + 0-9 3 ตัวหลัง
+    const validArea = /^([A-Z]{2})(\d{3})$/.test(area) ? area : null;
+  
+    return {
+      coNo: warehouse.coNo,
+      warehouse:  warehouse.warehouse,
+      warehouseName: warehouse.warehouseName,
+      area: validArea, // หาก valid จะเป็นค่าที่ได้ หากไม่ตรงเงื่อนไขจะเป็น null
+    };
+  });
+  
+  // กรองข้อมูลที่ area ไม่เป็น null (หมายความว่าตรงตามเงื่อนไข)
+    const filteredAreaData = areaData.filter((item) => item.area !== null);
+
+
+      return filteredAreaData
+    } catch (error) {
+      // Enhanced error handling
+      throw errorEndpoint(currentFilePath, 'fetchArea', error)
+    }
+  }
+
+
+
+
+
+
+
+
 
 exports.addStock = async (req, res) => {
     try {
@@ -280,8 +342,197 @@ exports.getProductAndStock = async (req, res) => {
     // })
 }
 
-exports.addStock_new = async (req, res) => {
-    res.status.json({
-        message: "Add Stock New"
-    })
+exports.addStockNew = async (req, res) => {
+
+   const {area,saleCode,period} = req.body
+   const locateData = {};
+//    console.log(area,saleCode,period)
+
+   const areaData = await fetchArea()
+
+    // const user = await User.find().select('area saleCode').lean();
+
+    const BalanceData = await Balance.findAll({
+        where: {
+          coNo: 410,
+          warehouse:'211',
+          itemCode: { 
+            [Op.and]: [
+              { [Op.ne]: null },
+              { [Op.ne]: "" },
+              // { [Op.eq]: "600102390" },
+              { [Op.notLike]: "ZNS%" },
+              { [Op.notLike]: "800%" },
+              { [Op.notLike]: "PRO%" },
+              { [Op.notLike]: "DIS%" },
+              { [Op.notLike]: "100            " },
+            ],
+          },
+        },
+        // limit: 100000  // กำหนดให้ดึงข้อมูลแค่ 100 แถว
+      });
+
+      for (let i = 0; i < BalanceData.length; i++) {
+        locateData[BalanceData[i].itemCode.trim()] = [];
+        const locate = await Locate.findAll({
+          where: {
+            warehouse: 211,
+            itemCode: BalanceData[i].itemCode.trim(),
+
+            coNo: 410,
+          },
+        });
+        // console.log("locate",locate)
+        if (locate.length > 0) {
+          const location = locate[0].location.trim();
+          locateData[BalanceData[i].itemCode.trim()].push({
+            location: location,
+            lot: locate[0].lot,
+            itemOnHand: locate[0].itemOnHand,
+            itemallocated: locate[0].itemallocated, // Assuming promotionName is a property of PromotionData
+          });
+        }
+      }
+      
+    //   console.log("locateData", JSON.stringify(locateData, null, 2));
+
+
+      const stocks = BalanceData.map((stock) => {
+        // const qtyPcs = locateData[itemOnHand]
+        // const locate = locateData[stock.itemCode] || [];
+        const itemCode = stock.itemCode.trim();
+
+        const locateData = locateData.map((locate) => {
+            return {
+                lot: locate.lot, // หรือค่าที่คุณต้องการจาก locate
+                itemOnHand: locate.itemOnHand,
+                itemallocated : locateitemallocated
+
+            };
+        });
+
+
+
+            
+            return {
+                coNo: stock.coNo,
+                warehouse: stock.warehouse,
+                itemCode: itemCode,
+              //   itemPcs: stock.itemPcs,
+              //   itemPcs: qtyPcs,
+                allocateMethod: stock.allocateMethod,
+                itemallocated: stock.itemallocated,
+                itemAllowcatable: stock.itemAllowcatable,
+              //   lot: locate,
+                // available:locateData
+              }; 
+
+
+
+
+
+
+      });
+
+      console.log("stocks", JSON.stringify(stocks, null, 2));
+final = []
+
+// console.log("stocks",stocks)
+// console.log("stocks", JSON.stringify(stocks, null, 2));
+
+// stocks
+
+const productIds = stocks.map(item => item.itemCode);
+
+
+
+
+
+const productDetail = await Product.find({
+    id:{ $in: productIds }
+})
+
+
+// console.log("productDetail",productDetail)
+
+
+if (areaData) {
+
+    
+    areaData.forEach((area)  =>  { 
+        // ค้นหาสินค้าในสต็อกตามคลังสินค้า
+        const productID = stocks.filter(item => item.warehouse === area.warehouse);
+        
+        // console.log(productID);
+        listProduct = [];
+
+        // ถ้า productID ไม่ว่าง และมีสินค้าในสต็อก
+        if (productID.length > 0) {
+            // ใช้ map เพื่อดึง itemCode จากแต่ละสินค้าที่ตรงกัน
+            listProduct = productID.map(product => {
+
+                return {
+                    productId : product.itemCode,
+                    qtyPcs : "qtyPcs",
+                    qtyCtn: "qtyCtn"
+                }
+            })
+        }
+
+
+        
+
+        // console.log(productIds)
+
+
+        final.push({
+            area:area.area,
+            saleCode:"saleCode",
+            period:period,
+            warehouse:area.warehouse,
+            listProduct: listProduct
+        })   
+    });
+
+     
+
 }
+
+// console.log(productIDs);
+
+
+// console.log(stocks)
+
+
+
+// const mergedData = stocks.map((stock) => {
+//     const area = areaData.find(item => item.coNo === stock.coNo);
+  
+//     // สร้าง itemCode เป็นอาเรย์เพื่อเก็บ itemCode
+//     let itemCodes = [];
+//     if (area) {
+//         itemCodes.push(stock.itemCode);  // ถ้าตรงกันก็เก็บ itemCode ลงในอาเรย์
+//     }
+
+//     return {
+//         area: area ? area.area : null,  // ถ้าเจอ area ก็ให้ใช้ area, ถ้าไม่เจอก็ให้เป็น null
+//         itemCode: itemCodes,  // เก็บ itemCode ในอาเรย์
+//         ...stock  // รวมข้อมูล stock ทั้งหมด
+//     };
+// });
+
+
+
+
+
+
+
+        // console.log("sdagds",areaData)
+
+
+        res.status(200).json({
+            data: final,
+            // data2: stocksWarehouse,  // ข้อมูล areaData
+            ttest: "productIDs" // ค่าของ ttest
+          });
+} 
