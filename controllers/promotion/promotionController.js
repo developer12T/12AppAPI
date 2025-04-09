@@ -119,6 +119,7 @@ exports.getPromotionProduct = async (req, res) => {
         brand : product.brand, 
         size : product.size,
         unit: product.unit,
+        qty: 1,
         name: product.name
       })
     })
