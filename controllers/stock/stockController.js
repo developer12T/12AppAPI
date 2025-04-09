@@ -162,13 +162,14 @@ exports.transaction = async (req, res) => {
 exports.getProductAndStock = async (req, res) => {
     try {
         const {  area, period, type, group, brand, size, flavour } = req.body
+        console.log(area,period)
         const stock = await Stock.find(
             {
             area:area,
             period:period ,
         }
     )  
-        // console.log("stock", JSON.stringify(stock, null, 2));
+        console.log("stock", JSON.stringify(stock, null, 2));
         let productIDs = []
         stock.forEach(stockItem  => {
 
@@ -187,16 +188,6 @@ exports.getProductAndStock = async (req, res) => {
                 )
             })
         })
-        // console.log("productIDs",productIDs)
-
-        // const stocks  = stock.map(stockItem =>{
-        //     stockItem.listProduct.map(product => {
-        //         // console.log(product)
-        //         product.available.map(available => {
-        //             console.log(available.qtyPcs)
-        //         })
-        //     })
-        // })
 
         
 
@@ -329,7 +320,7 @@ exports.getProductAndStock = async (req, res) => {
         res.status(200).json({
             status: "200",
             message: "Products fetched successfully!",
-            data : dataProducts
+            data : stock
         })
  
 
@@ -346,162 +337,154 @@ exports.addStockNew = async (req, res) => {
 
    const {area,saleCode,period} = req.body
    const locateData = {};
+   const factorData = {};
 //    console.log(area,saleCode,period)
 
    const areaData = await fetchArea()
-
-    // const user = await User.find().select('area saleCode').lean();
-
-    const BalanceData = await Balance.findAll({
-        where: {
-          coNo: 410,
-          warehouse:'211',
-          itemCode: { 
-            [Op.and]: [
-              { [Op.ne]: null },
-              { [Op.ne]: "" },
-              // { [Op.eq]: "600102390" },
-              { [Op.notLike]: "ZNS%" },
-              { [Op.notLike]: "800%" },
-              { [Op.notLike]: "PRO%" },
-              { [Op.notLike]: "DIS%" },
-              { [Op.notLike]: "100            " },
-            ],
-          },
-        },
-        // limit: 100000  // กำหนดให้ดึงข้อมูลแค่ 100 แถว
-      });
-
-      for (let i = 0; i < BalanceData.length; i++) {
-        locateData[BalanceData[i].itemCode.trim()] = [];
-        const locate = await Locate.findAll({
-          where: {
-            warehouse: 211,
-            itemCode: BalanceData[i].itemCode.trim(),
-
-            coNo: 410,
-          },
-        });
-        // console.log("locate",locate)
-        if (locate.length > 0) {
-          const location = locate[0].location.trim();
-          locateData[BalanceData[i].itemCode.trim()].push({
-            location: location,
-            lot: locate[0].lot,
-            itemOnHand: locate[0].itemOnHand,
-            itemallocated: locate[0].itemallocated, // Assuming promotionName is a property of PromotionData
-          });
-        }
+   warehouse = '211'
+   const BalanceData = await Balance.findAll({
+    where: {
+      warehouse: warehouse,
+      coNo: 410,
+      // itemCode: '10010601011'
+      itemCode: {
+        [Op.or]: [
+          { [Op.ne]: null },
+          { [Op.ne]: '' },
+          // { [Op.eq]: "600102390" },
+          { [Op.notLike]: 'ZNS%' },
+          { [Op.notLike]: '800%' },
+          { [Op.notLike]: 'PRO%' },
+          { [Op.notLike]: 'DIS%' },
+          { [Op.notLike]: '100            ' }
+        ]
       }
-      
-    //   console.log("locateData", JSON.stringify(locateData, null, 2));
+    }
+  })
 
+  for (let i = 0; i < BalanceData.length; i++) {
+    locateData[BalanceData[i].itemCode.trim()] = []
+    factorData[BalanceData[i].itemCode.trim()] = []
+    // console.log(`BalanceData[${i}].itemCode`, BalanceData[i].itemCode)
+    // console.log('locateData[BalanceData[i].itemCode.trim()]', locateData)
+    const locate = await Locate.findAll({
+      where: {
+        warehouse: warehouse,
+        itemCode: BalanceData[i].itemCode.trim(),
+        coNo: 410
+      }
+    })
 
-      const stocks = BalanceData.map((stock) => {
-        // const qtyPcs = locateData[itemOnHand]
-        // const locate = locateData[stock.itemCode] || [];
-        const itemCode = stock.itemCode.trim();
+    const factor = await Product.find({
+      id:BalanceData[i].itemCode.trim()
+    }).select('id listUnit.unit listUnit.factor')
 
-        const locateData = locateData.map((locate) => {
-            return {
-                lot: locate.lot, // หรือค่าที่คุณต้องการจาก locate
-                itemOnHand: locate.itemOnHand,
-                itemallocated : locateitemallocated
-
-            };
-        });
-
-
-
-            
-            return {
-                coNo: stock.coNo,
-                warehouse: stock.warehouse,
-                itemCode: itemCode,
-              //   itemPcs: stock.itemPcs,
-              //   itemPcs: qtyPcs,
-                allocateMethod: stock.allocateMethod,
-                itemallocated: stock.itemallocated,
-                itemAllowcatable: stock.itemAllowcatable,
-              //   lot: locate,
-                // available:locateData
-              }; 
+    const factorValue = factor.listUnit.find(unit => unit.unit === 'CTN').factor;
 
 
 
 
 
+    // console.log('factor', factor)
 
-      });
+    for (let j = 0; j < locate.length; j++) {
 
-      console.log("stocks", JSON.stringify(stocks, null, 2));
-final = []
+      locateData[BalanceData[i].itemCode.trim()].push({
+        location: locate[j].location.trim(),
+        lot: locate[j].lot,
+        itemOnHand: locate[j].itemOnHand,
+        itemallocated: locate[j].itemallocated, // Assuming promotionName is a property of PromotionData
+        factor: factorValue 
+      })
+    }
+    console.log('test',locateData)
+  }
+
+  const stocks = BalanceData.map(stock => {
+    const locate = locateData[stock.itemCode.trim()] || []
+    const itemCode = stock.itemCode.trim()
+
+    return {
+      coNo: stock.coNo,
+      warehouse: stock.warehouse,
+      itemCode: itemCode,
+      itemPcs: stock.itemPcs,
+      allocateMethod: stock.allocateMethod,
+      itemallocated: stock.itemallocated,
+      itemAllowcatable: stock.itemAllowcatable,
+      lot: locate
+    }
+  })
+
+
+const productIds = stocks.map(item => item.itemCode)
+data = []
 
 // console.log("stocks",stocks)
 // console.log("stocks", JSON.stringify(stocks, null, 2));
 
 // stocks
 
-const productIds = stocks.map(item => item.itemCode);
-
-
 
 
 
 const productDetail = await Product.find({
-    id:{ $in: productIds }
-})
+    id:{ $in: productIds },
+    // listUnit: { $elemMatch: { unit: "CTN" } }
 
 
-// console.log("productDetail",productDetail)
+}).select('id listUnit.unit listUnit.factor')
+
+const productFactors = productDetail.map(product => {
+    const ctnUnit = product.listUnit.find(unit => unit.unit === "CTN");
+    return {
+      id: product.id,
+      factor: ctnUnit ? ctnUnit.factor : null // หรือ default ค่าอื่นเช่น 1
+    };
+  });
 
 
 if (areaData) {
+  areaData.forEach((area) => {
+      // ค้นหาสินค้าในสต็อกตามคลังสินค้า
+      const productID = stocks.filter(item => item.warehouse === area.warehouse);
 
-    
-    areaData.forEach((area)  =>  { 
-        // ค้นหาสินค้าในสต็อกตามคลังสินค้า
-        const productID = stocks.filter(item => item.warehouse === area.warehouse);
-        
-        // console.log(productID);
-        listProduct = [];
+      let listProduct = [];
 
-        // ถ้า productID ไม่ว่าง และมีสินค้าในสต็อก
-        if (productID.length > 0) {
-            // ใช้ map เพื่อดึง itemCode จากแต่ละสินค้าที่ตรงกัน
-            listProduct = productID.map(product => {
+      // ถ้า productID ไม่ว่าง และมีสินค้าในสต็อก
+      if (productID.length > 0) {
+          // ใช้ map เพื่อดึง itemCode จากแต่ละสินค้าที่ตรงกัน
+          listProduct = productID.map(product => {
+              const lot = product.lot;
+              const productId = product.itemCode;
+              // const factor = factorMap[productId];
 
-                return {
-                    productId : product.itemCode,
-                    qtyPcs : "qtyPcs",
-                    qtyCtn: "qtyCtn"
-                }
-            })
-        }
+              let ctn = 0;
 
 
-        
+              return {
+                  productId: productId,
+                  qtyPcs: "qtyPcs",
+                  qtyCtn: "qtyCtn",
+                  available: lot       
+                  
+              };
+          });
+      }
 
-        // console.log(productIds)
-
-
-        final.push({
-            area:area.area,
-            saleCode:"saleCode",
-            period:period,
-            warehouse:area.warehouse,
-            listProduct: listProduct
-        })   
-    });
-
-     
-
+      data.push({
+          area: area.area,
+          saleCode: "saleCode",
+          period: period,
+          warehouse: area.warehouse,
+          listProduct: listProduct
+      });
+  });
 }
 
-// console.log(productIDs);
 
 
-// console.log(stocks)
+
 
 
 
@@ -531,7 +514,7 @@ if (areaData) {
 
 
         res.status(200).json({
-            data: final,
+            data: data,
             // data2: stocksWarehouse,  // ข้อมูล areaData
             ttest: "productIDs" // ค่าของ ttest
           });
