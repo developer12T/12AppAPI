@@ -57,7 +57,7 @@ async function summaryOrder(cart) {
       const productInfo = productDetails.find(p => p.id === cartItem.id) || {};
       const unitData = productInfo.listUnit?.find(u => u.unit === cartItem.unit) || {};
       const factor = parseInt(unitData?.factor, 10) || 1;
-      console.log("factor",factor);
+      // console.log("factor",factor);
       const qtyPcs = cartItem.qty * factor;
       const totalPrice = cartItem.qty * cartItem.price;
 

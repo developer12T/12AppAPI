@@ -1,12 +1,13 @@
 const crypto = require('crypto')
 const { Cart } = require('../../models/cash/cart')
 const { Product } = require('../../models/cash/product')
+const { Stock } = require('../../models/cash/stock')
 const { applyPromotion } = require('../promotion/calculate')
 const { summaryOrder, summaryWithdraw, summaryRefund, summaryGive } = require('../../utilities/summary')
 
 exports.getCart = async (req, res) => {
     try {
-        console.log("req.query",req.query)
+        // console.log("req.query",req.query)
         const { type, area, storeId } = req.query
 
         if (!type || !area) {
@@ -176,7 +177,7 @@ exports.addProduct = async (req, res) => {
             cart.total = cart.listProduct.reduce((sum, p) => sum + (p.qty * p.price), 0)
         }
         cart.createdAt = new Date()
-        await cart.save()
+        // await cart.save()
 
         res.status(200).json({
             status: 200,
@@ -411,4 +412,82 @@ exports.updateCartPromotion = async (req, res) => {
         console.error(error)
         res.status(500).json({ status: '500', message: error.message })
     }
+}
+
+
+
+exports.getQty = async (req,res,next) => {
+    try{
+     const { ProductId, Unit } = req.body
+
+
+    // console.log(ProductId,Unit)
+
+    const productStock = await Stock.find({
+      });
+    const products = await Product.find({
+    });
+    
+    let unitData = {}
+
+    const productUnitMatch = products?.find(p => p.id === ProductId) ;
+    if (productUnitMatch) {
+
+        unitData  = productUnitMatch.listUnit.map(Unit => ({
+            Unit:Unit.unit,
+            factor:Unit.factor
+        }))
+
+    }
+    else{
+        res.status(404).json({
+            message:"Not Found This ItemId"
+        })
+    }
+
+    const stockmatchList = []
+    
+
+    productStock.map(item => {
+
+     const stockmatch = item.listProduct.find(p => p.productId === ProductId);
+
+
+
+        if (stockmatch) {
+            stockmatchList.push(stockmatch)
+        }
+    });
+
+
+    const aggreFactor = stockmatchList.map(product => (
+        product.available.map(lot => ({
+            lot:lot.lot,
+            qtyPcs:lot.qtyPcs
+        }))
+    ))
+    const productUnit = unitData.find(p => p.Unit === Unit)
+
+
+    const data = {
+        productId:ProductId,
+        Unit:Unit,
+        // factor:productUnit.factor,
+        // sumQtyPcs:aggreFactor,
+        // qty:Math.floor(aggreFactor / productUnit.factor),
+        // productUnit:productUnit
+
+
+    }
+
+
+
+    res.status(200).json({
+        message:aggreFactor,
+        // test:aggreFactor
+    })
+} catch (error) {
+    console.error('Error transforming cart data:', error.message)
+    return { status: 500, message: 'Server error' }
+}
 }

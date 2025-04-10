@@ -16,7 +16,7 @@ const fetchArea = async () => {
       const WarehouseData = await Warehouse.findAll({
         where: {
           coNo: 410,
-        //   warehouse: "211"
+          warehouse: "225"
         }
       })
 
@@ -159,189 +159,15 @@ exports.transaction = async (req, res) => {
     }
 }
 
-exports.getProductAndStock = async (req, res) => {
-    try {
-        const {  area, period, type, group, brand, size, flavour } = req.body
-        console.log(area,period)
-        const stock = await Stock.find(
-            {
-            area:area,
-            period:period ,
-        }
-    )  
-        console.log("stock", JSON.stringify(stock, null, 2));
-        let productIDs = []
-        stock.forEach(stockItem  => {
-
-            
-            stockItem.listProduct.forEach(product => {
-                
-                product.available.forEach(availableItem => {
-                    productIDs.push({
-                        id: product.productId,
-                        lot: availableItem.lot,
-                        qtyPcs: availableItem.qtyPcs,
-                        qtyCtn: availableItem.qtyCtn
-                    });
-                }
-                    
-                )
-            })
-        })
-
-        
-
-
-        if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
-            return res.status(400).json({
-                status: '400',
-                message: 'Invalid type! Required: sale, refund, or withdraw.'
-            })
-        }
-        let filter = {}
-
-        if (type === 'sale') filter.statusSale = 'Y'
-        if (type === 'refund') filter.statusRefund = 'Y'
-        if (type === 'withdraw') filter.statusWithdraw = 'Y'
-
-        const parseArrayParam = (param) => {
-            if (!param) return []
-            try {
-                return typeof param === 'string' ? JSON.parse(param) : param
-            } catch (error) {
-                return param.split(',')
-            }
-        }
-
-        const groupArray = parseArrayParam(group)
-        const brandArray = parseArrayParam(brand)
-        const sizeArray = parseArrayParam(size)
-        const flavourArray = parseArrayParam(flavour)
-
-        let conditions = []
-        if (groupArray.length) conditions.push({ group: { $in: groupArray } })
-        if (brandArray.length) conditions.push({ brand: { $in: brandArray } })
-        if (sizeArray.length) conditions.push({ size: { $in: sizeArray } })
-        if (flavourArray.length) conditions.push({ flavour: { $in: flavourArray } })
-
-        if (conditions.length) filter.$and = conditions
-
-        let products = await Product.find({
-            ...filter,  // ขยายเงื่อนไขใน filter ที่มีอยู่
-            id: { $in: productIDs.map(item => item.id) }  // เพิ่มเงื่อนไขค้นหาว่า id อยู่ใน productIDs
-          }).lean();
-
-          products.forEach(item => {
-            item.listUnit.forEach(unit => {
-              unit.price.refund = unit.price.sale;
-            });
-          });
-
-          console.log('productIDs',productIDs)
-
-          let dataProducts = [];
-          productIDs.forEach(product => {
-            const data = products.find(item => item.id === product.id);
-            if (data) {
-                // console.log("data", JSON.stringify(data, null, 2));
-
-              
-              // สร้าง object ใหม่จาก data ที่พบ
-              const dataProduct = {
-                _id: data._id,
-                id: data.id,
-                name: data.name,
-                group: data.group,
-                brand: data.brand,
-                size: data.size,
-                flavour: data.flavour,
-                type: data.type,
-                weightGross: data.weightGross,
-                weightNet: data.weightNet,
-                statusSale: data.statusSale,
-                statusWithdraw: data.statusWithdraw,
-                statusRefund: data.statusRefund,
-                image: data.image,
-                listUnit: data.listUnit.map(listUnit => ({
-                  unit: listUnit.unit,
-                  name: listUnit.name,
-                  factor: listUnit.price.factor,
-                  price: listUnit.price.sale,
-                //   available : listUnit.available.map(avail =>({
-                //     qtyPcs : avail.qtyPcs,
-                //     lot : avail.lot
-                // }))
-                }))
-              };
-          
-              // เพิ่มข้อมูลลงใน dataProducts
-              dataProducts.push(dataProduct);
-            }
-          });
-          
-        //   console.log(dataProducts);
-          
-
-    
-
-        //   const dataProducts = products.map(product => ({
-        //     _id:product._id,
-        //     id:product.id,
-        //     name:product.name,
-        //     group:product.group,
-        //     brand:product.brand,
-        //     size:product.size,
-        //     flavour:product.flavour,
-        //     type:product.type,
-        //     weightGross:product.weightGross,
-        //     weightNet:product.weightNet,
-        //     statusSale:product.statusSale,
-        //     statusWithdraw:product.statusWithdraw,
-        //     statusRefund:product.statusRefund,
-        //     image:product.image,
-        //     // listUnit:,
-        //     listUnit: product.listUnit.map(listUnit =>({
-        //         unit: listUnit.unit,
-        //         name: listUnit.name,
-        //         factor: listUnit.price.factor,
-        //         price : listUnit.price.sale,
-        //         // available : listUnit.price
-        //         // available : listUnit.available.map(avail =>({
-        //         //     qtyPcs : avail.qtyPcs,
-        //         //     lot : avail.lot
-        //         // }))
-        //     }))
-        //   })) 
-
-
-
- 
-
-        res.status(200).json({
-            status: "200",
-            message: "Products fetched successfully!",
-            data : stock
-        })
- 
-
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ status: '501', message: error.message })
-    }
-    // res.status(200).json({
-    //     data:"getProductAndStock"
-    // })
-}
-
 exports.addStockNew = async (req, res) => {
 
-   const {area,saleCode,period} = req.body
+   const {period} = req.body
    const locateData = {};
    const factorData = {};
 //    console.log(area,saleCode,period)
 
    const areaData = await fetchArea()
-   warehouse = '211'
+   warehouse = '225'
    const BalanceData = await Balance.findAll({
     where: {
       warehouse: warehouse,
@@ -375,18 +201,6 @@ exports.addStockNew = async (req, res) => {
       }
     })
 
-    const factor = await Product.find({
-      id:BalanceData[i].itemCode.trim()
-    }).select('id listUnit.unit listUnit.factor')
-
-    const factorValue = factor.listUnit.find(unit => unit.unit === 'CTN').factor;
-
-
-
-
-
-    // console.log('factor', factor)
-
     for (let j = 0; j < locate.length; j++) {
 
       locateData[BalanceData[i].itemCode.trim()].push({
@@ -394,10 +208,8 @@ exports.addStockNew = async (req, res) => {
         lot: locate[j].lot,
         itemOnHand: locate[j].itemOnHand,
         itemallocated: locate[j].itemallocated, // Assuming promotionName is a property of PromotionData
-        factor: factorValue 
       })
     }
-    console.log('test',locateData)
   }
 
   const stocks = BalanceData.map(stock => {
@@ -418,55 +230,71 @@ exports.addStockNew = async (req, res) => {
 
 
 const productIds = stocks.map(item => item.itemCode)
-data = []
-
-// console.log("stocks",stocks)
-// console.log("stocks", JSON.stringify(stocks, null, 2));
-
-// stocks
-
-
-
-
 const productDetail = await Product.find({
-    id:{ $in: productIds },
-    // listUnit: { $elemMatch: { unit: "CTN" } }
-
-
+  id:{ $in: productIds },
 }).select('id listUnit.unit listUnit.factor')
+
+
+const areaIds = areaData.map(area => area.area)
+const  userDetail = await User.find({
+  area:{ $in: areaIds },
+}).select('area saleCode')
+
+
+
+
+
 
 const productFactors = productDetail.map(product => {
     const ctnUnit = product.listUnit.find(unit => unit.unit === "CTN");
     return {
       id: product.id,
-      factor: ctnUnit ? ctnUnit.factor : null // หรือ default ค่าอื่นเช่น 1
+      factor: ctnUnit ? parseInt(ctnUnit.factor) : 0 // หรือ default ค่าอื่นเช่น 1
     };
   });
 
 
+  // console.log("productFactors",productFactors)
+data = []
 if (areaData) {
   areaData.forEach((area) => {
       // ค้นหาสินค้าในสต็อกตามคลังสินค้า
-      const productID = stocks.filter(item => item.warehouse === area.warehouse);
+      const productID = stocks.filter(item => item.warehouse === area.warehouse && 
+        Array.isArray(item.lot) && item.lot.length > 0);
+      const SaleCode = userDetail.find(sale => sale.area === area.area) || {}
+
 
       let listProduct = [];
 
-      // ถ้า productID ไม่ว่าง และมีสินค้าในสต็อก
-      if (productID.length > 0) {
-          // ใช้ map เพื่อดึง itemCode จากแต่ละสินค้าที่ตรงกัน
-          listProduct = productID.map(product => {
-              const lot = product.lot;
-              const productId = product.itemCode;
-              // const factor = factorMap[productId];
 
-              let ctn = 0;
+      if (productID.length > 0) {
+ 
+          listProduct = productID.map(product => {
+            const productId = product.itemCode;
+            const Factor = productFactors.find(pf => pf.id === productId) || {} ;
+            const sumQtyPcs = product.lot.reduce((sum, obj) => sum + (obj.itemOnHand || 0), 0); // ตรงนี้คุณเขียน obj.lot.itemOnHand แต่จริงๆ obj คือ lot แล้ว
+            const sumQtyCtn = product.lot.reduce((sum, obj) => sum + (Factor?.factor && Factor.factor > 0
+              ? Math.floor(obj.itemOnHand / Factor.factor) // ใช้ obj แทน lot
+              : 0), 0);
+
+            lotList =  product.lot
+            .map(lot=> ({
+              location:lot.location,
+              lot:lot.lot,
+              qtyPcs:lot.itemOnHand ,
+              qtyCtn:
+                Factor?.factor && Factor.factor > 0
+                  ? Math.floor(lot.itemOnHand / Factor.factor)
+                  : 0
+            })) 
+
 
 
               return {
                   productId: productId,
-                  qtyPcs: "qtyPcs",
-                  qtyCtn: "qtyCtn",
-                  available: lot       
+                  sumQtyPcs: sumQtyPcs,
+                  sumQtyCtn: sumQtyCtn,
+                  available: lotList       
                   
               };
           });
@@ -474,7 +302,7 @@ if (areaData) {
 
       data.push({
           area: area.area,
-          saleCode: "saleCode",
+          saleCode: SaleCode?.saleCode || 'Null',
           period: period,
           warehouse: area.warehouse,
           listProduct: listProduct
@@ -482,40 +310,152 @@ if (areaData) {
   });
 }
 
+await Stock.insertMany(data);
 
 
-
-
-
-
-// const mergedData = stocks.map((stock) => {
-//     const area = areaData.find(item => item.coNo === stock.coNo);
-  
-//     // สร้าง itemCode เป็นอาเรย์เพื่อเก็บ itemCode
-//     let itemCodes = [];
-//     if (area) {
-//         itemCodes.push(stock.itemCode);  // ถ้าตรงกันก็เก็บ itemCode ลงในอาเรย์
-//     }
-
-//     return {
-//         area: area ? area.area : null,  // ถ้าเจอ area ก็ให้ใช้ area, ถ้าไม่เจอก็ให้เป็น null
-//         itemCode: itemCodes,  // เก็บ itemCode ในอาเรย์
-//         ...stock  // รวมข้อมูล stock ทั้งหมด
-//     };
-// });
-
-
-
-
-
-
-
-        // console.log("sdagds",areaData)
 
 
         res.status(200).json({
             data: data,
-            // data2: stocksWarehouse,  // ข้อมูล areaData
-            ttest: "productIDs" // ค่าของ ttest
-          });
+            message:'Successfull Insert'});
 } 
+
+
+
+// exports.getProductAndStock = async (req, res) => {
+//   try {
+//       const {  area, period, type, group, brand, size, flavour } = req.body
+//       // console.log(area,period)
+//       const stock = await Stock.find(
+//           {
+//           area:area,
+//           period:period ,
+//       }
+//   )  
+//       // console.log("stock", JSON.stringify(stock, null, 2));
+//       let stockDatas = []
+//       stock.forEach(stockItem  => {
+
+          
+//           stockItem.listProduct.forEach(product => {
+              
+//               product.available.forEach(availableItem => {
+//                 stockDatas.push({
+//                       id: product.productId,
+//                       lot: availableItem.lot,
+//                       qtyPcs: availableItem.qtyPcs,
+//                       qtyCtn: availableItem.qtyCtn
+//                   });
+//               }
+                  
+//               )
+//           })
+//       })
+
+      
+
+
+//       if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
+//           return res.status(400).json({
+//               status: '400',
+//               message: 'Invalid type! Required: sale, refund, or withdraw.'
+//           })
+//       }
+//       let filter = {}
+
+//       if (type === 'sale') filter.statusSale = 'Y'
+//       if (type === 'refund') filter.statusRefund = 'Y'
+//       if (type === 'withdraw') filter.statusWithdraw = 'Y'
+
+//       const parseArrayParam = (param) => {
+//           if (!param) return []
+//           try {
+//               return typeof param === 'string' ? JSON.parse(param) : param
+//           } catch (error) {
+//               return param.split(',')
+//           }
+//       }
+
+//       const groupArray = parseArrayParam(group)
+//       const brandArray = parseArrayParam(brand)
+//       const sizeArray = parseArrayParam(size)
+//       const flavourArray = parseArrayParam(flavour)
+
+//       let conditions = []
+//       if (groupArray.length) conditions.push({ group: { $in: groupArray } })
+//       if (brandArray.length) conditions.push({ brand: { $in: brandArray } })
+//       if (sizeArray.length) conditions.push({ size: { $in: sizeArray } })
+//       if (flavourArray.length) conditions.push({ flavour: { $in: flavourArray } })
+
+//       if (conditions.length) filter.$and = conditions
+
+//       let products = await Product.find({
+//           ...filter,  // ขยายเงื่อนไขใน filter ที่มีอยู่
+//           id: { $in: stockDatas.map(item => item.id) }  // เพิ่มเงื่อนไขค้นหาว่า id อยู่ใน productIDs
+//         }).lean();
+
+//         products.forEach(item => {
+//           item.listUnit.forEach(unit => {
+//             unit.price.refund = unit.price.sale;
+//           });
+//         });
+
+//         // console.log('productIDs',productIDs)
+
+//         let dataProducts = [];
+//         stockDatas.forEach(product => {
+//           const productDetail = products.find(item => item.id === product.id);
+//           const stockData = stockDatas.find(item => item.id == product.id)
+//           if (productDetail) {
+//               // console.log("data", JSON.stringify(data, null, 2));
+
+            
+//             // สร้าง object ใหม่จาก data ที่พบ
+//             const dataProduct = {
+//               _id: productDetail._id,
+//               id: productDetail.id,
+//               name: productDetail.name,
+//               group: productDetail.group,
+//               brand: productDetail.brand,
+//               size: productDetail.size,
+//               flavour: productDetail.flavour,
+//               type: productDetail.type,
+//               weightGross: productDetail.weightGross,
+//               weightNet: productDetail.weightNet,
+//               statusSale: productDetail.statusSale,
+//               statusWithdraw: productDetail.statusWithdraw,
+//               statusRefund: productDetail.statusRefund,
+//               image: productDetail.image,
+//               // listUnit: productDetail.listUnit.map(listUnit => ({
+//                 // unit: listUnit.unit,
+//                 // name: listUnit.name,
+//                 // factor: listUnit.price.factor,
+//                 // price: listUnit.price.sale,
+//               available : listUnit.available.map(avail =>({
+//                   qtyPcs : avail.qtyPcs,
+//                   lot : avail.lot
+//               }))
+//               // }))
+//             };
+        
+//             // เพิ่มข้อมูลลงใน dataProducts
+//             dataProducts.push(dataProduct);
+//           }
+//         });
+   
+
+//       res.status(200).json({
+//           status: "200",
+//           message: "Products fetched successfully!",
+//           data : dataProducts
+//       })
+
+
+//   } catch (error) {
+//       console.error(error);
+//       res.status(500).json({ status: '501', message: error.message })
+//   }
+//   // res.status(200).json({
+//   //     data:"getProductAndStock"
+//   // })
+// }
