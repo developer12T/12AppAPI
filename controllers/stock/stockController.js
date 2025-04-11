@@ -8,6 +8,8 @@ const { getStockAvailable } = require('./available')
 const { getStockMovement } = require('../../utilities/movement')
 const { Warehouse,Locate,Balance } = require('../../models/cash/master')
 const { Op } = require("sequelize");
+const XLSX = require('xlsx');
+
 // const { fetchArea } = require('./fetchArea')
 
 const fetchArea = async () => {
@@ -309,16 +311,51 @@ if (areaData) {
       });
   });
 }
-
 await Stock.insertMany(data);
-
-
-
 
         res.status(200).json({
             data: data,
             message:'Successfull Insert'});
 } 
+
+
+exports.stockToExcel = async (req,res) =>{
+
+    const { area, period, type } = req.body
+
+    const modelStock = await Stock.findOne({area:area})
+
+    const tableData = {
+      area:modelStock.area,
+      saleCode:modelStock.saleCode,
+      period:modelStock.period,
+      warehouse:modelStock.warehouse,
+      listProduct:modelStock.listProduct.map(product =>({
+        productId:product.productId
+      })
+
+      )
+    }
+
+    // สร้าง worksheet และ workbook
+    const worksheet = XLSX.utils.json_to_sheet(tableData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'StockList');
+
+    // เขียนไฟล์ .xlsx
+    XLSX.writeFile(workbook, 'stock_list.xlsx');
+
+    console.log('✅ สร้างไฟล์ stock_list.xlsx สำเร็จแล้ว!');
+
+
+    res.status(200).json({
+      main:stockData,
+      message:modelStock
+    })
+
+}
+
+
 
 
 
@@ -445,7 +482,7 @@ await Stock.insertMany(data);
    
 
 //       res.status(200).json({
-//           status: "200",
+//           status: 200,
 //           message: "Products fetched successfully!",
 //           data : dataProducts
 //       })

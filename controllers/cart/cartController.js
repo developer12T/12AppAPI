@@ -4,6 +4,8 @@ const { Product } = require('../../models/cash/product')
 const { Stock } = require('../../models/cash/stock')
 const { applyPromotion } = require('../promotion/calculate')
 const { summaryOrder, summaryWithdraw, summaryRefund, summaryGive } = require('../../utilities/summary')
+const { forEach } = require('lodash')
+const { error } = require('console')
 
 exports.getCart = async (req, res) => {
     try {
@@ -418,12 +420,10 @@ exports.updateCartPromotion = async (req, res) => {
 
 exports.getQty = async (req,res,next) => {
     try{
-     const { ProductId, Unit } = req.body
-
-
-    // console.log(ProductId,Unit)
+     const { area, ProductId, Unit } = req.body
 
     const productStock = await Stock.find({
+        area: area
       });
     const products = await Product.find({
     });
@@ -460,34 +460,252 @@ exports.getQty = async (req,res,next) => {
     });
 
 
-    const aggreFactor = stockmatchList.map(product => (
-        product.available.map(lot => ({
-            lot:lot.lot,
-            qtyPcs:lot.qtyPcs
-        }))
-    ))
+
+
+    const qtyList = stockmatchList.flatMap(product =>
+        product.available.map(lot => lot.qtyPcs)
+      );
+
+
+
+    const lotList = stockmatchList.flatMap(product =>
+        product.available.map(lot => lot.lot)
+    )
+      
+      
+    const totalQtyPcs = qtyList.reduce((sum, qty) => sum + qty, 0);
+
+
     const productUnit = unitData.find(p => p.Unit === Unit)
 
 
     const data = {
+        area:area,
         productId:ProductId,
+        sumQtyPcs:totalQtyPcs,
+        qty:Math.floor(totalQtyPcs / productUnit.factor),
         Unit:Unit,
-        // factor:productUnit.factor,
-        // sumQtyPcs:aggreFactor,
-        // qty:Math.floor(aggreFactor / productUnit.factor),
-        // productUnit:productUnit
 
+        lot:lotList
+        
 
     }
 
-
-
     res.status(200).json({
-        message:aggreFactor,
-        // test:aggreFactor
+        status: 200,
+        message: "Stock Quantity fetched successfully!",
+        data : data
     })
 } catch (error) {
     console.error('Error transforming cart data:', error.message)
     return { status: 500, message: 'Server error' }
 }
 }
+
+
+exports.updateStock = async (req,res) =>{
+    try{
+
+    const { area, ProductId  } = req.body
+
+    const modelStock = await Stock.findOne({
+                area: area
+              }).select("area listProduct");
+
+    if (!modelStock){
+        return res.status(404).json({
+            status:404,
+            errorMessage: 'Not Found This Area'
+        })
+    }
+
+    const stockData = modelStock.listProduct.find(product => product.productId === ProductId)
+
+    if (!stockData){
+        return res.status(404).json({
+            status:404,
+            errorMessage: 'Not Found This ProductId'
+        })
+    }
+
+    const modelProduct = await Product.findOne({
+        id:ProductId,
+    }).select("id listUnit")
+
+    const productCtn = modelProduct.listUnit.find(item => item.unit === 'CTN')
+    const productCtnFactor = productCtn? { factor:productCtn.factor } : null 
+
+    let qty = req.body.qty
+    const available = stockData.available.map(lot => {
+        const usedQty = Math.min(qty, lot.qtyPcs);
+        qty -= usedQty;
+      
+        return {
+          location: lot.location,
+          lot: lot.lot,
+          qtyPcs: lot.qtyPcs - usedQty,
+          qtyCtn: Math.floor((lot.qtyPcs - usedQty) / productCtnFactor.factor)
+        };
+      });
+      
+      const data = {
+        productId: stockData.productId,
+        sumQtyPcs: available.reduce((sum, item) => sum + item.qtyPcs, 0),
+        sumQtyCtn: available.reduce((sum, item) => sum + item.qtyCtn, 0),
+        available: available
+      };
+    
+      await Stock.findOneAndUpdate(
+        { area: area, 'listProduct.productId': data.productId }, // เงื่อนไขที่ใช้หา document
+        {
+          $set: {
+            'listProduct.$.sumQtyPcs': data.sumQtyPcs,
+            'listProduct.$.sumQtyCtn': data.sumQtyCtn,
+            'listProduct.$.available': data.available
+          }
+        },
+        { new: true } // ให้คืนค่าหลัง update แล้ว
+      );
+
+
+
+
+
+
+    res.status(200).json({
+        status:200,
+        // stockData,
+        data
+    })
+} catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+}
+}
+
+
+
+
+// exports.updateStock = async (req,res) =>{
+
+//     const { area, ProductId, Unit  } = req.body
+
+//     const productStock = await Stock.find({
+//         area: area
+//       });
+//     const products = await Product.find({
+//     });
+    
+//     let unitData = {}
+
+//     const productUnitMatch = products?.find(p => p.id === ProductId) ;
+//     if (productUnitMatch) {
+
+//         unitData = productUnitMatch.listUnit
+//         .filter(Unit => Unit.unit === 'CTN')
+//         .map(Unit => ({
+//           Unit: Unit.unit,
+//           factor: Unit.factor
+//         }));
+
+//     }
+//     else{
+//         res.status(404).json({
+//             message:"Not Found This ItemId"
+//         })
+//     }
+
+//     const stockmatchList = []
+    
+
+//     productStock.map(item => {
+
+//     const stockmatch = item.listProduct.find(p => p.productId === ProductId);
+
+//         if (stockmatch) {
+//             stockmatchList.push(stockmatch)
+//         }
+//     });
+    
+
+
+//     const lotAndqty = stockmatchList.flatMap(item => 
+//         item.available.map(avai  => ({
+//             lot:avai.lot,
+//             QtyPcs:avai.qtyPcs
+//         }))
+//     )
+
+
+
+//     let qty = parseInt(req.body.qty); // ตรวจสอบว่า qty เป็นตัวเลข
+
+//     const result = [];
+    
+//     for (const item of lotAndqty) {
+//       const usedQty = Math.min(qty, item.QtyPcs); // ใช้ได้ไม่เกินของใน lot
+//       qty -= usedQty; // หักออกจากยอดรวม
+    
+//       if (usedQty === 0) {
+//         break; // หยุดลูปทันทีเมื่อ usedQty = 0
+//       }
+    
+//       result.push({
+        
+//         lot: item.lot,
+//         // qtyInStock:item.QtyPcs,
+//         // usedQty: usedQty,
+//         qtyPcs: item.QtyPcs - usedQty ,
+//         qtyCtn:Math.floor((item.QtyPcs - usedQty) / unitData[0].factor  )
+
+
+//       });
+//     }
+
+
+//     const data = {
+//         // stockmatchList:stockmatchList,
+//         area:area,
+//         productId: stockmatchList[0].productId,
+//         sumQtyPcs:stockmatchList[0].sumQtyPcs,
+//         available: result
+//     };
+
+
+
+//     // console.log(stockmatchList[0])
+//     // console.log(JSON.stringify(stockmatchList[0], null, 2));
+
+//     // const stockNew = data.available.map(avil => {
+//     //     const stock = stockmatchList[0].available.find(item => item.lot === avil.lot);
+        
+//     //     return {
+//     //         location:stock.location,
+//     //         lot:stock.lot,
+//     //         // oldqty:stock.qtyPcs,
+//     //         qtyPcs:avil.remainInLot,
+//     //         qtyCtn : Math.floor(avil.remainInLot / unitData[0].factor  )
+//     //     };
+//     // });
+
+
+
+//     await Stock.updateOne(
+//         {
+//             "area": "BE211 test",
+//             "productId": "10010601011",
+//             "available.lot": "2401061110000000"
+//         },
+//         {
+//             "$set": {
+//                 "available.$[elem].qtyPcs": 0,
+//                 "available.$[elem].qtyCtn": 0
+//             }
+//         },
+//         array_filters=[{"elem.lot": "2401061110000000"}]
+//     )
+
+//     res.status(200).json({
+//         message:data
+//     })
+// }
