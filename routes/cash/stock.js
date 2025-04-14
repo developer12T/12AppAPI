@@ -1,10 +1,21 @@
 const express = require('express')
-const { addStock, available, addStockNew, fetchArea ,stockToExcel  } = require('../../controllers/stock/stockController')
+const {
+  addStock,
+  available,
+  addStockNew,
+  fetchArea,
+  getQty,
+  stockToExcel,
+  getProduct,
+  addStockMovement
+} = require('../../controllers/stock/stockController')
 
 const router = express.Router()
- 
+
 router.post('/add', addStock)
 router.get('/available', available)
+router.post('/get', getQty)
+router.post('/addStockMovement', addStockMovement)
 // router.post('/getProductAndStock', getProductAndStock)
 
 router.post('/addNew', addStockNew)

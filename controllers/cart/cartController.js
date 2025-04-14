@@ -3,560 +3,646 @@ const { Cart } = require('../../models/cash/cart')
 const { Product } = require('../../models/cash/product')
 const { Stock } = require('../../models/cash/stock')
 const { applyPromotion } = require('../promotion/calculate')
-const { summaryOrder, summaryWithdraw, summaryRefund, summaryGive } = require('../../utilities/summary')
+const {
+  summaryOrder,
+  summaryWithdraw,
+  summaryRefund,
+  summaryGive
+} = require('../../utilities/summary')
 const { forEach } = require('lodash')
 const { error } = require('console')
 
 exports.getCart = async (req, res) => {
-    try {
-        // console.log("req.query",req.query)
-        const { type, area, storeId } = req.query
-
-        if (!type || !area) {
-            return res.status(400).json({
-                status: 400,
-                message: 'type, area are required!'
-            })
-        }
-
-        if ((type === 'sale' || type === 'refund' || type === 'give') && !storeId) {
-            return res.status(400).json({
-                status: 400,
-                message: 'storeId is required for sale or refund or give!'
-            })
-        }
-
-        const cartQuery = type === 'withdraw'
-            ? { type, area }
-            : { type, area, storeId }
-
-        let cart = await Cart.findOne(cartQuery)
-
-        if (!cart) {
-            return res.status(404).json({ status: 404, message: 'Cart not found!' })
-        }
-
-        let summary = {}
-        if (type === 'sale') {
-            summary = await summaryOrder(cart)
-
-            const newCartHashProduct = crypto.createHash('md5').update(JSON.stringify(cart.listProduct)).digest('hex')
-            const newCartHashPromotion = crypto.createHash('md5').update(JSON.stringify(cart.listPromotion)).digest('hex')
-
-            let shouldRecalculatePromotion = cart.cartHashProduct !== newCartHashProduct
-
-            // if (shouldRecalculatePromotion) {
-                const promotion = await applyPromotion(summary)
-                cart.listPromotion = promotion.appliedPromotions
-                cart.cartHashProduct = newCartHashProduct
-                cart.cartHashPromotion = newCartHashPromotion
-                await cart.save()
-            // }
-            summary.listPromotion = cart.listPromotion
-        }
-
-        if (type === 'withdraw') {
-            summary = await summaryWithdraw(cart)
-        }
-
-        if (type === 'refund') {
-            summary = await summaryRefund(cart)
-        }
-
-        if (type === 'give') {
-            summary = await summaryGive(cart)
-        }
-
-        res.status(200).json({
-            status: '200',
-            message: 'success',
-            data: [summary]
-        })
-
-    } catch (error) {
-        console.error(error)
-        res.status(500).json({ status: '500', message: error.message })
-    }
-}
-
-exports.addProduct = async (req, res) => {
-    try {
-        const { type, area, storeId, id, qty, unit, condition, expire } = req.body
-
-        if (!type || !area || !id || !qty || !unit) {
-            return res.status(400).json({
-                status: 400,
-                message: 'type, area, id, qty, and unit are required!'
-            })
-        }
-
-        if ((type === 'sale' || type === 'refund' || type === 'give') && !storeId) {
-            return res.status(400).json({
-                status: 400,
-                message: 'storeId is required for sale or refund or give!'
-            })
-        }
-
-        const product = await Product.findOne({ id }).lean()
-        if (!product) {
-            return res.status(404).json({ status: 404, message: 'Product not found!' })
-        }
-
-        const unitData = product.listUnit.find((u) => u.unit === unit)
-        if (!unitData) {
-            return res.status(400).json({ status: 400, message: `Unit '${unit}' not found for this product!` })
-        }
-
-        const priceField = type === 'refund' ? 'refund' : 'sale'
-        const price = parseFloat(unitData.price[priceField])
-
-        const cartQuery = type === 'withdraw'
-            ? { type, area }
-            : { type, area, storeId }
-
-        let cart = await Cart.findOne(cartQuery)
-
-        if (!cart) {
-            cart = await Cart.create({
-                type,
-                area,
-                ...(type === 'withdraw' ? {} : { storeId }),
-                total: 0,
-                listProduct: [],
-                listRefund: []
-            })
-        }
-
-        if (type === 'refund') {
-            if (condition && expire) {
-                const existingRefund = cart.listRefund.find(p => p.id === id && p.unit === unit && p.condition === condition && p.expireDate === expire)
-                if (existingRefund) {
-                    existingRefund.qty += qty
-                } else {
-                    cart.listRefund.push({
-                        id,
-                        name: product.name,
-                        qty,
-                        unit,
-                        price,
-                        condition,
-                        expireDate: expire
-                    })
-                }
-            } else {
-                const existingProduct = cart.listProduct.find(p => p.id === id && p.unit === unit)
-                if (existingProduct) {
-                    existingProduct.qty += qty
-                } else {
-                    cart.listProduct.push({
-                        id,
-                        name: product.name,
-                        qty,
-                        unit,
-                        price
-                    })
-                }
-            }
-
-            const totalRefund = cart.listRefund.reduce((sum, p) => sum + (p.qty * p.price), 0)
-            const totalProduct = cart.listProduct.reduce((sum, p) => sum + (p.qty * p.price), 0)
-            cart.total = totalProduct - totalRefund
-
-        } else {
-            const existingProduct = cart.listProduct.find(p => p.id === id && p.unit === unit)
-            if (existingProduct) {
-                existingProduct.qty += qty
-            } else {
-                cart.listProduct.push({
-                    id,
-                    name: product.name,
-                    qty,
-                    unit,
-                    price
-                })
-            }
-
-            cart.total = cart.listProduct.reduce((sum, p) => sum + (p.qty * p.price), 0)
-        }
-        cart.createdAt = new Date()
-        // await cart.save()
-
-        res.status(200).json({
-            status: 200,
-            message: 'Product added successfully!',
-            data: cart
-        })
-
-    } catch (error) {
-        console.error(error)
-        res.status(500).json({ status: '500', message: error.message })
-    }
-}
-
-exports.adjustProduct = async (req, res) => {
-    try {
-        const { type, area, storeId, id, unit, qty, condition, expire } = req.body
-
-        if (!type || !area || !id || !unit || qty === undefined) {
-            return res.status(400).json({
-                status: 400,
-                message: 'type, area, id, unit, and qty are required!'
-            })
-        }
-
-        if ((type === 'sale' || type === 'refund' || type === 'give') && !storeId) {
-            return res.status(400).json({
-                status: 400,
-                message: 'storeId is required for sale, refund, or give!'
-            })
-        }
-
-        const cartQuery = type === 'withdraw'
-            ? { type, area }
-            : { type, area, storeId }
-
-        let cart = await Cart.findOne(cartQuery)
-        if (!cart) {
-            return res.status(404).json({ status: 404, message: 'Cart not found!' })
-        }
-
-        let updated = false
-
-        if (type === 'refund' && condition !== undefined && expire !== undefined) {
-            const existingRefundIndex = cart.listRefund.findIndex((p) => p.id === id && p.unit === unit && p.condition === condition && p.expireDate === expire)
-
-            if (existingRefundIndex === -1) {
-                return res.status(404).json({ status: 404, message: 'Refund product not found in cart!' })
-            }
-
-            if (qty === 0) {
-                cart.listRefund.splice(existingRefundIndex, 1)
-            } else {
-                cart.listRefund[existingRefundIndex].qty = qty
-            }
-            updated = true
-        } else {
-            const existingProductIndex = cart.listProduct.findIndex((p) => p.id === id && p.unit === unit)
-
-            if (existingProductIndex === -1) {
-                return res.status(404).json({ status: 404, message: 'Product not found in cart!' })
-            }
-
-            if (qty === 0) {
-                cart.listProduct.splice(existingProductIndex, 1)
-            } else {
-                cart.listProduct[existingProductIndex].qty = qty
-            }
-            updated = true
-        }
-
-        if (updated) {
-            if (type === 'refund') {
-                cart.total = cart.listRefund.reduce((sum, item) => sum + (item.qty * item.price), 0)
-                    - cart.listProduct.reduce((sum, item) => sum + (item.qty * item.price), 0)
-            } else {
-                cart.total = cart.listProduct.reduce((sum, item) => sum + (item.qty * item.price), 0)
-            }
-        }
-
-        if (cart.listProduct.length === 0 && cart.listRefund.length === 0) {
-            await Cart.deleteOne(cartQuery)
-            return res.status(200).json({
-                status: 200,
-                message: 'Cart deleted successfully!',
-                data: null
-            })
-        }
-
-        await cart.save()
-
-        res.status(200).json({
-            status: 200,
-            message: 'Cart updated successfully!',
-            data: cart
-        })
-
-    } catch (error) {
-        console.error(error)
-        res.status(500).json({ status: 500, message: error.message })
-    }
-}
-
-exports.deleteProduct = async (req, res) => {
-    try {
-        const { type, area, storeId, id, unit, condition, expire } = req.body
-
-        if (!type || !area || !id || !unit) {
-            return res.status(400).json({
-                status: 400,
-                message: 'type, area, id, and unit are required!'
-            })
-        }
-
-        if ((type === 'sale' || type === 'refund' || type === 'give') && !storeId) {
-            return res.status(400).json({
-                status: 400,
-                message: 'storeId is required for sale or refund or give!'
-            })
-        }
-
-        const cartQuery = type === 'withdraw'
-            ? { type, area }
-            : { type, area, storeId }
-
-        let cart = await Cart.findOne(cartQuery)
-        if (!cart) {
-            return res.status(404).json({ status: 404, message: 'Cart not found!' })
-        }
-
-        let updated = false
-
-        if (type === 'refund' && condition || expire) {
-            const refundIndex = cart.listRefund.findIndex(p => p.id === id && p.unit === unit && p.condition === condition && p.expireDate === expire)
-            if (refundIndex === -1) {
-                return res.status(404).json({ status: 404, message: 'Product not found in refund list!' })
-            }
-
-            const refundProduct = cart.listRefund[refundIndex]
-            cart.listRefund.splice(refundIndex, 1)
-            cart.total -= refundProduct.qty * refundProduct.price
-            updated = true
-        } else if (type === 'refund' && !condition && !expire) {
-            const productIndex = cart.listProduct.findIndex(p => p.id === id && p.unit === unit)
-            if (productIndex === -1) {
-                return res.status(404).json({ status: 404, message: 'Product not found in cart!' })
-            }
-
-            const product = cart.listProduct[productIndex]
-            cart.listProduct.splice(productIndex, 1)
-            cart.total += product.qty * product.price
-            updated = true
-        } else {
-            const productIndex = cart.listProduct.findIndex(p => p.id === id && p.unit === unit)
-            if (productIndex === -1) {
-                return res.status(404).json({ status: 404, message: 'Product not found in cart!' })
-            }
-
-            const product = cart.listProduct[productIndex]
-            cart.listProduct.splice(productIndex, 1)
-            cart.total -= product.qty * product.price
-            updated = true
-        }
-
-        if (cart.listProduct.length === 0 && cart.listRefund.length === 0) {
-            await Cart.deleteOne(cartQuery)
-            return res.status(200).json({
-                status: 200,
-                message: 'Cart deleted successfully!'
-            })
-        }
-
-        if (updated) {
-            await cart.save()
-        }
-
-        res.status(200).json({
-            status: 200,
-            message: 'Product removed successfully!',
-            data: cart
-        })
-
-    } catch (error) {
-        console.error(error)
-        res.status(500).json({ status: 500, message: error.message })
-    }
-}
-
-exports.updateCartPromotion = async (req, res) => {
-    const { type, area, storeId, proId, productId, qty } = req.body
-
-    try {
-        let cart = await Cart.findOne({ type, area, storeId })
-
-        if (!cart) {
-            return res.status(404).json({ status: 404, message: 'Cart not found!' })
-        }
-
-        let promotion = cart.listPromotion.find((promo) => promo.proId === proId)
-
-        if (!promotion) {
-            return res.status(404).json({ status: 404, message: 'Promotion not found!' })
-        }
-
-        const product = await Product.findOne({ id: productId }).lean()
-
-        if (!product) {
-            return res.status(404).json({ status: 404, message: 'Product not found!' })
-        }
-
-        const matchingUnit = product.listUnit.find(unit => unit.unit === promotion.unit)
-
-        if (!matchingUnit) {
-            return res.status(400).json({ status: 400, message: `Unit '${promotion.unit}' not found for this product!` })
-        }
-
-        promotion.id = product.id
-        promotion.group = product.group
-        promotion.flavour = product.flavour
-        promotion.brand = product.brand
-        promotion.size = product.size
-        promotion.unit = matchingUnit.unit
-        promotion.qty = promotion.qty
-
-        await cart.save()
-
-        res.status(200).json({
-            status: '200',
-            message: 'Promotion updated successfully!',
-            data: cart.listPromotion
-        })
-    } catch (error) {
-        console.error(error)
-        res.status(500).json({ status: '500', message: error.message })
-    }
-}
-
-
-
-exports.getQty = async (req,res,next) => {
-    try{
-     const { area, ProductId, Unit } = req.body
-
-    const productStock = await Stock.find({
-        area: area
-      });
-    const products = await Product.find({
-    });
-    
-    let unitData = {}
-
-    const productUnitMatch = products?.find(p => p.id === ProductId) ;
-    if (productUnitMatch) {
-
-        unitData  = productUnitMatch.listUnit.map(Unit => ({
-            Unit:Unit.unit,
-            factor:Unit.factor
-        }))
-
-    }
-    else{
-        res.status(404).json({
-            message:"Not Found This ItemId"
-        })
+  try {
+    // console.log("req.query",req.query)
+    const { type, area, storeId } = req.query
+
+    if (!type || !area) {
+      return res.status(400).json({
+        status: 400,
+        message: 'type, area are required!'
+      })
     }
 
-    const stockmatchList = []
-    
+    if ((type === 'sale' || type === 'refund' || type === 'give') && !storeId) {
+      return res.status(400).json({
+        status: 400,
+        message: 'storeId is required for sale or refund or give!'
+      })
+    }
 
-    productStock.map(item => {
+    const cartQuery =
+      type === 'withdraw' ? { type, area } : { type, area, storeId }
 
-     const stockmatch = item.listProduct.find(p => p.productId === ProductId);
+    let cart = await Cart.findOne(cartQuery)
 
+    if (!cart) {
+      return res.status(404).json({ status: 404, message: 'Cart not found!' })
+    }
 
+    let summary = {}
+    if (type === 'sale') {
+      summary = await summaryOrder(cart)
 
-        if (stockmatch) {
-            stockmatchList.push(stockmatch)
-        }
-    });
+      const newCartHashProduct = crypto
+        .createHash('md5')
+        .update(JSON.stringify(cart.listProduct))
+        .digest('hex')
+      const newCartHashPromotion = crypto
+        .createHash('md5')
+        .update(JSON.stringify(cart.listPromotion))
+        .digest('hex')
 
+      let shouldRecalculatePromotion =
+        cart.cartHashProduct !== newCartHashProduct
 
+      // if (shouldRecalculatePromotion) {
+      const promotion = await applyPromotion(summary)
+      cart.listPromotion = promotion.appliedPromotions
+      cart.cartHashProduct = newCartHashProduct
+      cart.cartHashPromotion = newCartHashPromotion
+      await cart.save()
+      // }
+      summary.listPromotion = cart.listPromotion
+    }
 
+    if (type === 'withdraw') {
+      summary = await summaryWithdraw(cart)
+    }
 
-    const qtyList = stockmatchList.flatMap(product =>
-        product.available.map(lot => lot.qtyPcs)
-      );
+    if (type === 'refund') {
+      summary = await summaryRefund(cart)
+    }
 
-
-
-    const lotList = stockmatchList.flatMap(product =>
-        product.available.map(lot => lot.lot)
-    )
-      
-      
-    const totalQtyPcs = qtyList.reduce((sum, qty) => sum + qty, 0);
-
-
-    const productUnit = unitData.find(p => p.Unit === Unit)
-
-
-    const data = {
-        area:area,
-        productId:ProductId,
-        sumQtyPcs:totalQtyPcs,
-        qty:Math.floor(totalQtyPcs / productUnit.factor),
-        Unit:Unit,
-
-        lot:lotList
-        
-
+    if (type === 'give') {
+      summary = await summaryGive(cart)
     }
 
     res.status(200).json({
-        status: 200,
-        message: "Stock Quantity fetched successfully!",
-        data : data
+      status: '200',
+      message: 'success',
+      data: [summary]
     })
-} catch (error) {
-    console.error('Error transforming cart data:', error.message)
-    return { status: 500, message: 'Server error' }
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
 }
-}
 
+exports.addProduct = async (req, res) => {
+  try {
+    const { type, area, storeId, id, qty, unit, condition, expire } = req.body
 
-exports.updateStock = async (req,res) =>{
-    try{
-
-    const { area, ProductId  } = req.body
-
-    const modelStock = await Stock.findOne({
-                area: area
-              }).select("area listProduct");
-
-    if (!modelStock){
-        return res.status(404).json({
-            status:404,
-            errorMessage: 'Not Found This Area'
-        })
+    if (!type || !area || !id || !qty || !unit) {
+      return res.status(400).json({
+        status: 400,
+        message: 'type, area, id, qty, and unit are required!'
+      })
     }
 
-    const stockData = modelStock.listProduct.find(product => product.productId === ProductId)
+    if ((type === 'sale' || type === 'refund' || type === 'give') && !storeId) {
+      return res.status(400).json({
+        status: 400,
+        message: 'storeId is required for sale or refund or give!'
+      })
+    }
 
-    if (!stockData){
-        return res.status(404).json({
-            status:404,
-            errorMessage: 'Not Found This ProductId'
+    const product = await Product.findOne({ id }).lean()
+    if (!product) {
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Product not found!' })
+    }
+
+    const unitData = product.listUnit.find(u => u.unit === unit)
+    if (!unitData) {
+      return res.status(400).json({
+        status: 400,
+        message: `Unit '${unit}' not found for this product!`
+      })
+    }
+
+    const priceField = type === 'refund' ? 'refund' : 'sale'
+    const price = parseFloat(unitData.price[priceField])
+
+    const cartQuery =
+      type === 'withdraw' ? { type, area } : { type, area, storeId }
+
+    let cart = await Cart.findOne(cartQuery)
+
+    if (!cart) {
+      cart = await Cart.create({
+        type,
+        area,
+        ...(type === 'withdraw' ? {} : { storeId }),
+        total: 0,
+        listProduct: [],
+        listRefund: []
+      })
+    }
+
+    if (type === 'refund') {
+      if (condition && expire) {
+        const existingRefund = cart.listRefund.find(
+          p =>
+            p.id === id &&
+            p.unit === unit &&
+            p.condition === condition &&
+            p.expireDate === expire
+        )
+        if (existingRefund) {
+          existingRefund.qty += qty
+        } else {
+          cart.listRefund.push({
+            id,
+            name: product.name,
+            qty,
+            unit,
+            price,
+            condition,
+            expireDate: expire
+          })
+        }
+      } else {
+        const existingProduct = cart.listProduct.find(
+          p => p.id === id && p.unit === unit
+        )
+        if (existingProduct) {
+          existingProduct.qty += qty
+        } else {
+          cart.listProduct.push({
+            id,
+            name: product.name,
+            qty,
+            unit,
+            price
+          })
+        }
+      }
+
+      const totalRefund = cart.listRefund.reduce(
+        (sum, p) => sum + p.qty * p.price,
+        0
+      )
+      const totalProduct = cart.listProduct.reduce(
+        (sum, p) => sum + p.qty * p.price,
+        0
+      )
+      cart.total = totalProduct - totalRefund
+    } else {
+      const existingProduct = cart.listProduct.find(
+        p => p.id === id && p.unit === unit
+      )
+      if (existingProduct) {
+        existingProduct.qty += qty
+      } else {
+        cart.listProduct.push({
+          id,
+          name: product.name,
+          qty,
+          unit,
+          price
         })
+      }
+
+      cart.total = cart.listProduct.reduce((sum, p) => sum + p.qty * p.price, 0)
+    }
+    cart.createdAt = new Date()
+    await cart.save()
+
+    res.status(200).json({
+      status: 200,
+      message: 'Product added successfully!',
+      data: cart
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.adjustProduct = async (req, res) => {
+  try {
+    const { type, area, storeId, id, unit, qty, condition, expire } = req.body
+
+    if (!type || !area || !id || !unit || qty === undefined) {
+      return res.status(400).json({
+        status: 400,
+        message: 'type, area, id, unit, and qty are required!'
+      })
+    }
+
+    if ((type === 'sale' || type === 'refund' || type === 'give') && !storeId) {
+      return res.status(400).json({
+        status: 400,
+        message: 'storeId is required for sale, refund, or give!'
+      })
+    }
+
+    const cartQuery =
+      type === 'withdraw' ? { type, area } : { type, area, storeId }
+
+    let cart = await Cart.findOne(cartQuery)
+    if (!cart) {
+      return res.status(404).json({ status: 404, message: 'Cart not found!' })
+    }
+
+    let updated = false
+
+    if (type === 'refund' && condition !== undefined && expire !== undefined) {
+      const existingRefundIndex = cart.listRefund.findIndex(
+        p =>
+          p.id === id &&
+          p.unit === unit &&
+          p.condition === condition &&
+          p.expireDate === expire
+      )
+
+      if (existingRefundIndex === -1) {
+        return res
+          .status(404)
+          .json({ status: 404, message: 'Refund product not found in cart!' })
+      }
+
+      if (qty === 0) {
+        cart.listRefund.splice(existingRefundIndex, 1)
+      } else {
+        cart.listRefund[existingRefundIndex].qty = qty
+      }
+      updated = true
+    } else {
+      const existingProductIndex = cart.listProduct.findIndex(
+        p => p.id === id && p.unit === unit
+      )
+
+      if (existingProductIndex === -1) {
+        return res
+          .status(404)
+          .json({ status: 404, message: 'Product not found in cart!' })
+      }
+
+      if (qty === 0) {
+        cart.listProduct.splice(existingProductIndex, 1)
+      } else {
+        cart.listProduct[existingProductIndex].qty = qty
+      }
+      updated = true
+    }
+
+    if (updated) {
+      if (type === 'refund') {
+        cart.total =
+          cart.listRefund.reduce(
+            (sum, item) => sum + item.qty * item.price,
+            0
+          ) -
+          cart.listProduct.reduce((sum, item) => sum + item.qty * item.price, 0)
+      } else {
+        cart.total = cart.listProduct.reduce(
+          (sum, item) => sum + item.qty * item.price,
+          0
+        )
+      }
+    }
+
+    if (cart.listProduct.length === 0 && cart.listRefund.length === 0) {
+      await Cart.deleteOne(cartQuery)
+      return res.status(200).json({
+        status: 200,
+        message: 'Cart deleted successfully!',
+        data: null
+      })
+    }
+
+    await cart.save()
+
+    res.status(200).json({
+      status: 200,
+      message: 'Cart updated successfully!',
+      data: cart
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: 500, message: error.message })
+  }
+}
+
+exports.deleteProduct = async (req, res) => {
+  try {
+    const { type, area, storeId, id, unit, condition, expire } = req.body
+
+    if (!type || !area || !id || !unit) {
+      return res.status(400).json({
+        status: 400,
+        message: 'type, area, id, and unit are required!'
+      })
+    }
+
+    if ((type === 'sale' || type === 'refund' || type === 'give') && !storeId) {
+      return res.status(400).json({
+        status: 400,
+        message: 'storeId is required for sale or refund or give!'
+      })
+    }
+
+    const cartQuery =
+      type === 'withdraw' ? { type, area } : { type, area, storeId }
+
+    let cart = await Cart.findOne(cartQuery)
+    if (!cart) {
+      return res.status(404).json({ status: 404, message: 'Cart not found!' })
+    }
+
+    let updated = false
+
+    if ((type === 'refund' && condition) || expire) {
+      const refundIndex = cart.listRefund.findIndex(
+        p =>
+          p.id === id &&
+          p.unit === unit &&
+          p.condition === condition &&
+          p.expireDate === expire
+      )
+      if (refundIndex === -1) {
+        return res
+          .status(404)
+          .json({ status: 404, message: 'Product not found in refund list!' })
+      }
+
+      const refundProduct = cart.listRefund[refundIndex]
+      cart.listRefund.splice(refundIndex, 1)
+      cart.total -= refundProduct.qty * refundProduct.price
+      updated = true
+    } else if (type === 'refund' && !condition && !expire) {
+      const productIndex = cart.listProduct.findIndex(
+        p => p.id === id && p.unit === unit
+      )
+      if (productIndex === -1) {
+        return res
+          .status(404)
+          .json({ status: 404, message: 'Product not found in cart!' })
+      }
+
+      const product = cart.listProduct[productIndex]
+      cart.listProduct.splice(productIndex, 1)
+      cart.total += product.qty * product.price
+      updated = true
+    } else {
+      const productIndex = cart.listProduct.findIndex(
+        p => p.id === id && p.unit === unit
+      )
+      if (productIndex === -1) {
+        return res
+          .status(404)
+          .json({ status: 404, message: 'Product not found in cart!' })
+      }
+
+      const product = cart.listProduct[productIndex]
+      cart.listProduct.splice(productIndex, 1)
+      cart.total -= product.qty * product.price
+      updated = true
+    }
+
+    if (cart.listProduct.length === 0 && cart.listRefund.length === 0) {
+      await Cart.deleteOne(cartQuery)
+      return res.status(200).json({
+        status: 200,
+        message: 'Cart deleted successfully!'
+      })
+    }
+
+    if (updated) {
+      await cart.save()
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'Product removed successfully!',
+      data: cart
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: 500, message: error.message })
+  }
+}
+
+exports.updateCartPromotion = async (req, res) => {
+  const { type, area, storeId, proId, productId, qty } = req.body
+
+  try {
+    let cart = await Cart.findOne({ type, area, storeId })
+
+    if (!cart) {
+      return res.status(404).json({ status: 404, message: 'Cart not found!' })
+    }
+
+    let promotion = cart.listPromotion.find(promo => promo.proId === proId)
+
+    if (!promotion) {
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Promotion not found!' })
+    }
+
+    const product = await Product.findOne({ id: productId }).lean()
+
+    if (!product) {
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Product not found!' })
+    }
+
+    const matchingUnit = product.listUnit.find(
+      unit => unit.unit === promotion.unit
+    )
+
+    if (!matchingUnit) {
+      return res.status(400).json({
+        status: 400,
+        message: `Unit '${promotion.unit}' not found for this product!`
+      })
+    }
+
+    promotion.id = product.id
+    promotion.group = product.group
+    promotion.flavour = product.flavour
+    promotion.brand = product.brand
+    promotion.size = product.size
+    promotion.unit = matchingUnit.unit
+    promotion.qty = promotion.qty
+
+    await cart.save()
+
+    res.status(200).json({
+      status: '200',
+      message: 'Promotion updated successfully!',
+      data: cart.listPromotion
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.updateStock = async (req, res) => {
+  try {
+    const { area, productId, unit, type } = req.body
+    let { qty } = req.body
+
+    const modelStock = await Stock.findOne({
+      area: area
+    }).select('area listProduct')
+
+    if (!modelStock) {
+      return res.status(404).json({
+        status: 404,
+        errorMessage: 'Not Found This Area'
+      })
+    }
+
+    const stockData = modelStock.listProduct.find(
+      product => product.productId === productId
+    )
+
+    if (!stockData) {
+      return res.status(404).json({
+        status: 404,
+        errorMessage: 'Not Found This productId'
+      })
     }
 
     const modelProduct = await Product.findOne({
-        id:ProductId,
-    }).select("id listUnit")
+      id: productId
+    }).select('id listUnit')
+
+    console.log('modelProduct', modelProduct)
+    console.log('qty', qty)
+
+    if (unit !== 'PCS') {
+      const qtyPCS = modelProduct.listUnit.find(item => item.unit === unit)
+      qty = parseInt(qtyPCS.factor) * qty
+    }
 
     const productCtn = modelProduct.listUnit.find(item => item.unit === 'CTN')
-    const productCtnFactor = productCtn? { factor:productCtn.factor } : null 
+    const productCtnFactor = productCtn ? { factor: productCtn.factor } : null
 
-    let qty = req.body.qty
-    const available = stockData.available.map(lot => {
-        const usedQty = Math.min(qty, lot.qtyPcs);
-        qty -= usedQty;
-      
+    // if (type === 'IN') {
+    //   const available = stockData.available.map(lot => {
+    //     const usedQty = Math.min(qty, lot.qtyPcs)
+    //     qty += usedQty
+
+    //     return {
+    //       location: lot.location,
+    //       lot: lot.lot,
+    //       qtyPcs: lot.qtyPcs + usedQty,
+    //       qtyCtn: Math.floor((lot.qtyPcs - usedQty) / productCtnFactor.factor)
+    //     }
+    //   })
+
+    //   // console.log("qty",qty);
+    //   // console.log("qtyCtn",qtyCtn);
+
+    //   const data = {
+    //     productId: stockData.productId,
+    //     sumQtyPcs: available.reduce((sum, item) => sum + item.qtyPcs, 0),
+    //     sumQtyCtn: available.reduce((sum, item) => sum + item.qtyCtn, 0),
+    //     available: available
+    //   }
+    //   await Stock.findOneAndUpdate(
+    //     { area: area, 'listProduct.productId': data.productId }, // เงื่อนไขที่ใช้หา document
+    //     {
+    //       $set: {
+    //         'listProduct.$.sumQtyPcs': data.sumQtyPcs,
+    //         'listProduct.$.sumQtyCtn': data.sumQtyCtn,
+    //         'listProduct.$.available': data.available
+    //       }
+    //     },
+    //     { new: true } // ให้คืนค่าหลัง update แล้ว
+    //   )
+
+    //   res.status(200).json({
+    //     status: 200,
+    //     // stockData,
+    //     data
+    //   })
+    // } else if (type === 'OUT') {
+    //   const available = stockData.available.map(lot => {
+    //     const usedQty = Math.min(qty, lot.qtyPcs)
+    //     qty -= usedQty
+
+    //     return {
+    //       location: lot.location,
+    //       lot: lot.lot,
+    //       qtyPcs: lot.qtyPcs - usedQty,
+    //       qtyCtn: Math.floor((lot.qtyPcs - usedQty) / productCtnFactor.factor)
+    //     }
+    //   })
+
+    //   // console.log("qty",qty);
+    //   // console.log("qtyCtn",qtyCtn);
+
+    //   const data = {
+    //     productId: stockData.productId,
+    //     sumQtyPcs: available.reduce((sum, item) => sum + item.qtyPcs, 0),
+    //     sumQtyCtn: available.reduce((sum, item) => sum + item.qtyCtn, 0),
+    //     available: available
+    //   }
+    //   await Stock.findOneAndUpdate(
+    //     { area: area, 'listProduct.productId': data.productId }, // เงื่อนไขที่ใช้หา document
+    //     {
+    //       $set: {
+    //         'listProduct.$.sumQtyPcs': data.sumQtyPcs,
+    //         'listProduct.$.sumQtyCtn': data.sumQtyCtn,
+    //         'listProduct.$.available': data.available
+    //       }
+    //     },
+    //     { new: true } // ให้คืนค่าหลัง update แล้ว
+    //   )
+
+    //   res.status(200).json({
+    //     status: 200,
+    //     // stockData,
+    //     data
+    //   })
+    // }
+    if (type === 'IN') {
+      let remainingQty = qty // remaining quantity to distribute into lots
+
+      const available = stockData.available.map(lot => {
+        let addedQty = 0
+
+        if (remainingQty > 0) {
+          addedQty = Math.min(remainingQty, lot.qtyPcs) // optionally spread into existing lots
+          remainingQty -= addedQty
+        }
+
         return {
           location: lot.location,
           lot: lot.lot,
-          qtyPcs: lot.qtyPcs - usedQty,
-          qtyCtn: Math.floor((lot.qtyPcs - usedQty) / productCtnFactor.factor)
-        };
-      });
-      
+          qtyPcs: lot.qtyPcs + addedQty,
+          qtyCtn: Math.floor((lot.qtyPcs + addedQty) / productCtnFactor.factor)
+        }
+      })
+
+      // If there's still remaining IN qty, create a new lot (or handle accordingly)
+      if (remainingQty > 0) {
+        available.push({
+          location: 'default', // change this to a valid location
+          lot: 'new', // generate a lot ID here if needed
+          qtyPcs: remainingQty,
+          qtyCtn: Math.floor(remainingQty / productCtnFactor.factor)
+        })
+      }
+
       const data = {
         productId: stockData.productId,
         sumQtyPcs: available.reduce((sum, item) => sum + item.qtyPcs, 0),
         sumQtyCtn: available.reduce((sum, item) => sum + item.qtyCtn, 0),
-        available: available
-      };
-    
+        available
+      }
+
       await Stock.findOneAndUpdate(
-        { area: area, 'listProduct.productId': data.productId }, // เงื่อนไขที่ใช้หา document
+        { area: area, 'listProduct.productId': data.productId },
         {
           $set: {
             'listProduct.$.sumQtyPcs': data.sumQtyPcs,
@@ -564,41 +650,65 @@ exports.updateStock = async (req,res) =>{
             'listProduct.$.available': data.available
           }
         },
-        { new: true } // ให้คืนค่าหลัง update แล้ว
-      );
+        { new: true }
+      )
 
+      res.status(200).json({ status: 200, data })
+    } else if (type === 'OUT') {
+      let remainingQty = qty
 
+      const available = stockData.available.map(lot => {
+        const usedQty = Math.min(remainingQty, lot.qtyPcs)
+        remainingQty -= usedQty
 
+        return {
+          location: lot.location,
+          lot: lot.lot,
+          qtyPcs: lot.qtyPcs - usedQty,
+          qtyCtn: Math.floor((lot.qtyPcs - usedQty) / productCtnFactor.factor)
+        }
+      })
 
+      const data = {
+        productId: stockData.productId,
+        sumQtyPcs: available.reduce((sum, item) => sum + item.qtyPcs, 0),
+        sumQtyCtn: available.reduce((sum, item) => sum + item.qtyCtn, 0),
+        available
+      }
 
+      await Stock.findOneAndUpdate(
+        { area: area, 'listProduct.productId': data.productId },
+        {
+          $set: {
+            'listProduct.$.sumQtyPcs': data.sumQtyPcs,
+            'listProduct.$.sumQtyCtn': data.sumQtyCtn,
+            'listProduct.$.available': data.available
+          }
+        },
+        { new: true }
+      )
 
-    res.status(200).json({
-        status:200,
-        // stockData,
-        data
-    })
-} catch (error) {
+      res.status(200).json({ status: 200, data })
+    }
+  } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
+  }
 }
-}
-
-
-
 
 // exports.updateStock = async (req,res) =>{
 
-//     const { area, ProductId, Unit  } = req.body
+//     const { area, productId, Unit  } = req.body
 
 //     const productStock = await Stock.find({
 //         area: area
 //       });
 //     const products = await Product.find({
 //     });
-    
+
 //     let unitData = {}
 
-//     const productUnitMatch = products?.find(p => p.id === ProductId) ;
+//     const productUnitMatch = products?.find(p => p.id === productId) ;
 //     if (productUnitMatch) {
 
 //         unitData = productUnitMatch.listUnit
@@ -616,52 +726,45 @@ exports.updateStock = async (req,res) =>{
 //     }
 
 //     const stockmatchList = []
-    
 
 //     productStock.map(item => {
 
-//     const stockmatch = item.listProduct.find(p => p.productId === ProductId);
+//     const stockmatch = item.listProduct.find(p => p.productId === productId);
 
 //         if (stockmatch) {
 //             stockmatchList.push(stockmatch)
 //         }
 //     });
-    
 
-
-//     const lotAndqty = stockmatchList.flatMap(item => 
+//     const lotAndqty = stockmatchList.flatMap(item =>
 //         item.available.map(avai  => ({
 //             lot:avai.lot,
 //             QtyPcs:avai.qtyPcs
 //         }))
 //     )
 
-
-
 //     let qty = parseInt(req.body.qty); // ตรวจสอบว่า qty เป็นตัวเลข
 
 //     const result = [];
-    
+
 //     for (const item of lotAndqty) {
 //       const usedQty = Math.min(qty, item.QtyPcs); // ใช้ได้ไม่เกินของใน lot
 //       qty -= usedQty; // หักออกจากยอดรวม
-    
+
 //       if (usedQty === 0) {
 //         break; // หยุดลูปทันทีเมื่อ usedQty = 0
 //       }
-    
+
 //       result.push({
-        
+
 //         lot: item.lot,
 //         // qtyInStock:item.QtyPcs,
 //         // usedQty: usedQty,
 //         qtyPcs: item.QtyPcs - usedQty ,
 //         qtyCtn:Math.floor((item.QtyPcs - usedQty) / unitData[0].factor  )
 
-
 //       });
 //     }
-
 
 //     const data = {
 //         // stockmatchList:stockmatchList,
@@ -671,14 +774,12 @@ exports.updateStock = async (req,res) =>{
 //         available: result
 //     };
 
-
-
 //     // console.log(stockmatchList[0])
 //     // console.log(JSON.stringify(stockmatchList[0], null, 2));
 
 //     // const stockNew = data.available.map(avil => {
 //     //     const stock = stockmatchList[0].available.find(item => item.lot === avil.lot);
-        
+
 //     //     return {
 //     //         location:stock.location,
 //     //         lot:stock.lot,
@@ -687,8 +788,6 @@ exports.updateStock = async (req,res) =>{
 //     //         qtyCtn : Math.floor(avil.remainInLot / unitData[0].factor  )
 //     //     };
 //     // });
-
-
 
 //     await Stock.updateOne(
 //         {
