@@ -91,7 +91,8 @@ exports.getCart = async (req, res) => {
 
 exports.addProduct = async (req, res) => {
   try {
-    const { type, area, storeId, id, qty, unit, condition, expire } = req.body
+    const { type, area, storeId, id, qty, unit, condition, expire, lot } =
+      req.body
 
     if (!type || !area || !id || !qty || !unit) {
       return res.status(400).json({
@@ -155,6 +156,7 @@ exports.addProduct = async (req, res) => {
         } else {
           cart.listRefund.push({
             id,
+
             name: product.name,
             qty,
             unit,
@@ -172,6 +174,7 @@ exports.addProduct = async (req, res) => {
         } else {
           cart.listProduct.push({
             id,
+            lot,
             name: product.name,
             qty,
             unit,
@@ -198,6 +201,7 @@ exports.addProduct = async (req, res) => {
       } else {
         cart.listProduct.push({
           id,
+          lot,
           name: product.name,
           qty,
           unit,
@@ -515,8 +519,8 @@ exports.updateStock = async (req, res) => {
       id: productId
     }).select('id listUnit')
 
-    console.log('modelProduct', modelProduct)
-    console.log('qty', qty)
+    // console.log('modelProduct', modelProduct)
+    // console.log('qty', qty)
 
     if (unit !== 'PCS') {
       const qtyPCS = modelProduct.listUnit.find(item => item.unit === unit)
@@ -652,6 +656,7 @@ exports.updateStock = async (req, res) => {
         },
         { new: true }
       )
+      console.log('Response', data)
 
       res.status(200).json({ status: 200, data })
     } else if (type === 'OUT') {
@@ -687,7 +692,7 @@ exports.updateStock = async (req, res) => {
         },
         { new: true }
       )
-
+      console.log('Response', data)
       res.status(200).json({ status: 200, data })
     }
   } catch (error) {

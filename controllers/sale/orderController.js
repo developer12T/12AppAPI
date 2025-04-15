@@ -83,6 +83,7 @@ exports.checkout = async (req, res) => {
 
       return {
         id: product.id,
+        lot: product.lot,
         name: product.name,
         group: product.group,
         brand: product.brand,
@@ -149,7 +150,7 @@ exports.checkout = async (req, res) => {
     })
 
     await newOrder.save()
-    // await Cart.deleteOne({ type, area, storeId })
+    await Cart.deleteOne({ type, area, storeId })
 
     const checkIn = await checkInRoute({
       storeId: storeId,

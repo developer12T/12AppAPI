@@ -31,19 +31,13 @@ const stockSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 })
 
-const lotSchema = new mongoose.Schema(
-  {
-    unit: { type: String, default: '' },
-    lot: { type: String, default: '' },
-    qty: { type: Number, default: 0 }
-  },
-  { _id: false }
-)
 
 const listProductMovementSchema = new mongoose.Schema(
   {
-    productId: { type: String, required: true },
-    lot: { type: [lotSchema], default: [] }
+    id: { type: String, required: true },
+    unit: { type: String, default: '' },
+    lot: { type: String, default: '' },
+    qty: { type: Number, default: 0 }
   },
   { _id: false }
 )
@@ -55,6 +49,7 @@ const stockMovementSchema = new mongoose.Schema({
   period: { type: String, required: true },
   warehouse: { type: String, required: true },
   status: { type: String, required: true },
+  action: { type: String, required: true },
   product: { type: [listProductMovementSchema], default: [] },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }

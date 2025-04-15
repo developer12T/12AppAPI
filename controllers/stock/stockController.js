@@ -536,23 +536,99 @@ exports.getQty = async (req, res, next) => {
 
 exports.addStockMovement = async (req, res, next) => {
   try {
-    const { orderId, area, saleCode, period, warehouse, status, product } = req.body
-
-    const newStockMovement = new StockMovement({
+    const {
       orderId,
       area,
       saleCode,
       period,
       warehouse,
       status,
-      product
+      product,
+      action
+    } = req.body
+
+    let movement = await StockMovement.findOne({
+      action,
+      area,
+      period
     })
-    newStockMovement.save()
-    res.status(200).json({
-      status: 200,
-      message: 'Stock Movement added successfully!'
-    })
+
+    if (!movement) {
+    } else {
+      const newStockMovement = new StockMovement({
+        orderId,
+        area,
+        saleCode,
+        period,
+        warehouse,
+        status,
+        product
+      })
+      newStockMovement.save()
+
+      res.status(200).json({
+        status: 200,
+        message: 'Stock Movement added successfully!'
+      })
+    }
   } catch (error) {
     next(error)
-  } 
+  }
 }
+
+// exports.rollbackStock = async (req, res, next) => {
+//   try {
+//     const { orderId, area, saleCode, period, warehouse, status, action } =
+//       req.body
+
+//     let movement = await StockMovement.findOne({
+//       // action: action,
+//       area: area,
+//       period: period
+//     })
+
+//     for (const item of movement.product) {
+//       if (item.unit !== 'PCS') {
+//         const productDetail = await Product.findOne({
+//           id: item.id,
+//           'listUnit.unit': item.unit
+//         })
+//         item.qty = item.qty * productDetail.listUnit[0].factor
+//       }
+//       const productCTN = await Product.findOne({
+//         id: item.id,
+//         'listUnit.unit': 'CTN'
+//       })
+//       const itemQtyCTN = Math.floor(item.qty / productCTN.listUnit[0].factor)
+
+//       await Stock.findOneAndUpdate(
+//         {
+//           area: area,
+//           'listProduct.productId': item.id,
+//           'listProduct.available.lot': item.lot
+//         },
+//         {
+//           $set: {
+//             'listProduct.$[i].available.$[j].qtyPcs': item.qty,
+//             'listProduct.$[i].available.$[j].qtyCtn': itemQtyCTN
+//           }
+//         },
+//         {
+//           arrayFilters: [{ 'i.productId': item.id }, { 'j.lot': item.lot }],
+//         }
+//       )
+//     }
+//     // movement.deleteOne({
+//     //   // action: action,
+//     //   area: area,
+//     //   period: period
+//     // })
+//     res.status(200).json({
+//       status: 200,
+//       message: 'Rollblack Stock successfully!',
+//       data:movement
+//     })
+//   } catch (error) {
+//     next(error)
+//   }
+// }
