@@ -11,7 +11,7 @@ const { checkInRoute } = require('../route/checkIn')
 const multer = require('multer')
 const path = require('path')
 const upload = multer({ storage: multer.memoryStorage() }).single('image')
-
+const xlsx = require('xlsx');
 exports.checkout = async (req, res) => {
   try {
     const {
@@ -41,7 +41,7 @@ exports.checkout = async (req, res) => {
     if (!cart || cart.listProduct.length === 0) {
       return res.status(404).json({ status: 404, message: 'Cart is empty!' })
     }
-
+    console.log("cart",cart)
     const sale = await User.findOne({ area }).select(
       'firstName surName warehouse tel saleCode salePayer'
     )
@@ -102,6 +102,10 @@ exports.checkout = async (req, res) => {
     if (listProduct.includes(null)) return
     const orderId = await generateOrderId(area, sale.warehouse)
 
+
+
+
+
     const newOrder = new Order({
       orderId,
       type,
@@ -149,8 +153,8 @@ exports.checkout = async (req, res) => {
       createdBy: sale.username
     })
 
-    await newOrder.save()
-    await Cart.deleteOne({ type, area, storeId })
+    // await newOrder.save()
+    // await Cart.deleteOne({ type, area, storeId })
 
     const checkIn = await checkInRoute({
       storeId: storeId,
@@ -172,8 +176,8 @@ exports.checkout = async (req, res) => {
     }
     else if (changePromotionStatus == 1) {
       summary = await summaryOrderProStatusOne(cart,listPromotion)
-      // console.log("summaryOrderProStatusOne")
-      // console.log(summary)
+      // console.log("summary.listPromotion", JSON.stringify(summary.listPromotion, null, 2));
+
 
       const productIds = cart.listProduct.map(p => p.id)
       const products = await Product.find({ id: { $in: productIds } }).select(
@@ -262,9 +266,12 @@ exports.checkout = async (req, res) => {
         createdBy: sale.username
       })
   
-      await newOrder.save()
+      // await newOrder.save()
       // await Cart.deleteOne({ type, area, storeId })
   
+      // console.log("summary.listPromotion", JSON.stringify(newOrder, null, 2));
+
+
       const checkIn = await checkInRoute({
         storeId: storeId,
         routeId: routeId,
@@ -489,4 +496,137 @@ exports.addSlip = async (req, res) => {
       .status(500)
       .json({ status: 500, message: 'Server error', error: error.message })
   }
+}
+
+exports.OrderToExcel = async(req, res) =>{
+
+      const { saleCode } = req.body
+      modelOrder = await Order.find()
+      const tranFromOrder = modelOrder.flatMap(order => {
+        let counterOrder = 0;
+        const date = new Date();
+        const RLDT = `${date.getFullYear()}${(date.getMonth() + 1)
+          .toString()
+          .padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
+
+          const listProduct = order.listProduct.map(product => {
+            return{
+              proCode:'',
+              id:product.id,
+              name:product.name,
+              group:product.group,
+              brand:product.brand,
+              size:product.size,
+              flavour:product.flavour,
+              qty:product.qty,
+              unit:product.unit,
+              unitName:product.unitName,
+              price:product.price,
+              subtotal:product.subtotal,
+              discount:product.discount,
+              netTotal:product.netTotal
+            }
+          });
+
+          const listPromotion = order.listPromotions.map(promo => 
+            promo.listProduct.map(product =>  {
+              return {
+                proCode:promo.proCode,
+                id:product.id,
+                name:product.name,
+                group:product.group,
+                brand:product.brand,
+                size:product.size,
+                flavour:product.flavour,
+                qty:product.qty,
+                unit:product.unit,
+                unitName:product.unitName,
+                qtyPcs:product.qtyPcs
+              }
+            })
+          )
+        
+          const productIDS = [...listProduct,...listPromotion].flat();
+
+          // console.log("productIDS",productIDS)
+        return productIDS.map(product => {
+          
+          counterOrder++;
+          
+          // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
+
+          
+          return {
+            CUNO: order.sale.salePayer,
+            FACI: 'F10',
+            WHLO: order.sale.warehouse,
+            ORNO: "",
+            OAORTP: "",
+            RLDT: RLDT,
+            ADID: order.shipping.shippingId,
+            CUOR: order.orderId,
+            OAOREF: '',
+            OBITNO: product.id,
+            OBBANO: "",
+            OBALUN: product.unit,
+            OBORQA: Number(product.qty),
+            OBSAPR: Number(product.price || 0),
+            OBSPUN: product.unit,
+            OBWHSL: "",
+            ROUT: "",
+            OBPONR: Number(counterOrder),
+            OBDIA2: Number(product.discount || 0),
+            OBRSCD:"",
+            OBCMNO:"",
+            OBPIDE: product.proCode,
+            OBSMCD: saleCode,
+            OAORDT: RLDT,
+            OAODAM: '',
+            OECRID: '',
+            OECRAM: '',
+            OECRID2: '',
+            OECRAM2:'',
+            OECRID3:'',
+            OECRAM3:'',
+            OECRID4:'',
+            OECRAM4:'',
+            OECRID5:'',
+            OECRAM5:'',
+            OARESP:'',
+            OAYREF:'',
+            OATEL2:'',
+            OAWCON:'',
+            OAFRE1:'',
+            OATXAP:'',
+            OATXAP2:'',
+            OBDIA1:'',
+            OBDIA3:'',
+            OBDIA4:''
+          };
+        });
+      });
+
+
+
+      const ws = xlsx.utils.json_to_sheet(tranFromOrder);
+      // กำหนด cell format แบบกำหนดเอง
+      // สร้าง workbook และ export
+      const wb = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(wb, ws, 'Orders');
+      xlsx.writeFile(wb, 'Order.xlsx');
+
+      console.log("✅ ไฟล์ Order.xlsx ถูกสร้างแล้ว");
+
+
+
+
+
+
+  res.status(200).json({
+    message:tranFromOrder
+  })
+
+
+
+
 }

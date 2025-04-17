@@ -445,7 +445,7 @@ async function summaryOrderProStatusOne(cart, listPromotion) {
     });
     
     // แสดงข้อมูล unitDataArray
-    console.log("unitDataArray", JSON.stringify(unitDataArray, null, 2));
+    // console.log("unitDataArray", JSON.stringify(unitDataArray, null, 2));
 
     listPromotion.forEach(promo => {
       promo.listProduct.forEach(product => {
@@ -466,12 +466,13 @@ async function summaryOrderProStatusOne(cart, listPromotion) {
       });
     });
     // แสดงผลข้อมูล listPromotion ที่มีข้อมูล unitData
-    console.log("listPromotion with unitData", JSON.stringify(listPromotion, null, 2));
+    // console.log("listPromotion with unitData", JSON.stringify(listPromotion, null, 2));
 
 
 
 
-    const enrichedProductsExtract = listPromotion.map(promo => ({
+    const enrichedPromotionExtract = listPromotion.map(promo => ({
+      proCode: promo?.proCode || '',
       proName: promo.proName,
       proType: promo.proType,
       proQty: promo.proQty || 0,
@@ -500,7 +501,7 @@ async function summaryOrderProStatusOne(cart, listPromotion) {
       shipping: [],
       listProduct: enrichedProducts,
       // listRefund: [],
-      listPromotion: enrichedProductsExtract,
+      listPromotion: enrichedPromotionExtract,
       total: parseFloat(cart.total.toFixed(2)),
       subtotal: 0,
       discount: 0,

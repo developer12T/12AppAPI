@@ -21,6 +21,6 @@ router.post('/addStockMovement', addStockMovement)
 // router.post('/getProductAndStock', getProductAndStock)
 
 router.post('/addNew', addStockNew)
-router.post('/stocktoexcel', stockToExcel)
+// router.post('/stocktoexcel', stockToExcel)
 // router.get('/movement', available)
 module.exports = router
