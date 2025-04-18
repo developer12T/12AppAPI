@@ -1,6 +1,6 @@
 const express = require('express')
 const { checkout, getOrder, getDetail, updateStatus } = require('../../controllers/distribution/withdrawController')
-const { getPlace, addPlace, getType } = require('../../controllers/distribution/placeController')
+const { getPlace, addPlace, getType, addAllPlace } = require('../../controllers/distribution/placeController')
 
 const router = express.Router()
 
@@ -12,5 +12,9 @@ router.get('/getType', getType)
 
 router.get('/place/get', getPlace)
 router.post('/place/add', addPlace)
+
+router.post('/place/addAllPlace', addAllPlace)
+
+
 
 module.exports = router

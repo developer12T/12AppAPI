@@ -1,4 +1,7 @@
-const { Place } = require('../../models/cash/distribution')
+const { find, each, forEach } = require('lodash')
+const { Place,  Withdraw } = require('../../models/cash/distribution')
+const { User } = require('../../models/cash/user')
+const { sequelize, DataTypes } = require('../../config/m3db')
 
 
 exports.getPlace = async (req, res) => {
@@ -104,3 +107,99 @@ exports.getType = async (req, res) => {
         res.status(500).json({ status: '500', message: error.message })
     }
 }
+
+exports.addAllPlace = async (req,res) => {
+try {
+    const users = await User.find()
+
+    areaList = users.map(user => user.area)
+
+    data =[]
+
+    areaAdded = []
+    // console.log("areaList",areaList)
+    for (const user of areaList) {
+
+        const withdrawT04 = await Withdraw.findOne({ Des_Area:user,ZType:"T04" });
+
+        const withdrawT05 = await Withdraw.findOne({ Des_Area:user,ZType:"T05" });
+
+        const checkPlace = await Place.findOne({ area:user })
+
+        if (!checkPlace) {
+
+
+            const t04 = {
+                type: "T04",
+                typeNameTH: withdrawT04.Des_Name,
+                typeNameEN: "pickup",
+                shippingId: withdrawT04.Des_Area,
+                route: withdrawT04.ROUTE,
+                name: "",
+                address: "",
+                district: "",
+                subDistrict: "",
+                province:"",
+                postcode:"",
+                tel:'',
+                warehouse:{
+                    normal:withdrawT04.WH,
+                    clearance:withdrawT04.WH1
+                }
+    
+              };
+            //   data.push(t04)
+    
+              const t05 = {
+                type: "T05",
+                typeNameTH: "ส่งสินค้า",
+                typeNameEN: "delivery",
+                shippingId: withdrawT05.Des_No,
+                route: withdrawT05.Des_Area,
+                name: withdrawT05.Des_Name,
+                address: "",
+                district: "",
+                subDistrict: "",
+                province:"",
+                postcode:"",
+                tel:"",
+                warehouse:{
+                    normal:withdrawT04.WH,
+                    clearance:withdrawT04.WH1
+                }
+    
+              };
+              
+    
+              const combineData  = {
+                area:user,
+                listAddress: [
+                    ...[t04],
+                    ...[t05]
+                  ]
+                  
+    
+              }
+              data.push(combineData)
+              areaAdded.push(combineData.area)
+              const placeDoc = new Place(combineData)
+              await placeDoc.save()
+        }
+    
+      }
+      
+
+
+
+    res.status(200).json({
+        status:200,
+        message: `add place ${areaAdded} fetched successfully!`
+    })
+
+
+} catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+}    
+}
+

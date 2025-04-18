@@ -55,9 +55,29 @@ const stockMovementSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 })
 
+
+const stockMovementLogSchema = new mongoose.Schema({
+  orderId: { type: String, required: true },
+  area: { type: String, required: true },
+  saleCode: { type: String, required: true },
+  period: { type: String, required: true },
+  warehouse: { type: String, required: true },
+  status: { type: String, required: true },
+  action: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+})
+
+
+
+
+
+
+
 const Stock = dbCA.model('Stock', stockSchema)
+const StockMovementLog = dbCA.model('stockMovementLog', stockMovementLogSchema,'stockmovementlogs')
 const StockMovement = dbCA.model('StockMovement', stockMovementSchema)
-module.exports = { Stock, StockMovement }
+module.exports = { Stock, StockMovement, StockMovementLog }
 
 // const availableSchema = new mongoose.Schema({
 //     qtyPcs: { type: Number, default: 0 },

@@ -1,4 +1,4 @@
-const { Stock, StockMovement } = require('../../models/cash/stock')
+const { Stock, StockMovement, StockMovementLog } = require('../../models/cash/stock')
 const { User } = require('../../models/cash/user')
 const { Product } = require('../../models/cash/product')
 const path = require('path')
@@ -408,8 +408,9 @@ exports.addStockMovement = async (req, res, next) => {
       period
     })
 
+    // console.log(movement)
     if (!movement) {
-    } else {
+
       const newStockMovement = new StockMovement({
         orderId,
         area,
@@ -417,7 +418,8 @@ exports.addStockMovement = async (req, res, next) => {
         period,
         warehouse,
         status,
-        product
+        product,
+        action
       })
       newStockMovement.save()
 
@@ -425,11 +427,63 @@ exports.addStockMovement = async (req, res, next) => {
         status: 200,
         message: 'Stock Movement added successfully!'
       })
+
+
+
+
+
+    } else {
+      return res.status(409).json({
+        status:409,
+        message:"action, area, period already in database"
+      })
+
     }
   } catch (error) {
     next(error)
   }
 }
+
+
+exports.updateStockMovement = async (req, res, next) => {
+  try {
+    const {
+      action
+    } = req.body
+
+    let movement = await StockMovement.find({
+    }).select("_id orderId area saleCode period warehouse status action")
+    console.log(movement)
+    
+    await StockMovementLog.insertMany(movement)
+    
+    await StockMovement.updateMany(
+      {},        // เงื่อนไข
+      { $set: { action: action } } // สิ่งที่ต้องการอัปเดต
+    );
+
+      res.status(200).json({
+        status: 200,
+        // data:"Update Status Successful!"
+        data:movement
+      })
+    
+  } catch (error) {
+    next(error)
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
 // exports.rollbackStock = async (req, res, next) => {
 //   try {

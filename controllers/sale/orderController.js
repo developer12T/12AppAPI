@@ -11,7 +11,8 @@ const { checkInRoute } = require('../route/checkIn')
 const multer = require('multer')
 const path = require('path')
 const upload = multer({ storage: multer.memoryStorage() }).single('image')
-const xlsx = require('xlsx');
+const os = require('os');
+const xlsx = require('xlsx'); 
 exports.checkout = async (req, res) => {
   try {
     const {
@@ -500,7 +501,9 @@ exports.addSlip = async (req, res) => {
 
 exports.OrderToExcel = async(req, res) =>{
 
-      const { saleCode } = req.body
+      const { saleCode } = req.params
+
+      console.log(saleCode)
       modelOrder = await Order.find()
       const tranFromOrder = modelOrder.flatMap(order => {
         let counterOrder = 0;
@@ -607,23 +610,19 @@ exports.OrderToExcel = async(req, res) =>{
       });
 
 
+  const ws = xlsx.utils.json_to_sheet(tranFromOrder);
 
-      const ws = xlsx.utils.json_to_sheet(tranFromOrder);
-      // กำหนด cell format แบบกำหนดเอง
-      // สร้าง workbook และ export
-      const wb = xlsx.utils.book_new();
-      xlsx.utils.book_append_sheet(wb, ws, 'Orders');
-      xlsx.writeFile(wb, 'Order.xlsx');
+  const downloadsPath = path.join(os.homedir(), 'Downloads', 'Order.xlsx');
 
-      console.log("✅ ไฟล์ Order.xlsx ถูกสร้างแล้ว");
+  const wb = xlsx.utils.book_new();
+  xlsx.utils.book_append_sheet(wb, ws, 'Orders');
 
+  xlsx.writeFile(wb, downloadsPath);
 
-
-
-
+  console.log("✅ ไฟล์ Order.xlsx ถูกสร้างแล้วที่:", downloadsPath);
 
   res.status(200).json({
-    message:tranFromOrder
+    message:"Create file successful!"
   })
 
 

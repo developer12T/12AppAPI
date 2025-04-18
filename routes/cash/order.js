@@ -10,7 +10,8 @@ router.post('/checkout', checkout)
 router.post('/addSlip', addSlip)
 
 router.post('/addSlip', addSlip)
-router.post('/ordertoexcel',OrderToExcel)
+router.get('/ordertoexcel/:saleCode', OrderToExcel);
+
 
 
 module.exports = router
