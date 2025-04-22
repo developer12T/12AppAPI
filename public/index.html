@@ -1,0 +1,26 @@
+<!-- public/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Socket.io Client</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        var socket = io();
+
+        // ฟัง event จาก server
+        socket.on('message', function(msg) {
+            console.log('Message from server: ' + msg);
+        });
+
+        // ส่งข้อความไปยัง server
+        function sendMessage() {
+            socket.emit('message', 'Hello from client!');
+        }
+    </script>
+</head>
+<body>
+    <h1>WebSocket with Socket.io</h1>
+    <button onclick="sendMessage()">Send Message</button>
+</body>
+</html>

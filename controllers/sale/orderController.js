@@ -4,7 +4,7 @@ const { User } = require('../../models/cash/user')
 const { Product } = require('../../models/cash/product')
 const { Route } = require('../../models/cash/route')
 const { generateOrderId } = require('../../utilities/genetateId')
-const { summaryOrder,summaryOrderProStatusOne } = require('../../utilities/summary')
+const { summaryOrder, summaryOrderProStatusOne } = require('../../utilities/summary')
 const { rangeDate } = require('../../utilities/datetime')
 const { uploadFiles } = require('../../utilities/upload')
 const { checkInRoute } = require('../route/checkIn')
@@ -12,7 +12,9 @@ const multer = require('multer')
 const path = require('path')
 const upload = multer({ storage: multer.memoryStorage() }).single('image')
 const os = require('os');
-const xlsx = require('xlsx'); 
+const xlsx = require('xlsx');
+const _ = require('lodash');
+
 exports.checkout = async (req, res) => {
   try {
     const {
@@ -42,7 +44,7 @@ exports.checkout = async (req, res) => {
     if (!cart || cart.listProduct.length === 0) {
       return res.status(404).json({ status: 404, message: 'Cart is empty!' })
     }
-    console.log("cart",cart)
+    console.log("cart", cart)
     const sale = await User.findOne({ area }).select(
       'firstName surName warehouse tel saleCode salePayer'
     )
@@ -184,24 +186,25 @@ exports.checkout = async (req, res) => {
       const products = await Product.find({ id: { $in: productIds } }).select(
         'id name group brand size flavour listUnit'
       )
-  
+
       let subtotal = 0
       let listProduct = cart.listProduct.map(item => {
         const product = products.find(p => p.id === item.id)
         if (!product) return null
-  
+
         const unitData = product.listUnit.find(u => u.unit === item.unit)
         if (!unitData) {
           return res
             .status(400)
             .json({ status: 400, message: `Invalid unit for product ${item.id}` })
         }
-  
+
         const totalPrice = item.qty * unitData.price.sale
         subtotal += totalPrice
-  
+
         return {
           id: product.id,
+          lot: product.lot,
           name: product.name,
           group: product.group,
           brand: product.brand,
@@ -216,10 +219,14 @@ exports.checkout = async (req, res) => {
           netTotal: parseFloat(totalPrice.toFixed(2))
         }
       })
-  
+
       if (listProduct.includes(null)) return
       const orderId = await generateOrderId(area, sale.warehouse)
-  
+
+
+
+
+
       const newOrder = new Order({
         orderId,
         type,
@@ -266,10 +273,123 @@ exports.checkout = async (req, res) => {
         paymentStatus: 'paid',
         createdBy: sale.username
       })
-  
+
       // await newOrder.save()
       // await Cart.deleteOne({ type, area, storeId })
-  
+
+      const checkIn = await checkInRoute({
+        storeId: storeId,
+        routeId: routeId,
+        orderId: orderId,
+        note: note,
+        latitude: latitude,
+        longitude: longitude
+      })
+
+      // console.log('checkin', checkIn)
+
+      res.status(200).json({
+        status: 200,
+        message: 'Checkout successful!',
+        data: newOrder
+      })
+
+    }
+    else if (changePromotionStatus == 1) {
+      summary = await summaryOrderProStatusOne(cart, listPromotion)
+      // console.log("summary.listPromotion", JSON.stringify(summary.listPromotion, null, 2));
+
+
+      const productIds = cart.listProduct.map(p => p.id)
+      const products = await Product.find({ id: { $in: productIds } }).select(
+        'id name group brand size flavour listUnit'
+      )
+
+      let subtotal = 0
+      let listProduct = cart.listProduct.map(item => {
+        const product = products.find(p => p.id === item.id)
+        if (!product) return null
+
+        const unitData = product.listUnit.find(u => u.unit === item.unit)
+        if (!unitData) {
+          return res
+            .status(400)
+            .json({ status: 400, message: `Invalid unit for product ${item.id}` })
+        }
+
+        const totalPrice = item.qty * unitData.price.sale
+        subtotal += totalPrice
+
+        return {
+          id: product.id,
+          name: product.name,
+          group: product.group,
+          brand: product.brand,
+          size: product.size,
+          flavour: product.flavour,
+          qty: item.qty,
+          unit: item.unit,
+          unitName: unitData.name,
+          price: unitData.price.sale,
+          subtotal: parseFloat(totalPrice.toFixed(2)),
+          discount: 0,
+          netTotal: parseFloat(totalPrice.toFixed(2))
+        }
+      })
+
+      if (listProduct.includes(null)) return
+      const orderId = await generateOrderId(area, sale.warehouse)
+
+      const newOrder = new Order({
+        orderId,
+        type,
+        status: 'pending',
+        sale: {
+          saleCode: sale.saleCode,
+          salePayer: sale.salePayer,
+          name: `${sale.firstName} ${sale.surName}`,
+          tel: sale.tel || '',
+          warehouse: sale.warehouse
+        },
+        store: {
+          storeId: summary.store.storeId,
+          name: summary.store.name,
+          type: summary.store.type,
+          address: summary.store.address,
+          taxId: summary.store.taxId,
+          tel: summary.store.tel,
+          area: summary.store.area,
+          zone: summary.store.zone
+        },
+        note,
+        latitude,
+        longitude,
+        listProduct,
+        listPromotions: summary.listPromotion,
+        subtotal,
+        discount: 0,
+        discountProduct: 0,
+        vat: 0,
+        totalExVat: 0,
+        total: subtotal,
+        // shipping: {
+        //     shippingId: shippingData.shippingId,
+        //     address: shippingData.address,
+        //     dateRequest: shipping.dateRequest,
+        //     note: shipping.note
+        // },
+        shipping: {
+          shippingId: '',
+          address: ''
+        },
+        paymentMethod: 'cash',
+        paymentStatus: 'paid',
+        createdBy: sale.username
+      })
+
+      // await newOrder.save()
+      // await Cart.deleteOne({ type, area, storeId })
+
       // console.log("summary.listPromotion", JSON.stringify(newOrder, null, 2));
 
 
@@ -281,9 +401,9 @@ exports.checkout = async (req, res) => {
         latitude: latitude,
         longitude: longitude
       })
-  
+
       // console.log('checkin', checkIn)
-  
+
       res.status(200).json({
         status: 200,
         message: 'Checkout successful!',
@@ -291,7 +411,7 @@ exports.checkout = async (req, res) => {
       })
 
     }
-    
+
 
   } catch (error) {
     console.error(error)
@@ -499,115 +619,115 @@ exports.addSlip = async (req, res) => {
   }
 }
 
-exports.OrderToExcel = async(req, res) =>{
+exports.OrderToExcel = async (req, res) => {
 
-      const { saleCode } = req.params
+  const { saleCode } = req.params
 
-      console.log(saleCode)
-      modelOrder = await Order.find()
-      const tranFromOrder = modelOrder.flatMap(order => {
-        let counterOrder = 0;
-        const date = new Date();
-        const RLDT = `${date.getFullYear()}${(date.getMonth() + 1)
-          .toString()
-          .padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
+  // console.log(saleCode)
+  modelOrder = await Order.find()
+  const tranFromOrder = modelOrder.flatMap(order => {
+    let counterOrder = 0;
+    const date = new Date();
+    const RLDT = `${date.getFullYear()}${(date.getMonth() + 1)
+      .toString()
+      .padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
 
-          const listProduct = order.listProduct.map(product => {
-            return{
-              proCode:'',
-              id:product.id,
-              name:product.name,
-              group:product.group,
-              brand:product.brand,
-              size:product.size,
-              flavour:product.flavour,
-              qty:product.qty,
-              unit:product.unit,
-              unitName:product.unitName,
-              price:product.price,
-              subtotal:product.subtotal,
-              discount:product.discount,
-              netTotal:product.netTotal
-            }
-          });
+    const listProduct = order.listProduct.map(product => {
+      return {
+        proCode: '',
+        id: product.id,
+        name: product.name,
+        group: product.group,
+        brand: product.brand,
+        size: product.size,
+        flavour: product.flavour,
+        qty: product.qty,
+        unit: product.unit,
+        unitName: product.unitName,
+        price: product.price,
+        subtotal: product.subtotal,
+        discount: product.discount,
+        netTotal: product.netTotal
+      }
+    });
 
-          const listPromotion = order.listPromotions.map(promo => 
-            promo.listProduct.map(product =>  {
-              return {
-                proCode:promo.proCode,
-                id:product.id,
-                name:product.name,
-                group:product.group,
-                brand:product.brand,
-                size:product.size,
-                flavour:product.flavour,
-                qty:product.qty,
-                unit:product.unit,
-                unitName:product.unitName,
-                qtyPcs:product.qtyPcs
-              }
-            })
-          )
-        
-          const productIDS = [...listProduct,...listPromotion].flat();
+    const listPromotion = order.listPromotions.map(promo =>
+      promo.listProduct.map(product => {
+        return {
+          proCode: promo.proCode,
+          id: product.id,
+          name: product.name,
+          group: product.group,
+          brand: product.brand,
+          size: product.size,
+          flavour: product.flavour,
+          qty: product.qty,
+          unit: product.unit,
+          unitName: product.unitName,
+          qtyPcs: product.qtyPcs
+        }
+      })
+    )
 
-          // console.log("productIDS",productIDS)
-        return productIDS.map(product => {
-          
-          counterOrder++;
-          
-          // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
+    const productIDS = [...listProduct, ...listPromotion].flat();
 
-          
-          return {
-            CUNO: order.sale.salePayer,
-            FACI: 'F10',
-            WHLO: order.sale.warehouse,
-            ORNO: "",
-            OAORTP: "",
-            RLDT: RLDT,
-            ADID: order.shipping.shippingId,
-            CUOR: order.orderId,
-            OAOREF: '',
-            OBITNO: product.id,
-            OBBANO: "",
-            OBALUN: product.unit,
-            OBORQA: Number(product.qty),
-            OBSAPR: Number(product.price || 0),
-            OBSPUN: product.unit,
-            OBWHSL: "",
-            ROUT: "",
-            OBPONR: Number(counterOrder),
-            OBDIA2: Number(product.discount || 0),
-            OBRSCD:"",
-            OBCMNO:"",
-            OBPIDE: product.proCode,
-            OBSMCD: saleCode,
-            OAORDT: RLDT,
-            OAODAM: '',
-            OECRID: '',
-            OECRAM: '',
-            OECRID2: '',
-            OECRAM2:'',
-            OECRID3:'',
-            OECRAM3:'',
-            OECRID4:'',
-            OECRAM4:'',
-            OECRID5:'',
-            OECRAM5:'',
-            OARESP:'',
-            OAYREF:'',
-            OATEL2:'',
-            OAWCON:'',
-            OAFRE1:'',
-            OATXAP:'',
-            OATXAP2:'',
-            OBDIA1:'',
-            OBDIA3:'',
-            OBDIA4:''
-          };
-        });
-      });
+    // console.log("productIDS",productIDS)
+    return productIDS.map(product => {
+
+      counterOrder++;
+
+      // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
+
+
+      return {
+        CUNO: order.sale.salePayer,
+        FACI: 'F10',
+        WHLO: order.sale.warehouse,
+        ORNO: "",
+        OAORTP: "",
+        RLDT: RLDT,
+        ADID: order.shipping.shippingId,
+        CUOR: order.orderId,
+        OAOREF: '',
+        OBITNO: product.id,
+        OBBANO: "",
+        OBALUN: product.unit,
+        OBORQA: Number(product.qty),
+        OBSAPR: Number(product.price || 0),
+        OBSPUN: product.unit,
+        OBWHSL: "",
+        ROUT: "",
+        OBPONR: Number(counterOrder),
+        OBDIA2: Number(product.discount || 0),
+        OBRSCD: "",
+        OBCMNO: "",
+        OBPIDE: product.proCode,
+        OBSMCD: saleCode,
+        OAORDT: RLDT,
+        OAODAM: '',
+        OECRID: '',
+        OECRAM: '',
+        OECRID2: '',
+        OECRAM2: '',
+        OECRID3: '',
+        OECRAM3: '',
+        OECRID4: '',
+        OECRAM4: '',
+        OECRID5: '',
+        OECRAM5: '',
+        OARESP: '',
+        OAYREF: '',
+        OATEL2: '',
+        OAWCON: '',
+        OAFRE1: '',
+        OATXAP: '',
+        OATXAP2: '',
+        OBDIA1: '',
+        OBDIA3: '',
+        OBDIA4: ''
+      };
+    });
+  });
 
 
   const ws = xlsx.utils.json_to_sheet(tranFromOrder);
@@ -622,10 +742,229 @@ exports.OrderToExcel = async(req, res) =>{
   console.log("✅ ไฟล์ Order.xlsx ถูกสร้างแล้วที่:", downloadsPath);
 
   res.status(200).json({
-    message:"Create file successful!"
+    message: "Create file successful!"
   })
 
-
-
-
 }
+
+
+exports.getAllOrder = async (req, res) => {
+  try{ 
+  const { period } = req.query
+
+  if (period) {
+    const periodYear = period.slice(0, 4);
+    const month = period.slice(4, 6);
+
+    // สร้างช่วงเวลาของเดือนนั้นใน timezone Bangkok
+    const start = new Date(
+      new Date(`${periodYear}-${month}-01T00:00:00`).toLocaleString("en-US", {
+        timeZone: "Asia/Bangkok"
+      })
+    );
+
+    const end = new Date(new Date(start).setMonth(start.getMonth() + 1));
+
+    const modelOrder = await Order.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: start, $lt: end },
+          type: { $in: ["sale", "change"] }
+        }
+      },
+      {
+        $group: {
+          _id: "$store.area", // Group by area
+          summary: { $sum: "$total" }, // รวม total
+        }
+      },
+      {
+        $project: {
+          area: "$_id",
+          summary: 1,
+          // count: 1,
+          _id: 0
+        }
+      }
+    ]);
+
+
+    const data = modelOrder.map(item => ({
+      area: item.area,
+      summary: item.summary
+    }));
+
+    res.status(200).json({
+      status:200,
+      message:'success',
+      data:data
+    })
+  }
+  else {
+    const year = parseInt(req.query.year);
+
+    const modelOrder = await Order.aggregate([
+      {
+        $match: {
+          $expr: {
+            $eq: [{ $year: "$createdAt" }, year] // ดึงปีจาก createdAt แล้วเปรียบเทียบกับ year
+          },
+          type: { $in: ["sale", "change"] }
+        }
+      },
+      {
+        $group: {
+          _id: "$store.area", // Group by area
+          summary: { $sum: "$total" }, // รวม total
+        }
+      },
+      {
+        $project: {
+          area: "$_id",
+          summary: 1,
+          _id: 0
+        }
+      }
+    ]);
+
+
+    const data = modelOrder.map(item => ({
+      area: item.area,
+      summary: item.summary
+    }));
+
+
+    res.status(200).json({
+      status:200,
+      message:'success',
+      data:data
+    })
+  }
+
+
+} catch (error) {
+  console.error(error)
+  res.status(500).json({ status: '500', message: error.message })
+}
+}
+
+exports.getSummaryItem = async (req,res) => {
+try {
+  const { area,period } = req.query
+
+  const periodYear = period.slice(0, 4);
+  const month = period.slice(4, 6);
+
+  // สร้างช่วงเวลาของเดือนนั้นใน timezone Bangkok
+  const start = new Date(
+    new Date(`${periodYear}-${month}-01T00:00:00`).toLocaleString("en-US", {
+      timeZone: "Asia/Bangkok"
+    })
+  );
+
+  const end = new Date(new Date(start).setMonth(start.getMonth() + 1));
+
+  const modelOrder = await Order.aggregate([
+    {
+      $match: {
+        "store.area" : area,
+        createdAt: { $gte: start, $lt: end },
+        type: { $in: ["sale", "change"] }
+      }
+    },
+    {
+      $project: {
+        listProduct: 1,
+      }
+    }
+  ]);
+
+  if (!modelOrder || modelOrder.length === 0) {
+    return res.status(404).json({
+      status : 404,
+      message: "Not Found Order"
+    })
+  }
+
+
+  const modelProduct = await Product.find()
+
+  const calPcs =  modelOrder.map(product => product.listProduct.map(item => {
+    const productdetail = modelProduct.find(u => u.id === item.id)
+    const productFactor = productdetail.listUnit.map(item =>{
+      return{
+        item:productdetail.id,
+        unit:item.unit,
+        factor:item.factor
+      }
+    })
+
+    const factor = productFactor.find(u => u.item === item.id && u.unit === item.unit)
+    // console.log(factor)
+    return {
+      item:item.id,
+      qtyPcs : item.qty*factor.factor,
+      factor : factor.factor,
+      unit:item.unit,
+      price:item.price
+    }
+  })
+  )
+
+  let arrayCalPcs = calPcs.flat();
+
+  const sumPcs = arrayCalPcs.reduce((acc, item) => {
+    if (acc[item.item]) {
+      acc[item.item].qtyPcs += item.qtyPcs;
+      acc[item.item].totalPrice += item.qtyPcs * item.price;
+    } else {
+      acc[item.item] = {
+        item: item.item,
+        qtyPcs: item.qtyPcs,
+        totalPrice: item.qtyPcs * item.price,
+      };
+    }
+    return acc;
+  }, {});
+  
+  // แปลงผลลัพธ์จาก object ให้เป็น array
+  const sumPcsResult = Object.values(sumPcs);
+  
+  const sumCtn = sumPcsResult.map(item => {
+    const productdetail = modelProduct.find(u => u.id === item.item)
+    const productFactor = productdetail.listUnit.filter(item => item.unit === 'CTN')
+    .map(item =>{
+      return{
+        item:productdetail.id,
+        unit:item.unit,
+        factor:parseInt(item.factor)
+      }
+    })
+    const ctnFactor = productFactor.find(u => u.item && item.item)
+
+    return{
+      item:item.item,
+      count:Math.floor(item.qtyPcs / ctnFactor.factor),
+      unit: "CTN",
+      // qtyPcs:item.qtyPcs,
+      // factor: ctnFactor.factor,
+      // qtyCtn: Math.floor(item.qtyPcs / ctnFactor.factor),
+      summary:item.totalPrice
+    }
+  })
+
+  
+
+  res.status(200).json({
+    status:200,
+    message:'success',
+    data:sumCtn
+  })
+
+} catch (error) {
+  console.error(error)
+  res.status(500).json({ status: '500', message: error.message })
+}
+}
+
+

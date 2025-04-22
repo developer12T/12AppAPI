@@ -9,7 +9,9 @@ const upload = multer({ storage: multer.memoryStorage() }).array(
   'checkInImage',
   1
 )
+
 const path = require('path')
+const { forEach } = require('lodash')
 
 exports.getRoute = async (req, res) => {
   try {
@@ -811,4 +813,75 @@ exports.getRouteCheckinAll = async (req, res) => {
     console.error(error)
     res.status(500).json({ message: 'Internal server error.' })
   }
+}
+
+
+exports.routeTimeline = async(req,res) => {
+try {
+  const { area, day } = req.body
+
+  const modelRoute = await Route.findOne({area:area,day:day})
+
+  if (modelRoute) {
+
+    const tranFromRoue = modelRoute.listStore.map(route => {
+      const date = new Date(route.date || "");
+    
+      if (isNaN(date)) {
+        return { date: "", hour: "" };
+      }
+    
+      const bangkokDate = new Date(
+        date.toLocaleString("en-US", { timeZone: "Asia/Bangkok" })
+      );
+    
+      return {
+        date: bangkokDate.toLocaleString("th-TH", {
+          timeZone: "Asia/Bangkok",
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', second: '2-digit',
+          hour12: false
+        }),
+        hour: bangkokDate.getHours()
+      };
+    });
+  
+  
+    const hourCountMap = {};
+  
+    // กรองข้อมูลเฉพาะเวลาที่อยู่ในช่วง 5 โมงเช้าถึง 6 โมงเย็น (05:00-17:59)
+    tranFromRoue.forEach(item => {
+      if (item.hour >= 5 && item.hour <= 18) {
+        hourCountMap[item.hour] = (hourCountMap[item.hour] || 0) + 1;
+      }
+    });
+    
+    // สร้างข้อมูลที่แสดงทุกชั่วโมงในช่วง 5-17 และกรอก count = 0 สำหรับชั่วโมงที่ไม่มีข้อมูล
+    const data = [];
+    for (let hour = 5; hour <= 18; hour++) {
+      data.push({
+        time: String(hour).padStart(2, '0') + ":00",
+        count: hourCountMap[hour] || 0
+      });
+    }
+      
+  res.status(200).json({
+    response:data
+  })
+
+  }
+  else {
+    return res.status(404).json({
+      message:`Not Found this ${area} day: ${day} `
+    })
+  }
+
+
+
+
+
+} catch (error) {
+  console.error(error)
+  res.status(500).json({ message: 'Internal server error.' })
+}
 }

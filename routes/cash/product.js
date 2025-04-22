@@ -9,5 +9,5 @@ router.get('/search', searchProduct)
 router.post('/filter', getFilters)
 router.post('/onOff', updateStatus)
 router.post('/addFromERP', addFromERP)
-
+// router.get('/searchProduct', searchProduct)
 module.exports = router
