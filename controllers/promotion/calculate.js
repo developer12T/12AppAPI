@@ -121,6 +121,7 @@ async function applyPromotion(order) {
 
             appliedPromotions.push({
                 proId: promo.proId,
+                proCode:promo.proCode,
                 proName: promo.name,
                 proType: promo.proType,
                 proQty: selectedProduct.productQty,
@@ -146,7 +147,6 @@ async function applyPromotion(order) {
             discountTotal += promoDiscount
         }
     }
-
     return { appliedPromotions }
 }
 

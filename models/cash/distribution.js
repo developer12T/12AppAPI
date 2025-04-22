@@ -1,5 +1,7 @@
 const mongoose = require('mongoose')
 const { dbCA } = require('../../config/db')
+const { sequelize, DataTypes } = require('../../config/m3db')
+
 
 const listWarehouse = mongoose.Schema({
     normal: { type: String, require: true },
@@ -110,7 +112,27 @@ const distributionSchema = mongoose.Schema({
     updatedAt: { type: Date, default: Date.now },
 })
 
+
+
+const withdrawSchema = mongoose.Schema({
+  Des_No: { type: String, required: true },
+  Des_Name: { type: String, required: true },
+  Des_Date: { type: String, required: true },
+  Des_Area: { type: String, required: true },
+  ZType: { type: String, required: true },  
+  WH: { type: String, required: true },
+  ROUTE: { type: String, required: true },
+  WH1: { type: String, required: true },
+});
+
+
+
+
+
+const Withdraw = dbCA.model('Withdraw', withdrawSchema, 'withdraw');
 const Place = dbCA.model('Place', placeSchema)
 const Distribution = dbCA.model('Distribution', distributionSchema)
 const Receive = dbCA.model('Receive', receiveSchema)
-module.exports = { Place, Distribution, Receive }
+
+
+module.exports = { Place, Distribution, Receive ,Withdraw }

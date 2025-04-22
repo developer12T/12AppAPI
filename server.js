@@ -2,6 +2,7 @@ const http = require('http')
 require('dotenv').config()
 const app = require('./app')
 const { dbCA } = require('./config/db.js')
+const { Server } = require('socket.io');
 
 const { API_PORT } = process.env
 const PORT = process.env.PORT || API_PORT

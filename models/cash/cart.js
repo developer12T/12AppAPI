@@ -27,6 +27,7 @@ const listProductPromotion = mongoose.Schema({
 
 const listCartPromotion = mongoose.Schema({
   proId: { type: String, require: true, default: '' },
+  proCode: { type: String, require: true, default: '' },
   proName: { type: String, require: true, default: '' },
   proType: { type: String, require: true, default: '' },
   proQty: { type: Number, require: true, default: 0 },

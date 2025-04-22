@@ -1,4 +1,4 @@
-const { Stock, StockMovement } = require('../../models/cash/stock')
+const { Stock, StockMovement, StockMovementLog } = require('../../models/cash/stock')
 const { User } = require('../../models/cash/user')
 const { Product } = require('../../models/cash/product')
 const path = require('path')
@@ -154,13 +154,14 @@ exports.transaction = async (req, res) => {
 }
 
 exports.addStockNew = async (req, res) => {
+  try {
   const { period, warehouse } = req.body
   const locateData = {}
   const factorData = {}
 
   const users = await User.find().select('area saleCode warehouse').lean()
 
-  //    console.log(area,saleCode,period)
+  console.log("users",users)
   for (const user of users) {
     const stock = await Stock.findOne({
       area: user.area
@@ -284,7 +285,7 @@ exports.addStockNew = async (req, res) => {
               }))
 
               return {
-                productId: productId,
+                id: productId,
                 sumQtyPcs: sumQtyPcs,
                 sumQtyCtn: sumQtyCtn,
                 available: lotList
@@ -301,7 +302,10 @@ exports.addStockNew = async (req, res) => {
           })
         })
       }
-      await Stock.insertMany(data)
+      // await Stock.insertMany(data)
+
+      // const productId = data.map(product => product.id )
+      // console.log(productId)
     }
   }
 
@@ -311,169 +315,12 @@ exports.addStockNew = async (req, res) => {
     data: data,
     message: 'Successfull Insert'
   })
+} catch (error) {
+  next(error)
+}
 }
 
-exports.stockToExcel = async (req, res) => {
-  const { area, period, type } = req.body
 
-  const modelStock = await Stock.findOne({ area: area })
-
-  const tableData = {
-    area: modelStock.area,
-    saleCode: modelStock.saleCode,
-    period: modelStock.period,
-    warehouse: modelStock.warehouse,
-    listProduct: modelStock.listProduct.map(product => ({
-      productId: product.productId
-    }))
-  }
-
-  // สร้าง worksheet และ workbook
-  const worksheet = XLSX.utils.json_to_sheet(tableData)
-  const workbook = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'StockList')
-
-  // เขียนไฟล์ .xlsx
-  XLSX.writeFile(workbook, 'stock_list.xlsx')
-
-  console.log('✅ สร้างไฟล์ stock_list.xlsx สำเร็จแล้ว!')
-
-  res.status(200).json({
-    main: stockData,
-    message: modelStock
-  })
-}
-
-// exports.getProductAndStock = async (req, res) => {
-//   try {
-//       const {  area, period, type, group, brand, size, flavour } = req.body
-//       // console.log(area,period)
-//       const stock = await Stock.find(
-//           {
-//           area:area,
-//           period:period ,
-//       }
-//   )
-//       // console.log("stock", JSON.stringify(stock, null, 2));
-//       let stockDatas = []
-//       stock.forEach(stockItem  => {
-
-//           stockItem.listProduct.forEach(product => {
-
-//               product.available.forEach(availableItem => {
-//                 stockDatas.push({
-//                       id: product.productId,
-//                       lot: availableItem.lot,
-//                       qtyPcs: availableItem.qtyPcs,
-//                       qtyCtn: availableItem.qtyCtn
-//                   });
-//               }
-
-//               )
-//           })
-//       })
-
-//       if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
-//           return res.status(400).json({
-//               status: '400',
-//               message: 'Invalid type! Required: sale, refund, or withdraw.'
-//           })
-//       }
-//       let filter = {}
-
-//       if (type === 'sale') filter.statusSale = 'Y'
-//       if (type === 'refund') filter.statusRefund = 'Y'
-//       if (type === 'withdraw') filter.statusWithdraw = 'Y'
-
-//       const parseArrayParam = (param) => {
-//           if (!param) return []
-//           try {
-//               return typeof param === 'string' ? JSON.parse(param) : param
-//           } catch (error) {
-//               return param.split(',')
-//           }
-//       }
-
-//       const groupArray = parseArrayParam(group)
-//       const brandArray = parseArrayParam(brand)
-//       const sizeArray = parseArrayParam(size)
-//       const flavourArray = parseArrayParam(flavour)
-
-//       let conditions = []
-//       if (groupArray.length) conditions.push({ group: { $in: groupArray } })
-//       if (brandArray.length) conditions.push({ brand: { $in: brandArray } })
-//       if (sizeArray.length) conditions.push({ size: { $in: sizeArray } })
-//       if (flavourArray.length) conditions.push({ flavour: { $in: flavourArray } })
-
-//       if (conditions.length) filter.$and = conditions
-
-//       let products = await Product.find({
-//           ...filter,  // ขยายเงื่อนไขใน filter ที่มีอยู่
-//           id: { $in: stockDatas.map(item => item.id) }  // เพิ่มเงื่อนไขค้นหาว่า id อยู่ใน productIDs
-//         }).lean();
-
-//         products.forEach(item => {
-//           item.listUnit.forEach(unit => {
-//             unit.price.refund = unit.price.sale;
-//           });
-//         });
-
-//         // console.log('productIDs',productIDs)
-
-//         let dataProducts = [];
-//         stockDatas.forEach(product => {
-//           const productDetail = products.find(item => item.id === product.id);
-//           const stockData = stockDatas.find(item => item.id == product.id)
-//           if (productDetail) {
-//               // console.log("data", JSON.stringify(data, null, 2));
-
-//             // สร้าง object ใหม่จาก data ที่พบ
-//             const dataProduct = {
-//               _id: productDetail._id,
-//               id: productDetail.id,
-//               name: productDetail.name,
-//               group: productDetail.group,
-//               brand: productDetail.brand,
-//               size: productDetail.size,
-//               flavour: productDetail.flavour,
-//               type: productDetail.type,
-//               weightGross: productDetail.weightGross,
-//               weightNet: productDetail.weightNet,
-//               statusSale: productDetail.statusSale,
-//               statusWithdraw: productDetail.statusWithdraw,
-//               statusRefund: productDetail.statusRefund,
-//               image: productDetail.image,
-//               // listUnit: productDetail.listUnit.map(listUnit => ({
-//                 // unit: listUnit.unit,
-//                 // name: listUnit.name,
-//                 // factor: listUnit.price.factor,
-//                 // price: listUnit.price.sale,
-//               available : listUnit.available.map(avail =>({
-//                   qtyPcs : avail.qtyPcs,
-//                   lot : avail.lot
-//               }))
-//               // }))
-//             };
-
-//             // เพิ่มข้อมูลลงใน dataProducts
-//             dataProducts.push(dataProduct);
-//           }
-//         });
-
-//       res.status(200).json({
-//           status: 200,
-//           message: "Products fetched successfully!",
-//           data : dataProducts
-//       })
-
-//   } catch (error) {
-//       console.error(error);
-//       res.status(500).json({ status: '501', message: error.message })
-//   }
-//   // res.status(200).json({
-//   //     data:"getProductAndStock"
-//   // })
-// }
 
 exports.getQty = async (req, res, next) => {
   try {
@@ -541,6 +388,7 @@ exports.getQty = async (req, res, next) => {
   }
 }
 
+// check updateStockMovement
 exports.addStockMovement = async (req, res, next) => {
   try {
     const {
@@ -560,25 +408,82 @@ exports.addStockMovement = async (req, res, next) => {
       period
     })
 
-    const newStockMovement = new StockMovement({
-      orderId,
-      area,
-      saleCode,
-      period,
-      warehouse,
-      status,
-      product
-    })
-    newStockMovement.save()
+    // console.log(movement)
+    if (!movement) {
 
-    res.status(200).json({
-      status: 200,
-      message: 'Stock Movement added successfully!'
-    })
+      const newStockMovement = new StockMovement({
+        orderId,
+        area,
+        saleCode,
+        period,
+        warehouse,
+        status,
+        product,
+        action
+      })
+      newStockMovement.save()
+
+      res.status(200).json({
+        status: 200,
+        message: 'Stock Movement added successfully!'
+      })
+
+
+
+
+
+    } else {
+      return res.status(409).json({
+        status:409,
+        message:"action, area, period already in database"
+      })
+
+    }
   } catch (error) {
     next(error)
   }
 }
+
+
+exports.updateStockMovement = async (req, res, next) => {
+  try {
+    const {
+      action
+    } = req.body
+
+    let movement = await StockMovement.find({
+    }).select("_id orderId area saleCode period warehouse status action")
+    console.log(movement)
+    
+    await StockMovementLog.insertMany(movement)
+    
+    await StockMovement.updateMany(
+      {},        // เงื่อนไข
+      { $set: { action: action } } // สิ่งที่ต้องการอัปเดต
+    );
+
+      res.status(200).json({
+        status: 200,
+        // data:"Update Status Successful!"
+        data:movement
+      })
+    
+  } catch (error) {
+    next(error)
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
 // exports.rollbackStock = async (req, res, next) => {
 //   try {

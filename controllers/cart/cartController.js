@@ -58,10 +58,11 @@ exports.getCart = async (req, res) => {
 
       // if (shouldRecalculatePromotion) {
       const promotion = await applyPromotion(summary)
+      // console.log("promotion",promotion)
       cart.listPromotion = promotion.appliedPromotions
       cart.cartHashProduct = newCartHashProduct
       cart.cartHashPromotion = newCartHashPromotion
-      await cart.save()
+      // await cart.save()
       // }
       summary.listPromotion = cart.listPromotion
     }
@@ -130,6 +131,9 @@ exports.addProduct = async (req, res) => {
       type === 'withdraw' ? { type, area } : { type, area, storeId }
 
     let cart = await Cart.findOne(cartQuery)
+
+    // console.log("cart", JSON.stringify(cart, null, 2));
+
 
     if (!cart) {
       cart = await Cart.create({
@@ -212,7 +216,7 @@ exports.addProduct = async (req, res) => {
       cart.total = cart.listProduct.reduce((sum, p) => sum + p.qty * p.price, 0)
     }
     cart.createdAt = new Date()
-    await cart.save()
+    // await cart.save()
 
     res.status(200).json({
       status: 200,
@@ -487,10 +491,10 @@ exports.updateCartPromotion = async (req, res) => {
     res.status(500).json({ status: '500', message: error.message })
   }
 }
-
+// check
 exports.updateStock = async (req, res) => {
   try {
-    const { area, productId, unit, type } = req.body
+    const { area, id, unit, type } = req.body
     let { qty } = req.body
 
     const modelStock = await Stock.findOne({
@@ -505,7 +509,7 @@ exports.updateStock = async (req, res) => {
     }
 
     const stockData = modelStock.listProduct.find(
-      product => product.productId === productId
+      product => product.id === id
     )
 
     if (!stockData) {
@@ -516,7 +520,7 @@ exports.updateStock = async (req, res) => {
     }
 
     const modelProduct = await Product.findOne({
-      id: productId
+      id: id
     }).select('id listUnit')
 
     // console.log('modelProduct', modelProduct)
@@ -639,14 +643,14 @@ exports.updateStock = async (req, res) => {
       }
 
       const data = {
-        productId: stockData.productId,
+        id: stockData.id,
         sumQtyPcs: available.reduce((sum, item) => sum + item.qtyPcs, 0),
         sumQtyCtn: available.reduce((sum, item) => sum + item.qtyCtn, 0),
         available
       }
 
       await Stock.findOneAndUpdate(
-        { area: area, 'listProduct.productId': data.productId },
+        { area: area, 'listProduct.productId': data.id },
         {
           $set: {
             'listProduct.$.sumQtyPcs': data.sumQtyPcs,
@@ -675,14 +679,14 @@ exports.updateStock = async (req, res) => {
       })
 
       const data = {
-        productId: stockData.productId,
+        id: stockData.id,
         sumQtyPcs: available.reduce((sum, item) => sum + item.qtyPcs, 0),
         sumQtyCtn: available.reduce((sum, item) => sum + item.qtyCtn, 0),
         available
       }
 
       await Stock.findOneAndUpdate(
-        { area: area, 'listProduct.productId': data.productId },
+        { area: area, 'listProduct.productId': data.id },
         {
           $set: {
             'listProduct.$.sumQtyPcs': data.sumQtyPcs,
