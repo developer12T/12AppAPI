@@ -1,5 +1,5 @@
 const express = require('express')
-const { getOrder, getDetail, updateStatus, checkout, addSlip, OrderToExcel } = require('../../controllers/sale/orderController')
+const { getOrder, getDetail, updateStatus, checkout, addSlip, OrderToExcel, getAllOrder, getSummaryItem } = require('../../controllers/sale/orderController')
 
 const router = express.Router()
 
@@ -11,7 +11,7 @@ router.post('/addSlip', addSlip)
 
 router.post('/addSlip', addSlip)
 router.get('/ordertoexcel/:saleCode', OrderToExcel);
-
-
+router.get('/getAllOrder', getAllOrder)
+router.get('/getSummaryItem', getSummaryItem)
 
 module.exports = router

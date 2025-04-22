@@ -333,7 +333,9 @@ exports.getQty = async (req, res, next) => {
 
     let unitData = {}
 
+    // console.log(products)
     const productUnitMatch = products?.find(p => p.id === productId)
+    
     if (productUnitMatch) {
       unitData = productUnitMatch.listUnit.map(unit => ({
         unit: unit.unit,
@@ -344,17 +346,16 @@ exports.getQty = async (req, res, next) => {
         message: 'Not Found This ItemId'
       })
     }
-
+    
     const stockmatchList = []
-
+    
     productStock.map(item => {
-      const stockmatch = item.listProduct.find(p => p.productId === productId)
-
+      const stockmatch = item.listProduct.find(p => p.productId === productId);
       if (stockmatch) {
         stockmatchList.push(stockmatch)
       }
     })
-
+    
     const qtyList = stockmatchList.flatMap(product =>
       product.available.map(lot => lot.qtyPcs)
     )
@@ -362,6 +363,7 @@ exports.getQty = async (req, res, next) => {
       product.available.map(lot => lot.lot)
     )
 
+  
     const totalQtyPcs = qtyList.reduce((sum, qty) => sum + qty, 0)
 
     const productUnit = unitData.find(p => p.unit === unit)

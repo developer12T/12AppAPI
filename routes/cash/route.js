@@ -7,7 +7,8 @@ const {
   routeHistory,
   createRoute,
   getRouteCheckinAll,
-  geTimelineCheckin
+  geTimelineCheckin,
+  routeTimeline
 } = require('../../controllers/route/routeController')
 
 const router = express.Router()
@@ -20,5 +21,8 @@ router.get('/history', routeHistory)
 router.post('/createRoute', createRoute)
 router.get('/getRouteCheckinAll', getRouteCheckinAll)
 router.get('/geTimelineCheckin', geTimelineCheckin)
+router.post('/routeTimeline', routeTimeline)
+
+
 
 module.exports = router
