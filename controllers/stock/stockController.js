@@ -560,24 +560,21 @@ exports.addStockMovement = async (req, res, next) => {
       period
     })
 
-    if (!movement) {
-    } else {
-      const newStockMovement = new StockMovement({
-        orderId,
-        area,
-        saleCode,
-        period,
-        warehouse,
-        status,
-        product
-      })
-      newStockMovement.save()
+    const newStockMovement = new StockMovement({
+      orderId,
+      area,
+      saleCode,
+      period,
+      warehouse,
+      status,
+      product
+    })
+    newStockMovement.save()
 
-      res.status(200).json({
-        status: 200,
-        message: 'Stock Movement added successfully!'
-      })
-    }
+    res.status(200).json({
+      status: 200,
+      message: 'Stock Movement added successfully!'
+    })
   } catch (error) {
     next(error)
   }
