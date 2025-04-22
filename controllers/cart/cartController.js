@@ -216,7 +216,7 @@ exports.addProduct = async (req, res) => {
       cart.total = cart.listProduct.reduce((sum, p) => sum + p.qty * p.price, 0)
     }
     cart.createdAt = new Date()
-    // await cart.save()
+    await cart.save()
 
     res.status(200).json({
       status: 200,
@@ -494,7 +494,7 @@ exports.updateCartPromotion = async (req, res) => {
 // check
 exports.updateStock = async (req, res) => {
   try {
-    const { area, id, unit, type } = req.body
+    const { area, productId, unit, type } = req.body
     let { qty } = req.body
 
     const modelStock = await Stock.findOne({
@@ -509,7 +509,7 @@ exports.updateStock = async (req, res) => {
     }
 
     const stockData = modelStock.listProduct.find(
-      product => product.id === id
+      product => product.productId === productId
     )
 
     if (!stockData) {
@@ -520,8 +520,8 @@ exports.updateStock = async (req, res) => {
     }
 
     const modelProduct = await Product.findOne({
-      id: id
-    }).select('id listUnit')
+      id: productId
+    }).select('productId listUnit')
 
     // console.log('modelProduct', modelProduct)
     // console.log('qty', qty)
@@ -643,14 +643,14 @@ exports.updateStock = async (req, res) => {
       }
 
       const data = {
-        id: stockData.id,
+        productId: stockData.productId,
         sumQtyPcs: available.reduce((sum, item) => sum + item.qtyPcs, 0),
         sumQtyCtn: available.reduce((sum, item) => sum + item.qtyCtn, 0),
         available
       }
 
       await Stock.findOneAndUpdate(
-        { area: area, 'listProduct.productId': data.id },
+        { area: area, 'listProduct.productId': data.productId },
         {
           $set: {
             'listProduct.$.sumQtyPcs': data.sumQtyPcs,
@@ -679,14 +679,14 @@ exports.updateStock = async (req, res) => {
       })
 
       const data = {
-        id: stockData.id,
+        productId: stockData.productId,
         sumQtyPcs: available.reduce((sum, item) => sum + item.qtyPcs, 0),
         sumQtyCtn: available.reduce((sum, item) => sum + item.qtyCtn, 0),
         available
       }
 
       await Stock.findOneAndUpdate(
-        { area: area, 'listProduct.productId': data.id },
+        { area: area, 'listProduct.productId': data.productId },
         {
           $set: {
             'listProduct.$.sumQtyPcs': data.sumQtyPcs,
