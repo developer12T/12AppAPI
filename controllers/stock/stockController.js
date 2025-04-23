@@ -9,6 +9,7 @@ const { getStockMovement } = require('../../utilities/movement')
 const { Warehouse, Locate, Balance } = require('../../models/cash/master')
 const { Op } = require('sequelize')
 const XLSX = require('xlsx')
+// const { getSocket } = require('./socket')
 
 // const { fetchArea } = require('./fetchArea')
 
@@ -156,6 +157,7 @@ exports.transaction = async (req, res) => {
 exports.addStockNew = async (req, res) => {
   try {
   const { period, warehouse } = req.body
+
   const locateData = {}
   const factorData = {}
 
@@ -327,7 +329,8 @@ exports.getQty = async (req, res, next) => {
     const { area, productId, unit } = req.body
 
     const productStock = await Stock.find({
-      area: area
+      area: area,
+      "listProduct.productId":productId
     })
     const products = await Product.find({})
 
@@ -455,7 +458,7 @@ exports.updateStockMovement = async (req, res, next) => {
 
     let movement = await StockMovement.find({
     }).select("_id orderId area saleCode period warehouse status action")
-    console.log(movement)
+    // console.log(movement)
     
     await StockMovementLog.insertMany(movement)
     

@@ -968,3 +968,88 @@ try {
 }
 
 
+exports.getSummarybyRoute = async (req,res) =>{
+  try {
+    const { area, period } = req.query
+
+    const modelRoute = await Route.aggregate([
+      { $match: { area, period } },
+      { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
+    
+      // JOIN: นำ orderId จาก listOrder ไป join กับ collection Order
+      {
+        $lookup: {
+          from: "orders", // ชื่อ collection ที่จะ join
+          localField: "listStore.listOrder.orderId",
+          foreignField: "orderId",
+          as: "orderDetails"
+        }
+      },
+    
+      // group by day, และ sum total จาก orderDetails
+      {
+        $group: {
+          _id: "$day",
+          totalAmount: {
+            $sum: {
+              $sum: { // เพิ่มการ sum ในนี้ถ้า `orderDetails` มีหลายรายการ
+                $map: {
+                  input: "$orderDetails",  // เข้าไปใน array `orderDetails`
+                  as: "order",  // ชื่อ alias ให้กับแต่ละ element ใน array
+                  in: "$$order.total"  // นำค่า `total` มารวมกัน
+                }
+              }
+            }
+          },
+          orders: {
+            $push: {
+              total: { $arrayElemAt: ["$orderDetails.total", 0] } // ใช้ arrayElemAt สำหรับเลือก `total` ถ้ามีแค่ 1
+            }
+          }
+        }
+      },
+    
+      { $sort: { _id: 1 } },
+    
+      {
+        $project: {
+          day: "$_id",
+          // orders: 1,
+          totalAmount: 1,
+          _id: 0
+        }
+      }
+    ]);
+    
+
+    if (modelRoute.length === 0) {
+      return res.status(404).json({
+        status:404,
+        message:"Not Found Route"
+      })
+    }
+
+    data = modelRoute.map(item => {
+      return {
+        route:item.day,
+        summary: item.totalAmount
+      }
+    })
+
+
+
+
+
+
+  res.status(200).json({
+    status:200,
+    message:'success',
+    data:data
+  })
+
+} catch (error) {
+  console.error(error)
+  res.status(500).json({ status: '500', message: error.message })
+}
+}

@@ -15,7 +15,11 @@ const { forEach } = require('lodash')
 
 exports.getRoute = async (req, res) => {
   try {
-    const { storeId, area, period, routeId } = req.query
+    const { storeId, area, period, routeId, province,district  } = req.query
+
+    if (storeId && period) {
+
+
 
     if (!period) {
       return res
@@ -130,6 +134,23 @@ exports.getRoute = async (req, res) => {
       message: 'Success',
       data: response
     })
+  }
+
+  if (period && province && district ) {
+
+
+
+    
+      res.status(200).json({
+        message:period,province,district
+      })
+
+
+
+
+  }
+
+
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
@@ -818,15 +839,17 @@ exports.getRouteCheckinAll = async (req, res) => {
 
 exports.routeTimeline = async(req,res) => {
 try {
-  const { area, day } = req.body
+  const { area, day, period } = req.body
 
-  const modelRoute = await Route.findOne({area:area,day:day})
+  const modelRoute = await Route.findOne({area:area,day:day,period:period})
+
+  // console.log(modelRoute)
 
   if (modelRoute) {
 
     const tranFromRoue = modelRoute.listStore.map(route => {
       const date = new Date(route.date || "");
-    
+      // console.log(date)
       if (isNaN(date)) {
         return { date: "", hour: "" };
       }
@@ -846,7 +869,7 @@ try {
       };
     });
   
-  
+    
     const hourCountMap = {};
   
     // กรองข้อมูลเฉพาะเวลาที่อยู่ในช่วง 5 โมงเช้าถึง 6 โมงเย็น (05:00-17:59)
