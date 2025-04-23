@@ -1053,3 +1053,92 @@ exports.getSummarybyRoute = async (req,res) =>{
   res.status(500).json({ status: '500', message: error.message })
 }
 }
+
+
+exports.getSummarybyMonth = async (req,res) =>{
+
+  const { area, period } = req.query
+
+  const modelRoute = await Route.aggregate([
+    { $match: { area, period } },
+  
+    { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
+  
+    {
+      $lookup: {
+        from: "orders",
+        localField: "listStore.listOrder.orderId",
+        foreignField: "orderId",
+        as: "orderDetails"
+      }
+    },
+  
+    { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } },
+  
+    {
+      $match: {
+        orderDetails: { $ne: null },
+        "orderDetails.createdAt": { $ne: null }
+      }
+    },
+  
+    {
+      $addFields: {
+        month: { $month: "$orderDetails.createdAt" }
+      }
+    },
+  
+    {
+      $project: {
+        month: 1,
+        total: "$orderDetails.total"
+      }
+    },
+  
+    {
+      $unionWith: {
+        coll: null,
+        pipeline: [
+          {
+            $documents: Array.from({ length: 12 }, (_, i) => ({
+              month: i + 1,
+              total: 0
+            }))
+          }
+        ]
+      }
+    },
+  
+    {
+      $group: {
+        _id: "$month",
+        totalAmount: { $sum: "$total" }
+      }
+    },
+  
+    { $sort: { _id: 1 } },
+  
+    {
+      $project: {
+        month: "$_id",
+        totalAmount: 1,
+        _id: 0
+      }
+    }
+  ]);
+  
+  
+  data = modelRoute.map(item => {
+    return {
+      month:item.month.toString(),
+      summary:item.totalAmount
+    }
+  })
+
+  res.status(200).json({
+    status:200,
+    message:"Success",
+    data:data
+  })
+}

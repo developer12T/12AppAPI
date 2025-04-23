@@ -15,147 +15,302 @@ const { forEach } = require('lodash')
 
 exports.getRoute = async (req, res) => {
   try {
-    const { storeId, area, period, routeId, province,district  } = req.query
-
-    if (storeId && period) {
-
-
-
-    if (!period) {
-      return res
-        .status(400)
-        .json({ status: '400', message: 'period is required!' })
-    }
-
-    let query = { period }
-    let response = []
-    let store = null
-
-    if (storeId) {
-      store = await Store.findOne({ storeId }).select('_id')
-      if (!store) {
-        return res
-          .status(404)
-          .json({ status: '404', message: 'Store not found!' })
+      const { storeId, area, period, routeId, province, district } = req.query
+  
+      if (!period) {
+          return res.status(400).json({ status: '400', message: 'period is required!' })
       }
-    }
-
-    if (area && !routeId && !storeId) {
-      query.area = area
-      const routes = await Route.find(query, { _id: 0, __v: 0 })
-
-      response = routes.map(route => ({
-        id: route.id,
-        period: route.period,
-        area: route.area,
-        day: route.day,
-        storeAll: route.storeAll,
-        storePending: route.storePending,
-        storeSell: route.storeSell,
-        storeNotSell: route.storeNotSell,
-        storeTotal: route.storeTotal,
-        percentComplete: route.percentComplete,
-        percentVisit: route.percentVisit,
-        percentEffective: route.percentEffective
-      }))
-    } else if (area && routeId && !storeId) {
-      query.area = area
-      query.id = routeId
-
-      const routes = await Route.findOne(query).populate(
-        'listStore.storeInfo',
-        'storeId name address typeName taxId tel'
-      )
-
-      if (!routes) {
-        return res
-          .status(404)
-          .json({ status: '404', message: 'Route not found!' })
+ 
+      let query = { period }
+      let response = []
+      let store = null
+ 
+      if (storeId) {
+          store = await Store.findOne({ storeId }).select('_id')
+          if (!store) {
+              return res.status(404).json({ status: '404', message: 'Store not found!' })
+          }
       }
-
-      const sortedListStore = routes.listStore.sort((a, b) => {
-        const statusA = parseInt(a.status, 10)
-        const statusB = parseInt(b.status, 10)
-        return statusA - statusB
-      })
-
-      response = [
-        {
-          ...routes.toObject(),
-          listStore: sortedListStore
+ 
+      if ( area && period  && province && district ) {
+       
+        const store = await Store.find({
+          area: area,
+          $and: [
+            { address: { $regex: district, $options: "i" } },
+            { address: { $regex: province, $options: "i" } }
+          ]
+        });
+       
+     
+        if (store.length === 0) {
+          return res
+            .status(404)
+            .json({ status: '404', message: 'Store not found!' })
         }
-      ]
-    } else if (area && routeId && storeId) {
-      query.area = area
-      query.id = routeId
+        const storeIdString = store.map(item => item._id.toString());
 
-      const routes = await Route.findOne(query).populate(
-        'listStore.storeInfo',
-        'storeId name address typeName taxId tel'
-      )
-
-      if (!routes) {
-        return res
-          .status(404)
-          .json({ status: '404', message: 'Route not found!' })
-      }
-
-      response = [
-        {
-          ...routes.toObject(),
-          listStore: routes.listStore.filter(
-            store => store.storeInfo && store.storeInfo.storeId === storeId
+        const storeId = store.map(item => item.storeId.toString());
+ 
+        const routes = await Route.find({
+          period,
+          'listStore.storeInfo': { $in: storeIdString }
+        }).populate(
+          'listStore.storeInfo',
+          'storeId name address typeName taxId tel'
+        );
+ 
+        response = routes.map(route => ({
+          ...route.toObject(),
+          listStore: route.listStore.filter(
+            store => store.storeInfo && store.storeInfo.storeId && storeId.includes(store.storeInfo.storeId)
           )
+        }));
+ 
+      }
+      else if ( area && period  && district ) {
+       
+        const store = await Store.find({
+          area: area,
+          $and: [
+            { address: { $regex: district, $options: "i" } },
+          ]
+        });
+       
+     
+        if (store.length === 0) {
+          return res
+            .status(404)
+            .json({ status: '404', message: 'Store not found!' })
         }
-      ]
-    } else if (!area && !routeId && storeId) {
-      const routes = await Route.find({
-        period,
-        'listStore.storeInfo': store._id
-      }).populate(
-        'listStore.storeInfo',
-        'storeId name address typeName taxId tel'
-      )
+        const storeIdString = store.map(item => item._id.toString());
+ 
+ 
+       
+        const storeId = store.map(item => item.storeId.toString());
+ 
+        const routes = await Route.find({
+          period,
+          'listStore.storeInfo': { $in: storeIdString }
+        }).populate(
+          'listStore.storeInfo',
+          'storeId name address typeName taxId tel'
+        );
+ 
+        response = routes.map(route => ({
+          ...route.toObject(),
+          listStore: route.listStore.filter(
+            store => store.storeInfo && store.storeInfo.storeId && storeId.includes(store.storeInfo.storeId)
+          )
+        }));
+ 
+      }
 
-      response = routes.map(route => ({
-        ...route.toObject(),
-        listStore: route.listStore.filter(
-          store => store.storeInfo && store.storeInfo.storeId === storeId
-        )
-      }))
-    } else {
-      return res
-        .status(400)
-        .json({ status: '400', message: 'params is required!' })
-    }
+      else if ( area && period  && province ) {
+       
+        const store = await Store.find({
+          area: area,
+          $and: [
+            { address: { $regex: province, $options: "i" } },
+          ]
+        });
+       
+     
+        if (store.length === 0) {
+          return res
+            .status(404)
+            .json({ status: '404', message: 'Store not found!' })
+        }
+        const storeIdString = store.map(item => item._id.toString());
 
-    res.status(200).json({
-      status: '200',
-      message: 'Success',
-      data: response
-    })
-  }
+        const storeId = store.map(item => item.storeId.toString());
+ 
+        const routes = await Route.find({
+          period,
+          'listStore.storeInfo': { $in: storeIdString }
+        }).populate(
+          'listStore.storeInfo',
+          'storeId name address typeName taxId tel'
+        );
+ 
+        response = routes.map(route => ({
+          ...route.toObject(),
+          listStore: route.listStore.filter(
+            store => store.storeInfo && store.storeInfo.storeId && storeId.includes(store.storeInfo.storeId)
+          )
+        }));
+ 
+      }
 
-  if (period && province && district ) {
+
+      else if ( !area && period  && district ) {
+       
+        const store = await Store.find({
+          $and: [
+            { address: { $regex: district, $options: "i" } },
+          ]
+        });
+       
+     
+        if (store.length === 0) {
+          return res
+            .status(404)
+            .json({ status: '404', message: 'Store not found!' })
+        }
+        const storeIdString = store.map(item => item._id.toString());
+ 
+ 
+       
+        const storeId = store.map(item => item.storeId.toString());
+ 
+        const routes = await Route.find({
+          period,
+          'listStore.storeInfo': { $in: storeIdString }
+        }).populate(
+          'listStore.storeInfo',
+          'storeId name address typeName taxId tel'
+        );
+ 
+        response = routes.map(route => ({
+          ...route.toObject(),
+          listStore: route.listStore.filter(
+            store => store.storeInfo && store.storeInfo.storeId && storeId.includes(store.storeInfo.storeId)
+          )
+        }));
+ 
+      }
 
 
 
-    
+      else if ( !area && period  && province ) {
+       
+        const store = await Store.find({
+          $and: [
+            { address: { $regex: province, $options: "i" } },
+          ]
+        });
+       
+     
+        if (store.length === 0) {
+          return res
+            .status(404)
+            .json({ status: '404', message: 'Store not found!' })
+        }
+        const storeIdString = store.map(item => item._id.toString());
+       
+        const storeId = store.map(item => item.storeId.toString());
+ 
+        const routes = await Route.find({
+          period,
+          'listStore.storeInfo': { $in: storeIdString }
+        }).populate(
+          'listStore.storeInfo',
+          'storeId name address typeName taxId tel'
+        );
+ 
+        response = routes.map(route => ({
+          ...route.toObject(),
+          listStore: route.listStore.filter(
+            store => store.storeInfo && store.storeInfo.storeId && storeId.includes(store.storeInfo.storeId)
+          )
+        }));
+ 
+      }
+
+
+
+
+      else if (area && !routeId && !storeId) {
+          query.area = area
+          const routes = await Route.find(query, { _id: 0, __v: 0 })
+ 
+          response = routes.map((route) => ({
+              id: route.id,
+              period: route.period,
+              area: route.area,
+              day: route.day,
+              storeAll: route.storeAll,
+              storePending: route.storePending,
+              storeSell: route.storeSell,
+              storeNotSell: route.storeNotSell,
+              storeTotal: route.storeTotal,
+              percentComplete: route.percentComplete,
+              percentVisit: route.percentVisit,
+              percentEffective: route.percentEffective
+          }))
+      }
+ 
+      else if (area && routeId && !storeId) {
+          query.area = area
+          query.id = routeId
+ 
+          const routes = await Route.findOne(query)
+              .populate('listStore.storeInfo', 'storeId name address typeName taxId tel')
+ 
+          if (!routes) {
+              return res.status(404).json({ status: '404', message: 'Route not found!' })
+          }
+ 
+          const sortedListStore = routes.listStore.sort((a, b) => {
+              const statusA = parseInt(a.status, 10)
+              const statusB = parseInt(b.status, 10)
+              return statusA - statusB
+          })
+ 
+          response = [
+              {
+                  ...routes.toObject(),
+                  listStore: sortedListStore,
+              },
+          ]
+      }
+ 
+      else if (area && routeId && storeId) {
+          query.area = area
+          query.id = routeId
+ 
+          const routes = await Route.findOne(query)
+              .populate('listStore.storeInfo', 'storeId name address typeName taxId tel')
+ 
+          if (!routes) {
+              return res.status(404).json({ status: '404', message: 'Route not found!' })
+          }
+ 
+          response = [
+              {
+                  ...routes.toObject(),
+                  listStore: routes.listStore.filter((store) => store.storeInfo && store.storeInfo.storeId === storeId)
+              },
+          ]
+      }
+ 
+      else if (!area && !routeId && storeId) {
+          const routes = await Route.find({ period, "listStore.storeInfo": store._id })
+              .populate('listStore.storeInfo', 'storeId name address typeName taxId tel')
+ 
+          response = routes.map(route => ({
+              ...route.toObject(),
+              listStore: route.listStore.filter(store => store.storeInfo && store.storeInfo.storeId === storeId)
+          }))
+      }
+ 
+ 
+      else {
+          return res.status(400).json({ status: '400', message: 'params is required!' })
+      }
+ 
       res.status(200).json({
-        message:period,province,district
+          status: '200',
+          message: 'Success',
+          data: response,
       })
-
-
-
-
-  }
-
-
   } catch (error) {
-    console.error(error)
-    res.status(500).json({ status: '500', message: error.message })
+      console.error(error)
+      res.status(500).json({ status: '500', message: error.message })
   }
 }
+
+
 
 exports.addFromERP = async (req, res) => {
   try {
