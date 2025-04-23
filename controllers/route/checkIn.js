@@ -29,7 +29,7 @@ async function checkInRoute(data) {
             "listStore.$.image": '',
             "listStore.$.latitude": data.latitude,
             "listStore.$.longtitude": data.longitude,
-            "listStore.$.status": '1',
+            "listStore.$.status": '3',
             "listStore.$.statusText": 'ซื้อ',
             "listStore.$.date": new Date()
         }
