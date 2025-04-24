@@ -34,6 +34,7 @@ exports.getStore = async (req, res) => {
         $gte: startMonth,
         $lt: NextMonth
       }
+      query.status = '10'
     } else if (type === 'all') {
       query.createdDate = {
         $not: {
@@ -387,47 +388,44 @@ exports.checkInStore = async (req, res) => {
   }
 }
 
-
-
 exports.updateStoreStatus = async (req, res) => {
+  const { storeId, area } = req.body
 
-    const { storeId,area } = req.body
+  const areaPrefix = area.substring(0, 2)
 
-    const areaPrefix = area.substring(0, 2);
+  const latestStore = await Store.findOne({
+    storeId: { $regex: `^V${areaPrefix}`, $options: 'i' }
+  })
+    .sort({ storeId: -1 })
+    .select('storeId')
 
-    const latestStore = await Store.findOne({
-      storeId: { $regex: `^V${areaPrefix}`, $options: 'i' }
-    }).sort({ storeId: -1 }).select("storeId");
-    
-
-    if (latestStore === null ){
-      return res.status(404).json({
-        status:404,
-        message:`Not Found This area:${area}`
-      })
-    }
-  const maxLength = 7;  // กำหนดให้ไม่เกิน 7 หลัก
+  if (latestStore === null) {
+    return res.status(404).json({
+      status: 404,
+      message: `Not Found This area:${area}`
+    })
+  }
+  const maxLength = 7 // กำหนดให้ไม่เกิน 7 หลัก
 
   const newStoreId = latestStore.storeId.replace(/\d+$/, num => {
-  // เพิ่ม 1 ที่เลขท้าย
-  const newNum = (Number(num) + 1).toString();
+    // เพิ่ม 1 ที่เลขท้าย
+    const newNum = (Number(num) + 1).toString()
 
-  // ถ้าหมายเลขมากกว่า maxLength ให้ตัดให้เป็น 7 หลัก
-  return newNum.length > maxLength
-    ? newNum.slice(0, maxLength)
-    : newNum.padStart(num.length, '0');
-});
+    // ถ้าหมายเลขมากกว่า maxLength ให้ตัดให้เป็น 7 หลัก
+    return newNum.length > maxLength
+      ? newNum.slice(0, maxLength)
+      : newNum.padStart(num.length, '0')
+  })
 
-const result = await Store.updateOne(
-  { storeId: storeId },
-  { $set: { storeId: newStoreId, status: "20" } }
-);
+  const result = await Store.updateOne(
+    { storeId: storeId },
+    { $set: { storeId: newStoreId, status: '20' } }
+  )
 
-// console.log(newStoreId)
+  // console.log(newStoreId)
 
-    res.status(200).json( {
-      status:200,
-      message:"Update Success"
-     } )
-
+  res.status(200).json({
+    status: 200,
+    message: 'Update Success'
+  })
 }
