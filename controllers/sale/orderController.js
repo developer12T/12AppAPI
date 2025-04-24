@@ -59,126 +59,126 @@ exports.checkout = async (req, res) => {
       summary = await summaryOrder(cart)
       // console.log(summary)
 
-    // const shippingData = store.shippingAddress.find(s => s.shippingId === shipping)
-    // if (!shippingData) {
-    //     return res.status(404).json({ status: 404, message: 'Shipping address not found!' })
-    // }
+      // const shippingData = store.shippingAddress.find(s => s.shippingId === shipping)
+      // if (!shippingData) {
+      //     return res.status(404).json({ status: 404, message: 'Shipping address not found!' })
+      // }
 
-    const productIds = cart.listProduct.map(p => p.id)
-    const products = await Product.find({ id: { $in: productIds } }).select(
-      'id name group brand size flavour listUnit'
-    )
+      const productIds = cart.listProduct.map(p => p.id)
+      const products = await Product.find({ id: { $in: productIds } }).select(
+        'id name group brand size flavour listUnit'
+      )
 
-    let subtotal = 0
-    let listProduct = cart.listProduct.map(item => {
-      const product = products.find(p => p.id === item.id)
-      if (!product) return null
+      let subtotal = 0
+      let listProduct = cart.listProduct.map(item => {
+        const product = products.find(p => p.id === item.id)
+        if (!product) return null
 
-      const unitData = product.listUnit.find(u => u.unit === item.unit)
-      if (!unitData) {
-        return res
-          .status(400)
-          .json({ status: 400, message: `Invalid unit for product ${item.id}` })
-      }
+        const unitData = product.listUnit.find(u => u.unit === item.unit)
+        if (!unitData) {
+          return res
+            .status(400)
+            .json({ status: 400, message: `Invalid unit for product ${item.id}` })
+        }
 
-      const totalPrice = item.qty * unitData.price.sale
-      subtotal += totalPrice
+        const totalPrice = item.qty * unitData.price.sale
+        subtotal += totalPrice
 
-      return {
-        id: product.id,
-        lot: product.lot,
-        name: product.name,
-        group: product.group,
-        brand: product.brand,
-        size: product.size,
-        flavour: product.flavour,
-        qty: item.qty,
-        unit: item.unit,
-        unitName: unitData.name,
-        price: unitData.price.sale,
-        subtotal: parseFloat(totalPrice.toFixed(2)),
+        return {
+          id: product.id,
+          lot: product.lot,
+          name: product.name,
+          group: product.group,
+          brand: product.brand,
+          size: product.size,
+          flavour: product.flavour,
+          qty: item.qty,
+          unit: item.unit,
+          unitName: unitData.name,
+          price: unitData.price.sale,
+          subtotal: parseFloat(totalPrice.toFixed(2)),
+          discount: 0,
+          netTotal: parseFloat(totalPrice.toFixed(2))
+        }
+      })
+
+      if (listProduct.includes(null)) return
+      const orderId = await generateOrderId(area, sale.warehouse)
+
+
+
+
+
+      const newOrder = new Order({
+        orderId,
+        type,
+        status: 'pending',
+        sale: {
+          saleCode: sale.saleCode,
+          salePayer: sale.salePayer,
+          name: `${sale.firstName} ${sale.surName}`,
+          tel: sale.tel || '',
+          warehouse: sale.warehouse
+        },
+        store: {
+          storeId: summary.store.storeId,
+          name: summary.store.name,
+          type: summary.store.type,
+          address: summary.store.address,
+          taxId: summary.store.taxId,
+          tel: summary.store.tel,
+          area: summary.store.area,
+          zone: summary.store.zone
+        },
+        note,
+        latitude,
+        longitude,
+        listProduct,
+        listPromotions: summary.listPromotion,
+        subtotal,
         discount: 0,
-        netTotal: parseFloat(totalPrice.toFixed(2))
-      }
-    })
+        discountProduct: 0,
+        vat: 0,
+        totalExVat: 0,
+        total: subtotal,
+        // shipping: {
+        //     shippingId: shippingData.shippingId,
+        //     address: shippingData.address,
+        //     dateRequest: shipping.dateRequest,
+        //     note: shipping.note
+        // },
+        shipping: {
+          shippingId: '',
+          address: ''
+        },
+        paymentMethod: 'cash',
+        paymentStatus: 'paid',
+        createdBy: sale.username
+      })
 
-    if (listProduct.includes(null)) return
-    const orderId = await generateOrderId(area, sale.warehouse)
+      await newOrder.save()
+      await Cart.deleteOne({ type, area, storeId })
 
+      const checkIn = await checkInRoute({
+        storeId: storeId,
+        routeId: routeId,
+        orderId: orderId,
+        note: note,
+        latitude: latitude,
+        longitude: longitude
+      })
 
+      // console.log('checkin', checkIn)
 
-
-
-    const newOrder = new Order({
-      orderId,
-      type,
-      status: 'pending',
-      sale: {
-        saleCode: sale.saleCode,
-        salePayer: sale.salePayer,
-        name: `${sale.firstName} ${sale.surName}`,
-        tel: sale.tel || '',
-        warehouse: sale.warehouse
-      },
-      store: {
-        storeId: summary.store.storeId,
-        name: summary.store.name,
-        type: summary.store.type,
-        address: summary.store.address,
-        taxId: summary.store.taxId,
-        tel: summary.store.tel,
-        area: summary.store.area,
-        zone: summary.store.zone
-      },
-      note,
-      latitude,
-      longitude,
-      listProduct,
-      listPromotions: summary.listPromotion,
-      subtotal,
-      discount: 0,
-      discountProduct: 0,
-      vat: 0,
-      totalExVat: 0,
-      total: subtotal,
-      // shipping: {
-      //     shippingId: shippingData.shippingId,
-      //     address: shippingData.address,
-      //     dateRequest: shipping.dateRequest,
-      //     note: shipping.note
-      // },
-      shipping: {
-        shippingId: '',
-        address: ''
-      },
-      paymentMethod: 'cash',
-      paymentStatus: 'paid',
-      createdBy: sale.username
-    })
-
-    await newOrder.save()
-    await Cart.deleteOne({ type, area, storeId })
-
-    const checkIn = await checkInRoute({
-      storeId: storeId,
-      routeId: routeId,
-      orderId: orderId,
-      note: note,
-      latitude: latitude,
-      longitude: longitude
-    })
-
-    // console.log('checkin', checkIn)
-
-    res.status(200).json({
-      status: 200,
-      message: 'Checkout successful!',
-      data: newOrder
-    })
+      res.status(200).json({
+        status: 200,
+        message: 'Checkout successful!',
+        data: newOrder
+      })
 
     }
     else if (changePromotionStatus == 1) {
-      summary = await summaryOrderProStatusOne(cart,listPromotion)
+      summary = await summaryOrderProStatusOne(cart, listPromotion)
       // console.log("summary.listPromotion", JSON.stringify(summary.listPromotion, null, 2));
 
 
@@ -749,10 +749,109 @@ exports.OrderToExcel = async (req, res) => {
 
 
 exports.getAllOrder = async (req, res) => {
-  try{ 
-  const { period } = req.query
+  try {
+    const { period } = req.query
 
-  if (period) {
+    if (period) {
+      const periodYear = period.slice(0, 4);
+      const month = period.slice(4, 6);
+
+      // สร้างช่วงเวลาของเดือนนั้นใน timezone Bangkok
+      const start = new Date(
+        new Date(`${periodYear}-${month}-01T00:00:00`).toLocaleString("en-US", {
+          timeZone: "Asia/Bangkok"
+        })
+      );
+
+      const end = new Date(new Date(start).setMonth(start.getMonth() + 1));
+
+      const modelOrder = await Order.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: start, $lt: end },
+            type: { $in: ["sale", "change"] }
+          }
+        },
+        {
+          $group: {
+            _id: "$store.area", // Group by area
+            summary: { $sum: "$total" }, // รวม total
+          }
+        },
+        {
+          $project: {
+            area: "$_id",
+            summary: 1,
+            // count: 1,
+            _id: 0
+          }
+        }
+      ]);
+
+
+      const data = modelOrder.map(item => ({
+        area: item.area,
+        summary: item.summary
+      }));
+
+      res.status(200).json({
+        status: 200,
+        message: 'success',
+        data: data
+      })
+    }
+    else {
+      const year = parseInt(req.query.year);
+
+      const modelOrder = await Order.aggregate([
+        {
+          $match: {
+            $expr: {
+              $eq: [{ $year: "$createdAt" }, year] // ดึงปีจาก createdAt แล้วเปรียบเทียบกับ year
+            },
+            type: { $in: ["sale", "change"] }
+          }
+        },
+        {
+          $group: {
+            _id: "$store.area", // Group by area
+            summary: { $sum: "$total" }, // รวม total
+          }
+        },
+        {
+          $project: {
+            area: "$_id",
+            summary: 1,
+            _id: 0
+          }
+        }
+      ]);
+
+
+      const data = modelOrder.map(item => ({
+        area: item.area,
+        summary: item.summary
+      }));
+
+
+      res.status(200).json({
+        status: 200,
+        message: 'success',
+        data: data
+      })
+    }
+
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.getSummaryItem = async (req, res) => {
+  try {
+    const { area, period } = req.query
+
     const periodYear = period.slice(0, 4);
     const month = period.slice(4, 6);
 
@@ -768,207 +867,108 @@ exports.getAllOrder = async (req, res) => {
     const modelOrder = await Order.aggregate([
       {
         $match: {
+          "store.area": area,
           createdAt: { $gte: start, $lt: end },
           type: { $in: ["sale", "change"] }
         }
       },
       {
-        $group: {
-          _id: "$store.area", // Group by area
-          summary: { $sum: "$total" }, // รวม total
-        }
-      },
-      {
         $project: {
-          area: "$_id",
-          summary: 1,
-          // count: 1,
-          _id: 0
+          listProduct: 1,
         }
       }
     ]);
 
-
-    const data = modelOrder.map(item => ({
-      area: item.area,
-      summary: item.summary
-    }));
-
-    res.status(200).json({
-      status:200,
-      message:'success',
-      data:data
-    })
-  }
-  else {
-    const year = parseInt(req.query.year);
-
-    const modelOrder = await Order.aggregate([
-      {
-        $match: {
-          $expr: {
-            $eq: [{ $year: "$createdAt" }, year] // ดึงปีจาก createdAt แล้วเปรียบเทียบกับ year
-          },
-          type: { $in: ["sale", "change"] }
-        }
-      },
-      {
-        $group: {
-          _id: "$store.area", // Group by area
-          summary: { $sum: "$total" }, // รวม total
-        }
-      },
-      {
-        $project: {
-          area: "$_id",
-          summary: 1,
-          _id: 0
-        }
-      }
-    ]);
-
-
-    const data = modelOrder.map(item => ({
-      area: item.area,
-      summary: item.summary
-    }));
-
-
-    res.status(200).json({
-      status:200,
-      message:'success',
-      data:data
-    })
-  }
-
-
-} catch (error) {
-  console.error(error)
-  res.status(500).json({ status: '500', message: error.message })
-}
-}
-
-exports.getSummaryItem = async (req,res) => {
-try {
-  const { area,period } = req.query
-
-  const periodYear = period.slice(0, 4);
-  const month = period.slice(4, 6);
-
-  // สร้างช่วงเวลาของเดือนนั้นใน timezone Bangkok
-  const start = new Date(
-    new Date(`${periodYear}-${month}-01T00:00:00`).toLocaleString("en-US", {
-      timeZone: "Asia/Bangkok"
-    })
-  );
-
-  const end = new Date(new Date(start).setMonth(start.getMonth() + 1));
-
-  const modelOrder = await Order.aggregate([
-    {
-      $match: {
-        "store.area" : area,
-        createdAt: { $gte: start, $lt: end },
-        type: { $in: ["sale", "change"] }
-      }
-    },
-    {
-      $project: {
-        listProduct: 1,
-      }
+    if (!modelOrder || modelOrder.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: "Not Found Order"
+      })
     }
-  ]);
-
-  if (!modelOrder || modelOrder.length === 0) {
-    return res.status(404).json({
-      status : 404,
-      message: "Not Found Order"
-    })
-  }
 
 
-  const modelProduct = await Product.find()
+    const modelProduct = await Product.find()
 
-  const calPcs =  modelOrder.map(product => product.listProduct.map(item => {
-    const productdetail = modelProduct.find(u => u.id === item.id)
-    const productFactor = productdetail.listUnit.map(item =>{
-      return{
-        item:productdetail.id,
-        unit:item.unit,
-        factor:item.factor
+    const calPcs = modelOrder.map(product => product.listProduct.map(item => {
+      const productdetail = modelProduct.find(u => u.id === item.id)
+      const productFactor = productdetail.listUnit.map(item => {
+        return {
+          item: productdetail.id,
+          unit: item.unit,
+          factor: item.factor
+        }
+      })
+
+      const factor = productFactor.find(u => u.item === item.id && u.unit === item.unit)
+      // console.log(factor)
+      return {
+        item: item.id,
+        qtyPcs: item.qty * factor.factor,
+        factor: factor.factor,
+        unit: item.unit,
+        price: item.price
       }
     })
+    )
 
-    const factor = productFactor.find(u => u.item === item.id && u.unit === item.unit)
-    // console.log(factor)
-    return {
-      item:item.id,
-      qtyPcs : item.qty*factor.factor,
-      factor : factor.factor,
-      unit:item.unit,
-      price:item.price
-    }
-  })
-  )
+    let arrayCalPcs = calPcs.flat();
 
-  let arrayCalPcs = calPcs.flat();
+    const sumPcs = arrayCalPcs.reduce((acc, item) => {
+      if (acc[item.item]) {
+        acc[item.item].qtyPcs += item.qtyPcs;
+        acc[item.item].totalPrice += item.qtyPcs * item.price;
+      } else {
+        acc[item.item] = {
+          item: item.item,
+          qtyPcs: item.qtyPcs,
+          totalPrice: item.qtyPcs * item.price,
+        };
+      }
+      return acc;
+    }, {});
 
-  const sumPcs = arrayCalPcs.reduce((acc, item) => {
-    if (acc[item.item]) {
-      acc[item.item].qtyPcs += item.qtyPcs;
-      acc[item.item].totalPrice += item.qtyPcs * item.price;
-    } else {
-      acc[item.item] = {
+    // แปลงผลลัพธ์จาก object ให้เป็น array
+    const sumPcsResult = Object.values(sumPcs);
+
+    const sumCtn = sumPcsResult.map(item => {
+      const productdetail = modelProduct.find(u => u.id === item.item)
+      const productFactor = productdetail.listUnit.filter(item => item.unit === 'CTN')
+        .map(item => {
+          return {
+            item: productdetail.id,
+            unit: item.unit,
+            factor: parseInt(item.factor)
+          }
+        })
+      const ctnFactor = productFactor.find(u => u.item && item.item)
+
+      return {
         item: item.item,
-        qtyPcs: item.qtyPcs,
-        totalPrice: item.qtyPcs * item.price,
-      };
-    }
-    return acc;
-  }, {});
-  
-  // แปลงผลลัพธ์จาก object ให้เป็น array
-  const sumPcsResult = Object.values(sumPcs);
-  
-  const sumCtn = sumPcsResult.map(item => {
-    const productdetail = modelProduct.find(u => u.id === item.item)
-    const productFactor = productdetail.listUnit.filter(item => item.unit === 'CTN')
-    .map(item =>{
-      return{
-        item:productdetail.id,
-        unit:item.unit,
-        factor:parseInt(item.factor)
+        count: Math.floor(item.qtyPcs / ctnFactor.factor),
+        unit: "CTN",
+        // qtyPcs:item.qtyPcs,
+        // factor: ctnFactor.factor,
+        // qtyCtn: Math.floor(item.qtyPcs / ctnFactor.factor),
+        summary: item.totalPrice
       }
     })
-    const ctnFactor = productFactor.find(u => u.item && item.item)
 
-    return{
-      item:item.item,
-      count:Math.floor(item.qtyPcs / ctnFactor.factor),
-      unit: "CTN",
-      // qtyPcs:item.qtyPcs,
-      // factor: ctnFactor.factor,
-      // qtyCtn: Math.floor(item.qtyPcs / ctnFactor.factor),
-      summary:item.totalPrice
-    }
-  })
 
-  
 
-  res.status(200).json({
-    status:200,
-    message:'success',
-    data:sumCtn
-  })
+    res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: sumCtn
+    })
 
-} catch (error) {
-  console.error(error)
-  res.status(500).json({ status: '500', message: error.message })
-}
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
 }
 
 
-exports.getSummarybyRoute = async (req,res) =>{
+exports.getSummarybyRoute = async (req, res) => {
   try {
     const { area, period } = req.query
 
@@ -976,7 +976,7 @@ exports.getSummarybyRoute = async (req,res) =>{
       { $match: { area, period } },
       { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
       { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
-    
+
       // JOIN: นำ orderId จาก listOrder ไป join กับ collection Order
       {
         $lookup: {
@@ -986,7 +986,7 @@ exports.getSummarybyRoute = async (req,res) =>{
           as: "orderDetails"
         }
       },
-    
+
       // group by day, และ sum total จาก orderDetails
       {
         $group: {
@@ -1009,9 +1009,9 @@ exports.getSummarybyRoute = async (req,res) =>{
           }
         }
       },
-    
+
       { $sort: { _id: 1 } },
-    
+
       {
         $project: {
           day: "$_id",
@@ -1021,81 +1021,88 @@ exports.getSummarybyRoute = async (req,res) =>{
         }
       }
     ]);
-    
+
 
     if (modelRoute.length === 0) {
       return res.status(404).json({
-        status:404,
-        message:"Not Found Route"
+        status: 404,
+        message: "Not Found Route"
       })
     }
 
     data = modelRoute.map(item => {
       return {
-        route:item.day,
+        route: item.day,
         summary: item.totalAmount
       }
     })
 
+    res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: data
+    })
 
-
-
-
-
-  res.status(200).json({
-    status:200,
-    message:'success',
-    data:data
-  })
-
-} catch (error) {
-  console.error(error)
-  res.status(500).json({ status: '500', message: error.message })
-}
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
 }
 
 
-exports.getSummarybyMonth = async (req,res) =>{
+exports.getSummarybyMonth = async (req, res) => {
 
   const { area, period } = req.query
 
   const modelRoute = await Route.aggregate([
     { $match: { area, period } },
-  
+
     { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
     { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
-  
+
     {
       $lookup: {
         from: "orders",
         localField: "listStore.listOrder.orderId",
         foreignField: "orderId",
-        as: "orderDetails"
+        as: "orderDetails",
       }
     },
-  
+
     { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } },
-  
+
     {
       $match: {
         orderDetails: { $ne: null },
         "orderDetails.createdAt": { $ne: null }
       }
     },
-  
+
     {
       $addFields: {
+        createdAtBangkok: {
+          $dateToString: {
+            format: "%Y-%m-%d %H:%M:%S",
+            date: {
+              $dateAdd: {
+                startDate: "$orderDetails.createdAt",
+                unit: "hour",
+                amount: 7
+              }
+            }
+          }
+        },
         month: { $month: "$orderDetails.createdAt" }
       }
     },
-  
+
     {
       $project: {
         month: 1,
         total: "$orderDetails.total"
       }
     },
-  
+
     {
       $unionWith: {
         coll: null,
@@ -1109,16 +1116,16 @@ exports.getSummarybyMonth = async (req,res) =>{
         ]
       }
     },
-  
+
     {
       $group: {
         _id: "$month",
         totalAmount: { $sum: "$total" }
       }
     },
-  
+
     { $sort: { _id: 1 } },
-  
+
     {
       $project: {
         month: "$_id",
@@ -1127,18 +1134,121 @@ exports.getSummarybyMonth = async (req,res) =>{
       }
     }
   ]);
-  
-  
+
+
   data = modelRoute.map(item => {
     return {
-      month:item.month.toString(),
-      summary:item.totalAmount
+      month: item.month.toString(),
+      summary: item.totalAmount
     }
   })
 
   res.status(200).json({
-    status:200,
-    message:"Success",
-    data:data
+    status: 200,
+    message: "Success",
+    data: data
   })
+}
+
+
+exports.getSummarybyArea = async (req, res) => {
+
+  const { period, year } = req.query
+  // let modelRoute = [];
+  // if ( period && !year) {
+  const modelRoute = await Route.aggregate([
+
+    { $match: { period: period } },
+    { $project: { area: 1, day: 1, listStore: 1 } },
+    { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
+    {
+
+      $lookup: {
+
+        from: "orders",
+
+        localField: "listStore.listOrder.orderId",
+
+        foreignField: "orderId",
+
+        as: "orderDetails",
+
+      }
+
+    },
+    { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } },
+    // แปลง createdAt เป็น Bangkok Time แล้วกรองปี 2025
+    {
+      $addFields: {
+        orderCreatedYear: {
+          $year: {
+            date: "$orderDetails.createdAt",
+            timezone: "Asia/Bangkok"
+          }
+        }
+      }
+    },
+    {
+      $match: {
+        orderCreatedYear: 2025
+      }
+    },
+    {
+      $group: {
+        _id: { area: "$area", day: "$day" },
+        totalAmount: { $sum: "$orderDetails.total" }
+      }
+    },
+    {
+      $project: {
+        area: "$_id.area",
+        day: "$_id.day",
+        totalAmount: 1,
+        _id: 0
+      }
+    },
+    { $sort: { area: 1, day: 1 } }
+  ]);
+
+
+
+
+  if (modelRoute.length === 0) {
+    return res.status(404).json({
+      status: 404,
+      message: 'Not Found Route This period'
+    })
+  }
+
+  console.log(modelRoute)
+
+  const areaList = [...new Set(modelRoute.map(item => item.area))].sort();
+
+  const data = areaList.map(area => {
+    const filtered = modelRoute.filter(item => item.area === area);
+
+    const filledDays = Array.from({ length: 27 }, (_, i) => {
+      const day = String(i + 1).padStart(2, '0');
+      const found = filtered.find(item => item.day === day);
+
+      return found || {
+        totalAmount: 0,
+        area: area,
+        day: day,
+      };
+    });
+
+
+    return {
+      area: area,
+      summary: filledDays.map(item => item.totalAmount),
+    };
+  });
+
+  res.status(200).json({
+    message: data
+
+  })
+
 }

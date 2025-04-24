@@ -163,7 +163,7 @@ exports.addStockNew = async (req, res) => {
 
   const users = await User.find().select('area saleCode warehouse').lean()
 
-  console.log("users",users)
+  // console.log("users",users)
   for (const user of users) {
     const stock = await Stock.findOne({
       area: user.area
