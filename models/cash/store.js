@@ -56,7 +56,7 @@ const storeSchema = mongoose.Schema({
     longtitude: { type: String, require: true },
     lineId: { type: String },
     note: { type: String },
-    status: { type: String },
+    status: { type: String ,default: '10'},
     approve: approveSchema,
     policyConsent: policyConsentSchema,
     imageList: [imageSchema],
@@ -64,6 +64,14 @@ const storeSchema = mongoose.Schema({
     checkIn: checkinSchema,
     createdDate: { type: Date, default: Date.now },
     updateDate: { type: Date, default: Date.now },
+    date: {
+        type: Date,
+        default: () => {
+          const now = new Date();
+          // เพิ่ม 7 ชั่วโมง (GMT+7)
+          return new Date(now.getTime() + 7 * 60 * 60 * 1000);
+        }
+      }
 })
 
 const typeStoreSchema = mongoose.Schema({

@@ -207,7 +207,7 @@ exports.addStore = async (req, res) => {
         longtitude: store.longtitude,
         lineId: store.lineId,
         note: store.note,
-        status: store.status,
+        status: '10',
         approve: approve,
         policyConsent: policyAgree,
         imageList: imageList,
@@ -216,6 +216,8 @@ exports.addStore = async (req, res) => {
       })
 
       await storeData.save()
+      // console.log(storeData)
+
       res.status(200).json({
         status: '200',
         message: 'Store added successfully'
@@ -383,4 +385,49 @@ exports.checkInStore = async (req, res) => {
     console.error('Error updating store:', error)
     res.status(500).json({ status: '500', message: 'Server error' })
   }
+}
+
+
+
+exports.updateStoreStatus = async (req, res) => {
+
+    const { storeId,area } = req.body
+
+    const areaPrefix = area.substring(0, 2);
+
+    const latestStore = await Store.findOne({
+      storeId: { $regex: `^V${areaPrefix}`, $options: 'i' }
+    }).sort({ storeId: -1 }).select("storeId");
+    
+
+    if (latestStore === null ){
+      return res.status(404).json({
+        status:404,
+        message:`Not Found This area:${area}`
+      })
+    }
+  const maxLength = 7;  // กำหนดให้ไม่เกิน 7 หลัก
+
+  const newStoreId = latestStore.storeId.replace(/\d+$/, num => {
+  // เพิ่ม 1 ที่เลขท้าย
+  const newNum = (Number(num) + 1).toString();
+
+  // ถ้าหมายเลขมากกว่า maxLength ให้ตัดให้เป็น 7 หลัก
+  return newNum.length > maxLength
+    ? newNum.slice(0, maxLength)
+    : newNum.padStart(num.length, '0');
+});
+
+const result = await Store.updateOne(
+  { storeId: storeId },
+  { $set: { storeId: newStoreId, status: "20" } }
+);
+
+// console.log(newStoreId)
+
+    res.status(200).json( {
+      status:200,
+      message:"Update Success"
+     } )
+
 }

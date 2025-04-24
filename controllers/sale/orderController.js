@@ -1141,8 +1141,23 @@ exports.getSummarybyArea = async (req, res) => {
   const { period, year } = req.query
   // year = Number(yearQuery)
   // let modelRoute = [];
+  if ( !period ) {
+    return res.status(404).json({
+      status:404,
+      message:'period is require'
+  })
+  }
+
+  if ( !year ) {
+    return res.status(404).json({
+      status:404,
+      message:'year is require'
+  })
+  }
+
+
   // console.log(year)
-  if ( period && !year) {
+  if ( period && year) {
   const modelRouteValue = await Route.aggregate([
  
     { $match: { period: period } },
@@ -1253,10 +1268,6 @@ exports.getSummarybyArea = async (req, res) => {
 
   modelRoute = [...modelRouteValue, ...otherModelRoute];
 
- 
-
-
-
   const areaList = [...new Set(modelRoute.map(item => item.area))].sort();
  
   const data = areaList.map(area => {
@@ -1288,4 +1299,5 @@ exports.getSummarybyArea = async (req, res) => {
  
   })
 }
+
 }
