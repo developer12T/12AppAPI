@@ -1030,6 +1030,15 @@ exports.getSummarybyRoute = async (req, res) => {
 exports.getSummarybyMonth = async (req, res) => {
   const { area, period } = req.query
 
+  checkArea = await Route.find({area:area})
+
+  if (checkArea.length == 0) {
+    return res.status(404).json({
+      status:404,
+      message:`Not Found This area: ${area}` 
+    })
+  }
+
   const modelRoute = await Route.aggregate([
     { $match: { area, period } },
 
@@ -1129,10 +1138,11 @@ exports.getSummarybyMonth = async (req, res) => {
 
 exports.getSummarybyArea = async (req, res) => {
  
-  const { period, yearQuery } = req.query
-  year = Number(yearQuery)
+  const { period, year } = req.query
+  // year = Number(yearQuery)
   // let modelRoute = [];
-  // if ( period && !year) {
+  // console.log(year)
+  if ( period && !year) {
   const modelRouteValue = await Route.aggregate([
  
     { $match: { period: period } },
@@ -1168,7 +1178,7 @@ exports.getSummarybyArea = async (req, res) => {
     },
     {
       $match: {
-        orderCreatedYear: 2025
+        orderCreatedYear: Number(year)
       }
     },
     {
@@ -1234,9 +1244,6 @@ exports.getSummarybyArea = async (req, res) => {
  
   ]);
  
-  // console.log(modelRouteValue)
-  // console.log(otherModelRoute)
-
   if (modelRouteValue.length === 0) {
     return res.status(404).json({
       status: 404,
@@ -1273,9 +1280,12 @@ exports.getSummarybyArea = async (req, res) => {
     };
   });
  
+
   res.status(200).json({
-    message: data
+    status:200 ,
+    message:'Success' ,
+    data:data
  
   })
- 
+}
 }
