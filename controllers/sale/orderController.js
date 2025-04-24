@@ -1085,20 +1085,6 @@ exports.getSummarybyMonth = async (req, res) => {
     },
 
     {
-      $unionWith: {
-        coll: null,
-        pipeline: [
-          {
-            $documents: Array.from({ length: 12 }, (_, i) => ({
-              month: i + 1,
-              total: 0
-            }))
-          }
-        ]
-      }
-    },
-
-    {
       $group: {
         _id: '$month',
         totalAmount: { $sum: '$total' }
@@ -1116,53 +1102,66 @@ exports.getSummarybyMonth = async (req, res) => {
     }
   ])
 
-  data = modelRoute.map(item => {
+  modelRouteValue = modelRoute.map(item => {
     return {
       month: item.month,
       summary: item.totalAmount
     }
   })
 
+  const result = Array.from({ length: 12 }, (_, i) => ({
+    month: i + 1,
+    summary: 0
+  }));
+  
+  // อัปเดตผลลัพธ์จาก data ที่มีอยู่
+  modelRouteValue.forEach(d => {
+    result[d.month - 1].summary = d.summary;
+  });
+  
+
   res.status(200).json({
     status: 200,
     message: 'Success',
-    data: data
+    data: result
   })
 }
 
 exports.getSummarybyArea = async (req, res) => {
-  const { period, year } = req.query
+ 
+  const { period, yearQuery } = req.query
+  year = Number(yearQuery)
   // let modelRoute = [];
   // if ( period && !year) {
-  const modelRoute = await Route.aggregate([
+  const modelRouteValue = await Route.aggregate([
+ 
     { $match: { period: period } },
     { $project: { area: 1, day: 1, listStore: 1 } },
-    { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
     {
-      $unwind: {
-        path: '$listStore.listOrder',
-        preserveNullAndEmptyArrays: true
-      }
-    },
-    {
+ 
       $lookup: {
-        from: 'orders',
-
-        localField: 'listStore.listOrder.orderId',
-
-        foreignField: 'orderId',
-
-        as: 'orderDetails'
+ 
+        from: "orders",
+ 
+        localField: "listStore.listOrder.orderId",
+ 
+        foreignField: "orderId",
+ 
+        as: "orderDetails",
+ 
       }
+ 
     },
-    { $unwind: { path: '$orderDetails', preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } },
     // แปลง createdAt เป็น Bangkok Time แล้วกรองปี 2025
     {
       $addFields: {
         orderCreatedYear: {
           $year: {
-            date: '$orderDetails.createdAt',
-            timezone: 'Asia/Bangkok'
+            date: "$orderDetails.createdAt",
+            timezone: "Asia/Bangkok"
           }
         }
       }
@@ -1174,55 +1173,109 @@ exports.getSummarybyArea = async (req, res) => {
     },
     {
       $group: {
-        _id: { area: '$area', day: '$day' },
-        totalAmount: { $sum: '$orderDetails.total' }
+        _id: { area: "$area", day: "$day" },
+        totalAmount: { $sum: "$orderDetails.total" }
       }
     },
     {
       $project: {
-        area: '$_id.area',
-        day: '$_id.day',
+        area: "$_id.area",
+        day: "$_id.day",
         totalAmount: 1,
         _id: 0
       }
     },
     { $sort: { area: 1, day: 1 } }
-  ])
+  ]);
+ 
+  const haveArea = [...new Set(modelRouteValue.map(i => i.area))];
+ 
+  // console.log(haveArea)
+ 
+  otherModelRoute = await Route.aggregate([
+    { $match: {
+      period: period,
+      area: { $nin: haveArea }  // เลือกเฉพาะ area ที่ไม่อยู่ใน haveArea
+    }
+    },
+    { $project: { area: 1, day: 1, listStore: 1 } },
+ 
+    { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
+ 
+    {
+      $lookup: {
+        from: "orders",
+        localField: "listStore.listOrder.orderId",
+        foreignField: "orderId",
+        as: "orderDetails",
+      }
+    },
+ 
+    { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } },
+ 
+ 
+    {
+      $group: {
+        _id: { area: "$area", day: "$day" },  // Group by area and day
+        totalAmount: { $sum: "$orderDetails.total" }  // Sum the total from orderDetails
+      }
+    },
+ 
+    {
+      $project: {
+        area: "$_id.area",   // Project area
+        day: "$_id.day",     // Project day
+        totalAmount: 1,      // Include totalAmount in the output
+        _id: 0               // Exclude _id field from the result
+      }
+    },
+    { $sort: { area: 1, day: 1 } }
+ 
+  ]);
+ 
+  // console.log(modelRouteValue)
+  // console.log(otherModelRoute)
 
-  if (modelRoute.length === 0) {
+  if (modelRouteValue.length === 0) {
     return res.status(404).json({
       status: 404,
       message: 'Not Found Route This period'
     })
   }
 
-  console.log(modelRoute)
+  modelRoute = [...modelRouteValue, ...otherModelRoute];
 
-  const areaList = [...new Set(modelRoute.map(item => item.area))].sort()
+ 
 
+
+
+  const areaList = [...new Set(modelRoute.map(item => item.area))].sort();
+ 
   const data = areaList.map(area => {
-    const filtered = modelRoute.filter(item => item.area === area)
-
+    const filtered = modelRoute.filter(item => item.area === area);
+ 
     const filledDays = Array.from({ length: 27 }, (_, i) => {
-      const day = String(i + 1).padStart(2, '0')
-      const found = filtered.find(item => item.day === day)
-
-      return (
-        found || {
-          totalAmount: 0,
-          area: area,
-          day: day
-        }
-      )
-    })
-
+      const day = String(i + 1).padStart(2, '0');
+      const found = filtered.find(item => item.day === day);
+ 
+      return found || {
+        totalAmount: 0,
+        area: area,
+        day: day,
+      };
+    });
+ 
+ 
     return {
       area: area,
-      summary: filledDays.map(item => item.totalAmount)
-    }
-  })
-
+      summary: filledDays.map(item => item.totalAmount),
+    };
+  });
+ 
   res.status(200).json({
     message: data
+ 
   })
+ 
 }
