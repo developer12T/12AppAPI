@@ -48,12 +48,10 @@ async function summaryOrder (cart) {
     }).lean()
     // หา Product ที่อยู่ใน อาร์เรย์ productIds แล้วเอาแต่ id
 
-
-    
-
     const enrichedProducts = cart.listProduct.map(cartItem => {
       const productInfo = productDetails.find(p => p.id === cartItem.id) || {}
-      const unitData = productInfo.listUnit?.find(u => u.unit === cartItem.unit) || {}
+      const unitData =
+        productInfo.listUnit?.find(u => u.unit === cartItem.unit) || {}
       const factor = parseInt(unitData?.factor, 10) || 1
       const qtyPcs = cartItem.qty * factor
       const totalPrice = cartItem.qty * cartItem.price
@@ -95,7 +93,7 @@ async function summaryOrder (cart) {
         })
       })) || []
 
-      console.log('enrichedPromotions',enrichedProducts)
+    console.log('enrichedPromotions', enrichedProducts)
 
     return {
       type: cart.type,

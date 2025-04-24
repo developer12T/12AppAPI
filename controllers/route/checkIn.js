@@ -41,7 +41,7 @@ async function checkInRoute(data) {
             const newOrder = {
                 number: newNumber,
                 orderId: data.orderId,
-                status: '1',
+                status: '3',
                 statusText: 'ซื้อ',
                 date: new Date()
             }

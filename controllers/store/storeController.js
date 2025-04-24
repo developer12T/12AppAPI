@@ -347,12 +347,10 @@ exports.checkInStore = async (req, res) => {
 
   try {
     if (!latitude || !longtitude) {
-      return res
-        .status(400)
-        .json({
-          status: '400',
-          message: 'latitude and longtitude are required!'
-        })
+      return res.status(400).json({
+        status: '400',
+        message: 'latitude and longtitude are required!'
+      })
     }
 
     const result = await Store.findOneAndUpdate(

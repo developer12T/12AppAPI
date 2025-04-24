@@ -2,7 +2,7 @@ const { Product } = require('../models/cash/product')
 const { Store } = require('../models/cash/store')
 const { User } = require('../models/cash/user')
 
-async function summaryOrder(cart) {
+async function summaryOrder (cart) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
@@ -11,21 +11,21 @@ async function summaryOrder(cart) {
     const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
     const store = storeData
       ? {
-        _id: storeData._id,
-        storeId: storeData.storeId,
-        name: storeData.name || '',
-        taxId: storeData.taxId || '',
-        tel: storeData.tel || '',
-        route: storeData.route || '',
-        storeType: storeData.type || '',
-        typeName: storeData.typeName || '',
-        address: storeData.address || '',
-        subDistrict: storeData.subDistrict || '',
-        district: storeData.district || '',
-        province: storeData.province || '',
-        zone: storeData.zone || '',
-        area: storeData.area || ''
-      }
+          _id: storeData._id,
+          storeId: storeData.storeId,
+          name: storeData.name || '',
+          taxId: storeData.taxId || '',
+          tel: storeData.tel || '',
+          route: storeData.route || '',
+          storeType: storeData.type || '',
+          typeName: storeData.typeName || '',
+          address: storeData.address || '',
+          subDistrict: storeData.subDistrict || '',
+          district: storeData.district || '',
+          province: storeData.province || '',
+          zone: storeData.zone || '',
+          area: storeData.area || ''
+        }
       : {}
 
     const productIds = [
@@ -48,18 +48,17 @@ async function summaryOrder(cart) {
     }).lean()
     // หา Product ที่อยู่ใน อาร์เรย์ productIds แล้วเอาแต่ id
 
-
-
-    let enrichedProducts = []; // ประกาศตัวแปรไว้ก่อน
-    // if (changePromotionStatus == 0) { 
+    let enrichedProducts = [] // ประกาศตัวแปรไว้ก่อน
+    // if (changePromotionStatus == 0) {
     // console.log('changePromotionStatus = 0', changePromotionStatus);
     enrichedProducts = cart.listProduct.map(cartItem => {
-      const productInfo = productDetails.find(p => p.id === cartItem.id) || {};
-      const unitData = productInfo.listUnit?.find(u => u.unit === cartItem.unit) || {};
-      const factor = parseInt(unitData?.factor, 10) || 1;
+      const productInfo = productDetails.find(p => p.id === cartItem.id) || {}
+      const unitData =
+        productInfo.listUnit?.find(u => u.unit === cartItem.unit) || {}
+      const factor = parseInt(unitData?.factor, 10) || 1
       // console.log("factor",factor);
-      const qtyPcs = cartItem.qty * factor;
-      const totalPrice = cartItem.qty * cartItem.price;
+      const qtyPcs = cartItem.qty * factor
+      const totalPrice = cartItem.qty * cartItem.price
 
       return {
         id: cartItem.id,
@@ -75,9 +74,8 @@ async function summaryOrder(cart) {
         price: cartItem.price,
         total: totalPrice,
         qtyPcs
-      };
-    });
-
+      }
+    })
 
     const enrichedPromotions =
       cart.listPromotion?.map(promo => ({
@@ -101,8 +99,6 @@ async function summaryOrder(cart) {
 
     // console.log('enrichedPromotions',enrichedPromotions)
 
-
-
     return {
       type: cart.type,
       store,
@@ -111,41 +107,26 @@ async function summaryOrder(cart) {
       // listRefund: [],
       listPromotion: enrichedPromotions,
       total: parseFloat(cart.total.toFixed(2)),
-      subtotal: 0,
+      subtotal: parseFloat(cart.total.toFixed(2)),
       discount: 0,
       discountProduct: 0,
-      vat: 0,
-      totalExVat: 0
+      vat: parseFloat((cart.total - cart.total / 1.07).toFixed(2)),
+      totalExVat: parseFloat((cart.total / 1.07).toFixed(2))
     }
     // }
 
-
-
     // ✅ Log ค่าแต่ละตัวหลังจาก enrichedProducts ถูกสร้าง
-
-
-
-
-
-
-
 
     // console.log(enrichedProducts) // สามารถใช้งาน enrichedProducts ได้
 
-
     // console.log('enrichedPromotions',enrichedProducts)
-
-
-
-
-
   } catch (error) {
     console.error('Error transforming cart data:', error.message)
     return null
   }
 }
 
-async function summaryWithdraw(cart) {
+async function summaryWithdraw (cart) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
@@ -194,29 +175,29 @@ async function summaryWithdraw(cart) {
   }
 }
 
-async function summaryRefund(cart) {
+async function summaryRefund (cart) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
     }
-    console.log("summaryRefund", cart.storeId)
+    console.log('summaryRefund', cart.storeId)
     const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
     const store = storeData
       ? {
-        storeId: storeData.storeId,
-        name: storeData.name || '',
-        taxId: storeData.taxId || '',
-        tel: storeData.tel || '',
-        route: storeData.route || '',
-        storeType: storeData.type || '',
-        typeName: storeData.typeName || '',
-        address: storeData.address || '',
-        subDistrict: storeData.subDistrict || '',
-        district: storeData.district || '',
-        province: storeData.province || '',
-        zone: storeData.zone || '',
-        area: storeData.area || ''
-      }
+          storeId: storeData.storeId,
+          name: storeData.name || '',
+          taxId: storeData.taxId || '',
+          tel: storeData.tel || '',
+          route: storeData.route || '',
+          storeType: storeData.type || '',
+          typeName: storeData.typeName || '',
+          address: storeData.address || '',
+          subDistrict: storeData.subDistrict || '',
+          district: storeData.district || '',
+          province: storeData.province || '',
+          zone: storeData.zone || '',
+          area: storeData.area || ''
+        }
       : {}
 
     const productIds = [
@@ -305,29 +286,29 @@ async function summaryRefund(cart) {
   }
 }
 
-async function summaryGive(cart) {
+async function summaryGive (cart) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
     }
-    console.log("summaryGive", cart.storeId)
+    console.log('summaryGive', cart.storeId)
     const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
     const store = storeData
       ? {
-        storeId: storeData.storeId,
-        name: storeData.name || '',
-        taxId: storeData.taxId || '',
-        tel: storeData.tel || '',
-        route: storeData.route || '',
-        storeType: storeData.type || '',
-        typeName: storeData.typeName || '',
-        address: storeData.address || '',
-        subDistrict: storeData.subDistrict || '',
-        district: storeData.district || '',
-        province: storeData.province || '',
-        zone: storeData.zone || '',
-        area: storeData.area || ''
-      }
+          storeId: storeData.storeId,
+          name: storeData.name || '',
+          taxId: storeData.taxId || '',
+          tel: storeData.tel || '',
+          route: storeData.route || '',
+          storeType: storeData.type || '',
+          typeName: storeData.typeName || '',
+          address: storeData.address || '',
+          subDistrict: storeData.subDistrict || '',
+          district: storeData.district || '',
+          province: storeData.province || '',
+          zone: storeData.zone || '',
+          area: storeData.area || ''
+        }
       : {}
 
     const productIds = cart.listProduct.map(p => p.id)
@@ -375,8 +356,7 @@ async function summaryGive(cart) {
   }
 }
 
-
-async function summaryOrderProStatusOne(cart, listPromotion) {
+async function summaryOrderProStatusOne (cart, listPromotion) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
@@ -386,21 +366,21 @@ async function summaryOrderProStatusOne(cart, listPromotion) {
 
     const store = storeData
       ? {
-        _id: storeData._id,
-        storeId: storeData.storeId,
-        name: storeData.name || '',
-        taxId: storeData.taxId || '',
-        tel: storeData.tel || '',
-        route: storeData.route || '',
-        storeType: storeData.type || '',
-        typeName: storeData.typeName || '',
-        address: storeData.address || '',
-        subDistrict: storeData.subDistrict || '',
-        district: storeData.district || '',
-        province: storeData.province || '',
-        zone: storeData.zone || '',
-        area: storeData.area || ''
-      }
+          _id: storeData._id,
+          storeId: storeData.storeId,
+          name: storeData.name || '',
+          taxId: storeData.taxId || '',
+          tel: storeData.tel || '',
+          route: storeData.route || '',
+          storeType: storeData.type || '',
+          typeName: storeData.typeName || '',
+          address: storeData.address || '',
+          subDistrict: storeData.subDistrict || '',
+          district: storeData.district || '',
+          province: storeData.province || '',
+          zone: storeData.zone || '',
+          area: storeData.area || ''
+        }
       : {}
 
     const productIds = [
@@ -412,23 +392,23 @@ async function summaryOrderProStatusOne(cart, listPromotion) {
 
     const productDetails = await Product.find({
       id: { $in: productIds }
-    }).lean();
+    }).lean()
 
-    let listProducts = [];
+    let listProducts = []
     enrichedProducts = listPromotion
     listPromotion.forEach(promotion => {
       // เก็บข้อมูลใน listProduct ของแต่ละโปรโมชั่นลงในตัวแปร listProducts
-      listProducts.push(promotion.listProduct);
-    });
+      listProducts.push(promotion.listProduct)
+    })
     // วนลูปผ่านแต่ละอาร์เรย์ใน listProducts
-    let unitDataArray = [];
+    let unitDataArray = []
 
     listProducts.forEach(innerArray => {
       innerArray.forEach(item => {
-        const productInfo = productDetails.find(p => p.id === item.id) || {};
-        
+        const productInfo = productDetails.find(p => p.id === item.id) || {}
+
         if (productInfo.listUnit) {
-          const foundUnit = productInfo.listUnit.find(u => u.unit === item.unit);
+          const foundUnit = productInfo.listUnit.find(u => u.unit === item.unit)
           if (foundUnit) {
             // เก็บ item.id ร่วมกับข้อมูล unit ที่พบ
             unitDataArray.push({
@@ -438,20 +418,20 @@ async function summaryOrderProStatusOne(cart, listPromotion) {
               factor: foundUnit.factor,
               sale: foundUnit.price.sale,
               refund: foundUnit.price.refund
-            });
+            })
           }
         }
-      });
-    });
-    
+      })
+    })
+
     // แสดงข้อมูล unitDataArray
     // console.log("unitDataArray", JSON.stringify(unitDataArray, null, 2));
 
     listPromotion.forEach(promo => {
       promo.listProduct.forEach(product => {
         // หาค่าจาก unitDataArray ที่ตรงกับ itemId
-        const unitData = unitDataArray.find(unit => unit.itemId === product.id);
-        
+        const unitData = unitDataArray.find(unit => unit.itemId === product.id)
+
         // ถ้ามีข้อมูล unitData ให้เพิ่มเข้าไปใน product
         if (unitData) {
           // เพิ่ม unitData เข้าไปใน product
@@ -461,15 +441,12 @@ async function summaryOrderProStatusOne(cart, listPromotion) {
             factor: unitData.factor,
             sale: unitData.sale,
             refund: unitData.refund
-          };
+          }
         }
-      });
-    });
+      })
+    })
     // แสดงผลข้อมูล listPromotion ที่มีข้อมูล unitData
     // console.log("listPromotion with unitData", JSON.stringify(listPromotion, null, 2));
-
-
-
 
     const enrichedPromotionExtract = listPromotion.map(promo => ({
       proCode: promo?.proCode || '',
@@ -481,7 +458,7 @@ async function summaryOrderProStatusOne(cart, listPromotion) {
         id: product.id,
         name: product.name,
         group: product.group,
-        size:product.size,
+        size: product.size,
         flavour: product.flavour,
         brand: product.brand,
         qty: product.qty,
@@ -489,11 +466,9 @@ async function summaryOrderProStatusOne(cart, listPromotion) {
         unitName: product.unitName,
         price: 0,
         total: 0,
-        qtyPcs: product.qty * (product.unitData?.factor || 0)  // ใช้ product.unitData.factor
+        qtyPcs: product.qty * (product.unitData?.factor || 0) // ใช้ product.unitData.factor
       }))
-    }));
-   
-
+    }))
 
     return {
       type: cart.type,
@@ -509,15 +484,13 @@ async function summaryOrderProStatusOne(cart, listPromotion) {
       vat: 0,
       totalExVat: 0
     }
-  }
-
-  catch (error) {
+  } catch (error) {
     console.error('Error transforming cart data:', error.message)
     return null
   }
 }
 
-async function summaryWithdraw(cart) {
+async function summaryWithdraw (cart) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
@@ -566,7 +539,7 @@ async function summaryWithdraw(cart) {
   }
 }
 
-async function summaryRefund(cart) {
+async function summaryRefund (cart) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
@@ -575,20 +548,20 @@ async function summaryRefund(cart) {
     const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
     const store = storeData
       ? {
-        storeId: storeData.storeId,
-        name: storeData.name || '',
-        taxId: storeData.taxId || '',
-        tel: storeData.tel || '',
-        route: storeData.route || '',
-        storeType: storeData.type || '',
-        typeName: storeData.typeName || '',
-        address: storeData.address || '',
-        subDistrict: storeData.subDistrict || '',
-        district: storeData.district || '',
-        province: storeData.province || '',
-        zone: storeData.zone || '',
-        area: storeData.area || ''
-      }
+          storeId: storeData.storeId,
+          name: storeData.name || '',
+          taxId: storeData.taxId || '',
+          tel: storeData.tel || '',
+          route: storeData.route || '',
+          storeType: storeData.type || '',
+          typeName: storeData.typeName || '',
+          address: storeData.address || '',
+          subDistrict: storeData.subDistrict || '',
+          district: storeData.district || '',
+          province: storeData.province || '',
+          zone: storeData.zone || '',
+          area: storeData.area || ''
+        }
       : {}
 
     const productIds = [
@@ -677,7 +650,7 @@ async function summaryRefund(cart) {
   }
 }
 
-async function summaryGive(cart) {
+async function summaryGive (cart) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
@@ -686,20 +659,20 @@ async function summaryGive(cart) {
     const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
     const store = storeData
       ? {
-        storeId: storeData.storeId,
-        name: storeData.name || '',
-        taxId: storeData.taxId || '',
-        tel: storeData.tel || '',
-        route: storeData.route || '',
-        storeType: storeData.type || '',
-        typeName: storeData.typeName || '',
-        address: storeData.address || '',
-        subDistrict: storeData.subDistrict || '',
-        district: storeData.district || '',
-        province: storeData.province || '',
-        zone: storeData.zone || '',
-        area: storeData.area || ''
-      }
+          storeId: storeData.storeId,
+          name: storeData.name || '',
+          taxId: storeData.taxId || '',
+          tel: storeData.tel || '',
+          route: storeData.route || '',
+          storeType: storeData.type || '',
+          typeName: storeData.typeName || '',
+          address: storeData.address || '',
+          subDistrict: storeData.subDistrict || '',
+          district: storeData.district || '',
+          province: storeData.province || '',
+          zone: storeData.zone || '',
+          area: storeData.area || ''
+        }
       : {}
 
     const productIds = cart.listProduct.map(p => p.id)
@@ -747,25 +720,10 @@ async function summaryGive(cart) {
   }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-module.exports = { summaryOrder, summaryOrderProStatusOne, summaryWithdraw, summaryRefund, summaryGive }
+module.exports = {
+  summaryOrder,
+  summaryOrderProStatusOne,
+  summaryWithdraw,
+  summaryRefund,
+  summaryGive
+}

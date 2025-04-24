@@ -122,8 +122,8 @@ exports.checkout = async (req, res) => {
       subtotal,
       discount: 0,
       discountProduct: 0,
-      vat: 0,
-      totalExVat: 0,
+      vat: parseFloat((subtotal - subtotal / 1.07).toFixed(2)),
+      totalExVat: parseFloat((subtotal / 1.07).toFixed(2)),
       total: subtotal,
       // shipping: {
       //     shippingId: shippingData.shippingId,
@@ -261,12 +261,10 @@ exports.updateStatus = async (req, res) => {
     }
 
     if (order.status !== 'pending' && status !== 'canceled') {
-      return res
-        .status(400)
-        .json({
-          status: 400,
-          message: 'Cannot update status, order is not in pending state!'
-        })
+      return res.status(400).json({
+        status: 400,
+        message: 'Cannot update status, order is not in pending state!'
+      })
     }
 
     let newOrderId = orderId
@@ -304,13 +302,11 @@ exports.addSlip = async (req, res) => {
   try {
     upload(req, res, async err => {
       if (err) {
-        return res
-          .status(400)
-          .json({
-            status: 400,
-            message: 'Error uploading file',
-            error: err.message
-          })
+        return res.status(400).json({
+          status: 400,
+          message: 'Error uploading file',
+          error: err.message
+        })
       }
 
       const { orderId, type } = req.body
