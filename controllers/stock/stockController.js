@@ -332,13 +332,14 @@ exports.getQty = async (req, res, next) => {
       area: area,
       "listProduct.productId":productId
     })
-    const products = await Product.find({})
+    const products = await Product.find({id:productId})
 
     let unitData = {}
 
-    // console.log(products)
     const productUnitMatch = products?.find(p => p.id === productId)
     
+    
+    // console.log(productUnitMatch)
     if (productUnitMatch) {
       unitData = productUnitMatch.listUnit.map(unit => ({
         unit: unit.unit,
@@ -366,7 +367,6 @@ exports.getQty = async (req, res, next) => {
       product.available.map(lot => lot.lot)
     )
 
-  
     const totalQtyPcs = qtyList.reduce((sum, qty) => sum + qty, 0)
 
     const productUnit = unitData.find(p => p.unit === unit)
@@ -435,8 +435,6 @@ exports.addStockMovement = async (req, res, next) => {
 
 
 
-
-
     } else {
       return res.status(409).json({
         status:409,
@@ -477,6 +475,90 @@ exports.updateStockMovement = async (req, res, next) => {
     next(error)
   }
 }
+
+exports.availableStock = async (req, res) => {
+    
+    const { area, period, type, group, brand, size, flavour } = req.body
+
+    const modelStock = await Stock.aggregate([
+      {
+        $match: {
+          area: area, 
+          period: period
+        }
+      },
+      { 
+        $unwind: { 
+          path: "$listProduct", 
+          preserveNullAndEmptyArrays: true 
+        } 
+      },
+      { 
+        $project: {
+          productId: "$listProduct.productId" ,
+          _id:0
+        }
+      }
+    ]);
+    
+    const productIds = modelStock.flatMap(item => item.productId)
+    // console.log(productIds)
+    
+
+
+
+    if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
+      return res.status(400).json({
+          status: '400',
+          message: 'Invalid type! Required: sale, refund, or withdraw.'
+      })
+  }
+
+  let filter = {}
+
+  if (type === 'sale') filter.statusSale = 'Y'
+  if (type === 'refund') filter.statusRefund = 'Y'
+  if (type === 'withdraw') filter.statusWithdraw = 'Y'
+
+  const parseArrayParam = (param) => {
+      if (!param) return []
+      try {
+          return typeof param === 'string' ? JSON.parse(param) : param
+      } catch (error) {
+          return param.split(',')
+      }
+  }
+
+  const groupArray = parseArrayParam(group)
+  const brandArray = parseArrayParam(brand)
+  const sizeArray = parseArrayParam(size)
+  const flavourArray = parseArrayParam(flavour)
+
+  let conditions = []
+  if (productIds.length) conditions.push({ id: { $in: productIds } })
+  if (groupArray.length) conditions.push({ groupCode: { $in: groupArray } })
+  if (brandArray.length) conditions.push({ brandCode: { $in: brandArray } })
+  if (sizeArray.length) conditions.push({ size: { $in: sizeArray } })
+  if (flavourArray.length) conditions.push({ flavourCode: { $in: flavourArray } })
+
+  if (conditions.length) filter.$and = conditions
+
+  let products = await Product.find(filter).lean()
+
+  if (!products.length) {
+      return res.status(404).json({ status: '404', message: 'No products found!' })
+  }
+
+
+  res.status(200).json({
+    status:200,
+    message:"Success",
+    data: products
+  })
+}
+
+
+
 
 
 

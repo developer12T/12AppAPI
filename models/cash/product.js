@@ -16,9 +16,12 @@ const listUnit = mongoose.Schema({
 const productSchema = mongoose.Schema({
     id: { type: String, require: true },
     name: { type: String, require: true },
+    groupCode: { type: String, require: true },
     group: { type: String, require: true },
+    brandCode: { type: String, require: true },
     brand: { type: String, require: true },
     size: { type: String, require: true },
+    flavourCode: { type: String, require: true },
     flavour: { type: String, require: true },
     type: { type: String, require: true },
     weightGross: { type: String, require: true },

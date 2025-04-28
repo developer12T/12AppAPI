@@ -64,9 +64,12 @@ async function summaryOrder (cart) {
         id: cartItem.id,
         lot: cartItem.lot,
         name: cartItem.name,
+        groupCode: productInfo.groupCode || '',
         group: productInfo.group || '',
+        brandCode: productInfo.brandCode || '',
         brand: productInfo.brand || '',
         size: productInfo.size || '',
+        flavourCode: productInfo.flavourCode || '',
         flavour: productInfo.flavour || '',
         qty: cartItem.qty,
         unit: cartItem.unit,
@@ -424,17 +427,11 @@ async function summaryOrderProStatusOne (cart, listPromotion) {
       })
     })
 
-    // แสดงข้อมูล unitDataArray
-    // console.log("unitDataArray", JSON.stringify(unitDataArray, null, 2));
-
     listPromotion.forEach(promo => {
       promo.listProduct.forEach(product => {
-        // หาค่าจาก unitDataArray ที่ตรงกับ itemId
         const unitData = unitDataArray.find(unit => unit.itemId === product.id)
 
-        // ถ้ามีข้อมูล unitData ให้เพิ่มเข้าไปใน product
         if (unitData) {
-          // เพิ่ม unitData เข้าไปใน product
           product.unitData = {
             unit: unitData.unit,
             name: unitData.name,
@@ -445,8 +442,6 @@ async function summaryOrderProStatusOne (cart, listPromotion) {
         }
       })
     })
-    // แสดงผลข้อมูล listPromotion ที่มีข้อมูล unitData
-    // console.log("listPromotion with unitData", JSON.stringify(listPromotion, null, 2));
 
     const enrichedPromotionExtract = listPromotion.map(promo => ({
       proCode: promo?.proCode || '',
@@ -457,9 +452,12 @@ async function summaryOrderProStatusOne (cart, listPromotion) {
       listProduct: promo.listProduct.map(product => ({
         id: product.id,
         name: product.name,
+        groupCode: product.groupCode,
         group: product.group,
         size: product.size,
+        flavourCode: product.flavourCode,
         flavour: product.flavour,
+        brandCode: product.brandCode,
         brand: product.brand,
         qty: product.qty,
         unit: product.unit,
