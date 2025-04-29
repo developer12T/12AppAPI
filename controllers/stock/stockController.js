@@ -502,11 +502,7 @@ exports.availableStock = async (req, res) => {
     ]);
     
     const productIds = modelStock.flatMap(item => item.productId)
-    // console.log(productIds)
     
-
-
-
     if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
       return res.status(400).json({
           status: '400',

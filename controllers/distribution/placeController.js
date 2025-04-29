@@ -127,8 +127,6 @@ try {
         const checkPlace = await Place.findOne({ area:user })
 
         if (!checkPlace) {
-
-
             const t04 = {
                 type: "T04",
                 typeNameTH: withdrawT04.Des_Name,

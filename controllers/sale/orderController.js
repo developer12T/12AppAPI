@@ -44,7 +44,6 @@ exports.checkout = async (req, res) => {
     if (!cart || cart.listProduct.length === 0) {
       return res.status(404).json({ status: 404, message: 'Cart is empty!' })
     }
-    console.log('cart', cart)
     const sale = await User.findOne({ area }).select(
       'firstName surName warehouse tel saleCode salePayer'
     )
@@ -57,7 +56,6 @@ exports.checkout = async (req, res) => {
     let summary = ''
     if (changePromotionStatus == 0) {
       summary = await summaryOrder(cart)
-      // console.log(summary)
 
       // const shippingData = store.shippingAddress.find(s => s.shippingId === shipping)
       // if (!shippingData) {
@@ -66,7 +64,7 @@ exports.checkout = async (req, res) => {
 
       const productIds = cart.listProduct.map(p => p.id)
       const products = await Product.find({ id: { $in: productIds } }).select(
-        'id name group brand size flavour listUnit'
+        'id name groupCode group brandCode brand size flavourCode flavour listUnit'
       )
 
       let subtotal = 0
@@ -92,8 +90,11 @@ exports.checkout = async (req, res) => {
           lot: product.lot,
           name: product.name,
           group: product.group,
+          groupCode: product.groupCode,
+          brandCode: product.brandCode,
           brand: product.brand,
           size: product.size,
+          flavourCode: product.flavourCode,
           flavour: product.flavour,
           qty: item.qty,
           unit: item.unit,
@@ -156,120 +157,6 @@ exports.checkout = async (req, res) => {
       })
 
       await newOrder.save()
-      await Cart.deleteOne({ type, area, storeId })
-
-      const checkIn = await checkInRoute({
-        storeId: storeId,
-        routeId: routeId,
-        orderId: orderId,
-        note: note,
-        latitude: latitude,
-        longitude: longitude
-      })
-
-      // console.log('checkin', checkIn)
-
-      res.status(200).json({
-        status: 200,
-        message: 'Checkout successful!',
-        data: newOrder
-      })
-    } else if (changePromotionStatus == 1) {
-      summary = await summaryOrderProStatusOne(cart, listPromotion)
-      // console.log("summary.listPromotion", JSON.stringify(summary.listPromotion, null, 2));
-
-      const productIds = cart.listProduct.map(p => p.id)
-      const products = await Product.find({ id: { $in: productIds } }).select(
-        'id name group brand size flavour listUnit'
-      )
-
-      let subtotal = 0
-      let listProduct = cart.listProduct.map(item => {
-        const product = products.find(p => p.id === item.id)
-        if (!product) return null
-
-        const unitData = product.listUnit.find(u => u.unit === item.unit)
-        if (!unitData) {
-          return res
-            .status(400)
-            .json({
-              status: 400,
-              message: `Invalid unit for product ${item.id}`
-            })
-        }
-
-        const totalPrice = item.qty * unitData.price.sale
-        subtotal += totalPrice
-
-        return {
-          id: product.id,
-          lot: product.lot,
-          name: product.name,
-          group: product.group,
-          brand: product.brand,
-          size: product.size,
-          flavour: product.flavour,
-          qty: item.qty,
-          unit: item.unit,
-          unitName: unitData.name,
-          price: unitData.price.sale,
-          subtotal: parseFloat(totalPrice.toFixed(2)),
-          discount: 0,
-          netTotal: parseFloat(totalPrice.toFixed(2))
-        }
-      })
-
-      if (listProduct.includes(null)) return
-      const orderId = await generateOrderId(area, sale.warehouse)
-
-      const newOrder = new Order({
-        orderId,
-        type,
-        status: 'pending',
-        sale: {
-          saleCode: sale.saleCode,
-          salePayer: sale.salePayer,
-          name: `${sale.firstName} ${sale.surName}`,
-          tel: sale.tel || '',
-          warehouse: sale.warehouse
-        },
-        store: {
-          storeId: summary.store.storeId,
-          name: summary.store.name,
-          type: summary.store.type,
-          address: summary.store.address,
-          taxId: summary.store.taxId,
-          tel: summary.store.tel,
-          area: summary.store.area,
-          zone: summary.store.zone
-        },
-        note,
-        latitude,
-        longitude,
-        listProduct,
-        listPromotions: summary.listPromotion,
-        subtotal,
-        discount: 0,
-        discountProduct: 0,
-        vat: 0,
-        totalExVat: 0,
-        total: subtotal,
-        // shipping: {
-        //     shippingId: shippingData.shippingId,
-        //     address: shippingData.address,
-        //     dateRequest: shipping.dateRequest,
-        //     note: shipping.note
-        // },
-        shipping: {
-          shippingId: '',
-          address: ''
-        },
-        paymentMethod: 'cash',
-        paymentStatus: 'paid',
-        createdBy: sale.username
-      })
-
-      // await newOrder.save()
       // await Cart.deleteOne({ type, area, storeId })
 
       const checkIn = await checkInRoute({
@@ -294,7 +181,7 @@ exports.checkout = async (req, res) => {
 
       const productIds = cart.listProduct.map(p => p.id)
       const products = await Product.find({ id: { $in: productIds } }).select(
-        'id name group brand size flavour listUnit'
+        'id name groupCode group brandCode brand size flavourCode flavour listUnit'
       )
 
       let subtotal = 0
@@ -317,10 +204,14 @@ exports.checkout = async (req, res) => {
 
         return {
           id: product.id,
+          lot: product.lot,
           name: product.name,
+          groupCode: product.groupCode,
           group: product.group,
+          brandCode: product.brandCode,
           brand: product.brand,
           size: product.size,
+          flavourCode: product.flavour,
           flavour: product.flavour,
           qty: item.qty,
           unit: item.unit,
@@ -364,8 +255,8 @@ exports.checkout = async (req, res) => {
         subtotal,
         discount: 0,
         discountProduct: 0,
-        vat: parseFloat((subtotal - subtotal / 1.07).toFixed(2)),
-        totalExVat: parseFloat((subtotal / 1.07).toFixed(2)),
+        vat: 0,
+        totalExVat: 0,
         total: subtotal,
         // shipping: {
         //     shippingId: shippingData.shippingId,
@@ -381,11 +272,9 @@ exports.checkout = async (req, res) => {
         paymentStatus: 'paid',
         createdBy: sale.username
       })
-
+      console.log(newOrder)
       await newOrder.save()
       await Cart.deleteOne({ type, area, storeId })
-
-      // console.log("summary.listPromotion", JSON.stringify(newOrder, null, 2));
 
       const checkIn = await checkInRoute({
         storeId: storeId,
@@ -395,6 +284,15 @@ exports.checkout = async (req, res) => {
         latitude: latitude,
         longitude: longitude
       })
+
+      // console.log('checkin', checkIn)
+
+      res.status(200).json({
+        status: 200,
+        message: 'Checkout successful!',
+        data: newOrder
+      })
+  
 
       // console.log('checkin', checkIn)
 
@@ -825,7 +723,9 @@ exports.getAllOrder = async (req, res) => {
 
 exports.getSummaryItem = async (req, res) => {
   try {
-    const { area, period } = req.query
+    // const { area, period, group, flavour, brand } = req.query
+
+    const { area, period, group, brand, flavour } = req.body
 
     const periodYear = period.slice(0, 4)
     const month = period.slice(4, 6)
@@ -853,7 +753,6 @@ exports.getSummaryItem = async (req, res) => {
         }
       }
     ])
-
     if (!modelOrder || modelOrder.length === 0) {
       return res.status(404).json({
         status: 404,
@@ -861,75 +760,114 @@ exports.getSummaryItem = async (req, res) => {
       })
     }
 
-    const modelProduct = await Product.find()
 
-    const calPcs = modelOrder.map(product =>
-      product.listProduct.map(item => {
-        const productdetail = modelProduct.find(u => u.id === item.id)
-        const productFactor = productdetail.listUnit.map(item => {
-          return {
-            item: productdetail.id,
-            unit: item.unit,
-            factor: item.factor
-          }
-        })
+    const productIds = modelOrder.flatMap(order => order.listProduct.map(product => product.id))
+    console.log("productIds",productIds)
 
-        const factor = productFactor.find(
-          u => u.item === item.id && u.unit === item.unit
-        )
-        // console.log(factor)
-        return {
-          item: item.id,
-          qtyPcs: item.qty * factor.factor,
-          factor: factor.factor,
-          unit: item.unit,
-          price: item.price
-        }
-      })
-    )
-
-    let arrayCalPcs = calPcs.flat()
-
-    const sumPcs = arrayCalPcs.reduce((acc, item) => {
-      if (acc[item.item]) {
-        acc[item.item].qtyPcs += item.qtyPcs
-        acc[item.item].totalPrice += item.qtyPcs * item.price
-      } else {
-        acc[item.item] = {
-          item: item.item,
-          qtyPcs: item.qtyPcs,
-          totalPrice: item.qtyPcs * item.price
-        }
+    const parseArrayParam = (param) => {
+      if (!param) return []
+      try {
+          return typeof param === 'string' ? JSON.parse(param) : param
+      } catch (error) {
+          return param.split(',')
       }
-      return acc
-    }, {})
+  }
 
-    // แปลงผลลัพธ์จาก object ให้เป็น array
-    const sumPcsResult = Object.values(sumPcs)
+  let filter = {}
+  const groupArray = parseArrayParam(group)
+  const brandArray = parseArrayParam(brand)
+  const flavourArray = parseArrayParam(flavour)
 
-    const sumCtn = sumPcsResult.map(item => {
-      const productdetail = modelProduct.find(u => u.id === item.item)
-      const productFactor = productdetail.listUnit
-        .filter(item => item.unit === 'CTN')
-        .map(item => {
-          return {
-            item: productdetail.id,
-            unit: item.unit,
-            factor: parseInt(item.factor)
-          }
-        })
-      const ctnFactor = productFactor.find(u => u.item && item.item)
+  let conditions = []
+  if (productIds.length) conditions.push({ id: { $in: productIds } })
+  if (groupArray.length) conditions.push({ groupCode: { $in: groupArray } })
+  if (brandArray.length) conditions.push({ brandCode: { $in: brandArray } })
+  if (flavourArray.length) conditions.push({ flavourCode: { $in: flavourArray } })
 
-      return {
-        item: item.item,
-        count: Math.floor(item.qtyPcs / ctnFactor.factor),
-        unit: 'CTN',
-        // qtyPcs:item.qtyPcs,
-        // factor: ctnFactor.factor,
-        // qtyCtn: Math.floor(item.qtyPcs / ctnFactor.factor),
-        summary: item.totalPrice
-      }
-    })
+  if (conditions.length) filter.$and = conditions
+
+  let products = await Product.find(filter).lean()
+
+  // console.log("products",products)
+
+// สร้าง productFactor ก่อน
+const productFactor = products.flatMap(product => 
+  product.listUnit.map(unit => ({
+    item: product.id,
+    unit: unit.unit,
+    factor: unit.factor
+  }))
+);
+const orderList = modelOrder.map(order => order.listProduct.map(product => product))
+
+// const factor = orderList.map(order =>order.find(u => u.item === orderList.id && u.unit === orderList.unit))
+
+// console.log("factor",factor)
+// const factor = productFactor.find(u => u.item === orderList.id && u.unit === orderList.unit )
+
+// console.log(productFactor)
+// const calPcs = modelOrder.map(product =>
+//   product.listProduct.map(item => {
+//     const factor = productFactor.find(
+//       u => u.item === item.id && u.unit === item.unit
+//     );
+
+//     const factorValue = factor ? factor.factor : 1;  // ถ้าไม่เจอ factor ใช้ 1 แทน
+
+//     return {
+//       item: item.id,
+//       qtyPcs: item.qty * factorValue,
+//       factor: factorValue,
+//       unit: item.unit,
+//       price: item.price
+//     };
+//   })
+// );
+
+// console.log(calPcs)
+
+//     let arrayCalPcs = calPcs.flat()
+
+//     const sumPcs = arrayCalPcs.reduce((acc, item) => {
+//       if (acc[item.item]) {
+//         acc[item.item].qtyPcs += item.qtyPcs
+//         acc[item.item].totalPrice += item.qtyPcs * item.price
+//       } else {
+//         acc[item.item] = {
+//           item: item.item,
+//           qtyPcs: item.qtyPcs,
+//           totalPrice: item.qtyPcs * item.price
+//         }
+//       }
+//       return acc
+//     }, {})
+
+//     // แปลงผลลัพธ์จาก object ให้เป็น array
+//     const sumPcsResult = Object.values(sumPcs)
+
+//     const sumCtn = sumPcsResult.map(item => {
+//       const productdetail = products.find(u => u.id === item.item)
+//       const productFactor = productdetail.listUnit
+//         .filter(item => item.unit === 'CTN')
+//         .map(item => {
+//           return {
+//             item: productdetail.id,
+//             unit: item.unit,
+//             factor: parseInt(item.factor)
+//           }
+//         })
+//       const ctnFactor = productFactor.find(u => u.item && item.item)
+
+//       return {
+//         item: item.item,
+//         count: Math.floor(item.qtyPcs / ctnFactor.factor),
+//         unit: 'CTN',
+//         // qtyPcs:item.qtyPcs,
+//         // factor: ctnFactor.factor,
+//         // qtyCtn: Math.floor(item.qtyPcs / ctnFactor.factor),
+//         summary: item.totalPrice
+//       }
+//     })
 
     res.status(200).json({
       status: 200,
@@ -941,6 +879,8 @@ exports.getSummaryItem = async (req, res) => {
     res.status(500).json({ status: '500', message: error.message })
   }
 }
+
+
 
 exports.getSummarybyRoute = async (req, res) => {
   try {
@@ -1030,12 +970,12 @@ exports.getSummarybyRoute = async (req, res) => {
 exports.getSummarybyMonth = async (req, res) => {
   const { area, period } = req.query
 
-  checkArea = await Route.find({area:area})
+  checkArea = await Route.find({ area: area })
 
   if (checkArea.length == 0) {
     return res.status(404).json({
-      status:404,
-      message:`Not Found This area: ${area}` 
+      status: 404,
+      message: `Not Found This area: ${area}`
     })
   }
 
@@ -1122,12 +1062,12 @@ exports.getSummarybyMonth = async (req, res) => {
     month: i + 1,
     summary: 0
   }));
-  
+
   // อัปเดตผลลัพธ์จาก data ที่มีอยู่
   modelRouteValue.forEach(d => {
     result[d.month - 1].summary = d.summary;
   });
-  
+
 
   res.status(200).json({
     status: 200,
@@ -1137,167 +1077,476 @@ exports.getSummarybyMonth = async (req, res) => {
 }
 
 exports.getSummarybyArea = async (req, res) => {
- 
+
   const { period, year } = req.query
   // year = Number(yearQuery)
   // let modelRoute = [];
-  if ( !period ) {
-    return res.status(404).json({
-      status:404,
-      message:'period is require'
-  })
+  // if ( !period ) {
+  //   return res.status(404).json({
+  //     status:404,
+  //     message:'period is require'
+  // })
+  // }
+
+  // if ( !year ) {
+  //   return res.status(404).json({
+  //     status:404,
+  //     message:'year is require'
+  // })
+  // }
+
+  if (!period && year) {
+
+    // console.log(period)
+    const modelRouteValue = await Order.aggregate([
+
+      {
+        $addFields: {
+          orderCreatedYear: {
+            $year: {
+              date: "$createdAt",
+              timezone: "Asia/Bangkok"
+            }
+          }
+        }
+      },
+      {
+        $match: {
+          orderCreatedYear: Number(year)
+        }
+      },
+
+
+      {
+        $lookup: {
+          from: "routes",
+          let: { orderId: "$orderId" },  // เอาค่า orderId จากฝั่ง orders
+          pipeline: [
+            { $unwind: "$listStore" },
+            { $unwind: "$listStore.listOrder" },
+            {
+              $match: {
+                $expr: { $eq: ["$listStore.listOrder.orderId", "$$orderId"] }  // ใช้ $expr + $$variable
+              }
+            }
+          ],
+          as: "routesDetails"
+        }
+      },
+      { $unwind: "$routesDetails" },
+      {
+        $group: {
+          _id: {
+            area: "$routesDetails.area",
+            day: "$routesDetails.day"
+          },
+          totalAmount: { $sum: "$total" }
+        }
+      },
+
+      {
+        $project: {
+          area: "$_id.area",
+          day: "$_id.day",
+          totalAmount: 1,
+          _id: 0
+        }
+      }
+    ])
+
+    const haveArea = [...new Set(modelRouteValue.map(i => i.area))];
+
+    // console.log(haveArea)
+    otherModelRoute = await Route.aggregate([
+      {
+        $match: {
+          // period: period,
+          area: { $nin: haveArea }  // เลือกเฉพาะ area ที่ไม่อยู่ใน haveArea
+        }
+      },
+      { $project: { area: 1, day: 1, listStore: 1 } },
+
+      { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
+
+      {
+        $lookup: {
+          from: "orders",
+          localField: "listStore.listOrder.orderId",
+          foreignField: "orderId",
+          as: "orderDetails",
+        }
+      },
+
+      { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } },
+
+      // {
+      //   $addFields: {
+      //     orderCreatedYear: {
+      //       $year: {
+      //         date: "$orderDetails.createdAt",
+      //         timezone: "Asia/Bangkok"
+      //       }
+      //     }
+      //   }
+      // },
+      // {
+      //   $match: {
+      //     orderCreatedYear: Number(year)
+      //   }
+      // },
+
+
+      {
+        $group: {
+          _id: { area: "$area", day: "$day" },  // Group by area and day
+          totalAmount: { $sum: "$orderDetails.total" }  // Sum the total from orderDetails
+        }
+      },
+
+      {
+        $project: {
+          area: "$_id.area",   // Project area
+          day: "$_id.day",     // Project day
+          totalAmount: 1,      // Include totalAmount in the output
+          _id: 0               // Exclude _id field from the result
+        }
+      },
+      { $sort: { area: 1, day: 1 } }
+
+    ]);
+
+    // console.log(otherModelRoute)
+
+    if (modelRouteValue.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not Found Route This period'
+      })
+    }
+
+    modelRoute = [...modelRouteValue, ...otherModelRoute];
+
+    const areaList = [...new Set(modelRoute.map(item => item.area))].sort();
+
+    const data = areaList.map(area => {
+      const filtered = modelRoute.filter(item => item.area === area);
+
+      const filledDays = Array.from({ length: 27 }, (_, i) => {
+        const day = String(i + 1).padStart(2, '0');
+        const found = filtered.find(item => item.day === day);
+
+        return found || {
+          totalAmount: 0,
+          area: area,
+          day: day,
+        };
+      })
+        ;
+
+      modelRoute = [...modelRouteValue, ...otherModelRoute];
+
+
+
+      return {
+        area: area,
+        summary: filledDays.map(item => item.totalAmount),
+      };
+    });
+
+    res.status(200).json({
+      status: 200,
+      message: 'Success',
+      data: data
+
+    })
+
   }
 
-  if ( !year ) {
-    return res.status(404).json({
-      status:404,
-      message:'year is require'
-  })
+  else if (period && !year) {
+    const modelRouteValue = await Route.aggregate([
+
+      { $match: { period: period } },
+      { $project: { area: 1, day: 1, listStore: 1 } },
+      { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
+      {
+
+        $lookup: {
+
+          from: "orders",
+
+          localField: "listStore.listOrder.orderId",
+
+          foreignField: "orderId",
+
+          as: "orderDetails",
+
+        }
+
+      },
+      { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } },
+      // แปลง createdAt เป็น Bangkok Time แล้วกรองปี 2025
+      {
+        $group: {
+          _id: { area: "$area", day: "$day" },
+          totalAmount: { $sum: "$orderDetails.total" }
+        }
+      },
+      {
+        $project: {
+          area: "$_id.area",
+          day: "$_id.day",
+          totalAmount: 1,
+          _id: 0
+        }
+      },
+      { $sort: { area: 1, day: 1 } }
+    ]);
+
+    const haveArea = [...new Set(modelRouteValue.map(i => i.area))];
+
+    // console.log(haveArea)
+
+    otherModelRoute = await Route.aggregate([
+      {
+        $match: {
+          period: period,
+          area: { $nin: haveArea }  // เลือกเฉพาะ area ที่ไม่อยู่ใน haveArea
+        }
+      },
+      { $project: { area: 1, day: 1, listStore: 1 } },
+
+      { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
+
+      {
+        $lookup: {
+          from: "orders",
+          localField: "listStore.listOrder.orderId",
+          foreignField: "orderId",
+          as: "orderDetails",
+        }
+      },
+
+      { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } },
+
+
+      {
+        $group: {
+          _id: { area: "$area", day: "$day" },  // Group by area and day
+          totalAmount: { $sum: "$orderDetails.total" }  // Sum the total from orderDetails
+        }
+      },
+
+      {
+        $project: {
+          area: "$_id.area",   // Project area
+          day: "$_id.day",     // Project day
+          totalAmount: 1,      // Include totalAmount in the output
+          _id: 0               // Exclude _id field from the result
+        }
+      },
+      { $sort: { area: 1, day: 1 } }
+
+    ]);
+
+
+    // console.log(modelRouteValue)
+
+
+
+    if (modelRouteValue.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not Found Route This period'
+      })
+    }
+
+    modelRoute = [...modelRouteValue, ...otherModelRoute];
+
+    const areaList = [...new Set(modelRoute.map(item => item.area))].sort();
+
+    const data = areaList.map(area => {
+      const filtered = modelRoute.filter(item => item.area === area);
+
+      const filledDays = Array.from({ length: 27 }, (_, i) => {
+        const day = String(i + 1).padStart(2, '0');
+        const found = filtered.find(item => item.day === day);
+
+        return found || {
+          totalAmount: 0,
+          area: area,
+          day: day,
+        };
+      });
+
+
+      return {
+        area: area,
+        summary: filledDays.map(item => item.totalAmount),
+      };
+    });
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'Success',
+      data: data
+
+    })
   }
 
 
   // console.log(year)
-  if ( period && year) {
-  const modelRouteValue = await Route.aggregate([
- 
-    { $match: { period: period } },
-    { $project: { area: 1, day: 1, listStore: 1 } },
-    { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
-    { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
-    {
- 
-      $lookup: {
- 
-        from: "orders",
- 
-        localField: "listStore.listOrder.orderId",
- 
-        foreignField: "orderId",
- 
-        as: "orderDetails",
- 
-      }
- 
-    },
-    { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } },
-    // แปลง createdAt เป็น Bangkok Time แล้วกรองปี 2025
-    {
-      $addFields: {
-        orderCreatedYear: {
-          $year: {
-            date: "$orderDetails.createdAt",
-            timezone: "Asia/Bangkok"
+  else if (period && year) {
+    const modelRouteValue = await Route.aggregate([
+
+      { $match: { period: period } },
+      { $project: { area: 1, day: 1, listStore: 1 } },
+      { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
+      {
+
+        $lookup: {
+
+          from: "orders",
+
+          localField: "listStore.listOrder.orderId",
+
+          foreignField: "orderId",
+
+          as: "orderDetails",
+
+        }
+
+      },
+      { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } },
+      // แปลง createdAt เป็น Bangkok Time แล้วกรองปี 2025
+      {
+        $addFields: {
+          orderCreatedYear: {
+            $year: {
+              date: "$orderDetails.createdAt",
+              timezone: "Asia/Bangkok"
+            }
           }
         }
-      }
-    },
-    {
-      $match: {
-        orderCreatedYear: Number(year)
-      }
-    },
-    {
-      $group: {
-        _id: { area: "$area", day: "$day" },
-        totalAmount: { $sum: "$orderDetails.total" }
-      }
-    },
-    {
-      $project: {
-        area: "$_id.area",
-        day: "$_id.day",
-        totalAmount: 1,
-        _id: 0
-      }
-    },
-    { $sort: { area: 1, day: 1 } }
-  ]);
- 
-  const haveArea = [...new Set(modelRouteValue.map(i => i.area))];
- 
-  // console.log(haveArea)
- 
-  otherModelRoute = await Route.aggregate([
-    { $match: {
-      period: period,
-      area: { $nin: haveArea }  // เลือกเฉพาะ area ที่ไม่อยู่ใน haveArea
+      },
+      {
+        $match: {
+          orderCreatedYear: Number(year)
+        }
+      },
+      {
+        $group: {
+          _id: { area: "$area", day: "$day" },
+          totalAmount: { $sum: "$orderDetails.total" }
+        }
+      },
+      {
+        $project: {
+          area: "$_id.area",
+          day: "$_id.day",
+          totalAmount: 1,
+          _id: 0
+        }
+      },
+      { $sort: { area: 1, day: 1 } }
+    ]);
+
+    const haveArea = [...new Set(modelRouteValue.map(i => i.area))];
+
+    // console.log(haveArea)
+
+    otherModelRoute = await Route.aggregate([
+      {
+        $match: {
+          period: period,
+          area: { $nin: haveArea }  // เลือกเฉพาะ area ที่ไม่อยู่ใน haveArea
+        }
+      },
+      { $project: { area: 1, day: 1, listStore: 1 } },
+
+      { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
+
+      {
+        $lookup: {
+          from: "orders",
+          localField: "listStore.listOrder.orderId",
+          foreignField: "orderId",
+          as: "orderDetails",
+        }
+      },
+
+      { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } },
+
+
+      {
+        $group: {
+          _id: { area: "$area", day: "$day" },  // Group by area and day
+          totalAmount: { $sum: "$orderDetails.total" }  // Sum the total from orderDetails
+        }
+      },
+
+      {
+        $project: {
+          area: "$_id.area",   // Project area
+          day: "$_id.day",     // Project day
+          totalAmount: 1,      // Include totalAmount in the output
+          _id: 0               // Exclude _id field from the result
+        }
+      },
+      { $sort: { area: 1, day: 1 } }
+
+    ]);
+
+
+    // console.log(modelRouteValue)
+
+
+
+    if (modelRouteValue.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not Found Route This period'
+      })
     }
-    },
-    { $project: { area: 1, day: 1, listStore: 1 } },
- 
-    { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
-    { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
- 
-    {
-      $lookup: {
-        from: "orders",
-        localField: "listStore.listOrder.orderId",
-        foreignField: "orderId",
-        as: "orderDetails",
-      }
-    },
- 
-    { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } },
- 
- 
-    {
-      $group: {
-        _id: { area: "$area", day: "$day" },  // Group by area and day
-        totalAmount: { $sum: "$orderDetails.total" }  // Sum the total from orderDetails
-      }
-    },
- 
-    {
-      $project: {
-        area: "$_id.area",   // Project area
-        day: "$_id.day",     // Project day
-        totalAmount: 1,      // Include totalAmount in the output
-        _id: 0               // Exclude _id field from the result
-      }
-    },
-    { $sort: { area: 1, day: 1 } }
- 
-  ]);
- 
-  if (modelRouteValue.length === 0) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not Found Route This period'
+
+    modelRoute = [...modelRouteValue, ...otherModelRoute];
+
+    const areaList = [...new Set(modelRoute.map(item => item.area))].sort();
+
+    const data = areaList.map(area => {
+      const filtered = modelRoute.filter(item => item.area === area);
+
+      const filledDays = Array.from({ length: 27 }, (_, i) => {
+        const day = String(i + 1).padStart(2, '0');
+        const found = filtered.find(item => item.day === day);
+
+        return found || {
+          totalAmount: 0,
+          area: area,
+          day: day,
+        };
+      });
+
+
+      return {
+        area: area,
+        summary: filledDays.map(item => item.totalAmount),
+      };
+    });
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'Success',
+      data: data
+
     })
   }
 
-  modelRoute = [...modelRouteValue, ...otherModelRoute];
-
-  const areaList = [...new Set(modelRoute.map(item => item.area))].sort();
- 
-  const data = areaList.map(area => {
-    const filtered = modelRoute.filter(item => item.area === area);
- 
-    const filledDays = Array.from({ length: 27 }, (_, i) => {
-      const day = String(i + 1).padStart(2, '0');
-      const found = filtered.find(item => item.day === day);
- 
-      return found || {
-        totalAmount: 0,
-        area: area,
-        day: day,
-      };
-    });
- 
- 
-    return {
-      area: area,
-      summary: filledDays.map(item => item.totalAmount),
-    };
-  });
- 
-
-  res.status(200).json({
-    status:200 ,
-    message:'Success' ,
-    data:data
- 
-  })
-}
 
 }

@@ -1,5 +1,8 @@
 const axios = require('axios')
 const { Product } = require('../../models/cash/product')
+const fs = require('fs');
+const path = require('path');
+
 
 exports.getProductAll = async (req, res) => {
     try {
@@ -444,6 +447,7 @@ exports.addProduct = async (req, res) => {
 exports.addFromERP = async (req, res) => {
     try {
         const response = await axios.get('http://58.181.206.159:9814/ca_api/ca_product.php')
+
         if (!response.data || !Array.isArray(response.data)) {
             return res.status(400).json({
                 status: 400,
@@ -482,9 +486,12 @@ exports.addFromERP = async (req, res) => {
             const newProduct = new Product({
                 id: listProduct.id,
                 name: listProduct.name,
+                groupCode: listProduct.groupCode,
                 group: listProduct.group,
+                brandCode: listProduct.brandCode,
                 brand: listProduct.brand,
                 size: listProduct.size,
+                flavourCode: listProduct.flavourCode,
                 flavour: listProduct.flavour,
                 type: listProduct.type,
                 weightGross: listProduct.weightGross,
@@ -495,10 +502,12 @@ exports.addFromERP = async (req, res) => {
                 listUnit: listUnit,
             })
             await newProduct.save()
+            // console.log(newProduct)
         }
         res.status(200).json({
             status: 200,
             message: 'Products added successfully',
+            // data:newProduct
         })
     } catch (e) {
         console.error(e);

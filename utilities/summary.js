@@ -118,7 +118,6 @@ async function summaryOrder (cart) {
     }
     // }
 
-    // ✅ Log ค่าแต่ละตัวหลังจาก enrichedProducts ถูกสร้าง
 
     // console.log(enrichedProducts) // สามารถใช้งาน enrichedProducts ได้
 

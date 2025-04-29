@@ -62,8 +62,8 @@ const storeSchema = mongoose.Schema({
     imageList: [imageSchema],
     shippingAddress: [shippingSchema],
     checkIn: checkinSchema,
-    createdDate: { type: Date, default: Date.now },
-    updateDate: { type: Date, default: Date.now },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
     date: {
         type: Date,
         default: () => {
@@ -79,8 +79,8 @@ const typeStoreSchema = mongoose.Schema({
     name: { type: String, require: true },
     description: { type: String, require: true },
     status: { type: String, require: true },
-    createDate: { type: Date, default: Date.now },
-    updateDate: { type: Date, default: Date.now },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
 })
 
 const Store = dbCA.model('Store', storeSchema)
