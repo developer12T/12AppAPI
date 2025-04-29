@@ -12,7 +12,7 @@ router.post('/addSlip', addSlip)
 router.post('/addSlip', addSlip)
 router.get('/ordertoexcel/:saleCode', OrderToExcel);
 router.get('/getAllOrder', getAllOrder)
-// router.post('/getSummaryItem', getSummaryItem)
+router.post('/getSummaryItem', getSummaryItem)
 router.get('/getSummarybyRoute', getSummarybyRoute)
 router.get('/getSummarybyMonth', getSummarybyMonth)
 router.get('/getSummarybyArea', getSummarybyArea)
