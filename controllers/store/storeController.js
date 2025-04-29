@@ -437,9 +437,9 @@ exports.rejectStore = async (req, res) => {
     { storeId: storeId },
     { $set: { status: '15', updatedDate: Date() } }
   )
-  // console.log(newStoreId)
   res.status(200).json({
     status: 200,
-    message: 'Update Success'
+    message: 'Reject Success',
+    data: result
   })
 }

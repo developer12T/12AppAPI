@@ -8,9 +8,10 @@ const {
   stockToExcel,
   getProduct,
   addStockMovement,
-  rollbackStock ,
+  rollbackStock,
   updateStockMovement,
-  availableStock
+  availableStock,
+  getStock
 } = require('../../controllers/stock/stockController')
 
 const router = express.Router()
