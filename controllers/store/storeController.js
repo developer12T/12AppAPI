@@ -34,7 +34,7 @@ exports.getStore = async (req, res) => {
         $gte: startMonth,
         $lt: NextMonth
       }
-      query.status = '10'
+      // query.status = '10'
     } else if (type === 'all') {
       query.createdDate = {
         $not: {
@@ -419,11 +419,25 @@ exports.updateStoreStatus = async (req, res) => {
 
   const result = await Store.updateOne(
     { storeId: storeId },
-    { $set: { storeId: newStoreId, status: '20' } }
+    { $set: { storeId: newStoreId, status: '20', updatedDate: Date() } }
   )
 
   // console.log(newStoreId)
 
+  res.status(200).json({
+    status: 200,
+    message: 'Update Success'
+  })
+}
+
+exports.rejectStore = async (req, res) => {
+  const { storeId, area } = req.body
+
+  const result = await Store.updateOne(
+    { storeId: storeId },
+    { $set: { status: '15', updatedDate: Date() } }
+  )
+  // console.log(newStoreId)
   res.status(200).json({
     status: 200,
     message: 'Update Success'
