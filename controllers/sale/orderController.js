@@ -725,7 +725,7 @@ exports.getSummaryItem = async (req, res) => {
   try {
     // const { area, period, group, flavour, brand } = req.query
 
-    const { area, period, group, brand, flavour } = req.body
+    const { area, period, group, brand, flavour, size, type } = req.body
 
     const periodYear = period.slice(0, 4)
     const month = period.slice(4, 6)
@@ -747,9 +747,11 @@ exports.getSummaryItem = async (req, res) => {
           type: { $in: ['sale', 'change'] }
         }
       },
+      { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
       {
         $project: {
-          listProduct: 1
+          listProduct: 1,      
+          _id: 0               
         }
       }
     ])
@@ -759,10 +761,12 @@ exports.getSummaryItem = async (req, res) => {
         message: 'Not Found Order'
       })
     }
+    // console.log("modelOrder",modelOrder)
 
 
-    const productIds = modelOrder.flatMap(order => order.listProduct.map(product => product.id))
-    console.log("productIds",productIds)
+    const productIds = modelOrder.map(order => order.listProduct.id);
+    // .listProduct.map(product => product.id)
+    // console.log("productIds",productIds)
 
     const parseArrayParam = (param) => {
       if (!param) return []
@@ -777,102 +781,137 @@ exports.getSummaryItem = async (req, res) => {
   const groupArray = parseArrayParam(group)
   const brandArray = parseArrayParam(brand)
   const flavourArray = parseArrayParam(flavour)
+  const sizeArray = parseArrayParam(size)
 
   let conditions = []
   if (productIds.length) conditions.push({ id: { $in: productIds } })
   if (groupArray.length) conditions.push({ groupCode: { $in: groupArray } })
   if (brandArray.length) conditions.push({ brandCode: { $in: brandArray } })
   if (flavourArray.length) conditions.push({ flavourCode: { $in: flavourArray } })
+  if (sizeArray.length) conditions.push({ size: { $in: sizeArray } })
 
   if (conditions.length) filter.$and = conditions
 
-  let products = await Product.find(filter).lean()
+  const products = await Product.aggregate([
+    { $match: filter } 
+  ]);
+  
+  if (products.length == 0) {
+    return res.status(404).json({
+      status:404,
+      message: 'Not Found Product'
+    })
+  }
 
-  // console.log("products",products)
+  const data = products.map(product => {
+    const netTotal = modelOrder.find(order => order.listProduct.id === product.id);
+    return {
+              id:product.id,
+              groupCode:product.groupCode,
+              brandCode:product.brandCode,
+              flavourCode:product.flavourCode,
+              size:product.size,
+              netTotal:netTotal.listProduct.netTotal
+    }
+  })
 
-// สร้าง productFactor ก่อน
-const productFactor = products.flatMap(product => 
-  product.listUnit.map(unit => ({
-    item: product.id,
-    unit: unit.unit,
-    factor: unit.factor
-  }))
-);
-const orderList = modelOrder.map(order => order.listProduct.map(product => product))
+  if ( !type ) {
+    return res.status(404).json({
+      status:404,
+      message: 'type is require'
+    })
+  }
 
-// const factor = orderList.map(order =>order.find(u => u.item === orderList.id && u.unit === orderList.unit))
 
-// console.log("factor",factor)
-// const factor = productFactor.find(u => u.item === orderList.id && u.unit === orderList.unit )
+    let result = [] 
 
-// console.log(productFactor)
-// const calPcs = modelOrder.map(product =>
-//   product.listProduct.map(item => {
-//     const factor = productFactor.find(
-//       u => u.item === item.id && u.unit === item.unit
-//     );
+    if (type == "group") {
+      const groupedByGroupCode = data.reduce((acc, item) => {
 
-//     const factorValue = factor ? factor.factor : 1;  // ถ้าไม่เจอ factor ใช้ 1 แทน
+        if (!acc[item.groupCode]) {
+          acc[item.groupCode] = {
+            groupCode: item.groupCode,
+            totalNetTotal: 0
+          };
+        }
 
-//     return {
-//       item: item.id,
-//       qtyPcs: item.qty * factorValue,
-//       factor: factorValue,
-//       unit: item.unit,
-//       price: item.price
-//     };
-//   })
-// );
+        acc[item.groupCode].totalNetTotal += item.netTotal;
+      
+        return acc;
+      }, {});
+      
 
-// console.log(calPcs)
+      result = Object.values(groupedByGroupCode);
+      // console.log(result)
+    }
+    else if (type == "flavour"){
+     
+      const groupedByFlavourCode = data.reduce((acc, item) => {
 
-//     let arrayCalPcs = calPcs.flat()
+        if (!acc[item.flavourCode]) {
+          acc[item.flavourCode] = {
+            flavourCode: item.flavourCode,
+            totalNetTotal: 0
+          };
+        }
 
-//     const sumPcs = arrayCalPcs.reduce((acc, item) => {
-//       if (acc[item.item]) {
-//         acc[item.item].qtyPcs += item.qtyPcs
-//         acc[item.item].totalPrice += item.qtyPcs * item.price
-//       } else {
-//         acc[item.item] = {
-//           item: item.item,
-//           qtyPcs: item.qtyPcs,
-//           totalPrice: item.qtyPcs * item.price
-//         }
-//       }
-//       return acc
-//     }, {})
+        acc[item.flavourCode].totalNetTotal += item.netTotal;
+      
+        return acc;
+      }, {});
+      
 
-//     // แปลงผลลัพธ์จาก object ให้เป็น array
-//     const sumPcsResult = Object.values(sumPcs)
+      result = Object.values(groupedByFlavourCode);
+      // console.log(result)
+    }
 
-//     const sumCtn = sumPcsResult.map(item => {
-//       const productdetail = products.find(u => u.id === item.item)
-//       const productFactor = productdetail.listUnit
-//         .filter(item => item.unit === 'CTN')
-//         .map(item => {
-//           return {
-//             item: productdetail.id,
-//             unit: item.unit,
-//             factor: parseInt(item.factor)
-//           }
-//         })
-//       const ctnFactor = productFactor.find(u => u.item && item.item)
+    else if (type == "size"){
+     
+      const groupedBySize = data.reduce((acc, item) => {
 
-//       return {
-//         item: item.item,
-//         count: Math.floor(item.qtyPcs / ctnFactor.factor),
-//         unit: 'CTN',
-//         // qtyPcs:item.qtyPcs,
-//         // factor: ctnFactor.factor,
-//         // qtyCtn: Math.floor(item.qtyPcs / ctnFactor.factor),
-//         summary: item.totalPrice
-//       }
-//     })
+        if (!acc[item.size]) {
+          acc[item.size] = {
+            size: item.size,
+            totalNetTotal: 0
+          };
+        }
 
+        acc[item.size].totalNetTotal += item.netTotal;
+      
+        return acc;
+      }, {});
+      
+
+      result = Object.values(groupedBySize);
+      // console.log(result)
+    }
+
+    else if (type == "brand"){
+     
+      const groupedByBrandCode = data.reduce((acc, item) => {
+
+        if (!acc[item.brandCode]) {
+          acc[item.brandCode] = {
+            brandCode: item.brandCode,
+            totalNetTotal: 0
+          };
+        }
+
+        acc[item.brandCode].totalNetTotal += item.netTotal;
+      
+        return acc;
+      }, {});
+      
+
+      result = Object.values(groupedByBrandCode);
+      // console.log(result)
+    }
+
+    
     res.status(200).json({
       status: 200,
       message: 'success',
-      data: sumCtn
+      data: result
     })
   } catch (error) {
     console.error(error)

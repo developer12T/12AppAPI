@@ -517,11 +517,12 @@ exports.availableStock = async (req, res) => {
       { 
         $project: {
           productId: "$listProduct.productId" ,
+          available: "$listProduct.available",
           _id:0
         }
       }
     ]);
-    
+    // console.log("modelStock",modelStock)
     const productIds = modelStock.flatMap(item => item.productId)
     
     if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
@@ -566,11 +567,42 @@ exports.availableStock = async (req, res) => {
       return res.status(404).json({ status: '404', message: 'No products found!' })
   }
 
+  // console.log(products)
+
+  const data = products.map(product => {
+    // ค้นหา lot ที่ตรงกับ product.id
+    const lot = modelStock.find(u => u.productId == product.id);
+  
+    // ตรวจสอบว่า lot และ lot.available มีค่าหรือไม่
+    if (lot && Array.isArray(lot.available)) {
+      // คำนวณผลรวมของ qtyPcs และ qtyCtn
+      const total = lot.available.reduce((acc, order) => {
+        acc.totalQtyPcs += order.qtyPcs || 0;  // รวม qtyPcs
+        acc.totalQtyCtn += order.qtyCtn || 0;  // รวม qtyCtn
+        return acc;
+      }, { totalQtyPcs: 0, totalQtyCtn: 0 });
+  
+      return {
+        ...product,  // เก็บข้อมูลของ product เดิม
+        totalQtyPcs : total.totalQtyPcs,  
+        totalQtyCtn : total.totalQtyCtn
+      };
+    }
+  
+    // ถ้าไม่มีข้อมูล lot หรือ lot.available
+    return {
+      ...product,
+      lot: { totalQtyPcs: 0, totalQtyCtn: 0 }
+    };
+  });
+  
+  // console.log(data);
+
 
   res.status(200).json({
     status:200,
     message:"Success",
-    data: products
+    data: data
   })
 }
 
