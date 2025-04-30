@@ -1,5 +1,7 @@
 const express = require('express')
-const { getOrder, getDetail, updateStatus, checkout, addSlip, OrderToExcel, getAllOrder, getSummaryItem, getSummarybyRoute, getSummarybyMonth, getSummarybyArea } = require('../../controllers/sale/orderController')
+const { getOrder, getDetail, updateStatus, checkout, addSlip, OrderToExcel, getAllOrder, getSummaryItem, getSummarybyRoute, 
+    getSummarybyMonth, getSummarybyArea,getSummarybyGroup
+ } = require('../../controllers/sale/orderController')
 
 const router = express.Router()
 
@@ -16,4 +18,5 @@ router.post('/getSummaryItem', getSummaryItem)
 router.get('/getSummarybyRoute', getSummarybyRoute)
 router.get('/getSummarybyMonth', getSummarybyMonth)
 router.get('/getSummarybyArea', getSummarybyArea)
+router.post('/getSummarybyGroup', getSummarybyGroup)
 module.exports = router

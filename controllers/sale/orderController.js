@@ -17,6 +17,7 @@ const upload = multer({ storage: multer.memoryStorage() }).single('image')
 const os = require('os')
 const xlsx = require('xlsx')
 const _ = require('lodash')
+const { DateTime } = require("luxon");
 
 exports.checkout = async (req, res) => {
   try {
@@ -1586,6 +1587,186 @@ exports.getSummarybyArea = async (req, res) => {
 
     })
   }
+}
+
+exports.getSummarybyGroup = async (req, res) => {
+
+    const { zone,group,period } = req.body 
+
+    const year = parseInt(period.slice(0, 4));
+    const month = period.slice(4, 6)
+
+    const start = DateTime.fromObject({ year, month, day: 1 }, { zone: 'Asia/Bangkok' }).toUTC().toJSDate();
+    const end = DateTime.fromObject({ year, month, day: 1 }, { zone: 'Asia/Bangkok' }).plus({ months: 1 }).toUTC().toJSDate();
+
+  
+    const modelOrder = await Order.aggregate([
+      { 
+        $match: { 
+          "store.zone": zone,  // กรองตาม zone
+          createdAt: { $gte: start, $lt: end },  
+        } 
+      },
+      { $unwind: { path: "$listProduct", preserveNullAndEmptyArrays: false } },
+      { $match: { "listProduct.groupCode": group } },
+      {
+        $group: {
+          area: { $first: "$store.area" },
+          _id: "$listProduct.size", 
+          entries: {
+            $push: {
+              k: "$listProduct.flavourCode",   
+              v: "$listProduct.qty"      
+            }
+          },
+          total: { $sum: "$listProduct.qty" }
+        }
+      },
+      {
+        $addFields: {
+          entriesObject: { $arrayToObject: "$entries" }
+        }
+      },
+    
+      {
+        $addFields: {
+          fullObject: {
+            $mergeObjects: [
+              "$entriesObject",
+              {
+                $arrayToObject: [
+                  [
+                    {
+                      k: { $concat: ["รวม", "$_id"] },
+                      v: "$total"
+                    }
+                  ]
+                ]
+              },
+              {
+                area: "$area" 
+              }
+            ]
+          }
+        }
+      }
+,      
+    
+      {
+        $replaceRoot: {
+          newRoot: {
+            $arrayToObject: [[
+              { k: "$_id", v: "$fullObject" }
+            ]]
+          }
+        }
+      },
 
 
+    ]);
+
+    if ( modelOrder.length == 0 ){
+      return res.status(404).json({
+        status:404,
+        message:"Not Found Order"
+      })
+    }
+
+
+
+
+    const sizeKey = Object.keys(modelOrder[0])[0];  
+    const area = modelOrder[0][sizeKey].area;  
+
+    const modelProduct = await Product.aggregate([
+      { $match: { groupCode: group } },
+          {
+        $group: {
+
+          _id: "$size", 
+          entries: {
+            $push: {
+              k: "$flavourCode",   
+              v: 0      
+            }
+          },
+          total: { $sum: "$value" } 
+        }
+      },
+    
+      {
+        $addFields: {
+          entriesObject: { $arrayToObject: "$entries" }
+        }
+      },
+    
+      {
+        $addFields: {
+          fullObject: {
+            $mergeObjects: [
+              "$entriesObject",
+              {
+                $arrayToObject: [
+                  [
+                    {
+                      k: { $concat: ["รวม", "$_id"] }, // ต่อข้อความ "รวม" + ขนาด
+                      v: "$total"
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        }
+      }
+,      
+    
+      {
+        $replaceRoot: {
+          newRoot: {
+            $arrayToObject: [[
+              { k: "$_id", v: "$fullObject" }
+            ]]
+          }
+        }
+      },
+    
+    ]);
+    
+  const orderMap = new Map();
+
+  modelOrder.forEach(obj => {
+    const key = Object.keys(obj)[0].trim(); // เช่น '850 G'
+    orderMap.set(key, obj[key]); // key: '850 G', value: { SK: 4, รวม850 G: 4, area: 'BE215' }
+  });
+  // console.log(orderMap,"orderMap")
+  // อัปเดต modelProduct ตาม orderMap
+  modelProduct.forEach(productObj => {
+    const sizeKey = Object.keys(productObj)[0]; // เช่น '850 G'
+    const trimmedKey = sizeKey.trim();
+
+    const matchedOrder = orderMap.get(trimmedKey);
+    if (matchedOrder) {
+      // เข้าถึง object ด้านในของ modelProduct เช่น productObj['850 G']
+      const innerProduct = productObj[sizeKey];
+      
+      Object.keys(matchedOrder).forEach(field => {
+        if (innerProduct.hasOwnProperty(field)) {
+          innerProduct[field] = matchedOrder[field];
+        }
+      });
+    }
+  });
+
+  const data = {
+    zone: area,  
+    list: [...modelProduct] 
+  };
+
+
+
+    res.status(200).json({
+      status:200,
+      message:data
+    })
 }
