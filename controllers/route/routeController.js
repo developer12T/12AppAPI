@@ -817,7 +817,7 @@ exports.routeHistory = async (req, res) => {
 //   } catch (error) {}
 // }
 
-exports.geTimelineCheckin = async (req, res) => {
+exports.getTimelineCheckin = async (req, res) => {
   try {
     const { area } = req.query
 

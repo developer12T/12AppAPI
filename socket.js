@@ -30,6 +30,7 @@ function initSocket (server) {
 }
 
 function getSocket () {
+  // console.log(io)
   if (!io) {
     throw new Error('Socket.io not initialized!')
   }
