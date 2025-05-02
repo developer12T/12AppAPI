@@ -318,8 +318,9 @@ exports.addStockNew = async (req, res) => {
     // const warehouse = '213'
 
     res.status(200).json({
+      status:200,
+      message: 'Successfull Insert',
       data: data,
-      message: 'Successfull Insert'
     })
   } catch (error) {
     next(error)
