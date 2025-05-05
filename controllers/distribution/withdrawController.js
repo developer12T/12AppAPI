@@ -168,9 +168,8 @@ exports.getOrder = async (req, res) => {
 
     const order = await Distribution.find(query)
     // const order2 = await Distribution.find();
-    console.log(order)
 
-    if (!order) {
+    if (order.length == 0) {
       return res
         .status(404)
         .json({ status: 404, message: 'Distribution order not found!' })
@@ -208,6 +207,13 @@ exports.getDetail = async (req, res) => {
     }
 
     const order = await Distribution.findOne({ orderId })
+    if (! order ) {
+      return res
+      .status(404)
+      .json({ status: 404, message: 'Distribution order not found!' })
+    }
+
+
 
     res.status(200).json({
       status: 200,

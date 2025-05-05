@@ -133,6 +133,38 @@ const Locate = sequelize.define(
     }
   )
 
+  const Sale = sequelize.define(
+    'OOHEAD',
+    {
+      coNo: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        primaryKey: true,
+        field: 'OAORNO'
+      },
+      // warehouse: {
+      //   type: DataTypes.INTEGER,
+      //   allowNull: false,
+      //   primaryKey: true,
+      //   field: 'MWWHLO'
+      // },
+      // warehouseName: {
+      //   type: DataTypes.STRING,
+      //   allowNull: false,
+      //   field: 'MWWHNM'
+      // }
+    },
+    {
+      freezeTableName: true,
+      timestamps: false,
+      createdAt: false,
+      updatedAt: false,
+      primaryKey: false
+    }
+  )
+
+
+
 
   module.exports = {
     // ItemFac,
@@ -141,6 +173,7 @@ const Locate = sequelize.define(
     Warehouse,
     Locate,
     Balance,
+    Sale
     // Policy,
     // OOTYPE,
     // MGTYPE,

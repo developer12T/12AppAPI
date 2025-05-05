@@ -7,7 +7,7 @@ const {
   routeHistory,
   createRoute,
   getRouteCheckinAll,
-  geTimelineCheckin,
+  getTimelineCheckin,
   checkInVisit,
   routeTimeline
 } = require('../../controllers/route/routeController')
@@ -22,7 +22,7 @@ router.post('/change', changeRoute)
 router.get('/history', routeHistory)
 router.post('/createRoute', createRoute)
 router.get('/getRouteCheckinAll', getRouteCheckinAll)
-router.get('/geTimelineCheckin', geTimelineCheckin)
+router.get('/getTimelineCheckin', getTimelineCheckin)
 router.post('/routeTimeline', routeTimeline)
 
 
