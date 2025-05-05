@@ -159,24 +159,23 @@ exports.transaction = async (req, res) => {
 }
 
 exports.addStockNew = async (req, res) => {
-  try {
+  // try {
     const { period, warehouse } = req.body
 
     const locateData = {}
     const factorData = {}
 
     const users = await User.find().select('area saleCode warehouse').lean()
-
-    // console.log("users",users)
+    // console.log("user.area",users.area)
     for (const user of users) {
       const stock = await Stock.findOne({
-        area: user.area
+        area: user.area,
+        period: period
       })
         .select('area')
         .lean()
       if (!stock) {
         const areaData = await fetchArea(user.warehouse)
-
         const BalanceData = await Balance.findAll({
           where: {
             warehouse: user.warehouse,
@@ -210,6 +209,7 @@ exports.addStockNew = async (req, res) => {
             }
           })
 
+
           for (let j = 0; j < locate.length; j++) {
             locateData[BalanceData[i].itemCode.trim()].push({
               location: locate[j].location.trim(),
@@ -241,6 +241,7 @@ exports.addStockNew = async (req, res) => {
           id: { $in: productIds }
         }).select('id listUnit.unit listUnit.factor')
 
+
         const productFactors = productDetail.map(product => {
           const ctnUnit = product.listUnit.find(unit => unit.unit === 'CTN')
           return {
@@ -248,8 +249,8 @@ exports.addStockNew = async (req, res) => {
             factor: ctnUnit ? parseInt(ctnUnit.factor) : 0 // หรือ default ค่าอื่นเช่น 1
           }
         })
-
         data = []
+
         if (areaData) {
           areaData.forEach(area => {
             // ค้นหาสินค้าในสต็อกตามคลังสินค้า
@@ -306,13 +307,15 @@ exports.addStockNew = async (req, res) => {
               warehouse: area.warehouse,
               listProduct: listProduct
             })
+            // console.log("data",data)
           })
         }
         // await Stock.insertMany(data)
 
         // const productId = data.map(product => product.id )
-        // console.log(productId)
+        
       }
+
     }
 
     // const warehouse = '213'
@@ -320,11 +323,11 @@ exports.addStockNew = async (req, res) => {
     res.status(200).json({
       status:200,
       message: 'Successfull Insert',
-      data: data,
+      // data: data,
     })
-  } catch (error) {
-    next(error)
-  }
+  // } catch (error) {
+  //   next(error)
+  // }
 }
 
 exports.getStock = async (req, res, next) => {
@@ -573,7 +576,7 @@ exports.availableStock = async (req, res) => {
   const data = products.map(product => {
     // ค้นหา lot ที่ตรงกับ product.id
     const lot = modelStock.find(u => u.productId == product.id);
-  
+    // console.log(lot)
     // ตรวจสอบว่า lot และ lot.available มีค่าหรือไม่
     if (lot && Array.isArray(lot.available)) {
       // คำนวณผลรวมของ qtyPcs และ qtyCtn
