@@ -487,7 +487,7 @@ exports.addFromERP = async (req, res) => {
       })
     }
 
-    for (const listProduct of response.data) {
+    for (const listProduct of response.data) {  
       const productId = listProduct.id
 
       const existingProduct = await Product.findOne({ id: productId })
@@ -502,6 +502,8 @@ exports.addFromERP = async (req, res) => {
       )
 
       const unitData = itemConvertResponse.data
+      // console.log(JSON.stringify(listProduct, null, 2));
+
       const listUnit = listProduct.unitList.map(unit => {
         const matchingUnit = unitData[0]?.type.find(u => u.unit === unit.unit)
         return {
@@ -514,8 +516,9 @@ exports.addFromERP = async (req, res) => {
           }
         }
       })
+      // console.log(JSON.stringify(listUnit, null, 2));
 
-      const newProduct = new Product({
+      newProduct = new Product({
         id: listProduct.id,
         name: listProduct.name,
         groupCode: listProduct.groupCode,
@@ -538,7 +541,7 @@ exports.addFromERP = async (req, res) => {
     }
     res.status(200).json({
       status: 200,
-      message: 'Products added successfully'
+      message: 'Products added successfully',
       // data:newProduct
     })
   } catch (e) {

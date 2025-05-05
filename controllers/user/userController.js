@@ -126,3 +126,10 @@ exports.getQRcode = async (req, res) => {
         res.status(500).json({ status: 500, message: 'Server error', error: error.message })
     }
 }
+
+
+exports.addUser = async (req , res) => {
+    res.status(200).json({
+        message: 'addUser'
+    })
+}
