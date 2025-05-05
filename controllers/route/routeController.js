@@ -652,8 +652,8 @@ exports.createRoute = async (req, res) => {
           changedStoreMap[store.storeInfo] = log
         })
       })
+      console.log('12', JSON.stringify(changeLogs, null, 2));
 
-      console.log('12', changedStoreMap)
 
       const routesGroupedByToRoute = previousRoutes.reduce((grouped, route) => {
         const routeId = `${period}${currentArea}${route.id.slice(-3)}`
@@ -728,14 +728,14 @@ exports.createRoute = async (req, res) => {
           listStore: routeData.listStore
         })
 
-        await newRoute.save()
+        // await newRoute.save()
         newRoutes.push(newRoute)
       }
 
-      await RouteChangeLog.updateMany(
-        { area: currentArea, period, status: '0' },
-        { $set: { status: '1' } }
-      )
+      // await RouteChangeLog.updateMany(
+      //   { area: currentArea, period, status: '0' },
+      //   { $set: { status: '1' } }
+      // )
     }
 
     res.status(200).json({

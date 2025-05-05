@@ -5,8 +5,12 @@ const availableSchema = new mongoose.Schema(
   {
     location: { type: String, default: '' },
     lot: { type: String, default: '' },
-    qtyPcs: { type: Number, default: 0 },
-    qtyCtn: { type: Number, default: 0 }
+    qtyPcs: { type: Number, required: true },
+    qtyPcsStockIn: { type: Number, default: 0 },
+    qtyPcsStockOut: { type: Number, default: 0 },
+    qtyCtn: { type: Number, default: 0 },
+    qtyCtnStockIn: { type: Number, default: 0 },
+    qtyCtnStockOut: { type: Number, default: 0 },
   },
   { _id: false }
 )
@@ -16,6 +20,8 @@ const listProductSchema = new mongoose.Schema(
     productId: { type: String, required: true },
     sumQtyPcs: { type: Number, required: true },
     sumQtyCtn: { type: Number, required: true },
+    sumQtyStockIn: { type: Number, required: true , default: 0},
+    sumQtyStockOut: { type: Number, required: true , default: 0},
     available: { type: [availableSchema], default: [] }
   },
   { _id: false }

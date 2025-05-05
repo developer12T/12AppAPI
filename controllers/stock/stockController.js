@@ -13,6 +13,7 @@ const { getStockMovement } = require('../../utilities/movement')
 const { Warehouse, Locate, Balance } = require('../../models/cash/master')
 const { Op } = require('sequelize')
 const XLSX = require('xlsx')
+const { Refund } = require('../../models/cash/refund')
 // const { getSocket } = require('./socket')
 
 // const { fetchArea } = require('./fetchArea')
@@ -502,7 +503,7 @@ exports.updateStockMovement = async (req, res, next) => {
 }
 
 exports.availableStock = async (req, res) => {
-    
+    try {
     const { area, period, type, group, brand, size, flavour } = req.body
 
     const modelStock = await Stock.aggregate([
@@ -574,42 +575,128 @@ exports.availableStock = async (req, res) => {
   // console.log(products)
 
   const data = products.map(product => {
-    // ค้นหา lot ที่ตรงกับ product.id
+
     const lot = modelStock.find(u => u.productId == product.id);
-    // console.log(lot)
-    // ตรวจสอบว่า lot และ lot.available มีค่าหรือไม่
+
+
+    // console.log("lot",lot)
+    const tranFromProduct = product ? {
+      // ...product,
+      _id:product._id,
+      id:product.id,
+      name:product.name,
+      group:product.group,
+      groupCode:product.groupCode,
+      brandCode:product.brandCode,
+      brand:product.brand,
+      size:product.size,
+      flavourCode:product.flavourCode,
+      flavour:product.flavour,
+      type:product.type,
+      weightGross:product.weightGross,
+      weightNet:product.weightNet,
+      statusSale:product.statusSale,
+      statusWithdraw:product.statusWithdraw,
+      statusRefund:product.statusRefund,
+      image:product.image,
+
+      listUnit:product.listUnit.map(unit => {
+        // console.log(parseFloat(unit.factor))
+        const totalQtyPcsToCtn = Math.floor(
+          lot.available.reduce((sum, item) => {
+            return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor;
+          }, 0)
+        );
+        
+        return {
+            unit:unit.unit,
+            name:unit.name,
+            factor:unit.factor,
+            qty : totalQtyPcsToCtn,
+            price:{
+              sale:unit.price.sale,
+              Refund:unit.price.refund,
+            }
+        }
+      }),
+      created:product.created,
+      updated:product.updated,
+      __v:product.__v
+    } : null;
+
     if (lot && Array.isArray(lot.available)) {
-      // คำนวณผลรวมของ qtyPcs และ qtyCtn
       const total = lot.available.reduce((acc, order) => {
-        acc.totalQtyPcs += order.qtyPcs || 0;  // รวม qtyPcs
-        acc.totalQtyCtn += order.qtyCtn || 0;  // รวม qtyCtn
+        acc.totalQtyPcs += order.qtyPcs || 0;
+        acc.totalQtyCtn += order.qtyCtn || 0;
         return acc;
       }, { totalQtyPcs: 0, totalQtyCtn: 0 });
   
       return {
-        ...product,  // เก็บข้อมูลของ product เดิม
-        totalQtyPcs : total.totalQtyPcs,  
-        totalQtyCtn : total.totalQtyCtn
+        ...tranFromProduct,
+        totalQtyPcs: total.totalQtyPcs,
+        totalQtyCtn: total.totalQtyCtn
       };
     }
   
-    // ถ้าไม่มีข้อมูล lot หรือ lot.available
     return {
-      ...product,
+      ...tranFromProduct,
       lot: { totalQtyPcs: 0, totalQtyCtn: 0 }
     };
-  });
+  }); 
   
-  // console.log(data);
+  function parseSize(sizeStr) {
+    if (!sizeStr) return 0;
+
+    const units = {
+        'KG': 1000,
+        'G': 1,
+        'L': 1000,
+        'ML': 1,
+    };
+
+    const match = sizeStr.trim().toUpperCase().match(/^([\d.]+)\s*(KG|G|L|ML)$/);
+    if (!match) return 0;
+
+    const value = parseFloat(match[1]);
+    const unit = match[2];
+
+    return units[unit] ? value * units[unit] : 0;
+}
+
+const groupMap = {};
+data.forEach(item => {
+    const group = item.group;
+    if (!groupMap[group]) groupMap[group] = [];
+    groupMap[group].push(item);
+});
+
+const groupList = Object.entries(groupMap).map(([group, items]) => {
+    const maxSize = Math.max(...items.map(i => parseSize(i.size)));
+    return { group, items, maxSize };
+});
+
+groupList.sort((a, b) => b.maxSize - a.maxSize);
+
+groupList.forEach(g => {
+    g.items.sort((a, b) => parseSize(b.size) - parseSize(a.size));
+});
+
+const sorted = groupList.flatMap(g => g.items);
+
+
+  
 
 
   res.status(200).json({
     status:200,
     message:"Success",
-    data: data
-  })
-}
+    data: sorted
+    })
 
+  } catch (error) {
+    next(error)
+  }
+}
 
 
 

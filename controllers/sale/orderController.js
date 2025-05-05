@@ -903,7 +903,7 @@ exports.getSummarybyRoute = async (req, res) => {
 
 exports.getSummarybyMonth = async (req, res) => {
 try {
-  const { area, period } = req.query
+  const { area, period,  } = req.query
 
   checkArea = await Route.find({ area: area })
 
@@ -985,6 +985,8 @@ try {
       }
     }
   ])
+
+  // console.log("modelRoute",modelRoute)
 
   modelRouteValue = modelRoute.map(item => {
     return {
@@ -1179,7 +1181,7 @@ try {
       { $unwind: { path: "$listProduct", preserveNullAndEmptyArrays: false } },
       { $match: { "listProduct.groupCode": group } },  
     ]);
-    
+
     const order = modelOrder.map( u => {
       return {
         id:u.listProduct.id,
@@ -1246,7 +1248,7 @@ try {
       },
     
     ]);
-
+    
     if (!modelProduct || modelProduct.length === 0) {
       return res.status(404).json({
         status: 404,
