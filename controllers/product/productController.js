@@ -37,6 +37,20 @@ exports.getProductAll = async (req, res) => {
   }
 }
 
+exports.getProductSwitch = async (req, res) => {
+  try {
+    const products = await Product.find().lean()
+    res.status(200).json({
+      status: '200',
+      message: 'Products fetched successfully!',
+      data: products
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '501', message: error.message })
+  }
+}
+
 exports.getProduct = async (req, res) => {
   try {
     const { type, group, brand, size, flavour } = req.body

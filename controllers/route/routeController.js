@@ -15,302 +15,287 @@ const { forEach } = require('lodash')
 
 exports.getRoute = async (req, res) => {
   try {
-      const { storeId, area, period, routeId, province, district } = req.query
-  
-      if (!period) {
-          return res.status(400).json({ status: '400', message: 'period is required!' })
-      }
- 
-      let query = { period }
-      let response = []
-      let store = null
- 
-      if (storeId) {
-          store = await Store.findOne({ storeId }).select('_id')
-          if (!store) {
-              return res.status(404).json({ status: '404', message: 'Store not found!' })
-          }
-      }
- 
-      if ( area && period  && province && district ) {
-       
-        const store = await Store.find({
-          area: area,
-          $and: [
-            { address: { $regex: district, $options: "i" } },
-            { address: { $regex: province, $options: "i" } }
-          ]
-        });
-       
-     
-        if (store.length === 0) {
-          return res
-            .status(404)
-            .json({ status: '404', message: 'Store not found!' })
-        }
-        const storeIdString = store.map(item => item._id.toString());
+    const { storeId, area, period, routeId, province, district } = req.query
 
-        const storeId = store.map(item => item.storeId.toString());
- 
-        const routes = await Route.find({
-          period,
-          'listStore.storeInfo': { $in: storeIdString }
-        }).populate(
-          'listStore.storeInfo',
-          'storeId name address typeName taxId tel'
-        );
- 
-        response = routes.map(route => ({
-          ...route.toObject(),
-          listStore: route.listStore.filter(
-            store => store.storeInfo && store.storeInfo.storeId && storeId.includes(store.storeInfo.storeId)
-          )
-        }));
- 
+    if (!period) {
+      return res
+        .status(400)
+        .json({ status: '400', message: 'period is required!' })
+    }
+
+    let query = { period }
+    let response = []
+    let store = null
+
+    if (storeId) {
+      store = await Store.findOne({ storeId }).select('_id')
+      if (!store) {
+        return res
+          .status(404)
+          .json({ status: '404', message: 'Store not found!' })
       }
-      else if ( area && period  && district ) {
-       
-        const store = await Store.find({
-          area: area,
-          $and: [
-            { address: { $regex: district, $options: "i" } },
-          ]
-        });
-       
-     
-        if (store.length === 0) {
-          return res
-            .status(404)
-            .json({ status: '404', message: 'Store not found!' })
-        }
-        const storeIdString = store.map(item => item._id.toString());
- 
- 
-       
-        const storeId = store.map(item => item.storeId.toString());
- 
-        const routes = await Route.find({
-          period,
-          'listStore.storeInfo': { $in: storeIdString }
-        }).populate(
-          'listStore.storeInfo',
-          'storeId name address typeName taxId tel'
-        );
- 
-        response = routes.map(route => ({
-          ...route.toObject(),
-          listStore: route.listStore.filter(
-            store => store.storeInfo && store.storeInfo.storeId && storeId.includes(store.storeInfo.storeId)
-          )
-        }));
- 
-      }
+    }
 
-      else if ( area && period  && province ) {
-       
-        const store = await Store.find({
-          area: area,
-          $and: [
-            { address: { $regex: province, $options: "i" } },
-          ]
-        });
-       
-     
-        if (store.length === 0) {
-          return res
-            .status(404)
-            .json({ status: '404', message: 'Store not found!' })
-        }
-        const storeIdString = store.map(item => item._id.toString());
-
-        const storeId = store.map(item => item.storeId.toString());
- 
-        const routes = await Route.find({
-          period,
-          'listStore.storeInfo': { $in: storeIdString }
-        }).populate(
-          'listStore.storeInfo',
-          'storeId name address typeName taxId tel'
-        );
- 
-        response = routes.map(route => ({
-          ...route.toObject(),
-          listStore: route.listStore.filter(
-            store => store.storeInfo && store.storeInfo.storeId && storeId.includes(store.storeInfo.storeId)
-          )
-        }));
- 
-      }
-
-
-      else if ( !area && period  && district ) {
-       
-        const store = await Store.find({
-          $and: [
-            { address: { $regex: district, $options: "i" } },
-          ]
-        });
-       
-     
-        if (store.length === 0) {
-          return res
-            .status(404)
-            .json({ status: '404', message: 'Store not found!' })
-        }
-        const storeIdString = store.map(item => item._id.toString());
- 
- 
-       
-        const storeId = store.map(item => item.storeId.toString());
- 
-        const routes = await Route.find({
-          period,
-          'listStore.storeInfo': { $in: storeIdString }
-        }).populate(
-          'listStore.storeInfo',
-          'storeId name address typeName taxId tel'
-        );
- 
-        response = routes.map(route => ({
-          ...route.toObject(),
-          listStore: route.listStore.filter(
-            store => store.storeInfo && store.storeInfo.storeId && storeId.includes(store.storeInfo.storeId)
-          )
-        }));
- 
-      }
-
-
-
-      else if ( !area && period  && province ) {
-       
-        const store = await Store.find({
-          $and: [
-            { address: { $regex: province, $options: "i" } },
-          ]
-        });
-       
-     
-        if (store.length === 0) {
-          return res
-            .status(404)
-            .json({ status: '404', message: 'Store not found!' })
-        }
-        const storeIdString = store.map(item => item._id.toString());
-       
-        const storeId = store.map(item => item.storeId.toString());
- 
-        const routes = await Route.find({
-          period,
-          'listStore.storeInfo': { $in: storeIdString }
-        }).populate(
-          'listStore.storeInfo',
-          'storeId name address typeName taxId tel'
-        );
- 
-        response = routes.map(route => ({
-          ...route.toObject(),
-          listStore: route.listStore.filter(
-            store => store.storeInfo && store.storeInfo.storeId && storeId.includes(store.storeInfo.storeId)
-          )
-        }));
- 
-      }
-
-
-
-
-      else if (area && !routeId && !storeId) {
-          query.area = area
-          const routes = await Route.find(query, { _id: 0, __v: 0 })
- 
-          response = routes.map((route) => ({
-              id: route.id,
-              period: route.period,
-              area: route.area,
-              day: route.day,
-              storeAll: route.storeAll,
-              storePending: route.storePending,
-              storeSell: route.storeSell,
-              storeNotSell: route.storeNotSell,
-              storeTotal: route.storeTotal,
-              percentComplete: route.percentComplete,
-              percentVisit: route.percentVisit,
-              percentEffective: route.percentEffective
-          }))
-      }
- 
-      else if (area && routeId && !storeId) {
-          query.area = area
-          query.id = routeId
- 
-          const routes = await Route.findOne(query)
-              .populate('listStore.storeInfo', 'storeId name address typeName taxId tel')
- 
-          if (!routes) {
-              return res.status(404).json({ status: '404', message: 'Route not found!' })
-          }
- 
-          const sortedListStore = routes.listStore.sort((a, b) => {
-              const statusA = parseInt(a.status, 10)
-              const statusB = parseInt(b.status, 10)
-              return statusA - statusB
-          })
- 
-          response = [
-              {
-                  ...routes.toObject(),
-                  listStore: sortedListStore,
-              },
-          ]
-      }
- 
-      else if (area && routeId && storeId) {
-          query.area = area
-          query.id = routeId
- 
-          const routes = await Route.findOne(query)
-              .populate('listStore.storeInfo', 'storeId name address typeName taxId tel')
- 
-          if (!routes) {
-              return res.status(404).json({ status: '404', message: 'Route not found!' })
-          }
- 
-          response = [
-              {
-                  ...routes.toObject(),
-                  listStore: routes.listStore.filter((store) => store.storeInfo && store.storeInfo.storeId === storeId)
-              },
-          ]
-      }
- 
-      else if (!area && !routeId && storeId) {
-          const routes = await Route.find({ period, "listStore.storeInfo": store._id })
-              .populate('listStore.storeInfo', 'storeId name address typeName taxId tel')
- 
-          response = routes.map(route => ({
-              ...route.toObject(),
-              listStore: route.listStore.filter(store => store.storeInfo && store.storeInfo.storeId === storeId)
-          }))
-      }
- 
- 
-      else {
-          return res.status(400).json({ status: '400', message: 'params is required!' })
-      }
- 
-      res.status(200).json({
-          status: '200',
-          message: 'Success',
-          data: response,
+    if (area && period && province && district) {
+      const store = await Store.find({
+        area: area,
+        $and: [
+          { address: { $regex: district, $options: 'i' } },
+          { address: { $regex: province, $options: 'i' } }
+        ]
       })
+
+      if (store.length === 0) {
+        return res
+          .status(404)
+          .json({ status: '404', message: 'Store not found!' })
+      }
+      const storeIdString = store.map(item => item._id.toString())
+
+      const storeId = store.map(item => item.storeId.toString())
+
+      const routes = await Route.find({
+        period,
+        'listStore.storeInfo': { $in: storeIdString }
+      }).populate(
+        'listStore.storeInfo',
+        'storeId name address typeName taxId tel'
+      )
+
+      response = routes.map(route => ({
+        ...route.toObject(),
+        listStore: route.listStore.filter(
+          store =>
+            store.storeInfo &&
+            store.storeInfo.storeId &&
+            storeId.includes(store.storeInfo.storeId)
+        )
+      }))
+    } else if (area && period && district) {
+      const store = await Store.find({
+        area: area,
+        $and: [{ address: { $regex: district, $options: 'i' } }]
+      })
+
+      if (store.length === 0) {
+        return res
+          .status(404)
+          .json({ status: '404', message: 'Store not found!' })
+      }
+      const storeIdString = store.map(item => item._id.toString())
+
+      const storeId = store.map(item => item.storeId.toString())
+
+      const routes = await Route.find({
+        period,
+        'listStore.storeInfo': { $in: storeIdString }
+      }).populate(
+        'listStore.storeInfo',
+        'storeId name address typeName taxId tel'
+      )
+
+      response = routes.map(route => ({
+        ...route.toObject(),
+        listStore: route.listStore.filter(
+          store =>
+            store.storeInfo &&
+            store.storeInfo.storeId &&
+            storeId.includes(store.storeInfo.storeId)
+        )
+      }))
+    } else if (area && period && province) {
+      const store = await Store.find({
+        area: area,
+        $and: [{ address: { $regex: province, $options: 'i' } }]
+      })
+
+      if (store.length === 0) {
+        return res
+          .status(404)
+          .json({ status: '404', message: 'Store not found!' })
+      }
+      const storeIdString = store.map(item => item._id.toString())
+
+      const storeId = store.map(item => item.storeId.toString())
+
+      const routes = await Route.find({
+        period,
+        'listStore.storeInfo': { $in: storeIdString }
+      }).populate(
+        'listStore.storeInfo',
+        'storeId name address typeName taxId tel'
+      )
+
+      response = routes.map(route => ({
+        ...route.toObject(),
+        listStore: route.listStore.filter(
+          store =>
+            store.storeInfo &&
+            store.storeInfo.storeId &&
+            storeId.includes(store.storeInfo.storeId)
+        )
+      }))
+    } else if (!area && period && district) {
+      const store = await Store.find({
+        $and: [{ address: { $regex: district, $options: 'i' } }]
+      })
+
+      if (store.length === 0) {
+        return res
+          .status(404)
+          .json({ status: '404', message: 'Store not found!' })
+      }
+      const storeIdString = store.map(item => item._id.toString())
+
+      const storeId = store.map(item => item.storeId.toString())
+
+      const routes = await Route.find({
+        period,
+        'listStore.storeInfo': { $in: storeIdString }
+      }).populate(
+        'listStore.storeInfo',
+        'storeId name address typeName taxId tel'
+      )
+
+      response = routes.map(route => ({
+        ...route.toObject(),
+        listStore: route.listStore.filter(
+          store =>
+            store.storeInfo &&
+            store.storeInfo.storeId &&
+            storeId.includes(store.storeInfo.storeId)
+        )
+      }))
+    } else if (!area && period && province) {
+      const store = await Store.find({
+        $and: [{ address: { $regex: province, $options: 'i' } }]
+      })
+
+      if (store.length === 0) {
+        return res
+          .status(404)
+          .json({ status: '404', message: 'Store not found!' })
+      }
+      const storeIdString = store.map(item => item._id.toString())
+
+      const storeId = store.map(item => item.storeId.toString())
+
+      const routes = await Route.find({
+        period,
+        'listStore.storeInfo': { $in: storeIdString }
+      }).populate(
+        'listStore.storeInfo',
+        'storeId name address typeName taxId tel'
+      )
+
+      response = routes.map(route => ({
+        ...route.toObject(),
+        listStore: route.listStore.filter(
+          store =>
+            store.storeInfo &&
+            store.storeInfo.storeId &&
+            storeId.includes(store.storeInfo.storeId)
+        )
+      }))
+    } else if (area && !routeId && !storeId) {
+      query.area = area
+      const routes = await Route.find(query, { _id: 0, __v: 0 })
+
+      response = routes.map(route => ({
+        id: route.id,
+        period: route.period,
+        area: route.area,
+        day: route.day,
+        storeAll: route.storeAll,
+        storePending: route.storePending,
+        storeSell: route.storeSell,
+        storeNotSell: route.storeNotSell,
+        storeTotal: route.storeTotal,
+        percentComplete: route.percentComplete,
+        percentVisit: route.percentVisit,
+        percentEffective: route.percentEffective
+      }))
+    } else if (area && routeId && !storeId) {
+      query.area = area
+      query.id = routeId
+
+      const routes = await Route.findOne(query).populate(
+        'listStore.storeInfo',
+        'storeId name address typeName taxId tel'
+      )
+
+      if (!routes) {
+        return res
+          .status(404)
+          .json({ status: '404', message: 'Route not found!' })
+      }
+
+      const sortedListStore = routes.listStore.sort((a, b) => {
+        const statusA = parseInt(a.status, 10)
+        const statusB = parseInt(b.status, 10)
+        return statusA - statusB
+      })
+
+      response = [
+        {
+          ...routes.toObject(),
+          listStore: sortedListStore
+        }
+      ]
+    } else if (area && routeId && storeId) {
+      query.area = area
+      query.id = routeId
+
+      const routes = await Route.findOne(query).populate(
+        'listStore.storeInfo',
+        'storeId name address typeName taxId tel'
+      )
+
+      if (!routes) {
+        return res
+          .status(404)
+          .json({ status: '404', message: 'Route not found!' })
+      }
+
+      response = [
+        {
+          ...routes.toObject(),
+          listStore: routes.listStore.filter(
+            store => store.storeInfo && store.storeInfo.storeId === storeId
+          )
+        }
+      ]
+    } else if (!area && !routeId && storeId) {
+      const routes = await Route.find({
+        period,
+        'listStore.storeInfo': store._id
+      }).populate(
+        'listStore.storeInfo',
+        'storeId name address typeName taxId tel'
+      )
+
+      response = routes.map(route => ({
+        ...route.toObject(),
+        listStore: route.listStore.filter(
+          store => store.storeInfo && store.storeInfo.storeId === storeId
+        )
+      }))
+    } else {
+      return res
+        .status(400)
+        .json({ status: '400', message: 'params is required!' })
+    }
+
+    res.status(200).json({
+      status: '200',
+      message: 'Success',
+      data: response
+    })
   } catch (error) {
-      console.error(error)
-      res.status(500).json({ status: '500', message: error.message })
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
   }
 }
-
-
 
 exports.addFromERP = async (req, res) => {
   try {
@@ -819,53 +804,93 @@ exports.routeHistory = async (req, res) => {
 
 exports.geTimelineCheckin = async (req, res) => {
   try {
-    const { area } = req.query
+    const { area, period } = req.query
 
-    if (!area) {
+    if (!area || !period) {
       return res
         .status(400)
         .json({ status: '400', message: 'params is required!' })
     }
 
+    // const data = await Route.find(
+    //   {
+    //     listStore: { $elemMatch: { status: { $ne: '0' } } },
+    //     area: { $regex: area },
+    //     period: period
+    //   },
+    //   {
+    //     listStore: { $elemMatch: { status: { $ne: '0' } } },
+    //     area: 1,
+    //     period: 1,
+    //     id: 1
+    //   },
+    //   {
+    //     'listStore.date': 1
+    //   }
+    // ).populate('listStore.storeInfo', 'storeId name address typeName taxId tel')
+
     const data = await Route.find(
       {
         listStore: { $elemMatch: { status: { $ne: '0' } } },
-        area: `${area}`
+        area: { $regex: area, $options: 'i' }, // case-insensitive area search
+        period: period
       },
       {
-        listStore: { $elemMatch: { status: { $ne: '0' } } },
+        listStore: 1,
         area: 1,
         period: 1,
         id: 1
-      },
-      {
-        'listStore.date': 1
       }
-    )
+    ).populate('listStore.storeInfo', 'storeId name address typeName taxId tel')
 
     const result = data.map(item => {
-      const utcDate = new Date(item.listStore[0].date)
-      // Convert to Bangkok time (UTC+7)
+      // Find the first store with status != '0'
+      const storeItem = item.listStore.find(s => s.status !== '0')
+
+      if (!storeItem) return null // skip if no valid store found
+
+      const utcDate = new Date(storeItem.date)
       const bangkokDate = new Date(utcDate.getTime() + 7 * 60 * 60 * 1000)
 
       return {
         id: item.id,
         period: item.period,
         area: item.area,
-        note: item.listStore[0].note,
-        latitude: item.listStore[0].latitude,
-        longtitude: item.listStore[0].longtitude,
-        statusText: item.listStore[0].statusText,
+        ay: item.day,  // Directly access item.day
+        storeId: storeItem.storeInfo.storeId,
+        storeId: storeItem.storeInfo.name,
+        note: storeItem.note,
+        latitude: storeItem.latitude,
+        longtitude: storeItem.longtitude,
+        statusText: storeItem.statusText,
         date: bangkokDate
       }
     })
+    // const result = data.map(item => {
+    //   const utcDate = new Date(item.listStore[0].date)
+    //   // Convert to Bangkok time (UTC+7)
+    //   const bangkokDate = new Date(utcDate.getTime() + 7 * 60 * 60 * 1000)
+
+    //   return {
+    //     id: item.id,
+    //     period: item.period,
+    //     area: item.area,
+    //     storeId: item.listStore.storeId,
+    //     note: item.listStore[0].note,
+    //     latitude: item.listStore[0].latitude,
+    //     longtitude: item.listStore[0].longtitude,
+    //     statusText: item.listStore[0].statusText,
+    //     date: bangkokDate
+    //   }
+    // })
+
+
     if (!result) {
       res.status(404).json({
         status: 404,
         message: 'Not Found'
       })
     }
-
     res.status(200).json({
       status: 200,
       message: 'Success',
@@ -991,75 +1016,73 @@ exports.getRouteCheckinAll = async (req, res) => {
   }
 }
 
+exports.routeTimeline = async (req, res) => {
+  try {
+    const { area, day, period } = req.body
 
-exports.routeTimeline = async(req,res) => {
-try {
-  const { area, day, period } = req.body
-
-  const modelRoute = await Route.findOne({area:area,day:day,period:period})
-
-  // console.log(modelRoute)
-
-  if (modelRoute) {
-
-    const tranFromRoue = modelRoute.listStore.map(route => {
-      const date = new Date(route.date || "");
-      // console.log(date)
-      if (isNaN(date)) {
-        return { date: "", hour: "" };
-      }
-    
-      const bangkokDate = new Date(
-        date.toLocaleString("en-US", { timeZone: "Asia/Bangkok" })
-      );
-    
-      return {
-        date: bangkokDate.toLocaleString("th-TH", {
-          timeZone: "Asia/Bangkok",
-          year: 'numeric', month: '2-digit', day: '2-digit',
-          hour: '2-digit', minute: '2-digit', second: '2-digit',
-          hour12: false
-        }),
-        hour: bangkokDate.getHours()
-      };
-    });
-  
-    
-    const hourCountMap = {};
-  
-    // กรองข้อมูลเฉพาะเวลาที่อยู่ในช่วง 5 โมงเช้าถึง 6 โมงเย็น (05:00-17:59)
-    tranFromRoue.forEach(item => {
-      if (item.hour >= 5 && item.hour <= 18) {
-        hourCountMap[item.hour] = (hourCountMap[item.hour] || 0) + 1;
-      }
-    });
-    
-    // สร้างข้อมูลที่แสดงทุกชั่วโมงในช่วง 5-17 และกรอก count = 0 สำหรับชั่วโมงที่ไม่มีข้อมูล
-    const data = [];
-    for (let hour = 5; hour <= 18; hour++) {
-      data.push({
-        time: String(hour).padStart(2, '0') + ":00",
-        count: hourCountMap[hour] || 0
-      });
-    }
-      
-  res.status(200).json({
-    response:data
-  })
-
-  }
-  else {
-    return res.status(404).json({
-      message:`Not Found this ${area} day: ${day} `
+    const modelRoute = await Route.findOne({
+      area: area,
+      day: day,
+      period: period
     })
+
+    // console.log(modelRoute)
+
+    if (modelRoute) {
+      const tranFromRoue = modelRoute.listStore.map(route => {
+        const date = new Date(route.date || '')
+        // console.log(date)
+        if (isNaN(date)) {
+          return { date: '', hour: '' }
+        }
+
+        const bangkokDate = new Date(
+          date.toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })
+        )
+
+        return {
+          date: bangkokDate.toLocaleString('th-TH', {
+            timeZone: 'Asia/Bangkok',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+          }),
+          hour: bangkokDate.getHours()
+        }
+      })
+
+      const hourCountMap = {}
+
+      // กรองข้อมูลเฉพาะเวลาที่อยู่ในช่วง 5 โมงเช้าถึง 6 โมงเย็น (05:00-17:59)
+      tranFromRoue.forEach(item => {
+        if (item.hour >= 5 && item.hour <= 18) {
+          hourCountMap[item.hour] = (hourCountMap[item.hour] || 0) + 1
+        }
+      })
+
+      // สร้างข้อมูลที่แสดงทุกชั่วโมงในช่วง 5-17 และกรอก count = 0 สำหรับชั่วโมงที่ไม่มีข้อมูล
+      const data = []
+      for (let hour = 5; hour <= 18; hour++) {
+        data.push({
+          time: String(hour).padStart(2, '0') + ':00',
+          count: hourCountMap[hour] || 0
+        })
+      }
+
+      res.status(200).json({
+        response: data
+      })
+    } else {
+      return res.status(404).json({
+        message: `Not Found this ${area} day: ${day} `
+      })
+    }
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ message: 'Internal server error.' })
   }
-
-
-
-
-
-} catch (error) {
-  console.error(error)
-  res.status(500).json({ message: 'Internal server error.' })
-}
 }
