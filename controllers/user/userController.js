@@ -3,7 +3,8 @@ const { uploadFiles } = require('../../utilities/upload')
 const multer = require('multer')
 const path = require('path')
 const upload = multer({ storage: multer.memoryStorage() }).single('image')
-
+const bcrypt = require('bcrypt')
+const axios = require('axios')
 exports.getUser = async (req, res) => {
     try {
         const users = await User.find({}).select('-_id salecode salePayer username firstName surName tel zone area warehouse role')
@@ -129,7 +130,104 @@ exports.getQRcode = async (req, res) => {
 
 
 exports.addUser = async (req , res) => {
+    const response = await axios.post(
+      'http://58.181.206.159:9814/ca_api/cr_user.php'
+    )
+
+    for (const sale of response.data) {
+        const saleInData = await User.findOne({ saleCode: sale.saleCode });
+        if (!saleInData) {
+
+            const newUser = new User({
+                saleCode:sale.saleCode,
+                salePayer:sale.salePayer,
+                username:sale.username,
+                firstName:sale.firstName,
+                surName:sale.surName,
+                password:sale.password,
+                tel:sale.tel,
+                zone:sale.zone,
+                area:sale.area,
+                warehouse:sale.warehouse,
+                role:sale.role,
+                status:sale.status,
+            });
+          await newUser.save();
+        }
+      }
+
+
     res.status(200).json({
-        message: 'addUser'
+        status:200,
+        message:'Insert User Success'
     })
+}
+
+exports.addUserOne = async (req , res) => {
+    const saleInData = await User.findOne({ saleCode: req.body.saleCode });
+
+    if (!saleInData) {
+        const user = new User({
+            saleCode: req.body.saleCode,
+            salePayer: req.body.salePayer,
+            username: req.body.username,
+            firstName: req.body.firstName,
+            surName: req.body.surName,
+            password: req.body.password,
+            tel: req.body.tel,
+            zone: req.body.zone,
+            area: req.body.area,
+            warehouse: req.body.warehouse,
+            role: req.body.role,
+            status: req.body.status,
+          });
+          await user.save();
+    }
+    else {
+        return res.status(409).json({
+            status:409,
+            message: "This saleCode already exists in the system"
+        })
+        
+    }
+    res.status(200).json({
+        status:200,
+        message:'Insert User Success'
+    })
+}
+
+
+exports.updateUserOne = async (req , res) => {
+
+    const user = await User.updateOne(
+        { saleCode: req.body.saleCode },  
+        { $set: {
+            salePayer: req.body.salePayer,
+            username: req.body.username,
+            firstName: req.body.firstName,
+            surName: req.body.surName,
+            password: req.body.password,
+            tel: req.body.tel,
+            zone: req.body.zone,
+            area: req.body.area,
+            warehouse: req.body.warehouse,
+            role: req.body.role,
+            status: req.body.status
+        }}
+      );
+
+      if (user.modifiedCount == 0) {
+        return res.status(409).json({
+            status:409,
+            message:"Not Found this saleCode"
+        })
+      } 
+
+
+
+      res.status(200).json({
+        status:200,
+        message:'Update User Success'
+      })
+
 }

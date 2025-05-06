@@ -727,7 +727,7 @@ exports.createRoute = async (req, res) => {
           day: routeId.slice(-2),
           listStore: routeData.listStore
         })
-
+        // console.log(newRoute)
         // await newRoute.save()
         newRoutes.push(newRoute)
       }

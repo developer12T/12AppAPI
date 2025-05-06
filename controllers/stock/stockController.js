@@ -167,6 +167,13 @@ exports.addStockNew = async (req, res) => {
     const factorData = {}
 
     const users = await User.find().select('area saleCode warehouse').lean()
+    // const users = await User.find({
+    //   warehouse: { $in: ["215", "216", "217"] }  // ตัวอย่าง: หา warehouse ที่อยู่ในกลุ่มนี้
+    // })
+    // .select('area saleCode warehouse')
+    // .lean();
+    
+
     // console.log("user.area",users.area)
     for (const user of users) {
       const stock = await Stock.findOne({
@@ -194,9 +201,9 @@ exports.addStockNew = async (req, res) => {
                 { [Op.notLike]: '100            ' }
               ]
             }
-          }
+          },
+          // limit: 10
         })
-
         for (let i = 0; i < BalanceData.length; i++) {
           locateData[BalanceData[i].itemCode.trim()] = []
           factorData[BalanceData[i].itemCode.trim()] = []
@@ -207,7 +214,8 @@ exports.addStockNew = async (req, res) => {
               warehouse: user.warehouse,
               itemCode: BalanceData[i].itemCode.trim(),
               coNo: 410
-            }
+            },
+            // limit: 10
           })
 
 
@@ -311,7 +319,7 @@ exports.addStockNew = async (req, res) => {
             // console.log("data",data)
           })
         }
-        // await Stock.insertMany(data)
+        await Stock.insertMany(data)
 
         // const productId = data.map(product => product.id )
         

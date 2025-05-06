@@ -3,6 +3,8 @@ const { Cart } = require('../../models/cash/cart')
 const { User } = require('../../models/cash/user')
 const { Product } = require('../../models/cash/product')
 const { Route } = require('../../models/cash/route')
+const { Store } = require('../../models/cash/store')
+
 const { Warehouse,Locate,Balance,Sale } = require('../../models/cash/master')
 const { generateOrderId } = require('../../utilities/genetateId')
 const {
@@ -903,7 +905,7 @@ exports.getSummarybyRoute = async (req, res) => {
 
 exports.getSummarybyMonth = async (req, res) => {
 try {
-  const { area, period,  } = req.query
+  const { area, period,storeId  } = req.query
 
   checkArea = await Route.find({ area: area })
 
@@ -914,10 +916,35 @@ try {
     })
   }
 
+  storeIdObj = await Store.findOne({storeId:storeId}).select("_id")
+
+  const matchStore = storeIdObj
+  ? {
+      "listStore.storeInfo": {
+        $exists: true,
+        $eq: storeIdObj._id.toString()
+      }
+    }
+  : {};
+
+
+  // const test = await Route.aggregate([
+  //   { $match: { area, period } },
+
+  //   { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
+
+  //   {$match: {"listStore.storeInfo": storeIdObj._id.toString()}},])
+
+  // console.log("storeIdObj._id.toString()",storeIdObj._id.toString())
+
   const modelRoute = await Route.aggregate([
     { $match: { area, period } },
 
     { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
+
+    { $match: matchStore },
+
+
     {
       $unwind: {
         path: '$listStore.listOrder',
@@ -933,9 +960,7 @@ try {
         as: 'orderDetails'
       }
     },
-
     { $unwind: { path: '$orderDetails', preserveNullAndEmptyArrays: true } },
-
     {
       $match: {
         orderDetails: { $ne: null },
@@ -986,7 +1011,7 @@ try {
     }
   ])
 
-  // console.log("modelRoute",modelRoute)
+  console.log("modelRoute",modelRoute)
 
   modelRouteValue = modelRoute.map(item => {
     return {
