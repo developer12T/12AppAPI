@@ -168,8 +168,8 @@ exports.checkout = async (req, res) => {
         createdBy: sale.username
       })
 
-      // await newOrder.save()
-      // await Cart.deleteOne({ type, area, storeId })
+      await newOrder.save()
+      await Cart.deleteOne({ type, area, storeId })
 
       const checkIn = await checkInRoute({
         storeId: storeId,

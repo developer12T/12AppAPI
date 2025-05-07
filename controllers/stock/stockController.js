@@ -161,175 +161,172 @@ exports.transaction = async (req, res) => {
 
 exports.addStockNew = async (req, res) => {
   // try {
-    const { period, warehouse } = req.body
+  const { period, warehouse } = req.body
 
-    const locateData = {}
-    const factorData = {}
+  const locateData = {}
+  const factorData = {}
 
-    const users = await User.find().select('area saleCode warehouse').lean()
-    // const users = await User.find({
-    //   warehouse: { $in: ["215", "216", "217"] }  // ตัวอย่าง: หา warehouse ที่อยู่ในกลุ่มนี้
-    // })
-    // .select('area saleCode warehouse')
-    // .lean();
-    
+  const users = await User.find().select('area saleCode warehouse').lean()
+  // const users = await User.find({
+  //   warehouse: { $in: ["215", "216", "217"] }  // ตัวอย่าง: หา warehouse ที่อยู่ในกลุ่มนี้
+  // })
+  // .select('area saleCode warehouse')
+  // .lean();
 
-    // console.log("user.area",users.area)
-    for (const user of users) {
-      const stock = await Stock.findOne({
-        area: user.area,
-        period: period
+  // console.log("user.area",users.area)
+  for (const user of users) {
+    const stock = await Stock.findOne({
+      area: user.area,
+      period: period
+    })
+      .select('area')
+      .lean()
+    if (!stock) {
+      const areaData = await fetchArea(user.warehouse)
+      const BalanceData = await Balance.findAll({
+        where: {
+          warehouse: user.warehouse,
+          coNo: 410,
+          // itemCode: '10010601011'
+          itemCode: {
+            [Op.or]: [
+              { [Op.ne]: null },
+              { [Op.ne]: '' },
+              // { [Op.eq]: "600102390" },
+              { [Op.notLike]: 'ZNS%' },
+              { [Op.notLike]: '800%' },
+              { [Op.notLike]: 'PRO%' },
+              { [Op.notLike]: 'DIS%' },
+              { [Op.notLike]: '100            ' }
+            ]
+          }
+        }
+        // limit: 10
       })
-        .select('area')
-        .lean()
-      if (!stock) {
-        const areaData = await fetchArea(user.warehouse)
-        const BalanceData = await Balance.findAll({
+      for (let i = 0; i < BalanceData.length; i++) {
+        locateData[BalanceData[i].itemCode.trim()] = []
+        factorData[BalanceData[i].itemCode.trim()] = []
+        // console.log(`BalanceData[${i}].itemCode`, BalanceData[i].itemCode)
+        // console.log('locateData[BalanceData[i].itemCode.trim()]', locateData)
+        const locate = await Locate.findAll({
           where: {
             warehouse: user.warehouse,
-            coNo: 410,
-            // itemCode: '10010601011'
-            itemCode: {
-              [Op.or]: [
-                { [Op.ne]: null },
-                { [Op.ne]: '' },
-                // { [Op.eq]: "600102390" },
-                { [Op.notLike]: 'ZNS%' },
-                { [Op.notLike]: '800%' },
-                { [Op.notLike]: 'PRO%' },
-                { [Op.notLike]: 'DIS%' },
-                { [Op.notLike]: '100            ' }
-              ]
-            }
-          },
+            itemCode: BalanceData[i].itemCode.trim(),
+            coNo: 410
+          }
           // limit: 10
         })
-        for (let i = 0; i < BalanceData.length; i++) {
-          locateData[BalanceData[i].itemCode.trim()] = []
-          factorData[BalanceData[i].itemCode.trim()] = []
-          // console.log(`BalanceData[${i}].itemCode`, BalanceData[i].itemCode)
-          // console.log('locateData[BalanceData[i].itemCode.trim()]', locateData)
-          const locate = await Locate.findAll({
-            where: {
-              warehouse: user.warehouse,
-              itemCode: BalanceData[i].itemCode.trim(),
-              coNo: 410
-            },
-            // limit: 10
-          })
 
-
-          for (let j = 0; j < locate.length; j++) {
-            locateData[BalanceData[i].itemCode.trim()].push({
-              location: locate[j].location.trim(),
-              lot: locate[j].lot,
-              itemOnHand: locate[j].itemOnHand,
-              itemallocated: locate[j].itemallocated // Assuming promotionName is a property of PromotionData
-            })
-          }
-        }
-
-        const stocks = BalanceData.map(stock => {
-          const locate = locateData[stock.itemCode.trim()] || []
-          const itemCode = stock.itemCode.trim()
-
-          return {
-            coNo: stock.coNo,
-            warehouse: stock.warehouse,
-            itemCode: itemCode,
-            itemPcs: stock.itemPcs,
-            allocateMethod: stock.allocateMethod,
-            itemallocated: stock.itemallocated,
-            itemAllowcatable: stock.itemAllowcatable,
-            lot: locate
-          }
-        })
-
-        const productIds = stocks.map(item => item.itemCode)
-        const productDetail = await Product.find({
-          id: { $in: productIds }
-        }).select('id listUnit.unit listUnit.factor')
-
-
-        const productFactors = productDetail.map(product => {
-          const ctnUnit = product.listUnit.find(unit => unit.unit === 'CTN')
-          return {
-            id: product.id,
-            factor: ctnUnit ? parseInt(ctnUnit.factor) : 0 // หรือ default ค่าอื่นเช่น 1
-          }
-        })
-        data = []
-
-        if (areaData) {
-          areaData.forEach(area => {
-            // ค้นหาสินค้าในสต็อกตามคลังสินค้า
-            const productID = stocks.filter(
-              item =>
-                item.warehouse === area.warehouse &&
-                Array.isArray(item.lot) &&
-                item.lot.length > 0
-            )
-
-            let listProduct = []
-
-            if (productID.length > 0) {
-              listProduct = productID.map(product => {
-                const productId = product.itemCode
-                const Factor =
-                  productFactors.find(pf => pf.id === productId) || {}
-                const sumQtyPcs = product.lot.reduce(
-                  (sum, obj) => sum + (obj.itemOnHand || 0),
-                  0
-                ) // ตรงนี้คุณเขียน obj.lot.itemOnHand แต่จริงๆ obj คือ lot แล้ว
-                const sumQtyCtn = product.lot.reduce(
-                  (sum, obj) =>
-                    sum +
-                    (Factor?.factor && Factor.factor > 0
-                      ? Math.floor(obj.itemOnHand / Factor.factor) // ใช้ obj แทน lot
-                      : 0),
-                  0
-                )
-
-                lotList = product.lot.map(lot => ({
-                  location: lot.location,
-                  lot: lot.lot,
-                  qtyPcs: lot.itemOnHand,
-                  qtyCtn:
-                    Factor?.factor && Factor.factor > 0
-                      ? Math.floor(lot.itemOnHand / Factor.factor)
-                      : 0
-                }))
-
-                return {
-                  id: productId,
-                  sumQtyPcs: sumQtyPcs,
-                  sumQtyCtn: sumQtyCtn,
-                  available: lotList
-                }
-              })
-            }
-
-            data.push({
-              area: area.area,
-              saleCode: user.saleCode || 'Null',
-              period: period,
-              warehouse: area.warehouse,
-              listProduct: listProduct
-            })
-            // console.log("data",data)
+        for (let j = 0; j < locate.length; j++) {
+          locateData[BalanceData[i].itemCode.trim()].push({
+            location: locate[j].location.trim(),
+            lot: locate[j].lot,
+            itemOnHand: locate[j].itemOnHand,
+            itemallocated: locate[j].itemallocated // Assuming promotionName is a property of PromotionData
           })
         }
-        await Stock.insertMany(data)
       }
+
+      const stocks = BalanceData.map(stock => {
+        const locate = locateData[stock.itemCode.trim()] || []
+        const itemCode = stock.itemCode.trim()
+
+        return {
+          coNo: stock.coNo,
+          warehouse: stock.warehouse,
+          itemCode: itemCode,
+          itemPcs: stock.itemPcs,
+          allocateMethod: stock.allocateMethod,
+          itemallocated: stock.itemallocated,
+          itemAllowcatable: stock.itemAllowcatable,
+          lot: locate
+        }
+      })
+
+      const productIds = stocks.map(item => item.itemCode)
+      const productDetail = await Product.find({
+        id: { $in: productIds }
+      }).select('id listUnit.unit listUnit.factor')
+
+      const productFactors = productDetail.map(product => {
+        const ctnUnit = product.listUnit.find(unit => unit.unit === 'CTN')
+        return {
+          id: product.id,
+          factor: ctnUnit ? parseInt(ctnUnit.factor) : 0 // หรือ default ค่าอื่นเช่น 1
+        }
+      })
+      data = []
+
+      if (areaData) {
+        areaData.forEach(area => {
+          // ค้นหาสินค้าในสต็อกตามคลังสินค้า
+          const productID = stocks.filter(
+            item =>
+              item.warehouse === area.warehouse &&
+              Array.isArray(item.lot) &&
+              item.lot.length > 0
+          )
+
+          let listProduct = []
+
+          if (productID.length > 0) {
+            listProduct = productID.map(product => {
+              const productId = product.itemCode
+              const Factor =
+                productFactors.find(pf => pf.id === productId) || {}
+              const sumQtyPcs = product.lot.reduce(
+                (sum, obj) => sum + (obj.itemOnHand || 0),
+                0
+              ) // ตรงนี้คุณเขียน obj.lot.itemOnHand แต่จริงๆ obj คือ lot แล้ว
+              const sumQtyCtn = product.lot.reduce(
+                (sum, obj) =>
+                  sum +
+                  (Factor?.factor && Factor.factor > 0
+                    ? Math.floor(obj.itemOnHand / Factor.factor) // ใช้ obj แทน lot
+                    : 0),
+                0
+              )
+
+              lotList = product.lot.map(lot => ({
+                location: lot.location,
+                lot: lot.lot,
+                qtyPcs: lot.itemOnHand,
+                qtyCtn:
+                  Factor?.factor && Factor.factor > 0
+                    ? Math.floor(lot.itemOnHand / Factor.factor)
+                    : 0
+              }))
+
+              return {
+                id: productId,
+                sumQtyPcs: sumQtyPcs,
+                sumQtyCtn: sumQtyCtn,
+                available: lotList
+              }
+            })
+          }
+
+          data.push({
+            area: area.area,
+            saleCode: user.saleCode || 'Null',
+            period: period,
+            warehouse: area.warehouse,
+            listProduct: listProduct
+          })
+          // console.log("data",data)
+        })
+      }
+      await Stock.insertMany(data)
     }
+  }
 
-    // const warehouse = '213'
+  // const warehouse = '213'
 
-    res.status(200).json({
-      status:200,
-      message: 'Stock added successfully',
-      // data: data,
-    })
+  res.status(200).json({
+    status: 200,
+    message: 'Stock added successfully'
+    // data: data,
+  })
   // } catch (error) {
   //   next(error)
   // }
@@ -342,7 +339,7 @@ exports.getStock = async (req, res, next) => {
       area: area,
       period: period
     })
-    if(!data){
+    if (!data) {
       res.status(404).json({
         status: 404,
         message: 'Not Found Data',
@@ -361,19 +358,19 @@ exports.getStock = async (req, res, next) => {
 
 exports.getQty = async (req, res, next) => {
   try {
-    const { area, productId, unit } = req.body
+    const { area, id, unit, period } = req.body
 
     const productStock = await Stock.find({
       area: area,
-      'listProduct.productId': productId
+      period: period,
+      'listProduct.id': id
     })
-    const products = await Product.find({id:productId})
+    const products = await Product.find({ id: id })
 
     let unitData = {}
 
-    const productUnitMatch = products?.find(p => p.id === productId)
-    
-    
+    const productUnitMatch = products?.find(p => p.id === id)
+
     // console.log(productUnitMatch)
     if (productUnitMatch) {
       unitData = productUnitMatch.listUnit.map(unit => ({
@@ -389,7 +386,7 @@ exports.getQty = async (req, res, next) => {
     const stockmatchList = []
 
     productStock.map(item => {
-      const stockmatch = item.listProduct.find(p => p.productId === productId)
+      const stockmatch = item.listProduct.find(p => p.id === id)
       if (stockmatch) {
         stockmatchList.push(stockmatch)
       }
@@ -410,7 +407,7 @@ exports.getQty = async (req, res, next) => {
 
     const data = {
       area: area,
-      productId: productId,
+      productId: id,
       sumQtyPcs: totalQtyPcs,
       qty: Math.floor(totalQtyPcs / productUnit.factor),
       unit: unit,
@@ -466,9 +463,6 @@ exports.addStockMovement = async (req, res, next) => {
         status: 200,
         message: 'Stock Movement added successfully!'
       })
-
-
-
     } else {
       return res.status(409).json({
         status: 409,
@@ -507,214 +501,204 @@ exports.updateStockMovement = async (req, res, next) => {
 }
 
 exports.availableStock = async (req, res) => {
-    try {
+  try {
     const { area, period, type, group, brand, size, flavour } = req.body
 
     const modelStock = await Stock.aggregate([
       {
         $match: {
-          area: area, 
+          area: area,
           period: period
         }
       },
-      { 
-        $unwind: { 
-          path: "$listProduct", 
-          preserveNullAndEmptyArrays: true 
-        } 
+      {
+        $unwind: {
+          path: '$listProduct',
+          preserveNullAndEmptyArrays: true
+        }
       },
-      { 
+      {
         $project: {
-          productId: "$listProduct.productId" ,
-          available: "$listProduct.available",
-          _id:0
+          productId: '$listProduct.productId',
+          available: '$listProduct.available',
+          _id: 0
         }
       }
-    ]);
+    ])
     // console.log("modelStock",modelStock)
     const productIds = modelStock.flatMap(item => item.productId)
-    
+
     if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
       return res.status(400).json({
-          status: '400',
-          message: 'Invalid type! Required: sale, refund, or withdraw.'
+        status: '400',
+        message: 'Invalid type! Required: sale, refund, or withdraw.'
       })
-  }
+    }
 
-  let filter = {}
+    let filter = {}
 
-  if (type === 'sale') filter.statusSale = 'Y'
-  if (type === 'refund') filter.statusRefund = 'Y'
-  if (type === 'withdraw') filter.statusWithdraw = 'Y'
+    if (type === 'sale') filter.statusSale = 'Y'
+    if (type === 'refund') filter.statusRefund = 'Y'
+    if (type === 'withdraw') filter.statusWithdraw = 'Y'
 
-  const parseArrayParam = (param) => {
+    const parseArrayParam = param => {
       if (!param) return []
       try {
-          return typeof param === 'string' ? JSON.parse(param) : param
+        return typeof param === 'string' ? JSON.parse(param) : param
       } catch (error) {
-          return param.split(',')
+        return param.split(',')
       }
-  }
+    }
 
-  const groupArray = parseArrayParam(group)
-  const brandArray = parseArrayParam(brand)
-  const sizeArray = parseArrayParam(size)
-  const flavourArray = parseArrayParam(flavour)
+    const groupArray = parseArrayParam(group)
+    const brandArray = parseArrayParam(brand)
+    const sizeArray = parseArrayParam(size)
+    const flavourArray = parseArrayParam(flavour)
 
-  let conditions = []
-  if (productIds.length) conditions.push({ id: { $in: productIds } })
-  if (groupArray.length) conditions.push({ groupCode: { $in: groupArray } })
-  if (brandArray.length) conditions.push({ brandCode: { $in: brandArray } })
-  if (sizeArray.length) conditions.push({ size: { $in: sizeArray } })
-  if (flavourArray.length) conditions.push({ flavourCode: { $in: flavourArray } })
+    let conditions = []
+    if (productIds.length) conditions.push({ id: { $in: productIds } })
+    if (groupArray.length) conditions.push({ groupCode: { $in: groupArray } })
+    if (brandArray.length) conditions.push({ brandCode: { $in: brandArray } })
+    if (sizeArray.length) conditions.push({ size: { $in: sizeArray } })
+    if (flavourArray.length)
+      conditions.push({ flavourCode: { $in: flavourArray } })
 
-  if (conditions.length) filter.$and = conditions
+    if (conditions.length) filter.$and = conditions
 
-  let products = await Product.find(filter).lean()
+    let products = await Product.find(filter).lean()
 
-  if (!products.length) {
-      return res.status(404).json({ status: '404', message: 'No products found!' })
-  }
+    if (!products.length) {
+      return res
+        .status(404)
+        .json({ status: '404', message: 'No products found!' })
+    }
 
-  // console.log(products)
+    // console.log(products)
 
-  const data = products.map(product => {
+    const data = products.map(product => {
+      const lot = modelStock.find(u => u.productId == product.id)
 
-    const lot = modelStock.find(u => u.productId == product.id);
+      // console.log("lot",lot)
+      const tranFromProduct = product
+        ? {
+            // ...product,
+            _id: product._id,
+            id: product.id,
+            name: product.name,
+            group: product.group,
+            groupCode: product.groupCode,
+            brandCode: product.brandCode,
+            brand: product.brand,
+            size: product.size,
+            flavourCode: product.flavourCode,
+            flavour: product.flavour,
+            type: product.type,
+            weightGross: product.weightGross,
+            weightNet: product.weightNet,
+            statusSale: product.statusSale,
+            statusWithdraw: product.statusWithdraw,
+            statusRefund: product.statusRefund,
+            image: product.image,
 
+            listUnit: product.listUnit.map(unit => {
+              // console.log(parseFloat(unit.factor))
+              const totalQtyPcsToCtn = Math.floor(
+                lot.available.reduce((sum, item) => {
+                  return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor
+                }, 0)
+              )
 
-    // console.log("lot",lot)
-    const tranFromProduct = product ? {
-      // ...product,
-      _id:product._id,
-      id:product.id,
-      name:product.name,
-      group:product.group,
-      groupCode:product.groupCode,
-      brandCode:product.brandCode,
-      brand:product.brand,
-      size:product.size,
-      flavourCode:product.flavourCode,
-      flavour:product.flavour,
-      type:product.type,
-      weightGross:product.weightGross,
-      weightNet:product.weightNet,
-      statusSale:product.statusSale,
-      statusWithdraw:product.statusWithdraw,
-      statusRefund:product.statusRefund,
-      image:product.image,
+              return {
+                unit: unit.unit,
+                name: unit.name,
+                factor: unit.factor,
+                qty: totalQtyPcsToCtn,
+                price: {
+                  sale: unit.price.sale,
+                  Refund: unit.price.refund
+                }
+              }
+            }),
+            created: product.created,
+            updated: product.updated,
+            __v: product.__v
+          }
+        : null
 
-      listUnit:product.listUnit.map(unit => {
-        // console.log(parseFloat(unit.factor))
-        const totalQtyPcsToCtn = Math.floor(
-          lot.available.reduce((sum, item) => {
-            return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor;
-          }, 0)
-        );
-        
+      if (lot && Array.isArray(lot.available)) {
+        const total = lot.available.reduce(
+          (acc, order) => {
+            acc.totalQtyPcs += order.qtyPcs || 0
+            acc.totalQtyCtn += order.qtyCtn || 0
+            return acc
+          },
+          { totalQtyPcs: 0, totalQtyCtn: 0 }
+        )
+
         return {
-            unit:unit.unit,
-            name:unit.name,
-            factor:unit.factor,
-            qty : totalQtyPcsToCtn,
-            price:{
-              sale:unit.price.sale,
-              Refund:unit.price.refund,
-            }
+          ...tranFromProduct,
+          totalQtyPcs: total.totalQtyPcs,
+          totalQtyCtn: total.totalQtyCtn
         }
-      }),
-      created:product.created,
-      updated:product.updated,
-      __v:product.__v
-    } : null;
+      }
 
-    if (lot && Array.isArray(lot.available)) {
-      const total = lot.available.reduce((acc, order) => {
-        acc.totalQtyPcs += order.qtyPcs || 0;
-        acc.totalQtyCtn += order.qtyCtn || 0;
-        return acc;
-      }, { totalQtyPcs: 0, totalQtyCtn: 0 });
-  
       return {
         ...tranFromProduct,
-        totalQtyPcs: total.totalQtyPcs,
-        totalQtyCtn: total.totalQtyCtn
-      };
-    }
-  
-    return {
-      ...tranFromProduct,
-      lot: { totalQtyPcs: 0, totalQtyCtn: 0 }
-    };
-  }); 
-  
-  function parseSize(sizeStr) {
-    if (!sizeStr) return 0;
-
-    const units = {
-        'KG': 1000,
-        'G': 1,
-        'L': 1000,
-        'ML': 1,
-    };
-
-    const match = sizeStr.trim().toUpperCase().match(/^([\d.]+)\s*(KG|G|L|ML)$/);
-    if (!match) return 0;
-
-    const value = parseFloat(match[1]);
-    const unit = match[2];
-
-    return units[unit] ? value * units[unit] : 0;
-}
-
-const groupMap = {};
-data.forEach(item => {
-    const group = item.group;
-    if (!groupMap[group]) groupMap[group] = [];
-    groupMap[group].push(item);
-});
-
-const groupList = Object.entries(groupMap).map(([group, items]) => {
-    const maxSize = Math.max(...items.map(i => parseSize(i.size)));
-    return { group, items, maxSize };
-});
-
-groupList.sort((a, b) => b.maxSize - a.maxSize);
-
-groupList.forEach(g => {
-    g.items.sort((a, b) => parseSize(b.size) - parseSize(a.size));
-});
-
-const sorted = groupList.flatMap(g => g.items);
-
-
-  
-
-
-  res.status(200).json({
-    status:200,
-    message:"Success",
-    data: sorted
+        lot: { totalQtyPcs: 0, totalQtyCtn: 0 }
+      }
     })
 
+    function parseSize (sizeStr) {
+      if (!sizeStr) return 0
+
+      const units = {
+        KG: 1000,
+        G: 1,
+        L: 1000,
+        ML: 1
+      }
+
+      const match = sizeStr
+        .trim()
+        .toUpperCase()
+        .match(/^([\d.]+)\s*(KG|G|L|ML)$/)
+      if (!match) return 0
+
+      const value = parseFloat(match[1])
+      const unit = match[2]
+
+      return units[unit] ? value * units[unit] : 0
+    }
+
+    const groupMap = {}
+    data.forEach(item => {
+      const group = item.group
+      if (!groupMap[group]) groupMap[group] = []
+      groupMap[group].push(item)
+    })
+
+    const groupList = Object.entries(groupMap).map(([group, items]) => {
+      const maxSize = Math.max(...items.map(i => parseSize(i.size)))
+      return { group, items, maxSize }
+    })
+
+    groupList.sort((a, b) => b.maxSize - a.maxSize)
+
+    groupList.forEach(g => {
+      g.items.sort((a, b) => parseSize(b.size) - parseSize(a.size))
+    })
+
+    const sorted = groupList.flatMap(g => g.items)
+
+    res.status(200).json({
+      status: 200,
+      message: 'Success',
+      data: sorted
+    })
   } catch (error) {
     next(error)
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // exports.rollbackStock = async (req, res, next) => {
 //   try {
