@@ -83,6 +83,14 @@ const typeStoreSchema = mongoose.Schema({
     updatedAt: { type: Date, default: Date.now },
 })
 
-const Store = dbCA.model('Store', storeSchema)
-const TypeStore = dbCA.model('TypeStore', typeStoreSchema)
-module.exports = { Store, TypeStore }
+// const Store = dbCA.model('Store', storeSchema)
+// const TypeStore = dbCA.model('TypeStore', typeStoreSchema)
+// module.exports = { Store, TypeStore }
+
+
+module.exports = (conn) => {
+    return {
+      Store: conn.model('Store', storeSchema),
+      TypeStore: conn.model('TypeStore', typeStoreSchema),
+    };
+  };

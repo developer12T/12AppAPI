@@ -25,6 +25,8 @@ const _ = require('lodash')
 const { DateTime } = require("luxon");
 const { getSocket } = require('../../socket')
 
+const { getStoreModelsByChannel } = require('../store/channelStore')
+
 exports.checkout = async (req, res) => {
   try {
     const {
@@ -905,11 +907,10 @@ exports.getSummarybyRoute = async (req, res) => {
 
 exports.getSummarybyMonth = async (req, res) => {
 try {
-  const { area, period,storeId,day  } = req.query
+  const { area, year,storeId,day  } = req.query
+  const channel = req.headers['x-channel']; // 'credit' or 'cash'
 
-
-  console.log("day",day)
-
+  const { Store } = getStoreModelsByChannel(channel,res); 
   checkArea = await Route.find({ area: area })
 
   if (checkArea.length == 0) {
@@ -919,7 +920,7 @@ try {
     })
   }
 
-  storeIdObj = await Store.findOne({storeId:storeId}).select("_id")
+  const storeIdObj = await Store.findOne({storeId:storeId}).select("_id")
 
   const matchStore = storeIdObj
   ? {
@@ -931,7 +932,7 @@ try {
   : {};
 
   const pipeline = [
-    { $match: { area, period } },
+    { $match: { area } },
     { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
     { $match: matchStore },
     {
@@ -970,6 +971,11 @@ try {
       $addFields: {
         createdDay: { $dayOfMonth: '$createdAtThai' }
       }
+    },
+    {
+      $addFields: {
+        createdYear: { $year: '$createdAtThai' }
+      }
     }
   ]
   
@@ -977,6 +983,14 @@ try {
     pipeline.push({
       $match: {
         createdDay: Number(day)
+      }
+    })
+  }
+
+  if (year != null) {
+    pipeline.push({
+      $match: {
+        createdYear: Number(year)
       }
     })
   }

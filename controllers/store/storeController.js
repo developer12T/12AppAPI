@@ -1,4 +1,4 @@
-const { Store } = require('../../models/cash/store')
+const storeModel = require('../../models/cash/store');
 const { uploadFiles } = require('../../utilities/upload')
 const { calculateSimilarity } = require('../../utilities/utility')
 const axios = require('axios')
@@ -7,14 +7,20 @@ const upload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages',
   3
 )
+const { getStoreModelsByChannel } = require('../store/channelStore')
 const path = require('path')
 const { v4: uuidv4 } = require('uuid')
 uuidv4() // ⇨ '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed'
 
+
+
 exports.getStore = async (req, res) => {
   try {
     const { area, type, route } = req.query
-    console.log('getStore req.query', req.query)
+    const channel = req.headers['x-channel']; // 'credit' or 'cash'
+
+    const { Store } = getStoreModelsByChannel(channel,res); 
+
     const currentDate = new Date()
     const startMonth = new Date(
       currentDate.getFullYear(),
@@ -48,10 +54,15 @@ exports.getStore = async (req, res) => {
       query.route = route
     }
     const data = await Store.find(query, { _id: 0, __v: 0 })
+    // console.log(data)
 
     if (data.length === 0) {
-      return res.status(204).json()
+      return res.status(404).json({
+        status: 404,
+        message: 'Not Found Store',
+      })
     }
+
     res.status(200).json({
       status: '200',
       message: 'Success',
@@ -93,6 +104,9 @@ exports.addStore = async (req, res) => {
           message: 'Number of files and types do not match'
         })
       }
+      const channel = req.headers['x-channel']; // 'credit' or 'cash'
+
+      const { Store } = getStoreModelsByChannel(channel,res); 
 
       const existingStores = await Store.find(
         {},
@@ -257,6 +271,10 @@ exports.editStore = async (req, res) => {
         .json({ status: '400', message: 'No valid fields to update' })
     }
 
+    const channel = req.headers['x-channel']; // 'credit' or 'cash'
+
+    const { Store } = getStoreModelsByChannel(channel,res); 
+
     const store = await Store.findOneAndUpdate({ storeId }, data, { new: true })
 
     if (!store) {
@@ -319,6 +337,11 @@ exports.addFromERP = async (req, res) => {
         createdDate: splitData.createdDate,
         updatedDate: Date()
       }
+
+      const channel = req.headers['x-channel']; // 'credit' or 'cash'
+
+      const { Store } = getStoreModelsByChannel(channel,res); 
+
       const StoreIf = await Store.findOne({ storeId: splitData.storeId })
       if (!StoreIf) {
         await Store.create(mainData)
@@ -333,7 +356,7 @@ exports.addFromERP = async (req, res) => {
     res.status(200).json({
       status: '200',
       message: 'Store Added Succesfully',
-      data: dataArray
+      // data: dataArray
     })
   } catch (error) {
     console.error('Error saving store to MongoDB:', error)
@@ -347,6 +370,10 @@ exports.addFromERP = async (req, res) => {
 exports.checkInStore = async (req, res) => {
   const { storeId } = req.params
   const { latitude, longtitude } = req.body
+
+  const channel = req.headers['x-channel']; // 'credit' or 'cash'
+
+  const { Store } = getStoreModelsByChannel(channel,res); 
 
   try {
     if (!latitude || !longtitude) {
@@ -392,6 +419,9 @@ exports.updateStoreStatus = async (req, res) => {
   const { storeId, area } = req.body
 
   const areaPrefix = area.substring(0, 2)
+  const channel = req.headers['x-channel']; // 'credit' or 'cash'
+
+  const { Store } = getStoreModelsByChannel(channel,res); 
 
   const latestStore = await Store.findOne({
     storeId: { $regex: `^V${areaPrefix}`, $options: 'i' }
@@ -443,3 +473,4 @@ exports.rejectStore = async (req, res) => {
     data: result
   })
 }
+
