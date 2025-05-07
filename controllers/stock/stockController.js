@@ -320,18 +320,14 @@ exports.addStockNew = async (req, res) => {
           })
         }
         await Stock.insertMany(data)
-
-        // const productId = data.map(product => product.id )
-        
       }
-
     }
 
     // const warehouse = '213'
 
     res.status(200).json({
       status:200,
-      message: 'Successfull Insert',
+      message: 'Stock added successfully',
       // data: data,
     })
   // } catch (error) {
