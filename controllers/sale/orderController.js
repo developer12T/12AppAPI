@@ -905,7 +905,10 @@ exports.getSummarybyRoute = async (req, res) => {
 
 exports.getSummarybyMonth = async (req, res) => {
 try {
-  const { area, period,storeId  } = req.query
+  const { area, period,storeId,day  } = req.query
+
+
+  console.log("day",day)
 
   checkArea = await Route.find({ area: area })
 
@@ -927,31 +930,16 @@ try {
     }
   : {};
 
-
-  // const test = await Route.aggregate([
-  //   { $match: { area, period } },
-
-  //   { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
-
-  //   {$match: {"listStore.storeInfo": storeIdObj._id.toString()}},])
-
-  // console.log("storeIdObj._id.toString()",storeIdObj._id.toString())
-
-  const modelRoute = await Route.aggregate([
+  const pipeline = [
     { $match: { area, period } },
-
     { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
-
     { $match: matchStore },
-
-
     {
       $unwind: {
         path: '$listStore.listOrder',
         preserveNullAndEmptyArrays: true
       }
     },
-
     {
       $lookup: {
         from: 'orders',
@@ -967,41 +955,46 @@ try {
         'orderDetails.createdAt': { $ne: null }
       }
     },
-
     {
       $addFields: {
-        createdAtBangkok: {
-          $dateToString: {
-            format: '%Y-%m-%d %H:%M:%S',
-            date: {
-              $dateAdd: {
-                startDate: '$orderDetails.createdAt',
-                unit: 'hour',
-                amount: 7
-              }
-            }
+        createdAtThai: {
+          $dateAdd: {
+            startDate: '$listStore.listOrder.date',
+            unit: 'hour',
+            amount: 7
           }
-        },
-        month: { $month: '$orderDetails.createdAt' }
+        }
       }
     },
+    {
+      $addFields: {
+        createdDay: { $dayOfMonth: '$createdAtThai' }
+      }
+    }
+  ]
+  
+  if (day != null) {
+    pipeline.push({
+      $match: {
+        createdDay: Number(day)
+      }
+    })
+  }
 
+  pipeline.push(
     {
       $project: {
-        month: 1,
+        month: { $month: '$createdAtThai' },
         total: '$orderDetails.total'
       }
     },
-
     {
       $group: {
         _id: '$month',
         totalAmount: { $sum: '$total' }
       }
     },
-
     { $sort: { _id: 1 } },
-
     {
       $project: {
         month: '$_id',
@@ -1009,9 +1002,13 @@ try {
         _id: 0
       }
     }
-  ])
+  )
+  
+  const modelRoute = await Route.aggregate(pipeline)
+  
 
-  console.log("modelRoute",modelRoute)
+  // console.log(JSON.stringify(modelRoute, null, 2));
+
 
   modelRouteValue = modelRoute.map(item => {
     return {
