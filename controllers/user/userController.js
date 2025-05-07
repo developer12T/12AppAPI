@@ -163,6 +163,7 @@ exports.addUser = async (req , res) => {
                 warehouse:sale.warehouse,
                 role:sale.role,
                 status:sale.status,
+                image:""
             });
           await newUser.save();
         }
@@ -194,6 +195,7 @@ exports.addUserOne = async (req , res) => {
             warehouse: req.body.warehouse,
             role: req.body.role,
             status: req.body.status,
+            image:req.body.image
           });
           await user.save();
     }
@@ -227,7 +229,9 @@ exports.updateUserOne = async (req , res) => {
             area: req.body.area,
             warehouse: req.body.warehouse,
             role: req.body.role,
-            status: req.body.status
+            status: req.body.status,
+            image:req.body.image
+
         }}
       );
 

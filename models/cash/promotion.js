@@ -66,5 +66,10 @@ const promotionSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 })
 
-const Promotion = dbCA.model('Promotion', promotionSchema)
-module.exports = { Promotion }
+// const Promotion = dbCA.model('Promotion', promotionSchema)
+// module.exports = { Promotion }
+module.exports = (conn) => {
+    return {
+        Promotion: conn.model('Promotion', promotionSchema),
+    };
+  };

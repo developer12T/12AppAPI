@@ -18,7 +18,7 @@ function getModelsByChannel(channel,res,model) {
           });
     }
   
-    return model(conn); // return { Store, TypeStore }
+    return model(conn); 
   }
   
   module.exports = { getModelsByChannel };
