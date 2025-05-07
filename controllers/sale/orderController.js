@@ -3,8 +3,7 @@ const { Cart } = require('../../models/cash/cart')
 const { User } = require('../../models/cash/user')
 const { Product } = require('../../models/cash/product')
 const { Route } = require('../../models/cash/route')
-const { Store } = require('../../models/cash/store')
-const storeModel = require('../../models/cash/store');
+
 
 const { Warehouse,Locate,Balance,Sale } = require('../../models/cash/master')
 const { generateOrderId } = require('../../utilities/genetateId')
@@ -26,6 +25,13 @@ const _ = require('lodash')
 const { DateTime } = require("luxon");
 const { getSocket } = require('../../socket')
 
+
+const orderModel  = require('../../models/cash/sale')
+const cartModel  = require('../../models/cash/cart')
+const userModel  = require('../../models/cash/user')
+const productModel  = require('../../models/cash/product')
+const routeModel = require('../../models/cash/route')
+const storeModel = require('../../models/cash/store');
 const { getModelsByChannel } = require('../../middleware/channel')
 
 exports.checkout = async (req, res) => {
@@ -43,6 +49,13 @@ exports.checkout = async (req, res) => {
       changePromotionStatus,
       listPromotion = []
     } = req.body
+
+    const channel = req.headers['x-channel'];
+
+    const { Cart } = getModelsByChannel(channel,res,cartModel); 
+    const { User } = getModelsByChannel(channel,res,userModel); 
+    const { Product } = getModelsByChannel(channel,res,productModel); 
+    const { Order } = getModelsByChannel(channel,res,orderModel); 
 
     if (!type || !area || !storeId || !shipping || !payment) {
       return res
@@ -65,9 +78,9 @@ exports.checkout = async (req, res) => {
 
     let summary = ''
     if (changePromotionStatus == 0) {
-      summary = await summaryOrder(cart)
+      summary = await summaryOrder(cart,channel,res)
     } else if (changePromotionStatus == 1) {
-      summary = await summaryOrderProStatusOne(cart, listPromotion)
+      summary = await summaryOrderProStatusOne(cart, listPromotion,channel,res)
     }
       // const shippingData = store.shippingAddress.find(s => s.shippingId === shipping)
       // if (!shippingData) {
@@ -199,6 +212,13 @@ exports.getOrder = async (req, res) => {
   try {
     const { type, area, store, period } = req.query
 
+    const channel = req.headers['x-channel'];
+
+
+    const { Order } = getModelsByChannel(channel,res,orderModel); 
+
+
+
     let response = []
 
     if (!type || !area || !period) {
@@ -257,6 +277,12 @@ exports.getOrder = async (req, res) => {
 exports.getDetail = async (req, res) => {
   try {
     const { orderId } = req.params
+
+    const channel = req.headers['x-channel'];
+
+
+    const { Order } = getModelsByChannel(channel,res,orderModel); 
+
     if (!orderId) {
       return res
         .status(400)
@@ -287,6 +313,12 @@ exports.getDetail = async (req, res) => {
 exports.updateStatus = async (req, res) => {
   try {
     const { orderId, status } = req.body
+
+    const channel = req.headers['x-channel'];
+
+
+    const { Order } = getModelsByChannel(channel,res,orderModel); 
+
 
     if (!orderId || !status) {
       return res
@@ -339,6 +371,11 @@ exports.updateStatus = async (req, res) => {
 
 exports.addSlip = async (req, res) => {
   try {
+
+    const channel = req.headers['x-channel'];
+
+    const { Order } = getModelsByChannel(channel,res,orderModel); 
+
     upload(req, res, async err => {
       if (err) {
         return res.status(400).json({
@@ -402,6 +439,10 @@ exports.addSlip = async (req, res) => {
 
 exports.OrderToExcel = async (req, res) => {
   const { saleCode } = req.params
+
+  const channel = req.headers['x-channel'];
+  const { Order } = getModelsByChannel(channel,res,orderModel); 
+
 
   // console.log(saleCode)
   const modelOrder = await Order.find({
@@ -531,6 +572,10 @@ exports.getAllOrder = async (req, res) => {
   try {
     const { period } = req.query
 
+    const channel = req.headers['x-channel'];
+
+    const { Order } = getModelsByChannel(channel,res,orderModel); 
+
     if (period) {
       const periodYear = period.slice(0, 4)
       const month = period.slice(4, 6)
@@ -566,6 +611,13 @@ exports.getAllOrder = async (req, res) => {
           }
         }
       ])
+
+      if (modelOrder.length == 0) {
+        return res.status(404).json({
+          status:404,
+          message:"Not Found Order"
+        })
+      }
 
       const data = modelOrder.map(item => ({
         area: item.area,
@@ -626,6 +678,13 @@ exports.getSummaryItem = async (req, res) => {
     // const { area, period, group, flavour, brand } = req.query
 
     const { area, period, group, brand, flavour, size, type } = req.body
+
+    const channel = req.headers['x-channel'];
+
+
+    const { Product } = getModelsByChannel(channel,res,productModel); 
+    const { Order } = getModelsByChannel(channel,res,orderModel); 
+
 
     const periodYear = period.slice(0, 4)
     const month = period.slice(4, 6)
@@ -825,6 +884,12 @@ exports.getSummarybyRoute = async (req, res) => {
   try {
     const { area, period } = req.query
 
+    const channel = req.headers['x-channel'];
+
+    const { Route } = getModelsByChannel(channel,res,routeModel); 
+
+
+
     const modelRoute = await Route.aggregate([
       { $match: { area, period } },
       { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
@@ -912,6 +977,8 @@ try {
   const channel = req.headers['x-channel']; // 'credit' or 'cash'
 
   const { Store } = getModelsByChannel(channel,res,storeModel); 
+  const { Route } = getModelsByChannel(channel,res,routeModel); 
+
   checkArea = await Route.find({ area: area })
 
   if (checkArea.length == 0) {
@@ -1058,6 +1125,10 @@ exports.getSummarybyArea = async (req, res) => {
 try {
   const { period, year } = req.query
 
+  const channel = req.headers['x-channel']; // 'credit' or 'cash'
+
+  const { Route } = getModelsByChannel(channel,res,routeModel); 
+
   if (!period) {
     return res.status(404).json({
       status:404,
@@ -1202,6 +1273,12 @@ exports.getSummarybyGroup = async (req, res) => {
 try {
     const { zone,group,period } = req.body 
 
+    const channel = req.headers['x-channel']; // 'credit' or 'cash'
+
+    const { Order } = getModelsByChannel(channel,res,orderModel); 
+    const { Product } = getModelsByChannel(channel,res,productModel); 
+
+
     const year = parseInt(period.slice(0, 4));
     const month = period.slice(4, 6)
 
@@ -1322,6 +1399,11 @@ try {
 
 exports.erpApiCheck = async (req, res) => {
   try {
+
+    const channel = req.headers['x-channel']; 
+
+    const { Order } = getModelsByChannel(channel,res,orderModel); 
+
 
   const modelSale = await Sale.findAll({
     attributes: [
