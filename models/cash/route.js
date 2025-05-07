@@ -1,5 +1,6 @@
 const mongoose = require('mongoose')
 const { dbCA } = require('../../config/db')
+const { dbCR } = require('../../config/db')
 
 const ListOrderSchema = new mongoose.Schema({
   number: { type: Number },
@@ -82,6 +83,17 @@ const RouteChangeLogSchema = new mongoose.Schema({
   approvedDate: { type: String, default: '' }
 })
 
-const Route = dbCA.model('Route', RouteSchema)
-const RouteChangeLog = dbCA.model('RouteChangeLog', RouteChangeLogSchema)
-module.exports = { Route, RouteChangeLog }
+// const Route = dbCA.model('Route', RouteSchema)
+// const RouteChangeLog = dbCA.model('RouteChangeLog', RouteChangeLogSchema)
+
+// const Route = dbCR.model('Route', RouteSchema)
+// const RouteChangeLog = dbCR.model('RouteChangeLog', RouteChangeLogSchema)
+// module.exports = { Route, RouteChangeLog }
+
+
+module.exports = (conn) => {
+  return {
+    Route: conn.model('Route', RouteSchema),
+    RouteChangeLog: conn.model('RouteChangeLog', RouteChangeLogSchema),
+  };
+};

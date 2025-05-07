@@ -11,4 +11,5 @@ dbCA.on('error', (err) => console.error('Cash DB Error:', err))
 dbCR.on('connected', () => console.log('Connected to Credit DB'))
 dbCR.on('error', (err) => console.error('Credit DB Error:', err))
 
-module.exports = { dbCA,dbCR }
+module.exports = {
+     dbCA,dbCR }

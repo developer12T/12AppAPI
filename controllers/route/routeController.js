@@ -9,13 +9,21 @@ const upload = multer({ storage: multer.memoryStorage() }).array(
   'checkInImage',
   1
 )
-
+const routeModel = require('../../models/cash/route');
+const storeModel = require('../../models/cash/store');
+const { getModelsByChannel } = require('../../middleware/channel')
 const path = require('path')
 const { forEach } = require('lodash')
 
 exports.getRoute = async (req, res) => {
   try {
     const { storeId, area, period, routeId, province, district } = req.query
+
+    const channel = req.headers['x-channel'];
+
+    const { Store } = getModelsByChannel(channel,res,storeModel); 
+
+    const { Route } = getModelsByChannel(channel,res,routeModel); 
 
     if (!period) {
       return res
@@ -309,6 +317,11 @@ exports.addFromERP = async (req, res) => {
       })
     }
 
+    const channel = req.headers['x-channel']; // 'credit' or 'cash'
+
+    const { Store } = getModelsByChannel(channel,res,storeModel); 
+
+
     const route = await Route.find({ period: period() })
     const routeMap = new Map(route.map(route => [route.id, route]))
     let routeId
@@ -416,7 +429,11 @@ exports.checkIn = async (req, res) => {
     }
     try {
       const { routeId, storeId, note, latitude, longtitude } = req.body
+      const channel = req.headers['x-channel'];
 
+      const { Store } = getModelsByChannel(channel,res,storeModel); 
+  
+      const { Route } = getModelsByChannel(channel,res,routeModel); 
       if (!routeId || !storeId) {
         return res.status(400).json({
           status: '400',
@@ -569,6 +586,10 @@ exports.changeRoute = async (req, res) => {
   try {
     const { area, period, type, changedBy, fromRoute, toRoute, listStore } =
       req.body
+      const channel = req.headers['x-channel'];
+
+      const { Store } = getModelsByChannel(channel,res,storeModel); 
+  
 
     if (
       !area ||
@@ -626,6 +647,10 @@ exports.changeRoute = async (req, res) => {
 exports.createRoute = async (req, res) => {
   try {
     const { period, area } = req.body
+
+    const channel = req.headers['x-channel'];
+
+    const { Route } = getModelsByChannel(channel,res,routeModel); 
 
     if (!period || !area || area.length === 0) {
       return res.status(400).json({ message: 'Period and area are required.' })
@@ -753,6 +778,11 @@ exports.routeHistory = async (req, res) => {
   try {
     const { area, period, route, storeId } = req.query
 
+    const channel = req.headers['x-channel'];
+
+    const { Store } = getModelsByChannel(channel,res,storeModel); 
+
+
     if (!area || !period) {
       return res.status(400).json({ message: 'Area and period are required.' })
     }
@@ -805,6 +835,11 @@ exports.routeHistory = async (req, res) => {
 exports.getTimelineCheckin = async (req, res) => {
   try {
     const { area, period } = req.query
+
+    const channel = req.headers['x-channel'];
+
+    const { Route } = getModelsByChannel(channel,res,routeModel); 
+
 
     if (!area || !period) {
       return res
@@ -905,6 +940,10 @@ exports.getTimelineCheckin = async (req, res) => {
 exports.getRouteCheckinAll = async (req, res) => {
   try {
     const { area } = req.query
+
+    const channel = req.headers['x-channel'];
+
+    const { Route } = getModelsByChannel(channel,res,routeModel); 
 
     // const routeAll = await Route.aggregate([
     //   { $unwind: '$listStore' },
@@ -1019,6 +1058,11 @@ exports.getRouteCheckinAll = async (req, res) => {
 exports.routeTimeline = async (req, res) => {
   try {
     const { area, day, period } = req.body
+
+    const channel = req.headers['x-channel'];
+
+    const { Route } = getModelsByChannel(channel,res,routeModel); 
+
 
     const modelRoute = await Route.findOne({
       area: area,
