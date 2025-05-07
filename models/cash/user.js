@@ -24,5 +24,12 @@ const userSchema = mongoose.Schema({
     image: [imageSchema],
 })
 
-const User = dbCA.model('User', userSchema)
-module.exports = { User }
+// const User = dbCA.model('User', userSchema)
+// module.exports = { User }
+
+
+module.exports = (conn) => {
+    return {
+      User: conn.model('User', userSchema),
+    };
+  };

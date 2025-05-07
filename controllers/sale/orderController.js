@@ -4,6 +4,7 @@ const { User } = require('../../models/cash/user')
 const { Product } = require('../../models/cash/product')
 const { Route } = require('../../models/cash/route')
 const { Store } = require('../../models/cash/store')
+const storeModel = require('../../models/cash/store');
 
 const { Warehouse,Locate,Balance,Sale } = require('../../models/cash/master')
 const { generateOrderId } = require('../../utilities/genetateId')
@@ -25,7 +26,7 @@ const _ = require('lodash')
 const { DateTime } = require("luxon");
 const { getSocket } = require('../../socket')
 
-const { getStoreModelsByChannel } = require('../store/channelStore')
+const { getModelsByChannel } = require('../../middleware/channel')
 
 exports.checkout = async (req, res) => {
   try {
@@ -910,7 +911,7 @@ try {
   const { area, year,storeId,day  } = req.query
   const channel = req.headers['x-channel']; // 'credit' or 'cash'
 
-  const { Store } = getStoreModelsByChannel(channel,res); 
+  const { Store } = getModelsByChannel(channel,res,storeModel); 
   checkArea = await Route.find({ area: area })
 
   if (checkArea.length == 0) {
@@ -960,7 +961,7 @@ try {
       $addFields: {
         createdAtThai: {
           $dateAdd: {
-            startDate: '$listStore.listOrder.date',
+            startDate: '$orderDetails.createdAt',
             unit: 'hour',
             amount: 7
           }

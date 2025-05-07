@@ -1,7 +1,7 @@
-const storeModel = require('../../models/cash/store');
-const { dbCA, dbCR } = require('../../config/db');
+// const storeModel = require('../../models/cash/store');
+const { dbCA, dbCR } = require('../config/db');
 
-function getStoreModelsByChannel(channel,res) {
+function getModelsByChannel(channel,res,model) {
     let conn;
   
     switch (channel) {
@@ -18,7 +18,7 @@ function getStoreModelsByChannel(channel,res) {
           });
     }
   
-    return storeModel(conn); // return { Store, TypeStore }
+    return model(conn); // return { Store, TypeStore }
   }
   
-  module.exports = { getStoreModelsByChannel };
+  module.exports = { getModelsByChannel };

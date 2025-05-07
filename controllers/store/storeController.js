@@ -1,4 +1,3 @@
-const storeModel = require('../../models/cash/store');
 const { uploadFiles } = require('../../utilities/upload')
 const { calculateSimilarity } = require('../../utilities/utility')
 const axios = require('axios')
@@ -7,7 +6,8 @@ const upload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages',
   3
 )
-const { getStoreModelsByChannel } = require('../store/channelStore')
+const storeModel = require('../../models/cash/store');
+const { getModelsByChannel } = require('../../middleware/channel')
 const path = require('path')
 const { v4: uuidv4 } = require('uuid')
 uuidv4() // ⇨ '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed'
@@ -19,7 +19,7 @@ exports.getStore = async (req, res) => {
     const { area, type, route } = req.query
     const channel = req.headers['x-channel']; // 'credit' or 'cash'
 
-    const { Store } = getStoreModelsByChannel(channel,res); 
+    const { Store } = getModelsByChannel(channel,res,storeModel); 
 
     const currentDate = new Date()
     const startMonth = new Date(
@@ -106,8 +106,7 @@ exports.addStore = async (req, res) => {
       }
       const channel = req.headers['x-channel']; // 'credit' or 'cash'
 
-      const { Store } = getStoreModelsByChannel(channel,res); 
-
+      const { Store } = getModelsByChannel(channel,res,storeModel); 
       const existingStores = await Store.find(
         {},
         { _id: 0, __v: 0, idIndex: 0 }
@@ -273,8 +272,7 @@ exports.editStore = async (req, res) => {
 
     const channel = req.headers['x-channel']; // 'credit' or 'cash'
 
-    const { Store } = getStoreModelsByChannel(channel,res); 
-
+    const { Store } = getModelsByChannel(channel,res,storeModel); 
     const store = await Store.findOneAndUpdate({ storeId }, data, { new: true })
 
     if (!store) {
@@ -340,8 +338,7 @@ exports.addFromERP = async (req, res) => {
 
       const channel = req.headers['x-channel']; // 'credit' or 'cash'
 
-      const { Store } = getStoreModelsByChannel(channel,res); 
-
+      const { Store } = getModelsByChannel(channel,res,storeModel); 
       const StoreIf = await Store.findOne({ storeId: splitData.storeId })
       if (!StoreIf) {
         await Store.create(mainData)
@@ -373,8 +370,7 @@ exports.checkInStore = async (req, res) => {
 
   const channel = req.headers['x-channel']; // 'credit' or 'cash'
 
-  const { Store } = getStoreModelsByChannel(channel,res); 
-
+  const { Store } = getModelsByChannel(channel,res,storeModel); 
   try {
     if (!latitude || !longtitude) {
       return res.status(400).json({
@@ -421,8 +417,7 @@ exports.updateStoreStatus = async (req, res) => {
   const areaPrefix = area.substring(0, 2)
   const channel = req.headers['x-channel']; // 'credit' or 'cash'
 
-  const { Store } = getStoreModelsByChannel(channel,res); 
-
+  const { Store } = getModelsByChannel(channel,res,storeModel); 
   const latestStore = await Store.findOne({
     storeId: { $regex: `^V${areaPrefix}`, $options: 'i' }
   })
