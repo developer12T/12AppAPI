@@ -5,8 +5,14 @@ const path = require('path')
 const upload = multer({ storage: multer.memoryStorage() }).single('image')
 const bcrypt = require('bcrypt')
 const axios = require('axios')
+const userModel = require('../../models/cash/user');
+const { getModelsByChannel } = require('../../middleware/channel')
+const { Types } = require('mongoose');
+
 exports.getUser = async (req, res) => {
     try {
+        const channel = req.headers['x-channel']; 
+        const { User } = getModelsByChannel(channel,res,userModel); 
         const users = await User.find({}).select('-_id salecode salePayer username firstName surName tel zone area warehouse role')
 
         if (!users || users.length === 0) {
@@ -27,7 +33,8 @@ exports.getUser = async (req, res) => {
 exports.editUser = async (req, res) => {
     try {
         const { userId, username, ...updateData } = req.body
-
+        const channel = req.headers['x-channel']; 
+        const { User } = getModelsByChannel(channel,res,userModel); 
         if (!userId && !username) {
             return res.status(400).json({
                 status: 400,
@@ -60,6 +67,8 @@ exports.editUser = async (req, res) => {
 
 exports.addImage = async (req, res) => {
     try {
+        const channel = req.headers['x-channel']; 
+        const { User } = getModelsByChannel(channel,res,userModel); 
         upload(req, res, async (err) => {
             if (err) {
                 return res.status(400).json({ status: 400, message: 'Error uploading file', error: err.message })
@@ -105,7 +114,8 @@ exports.addImage = async (req, res) => {
 exports.getQRcode = async (req, res) => {
     try {
         const { area, type } = req.query
-
+        const channel = req.headers['x-channel']; 
+        const { User } = getModelsByChannel(channel,res,userModel); 
         if (!area || !type) {
             return res.status(400).json({ status: 400, message: 'area and type are required!' })
         }
@@ -130,6 +140,8 @@ exports.getQRcode = async (req, res) => {
 
 
 exports.addUser = async (req , res) => {
+    const channel = req.headers['x-channel']; 
+    const { User } = getModelsByChannel(channel,res,userModel); 
     const response = await axios.post(
       'http://58.181.206.159:9814/ca_api/cr_user.php'
     )
@@ -164,6 +176,8 @@ exports.addUser = async (req , res) => {
 }
 
 exports.addUserOne = async (req , res) => {
+    const channel = req.headers['x-channel']; 
+    const { User } = getModelsByChannel(channel,res,userModel); 
     const saleInData = await User.findOne({ saleCode: req.body.saleCode });
 
     if (!saleInData) {
@@ -198,7 +212,8 @@ exports.addUserOne = async (req , res) => {
 
 
 exports.updateUserOne = async (req , res) => {
-
+    const channel = req.headers['x-channel']; 
+    const { User } = getModelsByChannel(channel,res,userModel); 
     const user = await User.updateOne(
         { saleCode: req.body.saleCode },  
         { $set: {
