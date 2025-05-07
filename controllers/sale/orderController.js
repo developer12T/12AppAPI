@@ -4,6 +4,7 @@ const { User } = require('../../models/cash/user')
 const { Product } = require('../../models/cash/product')
 const { Route } = require('../../models/cash/route')
 const { Store } = require('../../models/cash/store')
+const storeModel = require('../../models/cash/store');
 
 const { Warehouse,Locate,Balance,Sale } = require('../../models/cash/master')
 const { generateOrderId } = require('../../utilities/genetateId')
@@ -24,6 +25,8 @@ const xlsx = require('xlsx')
 const _ = require('lodash')
 const { DateTime } = require("luxon");
 const { getSocket } = require('../../socket')
+
+const { getModelsByChannel } = require('../../middleware/channel')
 
 exports.checkout = async (req, res) => {
   try {
@@ -905,11 +908,10 @@ exports.getSummarybyRoute = async (req, res) => {
 
 exports.getSummarybyMonth = async (req, res) => {
 try {
-  const { area, period,storeId,day  } = req.query
+  const { area, year,storeId,day  } = req.query
+  const channel = req.headers['x-channel']; // 'credit' or 'cash'
 
-
-  console.log("day",day)
-
+  const { Store } = getModelsByChannel(channel,res,storeModel); 
   checkArea = await Route.find({ area: area })
 
   if (checkArea.length == 0) {
@@ -919,7 +921,7 @@ try {
     })
   }
 
-  storeIdObj = await Store.findOne({storeId:storeId}).select("_id")
+  const storeIdObj = await Store.findOne({storeId:storeId}).select("_id")
 
   const matchStore = storeIdObj
   ? {
@@ -931,7 +933,7 @@ try {
   : {};
 
   const pipeline = [
-    { $match: { area, period } },
+    { $match: { area } },
     { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
     { $match: matchStore },
     {
@@ -959,7 +961,7 @@ try {
       $addFields: {
         createdAtThai: {
           $dateAdd: {
-            startDate: '$listStore.listOrder.date',
+            startDate: '$orderDetails.createdAt',
             unit: 'hour',
             amount: 7
           }
@@ -970,6 +972,11 @@ try {
       $addFields: {
         createdDay: { $dayOfMonth: '$createdAtThai' }
       }
+    },
+    {
+      $addFields: {
+        createdYear: { $year: '$createdAtThai' }
+      }
     }
   ]
   
@@ -977,6 +984,14 @@ try {
     pipeline.push({
       $match: {
         createdDay: Number(day)
+      }
+    })
+  }
+
+  if (year != null) {
+    pipeline.push({
+      $match: {
+        createdYear: Number(year)
       }
     })
   }
