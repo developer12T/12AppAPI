@@ -59,5 +59,10 @@ const cartSchema = mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 })
 
-const Cart = dbCA.model('Cart', cartSchema)
-module.exports = { Cart }
+// const Cart = dbCA.model('Cart', cartSchema)
+// module.exports = { Cart }
+module.exports = (conn) => {
+  return {
+    Cart: conn.model('Cart', cartSchema),
+  };
+};

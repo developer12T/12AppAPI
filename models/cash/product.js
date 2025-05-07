@@ -35,5 +35,11 @@ const productSchema = mongoose.Schema({
     updated: { type: Date, default: Date.now },
 })
 
-const Product = dbCA.model('Product', productSchema)
-module.exports = { Product }
+// const Product = dbCA.model('Product', productSchema)
+// module.exports = { Product }
+
+module.exports = (conn) => {
+    return {
+        Product: conn.model('Product', productSchema),
+    };
+  };

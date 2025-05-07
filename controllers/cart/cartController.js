@@ -11,10 +11,18 @@ const {
 } = require('../../utilities/summary')
 const { forEach } = require('lodash')
 const { error } = require('console')
+const  cartModel  = require('../../models/cash/cart')
+const  productModel  = require('../../models/cash/product')
+const  stockModel  = require('../../models/cash/stock')
+const { getModelsByChannel } = require('../../middleware/channel')
+
 
 exports.getCart = async (req, res) => {
   try {
-    // console.log("req.query",req.query)
+
+    const channel = req.headers['x-channel'];
+    const { Cart } = getModelsByChannel(channel,res,cartModel); 
+
     const { type, area, storeId } = req.query
 
     if (!type || !area) {
@@ -42,7 +50,7 @@ exports.getCart = async (req, res) => {
 
     let summary = {}
     if (type === 'sale') {
-      summary = await summaryOrder(cart)
+      summary = await summaryOrder(cart,channel,res)
 
       const newCartHashProduct = crypto
         .createHash('md5')
@@ -57,7 +65,7 @@ exports.getCart = async (req, res) => {
         cart.cartHashProduct !== newCartHashProduct
 
       // if (shouldRecalculatePromotion) {
-      const promotion = await applyPromotion(summary)
+      const promotion = await applyPromotion(summary,channel,res)
       // console.log("promotion",promotion)
       cart.listPromotion = promotion.appliedPromotions
       cart.cartHashProduct = newCartHashProduct
@@ -68,15 +76,15 @@ exports.getCart = async (req, res) => {
     }
 
     if (type === 'withdraw') {
-      summary = await summaryWithdraw(cart)
+      summary = await summaryWithdraw(cart,channel,res)
     }
 
     if (type === 'refund') {
-      summary = await summaryRefund(cart)
+      summary = await summaryRefund(cart,channel,res)
     }
 
     if (type === 'give') {
-      summary = await summaryGive(cart)
+      summary = await summaryGive(cart,channel,res)
     }
 
     res.status(200).json({
@@ -94,6 +102,9 @@ exports.addProduct = async (req, res) => {
   try {
     const { type, area, storeId, id, qty, unit, condition, expire, lot } =
       req.body
+
+    const channel = req.headers['x-channel'];
+    const { Product } = getModelsByChannel(channel,res,productModel); 
 
     if (!type || !area || !id || !qty || !unit) {
       return res.status(400).json({
@@ -129,6 +140,7 @@ exports.addProduct = async (req, res) => {
 
     const cartQuery =
       type === 'withdraw' ? { type, area } : { type, area, storeId }
+    const { Cart } = getModelsByChannel(channel,res,cartModel); 
 
     let cart = await Cart.findOne(cartQuery)
 
@@ -232,6 +244,10 @@ exports.addProduct = async (req, res) => {
 exports.adjustProduct = async (req, res) => {
   try {
     const { type, area, storeId, id, unit, qty, condition, expire } = req.body
+    const channel = req.headers['x-channel'];
+
+    const { Cart } = getModelsByChannel(channel,res,cartModel); 
+
 
     if (!type || !area || !id || !unit || qty === undefined) {
       return res.status(400).json({
@@ -339,6 +355,8 @@ exports.deleteProduct = async (req, res) => {
   try {
     const { type, area, storeId, id, unit, condition, expire } = req.body
 
+    const channel = req.headers['x-channel'];
+
     if (!type || !area || !id || !unit) {
       return res.status(400).json({
         status: 400,
@@ -355,6 +373,10 @@ exports.deleteProduct = async (req, res) => {
 
     const cartQuery =
       type === 'withdraw' ? { type, area } : { type, area, storeId }
+
+    const { Cart } = getModelsByChannel(channel,res,cartModel); 
+
+
 
     let cart = await Cart.findOne(cartQuery)
     if (!cart) {
@@ -437,6 +459,9 @@ exports.deleteProduct = async (req, res) => {
 exports.updateCartPromotion = async (req, res) => {
   const { type, area, storeId, proId, productId, qty } = req.body
 
+  const { Cart } = getModelsByChannel(channel,res,cartModel); 
+
+
   try {
     let cart = await Cart.findOne({ type, area, storeId })
 
@@ -451,6 +476,10 @@ exports.updateCartPromotion = async (req, res) => {
         .status(404)
         .json({ status: 404, message: 'Promotion not found!' })
     }
+
+    const { Product } = getModelsByChannel(channel,res,productModel); 
+
+
 
     const product = await Product.findOne({ id: productId }).lean()
 
@@ -495,6 +524,10 @@ exports.updateCartPromotion = async (req, res) => {
 exports.updateStock = async (req, res) => {
   try {
     const { area, productId, unit, type } = req.body
+
+    const { Stock } = getModelsByChannel(channel,res,stockModel); 
+
+
     let { qty } = req.body
 
     const modelStock = await Stock.findOne({
@@ -519,6 +552,9 @@ exports.updateStock = async (req, res) => {
       })
     }
 
+    const { Product } = getModelsByChannel(channel,res,productModel); 
+
+    
     const modelProduct = await Product.findOne({
       id: productId
     }).select('productId listUnit')

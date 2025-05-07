@@ -80,10 +80,20 @@ const stockMovementLogSchema = new mongoose.Schema({
 
 
 
-const Stock = dbCA.model('Stock', stockSchema)
-const StockMovementLog = dbCA.model('stockMovementLog', stockMovementLogSchema,'stockmovementlogs')
-const StockMovement = dbCA.model('StockMovement', stockMovementSchema)
-module.exports = { Stock, StockMovement, StockMovementLog }
+// const Stock = dbCA.model('Stock', stockSchema)
+// const StockMovementLog = dbCA.model('stockMovementLog', stockMovementLogSchema,'stockmovementlogs')
+// const StockMovement = dbCA.model('StockMovement', stockMovementSchema)
+// module.exports = { Stock, StockMovement, StockMovementLog }
+
+
+module.exports = (conn) => {
+  return {
+    Stock: conn.model('Stock', stockSchema),
+    StockMovementLog: conn.model('stockMovementLog', stockMovementLogSchema,'stockmovementlogs'),
+    StockMovement: conn.model('StockMovement', stockMovementSchema)
+  };
+};
+
 
 // const availableSchema = new mongoose.Schema({
 //     qtyPcs: { type: Number, default: 0 },

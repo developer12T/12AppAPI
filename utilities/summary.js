@@ -2,12 +2,19 @@ const { Product } = require('../models/cash/product')
 const { Store } = require('../models/cash/store')
 const { User } = require('../models/cash/user')
 
-async function summaryOrder (cart) {
+const  productModel  = require('../models/cash/product')
+const  storeModel  = require('../models/cash/store')
+const  userModel  = require('../models/cash/user')
+const { getModelsByChannel } = require('../middleware/channel')
+
+
+async function summaryOrder (cart,channel,res) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
     }
-    // console.log("summaryOrder",cart.storeId)
+
+    const { Store } = getModelsByChannel(channel,res,storeModel); 
     const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
     const store = storeData
       ? {
@@ -34,14 +41,8 @@ async function summaryOrder (cart) {
         ? cart.listPromotion.flatMap(promo => promo.listProduct.map(p => p.id))
         : [])
     ]
-    // ตัวอย่างการทำงานของโค้ด
-    // const cart = {
-    //   listProduct: [{ id: 101 }, { id: 102 }],
-    //   listPromotion: [
-    //     { listProduct: [{ id: 201 }, { id: 202 }] },
-    //     { listProduct: [{ id: 203 }] }
-    //   ]
-    // };
+
+    const { Product } = getModelsByChannel(channel,res,productModel); 
 
     const productDetails = await Product.find({
       id: { $in: productIds }
@@ -128,11 +129,12 @@ async function summaryOrder (cart) {
   }
 }
 
-async function summaryWithdraw (cart) {
+async function summaryWithdraw (cart,channel,res) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
     }
+    const { Product } = getModelsByChannel(channel,res,productModel); 
 
     const productIds = cart.listProduct.map(p => p.id)
     const productDetails = await Product.find({
@@ -177,12 +179,13 @@ async function summaryWithdraw (cart) {
   }
 }
 
-async function summaryRefund (cart) {
+async function summaryRefund (cart,channel,res) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
     }
-    console.log('summaryRefund', cart.storeId)
+    const { Store } = getModelsByChannel(channel,res,storeModel); 
+
     const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
     const store = storeData
       ? {
@@ -206,6 +209,9 @@ async function summaryRefund (cart) {
       ...cart.listProduct.map(p => p.id),
       ...cart.listRefund.map(p => p.id)
     ]
+
+    const { Product } = getModelsByChannel(channel,res,productModel); 
+
 
     const productDetails = await Product.find({
       id: { $in: productIds }
@@ -288,12 +294,14 @@ async function summaryRefund (cart) {
   }
 }
 
-async function summaryGive (cart) {
+async function summaryGive (cart,channel,res) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
     }
     console.log('summaryGive', cart.storeId)
+    const { Store } = getModelsByChannel(channel,res,storeModel); 
+
     const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
     const store = storeData
       ? {
@@ -314,6 +322,7 @@ async function summaryGive (cart) {
       : {}
 
     const productIds = cart.listProduct.map(p => p.id)
+    const { Product } = getModelsByChannel(channel,res,productModel); 
     const productDetails = await Product.find({
       id: { $in: productIds }
     }).lean()
@@ -358,11 +367,12 @@ async function summaryGive (cart) {
   }
 }
 
-async function summaryOrderProStatusOne (cart, listPromotion) {
+async function summaryOrderProStatusOne (cart, listPromotion,channel,res) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
     }
+    const { Store } = getModelsByChannel(channel,res,storeModel); 
 
     const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
 
@@ -391,6 +401,7 @@ async function summaryOrderProStatusOne (cart, listPromotion) {
         ? cart.listPromotion.flatMap(promo => promo.listProduct.map(p => p.id))
         : [])
     ]
+    const { Product } = getModelsByChannel(channel,res,productModel); 
 
     const productDetails = await Product.find({
       id: { $in: productIds }
@@ -487,11 +498,12 @@ async function summaryOrderProStatusOne (cart, listPromotion) {
   }
 }
 
-async function summaryWithdraw (cart) {
+async function summaryWithdraw (cart,channel,res) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
     }
+    const { Product } = getModelsByChannel(channel,res,productModel); 
 
     const productIds = cart.listProduct.map(p => p.id)
     const productDetails = await Product.find({
@@ -536,12 +548,12 @@ async function summaryWithdraw (cart) {
   }
 }
 
-async function summaryRefund (cart) {
+async function summaryRefund (cart,channel,res) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
     }
-    // console.log("summaryRefund",cart.storeId)
+    const { Store } = getModelsByChannel(channel,res,storeModel); 
     const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
     const store = storeData
       ? {
@@ -565,6 +577,7 @@ async function summaryRefund (cart) {
       ...cart.listProduct.map(p => p.id),
       ...cart.listRefund.map(p => p.id)
     ]
+    const { Product } = getModelsByChannel(channel,res,productModel); 
 
     const productDetails = await Product.find({
       id: { $in: productIds }
@@ -647,12 +660,12 @@ async function summaryRefund (cart) {
   }
 }
 
-async function summaryGive (cart) {
+async function summaryGive (cart,channel,res) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
     }
-    // console.log("summaryGive",cart.storeId)
+    const { Store } = getModelsByChannel(channel,res,storeModel); 
     const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
     const store = storeData
       ? {
@@ -673,6 +686,8 @@ async function summaryGive (cart) {
       : {}
 
     const productIds = cart.listProduct.map(p => p.id)
+    const { Product } = getModelsByChannel(channel,res,productModel); 
+
     const productDetails = await Product.find({
       id: { $in: productIds }
     }).lean()

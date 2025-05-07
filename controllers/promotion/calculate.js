@@ -1,8 +1,13 @@
 const { Promotion } = require('../../models/cash/promotion')
 const { Product } = require('../../models/cash/product')
+const  promotionModel  = require('../../models/cash/promotion')
+const  productModel  = require('../../models/cash/product')
+const { getModelsByChannel } = require('../../middleware/channel')
 
-async function rewardProduct(rewards, multiplier) {
+
+async function rewardProduct(rewards, multiplier,channel,res) {
     if (!rewards || rewards.length === 0) return []
+    const { Product } = getModelsByChannel(channel,res,productModel); 
 
     const rewardFilters = rewards.map(r => ({
         ...(r.productGroup ? { group: r.productGroup } : {}),
@@ -45,7 +50,9 @@ async function rewardProduct(rewards, multiplier) {
     }).filter(Boolean)
 }
 
-async function applyPromotion(order) {
+async function applyPromotion(order,channel,res) {
+
+    const { Promotion } = getModelsByChannel(channel,res,promotionModel); 
     let discountTotal = 0
     let appliedPromotions = []
 
@@ -100,7 +107,7 @@ async function applyPromotion(order) {
         switch (promo.proType) {
             case 'amount':
             case 'free':
-                freeProducts = await rewardProduct(promo.rewards, multiplier)
+                freeProducts = await rewardProduct(promo.rewards, multiplier,channel,res)
                 promoApplied = true
                 break
 
@@ -151,7 +158,10 @@ async function applyPromotion(order) {
 }
 
 
-async function getRewardProduct(proId) {
+async function getRewardProduct(proId,channel,res) {
+
+    const { Promotion } = getModelsByChannel(channel,res,promotionModel); 
+
     const promotion = await Promotion.findOne({ proId, status: 'active' }).lean()
     if (!promotion || !promotion.rewards || promotion.rewards.length === 0) {
         return []
