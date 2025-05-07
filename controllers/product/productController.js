@@ -2,9 +2,13 @@ const axios = require('axios')
 const { Product } = require('../../models/cash/product')
 const fs = require('fs')
 const path = require('path')
+const  productModel  = require('../../models/cash/product')
+const { getModelsByChannel } = require('../../middleware/channel')
 
 exports.getProductAll = async (req, res) => {
   try {
+    const channel = req.headers['x-channel'];
+    const { Product } = getModelsByChannel(channel,res,productModel); 
     let products = await Product.find({}, { _id: 0, __v: 0 }).lean()
 
     if (!products.length) {
@@ -39,6 +43,8 @@ exports.getProductAll = async (req, res) => {
 
 exports.getProductSwitch = async (req, res) => {
   try {
+    const channel = req.headers['x-channel'];
+    const { Product } = getModelsByChannel(channel,res,productModel); 
     const products = await Product.find().lean()
     res.status(200).json({
       status: '200',
@@ -54,6 +60,8 @@ exports.getProductSwitch = async (req, res) => {
 exports.getProduct = async (req, res) => {
   try {
     const { type, group, brand, size, flavour } = req.body
+    const channel = req.headers['x-channel'];
+    const { Product } = getModelsByChannel(channel,res,productModel); 
 
     if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
       return res.status(400).json({
@@ -154,6 +162,9 @@ exports.getFilters = async (req, res) => {
   try {
     let { group, brand, size, flavour } = req.body
 
+    const channel = req.headers['x-channel'];
+    const { Product } = getModelsByChannel(channel,res,productModel); 
+
     const isEmptyArray = arr => Array.isArray(arr) && arr.length === 0
     const isEmptyRequest =
       (!group && !brand && !size && !flavour) ||
@@ -226,7 +237,8 @@ exports.getFilters = async (req, res) => {
 exports.searchProduct = async (req, res) => {
   try {
     const { search } = req.query
-
+    const channel = req.headers['x-channel'];
+    const { Product } = getModelsByChannel(channel,res,productModel); 
     if (!search) {
       return res.status(400).json({
         status: '400',
@@ -269,7 +281,8 @@ exports.searchProduct = async (req, res) => {
 exports.updateStatus = async (req, res) => {
   try {
     const { id, type, status } = req.body
-
+    const channel = req.headers['x-channel'];
+    const { Product } = getModelsByChannel(channel,res,productModel); 
     if (!id || !type || !status) {
       return res
         .status(400)
@@ -480,6 +493,9 @@ exports.addFromERP = async (req, res) => {
       'http://58.181.206.159:9814/ca_api/ca_product.php'
     )
 
+    const channel = req.headers['x-channel'];
+    const { Product } = getModelsByChannel(channel,res,productModel); 
+
     if (!response.data || !Array.isArray(response.data)) {
       return res.status(400).json({
         status: 400,
@@ -536,7 +552,7 @@ exports.addFromERP = async (req, res) => {
         statusWithdraw: listProduct.statusWithdraw,
         listUnit: listUnit
       })
-      await newProduct.save()
+      // await newProduct.save()
       // console.log(newProduct)
     }
     res.status(200).json({

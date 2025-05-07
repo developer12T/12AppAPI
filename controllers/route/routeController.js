@@ -300,7 +300,7 @@ exports.getRoute = async (req, res) => {
 exports.addFromERP = async (req, res) => {
   try {
     const response = await axios.post(
-      'http://58.181.206.159:9814/ca_api/ca_route.php'
+      'http://58.181.206.159:9814/ca_api/cr_route.php'
     )
     if (!response.data || !Array.isArray(response.data)) {
       return res.status(400).json({
