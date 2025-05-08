@@ -2,13 +2,13 @@ const axios = require('axios')
 const { Product } = require('../../models/cash/product')
 const fs = require('fs')
 const path = require('path')
-const  productModel  = require('../../models/cash/product')
+const productModel = require('../../models/cash/product')
 const { getModelsByChannel } = require('../../middleware/channel')
 
 exports.getProductAll = async (req, res) => {
   try {
-    const channel = req.headers['x-channel'];
-    const { Product } = getModelsByChannel(channel,res,productModel); 
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
     let products = await Product.find({}, { _id: 0, __v: 0 }).lean()
 
     if (!products.length) {
@@ -43,8 +43,8 @@ exports.getProductAll = async (req, res) => {
 
 exports.getProductSwitch = async (req, res) => {
   try {
-    const channel = req.headers['x-channel'];
-    const { Product } = getModelsByChannel(channel,res,productModel); 
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
     const products = await Product.find().lean()
     res.status(200).json({
       status: '200',
@@ -60,8 +60,8 @@ exports.getProductSwitch = async (req, res) => {
 exports.getProduct = async (req, res) => {
   try {
     const { type, group, brand, size, flavour } = req.body
-    const channel = req.headers['x-channel'];
-    const { Product } = getModelsByChannel(channel,res,productModel); 
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
 
     if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
       return res.status(400).json({
@@ -162,8 +162,8 @@ exports.getFilters = async (req, res) => {
   try {
     let { group, brand, size, flavour } = req.body
 
-    const channel = req.headers['x-channel'];
-    const { Product } = getModelsByChannel(channel,res,productModel); 
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
 
     const isEmptyArray = arr => Array.isArray(arr) && arr.length === 0
     const isEmptyRequest =
@@ -237,8 +237,8 @@ exports.getFilters = async (req, res) => {
 exports.searchProduct = async (req, res) => {
   try {
     const { search } = req.query
-    const channel = req.headers['x-channel'];
-    const { Product } = getModelsByChannel(channel,res,productModel); 
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
     if (!search) {
       return res.status(400).json({
         status: '400',
@@ -281,8 +281,8 @@ exports.searchProduct = async (req, res) => {
 exports.updateStatus = async (req, res) => {
   try {
     const { id, type, status } = req.body
-    const channel = req.headers['x-channel'];
-    const { Product } = getModelsByChannel(channel,res,productModel); 
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
     if (!id || !type || !status) {
       return res
         .status(400)
@@ -489,12 +489,24 @@ exports.addProduct = async (req, res) => {
 
 exports.addFromERP = async (req, res) => {
   try {
+    let pathPhp = ''
+    const channel = req.headers['x-channel']
+    switch (channel) {
+      case 'cash':
+        pathPhp = 'ca_api/ca_product.php'
+        break
+      case 'credit':
+        pathPhp = 'cr_api/cr_product.php'
+        break
+      default:
+        break
+    }
+
     const response = await axios.get(
-      'http://58.181.206.159:9814/ca_api/ca_product.php'
+      `http://58.181.206.159:9814/apps_api/${pathPhp}`
     )
 
-    const channel = req.headers['x-channel'];
-    const { Product } = getModelsByChannel(channel,res,productModel); 
+    const { Product } = getModelsByChannel(channel, res, productModel)
 
     if (!response.data || !Array.isArray(response.data)) {
       return res.status(400).json({
@@ -503,7 +515,7 @@ exports.addFromERP = async (req, res) => {
       })
     }
 
-    for (const listProduct of response.data) {  
+    for (const listProduct of response.data) {
       const productId = listProduct.id
 
       const existingProduct = await Product.findOne({ id: productId })
@@ -534,7 +546,7 @@ exports.addFromERP = async (req, res) => {
       })
       // console.log(JSON.stringify(listUnit, null, 2));
 
-      newProduct = new Product({
+      const newProduct = new Product({
         id: listProduct.id,
         name: listProduct.name,
         groupCode: listProduct.groupCode,
@@ -552,12 +564,12 @@ exports.addFromERP = async (req, res) => {
         statusWithdraw: listProduct.statusWithdraw,
         listUnit: listUnit
       })
-      // await newProduct.save()
-      // console.log(newProduct)
+      await newProduct.save()
+      console.log(newProduct)
     }
     res.status(200).json({
       status: 200,
-      message: 'Products added successfully',
+      message: 'Products added successfully'
       // data:newProduct
     })
   } catch (e) {
