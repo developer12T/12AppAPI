@@ -1,10 +1,16 @@
-const { Givetype, Giveaways } = require('../../models/cash/give')
-const { Cart } = require('../../models/cash/cart')
-const { User } = require('../../models/cash/user')
+// const { Givetype, Giveaways } = require('../../models/cash/give')
+// const { Cart } = require('../../models/cash/cart')
+// const { User } = require('../../models/cash/user')
 const { generateGiveawaysId, generateGivetypeId } = require('../../utilities/genetateId')
 const { getProductGive, getStoreGive } = require('./giveProduct')
 const { summaryGive } = require('../../utilities/summary')
 const { rangeDate } = require('../../utilities/datetime')
+
+
+const  giveawaysModel = require('../../models/cash/give');
+const  cartModel  = require('../../models/cash/cart')
+const  userModel  = require('../../models/cash/user')
+const { getModelsByChannel } = require('../../middleware/channel')
 
 exports.addGiveType = async (req, res) => {
     try {
@@ -13,11 +19,14 @@ exports.addGiveType = async (req, res) => {
             dept, applicableTo, conditions, status
         } = req.body
 
+        const channel = req.headers['x-channel']; 
+        const { Givetype } = getModelsByChannel(channel,res,giveawaysModel); 
+
         if (!name || !type || !remark || !dept) {
             return res.status(400).json({ status: 400, message: 'Missing required fields!' })
         }
 
-        const giveId = await generateGivetypeId()
+        const giveId = await generateGivetypeId(channel,res)
 
         const newPromotion = new Givetype({
             giveId, name, description, type, remark,
@@ -41,6 +50,9 @@ exports.addGiveType = async (req, res) => {
 
 exports.getGiveType = async (req, res) => {
     try {
+        const channel = req.headers['x-channel']; 
+        const { Givetype } = getModelsByChannel(channel,res,giveawaysModel); 
+
         const givetypes = await Givetype.find({}).select('-_id giveId name').lean()
 
         if (!givetypes || givetypes.length === 0) {
@@ -66,6 +78,7 @@ exports.getGiveType = async (req, res) => {
 exports.getGiveProductFilter = async (req, res) => {
     try {
         const { area, giveId, group, brand, size, flavour } = req.body
+        const channel = req.headers['x-channel']; 
 
         if (!giveId || !area) {
             return res.status(400).json({
@@ -74,7 +87,7 @@ exports.getGiveProductFilter = async (req, res) => {
             })
         }
 
-        const products = await getProductGive(giveId, area)
+        const products = await getProductGive(giveId, area,channel,res)
 
         if (!products.length) {
             return res.status(404).json({
@@ -140,7 +153,8 @@ exports.getGiveProductFilter = async (req, res) => {
 exports.getGiveStoreFilter = async (req, res) => {
     try {
         const { area, giveId } = req.query
-        const store = await getStoreGive(giveId, area)
+        const channel = req.headers['x-channel']; 
+        const store = await getStoreGive(giveId, area,channel,res)
         res.status(200).json({
             status: 200,
             message: 'Successfully fetched give store filters!',
@@ -155,6 +169,11 @@ exports.getGiveStoreFilter = async (req, res) => {
 exports.checkout = async (req, res) => {
     try {
         const { type, area, storeId, giveId, note, latitude, longitude, shipping } = req.body
+        const channel = req.headers['x-channel']; 
+        const { Cart } = getModelsByChannel(channel,res,cartModel); 
+        const { User } = getModelsByChannel(channel,res,userModel); 
+        const { Givetype } = getModelsByChannel(channel,res,giveawaysModel); 
+
 
         if (!type || !area || !storeId || !giveId || !shipping) {
             return res.status(400).json({ status: 400, message: 'Missing required fields!' })
@@ -175,9 +194,9 @@ exports.checkout = async (req, res) => {
             return res.status(404).json({ status: 404, message: 'Give type not found!' })
         }
 
-        const orderId = await generateGiveawaysId(area, sale.warehouse)
+        const orderId = await generateGiveawaysId(area, sale.warehouse,channel,res)
 
-        const summary = await summaryGive(cart)
+        const summary = await summaryGive(cart,channel,res)
 
         const newOrder = new Giveaways({
             type,
@@ -240,6 +259,9 @@ exports.getOrder = async (req, res) => {
         const { type, area, store, period } = req.query
         let response = []
 
+        const channel = req.headers['x-channel']; 
+        const { Giveaways } = getModelsByChannel(channel,res,giveawaysModel); 
+
         if (!type || !area || !period) {
             return res.status(400).json({ status: 400, message: 'type, area, period are required!' })
         }
@@ -297,6 +319,10 @@ exports.getDetail = async (req, res) => {
         if (!orderId) {
             return res.status(400).json({ status: 400, message: 'orderId is required!' })
         }
+
+        const channel = req.headers['x-channel']; 
+        const { Giveaways } = getModelsByChannel(channel,res,giveawaysModel); 
+
 
         const order = await Giveaways.findOne({ orderId })
 
