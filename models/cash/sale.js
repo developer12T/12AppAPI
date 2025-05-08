@@ -105,5 +105,11 @@ const orderSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 })
 
-const Order = dbCA.model('Order', orderSchema)
-module.exports = { Order }
+// const Order = dbCA.model('Order', orderSchema)
+// module.exports = { Order }
+
+module.exports = (conn) => {
+    return {
+        Order: conn.model('Order', orderSchema),
+    };
+  };

@@ -15,5 +15,12 @@ const optionSchema = mongoose.Schema({
     updated: { type: Date, default: Date.now },
 })
 
-const Option = dbCA.model('Option', optionSchema)
-module.exports = { Option }
+// const Option = dbCA.model('Option', optionSchema)
+// module.exports = { Option }
+
+
+module.exports = (conn) => {
+    return {
+        Option: conn.model('Option', optionSchema),
+    };
+  };
