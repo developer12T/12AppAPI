@@ -2,15 +2,24 @@ const { Order } = require('../models/cash/sale')
 const { Refund } = require('../models/cash/refund')
 const { Giveaway } = require('../models/cash/give')
 const { Receive } = require('../models/cash/distribution')
-const { Product } = require('../models/cash/product')
-const { User } = require('../models/cash/user')
+// const { Product } = require('../models/cash/product')
+// const { User } = require('../models/cash/user')
 const { rangeDate } = require('../utilities/datetime')
 
 
-async function getStockMovement(area, period) {
+const  userModel  = require('../models/cash/user')
+const  productModel  = require('../models/cash/product')
+// const  refundModel  = require('../../models/cash/refund')
+const { getModelsByChannel } = require('../middleware/channel')
+
+async function getStockMovement(area, period,channel,res) {
     try {
         if (!area || !period) throw new Error('Area and period are required')
 
+        const { User } = getModelsByChannel(channel, res, userModel)
+        const { Product } = getModelsByChannel(channel, res, productModel)
+
+            
         const { startDate, endDate } = rangeDate(period)
 
         const users = await User.find({ area }).select('saleCode').lean()
