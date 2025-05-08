@@ -1,13 +1,24 @@
 const { find, each, forEach } = require('lodash')
-const { Place,  Withdraw } = require('../../models/cash/distribution')
-const { User } = require('../../models/cash/user')
+// const { Place,  Withdraw } = require('../../models/cash/distribution')
+// const { User } = require('../../models/cash/user')
 const { sequelize, DataTypes } = require('../../config/m3db')
+
+const  userModel  = require('../../models/cash/user')
+const distributionModel = require('../../models/cash/distribution')
+const { getModelsByChannel } = require('../../middleware/channel')
 
 
 exports.getPlace = async (req, res) => {
     try {
         const { area, type } = req.query
 
+        const channel = req.headers['x-channel'];
+        console.log(channel)
+
+
+        const { Place } = getModelsByChannel(channel,res,distributionModel); 
+        
+        
         if (!area) {
             return res.status(400).json({ status: 400, message: 'area is required!' })
         }
@@ -37,6 +48,9 @@ exports.getPlace = async (req, res) => {
 exports.addPlace = async (req, res) => {
     try {
         const { area, listAddress } = req.body
+
+        const channel = req.headers['x-channel'];
+        const { Place } = getModelsByChannel(channel,res,distributionModel); 
 
         if (!area || !listAddress) {
             return res.status(400).json({ status: 400, message: 'area and listAddress are required!' })
@@ -71,6 +85,9 @@ exports.addPlace = async (req, res) => {
 
 exports.getType = async (req, res) => {
     try {
+        const channel = req.headers['x-channel'];
+        const { Place } = getModelsByChannel(channel,res,distributionModel); 
+
         const places = await Place.find({}, { listAddress: 1 }).lean()
 
         if (!places.length) {
@@ -110,6 +127,11 @@ exports.getType = async (req, res) => {
 
 exports.addAllPlace = async (req,res) => {
 try {
+    const channel = req.headers['x-channel'];
+    const { User } = getModelsByChannel(channel,res,userModel); 
+    const { Place,Withdraw } = getModelsByChannel(channel,res,distributionModel); 
+
+
     const users = await User.find()
 
     areaList = users.map(user => user.area)

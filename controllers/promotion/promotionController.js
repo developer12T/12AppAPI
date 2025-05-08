@@ -1,8 +1,8 @@
 const { generatePromotionId } = require('../../utilities/genetateId')
 const { getRewardProduct } = require('./calculate')
 // const { Promotion } = require('../../models/cash/promotion')
-const { Cart } = require('../../models/cash/cart')
-const { Product } = require('../../models/cash/product')
+// const { Cart } = require('../../models/cash/cart')
+// const { Product } = require('../../models/cash/product')
 const  promotionModel = require('../../models/cash/promotion');
 const  CartModel  = require('../../models/cash/cart')
 const  productModel  = require('../../models/cash/product')
@@ -11,7 +11,7 @@ const { getModelsByChannel } = require('../../middleware/channel')
 
 exports.addPromotion = async (req, res) => {
   try {
-    const channel = req.headers['x-channel']; // 'credit' or 'cash'
+    const channel = req.headers['x-channel']; 
     const { Promotion } = getModelsByChannel(channel,res,promotionModel); 
     const {
       name,

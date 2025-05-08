@@ -111,7 +111,7 @@ const giveawaysSchema = new mongoose.Schema({
 
 module.exports = (conn) => {
     return {
-      Giveaway: conn.model('Giveaway', giveawaysSchema),
+      Giveaways: conn.model('Giveaway', giveawaysSchema),
       Givetype: conn.model('Givetype', giveTypeSchema),
     };
   };

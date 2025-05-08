@@ -1,9 +1,24 @@
-const { Product } = require('../../models/cash/product')
-const { Store } = require('../../models/cash/store')
-const { Givetype } = require('../../models/cash/give')
+// const { Product } = require('../../models/cash/product')
+// const { Store } = require('../../models/cash/store')
+// const { Givetype } = require('../../models/cash/give')
 
-async function getProductGive(giveId, area) {
+
+
+const  productModel  = require('../../models/cash/product')
+const  storeModel  = require('../../models/cash/store')
+const  givetypeModel = require('../../models/cash/give')
+const { getModelsByChannel } = require('../../middleware/channel')
+
+
+
+
+async function getProductGive(giveId, area,channel,res) {
     try {
+
+        const { Givetype } = getModelsByChannel(channel,res,givetypeModel); 
+        const { Product } = getModelsByChannel(channel,res,productModel); 
+
+
         const giveType = await Givetype.findOne({ giveId }).lean()
 
         if (!giveType) {
@@ -89,8 +104,12 @@ async function getProductGive(giveId, area) {
     }
 }
 
-async function getStoreGive(giveId, area) {
+async function getStoreGive(giveId, area,channel,res) {
     try {
+
+        const { Givetype } = getModelsByChannel(channel,res,givetypeModel); 
+        const { Store } = getModelsByChannel(channel,res,storeModel); 
+
         const giveType = await Givetype.findOne({ giveId }).lean()
         if (!giveType) {
             return []

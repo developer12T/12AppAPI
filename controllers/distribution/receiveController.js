@@ -1,8 +1,14 @@
 const axios = require('axios')
 const moment = require('moment')
-const { Product } = require('../../models/cash/product')
-const { Receive, Place } = require('../../models/cash/distribution')
-const { User } = require('../../models/cash/user')
+// const { Product } = require('../../models/cash/product')
+// const { Receive, Place } = require('../../models/cash/distribution')
+// const { User } = require('../../models/cash/user')
+
+const  productModel  = require('../../models/cash/product')
+const distributionModel = require('../../models/cash/distribution')
+const  userModel  = require('../../models/cash/user')
+const { getModelsByChannel } = require('../../middleware/channel')
+
 
 exports.addReceive = async (req, res) => {
     try {
@@ -10,7 +16,13 @@ exports.addReceive = async (req, res) => {
       // const response = await axios.post(`${process.env.API_URL_12ERP}/receive/getReceiveAll`, { transdate: today })
       const response = await axios.post(`${process.env.API_URL_12ERP}/receive/getReceiveAll`, { area: 'BE215', peroid: "202503" })
       const receiveData = response.data
-  
+
+      const channel = req.headers['x-channel'];
+      const { User } = getModelsByChannel(channel,res,userModel); 
+      const { Receive,Place } = getModelsByChannel(channel,res,distributionModel); 
+      const { Product } = getModelsByChannel(channel,res,productModel); 
+
+
       if (!Array.isArray(receiveData) || receiveData.length === 0) {
         return res.status(400).json({ status: 400, message: 'No receive data found' })
       }

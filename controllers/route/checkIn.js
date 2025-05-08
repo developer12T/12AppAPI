@@ -1,11 +1,21 @@
-const { Route } = require('../../models/cash/route')
-const { Store } = require('../../models/cash/store')
+// const { Route } = require('../../models/cash/route')
+// const { Store } = require('../../models/cash/store')
 
-async function checkInRoute(data) {
+const { getModelsByChannel } = require('../../middleware/channel')
+
+const  routeModel  = require('../../models/cash/route')
+const  storeModel  = require('../../models/cash/store')
+
+async function checkInRoute(data,channel,res) {
     try {
         if (!data) {
             throw new Error('Data check-in is required')
         }
+
+        const { Store } = getModelsByChannel(channel,res,storeModel); 
+
+        const { Route } = getModelsByChannel(channel,res,routeModel); 
+
 
         const store = await Store.findOne({ storeId: data.storeId })
         if (!store) {
