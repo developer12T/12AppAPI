@@ -469,6 +469,10 @@ exports.updateStoreStatus = async (req, res) => {
 exports.rejectStore = async (req, res) => {
   const { storeId, area } = req.body
 
+  const channel = req.headers['x-channel'] // 'credit' or 'cash'
+
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+
   const result = await Store.updateOne(
     { storeId: storeId },
     { $set: { status: '15', updatedDate: Date() } }
@@ -479,3 +483,96 @@ exports.rejectStore = async (req, res) => {
     data: result
   })
 }
+
+
+
+exports.updateStore = async (req, res) => {
+  const channel = req.headers['x-channel'] 
+
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  let pathPhp = ''
+
+  switch (channel) {
+    case 'cash':
+      pathPhp = 'ca_api/ca_customer.php'
+      break
+    case 'credit':
+      pathPhp = 'cr_api/cr_customer.php'
+      break
+    default:
+      break
+  }
+  const response = await axios.post(
+    `http://58.181.206.159:9814/apps_api/${pathPhp}`
+  )
+  const storeMongo = await Store.find()
+  let update = 0
+  let addNew = 0
+  for (const splitData of response.data) {
+
+    const approveData = {
+      dateSend: new Date(),
+      dateAction: new Date(),
+      appPerson: 'system'
+    }
+    const poliAgree = {
+      status: 'Agree',
+      date: new Date()
+    }
+    const m3 = {
+      storeId: splitData.storeId,
+      name: splitData.name,
+      taxId: splitData.taxId,
+      tel: splitData.tel,
+      route: splitData.route,
+      type: splitData.type,
+      typeName: splitData.typeName,
+      address: splitData.address,
+      district: splitData.district,
+      subDistrict: splitData.subDistrict,
+      province: splitData.province,
+      provinceCode: splitData.provinceCode,
+      'postCode ': splitData.postCode,
+      zone: splitData.zone,
+      area: splitData.area,
+      latitude: splitData.latitude,
+      longtitude: splitData.longtitude,
+      lineId: '',
+      'note ': '',
+      approve: approveData,
+      status: '20',
+      policyConsent: poliAgree,
+      imageList: [],
+      shippingAddress: splitData.shippingAddress,
+      checkIn: {},
+      createdDate: splitData.createdDate,
+      updatedDate: Date()
+    }
+    // console.log(m3)
+
+        const storeInMongo = storeMongo.find(id => id.saleCode == m3.saleCode)
+
+          if (storeInMongo) {
+            const excludedKeys = ['storeId', 'updatedDate', 'approve', 'policyConsent', 'imageList', 'checkIn'];
+
+            const hasChanged = Object.keys(m3).some(
+              key => !excludedKeys.includes(key) && m3[key] !== storeInMongo[key]
+            );
+
+
+            if (hasChanged) {
+              console.log(m3)
+              update += 1
+            }
+
+          }
+
+
+    }
+  res.status(200).json({
+    status: 200,
+    update: update,
+    // data: result
+  })
+}
+

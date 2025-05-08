@@ -291,11 +291,11 @@ exports.addAndUpdateUser = async (req, res) => {
   let update = 0
   let addNew = 0
   for (const m3 of userM3.data) {
-    const userDetail =  userMongo.find(id => id.saleCode == m3.saleCode)
+    const userInMongo =  userMongo.find(id => id.saleCode == m3.saleCode)
 
-        if (userDetail){
+        if (userInMongo){
           const hasChanged = Object.keys(m3).some(
-            key => !['saleCode', '__v'].includes(key) && m3[key] !== userDetail[key]
+            key => !['saleCode', '__v'].includes(key) && m3[key] !== userInMongo[key]
           );
 
             if (hasChanged) {

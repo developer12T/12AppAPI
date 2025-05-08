@@ -6,7 +6,8 @@ const {
   checkInStore,
   addFromERP,
   updateStoreStatus,
-  rejectStore
+  rejectStore,
+  updateStore
 } = require('../../controllers/store/storeController')
 
 const router = express.Router()
@@ -18,4 +19,6 @@ router.patch('/editStore/:storeId', editStore)
 router.post('/checkIn/:storeId', checkInStore)
 router.post('/updateStoreStatus', updateStoreStatus)
 router.post('/rejectStore', rejectStore)
+router.post('/updateStore', updateStore)
+
 module.exports = router

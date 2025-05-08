@@ -1132,3 +1132,129 @@ exports.routeTimeline = async (req, res) => {
     res.status(500).json({ message: 'Internal server error.' })
   }
 }
+
+
+exports.updateAndAddRoute = async (req, res) => {
+
+  const channel = req.headers['x-channel']
+
+  const { Route } = getModelsByChannel(channel, res, routeModel)
+
+  let pathPhp = ''
+  switch (channel) {
+    case 'cash':
+      pathPhp = 'ca_api/ca_route.php'
+      break
+    case 'credit':
+      pathPhp = 'cr_api/cr_route.php'
+      break
+    default:
+      break
+  }
+  const response = await axios.post(
+    `http://58.181.206.159:9814/apps_api/${pathPhp}`
+  )
+  if (!response.data || !Array.isArray(response.data)) {
+    return res.status(400).json({
+      status: '400',
+      message: 'Invalid response data from external API'
+    })
+  }
+
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const route = await Route.find({ period: period() })
+  const routeMap = new Map(route.map(route => [route.id, route]))
+
+  let routeId
+  const latestRoute = route.sort((a, b) => b.id.localeCompare(a.id))[0]
+
+  if (!latestRoute) {
+    routeId = `${period()}${response.data.area}R01`
+    console.log('route', routeId)
+    console.log('period', period())
+  } else {
+    const prefix = latestRoute.id.slice(0, 6)
+    const subfix = (parseInt(latestRoute.id.slice(7)) + 1)
+      .toString()
+      .padStart(2, '0')
+    routeId = prefix + subfix
+  }
+
+  for (const storeList of response.data) {
+    try {
+      const existingRoute = routeMap.get(storeList.id)
+      // console.log(existingRoute)
+      if (existingRoute) {
+        
+        for (const list of storeList.storeInfo || []) {
+          const store = await Store.findOne({ storeId: list })
+          if (!store) {
+            console.warn(`Store with storeId ${list} not found`)
+            continue
+          }
+
+          const storeExists = existingRoute.listStore.some(
+            store => store.storeInfo.toString() === store._id.toString()
+          )
+          if (!storeExists) {
+            const newData = {
+              storeInfo: store._id,
+              note: '',
+              image: '',
+              latitude: '',
+              longtitude: '',
+              status: 0,
+              statusText: 'รอเยี่ยม',
+              listOrder: [],
+              date: ''
+            }
+            existingRoute.listStore.push(newData)
+          }
+        }
+
+        // await existingRoute.save()
+      } else {
+        const listStore = []
+
+        for (const storeId of storeList.listStore || []) {
+          const idStore = storeId.storeInfo
+          const store = await Store.findOne({ storeId: idStore })
+          if (store) {
+            listStore.push({
+              storeInfo: store._id,
+              latitude: '',
+              longtitude: '',
+              status: 0,
+              statusText: 'รอเยี่ยม',
+              note: '',
+              date: '',
+              listOrder: []
+            })
+          } else {
+            console.warn(`Store with storeId ${storeId} not found`)
+          }
+        }
+
+        const data = {
+          id: storeList.id,
+          area: storeList.area,
+          period: period(),
+          day: storeList.day,
+          listStore
+        }
+        // await Route.create(data)
+      }
+    } catch (err) {
+      console.error(
+        `Error processing storeList with id ${storeList.id}:`,
+        err.message
+      )
+      continue
+    }
+  }
+
+  res.status(200).json({
+    status: '200',
+    message: 'Add Route Successfully'
+  })
+}
