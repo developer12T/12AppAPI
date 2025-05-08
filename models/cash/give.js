@@ -105,6 +105,13 @@ const giveawaysSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 })
 
-const Giveaway = dbCA.model('Giveaway', giveawaysSchema)
-const Givetype = dbCA.model('Givetype', giveTypeSchema)
-module.exports = { Giveaway, Givetype }
+// const Giveaway = dbCA.model('Giveaway', giveawaysSchema)
+// const Givetype = dbCA.model('Givetype', giveTypeSchema)
+// module.exports = { Giveaway, Givetype }
+
+module.exports = (conn) => {
+    return {
+      Giveaway: conn.model('Giveaway', giveawaysSchema),
+      Givetype: conn.model('Givetype', giveTypeSchema),
+    };
+  };
