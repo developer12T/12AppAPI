@@ -426,7 +426,7 @@ exports.updateStoreStatus = async (req, res) => {
   const { storeId, area } = req.body
 
   const areaPrefix = area.substring(0, 2)
-  const channel = req.headers['x-channel'] // 'credit' or 'cash'
+  const channel = req.headers['x-channel'] 
 
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const latestStore = await Store.findOne({

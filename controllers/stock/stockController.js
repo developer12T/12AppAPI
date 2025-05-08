@@ -13,14 +13,16 @@ const { getStockMovement } = require('../../utilities/movement')
 const { Warehouse, Locate, Balance } = require('../../models/cash/master')
 const { Op } = require('sequelize')
 const XLSX = require('xlsx')
-const { Refund } = require('../../models/cash/refund')
-// const { getSocket } = require('./socket')
+// const { Refund } = require('../../models/cash/refund')
 
-// const { fetchArea } = require('./fetchArea')
+const  userModel  = require('../../models/cash/user')
+const  productModel  = require('../../models/cash/product')
+const  stockModel  = require('../../models/cash/stock')
+const { getModelsByChannel } = require('../../middleware/channel')
 
 const fetchArea = async warehouse => {
   try {
-    // const { warehouseCode } = req.body
+
     const WarehouseData = await Warehouse.findAll({
       where: {
         coNo: 410,
@@ -69,6 +71,12 @@ const fetchArea = async warehouse => {
 exports.addStock = async (req, res) => {
   try {
     const body = req.body
+
+    const channel = req.headers['x-channel'] 
+
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
 
     if (!Array.isArray(body)) {
       return res
@@ -132,7 +140,8 @@ exports.addStock = async (req, res) => {
 exports.available = async (req, res) => {
   try {
     const { area, period } = req.query
-    const data = await getStockAvailable(area, period)
+
+    const data = await getStockAvailable(area, period,channel,res)
     res.status(200).json({
       status: 200,
       message: 'successfully',
@@ -147,7 +156,7 @@ exports.available = async (req, res) => {
 exports.transaction = async (req, res) => {
   try {
     const { area, period } = req.query
-    const movement = await getStockMovement(area, period)
+    const movement = await getStockMovement(area, period,channel,res)
     res.status(200).json({
       status: 200,
       message: 'successfully!',
@@ -163,24 +172,23 @@ exports.addStockNew = async (req, res) => {
   // try {
   const { period, warehouse } = req.body
 
+  const channel = req.headers['x-channel'] 
+
+  const { User } = getModelsByChannel(channel, res, userModel)
+  const { Stock } = getModelsByChannel(channel, res, stockModel)
+  const { Product } = getModelsByChannel(channel, res, productModel)
+
   const locateData = {}
   const factorData = {}
 
   const users = await User.find().select('area saleCode warehouse').lean()
-  // const users = await User.find({
-  //   warehouse: { $in: ["215", "216", "217"] }  // ตัวอย่าง: หา warehouse ที่อยู่ในกลุ่มนี้
-  // })
-  // .select('area saleCode warehouse')
-  // .lean();
 
-  // console.log("user.area",users.area)
   for (const user of users) {
     const stock = await Stock.findOne({
       area: user.area,
       period: period
-    })
-      .select('area')
-      .lean()
+    }).select('area').lean()
+
     if (!stock) {
       const areaData = await fetchArea(user.warehouse)
       const BalanceData = await Balance.findAll({
@@ -335,6 +343,10 @@ exports.addStockNew = async (req, res) => {
 exports.getStock = async (req, res, next) => {
   try {
     const { area, period } = req.query
+    const channel = req.headers['x-channel'] 
+
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
+
     const data = await Stock.find({
       area: area,
       period: period
@@ -359,6 +371,12 @@ exports.getStock = async (req, res, next) => {
 exports.getQty = async (req, res, next) => {
   try {
     const { area, id, unit, period } = req.body
+
+    const channel = req.headers['x-channel'] 
+
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+
 
     const productStock = await Stock.find({
       area: area,
@@ -439,6 +457,10 @@ exports.addStockMovement = async (req, res, next) => {
       action
     } = req.body
 
+    const channel = req.headers['x-channel'] 
+
+    const { StockMovement } = getModelsByChannel(channel, res, stockModel)
+
     let movement = await StockMovement.findOne({
       action,
       area,
@@ -478,6 +500,10 @@ exports.updateStockMovement = async (req, res, next) => {
   try {
     const { action } = req.body
 
+    const channel = req.headers['x-channel'] 
+
+    const { StockMovement,StockMovementLog } = getModelsByChannel(channel, res, stockModel)
+    
     let movement = await StockMovement.find({}).select(
       '_id orderId area saleCode period warehouse status action'
     )
@@ -503,6 +529,11 @@ exports.updateStockMovement = async (req, res, next) => {
 exports.availableStock = async (req, res) => {
   try {
     const { area, period, type, group, brand, size, flavour } = req.body
+
+    const channel = req.headers['x-channel'] 
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+
 
     const modelStock = await Stock.aggregate([
       {

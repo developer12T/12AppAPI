@@ -21,7 +21,7 @@ const userSchema = mongoose.Schema({
     warehouse: { type: String, require: true },
     role: { type: String, require: true },
     status: { type: String, require: true },
-    image: [imageSchema],
+    image: {imageSchema},
 })
 
 // const User = dbCA.model('User', userSchema)
