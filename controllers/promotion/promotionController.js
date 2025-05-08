@@ -34,7 +34,7 @@ exports.addPromotion = async (req, res) => {
         .json({ status: 400, message: 'Missing required fields!' })
     }
 
-    const proId = await generatePromotionId()
+    const proId = await generatePromotionId(channel,res)
 
     const newPromotion = new Promotion({
       proId,
@@ -102,7 +102,7 @@ exports.getPromotionProduct = async (req, res) => {
         .json({ status: 404, message: 'Promotion not found in the cart!' })
     }
 
-    const rewardProducts = await getRewardProduct(proId)
+    const rewardProducts = await getRewardProduct(proId,channel,res)
 
     if (!rewardProducts.length) {
       return res
