@@ -1,7 +1,7 @@
-const { Refund } = require('../../models/cash/refund')
-const { Order } = require('../../models/cash/sale')
-const { Cart } = require('../../models/cash/cart')
-const { User } = require('../../models/cash/user')
+// const { Refund } = require('../../models/cash/refund')
+// const { Order } = require('../../models/cash/sale')
+// const { Cart } = require('../../models/cash/cart')
+// const { User } = require('../../models/cash/user')
 const { generateOrderId, generateRefundId } = require('../../utilities/genetateId')
 const { summaryRefund } = require('../../utilities/summary')
 const { rangeDate } = require('../../utilities/datetime')
@@ -10,9 +10,25 @@ const path = require('path')
 const multer = require('multer')
 const upload = multer({ storage: multer.memoryStorage() }).single('image')
 
+const  refundModel  = require('../../models/cash/refund')
+const  orderModel  = require('../../models/cash/sale')
+const  cartModel  = require('../../models/cash/cart')
+const  userModel  = require('../../models/cash/user')
+const { getModelsByChannel } = require('../../middleware/channel')
+
+
+
+
+
 exports.checkout = async (req, res) => {
     try {
         const { type, area, storeId, note, latitude, longitude, shipping, payment } = req.body
+
+        const channel = req.headers['x-channel']; 
+        const { Cart } = getModelsByChannel(channel,res,cartModel); 
+        const { User } = getModelsByChannel(channel,res,userModel); 
+        const { Refund } = getModelsByChannel(channel,res,refundModel); 
+        const { Order } = getModelsByChannel(channel,res,orderModel); 
 
         if (!type || type !== 'refund') {
             return res.status(400).json({ status: 400, message: 'Invalid type! Must be "refund".' })
@@ -32,10 +48,10 @@ exports.checkout = async (req, res) => {
             return res.status(404).json({ status: 404, message: 'Sale user not found!' })
         }
 
-        const refundOrderId = await generateRefundId(area, sale.warehouse)
-        const changeOrderId = await generateOrderId(area, sale.warehouse)
+        const refundOrderId = await generateRefundId(area, sale.warehouse,channel,res)
+        const changeOrderId = await generateOrderId(area, sale.warehouse,channel,res)
 
-        const summary = await summaryRefund(cart)
+        const summary = await summaryRefund(cart,channel,res)
         // console.log('summary', summary)
 
         const refundOrder = new Refund({
@@ -131,6 +147,12 @@ exports.checkout = async (req, res) => {
 exports.getRefund = async (req, res) => {
     try {
         const { type, area, store, period } = req.query
+
+        const channel = req.headers['x-channel']; 
+        const { Refund } = getModelsByChannel(channel,res,refundModel); 
+        const { Order } = getModelsByChannel(channel,res,orderModel); 
+
+
         let response = []
 
         if (!type || !area || !period) {
@@ -205,6 +227,12 @@ exports.getDetail = async (req, res) => {
                 message: 'orderId is required!'
             })
         }
+
+        const channel = req.headers['x-channel']; 
+        const { Refund } = getModelsByChannel(channel,res,refundModel); 
+        const { Order } = getModelsByChannel(channel,res,orderModel); 
+
+
 
         const refund = await Refund.findOne({ orderId }).lean()
         if (!refund) {
@@ -288,6 +316,10 @@ exports.getDetail = async (req, res) => {
 
 exports.addSlip = async (req, res) => {
     try {
+
+        const channel = req.headers['x-channel'];  
+        const { Order } = getModelsByChannel(channel,res,orderModel); 
+
         upload(req, res, async (err) => {
             if (err) {
                 return res.status(400).json({ status: 400, message: 'Error uploading file', error: err.message })
@@ -333,6 +365,11 @@ exports.addSlip = async (req, res) => {
 exports.updateStatus = async (req, res) => {
     try {
         const { orderId, status } = req.body
+
+        const channel = req.headers['x-channel']; 
+        const { Refund } = getModelsByChannel(channel,res,refundModel); 
+        const { Order } = getModelsByChannel(channel,res,orderModel); 
+
 
         if (!orderId || !status) {
             return res.status(400).json({ status: 400, message: 'orderId and status are required!' })

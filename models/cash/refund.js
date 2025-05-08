@@ -64,5 +64,12 @@ const refundSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 })
 
-const Refund = dbCA.model('Refund', refundSchema)
-module.exports = { Refund }
+// const Refund = dbCA.model('Refund', refundSchema)
+// module.exports = { Refund }
+
+
+module.exports = (conn) => {
+    return {
+      Refund: conn.model('Refund', refundSchema),
+    };
+  };
