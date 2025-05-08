@@ -267,3 +267,84 @@ exports.updateUserOne = async (req, res) => {
     message: 'Update User Success'
   })
 }
+
+
+exports.addAndUpdateUser = async (req, res) => {
+  const channel = req.headers['x-channel']
+  const { User } = getModelsByChannel(channel, res, userModel)
+  const userMongo = await User.find()
+  let pathPhp = ''
+  switch (channel) {
+    case 'cash':
+      pathPhp = 'ca_api/ca_user.php'
+      break
+    case 'credit':
+      pathPhp = 'cr_api/cr_user.php'
+      break
+    default:
+      break
+  }
+
+    const userM3 = await axios.post(
+      `http://58.181.206.159:9814/apps_api/${pathPhp}`
+    )
+  let update = 0
+  let addNew = 0
+  for (const m3 of userM3.data) {
+    const userDetail =  userMongo.find(id => id.saleCode == m3.saleCode)
+
+        if (userDetail){
+          const hasChanged = Object.keys(m3).some(
+            key => !['saleCode', '__v'].includes(key) && m3[key] !== userDetail[key]
+          );
+
+            if (hasChanged) {
+              console.log(m3)
+              await User.updateOne(
+                { saleCode: m3.saleCode },
+                {
+                  $set: {
+                    salePayer: m3.name,
+                    username: m3.username,
+                    firstName: m3.firstName,
+                    surName: m3.surName,
+                    password: m3.password,
+                    tel: m3.tel,
+                    zone: m3.zone,
+                    area: m3.area,
+                    warehouse: m3.warehouse,
+                    role: m3.role,
+                    status: m3.status,
+                    // __v: m3.__v + 1
+                  }
+                }
+              )
+              update += 1
+            }
+        }
+        else{
+          await User.create({
+            saleCode: m3.saleCode,
+            username: m3.username,
+            firstName: m3.firstName,
+            surName: m3.surName,
+            password: m3.password,
+            tel: m3.tel,
+            zone: m3.zone,
+            area: m3.area,
+            warehouse: m3.warehouse,
+            role: m3.role,
+            status: m3.status,
+            // __v: 0
+          });
+          addNew += 1
+        }
+      }
+  res.status(200).json({
+    status:200,
+    message:`Insert And Update Success`,
+    Update:update,
+    Add: addNew
+  })
+
+}

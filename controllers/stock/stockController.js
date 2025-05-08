@@ -83,17 +83,24 @@ exports.addStock = async (req, res) => {
         .status(400)
         .json({ status: 400, message: 'Invalid format: expected an array' })
     }
-
+    
     for (const item of body) {
       const { area, period, listProduct } = item
 
       if (!area || !Array.isArray(listProduct)) continue
 
       const user = await User.findOne({ area }).select('saleCode').lean()
-      if (!user) continue
+
+     
+      if (!user) {
+        return res.status(404).json({
+          status:404,
+          message:'Not Found This Area'
+        })
+      }
 
       const saleCode = user.saleCode
-
+      
       let enrichedListProduct = []
 
       for (const productEntry of listProduct) {
@@ -526,7 +533,7 @@ exports.updateStockMovement = async (req, res, next) => {
   }
 }
 
-exports.availableStock = async (req, res) => {
+exports.availableStock = async (req, res,next) => {
   try {
     const { area, period, type, group, brand, size, flavour } = req.body
 
@@ -550,14 +557,14 @@ exports.availableStock = async (req, res) => {
       },
       {
         $project: {
-          productId: '$listProduct.productId',
+          id: '$listProduct.id',
           available: '$listProduct.available',
           _id: 0
         }
       }
     ])
-    // console.log("modelStock",modelStock)
-    const productIds = modelStock.flatMap(item => item.productId)
+    // console.log("modelStock", JSON.stringify(modelStock, null, 2));
+    const productIds = modelStock.flatMap(item => item.id)
 
     if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
       return res.status(400).json({
@@ -596,7 +603,11 @@ exports.availableStock = async (req, res) => {
 
     if (conditions.length) filter.$and = conditions
 
+    // console.log("productIds",productIds)
+
     let products = await Product.find(filter).lean()
+
+
 
     if (!products.length) {
       return res
@@ -607,9 +618,9 @@ exports.availableStock = async (req, res) => {
     // console.log(products)
 
     const data = products.map(product => {
-      const lot = modelStock.find(u => u.productId == product.id)
+      const lot = modelStock.find(u => u.id == product.id)
 
-      // console.log("lot",lot)
+      console.log("lot",lot)
       const tranFromProduct = product
         ? {
             // ...product,
@@ -632,7 +643,6 @@ exports.availableStock = async (req, res) => {
             image: product.image,
 
             listUnit: product.listUnit.map(unit => {
-              // console.log(parseFloat(unit.factor))
               const totalQtyPcsToCtn = Math.floor(
                 lot.available.reduce((sum, item) => {
                   return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor

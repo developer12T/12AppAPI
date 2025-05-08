@@ -458,6 +458,7 @@ exports.deleteProduct = async (req, res) => {
 
 exports.updateCartPromotion = async (req, res) => {
   const { type, area, storeId, proId, productId, qty } = req.body
+  const channel = req.headers['x-channel'];
 
   const { Cart } = getModelsByChannel(channel,res,cartModel); 
 
@@ -524,6 +525,8 @@ exports.updateCartPromotion = async (req, res) => {
 exports.updateStock = async (req, res) => {
   try {
     const { area, productId, unit, type } = req.body
+    const channel = req.headers['x-channel'];
+
 
     const { Stock } = getModelsByChannel(channel,res,stockModel); 
 

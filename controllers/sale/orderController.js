@@ -981,12 +981,12 @@ try {
 
   checkArea = await Route.find({ area: area })
 
-  if (checkArea.length == 0) {
-    return res.status(404).json({
-      status: 404,
-      message: `Not Found This area: ${area}`
-    })
-  }
+  // if (checkArea.length == 0) {
+  //   return res.status(404).json({
+  //     status: 404,
+  //     message: `Not Found This area: ${area}`
+  //   })
+  // }
 
   const storeIdObj = await Store.findOne({storeId:storeId}).select("_id")
 
