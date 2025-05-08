@@ -1,13 +1,29 @@
-const { Cart } = require('../../models/cash/cart')
-const { User } = require('../../models/cash/user')
-const { Product } = require('../../models/cash/product')
-const { Distribution, Place } = require('../../models/cash/distribution')
+// const { Cart } = require('../../models/cash/cart')
+// const { User } = require('../../models/cash/user')
+// const { Product } = require('../../models/cash/product')
+// const { Distribution, Place } = require('../../models/cash/distribution')
 const { generateDistributionId } = require('../../utilities/genetateId')
 const { rangeDate } = require('../../utilities/datetime')
+
+const  cartModel  = require('../../models/cash/cart')
+const  productModel  = require('../../models/cash/product')
+const  distributionModel = require('../../models/cash/distribution')
+const  userModel  = require('../../models/cash/user')
+const { getModelsByChannel } = require('../../middleware/channel')
+
+
+
 
 exports.checkout = async (req, res) => {
   try {
     const { type, area, shippingId, withdrawType, sendDate, note } = req.body
+
+      const channel = req.headers['x-channel'];
+      const { Cart } = getModelsByChannel(channel,res,cartModel); 
+      const { User } = getModelsByChannel(channel,res,userModel); 
+      const { Place } = getModelsByChannel(channel,res,distributionModel); 
+      const { Product } = getModelsByChannel(channel,res,productModel)
+
 
     if (!type || !area || !shippingId || !withdrawType || !sendDate || !note) {
       return res
@@ -104,7 +120,7 @@ exports.checkout = async (req, res) => {
 
     if (listProduct.includes(null)) return
     // if (listProduct.some(p => p === null)) return res.status(400).json({ status: 400, message: 'Invalid product in cart!' })
-    const orderId = await generateDistributionId(area, sale.warehouse)
+    const orderId = await generateDistributionId(area, sale.warehouse,channel,res)
 
     const newOrder = new Distribution({
       orderId,
@@ -144,6 +160,11 @@ exports.checkout = async (req, res) => {
 exports.getOrder = async (req, res) => {
   try {
     const { type, area, period } = req.query
+    const channel = req.headers['x-channel'];
+
+    const { Distribution } = getModelsByChannel(channel,res,distributionModel); 
+
+
     let response = []
     if (!type || !area || !period) {
       return res
@@ -200,6 +221,10 @@ exports.getOrder = async (req, res) => {
 exports.getDetail = async (req, res) => {
   try {
     const { orderId } = req.params
+
+    const channel = req.headers['x-channel'];
+
+    const { Distribution } = getModelsByChannel(channel,res,distributionModel); 
     if (!orderId) {
       return res
         .status(400)
@@ -229,6 +254,10 @@ exports.getDetail = async (req, res) => {
 exports.updateStatus = async (req, res) => {
   try {
     const { orderId, status } = req.body
+
+    const channel = req.headers['x-channel'];
+
+    const { Distribution } = getModelsByChannel(channel,res,distributionModel); 
 
     if (!orderId || !status) {
       return res

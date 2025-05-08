@@ -191,7 +191,7 @@ exports.checkout = async (req, res) => {
         note: note,
         latitude: latitude,
         longitude: longitude
-      })
+      },channel,res)
 
       // console.log('checkin', checkIn)
 
