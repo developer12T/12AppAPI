@@ -129,10 +129,20 @@ const withdrawSchema = mongoose.Schema({
 
 
 
-const Withdraw = dbCA.model('Withdraw', withdrawSchema, 'withdraw');
-const Place = dbCA.model('Place', placeSchema)
-const Distribution = dbCA.model('Distribution', distributionSchema)
-const Receive = dbCA.model('Receive', receiveSchema)
+// const Withdraw = dbCA.model('Withdraw', withdrawSchema, 'withdraw');
+// const Place = dbCA.model('Place', placeSchema)
+// const Distribution = dbCA.model('Distribution', distributionSchema)
+// const Receive = dbCA.model('Receive', receiveSchema)
 
 
-module.exports = { Place, Distribution, Receive ,Withdraw }
+// module.exports = { Place, Distribution, Receive ,Withdraw }
+
+module.exports = (conn) => {
+    return {
+      Withdraw: conn.model('Withdraw', withdrawSchema, 'withdraw'),
+      Place: conn.model('Place', placeSchema),
+      Distribution: conn.model('Distribution', distributionSchema),
+      Receive: conn.model('Receive', receiveSchema),
+
+    };
+  };
