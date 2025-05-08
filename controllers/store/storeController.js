@@ -6,20 +6,18 @@ const upload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages',
   3
 )
-const storeModel = require('../../models/cash/store');
+const storeModel = require('../../models/cash/store')
 const { getModelsByChannel } = require('../../middleware/channel')
 const path = require('path')
 const { v4: uuidv4 } = require('uuid')
 uuidv4() // ⇨ '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed'
 
-
-
 exports.getStore = async (req, res) => {
   try {
     const { area, type, route } = req.query
-    const channel = req.headers['x-channel']; // 'credit' or 'cash'
+    const channel = req.headers['x-channel'] // 'credit' or 'cash'
 
-    const { Store } = getModelsByChannel(channel,res,storeModel); 
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
     const currentDate = new Date()
     const startMonth = new Date(
@@ -59,7 +57,7 @@ exports.getStore = async (req, res) => {
     if (data.length === 0) {
       return res.status(404).json({
         status: 404,
-        message: 'Not Found Store',
+        message: 'Not Found Store'
       })
     }
 
@@ -104,9 +102,9 @@ exports.addStore = async (req, res) => {
           message: 'Number of files and types do not match'
         })
       }
-      const channel = req.headers['x-channel']; // 'credit' or 'cash'
+      const channel = req.headers['x-channel'] // 'credit' or 'cash'
 
-      const { Store } = getModelsByChannel(channel,res,storeModel); 
+      const { Store } = getModelsByChannel(channel, res, storeModel)
       const existingStores = await Store.find(
         {},
         { _id: 0, __v: 0, idIndex: 0 }
@@ -270,9 +268,9 @@ exports.editStore = async (req, res) => {
         .json({ status: '400', message: 'No valid fields to update' })
     }
 
-    const channel = req.headers['x-channel']; // 'credit' or 'cash'
+    const channel = req.headers['x-channel'] // 'credit' or 'cash'
 
-    const { Store } = getModelsByChannel(channel,res,storeModel); 
+    const { Store } = getModelsByChannel(channel, res, storeModel)
     const store = await Store.findOneAndUpdate({ storeId }, data, { new: true })
 
     if (!store) {
@@ -293,8 +291,21 @@ exports.editStore = async (req, res) => {
 exports.addFromERP = async (req, res) => {
   try {
     const dataArray = []
+    const channel = req.headers['x-channel']
+    let pathPhp = ''
+
+    switch (channel) {
+      case 'cash':
+        pathPhp = 'ca_api/ca_customer.php'
+        break
+      case 'credit':
+        pathPhp = 'cr_api/cr_customer.php'
+        break
+      default:
+        break
+    }
     const response = await axios.post(
-      'http://58.181.206.159:9814/ca_api/ca_customer.php'
+      `http://58.181.206.159:9814/apps_api/${pathPhp}`
     )
     for (const splitData of response.data) {
       const approveData = {
@@ -336,9 +347,9 @@ exports.addFromERP = async (req, res) => {
         updatedDate: Date()
       }
 
-      const channel = req.headers['x-channel']; // 'credit' or 'cash'
+      const channel = req.headers['x-channel'] // 'credit' or 'cash'
 
-      const { Store } = getModelsByChannel(channel,res,storeModel); 
+      const { Store } = getModelsByChannel(channel, res, storeModel)
       const StoreIf = await Store.findOne({ storeId: splitData.storeId })
       if (!StoreIf) {
         await Store.create(mainData)
@@ -352,7 +363,7 @@ exports.addFromERP = async (req, res) => {
     }
     res.status(200).json({
       status: '200',
-      message: 'Store Added Succesfully',
+      message: 'Store Added Succesfully'
       // data: dataArray
     })
   } catch (error) {
@@ -368,9 +379,9 @@ exports.checkInStore = async (req, res) => {
   const { storeId } = req.params
   const { latitude, longtitude } = req.body
 
-  const channel = req.headers['x-channel']; // 'credit' or 'cash'
+  const channel = req.headers['x-channel'] // 'credit' or 'cash'
 
-  const { Store } = getModelsByChannel(channel,res,storeModel); 
+  const { Store } = getModelsByChannel(channel, res, storeModel)
   try {
     if (!latitude || !longtitude) {
       return res.status(400).json({
@@ -415,9 +426,9 @@ exports.updateStoreStatus = async (req, res) => {
   const { storeId, area } = req.body
 
   const areaPrefix = area.substring(0, 2)
-  const channel = req.headers['x-channel']; // 'credit' or 'cash'
+  const channel = req.headers['x-channel'] // 'credit' or 'cash'
 
-  const { Store } = getModelsByChannel(channel,res,storeModel); 
+  const { Store } = getModelsByChannel(channel, res, storeModel)
   const latestStore = await Store.findOne({
     storeId: { $regex: `^V${areaPrefix}`, $options: 'i' }
   })
@@ -468,4 +479,3 @@ exports.rejectStore = async (req, res) => {
     data: result
   })
 }
-
