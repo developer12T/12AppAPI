@@ -143,7 +143,7 @@ exports.addUser = async (req , res) => {
     const channel = req.headers['x-channel']; 
     const { User } = getModelsByChannel(channel,res,userModel); 
     const response = await axios.post(
-      'http://58.181.206.159:9814/ca_api/cr_user.php'
+      'http://58.181.206.159:9814/apps_api/cr_api/cr_user.php'
     )
 
     for (const sale of response.data) {
