@@ -23,7 +23,7 @@ const { getModelsByChannel } = require('../../middleware/channel')
 exports.checkout = async (req, res) => {
     try {
         const { type, area, storeId, note, latitude, longitude, shipping, payment } = req.body
-
+        console.log()
         const channel = req.headers['x-channel']; 
         const { Cart } = getModelsByChannel(channel,res,cartModel); 
         const { User } = getModelsByChannel(channel,res,userModel); 
