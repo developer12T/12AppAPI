@@ -486,7 +486,7 @@ exports.rejectStore = async (req, res) => {
 
 
 
-exports.updateStore = async (req, res) => {
+exports.addAndUpdateStore = async (req, res) => {
   const channel = req.headers['x-channel'] 
 
   const { Store } = getModelsByChannel(channel, res, storeModel)
@@ -494,17 +494,23 @@ exports.updateStore = async (req, res) => {
 
   switch (channel) {
     case 'cash':
-      pathPhp = 'ca_api/ca_customer.php'
+      pathPhp = 'ca_api/cr_customertest.php'
       break
     case 'credit':
-      pathPhp = 'cr_api/cr_customer.php'
+      pathPhp = 'cr_api/cr_customertest.php'
       break
     default:
       break
   }
+  // area = ['NS121','SH101']
+  // area = 'NS121'
   const response = await axios.post(
-    `http://58.181.206.159:9814/apps_api/${pathPhp}`
+    `http://58.181.206.159:9814/apps_api/${pathPhp}`,
+    // {
+    //   area:area
+    // }
   )
+
   const storeMongo = await Store.find()
   let update = 0
   let addNew = 0
@@ -548,31 +554,40 @@ exports.updateStore = async (req, res) => {
       createdDate: splitData.createdDate,
       updatedDate: Date()
     }
-    // console.log(m3)
 
-        const storeInMongo = storeMongo.find(id => id.saleCode == m3.saleCode)
+        const storeInMongo = storeMongo.find(id => id.storeId == m3.storeId)
 
           if (storeInMongo) {
-            const excludedKeys = ['storeId', 'updatedDate', 'approve', 'policyConsent', 'imageList', 'checkIn'];
+            const includedKeys = ['route', 'zone', 'area'];
 
-            const hasChanged = Object.keys(m3).some(
-              key => !excludedKeys.includes(key) && m3[key] !== storeInMongo[key]
+            const hasChanged = includedKeys.some(
+              key => m3[key] !== storeInMongo[key]
             );
 
-
             if (hasChanged) {
-              console.log(m3)
+              await Store.updateOne(
+                {storeId:m3.storeId},
+                {$set:{
+                  route:m3.route,
+                  zone:m3.zone,
+                  area:m3.area
+                }}
+                )
               update += 1
             }
-
+          }
+          else{
+            await Store.create(m3)
+            addNew += 1
           }
 
 
     }
   res.status(200).json({
     status: 200,
-    update: update,
-    // data: result
+    message:`Insert And Update Success`,
+    Update:update,
+    Add: addNew
   })
 }
 
