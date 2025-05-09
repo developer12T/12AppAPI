@@ -563,7 +563,6 @@ exports.availableStock = async (req, res,next) => {
         }
       }
     ])
-    // console.log("modelStock", JSON.stringify(modelStock, null, 2));
     const productIds = modelStock.flatMap(item => item.id)
 
     if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
@@ -618,9 +617,10 @@ exports.availableStock = async (req, res,next) => {
     // console.log(products)
 
     const data = products.map(product => {
+
       const lot = modelStock.find(u => u.id == product.id)
 
-      console.log("lot",lot)
+      // console.log("lot",lot)
       const tranFromProduct = product
         ? {
             // ...product,
@@ -740,6 +740,10 @@ exports.availableStock = async (req, res,next) => {
     next(error)
   }
 }
+
+
+
+
 
 // exports.rollbackStock = async (req, res, next) => {
 //   try {

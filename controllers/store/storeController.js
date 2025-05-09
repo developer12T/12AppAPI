@@ -494,10 +494,10 @@ exports.addAndUpdateStore = async (req, res) => {
 
   switch (channel) {
     case 'cash':
-      pathPhp = 'ca_api/cr_customertest.php'
+      pathPhp = 'ca_api/ca_customer.php'
       break
     case 'credit':
-      pathPhp = 'cr_api/cr_customertest.php'
+      pathPhp = 'cr_api/cr_customer.php'
       break
     default:
       break
@@ -511,6 +511,7 @@ exports.addAndUpdateStore = async (req, res) => {
     // }
   )
 
+  console.log(response.data)
   const storeMongo = await Store.find()
   let update = 0
   let addNew = 0
@@ -578,7 +579,7 @@ exports.addAndUpdateStore = async (req, res) => {
           }
           else{
             await Store.create(m3)
-            addNew += 1
+            addNew += 1 
           }
 
 

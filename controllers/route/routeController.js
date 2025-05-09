@@ -330,6 +330,8 @@ exports.addFromERP = async (req, res) => {
     }
 
     const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+
     const route = await Route.find({ period: period() })
     const routeMap = new Map(route.map(route => [route.id, route]))
     let routeId
@@ -1168,6 +1170,9 @@ exports.updateAndAddRoute = async (req, res) => {
   let routeId
   const latestRoute = route.sort((a, b) => b.id.localeCompare(a.id))[0]
 
+  // console.log("route",route)
+
+
   if (!latestRoute) {
     routeId = `${period()}${response.data.area}R01`
     console.log('route', routeId)
@@ -1181,17 +1186,18 @@ exports.updateAndAddRoute = async (req, res) => {
   }
 
   for (const storeList of response.data) {
-    try {
+    // try {
       const existingRoute = routeMap.get(storeList.id)
       // console.log(existingRoute)
       if (existingRoute) {
         
+
         for (const list of storeList.storeInfo || []) {
           const store = await Store.findOne({ storeId: list })
-          if (!store) {
-            console.warn(`Store with storeId ${list} not found`)
-            continue
-          }
+          // if (!store) {
+          //   console.warn(`Store with storeId ${list} not found`)
+          //   continue
+          // }
 
           const storeExists = existingRoute.listStore.some(
             store => store.storeInfo.toString() === store._id.toString()
@@ -1212,14 +1218,17 @@ exports.updateAndAddRoute = async (req, res) => {
           }
         }
 
-        // await existingRoute.save()
+        await existingRoute.save()
+        console.log("existingRoute")
       } else {
+        
         const listStore = []
 
         for (const storeId of storeList.listStore || []) {
           const idStore = storeId.storeInfo
           const store = await Store.findOne({ storeId: idStore })
           if (store) {
+            // console.log(store)
             listStore.push({
               storeInfo: store._id,
               latitude: '',
@@ -1230,9 +1239,10 @@ exports.updateAndAddRoute = async (req, res) => {
               date: '',
               listOrder: []
             })
-          } else {
-            console.warn(`Store with storeId ${storeId} not found`)
-          }
+          } 
+          // else {
+          //   console.warn(`Store with storeId ${storeId} not found`)
+          // }
         }
 
         const data = {
@@ -1242,16 +1252,19 @@ exports.updateAndAddRoute = async (req, res) => {
           day: storeList.day,
           listStore
         }
-        // await Route.create(data)
+        await Route.create(data)
+        console.log("inElse")
+        // console.log("data",data)
       }
-    } catch (err) {
-      console.error(
-        `Error processing storeList with id ${storeList.id}:`,
-        err.message
-      )
-      continue
     }
-  }
+  //   } catch (err) {
+  //     console.error(
+  //       `Error processing storeList with id ${storeList.id}:`,
+  //       err.message
+  //     )
+  //     continue
+  //   }
+  // }
 
   res.status(200).json({
     status: '200',

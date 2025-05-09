@@ -304,7 +304,7 @@ exports.addAndUpdateUser = async (req, res) => {
                 { saleCode: m3.saleCode },
                 {
                   $set: {
-                    salePayer: m3.name,
+                    salePayer: m3.salePayer,
                     username: m3.username,
                     firstName: m3.firstName,
                     surName: m3.surName,
@@ -325,6 +325,7 @@ exports.addAndUpdateUser = async (req, res) => {
         else{
           await User.create({
             saleCode: m3.saleCode,
+            salePayer:m3.salePayer,
             username: m3.username,
             firstName: m3.firstName,
             surName: m3.surName,
