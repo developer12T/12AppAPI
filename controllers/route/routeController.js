@@ -330,6 +330,7 @@ exports.addFromERP = async (req, res) => {
     }
 
     const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { Route } = getModelsByChannel(channel, res, routeModel)
     const route = await Route.find({ period: period() })
     const routeMap = new Map(route.map(route => [route.id, route]))
     let routeId
