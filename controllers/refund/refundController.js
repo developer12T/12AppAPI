@@ -14,6 +14,7 @@ const  refundModel  = require('../../models/cash/refund')
 const  orderModel  = require('../../models/cash/sale')
 const  cartModel  = require('../../models/cash/cart')
 const  userModel  = require('../../models/cash/user')
+const  stockModel  = require('../../models/cash/stock')
 const { getModelsByChannel } = require('../../middleware/channel')
 
 
@@ -22,12 +23,14 @@ const { getModelsByChannel } = require('../../middleware/channel')
 
 exports.checkout = async (req, res) => {
     try {
-        const { type, area, storeId, note, latitude, longitude, shipping, payment } = req.body
+        const { type, area, period,storeId, note, latitude, longitude, shipping, payment } = req.body
         const channel = req.headers['x-channel']; 
         const { Cart } = getModelsByChannel(channel,res,cartModel); 
         const { User } = getModelsByChannel(channel,res,userModel); 
         const { Refund } = getModelsByChannel(channel,res,refundModel); 
         const { Order } = getModelsByChannel(channel,res,orderModel); 
+        const { Stock } = getModelsByChannel(channel,res,stockModel); 
+
 
         if (!type || type !== 'refund') {
             return res.status(400).json({ status: 400, message: 'Invalid type! Must be "refund".' })
@@ -37,8 +40,13 @@ exports.checkout = async (req, res) => {
             return res.status(400).json({ status: 400, message: 'Missing required fields!' })
         }
 
+
+        // console.log(type, area, storeId)
+
         const cart = await Cart.findOne({ type, area, storeId })
-        if (!cart || cart.listProduct.length === 0) {
+        // console.log("cart",cart)
+        // if (!cart || cart.listProduct.length === 0) {
+        if (!cart || cart.length === 0) {
             return res.status(404).json({ status: 404, message: 'Cart is empty!' })
         }
 
@@ -51,7 +59,7 @@ exports.checkout = async (req, res) => {
         const changeOrderId = await generateOrderId(area, sale.warehouse,channel,res)
 
         const summary = await summaryRefund(cart,channel,res)
-        // console.log('summary', summary)
+        // console.log('summary:', JSON.stringify(summary, null, 2))
 
         const refundOrder = new Refund({
             type: 'refund',
@@ -124,11 +132,71 @@ exports.checkout = async (req, res) => {
             createdBy: sale.username
         })
 
-        await refundOrder.save()
-        await changeOrder.save()
+        const calStock = {
+            // storeId: refundOrder.store.storeId,
+            area:refundOrder.store.area,
+            period:period,
+            type:"Refund",
+            listProduct:refundOrder.listProduct.map(u => {
+                return {
+                    id:u.id,
+                    unit:u.unit,
+                    qty:u.qty,
+                    condition:u.condition
+                }
+            })
+        }
+        // console.log("refundOrder",refundOrder)
+        // console.log(updateStock)
+        const stock = await Stock.findOne(
+            {area:area,
+             period:period
+            }
+        ).select("listProduct")
+        stockDetail = stock.listProduct.map(u => {
+                return{
+                    id: u.id,
+                    sumQtyPcs: u.sumQtyPcs,
+                    sumQtyCtn: u.sumQtyCtn,
+                    sumQtyPcsStockIn: u.sumQtyPcsStockIn,
+                    sumQtyCtnStockIn: u.sumQtyCtnStockIn,
+                    sumQtyPcsStockOut: u.sumQtyPcsStockOut,
+                    sumQtyCtnStockOut: u.sumQtyCtnStockOut
+                }
+            })
+        const data =  calStock.listProduct.map(cal => {
+            const stockData = stockDetail.find(stock => stock.id === cal.id )
 
-        await Cart.deleteOne({ type, area, storeId })
+            return {
+                id:cal.id,
+                sumQtyPcs: stockData.sumQtyPcs + (cal.unit ==='PCS' ? cal.qty : 0),
+                sumQtyCtn: stockData.sumQtyCtn + (cal.unit ==='CTN' ? cal.qty : 0),
+                sumQtyPcsStockIn: stockData.sumQtyPcsStockIn + (cal.unit ==='PCS' ? cal.qty : 0),
+                sumQtyCtnStockIn: stockData.sumQtyCtnStockIn + (cal.unit ==='CTN' ? cal.qty : 0) ,
+                sumQtyPcsStockOut: stockData.sumQtyPcsStockOut - (cal.unit ==='PCS' ? cal.qty : 0),
+                sumQtyCtnStockOut: stockData.sumQtyCtnStockOut - (cal.unit ==='CTN' ? cal.qty : 0),
+            }
+        })
 
+        for (const cal of data) {
+            await Stock.findOneAndUpdate(
+                {area:area, period:period},
+                { $set: {
+                        "listProduct.$[product].sumQtyPcs": cal.sumQtyPcs,
+                        "listProduct.$[product].sumQtyCtn": cal.sumQtyCtn,
+                        "listProduct.$[product].sumQtyPcsStockIn": cal.sumQtyPcsStockIn,
+                        "listProduct.$[product].sumQtyCtnStockIn": cal.sumQtyCtnStockIn,
+                        "listProduct.$[product].sumQtyPcsStockOut": cal.sumQtyPcsStockOut,
+                        "listProduct.$[product].sumQtyCtnStockOut": cal.sumQtyCtnStockOut
+                }},
+                { arrayFilters : [{ "product.id": cal.id }] , new: true}
+            )
+        }
+
+
+        // await refundOrder.save()
+        // await changeOrder.save()
+        // await Cart.deleteOne({ type, area, storeId })
         res.status(200).json({
             status: 200,
             message: 'Checkout successful!',

@@ -179,120 +179,122 @@ async function summaryWithdraw (cart,channel,res) {
   }
 }
 
-async function summaryRefund (cart,channel,res) {
-  try {
-    if (!cart) {
-      throw new Error('Cart data is required')
-    }
-    const { Store } = getModelsByChannel(channel,res,storeModel); 
+// async function summaryRefund (cart,channel,res) {
+//   // try {
+//     // if (!cart) {
+//     //   throw new Error('Cart data is required')
+//     // }
 
-    const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
-    const store = storeData
-      ? {
-          storeId: storeData.storeId,
-          name: storeData.name || '',
-          taxId: storeData.taxId || '',
-          tel: storeData.tel || '',
-          route: storeData.route || '',
-          storeType: storeData.type || '',
-          typeName: storeData.typeName || '',
-          address: storeData.address || '',
-          subDistrict: storeData.subDistrict || '',
-          district: storeData.district || '',
-          province: storeData.province || '',
-          zone: storeData.zone || '',
-          area: storeData.area || ''
-        }
-      : {}
+//     const { Store } = getModelsByChannel(channel,res,storeModel); 
 
-    const productIds = [
-      ...cart.listProduct.map(p => p.id),
-      ...cart.listRefund.map(p => p.id)
-    ]
+//     const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
+//     console.log("storeData",storeData)
+//     const store = storeData
+//       ? {
+//           storeId: storeData.storeId,
+//           name: storeData.name || '',
+//           taxId: storeData.taxId || '',
+//           tel: storeData.tel || '',
+//           route: storeData.route || '',
+//           storeType: storeData.type || '',
+//           typeName: storeData.typeName || '',
+//           address: storeData.address || '',
+//           subDistrict: storeData.subDistrict || '',
+//           district: storeData.district || '',
+//           province: storeData.province || '',
+//           zone: storeData.zone || '',
+//           area: storeData.area || ''
+//         }
+//       : {}
 
-    const { Product } = getModelsByChannel(channel,res,productModel); 
+//     const productIds = [
+//       ...cart.listProduct.map(p => p.id),
+//       ...cart.listRefund.map(p => p.id)
+//     ]
+
+//     const { Product } = getModelsByChannel(channel,res,productModel); 
 
 
-    const productDetails = await Product.find({
-      id: { $in: productIds }
-    }).lean()
+//     const productDetails = await Product.find({
+//       id: { $in: productIds }
+//     }).lean()
 
-    let totalRefund = 0
-    let totalProduct = 0
+//     let totalRefund = 0
+//     let totalProduct = 0
 
-    const enrichedProducts = cart.listProduct.map(cartItem => {
-      const productInfo = productDetails.find(p => p.id === cartItem.id) || {}
-      const unitData =
-        productInfo.listUnit?.find(u => u.unit === cartItem.unit) || {}
-      const qtyPcs = unitData?.factor || cartItem.qty
-      const totalPrice = cartItem.qty * cartItem.price
-      totalProduct += totalPrice
+//     const enrichedProducts = cart.listProduct.map(cartItem => {
+//       const productInfo = productDetails.find(p => p.id === cartItem.id) || {}
+//       const unitData =
+//         productInfo.listUnit?.find(u => u.unit === cartItem.unit) || {}
+//       const qtyPcs = unitData?.factor || cartItem.qty
+//       const totalPrice = cartItem.qty * cartItem.price
+//       totalProduct += totalPrice
 
-      return {
-        id: cartItem.id,
-        name: cartItem.name,
-        group: productInfo.group || '',
-        brand: productInfo.brand || '',
-        size: productInfo.size || '',
-        flavour: productInfo.flavour || '',
-        qty: cartItem.qty.toFixed(),
-        unit: cartItem.unit,
-        unitName: unitData.name,
-        qtyPcs: (qtyPcs * cartItem.qty).toFixed(),
-        price: cartItem.price.toFixed(2),
-        subtotal: totalPrice.toFixed(2),
-        netTotal: totalPrice.toFixed(2)
-      }
-    })
+//       return {
+//         id: cartItem.id,
+//         name: cartItem.name,
+//         group: productInfo.group || '',
+//         brand: productInfo.brand || '',
+//         size: productInfo.size || '',
+//         flavour: productInfo.flavour || '',
+//         qty: cartItem.qty.toFixed(),
+//         unit: cartItem.unit,
+//         unitName: unitData.name,
+//         qtyPcs: (qtyPcs * cartItem.qty).toFixed(),
+//         price: cartItem.price.toFixed(2),
+//         subtotal: totalPrice.toFixed(2),
+//         netTotal: totalPrice.toFixed(2)
+//       }
+//     })
 
-    const enrichedRefunds = cart.listRefund.map(refundItem => {
-      const productInfo = productDetails.find(p => p.id === refundItem.id) || {}
-      const unitData =
-        productInfo.listUnit?.find(u => u.unit === refundItem.unit) || {}
-      const qtyPcs = unitData?.factor || refundItem.qty
-      const totalRefundPrice = refundItem.qty * refundItem.price
-      totalRefund += totalRefundPrice
+//     const enrichedRefunds = cart.listRefund.map(refundItem => {
+//       const productInfo = productDetails.find(p => p.id === refundItem.id) || {}
+//       const unitData =
+//         productInfo.listUnit?.find(u => u.unit === refundItem.unit) || {}
+//       const qtyPcs = unitData?.factor || refundItem.qty
+//       const totalRefundPrice = refundItem.qty * refundItem.price
+//       totalRefund += totalRefundPrice
 
-      return {
-        id: refundItem.id,
-        name: refundItem.name,
-        group: productInfo.group || '',
-        brand: productInfo.brand || '',
-        size: productInfo.size || '',
-        flavour: productInfo.flavour || '',
-        qty: refundItem.qty.toFixed(),
-        unit: refundItem.unit,
-        unitName: unitData.name,
-        qtyPcs: (qtyPcs * refundItem.qty).toFixed(),
-        price: refundItem.price.toFixed(2),
-        total: totalRefundPrice.toFixed(2),
-        condition: refundItem.condition,
-        expireDate: refundItem.expireDate
-      }
-    })
+//       return {
+//         id: refundItem.id,
+//         name: refundItem.name,
+//         group: productInfo.group || '',
+//         brand: productInfo.brand || '',
+//         size: productInfo.size || '',
+//         flavour: productInfo.flavour || '',
+//         qty: refundItem.qty.toFixed(),
+//         unit: refundItem.unit,
+//         unitName: unitData.name,
+//         qtyPcs: (qtyPcs * refundItem.qty).toFixed(),
+//         price: refundItem.price.toFixed(2),
+//         total: totalRefundPrice.toFixed(2),
+//         condition: refundItem.condition,
+//         expireDate: refundItem.expireDate
+//       }
+//     })
 
-    return {
-      type: cart.type,
-      store,
-      listProduct: enrichedProducts,
-      listRefund: enrichedRefunds,
-      totalRefund: totalRefund.toFixed(2),
-      totalChange: totalProduct.toFixed(2),
-      totalExVat: ((totalProduct - totalRefund) / 1.07).toFixed(2),
-      totalVat: (
-        totalProduct -
-        totalRefund -
-        (totalProduct - totalRefund) / 1.07
-      ).toFixed(2),
-      totalNet: (totalProduct - totalRefund).toFixed(2),
-      created: cart.created,
-      updated: cart.updated
-    }
-  } catch (error) {
-    console.error('Error transforming refund cart data:', error.message)
-    return null
-  }
-}
+//     return {
+//       type: cart.type,
+//       store,
+//       listProduct: enrichedProducts,
+//       listRefund: enrichedRefunds,
+//       totalRefund: totalRefund.toFixed(2),
+//       totalChange: totalProduct.toFixed(2),
+//       totalExVat: ((totalProduct - totalRefund) / 1.07).toFixed(2),
+//       totalVat: (
+//         totalProduct -
+//         totalRefund -
+//         (totalProduct - totalRefund) / 1.07
+//       ).toFixed(2),
+//       totalNet: (totalProduct - totalRefund).toFixed(2),
+//       created: cart.created,
+//       updated: cart.updated
+//     }
+//   // } catch (error) {
+//   //   console.error('Error transforming refund cart data:', error.message)
+//   //   return null
+//   // }
+// }
 
 async function summaryGive (cart,channel,res) {
   try {
@@ -549,12 +551,13 @@ async function summaryWithdraw (cart,channel,res) {
 }
 
 async function summaryRefund (cart,channel,res) {
-  try {
+  // try {
     if (!cart) {
       throw new Error('Cart data is required')
     }
     const { Store } = getModelsByChannel(channel,res,storeModel); 
     const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
+    // console.log(storeData)
     const store = storeData
       ? {
           storeId: storeData.storeId,
@@ -594,6 +597,8 @@ async function summaryRefund (cart,channel,res) {
       const totalPrice = cartItem.qty * cartItem.price
       totalProduct += totalPrice
 
+      
+
       return {
         id: cartItem.id,
         name: cartItem.name,
@@ -610,7 +615,7 @@ async function summaryRefund (cart,channel,res) {
         netTotal: totalPrice.toFixed(2)
       }
     })
-
+    // console.log("cart",cart)
     const enrichedRefunds = cart.listRefund.map(refundItem => {
       const productInfo = productDetails.find(p => p.id === refundItem.id) || {}
       const unitData =
@@ -654,10 +659,10 @@ async function summaryRefund (cart,channel,res) {
       created: cart.created,
       updated: cart.updated
     }
-  } catch (error) {
-    console.error('Error transforming refund cart data:', error.message)
-    return null
-  }
+  // } catch (error) {
+  //   console.error('Error transforming refund cart data:', error.message)
+  //   return null
+  // }
 }
 
 async function summaryGive (cart,channel,res) {

@@ -147,6 +147,7 @@ exports.addStock = async (req, res) => {
 exports.available = async (req, res) => {
   try {
     const { area, period } = req.query
+    const channel = req.headers['x-channel'] 
 
     const data = await getStockAvailable(area, period,channel,res)
     res.status(200).json({
@@ -163,6 +164,7 @@ exports.available = async (req, res) => {
 exports.transaction = async (req, res) => {
   try {
     const { area, period } = req.query
+    const channel = req.headers['x-channel'] 
     const movement = await getStockMovement(area, period,channel,res)
     res.status(200).json({
       status: 200,
@@ -177,7 +179,7 @@ exports.transaction = async (req, res) => {
 
 exports.addStockNew = async (req, res) => {
   // try {
-  const { period, warehouse } = req.body
+  const { period } = req.body
 
   const channel = req.headers['x-channel'] 
 
@@ -377,7 +379,7 @@ exports.getStock = async (req, res, next) => {
 
 exports.getQty = async (req, res, next) => {
   try {
-    const { area, id, unit, period } = req.body
+    const { area, productId, unit, period } = req.body
 
     const channel = req.headers['x-channel'] 
 
@@ -388,15 +390,15 @@ exports.getQty = async (req, res, next) => {
     const productStock = await Stock.find({
       area: area,
       period: period,
-      'listProduct.id': id
+      'listProduct.id': productId
     })
-    const products = await Product.find({ id: id })
+    // console.log(productStock)
+    const products = await Product.find({ id: productId })
 
     let unitData = {}
 
-    const productUnitMatch = products?.find(p => p.id === id)
+    const productUnitMatch = products?.find(p => p.id === productId)
 
-    // console.log(productUnitMatch)
     if (productUnitMatch) {
       unitData = productUnitMatch.listUnit.map(unit => ({
         unit: unit.unit,
@@ -411,7 +413,7 @@ exports.getQty = async (req, res, next) => {
     const stockmatchList = []
 
     productStock.map(item => {
-      const stockmatch = item.listProduct.find(p => p.id === id)
+      const stockmatch = item.listProduct.find(p => p.id === productId)
       if (stockmatch) {
         stockmatchList.push(stockmatch)
       }
@@ -432,7 +434,7 @@ exports.getQty = async (req, res, next) => {
 
     const data = {
       area: area,
-      productId: id,
+      productId: productId,
       sumQtyPcs: totalQtyPcs,
       qty: Math.floor(totalQtyPcs / productUnit.factor),
       unit: unit,
@@ -547,6 +549,7 @@ exports.availableStock = async (req, res,next) => {
         $match: {
           area: area,
           period: period
+          // type: type
         }
       },
       {
@@ -643,17 +646,29 @@ exports.availableStock = async (req, res,next) => {
             image: product.image,
 
             listUnit: product.listUnit.map(unit => {
-              const totalQtyPcsToCtn = Math.floor(
-                lot.available.reduce((sum, item) => {
-                  return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor
-                }, 0)
-              )
+              // console.log("lot",lot)
+              // const totalQtyPcsToCtn = Math.floor(
+              //   lot.available.reduce((sum, item) => {
+              //     return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor
+              //   }, 0)
+              // )
+              if (unit.unit == 'CTN') {
+                qty = lot.available.reduce((total,u) => total + u.qtyCtn,0)
+              }
+              else if (unit.unit == 'PCS') {
+                qty = lot.available.reduce((total,u) => total + u.qtyPcs,0)
+              }
+              else{
+                qty = 0
+              }
 
               return {
                 unit: unit.unit,
                 name: unit.name,
                 factor: unit.factor,
-                qty: totalQtyPcsToCtn,
+                // qty: totalQtyPcsToCtn,
+              
+                qty:qty,
                 price: {
                   sale: unit.price.sale,
                   Refund: unit.price.refund
@@ -665,6 +680,8 @@ exports.availableStock = async (req, res,next) => {
             __v: product.__v
           }
         : null
+
+
 
       if (lot && Array.isArray(lot.available)) {
         const total = lot.available.reduce(

@@ -9,6 +9,8 @@ const  cartModel  = require('../../models/cash/cart')
 const  productModel  = require('../../models/cash/product')
 const  distributionModel = require('../../models/cash/distribution')
 const  userModel  = require('../../models/cash/user')
+const  stockModel  = require('../../models/cash/stock')
+
 const { getModelsByChannel } = require('../../middleware/channel')
 
 
@@ -16,13 +18,16 @@ const { getModelsByChannel } = require('../../middleware/channel')
 
 exports.checkout = async (req, res) => {
   try {
-    const { type, area, shippingId, withdrawType, sendDate, note } = req.body
+    const { type, area, shippingId, withdrawType, sendDate, note,period  } = req.body
 
       const channel = req.headers['x-channel'];
       const { Cart } = getModelsByChannel(channel,res,cartModel); 
       const { User } = getModelsByChannel(channel,res,userModel); 
       const { Place } = getModelsByChannel(channel,res,distributionModel); 
       const { Product } = getModelsByChannel(channel,res,productModel)
+      const { Distribution } = getModelsByChannel(channel,res,distributionModel)
+      const { Stock } = getModelsByChannel(channel,res,stockModel); 
+
 
 
     if (!type || !area || !shippingId || !withdrawType || !sendDate || !note) {
@@ -71,6 +76,7 @@ exports.checkout = async (req, res) => {
         })
     }
 
+    // console.log("cart",cart)
     const productIds = cart.listProduct.map(p => p.id)
     const products = await Product.find({ id: { $in: productIds } }).select(
       'id name group brand size flavour weightGross weightNet listUnit'
@@ -143,13 +149,83 @@ exports.checkout = async (req, res) => {
       createdBy: sale.username
     })
 
-    await newOrder.save()
+    const calStock = {
+            // storeId: newOrder.store.storeId,
+            area:newOrder.area,
+            period:period,
+            type:"withdraw",
+            listProduct:newOrder.listProduct.map(u => {
+                return {
+                    id:u.id,
+                    unit:u.unit,
+                    qty:u.qty,
+                    // condition:u.condition
+                }
+            })
+        }
+
+
+    const stock = await Stock.findOne(
+            {area:area,
+             period:period
+            }
+        ).select("listProduct")
+        stockDetail = stock.listProduct.map(u => {
+                return{
+                    id: u.id,
+                    sumQtyPcs: u.sumQtyPcs,
+                    sumQtyCtn: u.sumQtyCtn,
+                    sumQtyPcsStockIn: u.sumQtyPcsStockIn,
+                    sumQtyCtnStockIn: u.sumQtyCtnStockIn,
+                    sumQtyPcsStockOut: u.sumQtyPcsStockOut,
+                    sumQtyCtnStockOut: u.sumQtyCtnStockOut
+                }
+            })
+        const data =  calStock.listProduct.map(cal => {
+            const stockData = stockDetail.find(stock => stock.id === cal.id )
+
+            return {
+                id:cal.id,
+                sumQtyPcs: stockData.sumQtyPcs + (cal.unit ==='PCS' ? cal.qty : 0),
+                sumQtyCtn: stockData.sumQtyCtn + (cal.unit ==='CTN' ? cal.qty : 0),
+                sumQtyPcsStockIn: stockData.sumQtyPcsStockIn + (cal.unit ==='PCS' ? cal.qty : 0),
+                sumQtyCtnStockIn: stockData.sumQtyCtnStockIn + (cal.unit ==='CTN' ? cal.qty : 0) ,
+                sumQtyPcsStockOut: stockData.sumQtyPcsStockOut - (cal.unit ==='PCS' ? cal.qty : 0),
+                sumQtyCtnStockOut: stockData.sumQtyCtnStockOut - (cal.unit ==='CTN' ? cal.qty : 0),
+            }
+        })
+
+        for (const cal of data) {
+            await Stock.findOneAndUpdate(
+                {area:area, period:period},
+                { $set: {
+                        "listProduct.$[product].sumQtyPcs": cal.sumQtyPcs,
+                        "listProduct.$[product].sumQtyCtn": cal.sumQtyCtn,
+                        "listProduct.$[product].sumQtyPcsStockIn": cal.sumQtyPcsStockIn,
+                        "listProduct.$[product].sumQtyCtnStockIn": cal.sumQtyCtnStockIn,
+                        "listProduct.$[product].sumQtyPcsStockOut": cal.sumQtyPcsStockOut,
+                        "listProduct.$[product].sumQtyCtnStockOut": cal.sumQtyCtnStockOut
+                }},
+                { arrayFilters : [{ "product.id": cal.id }] , new: true}
+            )
+        }
+
+
+
+
+
+
+
+
+    console.log(calStock)
+    // await newOrder.save()
     // await Cart.deleteOne({ type, area })
 
     res.status(200).json({
       status: 200,
       message: 'Checkout successful!',
-      data: { orderId, total: subtotal, qty: totalQty }
+      // data: { orderId, total: subtotal, qty: totalQty }
+      data:newOrder
     })
   } catch (error) {
     console.error('Error saving store to MongoDB:', error)

@@ -20,8 +20,11 @@ const listProductSchema = new mongoose.Schema(
     id: { type: String, required: true },
     sumQtyPcs: { type: Number, required: true },
     sumQtyCtn: { type: Number, required: true },
-    sumQtyStockIn: { type: Number, required: true , default: 0},
-    sumQtyStockOut: { type: Number, required: true , default: 0},
+    sumQtyPcsStockIn: { type: Number, required: true , default: 0},
+    sumQtyCtnStockIn: { type: Number, required: true , default: 0},
+    sumQtyPcsStockOut: { type: Number, required: true , default: 0},
+    sumQtyCtnStockOut: { type: Number, required: true , default: 0},
+
     available: { type: [availableSchema], default: [] }
   },
   { _id: false }
