@@ -626,6 +626,7 @@ async function summaryRefund (cart,channel,res) {
 
       return {
         id: refundItem.id,
+        lot: refundItem.lot,
         name: refundItem.name,
         group: productInfo.group || '',
         brand: productInfo.brand || '',

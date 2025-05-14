@@ -35,7 +35,7 @@ const listRefundProductSchema = new mongoose.Schema({
     total: { type: Number, require: true },
     condition: { type: String, require: true },
     expireDate: { type: String, require: true, default: ''},
-    // lot: { type: String, require: true, default: ''}
+    lot: { type: String, require: true, default: ''}
 })
 
 const refundImageSchema = mongoose.Schema({

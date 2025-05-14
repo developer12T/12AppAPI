@@ -128,6 +128,7 @@ exports.addProduct = async (req, res) => {
     }
 
     const unitData = product.listUnit.find(u => u.unit === unit)
+
     if (!unitData) {
       return res.status(400).json({
         status: 400,
@@ -164,15 +165,16 @@ exports.addProduct = async (req, res) => {
           p =>
             p.id === id &&
             p.unit === unit &&
+            p.lot === lot &&
             p.condition === condition &&
-            p.expireDate === expire
+            p.expireDate === expire 
         )
-        if (existingRefund) {
+        if (existingRefund && existingRefund.lot === lot) {
           existingRefund.qty += qty
         } else {
           cart.listRefund.push({
             id,
-
+            lot,
             name: product.name,
             qty,
             unit,
@@ -212,7 +214,8 @@ exports.addProduct = async (req, res) => {
       const existingProduct = cart.listProduct.find(
         p => p.id === id && p.unit === unit
       )
-      if (existingProduct) {
+      console.log(existingProduct.lot,lot)
+      if (existingProduct && existingProduct.lot === lot) {
         existingProduct.qty += qty
       } else {
         cart.listProduct.push({
@@ -228,7 +231,7 @@ exports.addProduct = async (req, res) => {
       cart.total = cart.listProduct.reduce((sum, p) => sum + p.qty * p.price, 0)
     }
     cart.createdAt = new Date()
-    await cart.save()
+    // await cart.save()
 
     res.status(200).json({
       status: 200,

@@ -73,6 +73,7 @@ const receiveSchema = mongoose.Schema({
 
 const listProductDistribution = new mongoose.Schema({
     id: { type: String, require: true },
+    lot:{ type: String, require: true },
     name: { type: String, require: true },
     group: { type: String, require: true },
     brand: { type: String, require: true },

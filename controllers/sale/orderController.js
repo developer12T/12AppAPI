@@ -1,8 +1,8 @@
-const { Order } = require('../../models/cash/sale')
-const { Cart } = require('../../models/cash/cart')
-const { User } = require('../../models/cash/user')
-const { Product } = require('../../models/cash/product')
-const { Route } = require('../../models/cash/route')
+// const { Order } = require('../../models/cash/sale')
+// const { Cart } = require('../../models/cash/cart')
+// const { User } = require('../../models/cash/user')
+// const { Product } = require('../../models/cash/product')
+// const { Route } = require('../../models/cash/route')
 
 
 const { Warehouse,Locate,Balance,Sale } = require('../../models/cash/master')
@@ -132,7 +132,7 @@ exports.checkout = async (req, res) => {
       })
 
       if (listProduct.includes(null)) return
-      const orderId = await generateOrderId(area, sale.warehouse)
+      const orderId = await generateOrderId(area, sale.warehouse,channel,res)
 
       const newOrder = new Order({
         orderId,
@@ -181,8 +181,8 @@ exports.checkout = async (req, res) => {
         createdBy: sale.username
       })
 
-      await newOrder.save()
-      await Cart.deleteOne({ type, area, storeId })
+      // await newOrder.save()
+      // await Cart.deleteOne({ type, area, storeId })
 
       const checkIn = await checkInRoute({
         storeId: storeId,
@@ -192,8 +192,6 @@ exports.checkout = async (req, res) => {
         latitude: latitude,
         longitude: longitude
       },channel,res)
-
-      // console.log('checkin', checkIn)
 
       res.status(200).json({
         status: 200,

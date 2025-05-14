@@ -3,6 +3,7 @@ const { dbCA } = require('../../config/db')
 
 const listCartRefund = mongoose.Schema({
   id: { type: String, require: true, default: '' },
+  lot: { type: String, require: true, default: '' },
   name: { type: String, require: true, default: '' },
   qty: { type: Number, require: true, default: 0 },
   unit: { type: String, require: true, default: '' },
