@@ -87,6 +87,7 @@ exports.checkout = async (req, res) => {
     let totalWeightGross = 0
     let totalWeightNet = 0
     let listProduct = cart.listProduct.map(item => {
+      //มาเช็คตรงนี้
       const product = products.find(p => p.id === item.id)
       if (!product) return null
 
@@ -125,7 +126,7 @@ exports.checkout = async (req, res) => {
       }
     })
 
-    console.log(listProduct)
+    // console.log(listProduct)
 
     if (listProduct.includes(null)) return
     // if (listProduct.some(p => p === null)) return res.status(400).json({ status: 400, message: 'Invalid product in cart!' })
@@ -189,31 +190,30 @@ const stock = await Stock.aggregate([
                             available:"$listProduct.available"
                         }}
         ]);
-// console.dir(stock, { depth: null, colors: true });
 
-
-let listProductWithdraw = []
+let listProductWithDraw = []
 let updateLot = []
-
+// console.log(calStock)
         for (const stockDetail of stock) {
             for (const lot of stockDetail.available) {
                 const calDetail = calStock.listProduct.find(u => u.id === stockDetail.id && u.lot === lot.lot) 
-                console.log(calDetail)
+                // console.log(lot)
                 updateLot.push({
                     id:stockDetail.id,
                     location:lot.location,
                     lot:lot.lot,
-                    qtyPcs:lot.qtyPcs - (calDetail.unit ==='PCS'? calDetail.qty : 0) ,
-                    qtyPcsStockIn:lot.qtyPcsStockIn ,
-                    qtyPcsStockOut:lot.qtyPcsStockOut + (calDetail.unit ==='PCS' ? calDetail.qty : 0),
-                    qtyCtn:lot.qtyCtn - (calDetail.unit ==='CTN' ? calDetail.qty : 0),
-                    qtyCtnStockIn:lot.qtyCtnStockIn ,
-                    qtyCtnStockOut:lot.qtyCtnStockOut + (calDetail.unit ==='CTN' ? calDetail.qty : 0),
+                    qtyPcs:lot.qtyPcs + (calDetail.unit ==='PCS' ) ,
+                    qtyPcsStockIn:lot.qtyPcsStockIn + (calDetail.unit ==='PCS' ),
+                    qtyPcsStockOut:lot.qtyPcsStockOut,
+                    qtyCtn:lot.qtyCtn + (calDetail.unit ==='CTN' ),
+                    qtyCtnStockIn:lot.qtyCtnStockIn + (calDetail.unit ==='CTN' ),
+                    qtyCtnStockOut:lot.qtyCtnStockOut
                 })
 
             }
-            const relatedLots = updateLot.filter((u) => u.id === stockDetail.id);
-            listProductWithdraw.push({
+          
+const relatedLots = updateLot.filter((u) => u.id === stockDetail.id);
+            listProductWithDraw.push({
                 id: stockDetail.id,
                 sumQtyPcs: relatedLots.reduce((total, item) => total + item.qtyPcs, 0),
                 sumQtyCtn: relatedLots.reduce((total, item) => total + item.qtyCtn, 0),
@@ -224,9 +224,8 @@ let updateLot = []
                 available: relatedLots.map(({ id, ...rest }) => rest), 
             });
             }
-
-
-        for (const updated of listProduct) {
+console.dir(listProductWithDraw, { depth: null, colors: true });
+        for (const updated of listProductWithDraw) {
             await Stock.findOneAndUpdate(
                 {area:area, period:period},
                 { $set: {
@@ -243,8 +242,6 @@ let updateLot = []
         }
 
 
-
-
     // await newOrder.save()
     // await Cart.deleteOne({ type, area })
 
@@ -252,7 +249,7 @@ let updateLot = []
       status: 200,
       message: 'Checkout successful!',
       // data: { orderId, total: subtotal, qty: totalQty }
-      // data:newOrder
+      data:newOrder
       // data:listProductWithDraw
     })
   } catch (error) {

@@ -6,4 +6,5 @@ const router = express.Router()
 router.post('/add', addPromotion)
 router.post('/changeProduct', getPromotionProduct)
 router.get('/getPromotion', getPromotion)
+
 module.exports = router

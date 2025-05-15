@@ -259,8 +259,11 @@ exports.addStockNew = async (req, res) => {
           lot: locate
         }
       })
+       console.log("stocks",stocks)
 
       const productIds = stocks.map(item => item.itemCode)
+
+      // console.log("productIds",productIds)
       const productDetail = await Product.find({
         id: { $in: productIds }
       }).select('id listUnit.unit listUnit.factor')
@@ -276,7 +279,6 @@ exports.addStockNew = async (req, res) => {
 
       if (areaData) {
         areaData.forEach(area => {
-          // ค้นหาสินค้าในสต็อกตามคลังสินค้า
           const productID = stocks.filter(
             item =>
               item.warehouse === area.warehouse &&
@@ -289,6 +291,7 @@ exports.addStockNew = async (req, res) => {
           if (productID.length > 0) {
             listProduct = productID.map(product => {
               const productId = product.itemCode
+              // console.log("product",product)
               const Factor =
                 productFactors.find(pf => pf.id === productId) || {}
               const sumQtyPcs = product.lot.reduce(

@@ -520,7 +520,7 @@ exports.addFromERP = async (req, res) => {
 
       const existingProduct = await Product.findOne({ id: productId })
       if (existingProduct) {
-        console.log(`Product ID ${productId} already exists. Skipping.`)
+        // console.log(`Product ID ${productId} already exists. Skipping.`)
         continue
       }
 
@@ -529,6 +529,7 @@ exports.addFromERP = async (req, res) => {
         { itcode: productId }
       )
 
+      console.log("itemConvertResponse",itemConvertResponse)
       const unitData = itemConvertResponse.data
       // console.log(JSON.stringify(listProduct, null, 2));
 
@@ -564,8 +565,8 @@ exports.addFromERP = async (req, res) => {
         statusWithdraw: listProduct.statusWithdraw,
         listUnit: listUnit
       })
-      await newProduct.save()
-      console.log(newProduct)
+      // await newProduct.save()
+      // console.log(newProduct)
     }
     res.status(200).json({
       status: 200,

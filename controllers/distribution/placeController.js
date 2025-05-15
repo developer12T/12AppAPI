@@ -13,7 +13,7 @@ exports.getPlace = async (req, res) => {
         const { area, type } = req.query
 
         const channel = req.headers['x-channel'];
-        console.log(channel)
+        // console.log(channel)
 
 
         const { Place } = getModelsByChannel(channel,res,distributionModel); 

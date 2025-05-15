@@ -12,6 +12,7 @@ const distributionRoute = require('./distribution')
 const receiveRoute = require('./receive')
 const giveRoute = require('./give')
 const stockRoute = require('./stock')
+const deliveryRoute = require('./delivery')
 const { login } = require('../../controllers/authen/login')
 
 const router = express.Router()
@@ -30,5 +31,6 @@ router.use('/distribution', distributionRoute)
 router.use('/receive', receiveRoute)
 router.use('/give', giveRoute)
 router.use('/stock', stockRoute)
+router.use('/delivery', deliveryRoute)
 
 module.exports = router
