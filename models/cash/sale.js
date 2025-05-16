@@ -23,6 +23,7 @@ const orderStoreSchema = new mongoose.Schema({
 const listOrderProductSchema = new mongoose.Schema({
     id: { type: String, require: true },
     name: { type: String, require: true },
+    lot : { type: String, require: true },
     groupCode: { type: String, require: true },
     group: { type: String, require: true },
     brandCode: { type: String, require: true },
@@ -52,6 +53,7 @@ const listOrderPromotionSchema = new mongoose.Schema({
         {
             id: { type: String },
             name: { type: String },
+            lot: { type: String },
             groupCode: { type: String },
             group: { type: String },
             brandCode: { type: String },

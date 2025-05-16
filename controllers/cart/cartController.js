@@ -167,7 +167,7 @@ exports.addProduct = async (req, res) => {
             p.unit === unit &&
             p.lot === lot &&
             p.condition === condition &&
-            p.expireDate === expire 
+            p.expireDate === expire
         )
         if (existingRefund && existingRefund.lot === lot && existingRefund.unit === unit) {
           existingRefund.qty += qty
@@ -190,6 +190,7 @@ exports.addProduct = async (req, res) => {
         if (existingProduct && existingProduct.lot === lot && existingProduct.unit === unit) {
           existingProduct.qty += qty
         } else {
+
           cart.listProduct.push({
             id,
             lot,
@@ -219,7 +220,7 @@ exports.addProduct = async (req, res) => {
       if (existingProduct && existingProduct.lot === lot && existingProduct.unit === unit) {
         existingProduct.qty += qty
       } else {
-        console.log("test")
+        // console.log("test")
         cart.listProduct.push({
           id,
           lot,

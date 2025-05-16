@@ -26,6 +26,7 @@ const { DateTime } = require("luxon");
 const { getSocket } = require('../../socket')
 
 
+const stockModel = require('../../models/cash/stock')
 const orderModel  = require('../../models/cash/sale')
 const cartModel  = require('../../models/cash/cart')
 const userModel  = require('../../models/cash/user')
@@ -41,6 +42,7 @@ exports.checkout = async (req, res) => {
       area,
       storeId,
       routeId,
+      period,
       note,
       latitude,
       longitude,
@@ -56,6 +58,8 @@ exports.checkout = async (req, res) => {
     const { User } = getModelsByChannel(channel,res,userModel); 
     const { Product } = getModelsByChannel(channel,res,productModel); 
     const { Order } = getModelsByChannel(channel,res,orderModel); 
+    const { Stock } = getModelsByChannel(channel,res,stockModel); 
+
 
     if (!type || !area || !storeId || !shipping || !payment) {
       return res
@@ -87,6 +91,8 @@ exports.checkout = async (req, res) => {
       //     return res.status(404).json({ status: 404, message: 'Shipping address not found!' })
       // }
 
+
+
       const productIds = cart.listProduct.map(p => p.id)
       const products = await Product.find({ id: { $in: productIds } }).select(
         'id name groupCode group brandCode brand size flavourCode flavour listUnit'
@@ -112,7 +118,7 @@ exports.checkout = async (req, res) => {
 
         return {
           id: product.id,
-          lot: product.lot,
+          lot: item.lot,
           name: product.name,
           group: product.group,
           groupCode: product.groupCode,
@@ -130,7 +136,6 @@ exports.checkout = async (req, res) => {
           netTotal: parseFloat(totalPrice.toFixed(2))
         }
       })
-
       if (listProduct.includes(null)) return
       const orderId = await generateOrderId(area, sale.warehouse,channel,res)
 
@@ -180,6 +185,114 @@ exports.checkout = async (req, res) => {
         paymentStatus: 'paid',
         createdBy: sale.username
       })
+
+// console.log(JSON.stringify(newOrder.listProduct, null, 2));
+
+        const calStock = {
+            // storeId: refundOrder.store.storeId,
+            area: newOrder.store.area,
+            period: period,
+            type: "Sale",
+            listProduct: newOrder.listProduct.map(u => {
+                return {
+                    id: u.id,
+                    lot: u.lot,
+                    unit: u.unit,
+                    qty: u.qty,
+                }
+            })
+        }
+        // console.log("newOrder.listProduct",newOrder.listProduct)
+
+        const productId = calStock.listProduct.flatMap(u => u.id)
+
+        const stock = await Stock.aggregate([
+            { $match: { area: area, period: period } },
+            { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
+            { $match: { "listProduct.id": { $in: productId } } },
+            // { $match : { "listProduct.available.lot": u.lot } },
+            {
+                $project: {
+                    _id: 0,
+                    id: "$listProduct.id",
+                    sumQtyPcs: "$listProduct.sumQtyPcs",
+                    sumQtyCtn: "$listProduct.sumQtyCtn",
+                    sumQtyPcsStockIn: "$listProduct.sumQtyPcsStockIn",
+                    sumQtyCtnStockIn: "$listProduct.sumQtyCtnStockIn",
+                    sumQtyPcsStockOut: "$listProduct.sumQtyPcsStockOut",
+                    sumQtyCtnStockOut: "$listProduct.sumQtyCtnStockOut",
+                    available: "$listProduct.available"
+                }
+            }
+        ]);
+
+        let listProductStock = []
+        let updateLot = []
+
+        for (const stockDetail of stock) {
+            for (const lot of stockDetail.available) {
+
+                const calDetails = calStock.listProduct.filter(
+                    u => u.id === stockDetail.id && u.lot === lot.lot
+                );
+
+                let pcsQty = 0;
+                let ctnQty = 0;
+
+                for (const cal of calDetails) {
+                    if (cal.unit === 'PCS' || cal.unit === 'BOT') {
+                        pcsQty += cal.qty || 0;
+                    }
+                    if (cal.unit === 'CTN') {
+                        ctnQty += cal.qty || 0;
+                    }
+                }
+
+                updateLot.push({
+                    id: stockDetail.id,
+                    location: lot.location,
+                    lot: lot.lot,
+                    qtyPcs: lot.qtyPcs - pcsQty,
+                    qtyPcsStockIn: lot.qtyPcsStockIn ,
+                    qtyPcsStockOut: lot.qtyPcsStockOut + pcsQty,
+                    qtyCtn: lot.qtyCtn - ctnQty,
+                    qtyCtnStockIn: lot.qtyCtnStockIn ,
+                    qtyCtnStockOut: lot.qtyCtnStockOut + ctnQty
+                })
+            }
+            const relatedLots = updateLot.filter((u) => u.id === stockDetail.id);
+            listProductStock.push({
+                id: stockDetail.id,
+                sumQtyPcs: relatedLots.reduce((total, item) => total + item.qtyPcs, 0),
+                sumQtyCtn: relatedLots.reduce((total, item) => total + item.qtyCtn, 0),
+                sumQtyPcsStockIn: relatedLots.reduce((total, item) => total + item.qtyPcsStockIn, 0),
+                sumQtyCtnStockIn: relatedLots.reduce((total, item) => total + item.qtyCtnStockIn, 0),
+                sumQtyPcsStockOut: relatedLots.reduce((total, item) => total + item.qtyPcsStockOut, 0),
+                sumQtyCtnStockOut: relatedLots.reduce((total, item) => total + item.qtyCtnStockOut, 0),
+                available: relatedLots.map(({ id, ...rest }) => rest),
+            });
+        }
+
+        for (const updated of listProductStock) {
+            await Stock.findOneAndUpdate(
+                { area: area, period: period },
+                {
+                    $set: {
+                        "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
+                        "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
+                        "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
+                        "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
+                        "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
+                        "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
+                        "listProduct.$[product].available": updated.available
+                    }
+                },
+                { arrayFilters: [{ "product.id": updated.id }], new: true }
+            )
+        }
+
+
+
 
       // await newOrder.save()
       // await Cart.deleteOne({ type, area, storeId })

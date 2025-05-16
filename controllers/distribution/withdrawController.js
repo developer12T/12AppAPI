@@ -161,7 +161,7 @@ exports.checkout = async (req, res) => {
             // storeId: newOrder.store.storeId,
             area:newOrder.area,
             period:period,
-            type:"withdraw",
+            type:"Withdraw",
             listProduct:newOrder.listProduct.map(u => {
                 return {
                     id:u.id,
@@ -193,24 +193,41 @@ const stock = await Stock.aggregate([
 
 let listProductWithDraw = []
 let updateLot = []
-// console.log(calStock)
+
+
+// console.log("calStock",calStock)
         for (const stockDetail of stock) {
+          // console.log("stockDetail",stockDetail)
             for (const lot of stockDetail.available) {
-                const calDetail = calStock.listProduct.find(u => u.id === stockDetail.id && u.lot === lot.lot) 
-                // console.log(lot)
+
+              const calDetails = calStock.listProduct.filter(
+                u => u.id === stockDetail.id && u.lot === lot.lot
+              );
+
+              let pcsQty = 0;
+              let ctnQty = 0;
+
+              for (const cal of calDetails) {
+                if (cal.unit === 'PCS' || cal.unit === 'BOT') {
+                  pcsQty += cal.qty || 0;
+                }
+                if (cal.unit === 'CTN' ) {
+                  ctnQty += cal.qty || 0;
+                }
+              }
                 updateLot.push({
                     id:stockDetail.id,
                     location:lot.location,
                     lot:lot.lot,
-                    qtyPcs:lot.qtyPcs + (calDetail.unit ==='PCS' ) ,
-                    qtyPcsStockIn:lot.qtyPcsStockIn + (calDetail.unit ==='PCS' ),
-                    qtyPcsStockOut:lot.qtyPcsStockOut,
-                    qtyCtn:lot.qtyCtn + (calDetail.unit ==='CTN' ),
-                    qtyCtnStockIn:lot.qtyCtnStockIn + (calDetail.unit ==='CTN' ),
-                    qtyCtnStockOut:lot.qtyCtnStockOut
+                    qtyPcs:lot.qtyPcs -  pcsQty,
+                    qtyPcsStockIn:lot.qtyPcsStockIn ,
+                    qtyPcsStockOut:lot.qtyPcsStockOut + pcsQty,
+                    qtyCtn:lot.qtyCtn - ctnQty,
+                    qtyCtnStockIn:lot.qtyCtnStockIn ,
+                    qtyCtnStockOut:lot.qtyCtnStockOut + ctnQty
                 })
-
-            }
+              }
+            
           
 const relatedLots = updateLot.filter((u) => u.id === stockDetail.id);
             listProductWithDraw.push({
@@ -223,8 +240,9 @@ const relatedLots = updateLot.filter((u) => u.id === stockDetail.id);
                 sumQtyCtnStockOut: relatedLots.reduce((total, item) => total + item.qtyCtnStockOut, 0),
                 available: relatedLots.map(({ id, ...rest }) => rest), 
             });
+            // console.dir(relatedLots, { depth: null, colors: true });
             }
-console.dir(listProductWithDraw, { depth: null, colors: true });
+
         for (const updated of listProductWithDraw) {
             await Stock.findOneAndUpdate(
                 {area:area, period:period},

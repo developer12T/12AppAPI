@@ -60,7 +60,6 @@ async function summaryOrder (cart,channel,res) {
       // console.log("factor",factor);
       const qtyPcs = cartItem.qty * factor
       const totalPrice = cartItem.qty * cartItem.price
-
       return {
         id: cartItem.id,
         lot: cartItem.lot,
@@ -301,7 +300,7 @@ async function summaryGive (cart,channel,res) {
     if (!cart) {
       throw new Error('Cart data is required')
     }
-    console.log('summaryGive', cart.storeId)
+    // console.log('summaryGive', cart.storeId)
     const { Store } = getModelsByChannel(channel,res,storeModel); 
 
     const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
@@ -335,10 +334,11 @@ async function summaryGive (cart,channel,res) {
         productInfo.listUnit?.find(u => u.unit === cartItem.unit) || {}
       const qtyPcs = unitData?.factor || cartItem.qty
       const totalPrice = cartItem.qty * cartItem.price
-
+      // console.log("cartItem",cartItem)
       return {
         id: cartItem.id,
         name: cartItem.name,
+        lot:cartItem.lot,
         group: productInfo.group || '',
         brand: productInfo.brand || '',
         size: productInfo.size || '',
@@ -348,7 +348,8 @@ async function summaryGive (cart,channel,res) {
         unitName: unitData.name,
         qtyPcs: qtyPcs * cartItem.qty,
         price: cartItem.price,
-        total: totalPrice
+        total: totalPrice,
+        condition : cartItem.condition
       }
     })
 
@@ -666,77 +667,77 @@ async function summaryRefund (cart,channel,res) {
   // }
 }
 
-async function summaryGive (cart,channel,res) {
-  try {
-    if (!cart) {
-      throw new Error('Cart data is required')
-    }
-    const { Store } = getModelsByChannel(channel,res,storeModel); 
-    const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
-    const store = storeData
-      ? {
-          storeId: storeData.storeId,
-          name: storeData.name || '',
-          taxId: storeData.taxId || '',
-          tel: storeData.tel || '',
-          route: storeData.route || '',
-          storeType: storeData.type || '',
-          typeName: storeData.typeName || '',
-          address: storeData.address || '',
-          subDistrict: storeData.subDistrict || '',
-          district: storeData.district || '',
-          province: storeData.province || '',
-          zone: storeData.zone || '',
-          area: storeData.area || ''
-        }
-      : {}
+// async function summaryGive (cart,channel,res) {
+//   try {
+//     if (!cart) {
+//       throw new Error('Cart data is required')
+//     }
+//     const { Store } = getModelsByChannel(channel,res,storeModel); 
+//     const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
+//     const store = storeData
+//       ? {
+//           storeId: storeData.storeId,
+//           name: storeData.name || '',
+//           taxId: storeData.taxId || '',
+//           tel: storeData.tel || '',
+//           route: storeData.route || '',
+//           storeType: storeData.type || '',
+//           typeName: storeData.typeName || '',
+//           address: storeData.address || '',
+//           subDistrict: storeData.subDistrict || '',
+//           district: storeData.district || '',
+//           province: storeData.province || '',
+//           zone: storeData.zone || '',
+//           area: storeData.area || ''
+//         }
+//       : {}
 
-    const productIds = cart.listProduct.map(p => p.id)
-    const { Product } = getModelsByChannel(channel,res,productModel); 
+//     const productIds = cart.listProduct.map(p => p.id)
+//     const { Product } = getModelsByChannel(channel,res,productModel); 
 
-    const productDetails = await Product.find({
-      id: { $in: productIds }
-    }).lean()
+//     const productDetails = await Product.find({
+//       id: { $in: productIds }
+//     }).lean()
 
-    const enrichedProducts = cart.listProduct.map(cartItem => {
-      const productInfo = productDetails.find(p => p.id === cartItem.id) || {}
-      const unitData =
-        productInfo.listUnit?.find(u => u.unit === cartItem.unit) || {}
-      const qtyPcs = unitData?.factor || cartItem.qty
-      const totalPrice = cartItem.qty * cartItem.price
+//     const enrichedProducts = cart.listProduct.map(cartItem => {
+//       const productInfo = productDetails.find(p => p.id === cartItem.id) || {}
+//       const unitData =
+//         productInfo.listUnit?.find(u => u.unit === cartItem.unit) || {}
+//       const qtyPcs = unitData?.factor || cartItem.qty
+//       const totalPrice = cartItem.qty * cartItem.price
 
-      return {
-        id: cartItem.id,
-        name: cartItem.name,
-        group: productInfo.group || '',
-        brand: productInfo.brand || '',
-        size: productInfo.size || '',
-        flavour: productInfo.flavour || '',
-        qty: cartItem.qty,
-        unit: cartItem.unit,
-        unitName: unitData.name,
-        qtyPcs: qtyPcs * cartItem.qty,
-        price: cartItem.price,
-        total: totalPrice
-      }
-    })
+//       return {
+//         id: cartItem.id,
+//         name: cartItem.name,
+//         group: productInfo.group || '',
+//         brand: productInfo.brand || '',
+//         size: productInfo.size || '',
+//         flavour: productInfo.flavour || '',
+//         qty: cartItem.qty,
+//         unit: cartItem.unit,
+//         unitName: unitData.name,
+//         qtyPcs: qtyPcs * cartItem.qty,
+//         price: cartItem.price,
+//         total: totalPrice
+//       }
+//     })
 
-    return {
-      type: cart.type,
-      store,
-      shipping: [],
-      listProduct: enrichedProducts,
-      totalVat: parseFloat((cart.total - cart.total / 1.07).toFixed(2)),
-      totalExVat: parseFloat((cart.total / 1.07).toFixed(2)),
-      total: parseFloat(cart.total.toFixed(2)),
-      createdAt: cart.created,
-      updatedAt: cart.updated
-    }
-  } catch (error) {
-    console.error('Error transforming cart data:', error.message)
-    return null
-  }
-}
+//     return {
+//       type: cart.type,
+//       store,
+//       shipping: [],
+//       listProduct: enrichedProducts,
+//       totalVat: parseFloat((cart.total - cart.total / 1.07).toFixed(2)),
+//       totalExVat: parseFloat((cart.total / 1.07).toFixed(2)),
+//       total: parseFloat(cart.total.toFixed(2)),
+//       createdAt: cart.created,
+//       updatedAt: cart.updated
+//     }
+//   } catch (error) {
+//     console.error('Error transforming cart data:', error.message)
+//     return null
+//   }
+// }
 
 module.exports = {
   summaryOrder,

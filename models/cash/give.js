@@ -10,7 +10,8 @@ const giveawaysProduct = new mongoose.Schema({
     productUnit: [{ type: String }],
     productQty: { type: Number, default: 0 },
     productAmount: { type: Number, default: 0 },
-    limitType: { type: String, enum: ['limited', 'unlimited'], default: 'limited' }
+    limitType: { type: String, enum: ['limited', 'unlimited'], default: 'limited' },
+    lot : [{ type: String }],
 })
 
 const giveTypeSchema = new mongoose.Schema({
@@ -66,6 +67,7 @@ const giveShipingSchema = new mongoose.Schema({
 const listGiveProductSchema = new mongoose.Schema({
     id: { type: String, require: true },
     name: { type: String, require: true },
+    lot: { type: String, require: true },
     group: { type: String, require: true },
     brand: { type: String, require: true },
     size: { type: String, require: true },
@@ -111,7 +113,7 @@ const giveawaysSchema = new mongoose.Schema({
 
 module.exports = (conn) => {
     return {
-      Giveaways: conn.model('Giveaway', giveawaysSchema),
+      Giveaway: conn.model('Giveaway', giveawaysSchema),
       Givetype: conn.model('Givetype', giveTypeSchema),
     };
   };

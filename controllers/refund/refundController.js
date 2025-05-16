@@ -10,11 +10,11 @@ const path = require('path')
 const multer = require('multer')
 const upload = multer({ storage: multer.memoryStorage() }).single('image')
 
-const  refundModel  = require('../../models/cash/refund')
-const  orderModel  = require('../../models/cash/sale')
-const  cartModel  = require('../../models/cash/cart')
-const  userModel  = require('../../models/cash/user')
-const  stockModel  = require('../../models/cash/stock')
+const refundModel = require('../../models/cash/refund')
+const orderModel = require('../../models/cash/sale')
+const cartModel = require('../../models/cash/cart')
+const userModel = require('../../models/cash/user')
+const stockModel = require('../../models/cash/stock')
 const { getModelsByChannel } = require('../../middleware/channel')
 
 
@@ -23,13 +23,13 @@ const { getModelsByChannel } = require('../../middleware/channel')
 
 exports.checkout = async (req, res) => {
     try {
-        const { type, area, period,storeId, note, latitude, longitude, shipping, payment } = req.body
-        const channel = req.headers['x-channel']; 
-        const { Cart } = getModelsByChannel(channel,res,cartModel); 
-        const { User } = getModelsByChannel(channel,res,userModel); 
-        const { Refund } = getModelsByChannel(channel,res,refundModel); 
-        const { Order } = getModelsByChannel(channel,res,orderModel); 
-        const { Stock } = getModelsByChannel(channel,res,stockModel); 
+        const { type, area, period, storeId, note, latitude, longitude, shipping, payment } = req.body
+        const channel = req.headers['x-channel'];
+        const { Cart } = getModelsByChannel(channel, res, cartModel);
+        const { User } = getModelsByChannel(channel, res, userModel);
+        const { Refund } = getModelsByChannel(channel, res, refundModel);
+        const { Order } = getModelsByChannel(channel, res, orderModel);
+        const { Stock } = getModelsByChannel(channel, res, stockModel);
 
 
         if (!type || type !== 'refund') {
@@ -55,10 +55,10 @@ exports.checkout = async (req, res) => {
             return res.status(404).json({ status: 404, message: 'Sale user not found!' })
         }
 
-        const refundOrderId = await generateRefundId(area, sale.warehouse,channel,res)
-        const changeOrderId = await generateOrderId(area, sale.warehouse,channel,res)
+        const refundOrderId = await generateRefundId(area, sale.warehouse, channel, res)
+        const changeOrderId = await generateOrderId(area, sale.warehouse, channel, res)
 
-        const summary = await summaryRefund(cart,channel,res)
+        const summary = await summaryRefund(cart, channel, res)
         // console.log('summary:', JSON.stringify(summary, null, 2))
 
         const refundOrder = new Refund({
@@ -134,60 +134,77 @@ exports.checkout = async (req, res) => {
 
         const calStock = {
             // storeId: refundOrder.store.storeId,
-            area:refundOrder.store.area,
-            period:period,
-            type:"Refund",
-            listProduct:refundOrder.listProduct.map(u => {
+            area: refundOrder.store.area,
+            period: period,
+            type: "Refund",
+            listProduct: refundOrder.listProduct.map(u => {
                 return {
-                    id:u.id,
-                    lot:u.lot,
-                    unit:u.unit,
-                    qty:u.qty,
-                    condition:u.condition
+                    id: u.id,
+                    lot: u.lot,
+                    unit: u.unit,
+                    qty: u.qty,
+                    condition: u.condition
                 }
             })
         }
 
 
-        const productId = calStock.listProduct.flatMap( u => u.id)
+        const productId = calStock.listProduct.flatMap(u => u.id)
 
-const stock = await Stock.aggregate([
+        const stock = await Stock.aggregate([
             { $match: { area: area, period: period } },
             { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
-            { $match: { "listProduct.id":{$in: productId}}},
+            { $match: { "listProduct.id": { $in: productId } } },
             // { $match : { "listProduct.available.lot": u.lot } },
-              { $project: {
-                            _id: 0,
-                            id: "$listProduct.id",
-                            sumQtyPcs:"$listProduct.sumQtyPcs",
-                            sumQtyCtn:"$listProduct.sumQtyCtn",
-                            sumQtyPcsStockIn:"$listProduct.sumQtyPcsStockIn",
-                            sumQtyCtnStockIn:"$listProduct.sumQtyCtnStockIn",
-                            sumQtyPcsStockOut:"$listProduct.sumQtyPcsStockOut",
-                            sumQtyCtnStockOut:"$listProduct.sumQtyCtnStockOut",
-                            available:"$listProduct.available"
-                        }}
+            {
+                $project: {
+                    _id: 0,
+                    id: "$listProduct.id",
+                    sumQtyPcs: "$listProduct.sumQtyPcs",
+                    sumQtyCtn: "$listProduct.sumQtyCtn",
+                    sumQtyPcsStockIn: "$listProduct.sumQtyPcsStockIn",
+                    sumQtyCtnStockIn: "$listProduct.sumQtyCtnStockIn",
+                    sumQtyPcsStockOut: "$listProduct.sumQtyPcsStockOut",
+                    sumQtyCtnStockOut: "$listProduct.sumQtyCtnStockOut",
+                    available: "$listProduct.available"
+                }
+            }
         ]);
+        // console.dir(calStock, { depth: null, colors: true });
 
-let listProduct = []
-let updateLot = []
+        // console.dir(stock, { depth: null, colors: true });
+        let listProduct = []
+        let updateLot = []
 
         for (const stockDetail of stock) {
             for (const lot of stockDetail.available) {
-                const calDetail = calStock.listProduct.find(u => u.id === stockDetail.id && u.lot === lot.lot) 
 
+                const calDetails = calStock.listProduct.filter(
+                    u => u.id === stockDetail.id && u.lot === lot.lot
+                );
+
+                let pcsQty = 0;
+                let ctnQty = 0;
+
+                for (const cal of calDetails) {
+                    if (cal.unit === 'PCS' || cal.unit === 'BOT') {
+                        pcsQty += cal.qty || 0;
+                    }
+                    if (cal.unit === 'CTN') {
+                        ctnQty += cal.qty || 0;
+                    }
+                }
                 updateLot.push({
-                    id:stockDetail.id,
-                    location:lot.location,
-                    lot:lot.lot,
-                    qtyPcs:lot.qtyPcs + (calDetail.unit ==='PCS' && calDetail.condition === 'good' ? calDetail.qty : 0) ,
-                    qtyPcsStockIn:lot.qtyPcsStockIn + (calDetail.unit ==='PCS' && calDetail.condition === 'good' ? calDetail.qty : 0),
-                    qtyPcsStockOut:lot.qtyPcsStockOut,
-                    qtyCtn:lot.qtyCtn + (calDetail.unit ==='CTN' && calDetail.condition === 'good' ? calDetail.qty : 0),
-                    qtyCtnStockIn:lot.qtyCtnStockIn + (calDetail.unit ==='CTN' && calDetail.condition === 'good' ? calDetail.qty : 0),
-                    qtyCtnStockOut:lot.qtyCtnStockOut
+                    id: stockDetail.id,
+                    location: lot.location,
+                    lot: lot.lot,
+                    qtyPcs: lot.qtyPcs + pcsQty,
+                    qtyPcsStockIn: lot.qtyPcsStockIn + pcsQty,
+                    qtyPcsStockOut: lot.qtyPcsStockOut ,
+                    qtyCtn: lot.qtyCtn + ctnQty,
+                    qtyCtnStockIn: lot.qtyCtnStockIn + ctnQty,
+                    qtyCtnStockOut: lot.qtyCtnStockOut 
                 })
-
             }
             const relatedLots = updateLot.filter((u) => u.id === stockDetail.id);
             listProduct.push({
@@ -198,30 +215,32 @@ let updateLot = []
                 sumQtyCtnStockIn: relatedLots.reduce((total, item) => total + item.qtyCtnStockIn, 0),
                 sumQtyPcsStockOut: relatedLots.reduce((total, item) => total + item.qtyPcsStockOut, 0),
                 sumQtyCtnStockOut: relatedLots.reduce((total, item) => total + item.qtyCtnStockOut, 0),
-                available: relatedLots.map(({ id, ...rest }) => rest), 
+                available: relatedLots.map(({ id, ...rest }) => rest),
             });
-            }
+        }
 
         for (const updated of listProduct) {
             await Stock.findOneAndUpdate(
-                {area:area, period:period},
-                { $set: {
+                { area: area, period: period },
+                {
+                    $set: {
                         "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
                         "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
                         "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
                         "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
                         "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
                         "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
-                        "listProduct.$[product].available":updated.available
-                }},
-                { arrayFilters : [{ "product.id": updated.id }] , new: true}
+                        "listProduct.$[product].available": updated.available
+                    }
+                },
+                { arrayFilters: [{ "product.id": updated.id }], new: true }
             )
         }
 
 
         await refundOrder.save()
         await changeOrder.save()
-        await Cart.deleteOne({ type, area, storeId })
+        // await Cart.deleteOne({ type, area, storeId })
         res.status(200).json({
             status: 200,
             message: 'Checkout successful!',
@@ -241,9 +260,9 @@ exports.getRefund = async (req, res) => {
     try {
         const { type, area, store, period } = req.query
 
-        const channel = req.headers['x-channel']; 
-        const { Refund } = getModelsByChannel(channel,res,refundModel); 
-        const { Order } = getModelsByChannel(channel,res,orderModel); 
+        const channel = req.headers['x-channel'];
+        const { Refund } = getModelsByChannel(channel, res, refundModel);
+        const { Order } = getModelsByChannel(channel, res, orderModel);
 
 
         let response = []
@@ -321,9 +340,9 @@ exports.getDetail = async (req, res) => {
             })
         }
 
-        const channel = req.headers['x-channel']; 
-        const { Refund } = getModelsByChannel(channel,res,refundModel); 
-        const { Order } = getModelsByChannel(channel,res,orderModel); 
+        const channel = req.headers['x-channel'];
+        const { Refund } = getModelsByChannel(channel, res, refundModel);
+        const { Order } = getModelsByChannel(channel, res, orderModel);
 
 
 
@@ -410,8 +429,8 @@ exports.getDetail = async (req, res) => {
 exports.addSlip = async (req, res) => {
     try {
 
-        const channel = req.headers['x-channel'];  
-        const { Order } = getModelsByChannel(channel,res,orderModel); 
+        const channel = req.headers['x-channel'];
+        const { Order } = getModelsByChannel(channel, res, orderModel);
 
         upload(req, res, async (err) => {
             if (err) {
@@ -459,9 +478,9 @@ exports.updateStatus = async (req, res) => {
     try {
         const { orderId, status } = req.body
 
-        const channel = req.headers['x-channel']; 
-        const { Refund } = getModelsByChannel(channel,res,refundModel); 
-        const { Order } = getModelsByChannel(channel,res,orderModel); 
+        const channel = req.headers['x-channel'];
+        const { Refund } = getModelsByChannel(channel, res, refundModel);
+        const { Order } = getModelsByChannel(channel, res, orderModel);
 
 
         if (!orderId || !status) {
