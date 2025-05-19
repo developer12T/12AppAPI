@@ -168,9 +168,9 @@ exports.checkout = async (req, res) => {
         subtotal,
         discount: 0,
         discountProduct: 0,
-        vat: subtotal / 1.07 ,
-        totalExVat: 0,
-        total: subtotal - (subtotal / 1.07),
+        vat: parseFloat((subtotal - (subtotal / 1.07)).toFixed(2)),
+        totalExVat: parseFloat((subtotal / 1.07).toFixed(2)),
+        total: subtotal ,
         // shipping: {
         //     shippingId: shippingData.shippingId,
         //     address: shippingData.address,
@@ -549,7 +549,7 @@ exports.addSlip = async (req, res) => {
 }
 
 exports.OrderToExcel = async (req, res) => {
-  let { date } = req.params;
+  let { date,channel } = req.params;
 
 if (!date || date === 'null') {
   const today = new Date();
@@ -566,7 +566,7 @@ if (!date || date === 'null') {
   const end = new Date(`${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T23:59:59.999+07:00`);
 
 
-  const channel = req.headers['x-channel'];
+  // const channel = 'cash';
   const { Order } = getModelsByChannel(channel,res,orderModel); 
 
 
