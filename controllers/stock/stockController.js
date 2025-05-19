@@ -561,6 +561,7 @@ exports.availableStock = async (req, res,next) => {
           preserveNullAndEmptyArrays: true
         }
       },
+      
       {
         $project: {
           id: '$listProduct.id',
@@ -570,7 +571,7 @@ exports.availableStock = async (req, res,next) => {
       }
     ])
 
-    if (!modelStock) {
+    if (modelStock.length == 0) {
       return res.status(404).json({
         status:404,
         message:"Not Found Stock"

@@ -294,7 +294,7 @@ exports.checkout = async (req, res) => {
 
 
 
-      // await newOrder.save()
+      await newOrder.save()
       // await Cart.deleteOne({ type, area, storeId })
 
       const checkIn = await checkInRoute({
@@ -557,9 +557,10 @@ exports.OrderToExcel = async (req, res) => {
 
   // console.log(saleCode)
   const modelOrder = await Order.find({
-    orderId: { $not: /CC/ }
+    orderId: { $not: /CC/ },
   })
   
+
   // console.log(modelOrder)
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0

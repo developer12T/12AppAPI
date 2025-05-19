@@ -529,7 +529,7 @@ exports.addFromERP = async (req, res) => {
         { itcode: productId }
       )
 
-      console.log("itemConvertResponse",itemConvertResponse)
+      // console.log("itemConvertResponse",itemConvertResponse)
       const unitData = itemConvertResponse.data
       // console.log(JSON.stringify(listProduct, null, 2));
 

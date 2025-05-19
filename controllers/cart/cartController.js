@@ -100,8 +100,7 @@ exports.getCart = async (req, res) => {
 
 exports.addProduct = async (req, res) => {
   try {
-    const { type, area, storeId, id, qty, unit, condition, expire, lot } =
-      req.body
+    const { type, area, storeId, id, qty, unit, condition, expire, lot } = req.body
 
     const channel = req.headers['x-channel'];
     const { Product } = getModelsByChannel(channel,res,productModel); 
