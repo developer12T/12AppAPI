@@ -569,6 +569,13 @@ exports.availableStock = async (req, res,next) => {
         }
       }
     ])
+
+    if (!modelStock) {
+      return res.status(404).json({
+        status:404,
+        message:"Not Found Stock"
+      })
+    }
     const productIds = modelStock.flatMap(item => item.id)
 
     if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
@@ -684,7 +691,7 @@ exports.availableStock = async (req, res,next) => {
           }
         : null
 
-
+        // console.log(lot)
 
       if (lot && Array.isArray(lot.available)) {
         const total = lot.available.reduce(
