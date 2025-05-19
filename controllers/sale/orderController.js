@@ -555,7 +555,7 @@ exports.OrderToExcel = async (req, res) => {
   const { Order } = getModelsByChannel(channel,res,orderModel); 
 
 
-  // console.log(saleCode)
+  console.log(saleCode)
   const modelOrder = await Order.find({
     orderId: { $not: /CC/ },
   })
