@@ -1178,7 +1178,7 @@ exports.updateAndAddRoute = async (req, res) => {
   let routeId
   const latestRoute = route.sort((a, b) => b.id.localeCompare(a.id))[0]
 
-  console.log("route",route)
+  console.log("routesss",route)
 
 
   if (!latestRoute) {
