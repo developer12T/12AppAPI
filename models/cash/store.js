@@ -87,10 +87,23 @@ const typeStoreSchema = mongoose.Schema({
 // const TypeStore = dbCA.model('TypeStore', typeStoreSchema)
 // module.exports = { Store, TypeStore }
 
+const runningNumberSchema = mongoose.Schema({
+    zone: { type: String, require: true },
+    type: { type: String, require: true },
+    name: { type: String, require: true },
+    start: { type: String, require: true },
+    last: { type: String, require: true },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
+})
+
+
+
 
 module.exports = (conn) => {
     return {
       Store: conn.model('Store', storeSchema),
       TypeStore: conn.model('TypeStore', typeStoreSchema),
+      RunningNumber: conn.model('runningNumber',runningNumberSchema,'runningNumber')
     };
   };
