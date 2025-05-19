@@ -549,17 +549,47 @@ exports.addSlip = async (req, res) => {
 }
 
 exports.OrderToExcel = async (req, res) => {
-  const { saleCode } = req.params
+  const { date } = req.params;
+
+  const start = new Date(`${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T00:00:00+07:00`);
+  const end = new Date(`${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T23:59:59.999+07:00`);
+
 
   const channel = req.headers['x-channel'];
   const { Order } = getModelsByChannel(channel,res,orderModel); 
 
 
-  console.log(saleCode)
-  const modelOrder = await Order.find({
-    orderId: { $not: /CC/ },
-  })
+  // const modelOrder = await Order.find({
+  //   orderId: { $not: /CC/ },
+  // })
   
+ const modelOrder = await Order.aggregate([
+    {
+      $match: {
+        orderId: { $not: /CC/ }
+      }
+    },
+    {
+      $addFields: {
+        createdAtThai: {
+          $dateAdd: {
+            startDate: '$createdAt',
+            unit: 'hour',
+            amount: 7
+          }
+        }
+      }
+    },
+    {
+      $match: {
+        createdAtThai: {
+          $gte: start,
+          $lte: end
+        }
+      }
+    }
+  ]);
+
 
   // console.log(modelOrder)
   const tranFromOrder = modelOrder.flatMap(order => {
@@ -637,7 +667,7 @@ exports.OrderToExcel = async (req, res) => {
         OBRSCD: '',
         OBCMNO: '',
         OBPIDE: product.proCode,
-        OBSMCD: saleCode,
+        OBSMCD: order.sale.saleCode,
         OAORDT: RLDT,
         OAODAM: '',
         OECRID: '',
@@ -663,6 +693,13 @@ exports.OrderToExcel = async (req, res) => {
       }
     })
   })
+
+  if (tranFromOrder.length == 0) {
+    return res.status(404).json({
+      status:(404),
+      message:"Not Found Order"
+    })
+  }
 
   const ws = xlsx.utils.json_to_sheet(tranFromOrder)
 
