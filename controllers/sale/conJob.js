@@ -18,7 +18,7 @@ const startCronJobOrderToExcel = () => {
   times.forEach(hour => {
     cron.schedule(`0 ${hour} * * *`, async () => {
       console.log(`Running cron job at ${hour}:00`);
-      await OrderToExcel();
+      await OrderToExcelConJob();
     }, {
       timezone: 'Asia/Bangkok' 
     });
