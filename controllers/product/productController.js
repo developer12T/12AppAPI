@@ -3,6 +3,8 @@ const { Product } = require('../../models/cash/product')
 const fs = require('fs')
 const path = require('path')
 const productModel = require('../../models/cash/product')
+const stockModel = require('../../models/cash/stock')
+
 const { getModelsByChannel } = require('../../middleware/channel')
 
 exports.getProductAll = async (req, res) => {
@@ -29,6 +31,9 @@ exports.getProductAll = async (req, res) => {
 
       return modifiedProduct
     })
+
+
+
 
     res.status(200).json({
       status: '200',
@@ -62,6 +67,8 @@ exports.getProduct = async (req, res) => {
     const { type, group, brand, size, flavour } = req.body
     const channel = req.headers['x-channel']
     const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
+
 
     if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
       return res.status(400).json({
@@ -100,6 +107,16 @@ exports.getProduct = async (req, res) => {
 
     let products = await Product.find(filter).lean()
 
+    const stock = await Stock.aggregate([
+      { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
+      { $group :{
+        _id: "$listProduct.id",
+        // sumQtyPcs: { $sum: '$listProduct.sumQtyPcs' },
+        sumQtyCtn: { $sum: '$listProduct.sumQtyCtn' },
+
+      }}
+    ])
+
     if (!products.length) {
       return res
         .status(404)
@@ -108,6 +125,7 @@ exports.getProduct = async (req, res) => {
 
     products = products.map(product => {
       let modifiedProduct = { ...product }
+          // console.log("modifiedProduct",modifiedProduct)
 
       if (type === 'sale') {
         modifiedProduct.listUnit = modifiedProduct.listUnit.map(unit => ({
@@ -136,21 +154,25 @@ exports.getProduct = async (req, res) => {
             factor: unit.factor
           }))
       }
-
-      // if (type === 'withdraw') {
-      //     const unit = modifiedProduct.listUnit.find(unit => unit.unit === 'CTN')
-      //     modifiedProduct.unit = unit ? unit.unit : null
-      //     modifiedProduct.unitName = unit ? unit.name : null
-      //     delete modifiedProduct.listUnit
-      // }
-
       return modifiedProduct
     })
+
+  const data = products.map( u => {
+    const qty = stock.find(s => s._id === u.id) || {}; 
+    return {
+      ...u,
+      qty:qty.sumQtyCtn || 0
+    }
+  }).sort((a,b) => b.qty - a.qty)
+  .map(({qty,...rest}) => rest)
+
+
+
 
     res.status(200).json({
       status: '200',
       message: 'Products fetched successfully!',
-      data: products
+      data: data  
     })
   } catch (error) {
     console.error(error)

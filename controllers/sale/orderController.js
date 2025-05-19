@@ -168,9 +168,9 @@ exports.checkout = async (req, res) => {
         subtotal,
         discount: 0,
         discountProduct: 0,
-        vat: 0,
+        vat: subtotal / 1.07 ,
         totalExVat: 0,
-        total: subtotal,
+        total: subtotal - (subtotal / 1.07),
         // shipping: {
         //     shippingId: shippingData.shippingId,
         //     address: shippingData.address,
@@ -549,7 +549,18 @@ exports.addSlip = async (req, res) => {
 }
 
 exports.OrderToExcel = async (req, res) => {
-  const { date } = req.params;
+  let { date } = req.params;
+
+if (!date || date === 'null') {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0'); // เดือนเริ่มที่ 0
+  const day = String(today.getDate()).padStart(2, '0');
+
+  date = `${year}${month}${day}`;
+  console.log("📅 date:", date);
+
+}
 
   const start = new Date(`${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T00:00:00+07:00`);
   const end = new Date(`${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T23:59:59.999+07:00`);
@@ -716,6 +727,200 @@ exports.OrderToExcel = async (req, res) => {
     message: 'Create file successful!'
   })
 }
+
+
+exports.OrderToExcelConJob = async (req, res) => {
+
+  channel = ['cash','credit']
+
+for (const ch of channel) {
+
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0'); // เดือนเริ่มที่ 0
+  const day = String(today.getDate()).padStart(2, '0');
+
+  date = `${year}${month}${day}`;
+  console.log("📅 date:", date);
+
+  const start = new Date(`${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T00:00:00+07:00`);
+  const end = new Date(`${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T23:59:59.999+07:00`);
+
+
+  // const channel = req.headers['x-channel'];
+  const { Order } = getModelsByChannel(ch,res,orderModel); 
+
+
+  // const modelOrder = await Order.find({
+  //   orderId: { $not: /CC/ },
+  // })
+  
+ const modelOrder = await Order.aggregate([
+    {
+      $match: {
+        orderId: { $not: /CC/ }
+      }
+    },
+    {
+      $addFields: {
+        createdAtThai: {
+          $dateAdd: {
+            startDate: '$createdAt',
+            unit: 'hour',
+            amount: 7
+          }
+        }
+      }
+    },
+    {
+      $match: {
+        createdAtThai: {
+          $gte: start,
+          $lte: end
+        }
+      }
+    }
+  ]);
+
+
+  // console.log(modelOrder)
+  const tranFromOrder = modelOrder.flatMap(order => {
+    let counterOrder = 0
+    const date = new Date()
+    const RLDT = `${date.getFullYear()}${(date.getMonth() + 1)
+      .toString()
+      .padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`
+
+    const listProduct = order.listProduct.map(product => {
+      return {
+        proCode: '',
+        id: product.id,
+        name: product.name,
+        group: product.group,
+        brand: product.brand,
+        size: product.size,
+        flavour: product.flavour,
+        qty: product.qty,
+        unit: product.unit,
+        unitName: product.unitName,
+        price: product.price,
+        subtotal: product.subtotal,
+        discount: product.discount,
+        netTotal: product.netTotal
+      }
+    })
+
+    const listPromotion = order.listPromotions.map(promo =>
+      promo.listProduct.map(product => {
+        return {
+          proCode: promo.proCode,
+          id: product.id,
+          name: product.name,
+          group: product.group,
+          brand: product.brand,
+          size: product.size,
+          flavour: product.flavour,
+          qty: product.qty,
+          unit: product.unit,
+          unitName: product.unitName,
+          qtyPcs: product.qtyPcs
+        }
+      })
+    )
+
+    const productIDS = [...listProduct, ...listPromotion].flat()
+
+    // console.log("productIDS",productIDS)
+    return productIDS.map(product => {
+      counterOrder++
+
+      // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
+
+      return {
+        CUNO: order.sale.salePayer,
+        FACI: 'F10',
+        WHLO: order.sale.warehouse,
+        ORNO: '',
+        OAORTP: '',
+        RLDT: RLDT,
+        ADID: order.shipping.shippingId,
+        CUOR: order.orderId,
+        OAOREF: '',
+        OBITNO: product.id,
+        OBBANO: '',
+        OBALUN: product.unit,
+        OBORQA: Number(product.qty),
+        OBSAPR: Number(product.price || 0),
+        OBSPUN: product.unit,
+        OBWHSL: '',
+        ROUT: '',
+        OBPONR: Number(counterOrder),
+        OBDIA2: Number(product.discount || 0),
+        OBRSCD: '',
+        OBCMNO: '',
+        OBPIDE: product.proCode,
+        OBSMCD: order.sale.saleCode,
+        OAORDT: RLDT,
+        OAODAM: '',
+        OECRID: '',
+        OECRAM: '',
+        OECRID2: '',
+        OECRAM2: '',
+        OECRID3: '',
+        OECRAM3: '',
+        OECRID4: '',
+        OECRAM4: '',
+        OECRID5: '',
+        OECRAM5: '',
+        OARESP: '',
+        OAYREF: '',
+        OATEL2: '',
+        OAWCON: '',
+        OAFRE1: '',
+        OATXAP: '',
+        OATXAP2: '',
+        OBDIA1: '',
+        OBDIA3: '',
+        OBDIA4: ''
+      }
+    })
+  })
+
+  if (tranFromOrder.length == 0) {
+    return res.status(404).json({
+      status:(404),
+      message:"Not Found Order"
+    })
+  }
+
+  const ws = xlsx.utils.json_to_sheet(tranFromOrder)
+
+  const downloadsPath = path.join(os.homedir(), 'Downloads', `Order${ch}.xlsx`)
+
+  const wb = xlsx.utils.book_new()
+  xlsx.utils.book_append_sheet(wb, ws, 'Orders')
+
+  xlsx.writeFile(wb, downloadsPath)
+
+  console.log(`✅ ไฟล์ Order${ch}.xlsx ถูกสร้างแล้วที่:`, downloadsPath)
+}
+
+  // res.status(200).json({
+  //   message: 'Create file successful!'
+  // })
+
+
+}
+
+
+
+
+
+
+
+
+
+
 
 exports.getAllOrder = async (req, res) => {
   try {
