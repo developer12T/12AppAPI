@@ -13,7 +13,6 @@ const routeModel = require('../../models/cash/route')
 const storeModel = require('../../models/cash/store')
 const { getModelsByChannel } = require('../../middleware/channel')
 const path = require('path')
-const { forEach } = require('lodash')
 
 exports.getRoute = async (req, res) => {
   try {
@@ -514,6 +513,13 @@ exports.checkIn = async (req, res) => {
 }
 
 exports.checkInVisit = async (req, res) => {
+
+  const channel = req.headers['x-channel'];
+  const { Store } = getModelsByChannel(channel,res,storeModel);
+  const { Route } = getModelsByChannel(channel,res,routeModel);
+
+
+
   upload(req, res, async err => {
     if (err) {
       return res.status(400).json({ status: '400', message: err.message })
@@ -659,6 +665,8 @@ exports.createRoute = async (req, res) => {
     const channel = req.headers['x-channel']
 
     const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { RouteChangeLog } = getModelsByChannel(channel, res, routeModel)
+
 
     if (!period || !area || area.length === 0) {
       return res.status(400).json({ message: 'Period and area are required.' })
@@ -788,6 +796,7 @@ exports.routeHistory = async (req, res) => {
     const channel = req.headers['x-channel']
 
     const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { RouteChangeLog } = getModelsByChannel(channel, res, routeModel)
 
     if (!area || !period) {
       return res.status(400).json({ message: 'Area and period are required.' })
