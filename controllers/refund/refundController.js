@@ -134,8 +134,13 @@ exports.checkout = async (req, res) => {
 
         const calStock = {
             // storeId: refundOrder.store.storeId,
+            orderId : refundOrder.refundOrderId,
             area: refundOrder.store.area,
+            saleCode: refundOrder.sale.saleCode,
             period: period,
+            warehouse: refundOrder.sale.warehouse,
+            status: 'pending',
+            action: "Refund",
             type: "Refund",
             listProduct: refundOrder.listProduct.map(u => {
                 return {

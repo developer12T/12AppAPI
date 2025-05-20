@@ -22,7 +22,6 @@ const _ = require('lodash')
 const { DateTime } = require("luxon");
 const { getSocket } = require('../../socket')
 
-
 const stockModel = require('../../models/cash/stock')
 const orderModel  = require('../../models/cash/sale')
 const cartModel  = require('../../models/cash/cart')
@@ -1841,4 +1840,51 @@ exports.erpApiCheck = async (req, res) => {
   console.error(error)
   res.status(500).json({ message: 'Internal server error.' })
 }
+}
+
+exports.getSummarybyChoice = async (req, res) => {
+
+  const {area, date, type} = req.body
+
+    let day = date.substring(0, 2);    
+    let month = date.substring(2, 4);   
+    let year = date.substring(4, 8);   
+
+
+
+    const channel = req.headers['x-channel']; 
+
+    const { Order } = getModelsByChannel(channel,res,orderModel); 
+
+    const modelOrder = await Order.aggregate([
+      {$match: {
+        "store.area":area
+      }},
+      {$addFields:{
+        createdAtThai:{
+          $dateAdd:{
+            startDate:"$createdAt",
+            unit:"hour",
+            amount:7
+          }
+        }
+      }},
+      {
+    $addFields: {
+      day: { $dayOfMonth: "$createdAtThai" },
+      month: { $month: "$createdAtThai" },
+      year: { $year: "$createdAtThai" }
+    }
+  },
+  {$match:{
+    day:day,
+    month:month,
+    year:year
+  }}
+    ])
+
+  res.status(200).json({
+    status:200,
+    message:modelOrder
+  })
 }
