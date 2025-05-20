@@ -301,7 +301,7 @@ exports.checkout = async (req, res) => {
 
 
       await newOrder.save()
-      // await Cart.deleteOne({ type, area, storeId })
+      await Cart.deleteOne({ type, area, storeId })
 
       const checkIn = await checkInRoute({
         storeId: storeId,

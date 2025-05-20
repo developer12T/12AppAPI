@@ -240,7 +240,7 @@ exports.checkout = async (req, res) => {
 
         await refundOrder.save()
         await changeOrder.save()
-        // await Cart.deleteOne({ type, area, storeId })
+        await Cart.deleteOne({ type, area, storeId })
         res.status(200).json({
             status: 200,
             message: 'Checkout successful!',
