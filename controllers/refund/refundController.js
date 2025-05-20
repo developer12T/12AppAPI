@@ -198,12 +198,12 @@ exports.checkout = async (req, res) => {
                     id: stockDetail.id,
                     location: lot.location,
                     lot: lot.lot,
-                    qtyPcs: lot.qtyPcs + pcsQty,
-                    qtyPcsStockIn: lot.qtyPcsStockIn + pcsQty,
-                    qtyPcsStockOut: lot.qtyPcsStockOut ,
-                    qtyCtn: lot.qtyCtn + ctnQty,
-                    qtyCtnStockIn: lot.qtyCtnStockIn + ctnQty,
-                    qtyCtnStockOut: lot.qtyCtnStockOut 
+                    qtyPcs: lot.qtyPcs + (cal.condition === 'Good' ? pcsQty : 0) - (cal.condition === 'Damaged' ? pcsQty : 0),
+                    qtyPcsStockIn: lot.qtyPcsStockIn + (cal.condition === 'Good' ? pcsQty : 0),
+                    qtyPcsStockOut: lot.qtyPcsStockOut + (cal.condition === 'Damaged' ? pcsQty : 0),
+                    qtyCtn: lot.qtyCtn + (cal.condition === 'Good' ? pcsCtn : 0) - (cal.condition === 'Damaged' ? pcsCtn : 0),
+                    qtyCtnStockIn: lot.qtyCtnStockIn + (cal.condition === 'Good' ? ctnQty : 0) ,
+                    qtyCtnStockOut: lot.qtyCtnStockOut + (cal.condition === 'Damaged' ? ctnQty : 0)
                 })
             }
             const relatedLots = updateLot.filter((u) => u.id === stockDetail.id);
