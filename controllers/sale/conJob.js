@@ -5,25 +5,44 @@ const moment = require('moment-timezone');
 
 
 
-const startCronJobErpApiCheck = () => {
-  cron.schedule('*/5 * * * *', async () => {
-    console.log('Running cron job every 5 minutes')
-    await erpApiCheck()
-  })
-}
+// const startCronJobErpApiCheck = () => {
+//   cron.schedule('*/5 * * * *', async () => {
+//     console.log('Running cron job every 5 minutes')
+//     await erpApiCheck()
+//   })
+// }
 
-const startCronJobOrderToExcel = () => {
+const startCronJobErpApiCheck = () => {
   const times = [9, 12, 18, 23];
 
   times.forEach(hour => {
     cron.schedule(`0 ${hour} * * *`, async () => {
       console.log(`Running cron job at ${hour}:00`);
-      await OrderToExcelConJob();
+      await erpApiCheck();
     }, {
       timezone: 'Asia/Bangkok' 
     });
   });
 };
+
+
+
+
+
+
+
+// const startCronJobOrderToExcel = () => {
+//   const times = [9, 12, 18, 23];
+
+//   times.forEach(hour => {
+//     cron.schedule(`0 ${hour} * * *`, async () => {
+//       console.log(`Running cron job at ${hour}:00`);
+//       await OrderToExcelConJob();
+//     }, {
+//       timezone: 'Asia/Bangkok' 
+//     });
+//   });
+// };
 
 
 // const startCronJobOrderToExcel = () => {
@@ -50,5 +69,5 @@ const startCronJobOrderToExcel = () => {
 
 module.exports = {
   startCronJobErpApiCheck,
-  startCronJobOrderToExcel
+  // startCronJobOrderToExcel
 };

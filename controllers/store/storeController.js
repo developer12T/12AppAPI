@@ -592,3 +592,66 @@ exports.addAndUpdateStore = async (req, res) => {
   })
 }
 
+
+exports.runningNumber = async (req,res) => {
+
+  const channel = req.headers['x-channel'] 
+
+  const { RunningNumber,Store } = getModelsByChannel(channel, res, storeModel)
+
+  let type = ''
+  let running = ''
+  if (channel == 'cash') {
+    type = '101'
+    running = 'V'
+  } 
+  else if (channel == 'credit') {
+    type = '103'
+  }
+
+  const zoneId = await Store.aggregate([
+    {
+      $match: {
+        zone: { $ne: null, $ne: "" }
+      }
+    },
+    {$group:{
+      _id:"$zone"
+    }}
+  ])
+
+  const maxRunningAll = await Store.aggregate([
+    {
+      $match: {
+        zone: { $ne: null, $ne: "" }
+      }
+    },
+    {$group:{
+      _id:'$zone',
+      maxStoreId: { $max:'$storeId'}
+    }}
+  ])
+
+
+ const data = zoneId.map(u => {
+  const maxRunning = maxRunningAll.find(m => m._id === u._id)
+  return {
+    zone: u._id,
+    type: type,
+    name: channel,
+    start: `${running}${u._id}2500000`,
+    last: maxRunning.maxStoreId
+  }
+ })
+
+  await RunningNumber.create(data)
+
+  res.status(200).json({
+    status:200,
+    message:data
+  })
+}
+
+
+
+

@@ -1,10 +1,10 @@
-const {
-  Stock,
-  StockMovement,
-  StockMovementLog
-} = require('../../models/cash/stock')
-const { User } = require('../../models/cash/user')
-const { Product } = require('../../models/cash/product')
+// const {
+//   Stock,
+//   StockMovement,
+//   StockMovementLog
+// } = require('../../models/cash/stock')
+// const { User } = require('../../models/cash/user')
+// const { Product } = require('../../models/cash/product')
 const path = require('path')
 const errorEndpoint = require('../../middleware/errorEndpoint')
 const currentFilePath = path.basename(__filename)
