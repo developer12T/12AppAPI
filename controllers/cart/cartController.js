@@ -606,7 +606,7 @@ exports.updateStock = async (req, res) => {
       }
 
       await Stock.findOneAndUpdate(
-        { area: area, 'listProduct.id': data.productId },
+        { area: area, 'listProduct.productId': data.productId },
         {
           $set: {
             'listProduct.$.sumQtyPcs': data.sumQtyPcs,
@@ -616,7 +616,7 @@ exports.updateStock = async (req, res) => {
         },
         { new: true }
       )
-      console.log('Response', data)
+      // console.log('Response', data)
 
       res.status(200).json({ status: 200, data })
     } else if (type === 'OUT') {
@@ -642,7 +642,7 @@ exports.updateStock = async (req, res) => {
       }
 
       await Stock.findOneAndUpdate(
-        { area: area, 'listProduct.id': data.productId },
+        { area: area, 'listProduct.productId': data.productId },
         {
           $set: {
             'listProduct.$.sumQtyPcs': data.sumQtyPcs,
@@ -652,7 +652,7 @@ exports.updateStock = async (req, res) => {
         },
         { new: true }
       )
-      console.log('Response', data)
+      // console.log('Response', data)
       res.status(200).json({ status: 200, data })
     }
   } catch (error) {
