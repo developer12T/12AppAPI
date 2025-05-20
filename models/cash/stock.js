@@ -17,7 +17,7 @@ const availableSchema = new mongoose.Schema(
 
 const listProductSchema = new mongoose.Schema(
   {
-    id: { type: String, required: true },
+    productId: { type: String, required: true },
     sumQtyPcs: { type: Number, required: true },
     sumQtyCtn: { type: Number, required: true },
     sumQtyPcsStockIn: { type: Number, required: true , default: 0},

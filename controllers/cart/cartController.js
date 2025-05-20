@@ -554,8 +554,10 @@ exports.updateStock = async (req, res) => {
     console.log('modelStock', modelStock)
 
     const stockData = modelStock.listProduct.find(
-      product => product.id === productId
+      product => product.productId === productId
     )
+
+    console.log('stockData', stockData)
 
     if (!stockData) {
       return res.status(404).json({
@@ -658,4 +660,3 @@ exports.updateStock = async (req, res) => {
     res.status(500).json({ status: '500', message: error.message })
   }
 }
-

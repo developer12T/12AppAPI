@@ -318,7 +318,7 @@ exports.addStockNew = async (req, res) => {
               }))
 
               return {
-                id: productId,
+                productId: productId,
                 sumQtyPcs: sumQtyPcs,
                 sumQtyCtn: sumQtyCtn,
                 available: lotList
@@ -392,9 +392,9 @@ exports.getQty = async (req, res, next) => {
     const productStock = await Stock.find({
       area: area,
       period: period,
-      'listProduct.id': productId
+      'listProduct.productId': productId
     })
-    // console.log(productStock)
+    console.log(productStock)
 
 
     const products = await Product.find({ id: productId })
@@ -417,7 +417,7 @@ exports.getQty = async (req, res, next) => {
     const stockmatchList = []
 
     productStock.map(item => {
-      const stockmatch = item.listProduct.find(p => p.id === productId)
+      const stockmatch = item.listProduct.find(p => p.productId === productId)
       if (stockmatch) {
         stockmatchList.push(stockmatch)
       }
