@@ -64,7 +64,7 @@ exports.getProductSwitch = async (req, res) => {
 
 exports.getProduct = async (req, res) => {
   try {
-    const { type, group, brand, size, flavour } = req.body
+    const { type, group,area,period, brand, size, flavour } = req.body
     const channel = req.headers['x-channel']
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Stock } = getModelsByChannel(channel, res, stockModel)
@@ -108,14 +108,20 @@ exports.getProduct = async (req, res) => {
     let products = await Product.find(filter).lean()
 
     const stock = await Stock.aggregate([
+      {$match :{
+        period:period,
+        area:area
+      }},
       { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
       { $group :{
-        _id: "$listProduct.id",
+        _id: "$listProduct.productId",
         // sumQtyPcs: { $sum: '$listProduct.sumQtyPcs' },
         sumQtyCtn: { $sum: '$listProduct.sumQtyCtn' },
 
       }}
     ])
+
+    // console.log("stock",stock)
 
     if (!products.length) {
       return res
@@ -164,7 +170,7 @@ exports.getProduct = async (req, res) => {
       qty:qty.sumQtyCtn || 0
     }
   }).sort((a,b) => b.qty - a.qty)
-  .map(({qty,...rest}) => rest)
+  // .map(({qty,...rest}) => rest)
 
 
 
