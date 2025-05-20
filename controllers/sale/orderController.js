@@ -1846,9 +1846,9 @@ exports.getSummarybyChoice = async (req, res) => {
 
   const {area, date, type} = req.body
 
-    let day = date.substring(0, 2);    
-    let month = date.substring(2, 4);   
-    let year = date.substring(4, 8);   
+    let dayStr = date.substring(0, 2);    
+    let monthStr = date.substring(2, 4);   
+    let yearStr = date.substring(4, 8);   
 
 
 
@@ -1877,9 +1877,9 @@ exports.getSummarybyChoice = async (req, res) => {
     }
   },
   {$match:{
-    day:day,
-    month:month,
-    year:year
+    day:dayStr,
+    month:monthStr,
+    year:yearStr
   }}
     ])
 
