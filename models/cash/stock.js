@@ -43,7 +43,7 @@ const stockSchema = new mongoose.Schema({
 
 const listProductMovementSchema = new mongoose.Schema(
   {
-    id: { type: String, required: true },
+    productId: { type: String, required: true },
     unit: { type: String, default: '' },
     lot: { type: String, default: '' },
     qty: { type: Number, default: 0 }
@@ -64,7 +64,6 @@ const stockMovementSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 })
 
-
 const stockMovementLogSchema = new mongoose.Schema({
   orderId: { type: String, required: true },
   area: { type: String, required: true },
@@ -77,18 +76,6 @@ const stockMovementLogSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 })
 
-
-
-
-
-
-
-// const Stock = dbCA.model('Stock', stockSchema)
-// const StockMovementLog = dbCA.model('stockMovementLog', stockMovementLogSchema,'stockmovementlogs')
-// const StockMovement = dbCA.model('StockMovement', stockMovementSchema)
-// module.exports = { Stock, StockMovement, StockMovementLog }
-
-
 module.exports = (conn) => {
   return {
     Stock: conn.model('Stock', stockSchema),
@@ -98,28 +85,3 @@ module.exports = (conn) => {
 };
 
 
-// const availableSchema = new mongoose.Schema({
-//     qtyPcs: { type: Number, default: 0 },
-//     lot: { type: String, default: '' }
-// }, { _id: false })
-
-// const listProductSchema = new mongoose.Schema({
-//     productId: { type: String, required: true },
-//     productName: { type: String, required: true },
-//     productGroup: { type: String, default: '' },
-//     productFlavour: { type: String, default: '' },
-//     productSize: { type: String, default: '' },
-//     available: { type: [availableSchema], default: [] }
-// }, { _id: false })
-
-// const stockSchema = new mongoose.Schema({
-//     area: { type: String, required: true },
-//     saleCode: { type: String, required: true },
-//     period: { type: String, require: true },
-//     listProduct: { type: [listProductSchema], default: [] },
-//     createdAt: { type: Date, default: Date.now },
-//     updatedAt: { type: Date, default: Date.now }
-// })
-
-// const Stock = dbCA.model('Stock', stockSchema)
-// module.exports = { Stock }

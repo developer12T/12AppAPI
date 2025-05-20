@@ -15,14 +15,13 @@ const { Op } = require('sequelize')
 const XLSX = require('xlsx')
 // const { Refund } = require('../../models/cash/refund')
 
-const  userModel  = require('../../models/cash/user')
-const  productModel  = require('../../models/cash/product')
-const  stockModel  = require('../../models/cash/stock')
+const userModel = require('../../models/cash/user')
+const productModel = require('../../models/cash/product')
+const stockModel = require('../../models/cash/stock')
 const { getModelsByChannel } = require('../../middleware/channel')
 
 const fetchArea = async warehouse => {
   try {
-
     const WarehouseData = await Warehouse.findAll({
       where: {
         coNo: 410,
@@ -72,7 +71,7 @@ exports.addStock = async (req, res) => {
   try {
     const body = req.body
 
-    const channel = req.headers['x-channel'] 
+    const channel = req.headers['x-channel']
 
     const { User } = getModelsByChannel(channel, res, userModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
@@ -83,7 +82,7 @@ exports.addStock = async (req, res) => {
         .status(400)
         .json({ status: 400, message: 'Invalid format: expected an array' })
     }
-    
+
     for (const item of body) {
       const { area, period, listProduct } = item
 
@@ -91,16 +90,15 @@ exports.addStock = async (req, res) => {
 
       const user = await User.findOne({ area }).select('saleCode').lean()
 
-     
       if (!user) {
         return res.status(404).json({
-          status:404,
-          message:'Not Found This Area'
+          status: 404,
+          message: 'Not Found This Area'
         })
       }
 
       const saleCode = user.saleCode
-      
+
       let enrichedListProduct = []
 
       for (const productEntry of listProduct) {
@@ -147,9 +145,9 @@ exports.addStock = async (req, res) => {
 exports.available = async (req, res) => {
   try {
     const { area, period } = req.query
-    const channel = req.headers['x-channel'] 
+    const channel = req.headers['x-channel']
 
-    const data = await getStockAvailable(area, period,channel,res)
+    const data = await getStockAvailable(area, period, channel, res)
     res.status(200).json({
       status: 200,
       message: 'successfully',
@@ -164,8 +162,8 @@ exports.available = async (req, res) => {
 exports.transaction = async (req, res) => {
   try {
     const { area, period } = req.query
-    const channel = req.headers['x-channel'] 
-    const movement = await getStockMovement(area, period,channel,res)
+    const channel = req.headers['x-channel']
+    const movement = await getStockMovement(area, period, channel, res)
     res.status(200).json({
       status: 200,
       message: 'successfully!',
@@ -181,7 +179,7 @@ exports.addStockNew = async (req, res) => {
   // try {
   const { period } = req.body
 
-  const channel = req.headers['x-channel'] 
+  const channel = req.headers['x-channel']
 
   const { User } = getModelsByChannel(channel, res, userModel)
   const { Stock } = getModelsByChannel(channel, res, stockModel)
@@ -196,7 +194,9 @@ exports.addStockNew = async (req, res) => {
     const stock = await Stock.findOne({
       area: user.area,
       period: period
-    }).select('area').lean()
+    })
+      .select('area')
+      .lean()
 
     if (!stock) {
       const areaData = await fetchArea(user.warehouse)
@@ -259,7 +259,7 @@ exports.addStockNew = async (req, res) => {
           lot: locate
         }
       })
-       console.log("stocks",stocks)
+      console.log('stocks', stocks)
 
       const productIds = stocks.map(item => item.itemCode)
 
@@ -355,7 +355,7 @@ exports.addStockNew = async (req, res) => {
 exports.getStock = async (req, res, next) => {
   try {
     const { area, period } = req.query
-    const channel = req.headers['x-channel'] 
+    const channel = req.headers['x-channel']
 
     const { Stock } = getModelsByChannel(channel, res, stockModel)
 
@@ -384,11 +384,10 @@ exports.getQty = async (req, res, next) => {
   try {
     const { area, productId, unit, period } = req.body
 
-    const channel = req.headers['x-channel'] 
+    const channel = req.headers['x-channel']
 
     const { Stock } = getModelsByChannel(channel, res, stockModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
-
 
     const productStock = await Stock.find({
       area: area,
@@ -396,6 +395,8 @@ exports.getQty = async (req, res, next) => {
       'listProduct.id': productId
     })
     // console.log(productStock)
+
+
     const products = await Product.find({ id: productId })
 
     let unitData = {}
@@ -469,7 +470,7 @@ exports.addStockMovement = async (req, res, next) => {
       action
     } = req.body
 
-    const channel = req.headers['x-channel'] 
+    const channel = req.headers['x-channel']
 
     const { StockMovement } = getModelsByChannel(channel, res, stockModel)
 
@@ -512,10 +513,14 @@ exports.updateStockMovement = async (req, res, next) => {
   try {
     const { action } = req.body
 
-    const channel = req.headers['x-channel'] 
+    const channel = req.headers['x-channel']
 
-    const { StockMovement,StockMovementLog } = getModelsByChannel(channel, res, stockModel)
-    
+    const { StockMovement, StockMovementLog } = getModelsByChannel(
+      channel,
+      res,
+      stockModel
+    )
+
     let movement = await StockMovement.find({}).select(
       '_id orderId area saleCode period warehouse status action'
     )
@@ -538,14 +543,13 @@ exports.updateStockMovement = async (req, res, next) => {
   }
 }
 
-exports.availableStock = async (req, res,next) => {
+exports.availableStock = async (req, res, next) => {
   try {
     const { area, period, type, group, brand, size, flavour } = req.body
 
-    const channel = req.headers['x-channel'] 
+    const channel = req.headers['x-channel']
     const { Stock } = getModelsByChannel(channel, res, stockModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
-
 
     const modelStock = await Stock.aggregate([
       {
@@ -561,10 +565,10 @@ exports.availableStock = async (req, res,next) => {
           preserveNullAndEmptyArrays: true
         }
       },
-      
+
       {
         $project: {
-          id: '$listProduct.id',
+          id: '$listProduct.productId',
           available: '$listProduct.available',
           _id: 0
         }
@@ -573,8 +577,8 @@ exports.availableStock = async (req, res,next) => {
 
     if (modelStock.length == 0) {
       return res.status(404).json({
-        status:404,
-        message:"Not Found Stock"
+        status: 404,
+        message: 'Not Found Stock'
       })
     }
     const productIds = modelStock.flatMap(item => item.id)
@@ -620,8 +624,6 @@ exports.availableStock = async (req, res,next) => {
 
     let products = await Product.find(filter).lean()
 
-
-
     if (!products.length) {
       return res
         .status(404)
@@ -631,7 +633,6 @@ exports.availableStock = async (req, res,next) => {
     // console.log(products)
 
     const data = products.map(product => {
-
       const lot = modelStock.find(u => u.id == product.id)
 
       // console.log("lot",lot)
@@ -664,12 +665,10 @@ exports.availableStock = async (req, res,next) => {
               //   }, 0)
               // )
               if (unit.unit == 'CTN') {
-                qty = lot.available.reduce((total,u) => total + u.qtyCtn,0)
-              }
-              else if (unit.unit == 'PCS') {
-                qty = lot.available.reduce((total,u) => total + u.qtyPcs,0)
-              }
-              else{
+                qty = lot.available.reduce((total, u) => total + u.qtyCtn, 0)
+              } else if (unit.unit == 'PCS') {
+                qty = lot.available.reduce((total, u) => total + u.qtyPcs, 0)
+              } else {
                 qty = 0
               }
 
@@ -678,8 +677,8 @@ exports.availableStock = async (req, res,next) => {
                 name: unit.name,
                 factor: unit.factor,
                 // qty: totalQtyPcsToCtn,
-              
-                qty:qty,
+
+                qty: qty,
                 price: {
                   sale: unit.price.sale,
                   Refund: unit.price.refund
@@ -692,7 +691,7 @@ exports.availableStock = async (req, res,next) => {
           }
         : null
 
-        // console.log(lot)
+      // console.log(lot)
 
       if (lot && Array.isArray(lot.available)) {
         const total = lot.available.reduce(
@@ -768,10 +767,6 @@ exports.availableStock = async (req, res,next) => {
     next(error)
   }
 }
-
-
-
-
 
 // exports.rollbackStock = async (req, res, next) => {
 //   try {

@@ -11,17 +11,15 @@ const {
 } = require('../../utilities/summary')
 const { forEach } = require('lodash')
 const { error } = require('console')
-const  cartModel  = require('../../models/cash/cart')
-const  productModel  = require('../../models/cash/product')
-const  stockModel  = require('../../models/cash/stock')
+const cartModel = require('../../models/cash/cart')
+const productModel = require('../../models/cash/product')
+const stockModel = require('../../models/cash/stock')
 const { getModelsByChannel } = require('../../middleware/channel')
-
 
 exports.getCart = async (req, res) => {
   try {
-
-    const channel = req.headers['x-channel'];
-    const { Cart } = getModelsByChannel(channel,res,cartModel); 
+    const channel = req.headers['x-channel']
+    const { Cart } = getModelsByChannel(channel, res, cartModel)
 
     const { type, area, storeId } = req.query
 
@@ -50,7 +48,7 @@ exports.getCart = async (req, res) => {
 
     let summary = {}
     if (type === 'sale') {
-      summary = await summaryOrder(cart,channel,res)
+      summary = await summaryOrder(cart, channel, res)
 
       const newCartHashProduct = crypto
         .createHash('md5')
@@ -65,7 +63,7 @@ exports.getCart = async (req, res) => {
         cart.cartHashProduct !== newCartHashProduct
 
       // if (shouldRecalculatePromotion) {
-      const promotion = await applyPromotion(summary,channel,res)
+      const promotion = await applyPromotion(summary, channel, res)
       // console.log("promotion",promotion)
       cart.listPromotion = promotion.appliedPromotions
       cart.cartHashProduct = newCartHashProduct
@@ -76,15 +74,15 @@ exports.getCart = async (req, res) => {
     }
 
     if (type === 'withdraw') {
-      summary = await summaryWithdraw(cart,channel,res)
+      summary = await summaryWithdraw(cart, channel, res)
     }
 
     if (type === 'refund') {
-      summary = await summaryRefund(cart,channel,res)
+      summary = await summaryRefund(cart, channel, res)
     }
 
     if (type === 'give') {
-      summary = await summaryGive(cart,channel,res)
+      summary = await summaryGive(cart, channel, res)
     }
 
     res.status(200).json({
@@ -100,10 +98,11 @@ exports.getCart = async (req, res) => {
 
 exports.addProduct = async (req, res) => {
   try {
-    const { type, area, storeId, id, qty, unit, condition, expire, lot } = req.body
+    const { type, area, storeId, id, qty, unit, condition, expire, lot } =
+      req.body
 
-    const channel = req.headers['x-channel'];
-    const { Product } = getModelsByChannel(channel,res,productModel); 
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
 
     if (!type || !area || !id || !qty || !unit) {
       return res.status(400).json({
@@ -140,12 +139,11 @@ exports.addProduct = async (req, res) => {
 
     const cartQuery =
       type === 'withdraw' ? { type, area } : { type, area, storeId }
-    const { Cart } = getModelsByChannel(channel,res,cartModel); 
+    const { Cart } = getModelsByChannel(channel, res, cartModel)
 
     let cart = await Cart.findOne(cartQuery)
 
     // console.log("cart", JSON.stringify(cart, null, 2));
-
 
     if (!cart) {
       cart = await Cart.create({
@@ -168,7 +166,11 @@ exports.addProduct = async (req, res) => {
             p.condition === condition &&
             p.expireDate === expire
         )
-        if (existingRefund && existingRefund.lot === lot && existingRefund.unit === unit) {
+        if (
+          existingRefund &&
+          existingRefund.lot === lot &&
+          existingRefund.unit === unit
+        ) {
           existingRefund.qty += qty
         } else {
           cart.listRefund.push({
@@ -186,10 +188,13 @@ exports.addProduct = async (req, res) => {
         const existingProduct = cart.listProduct.find(
           p => p.id === id && p.unit === unit && p.lot === lot
         )
-        if (existingProduct && existingProduct.lot === lot && existingProduct.unit === unit) {
+        if (
+          existingProduct &&
+          existingProduct.lot === lot &&
+          existingProduct.unit === unit
+        ) {
           existingProduct.qty += qty
         } else {
-
           cart.listProduct.push({
             id,
             lot,
@@ -216,7 +221,11 @@ exports.addProduct = async (req, res) => {
         p => p.id === id && p.unit === unit && p.lot === lot
       )
       // console.log(JSON.stringify(existingProduct, null, 2));
-      if (existingProduct && existingProduct.lot === lot && existingProduct.unit === unit) {
+      if (
+        existingProduct &&
+        existingProduct.lot === lot &&
+        existingProduct.unit === unit
+      ) {
         existingProduct.qty += qty
       } else {
         // console.log("test")
@@ -249,10 +258,9 @@ exports.addProduct = async (req, res) => {
 exports.adjustProduct = async (req, res) => {
   try {
     const { type, area, storeId, id, unit, qty, condition, expire } = req.body
-    const channel = req.headers['x-channel'];
+    const channel = req.headers['x-channel']
 
-    const { Cart } = getModelsByChannel(channel,res,cartModel); 
-
+    const { Cart } = getModelsByChannel(channel, res, cartModel)
 
     if (!type || !area || !id || !unit || qty === undefined) {
       return res.status(400).json({
@@ -360,7 +368,7 @@ exports.deleteProduct = async (req, res) => {
   try {
     const { type, area, storeId, id, unit, condition, expire } = req.body
 
-    const channel = req.headers['x-channel'];
+    const channel = req.headers['x-channel']
 
     if (!type || !area || !id || !unit) {
       return res.status(400).json({
@@ -379,9 +387,7 @@ exports.deleteProduct = async (req, res) => {
     const cartQuery =
       type === 'withdraw' ? { type, area } : { type, area, storeId }
 
-    const { Cart } = getModelsByChannel(channel,res,cartModel); 
-
-
+    const { Cart } = getModelsByChannel(channel, res, cartModel)
 
     let cart = await Cart.findOne(cartQuery)
     if (!cart) {
@@ -463,10 +469,9 @@ exports.deleteProduct = async (req, res) => {
 
 exports.updateCartPromotion = async (req, res) => {
   const { type, area, storeId, proId, productId, qty } = req.body
-  const channel = req.headers['x-channel'];
+  const channel = req.headers['x-channel']
 
-  const { Cart } = getModelsByChannel(channel,res,cartModel); 
-
+  const { Cart } = getModelsByChannel(channel, res, cartModel)
 
   try {
     let cart = await Cart.findOne({ type, area, storeId })
@@ -483,9 +488,7 @@ exports.updateCartPromotion = async (req, res) => {
         .json({ status: 404, message: 'Promotion not found!' })
     }
 
-    const { Product } = getModelsByChannel(channel,res,productModel); 
-
-
+    const { Product } = getModelsByChannel(channel, res, productModel)
 
     const product = await Product.findOne({ id: productId }).lean()
 
@@ -529,17 +532,16 @@ exports.updateCartPromotion = async (req, res) => {
 // check
 exports.updateStock = async (req, res) => {
   try {
-    const { area, productId, unit, type } = req.body
-    const channel = req.headers['x-channel'];
+    const { area, productId, period, unit, type } = req.body
+    const channel = req.headers['x-channel']
 
-
-    const { Stock } = getModelsByChannel(channel,res,stockModel); 
-
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
 
     let { qty } = req.body
 
     const modelStock = await Stock.findOne({
-      area: area
+      area: area,
+      period: period
     }).select('area listProduct')
 
     if (!modelStock) {
@@ -549,8 +551,10 @@ exports.updateStock = async (req, res) => {
       })
     }
 
+    console.log('modelStock', modelStock)
+
     const stockData = modelStock.listProduct.find(
-      product => product.productId === productId
+      product => product.id === productId
     )
 
     if (!stockData) {
@@ -560,15 +564,11 @@ exports.updateStock = async (req, res) => {
       })
     }
 
-    const { Product } = getModelsByChannel(channel,res,productModel); 
+    const { Product } = getModelsByChannel(channel, res, productModel)
 
-    
     const modelProduct = await Product.findOne({
       id: productId
-    }).select('productId listUnit')
-
-    // console.log('modelProduct', modelProduct)
-    // console.log('qty', qty)
+    }).select('id listUnit')
 
     if (unit !== 'PCS') {
       const qtyPCS = modelProduct.listUnit.find(item => item.unit === unit)
@@ -578,85 +578,6 @@ exports.updateStock = async (req, res) => {
     const productCtn = modelProduct.listUnit.find(item => item.unit === 'CTN')
     const productCtnFactor = productCtn ? { factor: productCtn.factor } : null
 
-    // if (type === 'IN') {
-    //   const available = stockData.available.map(lot => {
-    //     const usedQty = Math.min(qty, lot.qtyPcs)
-    //     qty += usedQty
-
-    //     return {
-    //       location: lot.location,
-    //       lot: lot.lot,
-    //       qtyPcs: lot.qtyPcs + usedQty,
-    //       qtyCtn: Math.floor((lot.qtyPcs - usedQty) / productCtnFactor.factor)
-    //     }
-    //   })
-
-    //   // console.log("qty",qty);
-    //   // console.log("qtyCtn",qtyCtn);
-
-    //   const data = {
-    //     productId: stockData.productId,
-    //     sumQtyPcs: available.reduce((sum, item) => sum + item.qtyPcs, 0),
-    //     sumQtyCtn: available.reduce((sum, item) => sum + item.qtyCtn, 0),
-    //     available: available
-    //   }
-    //   await Stock.findOneAndUpdate(
-    //     { area: area, 'listProduct.productId': data.productId }, // เงื่อนไขที่ใช้หา document
-    //     {
-    //       $set: {
-    //         'listProduct.$.sumQtyPcs': data.sumQtyPcs,
-    //         'listProduct.$.sumQtyCtn': data.sumQtyCtn,
-    //         'listProduct.$.available': data.available
-    //       }
-    //     },
-    //     { new: true } // ให้คืนค่าหลัง update แล้ว
-    //   )
-
-    //   res.status(200).json({
-    //     status: 200,
-    //     // stockData,
-    //     data
-    //   })
-    // } else if (type === 'OUT') {
-    //   const available = stockData.available.map(lot => {
-    //     const usedQty = Math.min(qty, lot.qtyPcs)
-    //     qty -= usedQty
-
-    //     return {
-    //       location: lot.location,
-    //       lot: lot.lot,
-    //       qtyPcs: lot.qtyPcs - usedQty,
-    //       qtyCtn: Math.floor((lot.qtyPcs - usedQty) / productCtnFactor.factor)
-    //     }
-    //   })
-
-    //   // console.log("qty",qty);
-    //   // console.log("qtyCtn",qtyCtn);
-
-    //   const data = {
-    //     productId: stockData.productId,
-    //     sumQtyPcs: available.reduce((sum, item) => sum + item.qtyPcs, 0),
-    //     sumQtyCtn: available.reduce((sum, item) => sum + item.qtyCtn, 0),
-    //     available: available
-    //   }
-    //   await Stock.findOneAndUpdate(
-    //     { area: area, 'listProduct.productId': data.productId }, // เงื่อนไขที่ใช้หา document
-    //     {
-    //       $set: {
-    //         'listProduct.$.sumQtyPcs': data.sumQtyPcs,
-    //         'listProduct.$.sumQtyCtn': data.sumQtyCtn,
-    //         'listProduct.$.available': data.available
-    //       }
-    //     },
-    //     { new: true } // ให้คืนค่าหลัง update แล้ว
-    //   )
-
-    //   res.status(200).json({
-    //     status: 200,
-    //     // stockData,
-    //     data
-    //   })
-    // }
     if (type === 'IN') {
       let remainingQty = qty // remaining quantity to distribute into lots
 
@@ -675,17 +596,6 @@ exports.updateStock = async (req, res) => {
           qtyCtn: Math.floor((lot.qtyPcs + addedQty) / productCtnFactor.factor)
         }
       })
-
-      // If there's still remaining IN qty, create a new lot (or handle accordingly)
-      if (remainingQty > 0) {
-        available.push({
-          location: 'default', // change this to a valid location
-          lot: 'new', // generate a lot ID here if needed
-          qtyPcs: remainingQty,
-          qtyCtn: Math.floor(remainingQty / productCtnFactor.factor)
-        })
-      }
-
       const data = {
         productId: stockData.productId,
         sumQtyPcs: available.reduce((sum, item) => sum + item.qtyPcs, 0),
@@ -694,7 +604,7 @@ exports.updateStock = async (req, res) => {
       }
 
       await Stock.findOneAndUpdate(
-        { area: area, 'listProduct.productId': data.productId },
+        { area: area, 'listProduct.id': data.productId },
         {
           $set: {
             'listProduct.$.sumQtyPcs': data.sumQtyPcs,
@@ -730,7 +640,7 @@ exports.updateStock = async (req, res) => {
       }
 
       await Stock.findOneAndUpdate(
-        { area: area, 'listProduct.productId': data.productId },
+        { area: area, 'listProduct.id': data.productId },
         {
           $set: {
             'listProduct.$.sumQtyPcs': data.sumQtyPcs,
@@ -749,115 +659,3 @@ exports.updateStock = async (req, res) => {
   }
 }
 
-// exports.updateStock = async (req,res) =>{
-
-//     const { area, productId, Unit  } = req.body
-
-//     const productStock = await Stock.find({
-//         area: area
-//       });
-//     const products = await Product.find({
-//     });
-
-//     let unitData = {}
-
-//     const productUnitMatch = products?.find(p => p.id === productId) ;
-//     if (productUnitMatch) {
-
-//         unitData = productUnitMatch.listUnit
-//         .filter(Unit => Unit.unit === 'CTN')
-//         .map(Unit => ({
-//           Unit: Unit.unit,
-//           factor: Unit.factor
-//         }));
-
-//     }
-//     else{
-//         res.status(404).json({
-//             message:"Not Found This ItemId"
-//         })
-//     }
-
-//     const stockmatchList = []
-
-//     productStock.map(item => {
-
-//     const stockmatch = item.listProduct.find(p => p.productId === productId);
-
-//         if (stockmatch) {
-//             stockmatchList.push(stockmatch)
-//         }
-//     });
-
-//     const lotAndqty = stockmatchList.flatMap(item =>
-//         item.available.map(avai  => ({
-//             lot:avai.lot,
-//             QtyPcs:avai.qtyPcs
-//         }))
-//     )
-
-//     let qty = parseInt(req.body.qty); // ตรวจสอบว่า qty เป็นตัวเลข
-
-//     const result = [];
-
-//     for (const item of lotAndqty) {
-//       const usedQty = Math.min(qty, item.QtyPcs); // ใช้ได้ไม่เกินของใน lot
-//       qty -= usedQty; // หักออกจากยอดรวม
-
-//       if (usedQty === 0) {
-//         break; // หยุดลูปทันทีเมื่อ usedQty = 0
-//       }
-
-//       result.push({
-
-//         lot: item.lot,
-//         // qtyInStock:item.QtyPcs,
-//         // usedQty: usedQty,
-//         qtyPcs: item.QtyPcs - usedQty ,
-//         qtyCtn:Math.floor((item.QtyPcs - usedQty) / unitData[0].factor  )
-
-//       });
-//     }
-
-//     const data = {
-//         // stockmatchList:stockmatchList,
-//         area:area,
-//         productId: stockmatchList[0].productId,
-//         sumQtyPcs:stockmatchList[0].sumQtyPcs,
-//         available: result
-//     };
-
-//     // console.log(stockmatchList[0])
-//     // console.log(JSON.stringify(stockmatchList[0], null, 2));
-
-//     // const stockNew = data.available.map(avil => {
-//     //     const stock = stockmatchList[0].available.find(item => item.lot === avil.lot);
-
-//     //     return {
-//     //         location:stock.location,
-//     //         lot:stock.lot,
-//     //         // oldqty:stock.qtyPcs,
-//     //         qtyPcs:avil.remainInLot,
-//     //         qtyCtn : Math.floor(avil.remainInLot / unitData[0].factor  )
-//     //     };
-//     // });
-
-//     await Stock.updateOne(
-//         {
-//             "area": "BE211 test",
-//             "productId": "10010601011",
-//             "available.lot": "2401061110000000"
-//         },
-//         {
-//             "$set": {
-//                 "available.$[elem].qtyPcs": 0,
-//                 "available.$[elem].qtyCtn": 0
-//             }
-//         },
-//         array_filters=[{"elem.lot": "2401061110000000"}]
-//     )
-
-//     res.status(200).json({
-//         message:data
-//     })
-// }
