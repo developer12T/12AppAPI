@@ -12,7 +12,7 @@ router.post('/checkout', checkout)
 router.post('/addSlip', addSlip)
 
 router.post('/addSlip', addSlip)
-router.get('/ordertoexcel/:channel/:date', OrderToExcel);
+router.get('/ordertoexcel', OrderToExcel);
 router.get('/getAllOrder', getAllOrder)
 router.post('/getSummaryItem', getSummaryItem)
 router.get('/getSummarybyRoute', getSummarybyRoute)

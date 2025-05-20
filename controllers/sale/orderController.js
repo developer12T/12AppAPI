@@ -17,10 +17,7 @@ const { rangeDate } = require('../../utilities/datetime')
 const { uploadFiles } = require('../../utilities/upload')
 const { checkInRoute } = require('../route/checkIn')
 const multer = require('multer')
-const path = require('path')
 const upload = multer({ storage: multer.memoryStorage() }).single('image')
-const os = require('os')
-const xlsx = require('xlsx')
 const _ = require('lodash')
 const { DateTime } = require("luxon");
 const { getSocket } = require('../../socket')
@@ -34,6 +31,15 @@ const productModel  = require('../../models/cash/product')
 const routeModel = require('../../models/cash/route')
 const storeModel = require('../../models/cash/store');
 const { getModelsByChannel } = require('../../middleware/channel')
+
+const xlsx = require('xlsx');
+const path = require('path');
+const os = require('os');
+const fs = require('fs');
+
+
+
+
 
 exports.checkout = async (req, res) => {
   try {
@@ -549,7 +555,9 @@ exports.addSlip = async (req, res) => {
 }
 
 exports.OrderToExcel = async (req, res) => {
-  let { date,channel } = req.params;
+  const { channel, date } = req.query;
+
+  console.log(channel, date)
 
 if (!date || date === 'null') {
   const today = new Date();
@@ -712,20 +720,31 @@ if (!date || date === 'null') {
     })
   }
 
-  const ws = xlsx.utils.json_to_sheet(tranFromOrder)
+  const wb = xlsx.utils.book_new();
+  const ws = xlsx.utils.json_to_sheet(tranFromOrder);
+  xlsx.utils.book_append_sheet(wb, ws, 'Orders');
 
-  const downloadsPath = path.join(os.homedir(), 'Downloads', 'Order.xlsx')
+  const tempPath = path.join(os.tmpdir(), `Order_${Date.now()}.xlsx`);
+  xlsx.writeFile(wb, tempPath);
 
-  const wb = xlsx.utils.book_new()
-  xlsx.utils.book_append_sheet(wb, ws, 'Orders')
+    res.download(tempPath, 'Order.xlsx', (err) => {
+      if (err) {
+        console.error('❌ Download error:', err);
+        // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+        if (!res.headersSent) {
+          res.status(500).send('Download failed');
+        }
+      }
 
-  xlsx.writeFile(wb, downloadsPath)
+      // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+      fs.unlink(tempPath, () => {});
+    });
 
-  console.log('✅ ไฟล์ Order.xlsx ถูกสร้างแล้วที่:', downloadsPath)
 
-  res.status(200).json({
-    message: 'Create file successful!'
-  })
+
+  // res.status(200).json({
+  //   message: 'Create file successful!'
+  // })
 }
 
 
