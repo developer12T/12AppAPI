@@ -260,8 +260,8 @@ const relatedLots = updateLot.filter((u) => u.id === stockDetail.id);
         }
 
 
-    // await newOrder.save()
-    // await Cart.deleteOne({ type, area })
+    await newOrder.save()
+    await Cart.deleteOne({ type, area })
 
     res.status(200).json({
       status: 200,

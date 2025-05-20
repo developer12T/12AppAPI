@@ -354,8 +354,8 @@ exports.checkout = async (req, res) => {
         }
 
 
-        // await newOrder.save()
-        // await Cart.deleteOne({ type, area, storeId })
+        await newOrder.save()
+        await Cart.deleteOne({ type, area, storeId })
 
         res.status(200).json({
             status: 200,
