@@ -70,7 +70,7 @@ exports.getCart = async (req, res) => {
       cart.listPromotion = promotion.appliedPromotions
       cart.cartHashProduct = newCartHashProduct
       cart.cartHashPromotion = newCartHashPromotion
-      // await cart.save()
+      await cart.save()
       // }
       summary.listPromotion = cart.listPromotion
     }
