@@ -326,9 +326,8 @@ exports.addStockNew = async (req, res) => {
                 available: lotList
               }
             })
-          }
-          else  {
-              console.log(test)
+          } else {
+            console.log(test)
           }
 
           data.push({
@@ -339,9 +338,7 @@ exports.addStockNew = async (req, res) => {
             listProduct: listProduct
           })
           // console.log(test.push(data))
-        }
-      
-      )
+        })
       }
       // await Stock.insertMany(data)
     }
@@ -352,7 +349,7 @@ exports.addStockNew = async (req, res) => {
   res.status(200).json({
     status: 200,
     message: 'Stock added successfully',
-    data: test,
+    data: test
   })
   // } catch (error) {
   //   next(error)
@@ -402,7 +399,6 @@ exports.getQty = async (req, res, next) => {
       'listProduct.productId': productId
     })
     console.log(productStock)
-
 
     const products = await Product.find({ id: productId })
 
@@ -575,12 +571,13 @@ exports.availableStock = async (req, res, next) => {
 
       {
         $project: {
-          id: '$listProduct.productId',
+          productId: '$listProduct.productId',
           available: '$listProduct.available',
           _id: 0
         }
       }
     ])
+    // console.log("modelStock",modelStock)
 
     if (modelStock.length == 0) {
       return res.status(404).json({
@@ -588,7 +585,7 @@ exports.availableStock = async (req, res, next) => {
         message: 'Not Found Stock'
       })
     }
-    const productIds = modelStock.flatMap(item => item.id)
+    const productIds = modelStock.flatMap(item => item.productId)
 
     if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
       return res.status(400).json({
@@ -640,7 +637,7 @@ exports.availableStock = async (req, res, next) => {
     // console.log(products)
 
     const data = products.map(product => {
-      const lot = modelStock.find(u => u.id == product.id)
+      const lot = modelStock.find(u => u.productId == product.id)
 
       // console.log("lot",lot)
       const tranFromProduct = product
