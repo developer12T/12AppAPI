@@ -161,6 +161,7 @@ async function applyPromotion(order,channel,res) {
 async function getRewardProduct(proId,channel,res) {
 
     const { Promotion } = getModelsByChannel(channel,res,promotionModel); 
+    const { Product } = getModelsByChannel(channel,res,productModel); 
 
     const promotion = await Promotion.findOne({ proId, status: 'active' }).lean()
     if (!promotion || !promotion.rewards || promotion.rewards.length === 0) {

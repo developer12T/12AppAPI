@@ -189,7 +189,8 @@ exports.addStockNew = async (req, res) => {
   const factorData = {}
 
   const users = await User.find().select('area saleCode warehouse').lean()
-
+  test = []
+  console.log("users",users)
   for (const user of users) {
     const stock = await Stock.findOne({
       area: user.area,
@@ -200,131 +201,132 @@ exports.addStockNew = async (req, res) => {
 
     if (!stock) {
       const areaData = await fetchArea(user.warehouse)
-      const BalanceData = await Balance.findAll({
-        where: {
-          warehouse: user.warehouse,
-          coNo: 410,
-          // itemCode: '10010601011'
-          itemCode: {
-            [Op.or]: [
-              { [Op.ne]: null },
-              { [Op.ne]: '' },
-              // { [Op.eq]: "600102390" },
-              { [Op.notLike]: 'ZNS%' },
-              { [Op.notLike]: '800%' },
-              { [Op.notLike]: 'PRO%' },
-              { [Op.notLike]: 'DIS%' },
-              { [Op.notLike]: '100            ' }
-            ]
-          }
-        }
-        // limit: 10
-      })
-      for (let i = 0; i < BalanceData.length; i++) {
-        locateData[BalanceData[i].itemCode.trim()] = []
-        factorData[BalanceData[i].itemCode.trim()] = []
-        // console.log(`BalanceData[${i}].itemCode`, BalanceData[i].itemCode)
-        // console.log('locateData[BalanceData[i].itemCode.trim()]', locateData)
-        const locate = await Locate.findAll({
-          where: {
-            warehouse: user.warehouse,
-            itemCode: BalanceData[i].itemCode.trim(),
-            coNo: 410
-          }
-          // limit: 10
-        })
+      // console.log("areaData",areaData)
+      // const BalanceData = await Balance.findAll({
+      //   where: {
+      //     warehouse: user.warehouse,
+      //     coNo: 410,
+      //     // itemCode: '10010601011'
+      //     itemCode: {
+      //       [Op.or]: [
+      //         { [Op.ne]: null },
+      //         { [Op.ne]: '' },
+      //         // { [Op.eq]: "600102390" },
+      //         { [Op.notLike]: 'ZNS%' },
+      //         { [Op.notLike]: '800%' },
+      //         { [Op.notLike]: 'PRO%' },
+      //         { [Op.notLike]: 'DIS%' },
+      //         { [Op.notLike]: '100            ' }
+      //       ]
+      //     }
+      //   }
+      //   // limit: 10
+      // })
+      // for (let i = 0; i < BalanceData.length; i++) {
+      //   locateData[BalanceData[i].itemCode.trim()] = []
+      //   factorData[BalanceData[i].itemCode.trim()] = []
+      //   // console.log(`BalanceData[${i}].itemCode`, BalanceData[i].itemCode)
+      //   // console.log('locateData[BalanceData[i].itemCode.trim()]', locateData)
+      //   const locate = await Locate.findAll({
+      //     where: {
+      //       warehouse: user.warehouse,
+      //       itemCode: BalanceData[i].itemCode.trim(),
+      //       coNo: 410
+      //     }
+      //     // limit: 10
+      //   })
 
-        for (let j = 0; j < locate.length; j++) {
-          locateData[BalanceData[i].itemCode.trim()].push({
-            location: locate[j].location.trim(),
-            lot: locate[j].lot,
-            itemOnHand: locate[j].itemOnHand,
-            itemallocated: locate[j].itemallocated // Assuming promotionName is a property of PromotionData
-          })
-        }
-      }
+      //   for (let j = 0; j < locate.length; j++) {
+      //     locateData[BalanceData[i].itemCode.trim()].push({
+      //       location: locate[j].location.trim(),
+      //       lot: locate[j].lot,
+      //       itemOnHand: locate[j].itemOnHand,
+      //       itemallocated: locate[j].itemallocated // Assuming promotionName is a property of PromotionData
+      //     })
+      //   }
+      // }
 
-      const stocks = BalanceData.map(stock => {
-        const locate = locateData[stock.itemCode.trim()] || []
-        const itemCode = stock.itemCode.trim()
+      // const stocks = BalanceData.map(stock => {
+      //   const locate = locateData[stock.itemCode.trim()] || []
+      //   const itemCode = stock.itemCode.trim()
 
-        return {
-          coNo: stock.coNo,
-          warehouse: stock.warehouse,
-          itemCode: itemCode,
-          itemPcs: stock.itemPcs,
-          allocateMethod: stock.allocateMethod,
-          itemallocated: stock.itemallocated,
-          itemAllowcatable: stock.itemAllowcatable,
-          lot: locate
-        }
-      })
-      console.log('stocks', stocks)
+      //   return {
+      //     coNo: stock.coNo,
+      //     warehouse: stock.warehouse,
+      //     itemCode: itemCode,
+      //     itemPcs: stock.itemPcs,
+      //     allocateMethod: stock.allocateMethod,
+      //     itemallocated: stock.itemallocated,
+      //     itemAllowcatable: stock.itemAllowcatable,
+      //     lot: locate
+      //   }
+      // })
 
-      const productIds = stocks.map(item => item.itemCode)
+      // const productIds = stocks.map(item => item.itemCode)
 
-      // console.log("productIds",productIds)
-      const productDetail = await Product.find({
-        id: { $in: productIds }
-      }).select('id listUnit.unit listUnit.factor')
+      // // console.log("productIds",productIds)
+      // const productDetail = await Product.find({
+      //   id: { $in: productIds }
+      // }).select('id listUnit.unit listUnit.factor')
 
-      const productFactors = productDetail.map(product => {
-        const ctnUnit = product.listUnit.find(unit => unit.unit === 'CTN')
-        return {
-          id: product.id,
-          factor: ctnUnit ? parseInt(ctnUnit.factor) : 0 // หรือ default ค่าอื่นเช่น 1
-        }
-      })
+      // const productFactors = productDetail.map(product => {
+      //   const ctnUnit = product.listUnit.find(unit => unit.unit === 'CTN')
+      //   return {
+      //     id: product.id,
+      //     factor: ctnUnit ? parseInt(ctnUnit.factor) : 0 // หรือ default ค่าอื่นเช่น 1
+      //   }
+      // })
       data = []
 
       if (areaData) {
         areaData.forEach(area => {
-          const productID = stocks.filter(
-            item =>
-              item.warehouse === area.warehouse &&
-              Array.isArray(item.lot) &&
-              item.lot.length > 0
-          )
+          // console.log("test")
+          // const productID = stocks.filter(
+          //   item =>
+          //     item.warehouse === area.warehouse &&
+          //     Array.isArray(item.lot) &&
+          //     item.lot.length > 0
+          // )
 
           let listProduct = []
 
-          if (productID.length > 0) {
-            listProduct = productID.map(product => {
-              const productId = product.itemCode
-              // console.log("product",product)
-              const Factor =
-                productFactors.find(pf => pf.id === productId) || {}
-              const sumQtyPcs = product.lot.reduce(
-                (sum, obj) => sum + (obj.itemOnHand || 0),
-                0
-              ) // ตรงนี้คุณเขียน obj.lot.itemOnHand แต่จริงๆ obj คือ lot แล้ว
-              const sumQtyCtn = product.lot.reduce(
-                (sum, obj) =>
-                  sum +
-                  (Factor?.factor && Factor.factor > 0
-                    ? Math.floor(obj.itemOnHand / Factor.factor) // ใช้ obj แทน lot
-                    : 0),
-                0
-              )
+          // if (productID.length > 0) {
+          //   listProduct = productID.map(product => {
+          //     const productId = product.itemCode
+          //     // console.log("product",product)
+          //     const Factor =
+          //       productFactors.find(pf => pf.id === productId) || {}
+          //     const sumQtyPcs = product.lot.reduce(
+          //       (sum, obj) => sum + (obj.itemOnHand || 0),
+          //       0
+          //     ) // ตรงนี้คุณเขียน obj.lot.itemOnHand แต่จริงๆ obj คือ lot แล้ว
+          //     const sumQtyCtn = product.lot.reduce(
+          //       (sum, obj) =>
+          //         sum +
+          //         (Factor?.factor && Factor.factor > 0
+          //           ? Math.floor(obj.itemOnHand / Factor.factor) // ใช้ obj แทน lot
+          //           : 0),
+          //       0
+          //     )
 
-              lotList = product.lot.map(lot => ({
-                location: lot.location,
-                lot: lot.lot,
-                qtyPcs: lot.itemOnHand,
-                qtyCtn:
-                  Factor?.factor && Factor.factor > 0
-                    ? Math.floor(lot.itemOnHand / Factor.factor)
-                    : 0
-              }))
+          //     lotList = product.lot.map(lot => ({
+          //       location: lot.location,
+          //       lot: lot.lot,
+          //       qtyPcs: lot.itemOnHand,
+          //       qtyCtn:
+          //         Factor?.factor && Factor.factor > 0
+          //           ? Math.floor(lot.itemOnHand / Factor.factor)
+          //           : 0
+          //     }))
 
-              return {
-                productId: productId,
-                sumQtyPcs: sumQtyPcs,
-                sumQtyCtn: sumQtyCtn,
-                available: lotList
-              }
-            })
-          }
+          //     return {
+          //       productId: productId,
+          //       sumQtyPcs: sumQtyPcs,
+          //       sumQtyCtn: sumQtyCtn,
+          //       available: lotList
+          //     }
+          //   })
+          // }
 
           data.push({
             area: area.area,
@@ -333,10 +335,10 @@ exports.addStockNew = async (req, res) => {
             warehouse: area.warehouse,
             listProduct: listProduct
           })
-          // console.log("data",data)
+          console.log(test.push(data))
         })
       }
-      await Stock.insertMany(data)
+      // await Stock.insertMany(data)
     }
   }
 
@@ -344,8 +346,8 @@ exports.addStockNew = async (req, res) => {
 
   res.status(200).json({
     status: 200,
-    message: 'Stock added successfully'
-    // data: data,
+    message: 'Stock added successfully',
+    data: test,
   })
   // } catch (error) {
   //   next(error)
