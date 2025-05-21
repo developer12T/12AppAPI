@@ -26,7 +26,7 @@ exports.checkout = async (req, res) => {
       const { Place } = getModelsByChannel(channel,res,distributionModel); 
       const { Product } = getModelsByChannel(channel,res,productModel)
       const { Distribution } = getModelsByChannel(channel,res,distributionModel)
-      const { Stock } = getModelsByChannel(channel,res,stockModel); 
+      const { Stock,StockMovementLog,StockMovement } = getModelsByChannel(channel, res, stockModel);
 
 
 
@@ -157,30 +157,51 @@ exports.checkout = async (req, res) => {
     // console.log("newOrder",newOrder)
 
 
-    const calStock = {
-            // storeId: newOrder.store.storeId,
-            area:newOrder.area,
-            period:period,
-            type:"Withdraw",
-            listProduct:newOrder.listProduct.map(u => {
+    // const calStock = {
+    //         // storeId: newOrder.store.storeId,
+    //         area:newOrder.area,
+    //         period:period,
+    //         type:"Withdraw",
+    //         listProduct:newOrder.listProduct.map(u => {
+    //             return {
+    //                 id:u.id,
+    //                 lot:u.lot,
+    //                 unit:u.unit,
+    //                 qty:u.qty,}
+    //         })
+    //     }
+        const calStock = {
+            // storeId: refundOrder.store.storeId,
+            orderId : newOrder.orderId,
+            area: newOrder.area,
+            saleCode: sale.saleCode,
+            period: period,
+            warehouse: newOrder.fromWarehouse,
+            status: 'pending',
+            action: "Withdraw",
+            type: "Withdraw",
+            product: newOrder.listProduct.map(u => {
                 return {
-                    id:u.id,
-                    lot:u.lot,
-                    unit:u.unit,
-                    qty:u.qty,}
+                    productId: u.id,
+                    lot: u.lot,
+                    unit: u.unit,
+                    qty: u.qty,
+                }
             })
         }
 
-const productId = calStock.listProduct.flatMap( u => u.id)
+
+
+const productId = calStock.product.flatMap( u => u.productId)
 
 const stock = await Stock.aggregate([
             { $match: { area: area, period: period } },
             { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
-            { $match: { "listProduct.id":{$in: productId}}},
+            { $match: { "listProduct.productId":{$in: productId}}},
             // { $match : { "listProduct.available.lot": u.lot } },
               { $project: {
                             _id: 0,
-                            id: "$listProduct.id",
+                            productId: "$listProduct.productId",
                             sumQtyPcs:"$listProduct.sumQtyPcs",
                             sumQtyCtn:"$listProduct.sumQtyCtn",
                             sumQtyPcsStockIn:"$listProduct.sumQtyPcsStockIn",
@@ -195,18 +216,16 @@ let listProductWithDraw = []
 let updateLot = []
 
 
-// console.log("calStock",calStock)
         for (const stockDetail of stock) {
-          // console.log("stockDetail",stockDetail)
             for (const lot of stockDetail.available) {
-
-              const calDetails = calStock.listProduct.filter(
-                u => u.id === stockDetail.id && u.lot === lot.lot
+              const calDetails = calStock.product.filter(
+                u => u.productId === stockDetail.productId && u.lot === lot.lot
               );
+
 
               let pcsQty = 0;
               let ctnQty = 0;
-
+              
               for (const cal of calDetails) {
                 if (cal.unit === 'PCS' || cal.unit === 'BOT') {
                   pcsQty += cal.qty || 0;
@@ -216,22 +235,22 @@ let updateLot = []
                 }
               }
                 updateLot.push({
-                    id:stockDetail.id,
+                    productId:stockDetail.productId,
                     location:lot.location,
                     lot:lot.lot,
-                    qtyPcs:lot.qtyPcs -  pcsQty,
+                    qtyPcs:Math.max(0,lot.qtyPcs -  pcsQty),
                     qtyPcsStockIn:lot.qtyPcsStockIn ,
                     qtyPcsStockOut:lot.qtyPcsStockOut + pcsQty,
-                    qtyCtn:lot.qtyCtn - ctnQty,
+                    qtyCtn:Math.max(0,lot.qtyCtn - ctnQty),
                     qtyCtnStockIn:lot.qtyCtnStockIn ,
                     qtyCtnStockOut:lot.qtyCtnStockOut + ctnQty
                 })
               }
             
-          
-const relatedLots = updateLot.filter((u) => u.id === stockDetail.id);
+            
+const relatedLots = updateLot.filter((u) => u.productId === stockDetail.productId);
             listProductWithDraw.push({
-                id: stockDetail.id,
+                productId: stockDetail.productId,
                 sumQtyPcs: relatedLots.reduce((total, item) => total + item.qtyPcs, 0),
                 sumQtyCtn: relatedLots.reduce((total, item) => total + item.qtyCtn, 0),
                 sumQtyPcsStockIn: relatedLots.reduce((total, item) => total + item.qtyPcsStockIn, 0),
@@ -240,9 +259,8 @@ const relatedLots = updateLot.filter((u) => u.id === stockDetail.id);
                 sumQtyCtnStockOut: relatedLots.reduce((total, item) => total + item.qtyCtnStockOut, 0),
                 available: relatedLots.map(({ id, ...rest }) => rest), 
             });
-            // console.dir(relatedLots, { depth: null, colors: true });
             }
-
+            
         for (const updated of listProductWithDraw) {
             await Stock.findOneAndUpdate(
                 {area:area, period:period},
@@ -255,9 +273,18 @@ const relatedLots = updateLot.filter((u) => u.id === stockDetail.id);
                         "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
                         "listProduct.$[product].available":updated.available
                 }},
-                { arrayFilters : [{ "product.id": updated.id }] , new: true}
+                { arrayFilters : [{ "product.productId": updated.productId }] , new: true}
             )
         }
+
+        const createdMovement = await StockMovement.create({
+            ...calStock
+        });
+
+        await StockMovementLog.create({
+            ...calStock,
+            refOrderId: createdMovement._id
+        });
 
 
     await newOrder.save()
@@ -267,7 +294,7 @@ const relatedLots = updateLot.filter((u) => u.id === stockDetail.id);
       status: 200,
       message: 'Checkout successful!',
       // data: { orderId, total: subtotal, qty: totalQty }
-      data:newOrder
+      data:listProductWithDraw
       // data:listProductWithDraw
     })
   } catch (error) {
