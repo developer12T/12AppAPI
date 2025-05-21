@@ -1352,16 +1352,16 @@ try {
   const { Route } = getModelsByChannel(channel,res,routeModel); 
 
   checkArea = await Route.find({ area: area })
-
-  // if (checkArea.length == 0) {
-  //   return res.status(404).json({
-  //     status: 404,
-  //     message: `Not Found This area: ${area}`
-  //   })
-  // }
+  if (checkArea.length == 0) {
+    return res.status(404).json({
+      status: 404,
+      message: `Not Found This area: ${area}`
+    })
+  }
 
   const storeIdObj = await Store.findOne({storeId:storeId}).select("_id")
 
+  // console.log("storeIdObj",storeIdObj)
   const matchStore = storeIdObj
   ? {
       "listStore.storeInfo": {
@@ -1419,6 +1419,8 @@ try {
     }
   ]
   
+
+
   if (day != null) {
     pipeline.push({
       $match: {
@@ -1459,11 +1461,7 @@ try {
   )
   
   const modelRoute = await Route.aggregate(pipeline)
-  
-
-  // console.log(JSON.stringify(modelRoute, null, 2));
-
-
+  console.log("modelRoute",modelRoute)
   modelRouteValue = modelRoute.map(item => {
     return {
       month: item.month,
