@@ -859,7 +859,7 @@ for (const ch of channel) {
         FACI: 'F10',
         WHLO: order.sale.warehouse,
         ORNO: '',
-        OAORTP: '',
+        OAORTP: 'A31',
         RLDT: RLDT,
         ADID: order.shipping.shippingId,
         CUOR: order.orderId,
@@ -1845,13 +1845,33 @@ exports.erpApiCheck = async (req, res) => {
 exports.getSummarybyChoice = async (req, res) => {
 
   const {area, date, type} = req.body
+  let dayStr, monthStr, yearStr;
 
-    let dayStr = date.substring(0, 2);    
-    let monthStr = date.substring(2, 4);   
-    let yearStr = date.substring(4, 8);   
+  if (!date) {
+    return res.status(400).json({
+      status:400,
+      message:"Date is required"
+    })
+  }
 
 
 
+  if (type == 'day') {
+    dayStr = parseInt(date.substring(0, 2), 10);   
+  }
+  else if (type == 'month') {
+    monthStr = parseInt(date.substring(2, 4), 10);    
+  }
+  else if (type == 'year') {
+    yearStr = parseInt(date.substring(4, 8), 10);  
+  }
+
+  const match = {}
+    if(dayStr) match.day = dayStr
+    if(monthStr) match.month = monthStr
+    if(yearStr) match.year = yearStr
+
+    console.log(match)
     const channel = req.headers['x-channel']; 
 
     const { Order } = getModelsByChannel(channel,res,orderModel); 
@@ -1876,12 +1896,27 @@ exports.getSummarybyChoice = async (req, res) => {
       year: { $year: "$createdAtThai" }
     }
   },
-  {$match:{
-    day:dayStr,
-    month:monthStr,
-    year:yearStr
-  }}
+  {
+    $match: match
+  },
+{
+  $group: {
+    _id: type, 
+    total: { $sum: "$total" } 
+  }
+},
+{$project:{
+  _id:0,
+  total:1
+}}
     ])
+
+    // if (modelOrder.length === 0) {
+    //   return res.status(404).json({
+    //     status:404,
+    //     message:"Not found order"
+    //   })
+    // }
 
   res.status(200).json({
     status:200,
