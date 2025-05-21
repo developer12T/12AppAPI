@@ -74,13 +74,11 @@ exports.addImage = async (req, res) => {
     const { User } = getModelsByChannel(channel, res, userModel)
     upload(req, res, async err => {
       if (err) {
-        return res
-          .status(400)
-          .json({
-            status: 400,
-            message: 'Error uploading file',
-            error: err.message
-          })
+        return res.status(400).json({
+          status: 400,
+          message: 'Error uploading file',
+          error: err.message
+        })
       }
 
       const { userId, type } = req.body
@@ -164,38 +162,58 @@ exports.getQRcode = async (req, res) => {
 }
 
 exports.addUser = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { User } = getModelsByChannel(channel, res, userModel)
-  const response = await axios.post(
-    'http://58.181.206.159:9814/apps_api/cr_api/cr_user.php'
-  )
-
-  for (const sale of response.data) {
-    const saleInData = await User.findOne({ saleCode: sale.saleCode })
-    if (!saleInData) {
-      const newUser = new User({
-        saleCode: sale.saleCode,
-        salePayer: sale.salePayer,
-        username: sale.username,
-        firstName: sale.firstName,
-        surName: sale.surName,
-        password: sale.password,
-        tel: sale.tel,
-        zone: sale.zone,
-        area: sale.area,
-        warehouse: sale.warehouse,
-        role: sale.role,
-        status: sale.status,
-        image: ''
-      })
-      await newUser.save()
+  try {
+    let pathPhp = ''
+    const channel = req.headers['x-channel']
+    switch (channel) {
+      case 'cash':
+        pathPhp = 'ca_api/ca_user.php'
+        break
+      case 'credit':
+        pathPhp = 'cr_api/cr_user.php'
+        break
+      default:
+        break
     }
-  }
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const response = await axios.post(
+      `http://58.181.206.159:9814/apps_api/${pathPhp}`
+    )
 
-  res.status(200).json({
-    status: 200,
-    message: 'Insert User Success'
-  })
+    for (const sale of response.data) {
+      const saleInData = await User.findOne({ saleCode: sale.saleCode })
+      if (!saleInData) {
+        const newUser = new User({
+          saleCode: sale.saleCode,
+          salePayer: sale.salePayer,
+          username: sale.username,
+          firstName: sale.firstName,
+          surName: sale.surName,
+          password: sale.password,
+          tel: sale.tel,
+          zone: sale.zone,
+          area: sale.area,
+          warehouse: sale.warehouse,
+          role: sale.role,
+          status: sale.status,
+          qrCodeImage: sale.qrCodeImage,
+          image: ''
+        })
+        await newUser.save()
+      }
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'Insert User Success'
+    })
+  } catch (error) {
+    console.error(e)
+    res.status(500).json({
+      status: 500,
+      message: e.message
+    })
+  }
 }
 
 exports.addUserOne = async (req, res) => {
@@ -268,7 +286,6 @@ exports.updateUserOne = async (req, res) => {
   })
 }
 
-
 exports.addAndUpdateUser = async (req, res) => {
   const channel = req.headers['x-channel']
   const { User } = getModelsByChannel(channel, res, userModel)
@@ -285,67 +302,66 @@ exports.addAndUpdateUser = async (req, res) => {
       break
   }
 
-    const userM3 = await axios.post(
-      `http://58.181.206.159:9814/apps_api/${pathPhp}`
-    )
+  const userM3 = await axios.post(
+    `http://58.181.206.159:9814/apps_api/${pathPhp}`
+  )
   let update = 0
   let addNew = 0
   for (const m3 of userM3.data) {
-    const userInMongo =  userMongo.find(id => id.saleCode == m3.saleCode)
+    const userInMongo = userMongo.find(id => id.saleCode == m3.saleCode)
 
-        if (userInMongo){
-          const hasChanged = Object.keys(m3).some(
-            key => !['saleCode', '__v'].includes(key) && m3[key] !== userInMongo[key]
-          );
+    if (userInMongo) {
+      const hasChanged = Object.keys(m3).some(
+        key =>
+          !['saleCode', '__v'].includes(key) && m3[key] !== userInMongo[key]
+      )
 
-            if (hasChanged) {
-              console.log(m3)
-              await User.updateOne(
-                { saleCode: m3.saleCode },
-                {
-                  $set: {
-                    salePayer: m3.salePayer,
-                    username: m3.username,
-                    firstName: m3.firstName,
-                    surName: m3.surName,
-                    password: m3.password,
-                    tel: m3.tel,
-                    zone: m3.zone,
-                    area: m3.area,
-                    warehouse: m3.warehouse,
-                    role: m3.role,
-                    status: m3.status,
-                    // __v: m3.__v + 1
-                  }
-                }
-              )
-              update += 1
+      if (hasChanged) {
+        console.log(m3)
+        await User.updateOne(
+          { saleCode: m3.saleCode },
+          {
+            $set: {
+              salePayer: m3.salePayer,
+              username: m3.username,
+              firstName: m3.firstName,
+              surName: m3.surName,
+              password: m3.password,
+              tel: m3.tel,
+              zone: m3.zone,
+              area: m3.area,
+              warehouse: m3.warehouse,
+              role: m3.role,
+              status: m3.status
+              // __v: m3.__v + 1
             }
-        }
-        else{
-          await User.create({
-            saleCode: m3.saleCode,
-            salePayer:m3.salePayer,
-            username: m3.username,
-            firstName: m3.firstName,
-            surName: m3.surName,
-            password: m3.password,
-            tel: m3.tel,
-            zone: m3.zone,
-            area: m3.area,
-            warehouse: m3.warehouse,
-            role: m3.role,
-            status: m3.status,
-            // __v: 0
-          });
-          addNew += 1
-        }
+          }
+        )
+        update += 1
       }
+    } else {
+      await User.create({
+        saleCode: m3.saleCode,
+        salePayer: m3.salePayer,
+        username: m3.username,
+        firstName: m3.firstName,
+        surName: m3.surName,
+        password: m3.password,
+        tel: m3.tel,
+        zone: m3.zone,
+        area: m3.area,
+        warehouse: m3.warehouse,
+        role: m3.role,
+        status: m3.status
+        // __v: 0
+      })
+      addNew += 1
+    }
+  }
   res.status(200).json({
-    status:200,
-    message:`Insert And Update Success`,
-    Update:update,
+    status: 200,
+    message: `Insert And Update Success`,
+    Update: update,
     Add: addNew
   })
-
 }
