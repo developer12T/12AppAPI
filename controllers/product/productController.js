@@ -593,7 +593,7 @@ exports.addFromERP = async (req, res) => {
         statusWithdraw: listProduct.statusWithdraw,
         listUnit: listUnit
       })
-      // await newProduct.save()
+      await newProduct.save()
       // console.log(newProduct)
     }
     res.status(200).json({

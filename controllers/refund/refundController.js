@@ -246,9 +246,9 @@ exports.checkout = async (req, res) => {
         //    await StockMovementLog.create(calStock)
         //    await StockMovement.create(calStock)
 
-        // await refundOrder.save()
-        // await changeOrder.save()
-        // await Cart.deleteOne({ type, area, storeId })
+        await refundOrder.save()
+        await changeOrder.save()
+        await Cart.deleteOne({ type, area, storeId })
         res.status(200).json({
             status: 200,
             message: 'Checkout successful!',

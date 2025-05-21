@@ -768,7 +768,7 @@ exports.createRoute = async (req, res) => {
           listStore: routeData.listStore
         })
         // console.log(newRoute)
-        // await newRoute.save()
+        await newRoute.save()
         newRoutes.push(newRoute)
       }
 
