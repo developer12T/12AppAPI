@@ -1911,15 +1911,18 @@ exports.getSummarybyChoice = async (req, res) => {
 }}
     ])
 
-    // if (modelOrder.length === 0) {
-    //   return res.status(404).json({
-    //     status:404,
-    //     message:"Not found order"
-    //   })
-    // }
+    if (modelOrder.length === 0) {
+      return res.status(404).json({
+        status:404,
+        message:"Not found order"
+      })
+    }
+
+    
 
   res.status(200).json({
     status:200,
-    message:modelOrder
+    message:"Successful",
+    total:modelOrder[0].total
   })
 }

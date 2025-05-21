@@ -552,7 +552,7 @@ async function summaryWithdraw (cart,channel,res) {
 }
 
 async function summaryRefund (cart,channel,res) {
-  // try {
+  try {
     if (!cart) {
       throw new Error('Cart data is required')
     }
@@ -661,10 +661,10 @@ async function summaryRefund (cart,channel,res) {
       created: cart.created,
       updated: cart.updated
     }
-  // } catch (error) {
-  //   console.error('Error transforming refund cart data:', error.message)
-  //   return null
-  // }
+  } catch (error) {
+    console.error('Error transforming refund cart data:', error.message)
+    return null
+  }
 }
 
 // async function summaryGive (cart,channel,res) {

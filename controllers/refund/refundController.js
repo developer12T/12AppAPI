@@ -29,7 +29,7 @@ exports.checkout = async (req, res) => {
         const { User } = getModelsByChannel(channel, res, userModel);
         const { Refund } = getModelsByChannel(channel, res, refundModel);
         const { Order } = getModelsByChannel(channel, res, orderModel);
-        const { Stock } = getModelsByChannel(channel, res, stockModel);
+        const { Stock,StockMovementLog,StockMovement } = getModelsByChannel(channel, res, stockModel);
 
 
         if (!type || type !== 'refund') {
@@ -132,9 +132,10 @@ exports.checkout = async (req, res) => {
             createdBy: sale.username
         })
 
+        console.log(refundOrder.store.area)
         const calStock = {
             // storeId: refundOrder.store.storeId,
-            orderId : refundOrder.refundOrderId,
+            orderId : refundOrder.orderId,
             area: refundOrder.store.area,
             saleCode: refundOrder.sale.saleCode,
             period: period,
@@ -241,11 +242,13 @@ exports.checkout = async (req, res) => {
                 { arrayFilters: [{ "product.id": updated.id }], new: true }
             )
         }
+        console.log(calStock)
+        //    await StockMovementLog.create(calStock)
+        //    await StockMovement.create(calStock)
 
-
-        await refundOrder.save()
-        await changeOrder.save()
-        await Cart.deleteOne({ type, area, storeId })
+        // await refundOrder.save()
+        // await changeOrder.save()
+        // await Cart.deleteOne({ type, area, storeId })
         res.status(200).json({
             status: 200,
             message: 'Checkout successful!',
