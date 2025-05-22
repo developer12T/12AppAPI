@@ -1348,59 +1348,30 @@ try {
   const { area, year,storeId,day  } = req.query
   const channel = req.headers['x-channel']; // 'credit' or 'cash'
 
-  const { Store } = getModelsByChannel(channel,res,storeModel); 
-  const { Route } = getModelsByChannel(channel,res,routeModel); 
+  // const { Store } = getModelsByChannel(channel,res,storeModel); 
+  // const { Route } = getModelsByChannel(channel,res,routeModel); 
+  const { Order } = getModelsByChannel(channel,res,orderModel); 
 
-  checkArea = await Route.find({ area: area })
-  if (checkArea.length == 0) {
-    return res.status(404).json({
-      status: 404,
-      message: `Not Found This area: ${area}`
-    })
-  }
+  let pipeline = []
 
-  const storeIdObj = await Store.findOne({storeId:storeId}).select("_id")
-
-  // console.log("storeIdObj",storeIdObj)
-  const matchStore = storeIdObj
-  ? {
-      "listStore.storeInfo": {
-        $exists: true,
-        $eq: storeIdObj._id.toString()
-      }
-    }
-  : {};
-
-  const pipeline = [
-    { $match: { area } },
+  pipeline.push(
+    { $match:{
+      'store.area':area
+    } },
     { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
-    { $match: matchStore },
+    // { $match: matchStore },
     {
       $unwind: {
         path: '$listStore.listOrder',
         preserveNullAndEmptyArrays: true
       }
     },
-    {
-      $lookup: {
-        from: 'orders',
-        localField: 'listStore.listOrder.orderId',
-        foreignField: 'orderId',
-        as: 'orderDetails'
-      }
-    },
-    { $unwind: { path: '$orderDetails', preserveNullAndEmptyArrays: true } },
-    {
-      $match: {
-        orderDetails: { $ne: null },
-        'orderDetails.createdAt': { $ne: null }
-      }
-    },
+
     {
       $addFields: {
         createdAtThai: {
           $dateAdd: {
-            startDate: '$orderDetails.createdAt',
+            startDate: '$createdAt',
             unit: 'hour',
             amount: 7
           }
@@ -1417,22 +1388,19 @@ try {
         createdYear: { $year: '$createdAtThai' }
       }
     }
-  ]
+  )
   
-
-
-  if (day != null) {
+  if (storeId) {
     pipeline.push({
       $match: {
-        createdDay: Number(day)
+        'store.storeId': storeId
       }
     })
   }
-
-  if (year != null) {
+  if (year) {
     pipeline.push({
-      $match: {
-        createdYear: Number(year)
+      $match:{
+        createdYear:parseInt(year)
       }
     })
   }
@@ -1441,7 +1409,7 @@ try {
     {
       $project: {
         month: { $month: '$createdAtThai' },
-        total: '$orderDetails.total'
+        total: '$total'
       }
     },
     {
@@ -1460,9 +1428,8 @@ try {
     }
   )
   
-  const modelRoute = await Route.aggregate(pipeline)
-  console.log("modelRoute",modelRoute)
-  modelRouteValue = modelRoute.map(item => {
+  const modelOrder = await Order.aggregate(pipeline)
+  const modelOrderValue = modelOrder.map(item => {
     return {
       month: item.month,
       summary: item.totalAmount
@@ -1475,7 +1442,7 @@ try {
   }));
 
   // อัปเดตผลลัพธ์จาก data ที่มีอยู่
-  modelRouteValue.forEach(d => {
+  modelOrderValue.forEach(d => {
     result[d.month - 1].summary = d.summary;
   });
 

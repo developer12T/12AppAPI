@@ -219,8 +219,9 @@ exports.checkout = async (req, res) => {
                         qtyCtnStockIn: lot.qtyCtnStockIn + ctnQtyGood,
                         qtyCtnStockOut: lot.qtyCtnStockOut + ctnQtyDamaged
                     });
+
+                    console.log("updateLot",updateLot)
             }
-            // console.log(updateLot)
             const relatedLots = updateLot.filter((u) => u.productId === stockDetail.productId);
             listProduct.push({
                 productId: stockDetail.productId,
@@ -233,38 +234,39 @@ exports.checkout = async (req, res) => {
                 available: relatedLots.map(({ id, ...rest }) => rest),
             });
         }
+        console.log("listProduct",listProduct)
 
-        for (const updated of listProduct) {
-            await Stock.findOneAndUpdate(
-                { area: area, period: period },
-                {
-                    $set: {
-                        "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
-                        "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
-                        "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
-                        "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
-                        "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
-                        "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
-                        "listProduct.$[product].available": updated.available
-                    }
-                },
-                { arrayFilters: [{ "product.productId": updated.productId }], new: true }
-            )
-        }
+        // for (const updated of listProduct) {
+        //     await Stock.findOneAndUpdate(
+        //         { area: area, period: period },
+        //         {
+        //             $set: {
+        //                 "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
+        //                 "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
+        //                 "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
+        //                 "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
+        //                 "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
+        //                 "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
+        //                 "listProduct.$[product].available": updated.available
+        //             }
+        //         },
+        //         { arrayFilters: [{ "product.productId": updated.productId }], new: true }
+        //     )
+        // }
            
-        const createdMovement = await StockMovement.create({
-            ...calStock
-        });
+        // const createdMovement = await StockMovement.create({
+        //     ...calStock
+        // });
 
-        await StockMovementLog.create({
-            ...calStock,
-            refOrderId: createdMovement._id
-        });
+        // await StockMovementLog.create({
+        //     ...calStock,
+        //     refOrderId: createdMovement._id
+        // });
 
 
-        await refundOrder.save()
-        await changeOrder.save()
-        await Cart.deleteOne({ type, area, storeId })
+        // await refundOrder.save()
+        // await changeOrder.save()
+        // await Cart.deleteOne({ type, area, storeId })
         res.status(200).json({
             status: 200,
             message: 'Checkout successful!',
