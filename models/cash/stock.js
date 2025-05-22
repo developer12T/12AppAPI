@@ -1,4 +1,6 @@
 const mongoose = require('mongoose')
+const { Schema } = mongoose;
+
 const { dbCA } = require('../../config/db') // ตรวจสอบการเชื่อมต่อ
 
 const availableSchema = new mongoose.Schema(
@@ -46,7 +48,8 @@ const listProductMovementSchema = new mongoose.Schema(
     productId: { type: String, required: true },
     unit: { type: String, default: '' },
     lot: { type: String, default: '' },
-    qty: { type: Number, default: 0 }
+    qty: { type: Number, default: 0 },
+    condition: { type: String, default: '' }
   },
   { _id: false }
 )
@@ -66,6 +69,7 @@ const stockMovementSchema = new mongoose.Schema({
 
 const stockMovementLogSchema = new mongoose.Schema({
   orderId: { type: String, required: true },
+  refOrderId: { type: Schema.Types.ObjectId, required: true },
   area: { type: String, required: true },
   saleCode: { type: String, required: true },
   period: { type: String, required: true },

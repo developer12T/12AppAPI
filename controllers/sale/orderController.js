@@ -1352,16 +1352,16 @@ try {
   const { Route } = getModelsByChannel(channel,res,routeModel); 
 
   checkArea = await Route.find({ area: area })
-
-  // if (checkArea.length == 0) {
-  //   return res.status(404).json({
-  //     status: 404,
-  //     message: `Not Found This area: ${area}`
-  //   })
-  // }
+  if (checkArea.length == 0) {
+    return res.status(404).json({
+      status: 404,
+      message: `Not Found This area: ${area}`
+    })
+  }
 
   const storeIdObj = await Store.findOne({storeId:storeId}).select("_id")
 
+  // console.log("storeIdObj",storeIdObj)
   const matchStore = storeIdObj
   ? {
       "listStore.storeInfo": {
@@ -1419,6 +1419,8 @@ try {
     }
   ]
   
+
+
   if (day != null) {
     pipeline.push({
       $match: {
@@ -1459,11 +1461,7 @@ try {
   )
   
   const modelRoute = await Route.aggregate(pipeline)
-  
-
-  // console.log(JSON.stringify(modelRoute, null, 2));
-
-
+  console.log("modelRoute",modelRoute)
   modelRouteValue = modelRoute.map(item => {
     return {
       month: item.month,
@@ -1844,7 +1842,7 @@ exports.erpApiCheck = async (req, res) => {
 
 exports.getSummarybyChoice = async (req, res) => {
 
-  const {area, date, type} = req.body
+  const {storeId,area, date, type,} = req.body
   let dayStr, monthStr, yearStr;
 
   if (!date) {
@@ -1853,8 +1851,6 @@ exports.getSummarybyChoice = async (req, res) => {
       message:"Date is required"
     })
   }
-
-
 
   if (type == 'day') {
     dayStr = parseInt(date.substring(0, 2), 10);   
@@ -1866,20 +1862,22 @@ exports.getSummarybyChoice = async (req, res) => {
     yearStr = parseInt(date.substring(4, 8), 10);  
   }
 
+  let matchStage = {}
+      matchStage["store.area"] = area;
+    if (storeId){
+      matchStage["store.storeId"] = storeId;
+    }
   const match = {}
     if(dayStr) match.day = dayStr
     if(monthStr) match.month = monthStr
     if(yearStr) match.year = yearStr
 
-    console.log(match)
     const channel = req.headers['x-channel']; 
 
     const { Order } = getModelsByChannel(channel,res,orderModel); 
 
     const modelOrder = await Order.aggregate([
-      {$match: {
-        "store.area":area
-      }},
+      {$match:matchStage},
       {$addFields:{
         createdAtThai:{
           $dateAdd:{

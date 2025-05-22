@@ -94,6 +94,7 @@ exports.checkout = async (req, res) => {
             createdBy: sale.username
         })
 
+        // console.log("refundOrder",refundOrder)
         const changeOrder = new Order({
             type: 'change',
             orderId: changeOrderId,
@@ -132,7 +133,7 @@ exports.checkout = async (req, res) => {
             createdBy: sale.username
         })
 
-        console.log(refundOrder.store.area)
+        // console.log(refundOrder)
         const calStock = {
             // storeId: refundOrder.store.storeId,
             orderId : refundOrder.orderId,
@@ -143,9 +144,9 @@ exports.checkout = async (req, res) => {
             status: 'pending',
             action: "Refund",
             type: "Refund",
-            listProduct: refundOrder.listProduct.map(u => {
+            product: refundOrder.listProduct.map(u => {
                 return {
-                    id: u.id,
+                    productId: u.id,
                     lot: u.lot,
                     unit: u.unit,
                     qty: u.qty,
@@ -153,19 +154,19 @@ exports.checkout = async (req, res) => {
                 }
             })
         }
+        // console.log("calStock",calStock)
 
-
-        const productId = calStock.listProduct.flatMap(u => u.id)
+        const productId = calStock.product.flatMap(u => u.productId)
 
         const stock = await Stock.aggregate([
             { $match: { area: area, period: period } },
             { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
-            { $match: { "listProduct.id": { $in: productId } } },
+            { $match: { "listProduct.productId": { $in: productId } } },
             // { $match : { "listProduct.available.lot": u.lot } },
             {
                 $project: {
                     _id: 0,
-                    id: "$listProduct.id",
+                    productId: "$listProduct.productId",
                     sumQtyPcs: "$listProduct.sumQtyPcs",
                     sumQtyCtn: "$listProduct.sumQtyCtn",
                     sumQtyPcsStockIn: "$listProduct.sumQtyPcsStockIn",
@@ -176,45 +177,53 @@ exports.checkout = async (req, res) => {
                 }
             }
         ]);
-        // console.dir(calStock, { depth: null, colors: true });
+        // console.log(JSON.stringify(stock, null, 2));
 
-        // console.dir(stock, { depth: null, colors: true });
         let listProduct = []
         let updateLot = []
 
         for (const stockDetail of stock) {
             for (const lot of stockDetail.available) {
 
-                const calDetails = calStock.listProduct.filter(
-                    u => u.id === stockDetail.id && u.lot === lot.lot
+                const calDetails = calStock.product.filter(
+                    u => u.productId === stockDetail.productId && u.lot === lot.lot
                 );
+                    let pcsQtyGood = 0;
+                    let pcsQtyDamaged = 0;
+                    let ctnQtyGood = 0;
+                    let ctnQtyDamaged = 0;
 
-                let pcsQty = 0;
-                let ctnQty = 0;
+                    for (const cal of calDetails) {
+                        if ((cal.unit === 'PCS' || cal.unit === 'BOT') && cal.condition === 'good') {
+                        pcsQtyGood += cal.qty || 0;
+                        }
+                        if ((cal.unit === 'PCS' || cal.unit === 'BOT') && cal.condition === 'damaged') {
+                        pcsQtyDamaged += cal.qty || 0;
+                        }
+                        if (cal.unit === 'CTN' && cal.condition === 'good') {
+                        ctnQtyGood += cal.qty || 0;
+                        }
+                        if (cal.unit === 'CTN' && cal.condition === 'damaged') {
+                        ctnQtyDamaged += cal.qty || 0;
+                        }
+                    }
 
-                for (const cal of calDetails) {
-                    if (cal.unit === 'PCS' || cal.unit === 'BOT') {
-                        pcsQty += cal.qty || 0;
-                    }
-                    if (cal.unit === 'CTN') {
-                        ctnQty += cal.qty || 0;
-                    }
-                }
-                updateLot.push({
-                    id: stockDetail.id,
-                    location: lot.location,
-                    lot: lot.lot,
-                    qtyPcs: lot.qtyPcs + (cal.condition === 'Good' ? pcsQty : 0) - (cal.condition === 'Damaged' ? pcsQty : 0),
-                    qtyPcsStockIn: lot.qtyPcsStockIn + (cal.condition === 'Good' ? pcsQty : 0),
-                    qtyPcsStockOut: lot.qtyPcsStockOut + (cal.condition === 'Damaged' ? pcsQty : 0),
-                    qtyCtn: lot.qtyCtn + (cal.condition === 'Good' ? pcsCtn : 0) - (cal.condition === 'Damaged' ? pcsCtn : 0),
-                    qtyCtnStockIn: lot.qtyCtnStockIn + (cal.condition === 'Good' ? ctnQty : 0) ,
-                    qtyCtnStockOut: lot.qtyCtnStockOut + (cal.condition === 'Damaged' ? ctnQty : 0)
-                })
+                    updateLot.push({
+                        productId: stockDetail.productId,
+                        location: lot.location,
+                        lot: lot.lot,
+                        qtyPcs: Math.max(0,lot.qtyPcs + pcsQtyGood - pcsQtyDamaged),
+                        qtyPcsStockIn: lot.qtyPcsStockIn + pcsQtyGood,
+                        qtyPcsStockOut: lot.qtyPcsStockOut + pcsQtyDamaged,
+                        qtyCtn: Math.max(0,lot.qtyCtn + ctnQtyGood - ctnQtyDamaged),
+                        qtyCtnStockIn: lot.qtyCtnStockIn + ctnQtyGood,
+                        qtyCtnStockOut: lot.qtyCtnStockOut + ctnQtyDamaged
+                    });
             }
-            const relatedLots = updateLot.filter((u) => u.id === stockDetail.id);
+            // console.log(updateLot)
+            const relatedLots = updateLot.filter((u) => u.productId === stockDetail.productId);
             listProduct.push({
-                id: stockDetail.id,
+                productId: stockDetail.productId,
                 sumQtyPcs: relatedLots.reduce((total, item) => total + item.qtyPcs, 0),
                 sumQtyCtn: relatedLots.reduce((total, item) => total + item.qtyCtn, 0),
                 sumQtyPcsStockIn: relatedLots.reduce((total, item) => total + item.qtyPcsStockIn, 0),
@@ -239,16 +248,23 @@ exports.checkout = async (req, res) => {
                         "listProduct.$[product].available": updated.available
                     }
                 },
-                { arrayFilters: [{ "product.id": updated.id }], new: true }
+                { arrayFilters: [{ "product.productId": updated.productId }], new: true }
             )
         }
-        console.log(calStock)
-        //    await StockMovementLog.create(calStock)
-        //    await StockMovement.create(calStock)
+           
+        const createdMovement = await StockMovement.create({
+            ...calStock
+        });
 
-        // await refundOrder.save()
-        // await changeOrder.save()
-        // await Cart.deleteOne({ type, area, storeId })
+        await StockMovementLog.create({
+            ...calStock,
+            refOrderId: createdMovement._id
+        });
+
+
+        await refundOrder.save()
+        await changeOrder.save()
+        await Cart.deleteOne({ type, area, storeId })
         res.status(200).json({
             status: 200,
             message: 'Checkout successful!',

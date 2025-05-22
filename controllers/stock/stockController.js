@@ -124,7 +124,7 @@ exports.addStock = async (req, res) => {
           period,
           listProduct: enrichedListProduct
         })
-        // await stockDoc.save()
+        await stockDoc.save()
         res.status(200).json({
           status: 200,
           message: stockDoc

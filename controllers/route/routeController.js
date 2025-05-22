@@ -34,14 +34,14 @@ exports.getRoute = async (req, res) => {
     let response = []
     let store = null
 
-    if (storeId) {
-      store = await Store.findOne({ storeId }).select('_id')
-      if (!store) {
-        return res
-          .status(404)
-          .json({ status: '404', message: 'Store not found!' })
-      }
-    }
+    // if (storeId) {
+    //   store = await Store.findOne({ storeId }).select('_id')
+    //   if (!store) {
+    //     return res
+    //       .status(404)
+    //       .json({ status: '404', message: 'Store not found!' })
+    //   }
+    // }
 
     if (area && period && province && district) {
       const store = await Store.find({
@@ -52,11 +52,11 @@ exports.getRoute = async (req, res) => {
         ]
       })
 
-      if (store.length === 0) {
-        return res
-          .status(404)
-          .json({ status: '404', message: 'Store not found!' })
-      }
+      // if (store.length === 0) {
+      //   return res
+      //     .status(404)
+      //     .json({ status: '404', message: 'Store not found!' })
+      // }
       const storeIdString = store.map(item => item._id.toString())
 
       const storeId = store.map(item => item.storeId.toString())
@@ -115,6 +115,8 @@ exports.getRoute = async (req, res) => {
         area: area,
         $and: [{ address: { $regex: province, $options: 'i' } }]
       })
+
+
 
       if (store.length === 0) {
         return res
@@ -769,7 +771,7 @@ exports.createRoute = async (req, res) => {
           listStore: routeData.listStore
         })
         // console.log(newRoute)
-        // await newRoute.save()
+        await newRoute.save()
         newRoutes.push(newRoute)
       }
 
