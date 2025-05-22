@@ -55,7 +55,7 @@ exports.getStore = async (req, res) => {
   { $match: query },
   {
     $lookup: {
-      from: 'storebueaty',
+      from: 'typestore',
       localField: 'storeId',
       foreignField: 'storeId',
       as: 'beauty'
@@ -819,12 +819,12 @@ exports.addBueatyStore = async (req, res) => {
     `http://58.181.206.159:9814/apps_api/${pathPhp}`
   )
 
-  const { StoreBueaty } = getModelsByChannel(channel, res, storeModel)
+  const { TypeStore } = getModelsByChannel(channel, res, storeModel)
 
   for (const data of response.data) {
-    const exists = await StoreBueaty.findOne({ storeId: data.storeId })
+    const exists = await TypeStore.findOne({ storeId: data.storeId })
     if (!exists) {
-      await StoreBueaty.create({ ...data, type: ['beauty'] })
+      await TypeStore.create({ ...data, type: ['beauty'] })
     }
   }
 
@@ -837,9 +837,9 @@ exports.addBueatyStore = async (req, res) => {
 exports.getBueatyStore = async (req, res) => {
   const channel = req.headers['x-channel']
 
-  const { Store, StoreBueaty } = getModelsByChannel(channel, res, storeModel)
+  const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
 
-  const storeBueaty = await StoreBueaty.aggregate([
+  const storeBueaty = await TypeStore.aggregate([
     {
       $lookup: {
         from: 'stores',

@@ -113,9 +113,9 @@ const storeBueatySchema = mongoose.Schema({
 module.exports = (conn) => {
     return {
       Store: conn.model('Store', storeSchema),
-      TypeStore: conn.model('TypeStore', typeStoreSchema),
+    //   TypeStore: conn.model('TypeStore', typeStoreSchema),
       RunningNumber: conn.model('runningNumber',runningNumberSchema,'runningNumber'),
-      StoreBueaty: conn.model('storebueaty',storeBueatySchema,'storebueaty')
+      TypeStore: conn.model('typestore',storeBueatySchema,'typestore')
 
     };
   };
