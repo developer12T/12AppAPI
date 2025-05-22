@@ -357,7 +357,7 @@ exports.getOrder = async (req, res) => {
 
     const order = await Order.find(query)
       .select(
-        'orderId store.createdAt store.storeId store.name store.address total status'
+        'orderId store.createdAt store.storeId store.name store.address total status createdAt'
       )
       .lean()
     // console.log("order",order)
@@ -376,7 +376,8 @@ exports.getOrder = async (req, res) => {
       storeAddress: o.store?.address || '',
       createAt: o.createdAt,
       total: o.total,
-      status: o.status
+      status: o.status,
+      createdAt: o.createdAt
     }))
 
     res.status(200).json({
