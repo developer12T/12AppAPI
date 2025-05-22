@@ -238,44 +238,44 @@ let updateLot = []
                     productId:stockDetail.productId,
                     location:lot.location,
                     lot:lot.lot,
-                    qtyPcs:Math.max(0,lot.qtyPcs -  pcsQty),
+                    qtyPcs:Math.max(0,lot.qtyPcs +  pcsQty),
                     qtyPcsStockIn:lot.qtyPcsStockIn ,
                     qtyPcsStockOut:lot.qtyPcsStockOut + pcsQty,
-                    qtyCtn:Math.max(0,lot.qtyCtn - ctnQty),
+                    qtyCtn:Math.max(0,lot.qtyCtn + ctnQty),
                     qtyCtnStockIn:lot.qtyCtnStockIn ,
                     qtyCtnStockOut:lot.qtyCtnStockOut + ctnQty
                 })
               }
 console.log("updateLot",updateLot)          
             
-// const relatedLots = updateLot.filter((u) => u.productId === stockDetail.productId);
-//             listProductWithDraw.push({
-//                 productId: stockDetail.productId,
-//                 sumQtyPcs: relatedLots.reduce((total, item) => total + item.qtyPcs, 0),
-//                 sumQtyCtn: relatedLots.reduce((total, item) => total + item.qtyCtn, 0),
-//                 sumQtyPcsStockIn: relatedLots.reduce((total, item) => total + item.qtyPcsStockIn, 0),
-//                 sumQtyCtnStockIn: relatedLots.reduce((total, item) => total + item.qtyCtnStockIn, 0),
-//                 sumQtyPcsStockOut: relatedLots.reduce((total, item) => total + item.qtyPcsStockOut, 0),
-//                 sumQtyCtnStockOut: relatedLots.reduce((total, item) => total + item.qtyCtnStockOut, 0),
-//                 available: relatedLots.map(({ id, ...rest }) => rest), 
-//             });
+const relatedLots = updateLot.filter((u) => u.productId === stockDetail.productId);
+            listProductWithDraw.push({
+                productId: stockDetail.productId,
+                sumQtyPcs: relatedLots.reduce((total, item) => total + item.qtyPcs, 0),
+                sumQtyCtn: relatedLots.reduce((total, item) => total + item.qtyCtn, 0),
+                sumQtyPcsStockIn: relatedLots.reduce((total, item) => total + item.qtyPcsStockIn, 0),
+                sumQtyCtnStockIn: relatedLots.reduce((total, item) => total + item.qtyCtnStockIn, 0),
+                sumQtyPcsStockOut: relatedLots.reduce((total, item) => total + item.qtyPcsStockOut, 0),
+                sumQtyCtnStockOut: relatedLots.reduce((total, item) => total + item.qtyCtnStockOut, 0),
+                available: relatedLots.map(({ id, ...rest }) => rest), 
+            });
             }
             // console.log("listProductWithDraw:\n", JSON.stringify(listProductWithDraw, null, 2));
-        // for (const updated of listProductWithDraw) {
-        //     await Stock.findOneAndUpdate(
-        //         {area:area, period:period},
-        //         { $set: {
-        //                 "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
-        //                 "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
-        //                 "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
-        //                 "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
-        //                 "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
-        //                 "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
-        //                 "listProduct.$[product].available":updated.available
-        //         }},
-        //         { arrayFilters : [{ "product.productId": updated.productId }] , new: true}
-        //     )
-        // }
+        for (const updated of listProductWithDraw) {
+            await Stock.findOneAndUpdate(
+                {area:area, period:period},
+                { $set: {
+                        "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
+                        "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
+                        "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
+                        "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
+                        "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
+                        "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
+                        "listProduct.$[product].available":updated.available
+                }},
+                { arrayFilters : [{ "product.productId": updated.productId }] , new: true}
+            )
+        }
 
         const createdMovement = await StockMovement.create({
             ...calStock
@@ -287,8 +287,8 @@ console.log("updateLot",updateLot)
         });
 
 
-    // await newOrder.save()
-    // await Cart.deleteOne({ type, area })
+    await newOrder.save()
+    await Cart.deleteOne({ type, area })
 
     res.status(200).json({
       status: 200,
