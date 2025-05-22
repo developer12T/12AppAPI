@@ -8,7 +8,8 @@ const {
   updateStoreStatus,
   rejectStore,
   addAndUpdateStore,
-  runningNumber
+  createRunningNumber,
+  updateRunningNumber
 } = require('../../controllers/store/storeController')
 
 const router = express.Router()
@@ -21,8 +22,9 @@ router.post('/checkIn/:storeId', checkInStore)
 router.post('/updateStoreStatus', updateStoreStatus)
 router.post('/rejectStore', rejectStore)
 router.post('/addAndUpdateStore', addAndUpdateStore)
+router.post('/createRunningNumber', createRunningNumber)
 
-router.post('/runningNumber', runningNumber)
+router.post('/updateRunningNumber', updateRunningNumber)
 
 
 module.exports = router

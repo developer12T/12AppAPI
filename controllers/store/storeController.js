@@ -233,6 +233,7 @@ exports.addStore = async (req, res) => {
       res.status(200).json({
         status: '200',
         message: 'Store added successfully'
+        // data:storeData
       })
     } catch (error) {
       console.error('Error saving store to MongoDB:', error)
@@ -593,37 +594,36 @@ exports.addAndUpdateStore = async (req, res) => {
 }
 
 
-exports.runningNumber = async (req,res) => {
+exports.createRunningNumber = async (req,res) => {
+    const channel = req.headers['x-channel'] 
+    const { RunningNumber,Store } = getModelsByChannel(channel, res, storeModel)
 
-  const channel = req.headers['x-channel'] 
 
-  const { RunningNumber,Store } = getModelsByChannel(channel, res, storeModel)
+    let type = ''
+    let running = ''
+    if (channel == 'cash') {
+      type = '101'
+      running = 'V'
+    } 
+    else if (channel == 'credit') {
+      type = '103'
+    }
 
-  let type = ''
-  let running = ''
-  if (channel == 'cash') {
-    type = '101'
-    running = 'V'
-  } 
-  else if (channel == 'credit') {
-    type = '103'
-  }
-
-  const zoneId = await Store.aggregate([
-    {
-      $match: {
-        zone: { $ne: null, $ne: "" }
-      }
-    },
-    {$group:{
-      _id:"$zone"
-    }}
-  ])
+    const zoneId = await Store.aggregate([
+      {
+        $match: {
+          zone: { $ne: null, $ne: "" }
+        }
+      },
+      {$group:{
+        _id:"$zone"
+      }}
+    ])
 
   const maxRunningAll = await Store.aggregate([
     {
       $match: {
-        zone: { $ne: null, $ne: "" }
+        zone: { $ne: null, $ne: "" },
       }
     },
     {$group:{
@@ -631,7 +631,6 @@ exports.runningNumber = async (req,res) => {
       maxStoreId: { $max:'$storeId'}
     }}
   ])
-
 
  const data = zoneId.map(u => {
   const maxRunning = maxRunningAll.find(m => m._id === u._id)
@@ -644,11 +643,69 @@ exports.runningNumber = async (req,res) => {
   }
  })
 
-  await RunningNumber.create(data)
+  for (const runing of data) {
+      const exists = await RunningNumber.findOne({ zone: runing.zone });
+
+     if (!exists) {
+      await RunningNumber.create(runing);
+      }
+  }
 
   res.status(200).json({
     status:200,
     message:data
+  })
+}
+
+
+
+
+
+exports.updateRunningNumber = async (req,res) => {
+
+  const { storeId } = req.body
+  const channel = req.headers['x-channel'] 
+  const { RunningNumber,Store } = getModelsByChannel(channel, res, storeModel)
+  const store = await Store.findOne({storeId:storeId})
+
+  if (!store) {
+    return res.status(404).json({
+      status:404,
+      message:"Not found store"
+    })
+  }
+
+  const maxRunningAll = await Store.aggregate([
+    {
+      $match: {
+        zone: store.zone
+      }
+    },
+    {$group:{
+      _id:'$zone',
+      maxStoreId: { $max:'$storeId'}
+    }}
+  ])
+  const oldId = maxRunningAll.flatMap( u => u.maxStoreId)
+  const newId = oldId[0].replace(/\d+$/, n => String(+n + 1).padStart(n.length, '0'));
+
+  const newStore = await Store.findOneAndUpdate(
+    { storeId: storeId },           
+    { $set: { storeId: newId } },
+    { new: true }                   
+  );
+
+  await RunningNumber.findOneAndUpdate(
+    { zone: store.zone},
+    { $set: { last: newId}},
+    {new: true}
+  )
+
+
+
+  res.status(200).json({
+    status:200,
+    message:'Update storeId successful'
   })
 }
 
