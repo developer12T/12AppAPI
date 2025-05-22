@@ -51,7 +51,38 @@ exports.getStore = async (req, res) => {
     if (route) {
       query.route = route
     }
-    const data = await Store.find(query, { _id: 0, __v: 0 })
+    const data = await Store.aggregate([
+  { $match: query },
+  {
+    $lookup: {
+      from: 'storebueaty',
+      localField: 'storeId',
+      foreignField: 'storeId',
+      as: 'beauty'
+    }
+  },
+{
+  $addFields: {
+    storetype: {
+      $reduce: {
+        input: "$beauty",
+        initialValue: [],
+        in: {
+          $concatArrays: ["$$value", "$$this.type"]
+        }
+      }
+    }
+  }
+},
+  {
+    $project: {
+      _id: 0,
+      __v: 0,
+      beauty:0
+    }
+  }
+]);
+
     // console.log(data)
 
     if (data.length === 0) {
