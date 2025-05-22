@@ -340,7 +340,7 @@ exports.addStockNew = async (req, res) => {
           // console.log(test.push(data))
         })
       }
-      // await Stock.insertMany(data)
+      await Stock.insertMany(data)
     }
   }
 
@@ -351,9 +351,7 @@ exports.addStockNew = async (req, res) => {
     message: 'Stock added successfully',
     data: test
   })
-  // } catch (error) {
-  //   next(error)
-  // }
+
 }
 
 exports.getStock = async (req, res, next) => {

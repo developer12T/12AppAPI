@@ -216,6 +216,7 @@ exports.getRoute = async (req, res) => {
         storeAll: route.storeAll,
         storePending: route.storePending,
         storeSell: route.storeSell,
+        storeCheckInNotSell: route.storeCheckInNotSell,
         storeNotSell: route.storeNotSell,
         storeTotal: route.storeTotal,
         percentComplete: route.percentComplete,

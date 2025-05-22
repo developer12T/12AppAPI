@@ -62,7 +62,7 @@ const storeSchema = mongoose.Schema({
     imageList: [imageSchema],
     shippingAddress: [shippingSchema],
     checkIn: checkinSchema,
-    createdAt: { type: Date, default: Date.now },
+    createdDate: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
     date: {
         type: Date,

@@ -133,25 +133,25 @@ exports.addImage = async (req, res) => {
 
 exports.getQRcode = async (req, res) => {
   try {
-    const { area, type } = req.query
+    const { area } = req.query
     const channel = req.headers['x-channel']
     const { User } = getModelsByChannel(channel, res, userModel)
-    if (!area || !type) {
+    if (!area) {
       return res
         .status(400)
-        .json({ status: 400, message: 'area and type are required!' })
+        .json({ status: 400, message: 'area are required!' })
     }
 
-    const qrcode = await User.findOne({ area }).select('-_id image')
+    const qrcode = await User.findOne({ area }).select('-_id qrCodeImage')
 
-    if (type) {
-      qrcode.image = qrcode.image.filter(img => img.type === type)
-    }
+    // if (type) {
+    //   qrcode.image = qrcode.image.filter(img => img.type === type)
+    // }
 
     res.status(200).json({
       status: 200,
       message: 'successful!',
-      data: qrcode
+      data: qrcode.qrCodeImage
     })
   } catch (error) {
     console.error('Error uploading images:', error)

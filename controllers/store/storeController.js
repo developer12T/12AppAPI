@@ -34,13 +34,13 @@ exports.getStore = async (req, res) => {
     let query = { area }
 
     if (type === 'new') {
-      // query.createdDate = {
-      //   $gte: startMonth,
-      //   $lt: NextMonth
-      // }
-      query.status = '10'
+      query.createdAt = {
+        $gte: startMonth,
+        $lt: NextMonth
+      }
+      // query.status = '10'
     } else if (type === 'all') {
-      query.createdDate = {
+      query.createdAt = {
         $not: {
           $gte: startMonth,
           $lt: NextMonth
