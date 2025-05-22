@@ -1264,21 +1264,20 @@ exports.updateAndAddRoute = async (req, res) => {
           listStore
         }
         await Route.create(data)
-        console.log("inElse")
         // console.log("data",data)
       }
     }
-  //   } catch (err) {
-  //     console.error(
-  //       `Error processing storeList with id ${storeList.id}:`,
-  //       err.message
-  //     )
-  //     continue
-  //   }
-  // }
 
   res.status(200).json({
     status: '200',
     message: 'Add Route Successfully'
+  })
+}
+
+exports.getRouteProvince = async (req,res) => {
+
+  res.status(200).json({
+    status:200,
+    message:"getRouteProvince"
   })
 }

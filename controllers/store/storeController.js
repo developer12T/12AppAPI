@@ -51,7 +51,40 @@ exports.getStore = async (req, res) => {
     if (route) {
       query.route = route
     }
-    const data = await Store.find(query, { _id: 0, __v: 0 })
+ const data = await Store.aggregate([
+  { $match: query },
+  {
+    $lookup: {
+      from: 'storebueaty',
+      localField: 'storeId',
+      foreignField: 'storeId',
+      as: 'beauty'
+    }
+  },
+{
+  $addFields: {
+    storetype: {
+      $reduce: {
+        input: "$beauty",
+        initialValue: [],
+        in: {
+          $concatArrays: ["$$value", "$$this.type"]
+        }
+      }
+    }
+  }
+},
+  {
+    $project: {
+      _id: 0,
+      __v: 0,
+      beauty:0
+    }
+  }
+]);
+
+
+    // const data = await Store.find(query, { _id: 0, __v: 0 })
     // console.log(data)
 
     if (data.length === 0) {
@@ -710,5 +743,63 @@ exports.updateRunningNumber = async (req,res) => {
 }
 
 
+exports.addBueatyStore = async (req,res) => {
+
+    const channel = req.headers['x-channel']
+    let pathPhp = ''
+
+    switch (channel) {
+      case 'cash':
+        pathPhp = 'ca_api/ca_customer_beauty.php'
+        break
+      case 'credit':
+        pathPhp = 'cr_api/cr_customer_beauty.php'
+        break
+      default:
+        break
+    }
+    const response = await axios.post(
+      `http://58.181.206.159:9814/apps_api/${pathPhp}`
+    )
+
+  const { StoreBueaty } = getModelsByChannel(channel, res, storeModel)
 
 
+    for (const data of response.data){
+        const exists = await StoreBueaty.findOne({storeId:data.storeId})
+        if (!exists) {
+
+          await StoreBueaty.create({...data,
+                              type:['beauty']
+          })
+        }
+    
+    }
+
+  res.status(200).json({
+    status:200,
+    message:response.data
+  })
+}
+
+
+exports.getBueatyStore = async (req,res) => {
+
+    const channel = req.headers['x-channel']
+
+    const { Store,StoreBueaty } = getModelsByChannel(channel, res, storeModel)
+
+    const storeBueaty = await StoreBueaty.aggregate([
+      {$lookup:{
+        from:'stores',
+        localField:'storeId',
+        foreignField:'storeId',
+        as:"storeDetail"
+      }}
+    ])
+
+    res.status(200).json({
+    status:200,
+    message:storeBueaty
+  })
+}

@@ -10,7 +10,8 @@ const {
   getTimelineCheckin,
   checkInVisit,
   routeTimeline,
-  updateAndAddRoute
+  updateAndAddRoute,
+  getRouteProvince
 } = require('../../controllers/route/routeController')
 
 const router = express.Router()
@@ -26,6 +27,7 @@ router.get('/getRouteCheckinAll', getRouteCheckinAll)
 router.get('/getTimelineCheckin', getTimelineCheckin)
 router.post('/routeTimeline', routeTimeline)
 router.post('/updateAndAddRoute', updateAndAddRoute)
+router.post('/getRouteProvince', getRouteProvince)
 
 
 
