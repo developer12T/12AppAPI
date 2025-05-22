@@ -10,7 +10,9 @@ const {
   rejectStore,
   addAndUpdateStore,
   createRunningNumber,
-  updateRunningNumber
+  updateRunningNumber,
+  addBueatyStore,
+  getBueatyStore
 } = require('../../controllers/store/storeController')
 
 const router = express.Router()
@@ -26,6 +28,10 @@ router.post('/rejectStore', rejectStore)
 router.post('/addAndUpdateStore', addAndUpdateStore)
 router.post('/createRunningNumber', createRunningNumber)
 router.post('/updateRunningNumber', updateRunningNumber)
+
+router.post('/addBueatyStore', addBueatyStore)
+
+router.post('/getBueatyStore', getBueatyStore)
 
 
 module.exports = router

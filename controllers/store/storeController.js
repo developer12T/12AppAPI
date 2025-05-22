@@ -40,12 +40,12 @@ exports.getStore = async (req, res) => {
       }
       // query.status = '10'
     } else if (type === 'all') {
-      // query.createdAt = {
-      //   $not: {
-      //     $gte: startMonth,
-      //     $lt: NextMonth
-      //   }
-      // }
+      query.createdAt = {
+        $not: {
+          $gte: startMonth,
+          $lt: NextMonth
+        }
+      }
     }
 
     if (route) {
@@ -131,7 +131,7 @@ exports.updateImage = async (req, res) => {
 
       res.status(200).json({
         status: '200',
-        message: 'Store updated Image successfully'
+        message: 'Store update successfully'
         // data:storeData
       })
     } catch (error) {
@@ -767,5 +767,60 @@ exports.updateRunningNumber = async (req, res) => {
   res.status(200).json({
     status: 200,
     message: 'Update storeId successful'
+  })
+}
+
+exports.addBueatyStore = async (req, res) => {
+  const channel = req.headers['x-channel']
+  let pathPhp = ''
+
+  switch (channel) {
+    case 'cash':
+      pathPhp = 'ca_api/ca_customer_beauty.php'
+      break
+    case 'credit':
+      pathPhp = 'cr_api/cr_customer_beauty.php'
+      break
+    default:
+      break
+  }
+  const response = await axios.post(
+    `http://58.181.206.159:9814/apps_api/${pathPhp}`
+  )
+
+  const { StoreBueaty } = getModelsByChannel(channel, res, storeModel)
+
+  for (const data of response.data) {
+    const exists = await StoreBueaty.findOne({ storeId: data.storeId })
+    if (!exists) {
+      await StoreBueaty.create({ ...data, type: ['beauty'] })
+    }
+  }
+
+  res.status(200).json({
+    status: 200,
+    message: response.data
+  })
+}
+
+exports.getBueatyStore = async (req, res) => {
+  const channel = req.headers['x-channel']
+
+  const { Store, StoreBueaty } = getModelsByChannel(channel, res, storeModel)
+
+  const storeBueaty = await StoreBueaty.aggregate([
+    {
+      $lookup: {
+        from: 'stores',
+        localField: 'storeId',
+        foreignField: 'storeId',
+        as: 'storeDetail'
+      }
+    }
+  ])
+
+  res.status(200).json({
+    status: 200,
+    message: storeBueaty
   })
 }
