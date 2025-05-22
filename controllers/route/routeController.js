@@ -1276,8 +1276,61 @@ exports.updateAndAddRoute = async (req, res) => {
 
 exports.getRouteProvince = async (req,res) => {
 
+  const { area,period } = req.body
+
+  const channel = req.headers['x-channel']
+
+  const { Route } = getModelsByChannel(channel, res, routeModel)
+
+  const route = await Route.aggregate([
+    {$match:{
+      area:area,
+      period:period,
+      listStore: { $ne: null,$not:{ $size:0} }
+    }},
+    { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
+    {
+      $addFields: {
+        storeObjId: { $toObjectId: "$listStore.storeInfo" }
+      }
+    },
+    {$lookup:{
+      from:'stores',
+      localField:'storeObjId',
+      foreignField:'_id',
+      as:'storeDetail'
+    }},
+    {
+    $project: {
+        storeDetail:1
+    }
+  },
+  {$group:{
+    _id:'$storeDetail.province'
+  }},
+  {
+  $project: {
+    _id: 0,
+    province: "$_id",  
+  }
+},
+  ])
+
+  if (route.length == 0) {
+    return res.status(404).json({
+      status:404,
+      message:"Not found province this area"
+    })
+  }
+
+
+const result = route.flatMap(item => item.province).filter(p => p && p.trim() !== '');
+
+
+
   res.status(200).json({
     status:200,
-    message:"getRouteProvince"
+    message:"successful",
+    data:result
   })
 }

@@ -855,3 +855,5 @@ exports.getBueatyStore = async (req, res) => {
     message: storeBueaty
   })
 }
+
+
