@@ -40,12 +40,12 @@ exports.getStore = async (req, res) => {
       }
       // query.status = '10'
     } else if (type === 'all') {
-      query.createdAt = {
-        $not: {
-          $gte: startMonth,
-          $lt: NextMonth
-        }
-      }
+      // query.createdAt = {
+      //   $not: {
+      //     $gte: startMonth,
+      //     $lt: NextMonth
+      //   }
+      // }
     }
 
     if (route) {
