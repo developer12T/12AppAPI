@@ -207,21 +207,34 @@ exports.checkout = async (req, res) => {
                         ctnQtyDamaged += cal.qty || 0;
                         }
                     }
+                    
+                    checkQtyPcs = lot.qtyPcs + pcsQtyGood - pcsQtyDamaged
+                    checkQtyCtn = lot.qtyCtn + ctnQtyGood - ctnQtyDamaged
+
+                    if (checkQtyPcs < 0 || checkQtyCtn < 0) {
+                        return res.status(400).json({
+                            status:400,
+                            message: `This lot ${lot.lot} is not enough to refund`
+                        })
+                    }
+
 
                     updateLot.push({
                         productId: stockDetail.productId,
                         location: lot.location,
                         lot: lot.lot,
-                        qtyPcs: Math.max(0,lot.qtyPcs + pcsQtyGood - pcsQtyDamaged),
+                        qtyPcs: checkQtyPcs,
                         qtyPcsStockIn: lot.qtyPcsStockIn + pcsQtyGood,
                         qtyPcsStockOut: lot.qtyPcsStockOut + pcsQtyDamaged,
-                        qtyCtn: Math.max(0,lot.qtyCtn + ctnQtyGood - ctnQtyDamaged),
+                        qtyCtn: checkQtyCtn,
                         qtyCtnStockIn: lot.qtyCtnStockIn + ctnQtyGood,
                         qtyCtnStockOut: lot.qtyCtnStockOut + ctnQtyDamaged
                     });
 
-                    console.log("updateLot",updateLot)
             }
+
+
+  
             const relatedLots = updateLot.filter((u) => u.productId === stockDetail.productId);
             listProduct.push({
                 productId: stockDetail.productId,
@@ -234,39 +247,39 @@ exports.checkout = async (req, res) => {
                 available: relatedLots.map(({ id, ...rest }) => rest),
             });
         }
-        console.log("listProduct",listProduct)
+        // console.log("listProduct",listProduct)
 
-        // for (const updated of listProduct) {
-        //     await Stock.findOneAndUpdate(
-        //         { area: area, period: period },
-        //         {
-        //             $set: {
-        //                 "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
-        //                 "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
-        //                 "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
-        //                 "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
-        //                 "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
-        //                 "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
-        //                 "listProduct.$[product].available": updated.available
-        //             }
-        //         },
-        //         { arrayFilters: [{ "product.productId": updated.productId }], new: true }
-        //     )
-        // }
+        for (const updated of listProduct) {
+            await Stock.findOneAndUpdate(
+                { area: area, period: period },
+                {
+                    $set: {
+                        "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
+                        "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
+                        "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
+                        "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
+                        "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
+                        "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
+                        "listProduct.$[product].available": updated.available
+                    }
+                },
+                { arrayFilters: [{ "product.productId": updated.productId }], new: true }
+            )
+        }
            
-        // const createdMovement = await StockMovement.create({
-        //     ...calStock
-        // });
+        const createdMovement = await StockMovement.create({
+            ...calStock
+        });
 
-        // await StockMovementLog.create({
-        //     ...calStock,
-        //     refOrderId: createdMovement._id
-        // });
+        await StockMovementLog.create({
+            ...calStock,
+            refOrderId: createdMovement._id
+        });
 
 
-        // await refundOrder.save()
-        // await changeOrder.save()
-        // await Cart.deleteOne({ type, area, storeId })
+        await refundOrder.save()
+        await changeOrder.save()
+        await Cart.deleteOne({ type, area, storeId })
         res.status(200).json({
             status: 200,
             message: 'Checkout successful!',
