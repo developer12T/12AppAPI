@@ -16,7 +16,7 @@ const path = require('path')
 
 exports.getRoute = async (req, res) => {
   try {
-    const { period, area } = req.query;
+    const { period, area,district,province,routeId } = req.query;
     const channel = req.headers['x-channel'];
 
     const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel);
@@ -27,15 +27,35 @@ exports.getRoute = async (req, res) => {
 
     const query = { period };
     if (area) query.area = area;
-
+    if (routeId) query.id = routeId;
 
     const routes = await Route.find(query).populate(
       'listStore.storeInfo',
       'storeId name address typeName taxId tel'
     );
 
+const filteredRoutes = routes
+  .map(route => {
+    const filteredListStore = route.listStore.filter(store => {
+      const addr = (store.storeInfo?.address || '').toLowerCase();
 
-    const allStoreIds = routes.flatMap(route =>
+      const matchDistrict = district ? addr.includes(district.toLowerCase()) : true;
+      const matchProvince = province ? addr.includes(province.toLowerCase()) : true;
+
+      return matchDistrict && matchProvince;
+    });
+
+    return {
+      ...route.toObject(),
+      listStore: filteredListStore
+    };
+  })
+  .filter(route => route.listStore.length > 0);
+
+  // console.log(filteredRoutes)
+
+
+    const allStoreIds = filteredRoutes.flatMap(route =>
       route.listStore.map(s => s.storeInfo?.storeId).filter(Boolean)
     );
 
@@ -50,23 +70,24 @@ exports.getRoute = async (req, res) => {
     );
 
     
-    const enrichedRoutes = routes.map(route => {
-      const enrichedListStore = route.listStore.map(item => {
-        const storeInfo = item.storeInfo?.toObject?.() || {};
-        const type = storeTypeMap.get(storeInfo.storeId);
+const enrichedRoutes = filteredRoutes.map(route => {
+  const enrichedListStore = route.listStore.map(itemRaw => {
+    const item = itemRaw.toObject ? itemRaw.toObject() : itemRaw;
+    const storeInfo = item.storeInfo?.toObject ? item.storeInfo.toObject() : item.storeInfo || {};
+    const type = storeTypeMap.get(storeInfo.storeId);
 
-        return {
-          ...item.toObject(),
-          storeInfo,
-          storeType: type || [] 
-        };
-      });
+    return {
+      ...item,
+      storeInfo,
+      storeType: type || []
+    };
+  });
 
-      return {
-        ...route.toObject(),
-        listStore: enrichedListStore
-      };
-    });
+  return {
+    ...route,
+    listStore: enrichedListStore
+  };
+});
 
     res.status(200).json({
       status: 200,
@@ -1096,8 +1117,6 @@ exports.getRouteProvince = async (req,res) => {
 
 
 const result = route.flatMap(item => item.province).filter(p => p && p.trim() !== '');
-
-
 
   res.status(200).json({
     status:200,
