@@ -369,13 +369,48 @@ exports.getDetail = async (req, res) => {
       .status(404)
       .json({ status: 404, message: 'Distribution order not found!' })
     }
-
+    const data = {
+      order:order.order,
+      type: order.type,
+      _id: order._id,
+      orderId: order.orderId,
+      orderType: order.orderType,
+      orderTypeName:order.orderTypeName,
+      area: order.area,
+      fromWarehouse: order.fromWarehouse,
+      toWarehouse: order.toWarehouse,
+      shippingId: order.shippingId,
+      shippingRoute: order.shippingRoute,
+      shippingName: order.shippingName,
+      sendAddress: order.sendAddress,
+      sendDate: order.sendDate,
+      remark: order.remark,
+      listProduct:order.listProduct.map(u => {
+              return {
+                    id: u.id,
+                    name: u.name,
+                    group: u.group,
+                    brand: u.brand,
+                    size: u.size,
+                    flavour: u.flavour,
+                    qty: u.qty,
+                    unit: u.unit,
+                    qtyPcs: u.qtyPcs,
+                    price: u.price,
+                    total: u.total,
+                    weightGross: u.weightGross,
+                    weightNet: u.weightNet,
+                    receiveQty: u.receiveQty,
+                    _id: u._id
+              }
+      })
+    }
 
 
     res.status(200).json({
       status: 200,
       message: 'successful!',
-      data: [order]
+      data: data
     })
   } catch (error) {
     console.error(error)
