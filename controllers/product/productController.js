@@ -543,12 +543,14 @@ exports.addFromERP = async (req, res) => {
       })
     }
 
+    data = []
+
     for (const listProduct of response.data) {
       const productId = listProduct.id
 
       const existingProduct = await Product.findOne({ id: productId })
       if (existingProduct) {
-        // console.log(`Product ID ${productId} already exists. Skipping.`)
+        console.log(`Product ID ${productId} already exists. Skipping.`)
         continue
       }
 
@@ -573,6 +575,7 @@ exports.addFromERP = async (req, res) => {
           }
         }
       })
+      .sort((a, b) => b.factor - a.factor);
       // console.log(JSON.stringify(listUnit, null, 2));
 
       const newProduct = new Product({
@@ -593,13 +596,14 @@ exports.addFromERP = async (req, res) => {
         statusWithdraw: listProduct.statusWithdraw,
         listUnit: listUnit
       })
-      await newProduct.save()
       // console.log(newProduct)
+      await newProduct.save()
+      data.push(newProduct) 
     }
     res.status(200).json({
       status: 200,
-      message: 'Products added successfully'
-      // data:newProduct
+      message: 'Products added successfully',
+      // data:data
     })
   } catch (e) {
     console.error(e)

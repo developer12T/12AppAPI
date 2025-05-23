@@ -85,7 +85,8 @@ const listProductDistribution = new mongoose.Schema({
     price: { type: Number, require: true },
     total: { type: Number, require: true },
     weightGross: { type: Number, require: true },
-    weightNet: { type: Number, require: true }
+    weightNet: { type: Number, require: true },
+    receiveQty: { type: Number, require: true, default: 0 }
 })
 
 const distributionSchema = mongoose.Schema({

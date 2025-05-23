@@ -153,23 +153,6 @@ exports.checkout = async (req, res) => {
       createdBy: sale.username
     })
 
-
-    // console.log("newOrder",newOrder)
-
-
-    // const calStock = {
-    //         // storeId: newOrder.store.storeId,
-    //         area:newOrder.area,
-    //         period:period,
-    //         type:"Withdraw",
-    //         listProduct:newOrder.listProduct.map(u => {
-    //             return {
-    //                 id:u.id,
-    //                 lot:u.lot,
-    //                 unit:u.unit,
-    //                 qty:u.qty,}
-    //         })
-    //     }
         const calStock = {
             // storeId: refundOrder.store.storeId,
             orderId : newOrder.orderId,
@@ -234,19 +217,22 @@ let updateLot = []
                   ctnQty += cal.qty || 0;
                 }
               }
+              checkQtyPcs = lot.qtyPcs +  pcsQty
+              checkQtyCtn = lot.qtyCtn + ctnQty
+
+
                 updateLot.push({
                     productId:stockDetail.productId,
                     location:lot.location,
                     lot:lot.lot,
-                    qtyPcs:Math.max(0,lot.qtyPcs +  pcsQty),
-                    qtyPcsStockIn:lot.qtyPcsStockIn ,
-                    qtyPcsStockOut:lot.qtyPcsStockOut + pcsQty,
-                    qtyCtn:Math.max(0,lot.qtyCtn + ctnQty),
-                    qtyCtnStockIn:lot.qtyCtnStockIn ,
-                    qtyCtnStockOut:lot.qtyCtnStockOut + ctnQty
+                    qtyPcs:Math.checkQtyPcs,
+                    qtyPcsStockIn:lot.qtyPcsStockIn + pcsQty,
+                    qtyPcsStockOut:lot.qtyPcsStockOut ,
+                    qtyCtn:Math.checkQtyCtn,
+                    qtyCtnStockIn:lot.qtyCtnStockIn + ctnQty,
+                    qtyCtnStockOut:lot.qtyCtnStockOut 
                 })
               }
-console.log("updateLot",updateLot)          
             
 const relatedLots = updateLot.filter((u) => u.productId === stockDetail.productId);
             listProductWithDraw.push({
