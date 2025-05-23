@@ -31,8 +31,8 @@ const productSchema = mongoose.Schema({
     statusRefund: { type: String, require: true },
     image: { type: String, default: '' },
     listUnit: [listUnit],
-    created: { type: Date, default: Date.now },
-    updated: { type: Date, default: Date.now },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
 })
 
 // const Product = dbCA.model('Product', productSchema)

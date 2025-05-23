@@ -1,5 +1,4 @@
 const mongoose = require('mongoose')
-const moment = require('moment-timezone');
 
 
 const deliverySchema = new mongoose.Schema({
@@ -7,14 +6,8 @@ const deliverySchema = new mongoose.Schema({
   deliveryDateEnd: { type: Date },
   preparationDays: { type: Number}, // ตัวอย่างใช้จำนวนวัน
   displayDays: { type: Number},
-  createdAt: {
-    type: Date,
-    default: () => moment.tz('Asia/Bangkok').toDate()
-  },
-  updatedAt: {
-    type: Date,
-    default: () => moment.tz('Asia/Bangkok').toDate()
-  }
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
 });
 
 module.exports = (conn) => {

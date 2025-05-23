@@ -114,7 +114,7 @@ module.exports = (conn) => {
     return {
       Store: conn.model('Store', storeSchema),
     //   TypeStore: conn.model('TypeStore', typeStoreSchema),
-      RunningNumber: conn.model('runningNumber',runningNumberSchema,'runningNumber'),
+      RunningNumber: conn.model('runningnumber',runningNumberSchema,'runningnumber'),
       TypeStore: conn.model('typestores',storeBueatySchema,'typestores')
 
     };

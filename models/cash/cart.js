@@ -56,7 +56,7 @@ const cartSchema = mongoose.Schema({
   listRefund: [listCartRefund],
   cartHashProduct: { type: String, default: '' },
   cartHashPromotion: { type: String, default: '' },
-  createdAt: { type: Date },
+  createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 })
 
