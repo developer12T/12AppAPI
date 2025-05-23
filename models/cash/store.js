@@ -115,7 +115,7 @@ module.exports = (conn) => {
       Store: conn.model('Store', storeSchema),
     //   TypeStore: conn.model('TypeStore', typeStoreSchema),
       RunningNumber: conn.model('runningNumber',runningNumberSchema,'runningNumber'),
-      TypeStore: conn.model('typestore',storeBueatySchema,'typestore')
+      TypeStore: conn.model('typestores',storeBueatySchema,'typestores')
 
     };
   };

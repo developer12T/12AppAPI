@@ -55,7 +55,7 @@ exports.getStore = async (req, res) => {
       { $match: query },
       {
         $lookup: {
-          from: 'typestore',
+          from: 'typestores',
           localField: 'storeId',
           foreignField: 'storeId',
           as: 'beauty'

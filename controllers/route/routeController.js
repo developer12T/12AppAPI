@@ -58,7 +58,7 @@ exports.getRoute = async (req, res) => {
         return {
           ...item.toObject(),
           storeInfo,
-          storeType: type || '' 
+          storeType: type || [] 
         };
       });
 
@@ -953,8 +953,6 @@ exports.updateAndAddRoute = async (req, res) => {
 
   let routeId
   const latestRoute = route.sort((a, b) => b.id.localeCompare(a.id))[0]
-
-  console.log("routesss",route)
 
 
   if (!latestRoute) {
