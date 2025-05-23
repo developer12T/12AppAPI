@@ -52,36 +52,36 @@ exports.getStore = async (req, res) => {
       query.route = route
     }
     const data = await Store.aggregate([
-  { $match: query },
-  {
-    $lookup: {
-      from: 'typestore',
-      localField: 'storeId',
-      foreignField: 'storeId',
-      as: 'beauty'
-    }
-  },
-{
-  $addFields: {
-    storetype: {
-      $reduce: {
-        input: "$beauty",
-        initialValue: [],
-        in: {
-          $concatArrays: ["$$value", "$$this.type"]
+      { $match: query },
+      {
+        $lookup: {
+          from: 'typestore',
+          localField: 'storeId',
+          foreignField: 'storeId',
+          as: 'beauty'
+        }
+      },
+      {
+        $addFields: {
+          storetype: {
+            $reduce: {
+              input: '$beauty',
+              initialValue: [],
+              in: {
+                $concatArrays: ['$$value', '$$this.type']
+              }
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          __v: 0,
+          beauty: 0
         }
       }
-    }
-  }
-},
-  {
-    $project: {
-      _id: 0,
-      __v: 0,
-      beauty:0
-    }
-  }
-]);
+    ])
 
     // console.log(data)
 
@@ -138,27 +138,40 @@ exports.updateImage = async (req, res) => {
           .json({ status: '404', message: 'Store not found' })
       }
 
+      const existingImageList = store.imageList || []
+      const existingTypes = new Set(existingImageList.map(item => item.type))
+
       const uploadedFiles = []
       for (let i = 0; i < files.length; i++) {
+        const type = types[i]
+
+        // ถ้ามี type นี้อยู่แล้วใน DB, ไม่ต้องอัปโหลด
+        if (existingTypes.has(type)) {
+          continue
+        }
+
         const uploadedFile = await uploadFiles(
           [files[i]],
           path.join(__dirname, '../../public/images/stores'),
           store.area,
-          types[i]
+          type
         )
+
         uploadedFiles.push({
           name: uploadedFile[0].name,
           path: uploadedFile[0].fullPath,
-          type: types[i]
+          type: type
         })
       }
 
       const imageList = uploadedFiles
 
-      await Store.updateOne(
-        { storeId: storeId },
-        { $set: { imageList: imageList } }
-      )
+      if (uploadedFiles.length > 0) {
+        await Store.updateOne(
+          { storeId: storeId },
+          { $push: { imageList: { $each: uploadedFiles } } }
+        )
+      }
 
       res.status(200).json({
         status: '200',
