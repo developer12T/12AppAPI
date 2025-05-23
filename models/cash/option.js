@@ -11,8 +11,8 @@ const optionSchema = mongoose.Schema({
     type: { type: String, require: true },
     description: { type: String, require: true },
     list: [list],
-    created: { type: Date, default: Date.now },
-    updated: { type: Date, default: Date.now },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
 })
 
 // const Option = dbCA.model('Option', optionSchema)

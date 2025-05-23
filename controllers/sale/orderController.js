@@ -1847,6 +1847,12 @@ exports.getSummarybyChoice = async (req, res) => {
   const {storeId,area, date, type,} = req.body
   let dayStr, monthStr, yearStr;
 
+    const channel = req.headers['x-channel']; 
+
+    const { Order } = getModelsByChannel(channel,res,orderModel); 
+
+
+
   if (!date) {
     return res.status(400).json({
       status:400,
@@ -1874,9 +1880,7 @@ exports.getSummarybyChoice = async (req, res) => {
     if(monthStr) match.month = monthStr
     if(yearStr) match.year = yearStr
 
-    const channel = req.headers['x-channel']; 
 
-    const { Order } = getModelsByChannel(channel,res,orderModel); 
 
     const modelOrder = await Order.aggregate([
       {$match:matchStage},
@@ -1925,4 +1929,39 @@ exports.getSummarybyChoice = async (req, res) => {
     message:"Successful",
     total:modelOrder[0].total
   })
+}
+
+exports.getSaleSummaryByStore = async ( req, res) => {
+
+    const { routeCode } = req.body
+    const channel = req.headers['x-channel']; 
+    const { Route } = getModelsByChannel(channel,res,routeModel); 
+
+    const routeData = await Route.aggregate([
+      {$match:{
+        id:routeCode
+      }},
+      { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
+{
+      $addFields: {
+        storeObjId: { $toObjectId: "$listStore.storeInfo" }
+      }
+    },
+    {$lookup:{
+      from:'stores',
+      localField:'storeObjId',
+      foreignField:'_id',
+      as:'storeDetail'
+    }},
+
+    ])
+
+
+
+
+    res.status(200).json({
+      status:200,
+      message:'sucess',
+      data:routeData
+    })
 }

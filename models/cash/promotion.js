@@ -62,8 +62,8 @@ const promotionSchema = new mongoose.Schema({
     validTo: { type: Date, required: true },
 
     status: { type: String, enum: ['active', 'inactive'], default: 'active' },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
 })
 
 // const Promotion = dbCA.model('Promotion', promotionSchema)
