@@ -1953,7 +1953,11 @@ exports.getSaleSummaryByStore = async ( req, res) => {
       foreignField:'_id',
       as:'storeDetail'
     }},
+    // {$project:{
+    //   storeId:'$storeDetail.storeId',
+    //   storeName:'$storeDetail.name',
 
+    // }}
     ])
 
 

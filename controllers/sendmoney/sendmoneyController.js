@@ -170,52 +170,9 @@ exports.getSendMoney = async (req,res) => {
     }}
     ]);
     
+
+
 let data = routeData;
-if (!routeData[0]) {
-
-data = await Route.aggregate([
-    { $match: { area: area ,period:period} },
-    { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
-    { $unwind: { path: '$listStore.listOrder', preserveNullAndEmptyArrays: true } },
-      {
-    $match: {
-      'listStore.listOrder': { $ne: null }
-    }
-  },
-    {$project:{
-        _id:0,
-        'listStore.listOrder':1
-    }},
-    {$lookup:{
-        from:'orders',
-        localField:'listStore.listOrder.orderId',
-        foreignField:'orderId',
-        as:'order'
-    }},
-    {
-    $unwind: {
-        path: "$order",
-        preserveNullAndEmptyArrays: false
-    }
-    },
-    {$match:{
-        'order.status':'pending'
-    }},
-    {
-    $group: {
-        _id: null,
-        sendmoney: { $sum: "$order.total" }
-    }
-    },
-    {$project:{
-        _id:0,
-        sendmoney:1,
-        status:'ยังไม่ได้ส่งเงิน'
-    }}
-    ]);
-
-
-}
 
 
 // console.log(JSON.stringify(routeData, null, 2));

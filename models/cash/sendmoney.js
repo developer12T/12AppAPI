@@ -8,7 +8,7 @@ const imageSchema = mongoose.Schema({
 
 const sendMoneySchema = mongoose.Schema({
   area: { type: String, require: true },
-  date: { type: Date, require: true },
+  preiod: { type: String, require: true },
   sendmoney: { type: Number, require: true },
   imageList: [imageSchema],
   status: { type: String },
@@ -18,6 +18,6 @@ const sendMoneySchema = mongoose.Schema({
 
 module.exports = conn => {
   return {
-    SendMoney: conn.model('sendMoney', sendMoneySchema, 'sendMoney')
+    SendMoney: conn.model('sendmoney', sendMoneySchema, 'sendmoney')
   }
 }
