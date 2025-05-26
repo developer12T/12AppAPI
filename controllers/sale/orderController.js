@@ -1942,6 +1942,8 @@ exports.getSaleSummaryByStore = async ( req, res) => {
         id:routeCode
       }},
       { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: '$listStore.listOrder', preserveNullAndEmptyArrays: true } },
+
 {
       $addFields: {
         storeObjId: { $toObjectId: "$listStore.storeInfo" }
@@ -1953,15 +1955,43 @@ exports.getSaleSummaryByStore = async ( req, res) => {
       foreignField:'_id',
       as:'storeDetail'
     }},
-    // {$project:{
-    //   storeId:'$storeDetail.storeId',
-    //   storeName:'$storeDetail.name',
 
-    // }}
+    {$lookup:{
+        from:'orders',
+        localField:'listStore.listOrder.orderId',
+        foreignField:'orderId',
+        as:'order'
+    }},
+    {$project:{
+      storeId: { $arrayElemAt : ['$storeDetail.storeId',0]},
+      storeName: { $arrayElemAt: ['$storeDetail.name',0]},
+      orderId:'$listStore.listOrder.orderId',
+      sum: { $arrayElemAt: ['$order.total',0]} ,
+      phone: { $arrayElemAt: ['$storeDetail.tel',0] },
+      mapLink:{
+        $concat:[
+          'https://maps.google.com/?q=',
+          { $toString : { $arrayElemAt : ['$storeDetail.latitude', 0] } },
+          ',',
+          { $toString: { $arrayElemAt: ['$storeDetail.longtitude', 0] } }
+        ]
+      },
+      datetime: {
+        $cond: {
+          if: {$ne:['$listStore.date',null]},
+          then:{
+            $dateAdd:{
+              startDate:'$listStore.date',
+              unit:'hour',
+              amount:7
+            }
+          },
+          else:'$$REMOVE'
+        }
+      }
+    }
+  }
     ])
-
-
-
 
     res.status(200).json({
       status:200,
