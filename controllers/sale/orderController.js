@@ -5,7 +5,7 @@
 // const { Route } = require('../../models/cash/route')
 
 
-const { Warehouse,Locate,Balance,Sale } = require('../../models/cash/master')
+const { Warehouse, Locate, Balance, Sale } = require('../../models/cash/master')
 const { generateOrderId } = require('../../utilities/genetateId')
 const {
   summaryOrder,
@@ -23,10 +23,10 @@ const { DateTime } = require("luxon");
 const { getSocket } = require('../../socket')
 
 const stockModel = require('../../models/cash/stock')
-const orderModel  = require('../../models/cash/sale')
-const cartModel  = require('../../models/cash/cart')
-const userModel  = require('../../models/cash/user')
-const productModel  = require('../../models/cash/product')
+const orderModel = require('../../models/cash/sale')
+const cartModel = require('../../models/cash/cart')
+const userModel = require('../../models/cash/user')
+const productModel = require('../../models/cash/product')
 const routeModel = require('../../models/cash/route')
 const storeModel = require('../../models/cash/store');
 const { getModelsByChannel } = require('../../middleware/channel')
@@ -59,11 +59,11 @@ exports.checkout = async (req, res) => {
 
     const channel = req.headers['x-channel'];
 
-    const { Cart } = getModelsByChannel(channel,res,cartModel); 
-    const { User } = getModelsByChannel(channel,res,userModel); 
-    const { Product } = getModelsByChannel(channel,res,productModel); 
-    const { Order } = getModelsByChannel(channel,res,orderModel); 
-    const { Stock,StockMovementLog,StockMovement } = getModelsByChannel(channel, res, stockModel);
+    const { Cart } = getModelsByChannel(channel, res, cartModel);
+    const { User } = getModelsByChannel(channel, res, userModel);
+    const { Product } = getModelsByChannel(channel, res, productModel);
+    const { Order } = getModelsByChannel(channel, res, orderModel);
+    const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(channel, res, stockModel);
 
 
     if (!type || !area || !storeId || !shipping || !payment) {
@@ -87,271 +87,271 @@ exports.checkout = async (req, res) => {
 
     let summary = ''
     if (changePromotionStatus == 0) {
-      summary = await summaryOrder(cart,channel,res)
+      summary = await summaryOrder(cart, channel, res)
     } else if (changePromotionStatus == 1) {
-      summary = await summaryOrderProStatusOne(cart, listPromotion,channel,res)
+      summary = await summaryOrderProStatusOne(cart, listPromotion, channel, res)
     }
-      // const shippingData = store.shippingAddress.find(s => s.shippingId === shipping)
-      // if (!shippingData) {
-      //     return res.status(404).json({ status: 404, message: 'Shipping address not found!' })
-      // }
+    // const shippingData = store.shippingAddress.find(s => s.shippingId === shipping)
+    // if (!shippingData) {
+    //     return res.status(404).json({ status: 404, message: 'Shipping address not found!' })
+    // }
 
 
 
-      const productIds = cart.listProduct.map(p => p.id)
-      const products = await Product.find({ id: { $in: productIds } }).select(
-        'id name groupCode group brandCode brand size flavourCode flavour listUnit'
-      )
+    const productIds = cart.listProduct.map(p => p.id)
+    const products = await Product.find({ id: { $in: productIds } }).select(
+      'id name groupCode group brandCode brand size flavourCode flavour listUnit'
+    )
 
-      let subtotal = 0
-      let listProduct = cart.listProduct.map(item => {
-        const product = products.find(p => p.id === item.id)
-        if (!product) return null
+    let subtotal = 0
+    let listProduct = cart.listProduct.map(item => {
+      const product = products.find(p => p.id === item.id)
+      if (!product) return null
 
-        const unitData = product.listUnit.find(u => u.unit === item.unit)
-        if (!unitData) {
-          return res
-            .status(400)
-            .json({
-              status: 400,
-              message: `Invalid unit for product ${item.id}`
-            })
-        }
+      const unitData = product.listUnit.find(u => u.unit === item.unit)
+      if (!unitData) {
+        return res
+          .status(400)
+          .json({
+            status: 400,
+            message: `Invalid unit for product ${item.id}`
+          })
+      }
 
-        const totalPrice = item.qty * unitData.price.sale
-        subtotal += totalPrice
+      const totalPrice = item.qty * unitData.price.sale
+      subtotal += totalPrice
 
-        return {
-          id: product.id,
-          lot: item.lot,
-          name: product.name,
-          group: product.group,
-          groupCode: product.groupCode,
-          brandCode: product.brandCode,
-          brand: product.brand,
-          size: product.size,
-          flavourCode: product.flavourCode,
-          flavour: product.flavour,
-          qty: item.qty,
-          unit: item.unit,
-          unitName: unitData.name,
-          price: unitData.price.sale,
-          subtotal: parseFloat(totalPrice.toFixed(2)),
-          discount: 0,
-          netTotal: parseFloat(totalPrice.toFixed(2))
-        }
-      })
-      if (listProduct.includes(null)) return
-      const orderId = await generateOrderId(area, sale.warehouse,channel,res)
-
-      const newOrder = new Order({
-        orderId,
-        type,
-        status: 'pending',
-        sale: {
-          saleCode: sale.saleCode,
-          salePayer: sale.salePayer,
-          name: `${sale.firstName} ${sale.surName}`,
-          tel: sale.tel || '',
-          warehouse: sale.warehouse
-        },
-        store: {
-          storeId: summary.store.storeId,
-          name: summary.store.name,
-          type: summary.store.type,
-          address: summary.store.address,
-          taxId: summary.store.taxId,
-          tel: summary.store.tel,
-          area: summary.store.area,
-          zone: summary.store.zone
-        },
-        note,
-        latitude,
-        longitude,
-        listProduct,
-        listPromotions: summary.listPromotion,
-        subtotal,
+      return {
+        id: product.id,
+        lot: item.lot,
+        name: product.name,
+        group: product.group,
+        groupCode: product.groupCode,
+        brandCode: product.brandCode,
+        brand: product.brand,
+        size: product.size,
+        flavourCode: product.flavourCode,
+        flavour: product.flavour,
+        qty: item.qty,
+        unit: item.unit,
+        unitName: unitData.name,
+        price: unitData.price.sale,
+        subtotal: parseFloat(totalPrice.toFixed(2)),
         discount: 0,
-        discountProduct: 0,
-        vat: parseFloat((subtotal - (subtotal / 1.07)).toFixed(2)),
-        totalExVat: parseFloat((subtotal / 1.07).toFixed(2)),
-        total: subtotal ,
-        // shipping: {
-        //     shippingId: shippingData.shippingId,
-        //     address: shippingData.address,
-        //     dateRequest: shipping.dateRequest,
-        //     note: shipping.note
-        // },
-        shipping: {
-          shippingId: '',
-          address: ''
+        netTotal: parseFloat(totalPrice.toFixed(2))
+      }
+    })
+    if (listProduct.includes(null)) return
+    const orderId = await generateOrderId(area, sale.warehouse, channel, res)
+
+    const newOrder = new Order({
+      orderId,
+      type,
+      status: 'pending',
+      sale: {
+        saleCode: sale.saleCode,
+        salePayer: sale.salePayer,
+        name: `${sale.firstName} ${sale.surName}`,
+        tel: sale.tel || '',
+        warehouse: sale.warehouse
+      },
+      store: {
+        storeId: summary.store.storeId,
+        name: summary.store.name,
+        type: summary.store.type,
+        address: summary.store.address,
+        taxId: summary.store.taxId,
+        tel: summary.store.tel,
+        area: summary.store.area,
+        zone: summary.store.zone
+      },
+      note,
+      latitude,
+      longitude,
+      listProduct,
+      listPromotions: summary.listPromotion,
+      subtotal,
+      discount: 0,
+      discountProduct: 0,
+      vat: parseFloat((subtotal - (subtotal / 1.07)).toFixed(2)),
+      totalExVat: parseFloat((subtotal / 1.07).toFixed(2)),
+      total: subtotal,
+      // shipping: {
+      //     shippingId: shippingData.shippingId,
+      //     address: shippingData.address,
+      //     dateRequest: shipping.dateRequest,
+      //     note: shipping.note
+      // },
+      shipping: {
+        shippingId: '',
+        address: ''
+      },
+      paymentMethod: 'cash',
+      paymentStatus: 'paid',
+      createdBy: sale.username
+    })
+
+    // console.log(JSON.stringify(newOrder.listProduct, null, 2));
+
+    // const calStock = {
+    //     // storeId: refundOrder.store.storeId,
+    //     area: newOrder.store.area,
+    //     period: period,
+    //     type: "Sale",
+    //     listProduct: newOrder.listProduct.map(u => {
+    //         return {
+    //             id: u.id,
+    //             lot: u.lot,
+    //             unit: u.unit,
+    //             qty: u.qty,
+    //         }
+    //     })
+    // }
+    const calStock = {
+      // storeId: refundOrder.store.storeId,
+      orderId: newOrder.orderId,
+      area: newOrder.store.area,
+      saleCode: sale.saleCode,
+      period: period,
+      warehouse: newOrder.sale.warehouse,
+      status: 'pending',
+      action: "Sale",
+      type: "Sale",
+      product: newOrder.listProduct.map(u => {
+        return {
+          productId: u.id,
+          lot: u.lot,
+          unit: u.unit,
+          qty: u.qty,
+        }
+      })
+    }
+    // console.log("calStock",calStock)
+    const productId = calStock.product.flatMap(u => u.productId)
+
+    const stock = await Stock.aggregate([
+      { $match: { area: area, period: period } },
+      { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
+      { $match: { "listProduct.productId": { $in: productId } } },
+      // { $match : { "listProduct.available.lot": u.lot } },
+      {
+        $project: {
+          _id: 0,
+          productId: "$listProduct.productId",
+          sumQtyPcs: "$listProduct.sumQtyPcs",
+          sumQtyCtn: "$listProduct.sumQtyCtn",
+          sumQtyPcsStockIn: "$listProduct.sumQtyPcsStockIn",
+          sumQtyCtnStockIn: "$listProduct.sumQtyCtnStockIn",
+          sumQtyPcsStockOut: "$listProduct.sumQtyPcsStockOut",
+          sumQtyCtnStockOut: "$listProduct.sumQtyCtnStockOut",
+          available: "$listProduct.available"
+        }
+      }
+    ]);
+
+    let listProductStock = []
+    let updateLot = []
+
+    for (const stockDetail of stock) {
+      for (const lot of stockDetail.available) {
+
+        const calDetails = calStock.product.filter(
+          u => u.productId === stockDetail.productId && u.lot === lot.lot
+        );
+
+        let pcsQty = 0;
+        let ctnQty = 0;
+
+        for (const cal of calDetails) {
+          if (cal.unit === 'PCS' || cal.unit === 'BOT') {
+            pcsQty += cal.qty || 0;
+          }
+          if (cal.unit === 'CTN') {
+            ctnQty += cal.qty || 0;
+          }
+        }
+        checkQtyPcs = lot.qtyPcs - pcsQty
+        checkQtyCtn = lot.qtyCtn - ctnQty
+
+        if (checkQtyPcs < 0 || checkQtyCtn < 0) {
+          return res.status(400).json({
+            status: 400,
+            message: `This lot ${lot.lot} is not enough to sale`
+          })
+        }
+
+        updateLot.push({
+          productId: stockDetail.productId,
+          location: lot.location,
+          lot: lot.lot,
+          qtyPcs: lot.qtyPcs - pcsQty,
+          qtyPcsStockIn: lot.qtyPcsStockIn,
+          qtyPcsStockOut: lot.qtyPcsStockOut + pcsQty,
+          qtyCtn: lot.qtyCtn - ctnQty,
+          qtyCtnStockIn: lot.qtyCtnStockIn,
+          qtyCtnStockOut: lot.qtyCtnStockOut + ctnQty
+        })
+      }
+      const relatedLots = updateLot.filter((u) => u.productId === stockDetail.productId);
+      listProductStock.push({
+        productId: stockDetail.productId,
+        sumQtyPcs: relatedLots.reduce((total, item) => total + item.qtyPcs, 0),
+        sumQtyCtn: relatedLots.reduce((total, item) => total + item.qtyCtn, 0),
+        sumQtyPcsStockIn: relatedLots.reduce((total, item) => total + item.qtyPcsStockIn, 0),
+        sumQtyCtnStockIn: relatedLots.reduce((total, item) => total + item.qtyCtnStockIn, 0),
+        sumQtyPcsStockOut: relatedLots.reduce((total, item) => total + item.qtyPcsStockOut, 0),
+        sumQtyCtnStockOut: relatedLots.reduce((total, item) => total + item.qtyCtnStockOut, 0),
+        available: relatedLots.map(({ id, ...rest }) => rest),
+      });
+    }
+
+    for (const updated of listProductStock) {
+      await Stock.findOneAndUpdate(
+        { area: area, period: period },
+        {
+          $set: {
+            "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
+            "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
+            "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
+            "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
+            "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
+            "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
+            "listProduct.$[product].available": updated.available
+          }
         },
-        paymentMethod: 'cash',
-        paymentStatus: 'paid',
-        createdBy: sale.username
-      })
+        { arrayFilters: [{ "product.productId": updated.productId }], new: true }
+      )
+    }
 
-// console.log(JSON.stringify(newOrder.listProduct, null, 2));
+    const createdMovement = await StockMovement.create({
+      ...calStock
+    });
 
-        // const calStock = {
-        //     // storeId: refundOrder.store.storeId,
-        //     area: newOrder.store.area,
-        //     period: period,
-        //     type: "Sale",
-        //     listProduct: newOrder.listProduct.map(u => {
-        //         return {
-        //             id: u.id,
-        //             lot: u.lot,
-        //             unit: u.unit,
-        //             qty: u.qty,
-        //         }
-        //     })
-        // }
-      const calStock = {
-            // storeId: refundOrder.store.storeId,
-            orderId : newOrder.orderId,
-            area: newOrder.store.area,
-            saleCode: sale.saleCode,
-            period: period,
-            warehouse: newOrder.sale.warehouse,
-            status: 'pending',
-            action: "Sale",
-            type: "Sale",
-            product: newOrder.listProduct.map(u => {
-                return {
-                    productId: u.id,
-                    lot: u.lot,
-                    unit: u.unit,
-                    qty: u.qty,
-                }
-            })
-        }
-        // console.log("calStock",calStock)
-        const productId = calStock.product.flatMap(u => u.productId)
-
-        const stock = await Stock.aggregate([
-            { $match: { area: area, period: period } },
-            { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
-            { $match: { "listProduct.productId": { $in: productId } } },
-            // { $match : { "listProduct.available.lot": u.lot } },
-            {
-                $project: {
-                    _id: 0,
-                    productId: "$listProduct.productId",
-                    sumQtyPcs: "$listProduct.sumQtyPcs",
-                    sumQtyCtn: "$listProduct.sumQtyCtn",
-                    sumQtyPcsStockIn: "$listProduct.sumQtyPcsStockIn",
-                    sumQtyCtnStockIn: "$listProduct.sumQtyCtnStockIn",
-                    sumQtyPcsStockOut: "$listProduct.sumQtyPcsStockOut",
-                    sumQtyCtnStockOut: "$listProduct.sumQtyCtnStockOut",
-                    available: "$listProduct.available"
-                }
-            }
-        ]);
-
-        let listProductStock = []
-        let updateLot = []
-
-        for (const stockDetail of stock) {
-            for (const lot of stockDetail.available) {
-
-                const calDetails = calStock.product.filter(
-                    u => u.productId === stockDetail.productId && u.lot === lot.lot
-                );
-
-                let pcsQty = 0;
-                let ctnQty = 0;
-
-                for (const cal of calDetails) {
-                    if (cal.unit === 'PCS' || cal.unit === 'BOT') {
-                        pcsQty += cal.qty || 0;
-                    }
-                    if (cal.unit === 'CTN') {
-                        ctnQty += cal.qty || 0;
-                    }
-                }
-                checkQtyPcs = lot.qtyPcs - pcsQty
-                checkQtyCtn = lot.qtyCtn - ctnQty
-
-                if (checkQtyPcs < 0 || checkQtyCtn < 0) {
-                    return res.status(400).json({
-                        status:400,
-                        message: `This lot ${lot.lot} is not enough to sale`
-                    })
-                }
-
-                updateLot.push({
-                    productId: stockDetail.productId,
-                    location: lot.location,
-                    lot: lot.lot,
-                    qtyPcs: lot.qtyPcs - pcsQty,
-                    qtyPcsStockIn: lot.qtyPcsStockIn ,
-                    qtyPcsStockOut: lot.qtyPcsStockOut + pcsQty,
-                    qtyCtn: lot.qtyCtn - ctnQty,
-                    qtyCtnStockIn: lot.qtyCtnStockIn ,
-                    qtyCtnStockOut: lot.qtyCtnStockOut + ctnQty
-                })
-            }
-            const relatedLots = updateLot.filter((u) => u.productId === stockDetail.productId);
-            listProductStock.push({
-                productId: stockDetail.productId,
-                sumQtyPcs: relatedLots.reduce((total, item) => total + item.qtyPcs, 0),
-                sumQtyCtn: relatedLots.reduce((total, item) => total + item.qtyCtn, 0),
-                sumQtyPcsStockIn: relatedLots.reduce((total, item) => total + item.qtyPcsStockIn, 0),
-                sumQtyCtnStockIn: relatedLots.reduce((total, item) => total + item.qtyCtnStockIn, 0),
-                sumQtyPcsStockOut: relatedLots.reduce((total, item) => total + item.qtyPcsStockOut, 0),
-                sumQtyCtnStockOut: relatedLots.reduce((total, item) => total + item.qtyCtnStockOut, 0),
-                available: relatedLots.map(({ id, ...rest }) => rest),
-            });
-        }
-
-        for (const updated of listProductStock) {
-            await Stock.findOneAndUpdate(
-                { area: area, period: period },
-                {
-                    $set: {
-                        "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
-                        "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
-                        "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
-                        "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
-                        "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
-                        "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
-                        "listProduct.$[product].available": updated.available
-                    }
-                },
-                { arrayFilters: [{ "product.productId": updated.productId }], new: true }
-            )
-        }
-
-        const createdMovement = await StockMovement.create({
-            ...calStock
-        });
-
-        await StockMovementLog.create({
-            ...calStock,
-            refOrderId: createdMovement._id
-        });
+    await StockMovementLog.create({
+      ...calStock,
+      refOrderId: createdMovement._id
+    });
 
 
-      await newOrder.save()
-      await Cart.deleteOne({ type, area, storeId })
+    await newOrder.save()
+    await Cart.deleteOne({ type, area, storeId })
 
-      const checkIn = await checkInRoute({
-        storeId: storeId,
-        routeId: routeId,
-        orderId: orderId,
-        note: note,
-        latitude: latitude,
-        longitude: longitude
-      },channel,res)
+    const checkIn = await checkInRoute({
+      storeId: storeId,
+      routeId: routeId,
+      orderId: orderId,
+      note: note,
+      latitude: latitude,
+      longitude: longitude
+    }, channel, res)
 
-      res.status(200).json({
-        status: 200,
-        message: 'Checkout successful!',
-        data: newOrder
-      })
+    res.status(200).json({
+      status: 200,
+      message: 'Checkout successful!',
+      data: newOrder
+    })
 
-    
+
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
@@ -365,7 +365,7 @@ exports.getOrder = async (req, res) => {
     const channel = req.headers['x-channel'];
 
 
-    const { Order } = getModelsByChannel(channel,res,orderModel); 
+    const { Order } = getModelsByChannel(channel, res, orderModel);
 
 
 
@@ -432,7 +432,7 @@ exports.getDetail = async (req, res) => {
     const channel = req.headers['x-channel'];
 
 
-    const { Order } = getModelsByChannel(channel,res,orderModel); 
+    const { Order } = getModelsByChannel(channel, res, orderModel);
 
     if (!orderId) {
       return res
@@ -441,7 +441,7 @@ exports.getDetail = async (req, res) => {
     }
 
     const order = await Order.findOne({ orderId })
-    
+
     if (!order) {
       return res.status(404).json({
         status: 404,
@@ -468,7 +468,7 @@ exports.updateStatus = async (req, res) => {
     const channel = req.headers['x-channel'];
 
 
-    const { Order } = getModelsByChannel(channel,res,orderModel); 
+    const { Order } = getModelsByChannel(channel, res, orderModel);
 
 
     if (!orderId || !status) {
@@ -525,7 +525,7 @@ exports.addSlip = async (req, res) => {
 
     const channel = req.headers['x-channel'];
 
-    const { Order } = getModelsByChannel(channel,res,orderModel); 
+    const { Order } = getModelsByChannel(channel, res, orderModel);
 
     upload(req, res, async err => {
       if (err) {
@@ -593,30 +593,30 @@ exports.OrderToExcel = async (req, res) => {
 
   console.log(channel, date)
 
-if (!date || date === 'null') {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0'); // เดือนเริ่มที่ 0
-  const day = String(today.getDate()).padStart(2, '0');
+  if (!date || date === 'null') {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0'); // เดือนเริ่มที่ 0
+    const day = String(today.getDate()).padStart(2, '0');
 
-  date = `${year}${month}${day}`;
-  console.log("📅 date:", date);
+    date = `${year}${month}${day}`;
+    console.log("📅 date:", date);
 
-}
+  }
 
-  const start = new Date(`${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T00:00:00+07:00`);
-  const end = new Date(`${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T23:59:59.999+07:00`);
+  const start = new Date(`${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00+07:00`);
+  const end = new Date(`${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T23:59:59.999+07:00`);
 
 
   // const channel = 'cash';
-  const { Order } = getModelsByChannel(channel,res,orderModel); 
+  const { Order } = getModelsByChannel(channel, res, orderModel);
 
 
   // const modelOrder = await Order.find({
   //   orderId: { $not: /CC/ },
   // })
-  
- const modelOrder = await Order.aggregate([
+
+  const modelOrder = await Order.aggregate([
     {
       $match: {
         orderId: { $not: /CC/ }
@@ -749,8 +749,8 @@ if (!date || date === 'null') {
 
   if (tranFromOrder.length == 0) {
     return res.status(404).json({
-      status:(404),
-      message:"Not Found Order"
+      status: (404),
+      message: "Not Found Order"
     })
   }
 
@@ -761,18 +761,18 @@ if (!date || date === 'null') {
   const tempPath = path.join(os.tmpdir(), `Order_${Date.now()}.xlsx`);
   xlsx.writeFile(wb, tempPath);
 
-    res.download(tempPath, 'Order.xlsx', (err) => {
-      if (err) {
-        console.error('❌ Download error:', err);
-        // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
-        if (!res.headersSent) {
-          res.status(500).send('Download failed');
-        }
+  res.download(tempPath, 'Order.xlsx', (err) => {
+    if (err) {
+      console.error('❌ Download error:', err);
+      // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+      if (!res.headersSent) {
+        res.status(500).send('Download failed');
       }
+    }
 
-      // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {});
-    });
+    // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+    fs.unlink(tempPath, () => { });
+  });
 
 
 
@@ -784,89 +784,69 @@ if (!date || date === 'null') {
 
 exports.OrderToExcelConJob = async (req, res) => {
 
-  channel = ['cash','credit']
+  channel = ['cash', 'credit']
 
-for (const ch of channel) {
+  for (const ch of channel) {
 
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0'); // เดือนเริ่มที่ 0
-  const day = String(today.getDate()).padStart(2, '0');
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0'); // เดือนเริ่มที่ 0
+    const day = String(today.getDate()).padStart(2, '0');
 
-  date = `${year}${month}${day}`;
-  console.log("📅 date:", date);
+    date = `${year}${month}${day}`;
+    console.log("📅 date:", date);
 
-  const start = new Date(`${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T00:00:00+07:00`);
-  const end = new Date(`${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T23:59:59.999+07:00`);
-
-
-  // const channel = req.headers['x-channel'];
-  const { Order } = getModelsByChannel(ch,res,orderModel); 
+    const start = new Date(`${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00+07:00`);
+    const end = new Date(`${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T23:59:59.999+07:00`);
 
 
-  // const modelOrder = await Order.find({
-  //   orderId: { $not: /CC/ },
-  // })
-  
- const modelOrder = await Order.aggregate([
-    {
-      $match: {
-        orderId: { $not: /CC/ }
-      }
-    },
-    {
-      $addFields: {
-        createdAtThai: {
-          $dateAdd: {
-            startDate: '$createdAt',
-            unit: 'hour',
-            amount: 7
+    // const channel = req.headers['x-channel'];
+    const { Order } = getModelsByChannel(ch, res, orderModel);
+
+
+    // const modelOrder = await Order.find({
+    //   orderId: { $not: /CC/ },
+    // })
+
+    const modelOrder = await Order.aggregate([
+      {
+        $match: {
+          orderId: { $not: /CC/ }
+        }
+      },
+      {
+        $addFields: {
+          createdAtThai: {
+            $dateAdd: {
+              startDate: '$createdAt',
+              unit: 'hour',
+              amount: 7
+            }
+          }
+        }
+      },
+      {
+        $match: {
+          createdAtThai: {
+            $gte: start,
+            $lte: end
           }
         }
       }
-    },
-    {
-      $match: {
-        createdAtThai: {
-          $gte: start,
-          $lte: end
-        }
-      }
-    }
-  ]);
+    ]);
 
 
-  // console.log(modelOrder)
-  const tranFromOrder = modelOrder.flatMap(order => {
-    let counterOrder = 0
-    const date = new Date()
-    const RLDT = `${date.getFullYear()}${(date.getMonth() + 1)
-      .toString()
-      .padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`
+    // console.log(modelOrder)
+    const tranFromOrder = modelOrder.flatMap(order => {
+      let counterOrder = 0
+      const date = new Date()
+      const RLDT = `${date.getFullYear()}${(date.getMonth() + 1)
+        .toString()
+        .padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`
 
-    const listProduct = order.listProduct.map(product => {
-      return {
-        proCode: '',
-        id: product.id,
-        name: product.name,
-        group: product.group,
-        brand: product.brand,
-        size: product.size,
-        flavour: product.flavour,
-        qty: product.qty,
-        unit: product.unit,
-        unitName: product.unitName,
-        price: product.price,
-        subtotal: product.subtotal,
-        discount: product.discount,
-        netTotal: product.netTotal
-      }
-    })
-
-    const listPromotion = order.listPromotions.map(promo =>
-      promo.listProduct.map(product => {
+      const listProduct = order.listProduct.map(product => {
         return {
-          proCode: promo.proCode,
+          proCode: '',
           id: product.id,
           name: product.name,
           group: product.group,
@@ -876,87 +856,107 @@ for (const ch of channel) {
           qty: product.qty,
           unit: product.unit,
           unitName: product.unitName,
-          qtyPcs: product.qtyPcs
+          price: product.price,
+          subtotal: product.subtotal,
+          discount: product.discount,
+          netTotal: product.netTotal
         }
       })
-    )
 
-    const productIDS = [...listProduct, ...listPromotion].flat()
+      const listPromotion = order.listPromotions.map(promo =>
+        promo.listProduct.map(product => {
+          return {
+            proCode: promo.proCode,
+            id: product.id,
+            name: product.name,
+            group: product.group,
+            brand: product.brand,
+            size: product.size,
+            flavour: product.flavour,
+            qty: product.qty,
+            unit: product.unit,
+            unitName: product.unitName,
+            qtyPcs: product.qtyPcs
+          }
+        })
+      )
 
-    // console.log("productIDS",productIDS)
-    return productIDS.map(product => {
-      counterOrder++
+      const productIDS = [...listProduct, ...listPromotion].flat()
 
-      // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
+      // console.log("productIDS",productIDS)
+      return productIDS.map(product => {
+        counterOrder++
 
-      return {
-        CUNO: order.sale.salePayer,
-        FACI: 'F10',
-        WHLO: order.sale.warehouse,
-        ORNO: '',
-        OAORTP: 'A31',
-        RLDT: RLDT,
-        ADID: order.shipping.shippingId,
-        CUOR: order.orderId,
-        OAOREF: '',
-        OBITNO: product.id,
-        OBBANO: '',
-        OBALUN: product.unit,
-        OBORQA: Number(product.qty),
-        OBSAPR: Number(product.price || 0),
-        OBSPUN: product.unit,
-        OBWHSL: '',
-        ROUT: '',
-        OBPONR: Number(counterOrder),
-        OBDIA2: Number(product.discount || 0),
-        OBRSCD: '',
-        OBCMNO: '',
-        OBPIDE: product.proCode,
-        OBSMCD: order.sale.saleCode,
-        OAORDT: RLDT,
-        OAODAM: '',
-        OECRID: '',
-        OECRAM: '',
-        OECRID2: '',
-        OECRAM2: '',
-        OECRID3: '',
-        OECRAM3: '',
-        OECRID4: '',
-        OECRAM4: '',
-        OECRID5: '',
-        OECRAM5: '',
-        OARESP: '',
-        OAYREF: '',
-        OATEL2: '',
-        OAWCON: '',
-        OAFRE1: '',
-        OATXAP: '',
-        OATXAP2: '',
-        OBDIA1: '',
-        OBDIA3: '',
-        OBDIA4: ''
-      }
+        // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
+
+        return {
+          CUNO: order.sale.salePayer,
+          FACI: 'F10',
+          WHLO: order.sale.warehouse,
+          ORNO: '',
+          OAORTP: 'A31',
+          RLDT: RLDT,
+          ADID: order.shipping.shippingId,
+          CUOR: order.orderId,
+          OAOREF: '',
+          OBITNO: product.id,
+          OBBANO: '',
+          OBALUN: product.unit,
+          OBORQA: Number(product.qty),
+          OBSAPR: Number(product.price || 0),
+          OBSPUN: product.unit,
+          OBWHSL: '',
+          ROUT: '',
+          OBPONR: Number(counterOrder),
+          OBDIA2: Number(product.discount || 0),
+          OBRSCD: '',
+          OBCMNO: '',
+          OBPIDE: product.proCode,
+          OBSMCD: order.sale.saleCode,
+          OAORDT: RLDT,
+          OAODAM: '',
+          OECRID: '',
+          OECRAM: '',
+          OECRID2: '',
+          OECRAM2: '',
+          OECRID3: '',
+          OECRAM3: '',
+          OECRID4: '',
+          OECRAM4: '',
+          OECRID5: '',
+          OECRAM5: '',
+          OARESP: '',
+          OAYREF: '',
+          OATEL2: '',
+          OAWCON: '',
+          OAFRE1: '',
+          OATXAP: '',
+          OATXAP2: '',
+          OBDIA1: '',
+          OBDIA3: '',
+          OBDIA4: ''
+        }
+      })
     })
-  })
 
-  if (tranFromOrder.length == 0) {
-    return res.status(404).json({
-      status:(404),
-      message:"Not Found Order"
-    })
+    if (tranFromOrder.length == 0) {
+      return res.status(404).json({
+        status: (404),
+        message: "Not Found Order"
+      })
+    }
+
+    const ws = xlsx.utils.json_to_sheet(tranFromOrder)
+
+    const downloadsPath = path.join(os.homedir(), 'Downloads', `Order${ch}.xlsx`)
+
+    const wb = xlsx.utils.book_new()
+    xlsx.utils.book_append_sheet(wb, ws, 'Orders')
+
+    xlsx.writeFile(wb, downloadsPath)
+
+    console.log(`✅ ไฟล์ Order${ch}.xlsx ถูกสร้างแล้วที่:`, downloadsPath)
   }
-
-  const ws = xlsx.utils.json_to_sheet(tranFromOrder)
-
-  const downloadsPath = path.join(os.homedir(), 'Downloads', `Order${ch}.xlsx`)
-
-  const wb = xlsx.utils.book_new()
-  xlsx.utils.book_append_sheet(wb, ws, 'Orders')
-
-  xlsx.writeFile(wb, downloadsPath)
-
-  console.log(`✅ ไฟล์ Order${ch}.xlsx ถูกสร้างแล้วที่:`, downloadsPath)
-}
 
   // res.status(200).json({
   //   message: 'Create file successful!'
@@ -981,7 +981,7 @@ exports.getAllOrder = async (req, res) => {
 
     const channel = req.headers['x-channel'];
 
-    const { Order } = getModelsByChannel(channel,res,orderModel); 
+    const { Order } = getModelsByChannel(channel, res, orderModel);
 
     if (period) {
       const periodYear = period.slice(0, 4)
@@ -1021,8 +1021,8 @@ exports.getAllOrder = async (req, res) => {
 
       if (modelOrder.length == 0) {
         return res.status(404).json({
-          status:404,
-          message:"Not Found Order"
+          status: 404,
+          message: "Not Found Order"
         })
       }
 
@@ -1089,8 +1089,8 @@ exports.getSummaryItem = async (req, res) => {
     const channel = req.headers['x-channel'];
 
 
-    const { Product } = getModelsByChannel(channel,res,productModel); 
-    const { Order } = getModelsByChannel(channel,res,orderModel); 
+    const { Product } = getModelsByChannel(channel, res, productModel);
+    const { Order } = getModelsByChannel(channel, res, orderModel);
 
 
     const periodYear = period.slice(0, 4)
@@ -1116,8 +1116,8 @@ exports.getSummaryItem = async (req, res) => {
       { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
       {
         $project: {
-          listProduct: 1,      
-          _id: 0               
+          listProduct: 1,
+          _id: 0
         }
       }
     ])
@@ -1137,59 +1137,59 @@ exports.getSummaryItem = async (req, res) => {
     const parseArrayParam = (param) => {
       if (!param) return []
       try {
-          return typeof param === 'string' ? JSON.parse(param) : param
+        return typeof param === 'string' ? JSON.parse(param) : param
       } catch (error) {
-          return param.split(',')
+        return param.split(',')
       }
-  }
-
-  let filter = {}
-  const groupArray = parseArrayParam(group)
-  const brandArray = parseArrayParam(brand)
-  const flavourArray = parseArrayParam(flavour)
-  const sizeArray = parseArrayParam(size)
-
-  let conditions = []
-  if (productIds.length) conditions.push({ id: { $in: productIds } })
-  if (groupArray.length) conditions.push({ groupCode: { $in: groupArray } })
-  if (brandArray.length) conditions.push({ brandCode: { $in: brandArray } })
-  if (flavourArray.length) conditions.push({ flavourCode: { $in: flavourArray } })
-  if (sizeArray.length) conditions.push({ size: { $in: sizeArray } })
-
-  if (conditions.length) filter.$and = conditions
-
-  const products = await Product.aggregate([
-    { $match: filter } 
-  ]);
-  
-  if (products.length == 0) {
-    return res.status(404).json({
-      status:404,
-      message: 'Not Found Product'
-    })
-  }
-
-  const data = products.map(product => {
-    const netTotal = modelOrder.find(order => order.listProduct.id === product.id);
-    return {
-              id:product.id,
-              groupCode:product.groupCode,
-              brandCode:product.brandCode,
-              flavourCode:product.flavourCode,
-              size:product.size,
-              netTotal:netTotal.listProduct.netTotal
     }
-  })
 
-  if ( !type ) {
-    return res.status(404).json({
-      status:404,
-      message: 'type is require'
+    let filter = {}
+    const groupArray = parseArrayParam(group)
+    const brandArray = parseArrayParam(brand)
+    const flavourArray = parseArrayParam(flavour)
+    const sizeArray = parseArrayParam(size)
+
+    let conditions = []
+    if (productIds.length) conditions.push({ id: { $in: productIds } })
+    if (groupArray.length) conditions.push({ groupCode: { $in: groupArray } })
+    if (brandArray.length) conditions.push({ brandCode: { $in: brandArray } })
+    if (flavourArray.length) conditions.push({ flavourCode: { $in: flavourArray } })
+    if (sizeArray.length) conditions.push({ size: { $in: sizeArray } })
+
+    if (conditions.length) filter.$and = conditions
+
+    const products = await Product.aggregate([
+      { $match: filter }
+    ]);
+
+    if (products.length == 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not Found Product'
+      })
+    }
+
+    const data = products.map(product => {
+      const netTotal = modelOrder.find(order => order.listProduct.id === product.id);
+      return {
+        id: product.id,
+        groupCode: product.groupCode,
+        brandCode: product.brandCode,
+        flavourCode: product.flavourCode,
+        size: product.size,
+        netTotal: netTotal.listProduct.netTotal
+      }
     })
-  }
+
+    if (!type) {
+      return res.status(404).json({
+        status: 404,
+        message: 'type is require'
+      })
+    }
 
 
-    let result = [] 
+    let result = []
 
     if (type == "group") {
       const groupedByGroupCode = data.reduce((acc, item) => {
@@ -1202,16 +1202,16 @@ exports.getSummaryItem = async (req, res) => {
         }
 
         acc[item.groupCode].totalNetTotal += item.netTotal;
-      
+
         return acc;
       }, {});
-      
+
 
       result = Object.values(groupedByGroupCode);
       // console.log(result)
     }
-    else if (type == "flavour"){
-     
+    else if (type == "flavour") {
+
       const groupedByFlavourCode = data.reduce((acc, item) => {
 
         if (!acc[item.flavourCode]) {
@@ -1222,17 +1222,17 @@ exports.getSummaryItem = async (req, res) => {
         }
 
         acc[item.flavourCode].totalNetTotal += item.netTotal;
-      
+
         return acc;
       }, {});
-      
+
 
       result = Object.values(groupedByFlavourCode);
       // console.log(result)
     }
 
-    else if (type == "size"){
-     
+    else if (type == "size") {
+
       const groupedBySize = data.reduce((acc, item) => {
 
         if (!acc[item.size]) {
@@ -1243,17 +1243,17 @@ exports.getSummaryItem = async (req, res) => {
         }
 
         acc[item.size].totalNetTotal += item.netTotal;
-      
+
         return acc;
       }, {});
-      
+
 
       result = Object.values(groupedBySize);
       // console.log(result)
     }
 
-    else if (type == "brand"){
-     
+    else if (type == "brand") {
+
       const groupedByBrandCode = data.reduce((acc, item) => {
 
         if (!acc[item.brandCode]) {
@@ -1264,16 +1264,16 @@ exports.getSummaryItem = async (req, res) => {
         }
 
         acc[item.brandCode].totalNetTotal += item.netTotal;
-      
+
         return acc;
       }, {});
-      
+
 
       result = Object.values(groupedByBrandCode);
       // console.log(result)
     }
 
-    
+
     res.status(200).json({
       status: 200,
       message: 'success',
@@ -1293,7 +1293,7 @@ exports.getSummarybyRoute = async (req, res) => {
 
     const channel = req.headers['x-channel'];
 
-    const { Route } = getModelsByChannel(channel,res,routeModel); 
+    const { Route } = getModelsByChannel(channel, res, routeModel);
 
 
 
@@ -1379,134 +1379,136 @@ exports.getSummarybyRoute = async (req, res) => {
 }
 
 exports.getSummarybyMonth = async (req, res) => {
-try {
-  const { area, year,storeId,day  } = req.query
-  const channel = req.headers['x-channel']; // 'credit' or 'cash'
+  try {
+    const { area, year, storeId, day } = req.query
+    const channel = req.headers['x-channel']; // 'credit' or 'cash'
 
-  // const { Store } = getModelsByChannel(channel,res,storeModel); 
-  // const { Route } = getModelsByChannel(channel,res,routeModel); 
-  const { Order } = getModelsByChannel(channel,res,orderModel); 
+    // const { Store } = getModelsByChannel(channel,res,storeModel); 
+    // const { Route } = getModelsByChannel(channel,res,routeModel); 
+    const { Order } = getModelsByChannel(channel, res, orderModel);
 
-  let pipeline = []
+    let pipeline = []
 
-  pipeline.push(
-    { $match:{
-      'store.area':area
-    } },
-    { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
-    // { $match: matchStore },
-    {
-      $unwind: {
-        path: '$listStore.listOrder',
-        preserveNullAndEmptyArrays: true
-      }
-    },
+    pipeline.push(
+      {
+        $match: {
+          'store.area': area
+        }
+      },
+      { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
+      // { $match: matchStore },
+      {
+        $unwind: {
+          path: '$listStore.listOrder',
+          preserveNullAndEmptyArrays: true
+        }
+      },
 
-    {
-      $addFields: {
-        createdAtThai: {
-          $dateAdd: {
-            startDate: '$createdAt',
-            unit: 'hour',
-            amount: 7
+      {
+        $addFields: {
+          createdAtThai: {
+            $dateAdd: {
+              startDate: '$createdAt',
+              unit: 'hour',
+              amount: 7
+            }
           }
         }
+      },
+      {
+        $addFields: {
+          createdDay: { $dayOfMonth: '$createdAtThai' }
+        }
+      },
+      {
+        $addFields: {
+          createdYear: { $year: '$createdAtThai' }
+        }
       }
-    },
-    {
-      $addFields: {
-        createdDay: { $dayOfMonth: '$createdAtThai' }
-      }
-    },
-    {
-      $addFields: {
-        createdYear: { $year: '$createdAtThai' }
-      }
+    )
+
+    if (storeId) {
+      pipeline.push({
+        $match: {
+          'store.storeId': storeId
+        }
+      })
     }
-  )
-  
-  if (storeId) {
-    pipeline.push({
-      $match: {
-        'store.storeId': storeId
+    if (year) {
+      pipeline.push({
+        $match: {
+          createdYear: parseInt(year)
+        }
+      })
+    }
+
+    pipeline.push(
+      {
+        $project: {
+          month: { $month: '$createdAtThai' },
+          total: '$total'
+        }
+      },
+      {
+        $group: {
+          _id: '$month',
+          totalAmount: { $sum: '$total' }
+        }
+      },
+      { $sort: { _id: 1 } },
+      {
+        $project: {
+          month: '$_id',
+          totalAmount: 1,
+          _id: 0
+        }
+      }
+    )
+
+    const modelOrder = await Order.aggregate(pipeline)
+    const modelOrderValue = modelOrder.map(item => {
+      return {
+        month: item.month,
+        summary: item.totalAmount
       }
     })
-  }
-  if (year) {
-    pipeline.push({
-      $match:{
-        createdYear:parseInt(year)
-      }
+
+    const result = Array.from({ length: 12 }, (_, i) => ({
+      month: i + 1,
+      summary: 0
+    }));
+
+    // อัปเดตผลลัพธ์จาก data ที่มีอยู่
+    modelOrderValue.forEach(d => {
+      result[d.month - 1].summary = d.summary;
+    });
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'Success',
+      data: result
     })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ message: 'Internal server error.' })
   }
-
-  pipeline.push(
-    {
-      $project: {
-        month: { $month: '$createdAtThai' },
-        total: '$total'
-      }
-    },
-    {
-      $group: {
-        _id: '$month',
-        totalAmount: { $sum: '$total' }
-      }
-    },
-    { $sort: { _id: 1 } },
-    {
-      $project: {
-        month: '$_id',
-        totalAmount: 1,
-        _id: 0
-      }
-    }
-  )
-  
-  const modelOrder = await Order.aggregate(pipeline)
-  const modelOrderValue = modelOrder.map(item => {
-    return {
-      month: item.month,
-      summary: item.totalAmount
-    }
-  })
-
-  const result = Array.from({ length: 12 }, (_, i) => ({
-    month: i + 1,
-    summary: 0
-  }));
-
-  // อัปเดตผลลัพธ์จาก data ที่มีอยู่
-  modelOrderValue.forEach(d => {
-    result[d.month - 1].summary = d.summary;
-  });
-
-
-  res.status(200).json({
-    status: 200,
-    message: 'Success',
-    data: result
-  })
-} catch (error) {
-  console.error(error)
-  res.status(500).json({ message: 'Internal server error.' })
-}
 }
 
 exports.getSummarybyArea = async (req, res) => {
-try {
-  const { period, year } = req.query
+  try {
+    const { period, year } = req.query
 
-  const channel = req.headers['x-channel']; // 'credit' or 'cash'
+    const channel = req.headers['x-channel']; // 'credit' or 'cash'
 
-  const { Route } = getModelsByChannel(channel,res,routeModel); 
+    const { Route } = getModelsByChannel(channel, res, routeModel);
 
-  if (!period) {
-    return res.status(404).json({
-      status:404,
-      message:"period is require" 
-    })
-  }
+    if (!period) {
+      return res.status(404).json({
+        status: 404,
+        message: "period is require"
+      })
+    }
 
 
     const modelRouteValue = await Route.aggregate([
@@ -1518,22 +1520,23 @@ try {
         $addFields: {
           convertedDate: {
             $dateToString: {
-              format: "%Y-%m-%dT%H:%M:%S", 
+              format: "%Y-%m-%dT%H:%M:%S",
               date: "$listStore.listOrder.date",
-              timezone: "Asia/Bangkok" 
+              timezone: "Asia/Bangkok"
             }
           }
-      }},
-          {
+        }
+      },
+      {
         $match: {
           $expr: {
             $cond: {
-              if: { $eq: [year, null] }, 
-              then: true, 
+              if: { $eq: [year, null] },
+              then: true,
               else: {
                 $eq: [
-                  { $substr: [{ $toString: "$convertedDate" }, 0, 4] }, 
-                  { $toString: year } 
+                  { $substr: [{ $toString: "$convertedDate" }, 0, 4] },
+                  { $toString: year }
                 ]
               }
             }
@@ -1566,7 +1569,7 @@ try {
       { $sort: { area: 1, day: 1 } }
     ]);
 
-    
+
     const haveArea = [...new Set(modelRouteValue.map(i => i.area))];
     otherModelRoute = await Route.aggregate([
       {
@@ -1589,15 +1592,15 @@ try {
       { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } },
       {
         $group: {
-          _id: { area: "$area", day: "$day" },  
-          totalAmount: { $sum: "$orderDetails.total" }  
+          _id: { area: "$area", day: "$day" },
+          totalAmount: { $sum: "$orderDetails.total" }
         }
       },
       {
         $project: {
-          area: "$_id.area", 
+          area: "$_id.area",
           day: "$_id.day",
-          totalAmount: 1, 
+          totalAmount: 1,
           _id: 0
         }
       },
@@ -1642,13 +1645,13 @@ try {
 
 
 exports.getSummarybyGroup = async (req, res) => {
-try {
-    const { zone,group,period } = req.body 
+  try {
+    const { zone, group, period } = req.body
 
     const channel = req.headers['x-channel']; // 'credit' or 'cash'
 
-    const { Order } = getModelsByChannel(channel,res,orderModel); 
-    const { Product } = getModelsByChannel(channel,res,productModel); 
+    const { Order } = getModelsByChannel(channel, res, orderModel);
+    const { Product } = getModelsByChannel(channel, res, productModel);
 
 
     const year = parseInt(period.slice(0, 4));
@@ -1658,23 +1661,23 @@ try {
     const end = DateTime.fromObject({ year, month, day: 1 }, { zone: 'Asia/Bangkok' }).plus({ months: 1 }).toUTC().toJSDate();
 
     const modelOrder = await Order.aggregate([
-      { 
-        $match: { 
+      {
+        $match: {
           "store.zone": zone,  // กรองตาม zone
-          createdAt: { $gte: start, $lt: end },  
-        } 
+          createdAt: { $gte: start, $lt: end },
+        }
       },
       { $unwind: { path: "$listProduct", preserveNullAndEmptyArrays: false } },
-      { $match: { "listProduct.groupCode": group } },  
+      { $match: { "listProduct.groupCode": group } },
     ]);
 
-    const order = modelOrder.map( u => {
+    const order = modelOrder.map(u => {
       return {
-        id:u.listProduct.id,
-        groupCode:u.listProduct.groupCode,
-        size:u.listProduct.size,
-        flavourCode:u.listProduct.flavourCode,
-        qty:u.listProduct.qty
+        id: u.listProduct.id,
+        groupCode: u.listProduct.groupCode,
+        size: u.listProduct.size,
+        flavourCode: u.listProduct.flavourCode,
+        qty: u.listProduct.qty
 
       }
     })
@@ -1683,26 +1686,26 @@ try {
 
     const modelProduct = await Product.aggregate([
       { $match: { groupCode: group } },
-          {
+      {
         $group: {
 
-          _id: "$size", 
+          _id: "$size",
           entries: {
             $push: {
-              k: "$flavourCode",   
-              v: 0      
+              k: "$flavourCode",
+              v: 0
             }
           },
-          total: { $sum: "$value" } 
+          total: { $sum: "$value" }
         }
       },
-    
+
       {
         $addFields: {
           entriesObject: { $arrayToObject: "$entries" }
         }
       },
-    
+
       {
         $addFields: {
           fullObject: {
@@ -1722,7 +1725,7 @@ try {
           }
         }
       }
-,      
+      ,
       {
         $replaceRoot: {
           newRoot: {
@@ -1732,9 +1735,9 @@ try {
           }
         }
       },
-    
+
     ]);
-    
+
     if (!modelProduct || modelProduct.length === 0) {
       return res.status(404).json({
         status: 404,
@@ -1744,13 +1747,13 @@ try {
 
     for (const item of order) {
       const { size, flavourCode, qty } = item;
-    
+
       const model = modelProduct.find(obj => obj[size]);
       if (!model) continue;
-    
+
       if (model[size][flavourCode] !== undefined) {
         model[size][flavourCode] += qty;
-    
+
         const sumKey = `รวม${size}`;
         if (model[size][sumKey] !== undefined) {
           model[size][sumKey] += qty;
@@ -1759,9 +1762,9 @@ try {
     }
 
     res.status(200).json({
-      status:200,
-      message:'Success',
-      data:modelProduct
+      status: 200,
+      message: 'Success',
+      data: modelProduct
     })
   } catch (error) {
     console.error(error)
@@ -1772,230 +1775,260 @@ try {
 exports.erpApiCheck = async (req, res) => {
   try {
 
-    const channel = req.headers['x-channel']; 
+    const channel = req.headers['x-channel'];
 
-    const { Order } = getModelsByChannel(channel,res,orderModel); 
+    const { Order } = getModelsByChannel(channel, res, orderModel);
 
 
-  const modelSale = await Sale.findAll({
-    attributes: [
-      'OAORNO',
-      [sequelize.fn('COUNT', sequelize.col('OAORNO')), 'count']
-    ],
-    group: ['OAORNO']
-  })
-  
-  const saleId = modelSale.map(row => row.get('OAORNO'))
-  // notInmodelOrder = await Order.find({
-  //   orderId: { $nin: saleId }
-  // }).select("orderId")
-  const data = await Order.updateMany(
-    { orderId: { $in: saleId } },
-    {
-      $set: {
-        status: 'success',
+    const modelSale = await Sale.findAll({
+      attributes: [
+        'OAORNO',
+        [sequelize.fn('COUNT', sequelize.col('OAORNO')), 'count']
+      ],
+      group: ['OAORNO']
+    })
+
+    const saleId = modelSale.map(row => row.get('OAORNO'))
+    // notInmodelOrder = await Order.find({
+    //   orderId: { $nin: saleId }
+    // }).select("orderId")
+    const data = await Order.updateMany(
+      { orderId: { $in: saleId } },
+      {
+        $set: {
+          status: 'success',
+        }
       }
+    )
+
+    // console.log(data.modifiedCount)
+
+    if (data.modifiedCount == 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'No new orders found in the M3 system'
+      })
     }
-  )
 
-  // console.log(data.modifiedCount)
+    const io = getSocket()
+    const events = [
+      'sale_getSummarybyArea',
+      'sale_getSummarybyMonth',
+      'sale_getSummarybyRoute',
+      'sale_getSummaryItem',
+      'sale_getSummarybyGroup',
+      'sale_getRouteCheckinAll',
+      'sale_getTimelineCheckin',
+      'sale_routeTimeline',
+    ]
 
-  if (data.modifiedCount == 0) {
-    return res.status(404).json({
-      status:404,
-      message:'No new orders found in the M3 system'
+    events.forEach(event => {
+      io.emit(event, {
+        status: 200,
+        message: 'New Update Data',
+        // data: data
+      })
     })
+
+    res.status(200).json(
+      {
+        status: 200,
+        message: 'Update status Sucess'
+      }
+    )
+
+
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ message: 'Internal server error.' })
   }
-
-  const io = getSocket()
-  const events = [
-    'sale_getSummarybyArea',
-    'sale_getSummarybyMonth',
-    'sale_getSummarybyRoute',
-    'sale_getSummaryItem',
-    'sale_getSummarybyGroup',
-    'sale_getRouteCheckinAll',
-    'sale_getTimelineCheckin',
-    'sale_routeTimeline',
-  ]
-  
-  events.forEach(event => {
-    io.emit(event, {
-      status: 200,
-      message: 'New Update Data',
-      // data: data
-    })
-  })
-
-  res.status(200).json(
-    {
-      status: 200,
-      message:'Update status Sucess'
-  }
-  )
-
-
-
-} catch (error) {
-  console.error(error)
-  res.status(500).json({ message: 'Internal server error.' })
-}
 }
 
 exports.getSummarybyChoice = async (req, res) => {
 
-  const {storeId,area, date, type,} = req.body
+  const { storeId, area, date, type, } = req.body
   let dayStr, monthStr, yearStr;
 
-    const channel = req.headers['x-channel']; 
+  const channel = req.headers['x-channel'];
 
-    const { Order } = getModelsByChannel(channel,res,orderModel); 
+  const { Order } = getModelsByChannel(channel, res, orderModel);
 
 
 
   if (!date) {
     return res.status(400).json({
-      status:400,
-      message:"Date is required"
+      status: 400,
+      message: "Date is required"
     })
   }
 
   if (type == 'day') {
-    dayStr = parseInt(date.substring(0, 2), 10);   
+    dayStr = parseInt(date.substring(0, 2), 10);
   }
   else if (type == 'month') {
-    monthStr = parseInt(date.substring(2, 4), 10);    
+    monthStr = parseInt(date.substring(2, 4), 10);
   }
   else if (type == 'year') {
-    yearStr = parseInt(date.substring(4, 8), 10);  
+    yearStr = parseInt(date.substring(4, 8), 10);
   }
 
   let matchStage = {}
-      matchStage["store.area"] = area;
-    if (storeId){
-      matchStage["store.storeId"] = storeId;
-    }
+  matchStage["store.area"] = area;
+  if (storeId) {
+    matchStage["store.storeId"] = storeId;
+  }
   const match = {}
-    if(dayStr) match.day = dayStr
-    if(monthStr) match.month = monthStr
-    if(yearStr) match.year = yearStr
+  if (dayStr) match.day = dayStr
+  if (monthStr) match.month = monthStr
+  if (yearStr) match.year = yearStr
 
 
 
-    const modelOrder = await Order.aggregate([
-      {$match:matchStage},
-      {$addFields:{
-        createdAtThai:{
-          $dateAdd:{
-            startDate:"$createdAt",
-            unit:"hour",
-            amount:7
+  const modelOrder = await Order.aggregate([
+    { $match: matchStage },
+    {
+      $addFields: {
+        createdAtThai: {
+          $dateAdd: {
+            startDate: "$createdAt",
+            unit: "hour",
+            amount: 7
           }
         }
-      }},
-      {
-    $addFields: {
-      day: { $dayOfMonth: "$createdAtThai" },
-      month: { $month: "$createdAtThai" },
-      year: { $year: "$createdAtThai" }
+      }
+    },
+    {
+      $addFields: {
+        day: { $dayOfMonth: "$createdAtThai" },
+        month: { $month: "$createdAtThai" },
+        year: { $year: "$createdAtThai" }
+      }
+    },
+    {
+      $match: match
+    },
+    {
+      $group: {
+        _id: type,
+        total: { $sum: "$total" }
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        total: 1
+      }
     }
-  },
-  {
-    $match: match
-  },
-{
-  $group: {
-    _id: type, 
-    total: { $sum: "$total" } 
+  ])
+
+  if (modelOrder.length === 0) {
+    return res.status(404).json({
+      status: 404,
+      message: "Not found order"
+    })
   }
-},
-{$project:{
-  _id:0,
-  total:1
-}}
-    ])
 
-    if (modelOrder.length === 0) {
-      return res.status(404).json({
-        status:404,
-        message:"Not found order"
-      })
-    }
 
-    
 
   res.status(200).json({
-    status:200,
-    message:"Successful",
-    total:modelOrder[0].total
+    status: 200,
+    message: "Successful",
+    total: modelOrder[0].total
   })
 }
 
-exports.getSaleSummaryByStore = async ( req, res) => {
+exports.getSaleSummaryByStore = async (req, res) => {
 
-    const { routeCode } = req.body
-    const channel = req.headers['x-channel']; 
-    const { Route } = getModelsByChannel(channel,res,routeModel); 
+  const { routeCode } = req.body
+  const channel = req.headers['x-channel'];
+  const { Route } = getModelsByChannel(channel, res, routeModel);
 
-    const routeData = await Route.aggregate([
-      {$match:{
-        id:routeCode
-      }},
-      { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
-      { $unwind: { path: '$listStore.listOrder', preserveNullAndEmptyArrays: true } },
+  const routeData = await Route.aggregate([
+    {
+      $match: {
+        id: routeCode
+      }
+    },
+    { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: '$listStore.listOrder', preserveNullAndEmptyArrays: true } },
 
-{
+    {
       $addFields: {
         storeObjId: { $toObjectId: "$listStore.storeInfo" }
       }
     },
-    {$lookup:{
-      from:'stores',
-      localField:'storeObjId',
-      foreignField:'_id',
-      as:'storeDetail'
-    }},
+    {
+      $lookup: {
+        from: 'stores',
+        localField: 'storeObjId',
+        foreignField: '_id',
+        as: 'storeDetail'
+      }
+    },
 
-    {$lookup:{
-        from:'orders',
-        localField:'listStore.listOrder.orderId',
-        foreignField:'orderId',
-        as:'order'
-    }},
-    {$project:{
-      storeId: { $arrayElemAt : ['$storeDetail.storeId',0]},
-      storeName: { $arrayElemAt: ['$storeDetail.name',0]},
-      orderId:'$listStore.listOrder.orderId',
-      sum: { $arrayElemAt: ['$order.total',0]} ,
-      phone: { $arrayElemAt: ['$storeDetail.tel',0] },
-      mapLink:{
-        $concat:[
-          'https://maps.google.com/?q=',
-          { $toString : { $arrayElemAt : ['$storeDetail.latitude', 0] } },
-          ',',
-          { $toString: { $arrayElemAt: ['$storeDetail.longtitude', 0] } }
-        ]
-      },
-      datetime: {
-        $cond: {
-          if: {$ne:['$listStore.date',null]},
-          then:{
-            $dateAdd:{
-              startDate:'$listStore.date',
-              unit:'hour',
-              amount:7
-            }
-          },
-          else:'$$REMOVE'
+    {
+      $lookup: {
+        from: 'orders',
+        localField: 'listStore.listOrder.orderId',
+        foreignField: 'orderId',
+        as: 'order'
+      }
+    },
+    {
+      $project: {
+        storeId: { $arrayElemAt: ['$storeDetail.storeId', 0] },
+        storeName: { $arrayElemAt: ['$storeDetail.name', 0] },
+        orderId: {
+          $ifNull: ['$listStore.listOrder.orderId', '']
+        },
+        status: {
+          $cond: {
+            if: { $gt: [{ $size: '$order' }, 0] },
+            then: 'ขายได้',
+            else: 'ขายไม่ได้'
+          }
         }
+        ,
+
+        sum: {
+          $ifNull: [{ $arrayElemAt: ['$order.total', 0] }, 0]
+        },
+        phone: { $arrayElemAt: ['$storeDetail.tel', 0] },
+        mapLink: {
+          $concat: [
+            'https://maps.google.com/?q=',
+            { $toString: { $arrayElemAt: ['$storeDetail.latitude', 0] } },
+            ',',
+            { $toString: { $arrayElemAt: ['$storeDetail.longtitude', 0] } }
+          ]
+        },
+    datetime: {
+      $cond: {
+        if: { $ne: ['$listStore.listOrder.date', null] },
+        then: {
+          $dateToString: {
+            date: {
+              $dateAdd: {
+                startDate: '$listStore.listOrder.date',
+                unit: 'hour',
+                amount: 7
+              }
+            },
+            format: '%Y-%m-%d %H:%M:%S',
+            timezone: 'Asia/Bangkok'
+          }
+        },
+        else: ''
+      }
+    },
       }
     }
-  }
-    ])
+  ])
 
-    res.status(200).json({
-      status:200,
-      message:'sucess',
-      data:routeData
-    })
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: routeData
+  })
 }
