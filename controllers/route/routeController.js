@@ -9,14 +9,16 @@ const upload = multer({ storage: multer.memoryStorage() }).array(
   'checkInImage',
   1
 )
+const orderModel = require('../../models/cash/sale')
 const routeModel = require('../../models/cash/route')
 const storeModel = require('../../models/cash/store')
 const { getModelsByChannel } = require('../../middleware/channel')
 const path = require('path')
+const { json } = require('body-parser')
 
 exports.getRoute = async (req, res) => {
   try {
-    const { period, area,district,province,routeId } = req.query;
+    const { period, area, district, province, routeId } = req.query;
     const channel = req.headers['x-channel'];
 
     const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel);
@@ -34,25 +36,25 @@ exports.getRoute = async (req, res) => {
       'storeId name address typeName taxId tel'
     );
 
-const filteredRoutes = routes
-  .map(route => {
-    const filteredListStore = route.listStore.filter(store => {
-      const addr = (store.storeInfo?.address || '').toLowerCase();
+    const filteredRoutes = routes
+      .map(route => {
+        const filteredListStore = route.listStore.filter(store => {
+          const addr = (store.storeInfo?.address || '').toLowerCase();
 
-      const matchDistrict = district ? addr.includes(district.toLowerCase()) : true;
-      const matchProvince = province ? addr.includes(province.toLowerCase()) : true;
+          const matchDistrict = district ? addr.includes(district.toLowerCase()) : true;
+          const matchProvince = province ? addr.includes(province.toLowerCase()) : true;
 
-      return matchDistrict && matchProvince;
-    });
+          return matchDistrict && matchProvince;
+        });
 
-    return {
-      ...route.toObject(),
-      listStore: filteredListStore
-    };
-  })
-  .filter(route => route.listStore.length > 0);
+        return {
+          ...route.toObject(),
+          listStore: filteredListStore
+        };
+      })
+      .filter(route => route.listStore.length > 0);
 
-  // console.log(filteredRoutes)
+    // console.log(filteredRoutes)
 
 
     const allStoreIds = filteredRoutes.flatMap(route =>
@@ -64,30 +66,30 @@ const filteredRoutes = routes
       storeId: { $in: allStoreIds }
     }).select('storeId type');
 
-   
+
     const storeTypeMap = new Map(
       storeTypes.map(s => [s.storeId, s.type])
     );
 
-    
-const enrichedRoutes = filteredRoutes.map(route => {
-  const enrichedListStore = route.listStore.map(itemRaw => {
-    const item = itemRaw.toObject ? itemRaw.toObject() : itemRaw;
-    const storeInfo = item.storeInfo?.toObject ? item.storeInfo.toObject() : item.storeInfo || {};
-    const type = storeTypeMap.get(storeInfo.storeId);
 
-    return {
-      ...item,
-      storeInfo,
-      storeType: type || []
-    };
-  });
+    const enrichedRoutes = filteredRoutes.map(route => {
+      const enrichedListStore = route.listStore.map(itemRaw => {
+        const item = itemRaw.toObject ? itemRaw.toObject() : itemRaw;
+        const storeInfo = item.storeInfo?.toObject ? item.storeInfo.toObject() : item.storeInfo || {};
+        const type = storeTypeMap.get(storeInfo.storeId);
 
-  return {
-    ...route,
-    listStore: enrichedListStore
-  };
-});
+        return {
+          ...item,
+          storeInfo,
+          storeType: type || []
+        };
+      });
+
+      return {
+        ...route,
+        listStore: enrichedListStore
+      };
+    });
 
     res.status(200).json({
       status: 200,
@@ -312,8 +314,8 @@ exports.checkIn = async (req, res) => {
 exports.checkInVisit = async (req, res) => {
 
   const channel = req.headers['x-channel'];
-  const { Store } = getModelsByChannel(channel,res,storeModel);
-  const { Route } = getModelsByChannel(channel,res,routeModel);
+  const { Store } = getModelsByChannel(channel, res, storeModel);
+  const { Route } = getModelsByChannel(channel, res, routeModel);
 
 
 
@@ -990,75 +992,75 @@ exports.updateAndAddRoute = async (req, res) => {
 
   for (const storeList of response.data) {
     // try {
-      const existingRoute = routeMap.get(storeList.id)
-      // console.log(existingRoute)
-      if (existingRoute) {
-        
+    const existingRoute = routeMap.get(storeList.id)
+    // console.log(existingRoute)
+    if (existingRoute) {
 
-        for (const list of storeList.storeInfo || []) {
-          const store = await Store.findOne({ storeId: list })
-          // if (!store) {
-          //   console.warn(`Store with storeId ${list} not found`)
-          //   continue
-          // }
 
-          const storeExists = existingRoute.listStore.some(
-            store => store.storeInfo.toString() === store._id.toString()
-          )
-          if (!storeExists) {
-            const newData = {
-              storeInfo: store._id,
-              note: '',
-              image: '',
-              latitude: '',
-              longtitude: '',
-              status: 0,
-              statusText: 'รอเยี่ยม',
-              listOrder: [],
-              date: ''
-            }
-            existingRoute.listStore.push(newData)
+      for (const list of storeList.storeInfo || []) {
+        const store = await Store.findOne({ storeId: list })
+        // if (!store) {
+        //   console.warn(`Store with storeId ${list} not found`)
+        //   continue
+        // }
+
+        const storeExists = existingRoute.listStore.some(
+          store => store.storeInfo.toString() === store._id.toString()
+        )
+        if (!storeExists) {
+          const newData = {
+            storeInfo: store._id,
+            note: '',
+            image: '',
+            latitude: '',
+            longtitude: '',
+            status: 0,
+            statusText: 'รอเยี่ยม',
+            listOrder: [],
+            date: ''
           }
+          existingRoute.listStore.push(newData)
         }
-
-        await existingRoute.save()
-        console.log("existingRoute")
-      } else {
-        
-        const listStore = []
-
-        for (const storeId of storeList.listStore || []) {
-          const idStore = storeId.storeInfo
-          const store = await Store.findOne({ storeId: idStore })
-          if (store) {
-            // console.log(store)
-            listStore.push({
-              storeInfo: store._id,
-              latitude: '',
-              longtitude: '',
-              status: 0,
-              statusText: 'รอเยี่ยม',
-              note: '',
-              date: '',
-              listOrder: []
-            })
-          } 
-          // else {
-          //   console.warn(`Store with storeId ${storeId} not found`)
-          // }
-        }
-
-        const data = {
-          id: storeList.id,
-          area: storeList.area,
-          period: period(),
-          day: storeList.day,
-          listStore
-        }
-        await Route.create(data)
-        // console.log("data",data)
       }
+
+      await existingRoute.save()
+      console.log("existingRoute")
+    } else {
+
+      const listStore = []
+
+      for (const storeId of storeList.listStore || []) {
+        const idStore = storeId.storeInfo
+        const store = await Store.findOne({ storeId: idStore })
+        if (store) {
+          // console.log(store)
+          listStore.push({
+            storeInfo: store._id,
+            latitude: '',
+            longtitude: '',
+            status: 0,
+            statusText: 'รอเยี่ยม',
+            note: '',
+            date: '',
+            listOrder: []
+          })
+        }
+        // else {
+        //   console.warn(`Store with storeId ${storeId} not found`)
+        // }
+      }
+
+      const data = {
+        id: storeList.id,
+        area: storeList.area,
+        period: period(),
+        day: storeList.day,
+        listStore
+      }
+      await Route.create(data)
+      // console.log("data",data)
     }
+  }
 
   res.status(200).json({
     status: '200',
@@ -1066,63 +1068,137 @@ exports.updateAndAddRoute = async (req, res) => {
   })
 }
 
-exports.getRouteProvince = async (req,res) => {
+exports.getRouteProvince = async (req, res) => {
 
-  const { area,period } = req.body
+  const { area, period } = req.body
 
   const channel = req.headers['x-channel']
 
   const { Route } = getModelsByChannel(channel, res, routeModel)
 
   const route = await Route.aggregate([
-    {$match:{
-      area:area,
-      period:period,
-      listStore: { $ne: null,$not:{ $size:0} }
-    }},
+    {
+      $match: {
+        area: area,
+        period: period,
+        listStore: { $ne: null, $not: { $size: 0 } }
+      }
+    },
     { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
     {
       $addFields: {
         storeObjId: { $toObjectId: "$listStore.storeInfo" }
       }
     },
-    {$lookup:{
-      from:'stores',
-      localField:'storeObjId',
-      foreignField:'_id',
-      as:'storeDetail'
-    }},
     {
-    $project: {
-        storeDetail:1
-    }
-  },
-  {$group:{
-    _id:'$storeDetail.province'
-  }},
-  {
-  $project: {
-    _id: 0,
-    province: "$_id",  
-  }
-},
+      $lookup: {
+        from: 'stores',
+        localField: 'storeObjId',
+        foreignField: '_id',
+        as: 'storeDetail'
+      }
+    },
+    {
+      $project: {
+        storeDetail: 1
+      }
+    },
+    {
+      $group: {
+        _id: '$storeDetail.province'
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        province: "$_id",
+      }
+    },
   ])
 
   if (route.length == 0) {
     return res.status(404).json({
-      status:404,
-      message:"Not found province this area"
+      status: 404,
+      message: "Not found province this area"
     })
   }
 
 
-const result = route.flatMap(item => item.province).filter(p => p && p.trim() !== '');
+  const result = route.flatMap(item => item.province).filter(p => p && p.trim() !== '');
 
   res.status(200).json({
-    status:200,
-    message:"successful",
-    data:result
+    status: 200,
+    message: "successful",
+    data: result
   })
+}
+
+
+exports.getRouteEffective = async (req, res) => {
+
+  const { area, period } = req.body
+
+  const channel = req.headers['x-channel']
+
+  const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel);
+  const { Route } = getModelsByChannel(channel, res, routeModel);
+  const { Order } = getModelsByChannel(channel, res, orderModel);
+
+
+  const routes = await Route.find({ area: area, period: period }).populate(
+    'listStore.storeInfo',
+    'storeId name address typeName taxId tel'
+  );
+
+  console.log("routes",routes)
+  if ( routes.length == 0) {
+    return res.status(404).json({
+      status:404,
+      message:'Not found route'
+    })
+  }
+
+
+
+  const orderIdList = routes.flatMap(u =>
+    (u.listStore || []).flatMap(i =>
+      (i.listOrder || []).map(order => order.orderId)
+    )
+  );
+  const orderDetail = await Order.find({ orderId: { $in: orderIdList } })
+
+  const routesTranFrom = routes.map(u => {
+    const totalSummary = u.listStore?.flatMap(i =>
+      i.listOrder?.map(order => {
+        const detail = orderDetail.find(d => d.orderId === order.orderId);
+        return detail?.total || 0;
+      }) || []
+    ).reduce((sum, val) => sum + val, 0) || 0;
+
+    return {
+      routeId: u.id,
+      route: u.id.slice(-3) ,
+      storeAll: u.storeAll,
+      storePending: u.storePending,
+      storeSell: u.storeSell,
+      storeNotSell: u.storeNotSell,
+      storeCheckInNotSell: u.storeCheckInNotSell,
+      storeTotal: u.storeTotal,
+      percentComplete: u.percentComplete,
+      percentVisit: u.percentVisit,
+      percentEffective: u.percentEffective,
+      summary: totalSummary
+    };
+  });
+
+
+
+  res.status(200).json({
+    status: 200,
+    message: "successful",
+    data: routesTranFrom
+  })
+
 }
 
 

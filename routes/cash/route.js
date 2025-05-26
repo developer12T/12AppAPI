@@ -11,7 +11,8 @@ const {
   checkInVisit,
   routeTimeline,
   updateAndAddRoute,
-  getRouteProvince
+  getRouteProvince,
+  getRouteEffective
 } = require('../../controllers/route/routeController')
 
 const router = express.Router()
@@ -28,6 +29,8 @@ router.get('/getTimelineCheckin', getTimelineCheckin)
 router.post('/routeTimeline', routeTimeline)
 router.post('/updateAndAddRoute', updateAndAddRoute)
 router.post('/getRouteProvince', getRouteProvince)
+router.post('/getRouteEffective', getRouteEffective)
+
 
 
 
