@@ -49,7 +49,8 @@ const listProductMovementSchema = new mongoose.Schema(
     unit: { type: String, default: '' },
     lot: { type: String, default: '' },
     qty: { type: Number, default: 0 },
-    condition: { type: String, default: '' }
+    condition: { type: String, default: '' },
+    statusMovement:{ type: String, default: '' }
   },
   { _id: false }
 )

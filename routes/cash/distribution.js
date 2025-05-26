@@ -1,5 +1,5 @@
 const express = require('express')
-const { checkout, getOrder, getDetail, updateStatus } = require('../../controllers/distribution/withdrawController')
+const { checkout, getOrder, getDetail, updateStatus,updateStockWithdraw } = require('../../controllers/distribution/withdrawController')
 const { getPlace, addPlace, getType, addAllPlace } = require('../../controllers/distribution/placeController')
 
 const router = express.Router()
@@ -15,6 +15,7 @@ router.post('/place/add', addPlace)
 
 router.post('/place/addAllPlace', addAllPlace)
 
+router.post('/updateStockWithdraw', updateStockWithdraw)
 
 
 module.exports = router

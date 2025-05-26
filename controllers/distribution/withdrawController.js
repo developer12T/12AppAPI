@@ -169,102 +169,9 @@ exports.checkout = async (req, res) => {
           lot: u.lot,
           unit: u.unit,
           qty: u.qty,
+          statusMovement: 'in'
         }
       })
-    }
-
-
-
-    const productId = calStock.product.flatMap(u => u.productId)
-
-    const stock = await Stock.aggregate([
-      { $match: { area: area, period: period } },
-      { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
-      { $match: { "listProduct.productId": { $in: productId } } },
-      // { $match : { "listProduct.available.lot": u.lot } },
-      {
-        $project: {
-          _id: 0,
-          productId: "$listProduct.productId",
-          sumQtyPcs: "$listProduct.sumQtyPcs",
-          sumQtyCtn: "$listProduct.sumQtyCtn",
-          sumQtyPcsStockIn: "$listProduct.sumQtyPcsStockIn",
-          sumQtyCtnStockIn: "$listProduct.sumQtyCtnStockIn",
-          sumQtyPcsStockOut: "$listProduct.sumQtyPcsStockOut",
-          sumQtyCtnStockOut: "$listProduct.sumQtyCtnStockOut",
-          available: "$listProduct.available"
-        }
-      }
-    ]);
-
-    let listProductWithDraw = []
-    let updateLot = []
-
-
-    for (const stockDetail of stock) {
-      for (const lot of stockDetail.available) {
-        const calDetails = calStock.product.filter(
-          u => u.productId === stockDetail.productId && u.lot === lot.lot
-        );
-
-
-        let pcsQty = 0;
-        let ctnQty = 0;
-
-        for (const cal of calDetails) {
-          if (cal.unit === 'PCS' || cal.unit === 'BOT') {
-            pcsQty += cal.qty || 0;
-          }
-          if (cal.unit === 'CTN') {
-            ctnQty += cal.qty || 0;
-          }
-        }
-        checkQtyPcs = lot.qtyPcs + pcsQty
-        checkQtyCtn = lot.qtyCtn + ctnQty
-
-
-        updateLot.push({
-          productId: stockDetail.productId,
-          location: lot.location,
-          lot: lot.lot,
-          qtyPcs: Math.checkQtyPcs,
-          qtyPcsStockIn: lot.qtyPcsStockIn + pcsQty,
-          qtyPcsStockOut: lot.qtyPcsStockOut,
-          qtyCtn: Math.checkQtyCtn,
-          qtyCtnStockIn: lot.qtyCtnStockIn + ctnQty,
-          qtyCtnStockOut: lot.qtyCtnStockOut
-        })
-      }
-
-      const relatedLots = updateLot.filter((u) => u.productId === stockDetail.productId);
-      listProductWithDraw.push({
-        productId: stockDetail.productId,
-        sumQtyPcs: relatedLots.reduce((total, item) => total + item.qtyPcs, 0),
-        sumQtyCtn: relatedLots.reduce((total, item) => total + item.qtyCtn, 0),
-        sumQtyPcsStockIn: relatedLots.reduce((total, item) => total + item.qtyPcsStockIn, 0),
-        sumQtyCtnStockIn: relatedLots.reduce((total, item) => total + item.qtyCtnStockIn, 0),
-        sumQtyPcsStockOut: relatedLots.reduce((total, item) => total + item.qtyPcsStockOut, 0),
-        sumQtyCtnStockOut: relatedLots.reduce((total, item) => total + item.qtyCtnStockOut, 0),
-        available: relatedLots.map(({ id, ...rest }) => rest),
-      });
-    }
-    // console.log("listProductWithDraw:\n", JSON.stringify(listProductWithDraw, null, 2));
-    for (const updated of listProductWithDraw) {
-      await Stock.findOneAndUpdate(
-        { area: area, period: period },
-        {
-          $set: {
-            "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
-            "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
-            "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
-            "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
-            "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
-            "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
-            "listProduct.$[product].available": updated.available
-          }
-        },
-        { arrayFilters: [{ "product.productId": updated.productId }], new: true }
-      )
     }
 
     const createdMovement = await StockMovement.create({
@@ -485,3 +392,43 @@ exports.updateStatus = async (req, res) => {
     res.status(500).json({ status: 500, message: 'Server error' })
   }
 }
+
+exports.updateStockWithdraw = async (req,res) => {
+
+    const { orderId, status } = req.body
+    const channel = req.headers['x-channel'];
+    const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(channel, res, stockModel);
+
+    const stockmovements = await StockMovement.findOne({orderId:orderId,status:status})
+
+   const productId = stockmovements.product.flatMap(u => u.productId)
+
+    const stock = await Stock.aggregate([
+      { $match: { area: stockmovements.area, period: stockmovements.period } },
+      { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
+      { $match: { "listProduct.productId": { $in: productId } } },
+      // { $match : { "listProduct.available.lot": u.lot } },
+      {
+        $project: {
+          _id: 0,
+          productId: "$listProduct.productId",
+          sumQtyPcs: "$listProduct.sumQtyPcs",
+          sumQtyCtn: "$listProduct.sumQtyCtn",
+          sumQtyPcsStockIn: "$listProduct.sumQtyPcsStockIn",
+          sumQtyCtnStockIn: "$listProduct.sumQtyCtnStockIn",
+          sumQtyPcsStockOut: "$listProduct.sumQtyPcsStockOut",
+          sumQtyCtnStockOut: "$listProduct.sumQtyCtnStockOut",
+          available: "$listProduct.available"
+        }
+      }
+    ]);
+
+
+
+
+    res.status(200).json({
+      status:200,
+      message:stock
+    })
+}
+

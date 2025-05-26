@@ -1398,7 +1398,8 @@ exports.getRouteByArea = async (req,res) => {
     { $match: match },
     {$project:{
       routeId:'$id',
-      route:'$day',
+      route: {$concat : ['R','$day'] },
+      day:'$day',
       _id:0
     }}
   ])
