@@ -2102,7 +2102,7 @@ exports.getSummarybyChoice = async (req, res) => {
 
 exports.getSaleSummaryByStore = async (req, res) => {
 
-  const { routeCode } = req.body
+  const { routeid } = req.body
   const channel = req.headers['x-channel'];
   const { Route } = getModelsByChannel(channel, res, routeModel);
 

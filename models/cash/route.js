@@ -55,6 +55,11 @@ RouteSchema.virtual('percentComplete').get(function () {
     (((this.storeTotal / this.storeAll) * 100 * 360) / 100).toFixed(2)
   )
 })
+RouteSchema.virtual('complete').get(function () {
+  return parseFloat(((this.storeTotal / this.storeAll) * 100).toFixed(2))
+
+})
+
 RouteSchema.virtual('percentVisit').get(function () {
   return parseFloat(((this.storeTotal / this.storeAll) * 100).toFixed(2))
 })

@@ -1185,6 +1185,7 @@ exports.getRouteEffective = async (req, res) => {
       storeCheckInNotSell: u.storeCheckInNotSell,
       storeTotal: u.storeTotal,
       percentComplete: u.percentComplete,
+      complete:u.complete,
       percentVisit: u.percentVisit,
       percentEffective: u.percentEffective,
       summary: totalSummary
