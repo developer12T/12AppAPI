@@ -1284,7 +1284,7 @@ if (zone) {
 
 exports.getAreaInRoute = async (req, res) => {
 
-  const { period } = req.body
+  const { period } = req.query
   const channel = req.headers['x-channel'];
   const { Route } = getModelsByChannel(channel, res, routeModel);
 

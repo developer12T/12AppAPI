@@ -33,9 +33,9 @@ router.post('/routeTimeline', routeTimeline)
 router.post('/updateAndAddRoute', updateAndAddRoute)
 router.post('/getRouteProvince', getRouteProvince)
 router.post('/getRouteEffective', getRouteEffective)
-router.post('/getRouteEffectiveAll', getRouteEffectiveAll)
-router.post('/getAreaInRoute', getAreaInRoute)
-router.post('/getZoneInRoute', getZoneInRoute)
+router.get('/getRouteEffectiveAll', getRouteEffectiveAll)
+router.get('/getZone', getAreaInRoute)
+router.get('/getArea', getZoneInRoute)
 
 
 
