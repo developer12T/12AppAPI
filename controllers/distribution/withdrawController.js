@@ -284,7 +284,7 @@ exports.checkout = async (req, res) => {
       status: 200,
       message: 'Checkout successful!',
       // data: { orderId, total: subtotal, qty: totalQty }
-      data: listProductWithDraw
+      data: newOrder
       // data:listProductWithDraw
     })
   } catch (error) {

@@ -77,6 +77,8 @@ const generateDistributionId = async (area, warehouse,channel,res) => {
 
     let runningNumber = latestOrder ? parseInt(latestOrder.orderId.slice(-2)) + 1 : 1
 
+    console.log(`W${currentYear.toString().slice(2, 4)}${currentMonth}${warehouse}${runningNumber.toString().padStart(2, '0')}`)
+
     return `W${currentYear.toString().slice(2, 4)}${currentMonth}${warehouse}${runningNumber.toString().padStart(2, '0')}`
 }
 
