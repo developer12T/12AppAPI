@@ -1150,11 +1150,11 @@ exports.getRouteEffective = async (req, res) => {
     'storeId name address typeName taxId tel'
   );
 
-  console.log("routes",routes)
-  if ( routes.length == 0) {
+  // console.log("routes",routes)
+  if (routes.length == 0) {
     return res.status(404).json({
-      status:404,
-      message:'Not found route'
+      status: 404,
+      message: 'Not found route'
     })
   }
 
@@ -1177,7 +1177,7 @@ exports.getRouteEffective = async (req, res) => {
 
     return {
       routeId: u.id,
-      route: u.id.slice(-3) ,
+      route: u.id.slice(-3),
       storeAll: u.storeAll,
       storePending: u.storePending,
       storeSell: u.storeSell,
@@ -1185,7 +1185,7 @@ exports.getRouteEffective = async (req, res) => {
       storeCheckInNotSell: u.storeCheckInNotSell,
       storeTotal: u.storeTotal,
       percentComplete: u.percentComplete,
-      complete:u.complete,
+      complete: u.complete,
       percentVisit: u.percentVisit,
       percentEffective: u.percentEffective,
       summary: totalSummary
@@ -1203,3 +1203,174 @@ exports.getRouteEffective = async (req, res) => {
 }
 
 
+
+exports.getRouteEffectiveAll = async (req, res) => {
+
+  const { zone, area, period } = req.body
+
+  const query = {};
+  if (area) query.area = area;
+  if (period) query.period = period;
+
+  const channel = req.headers['x-channel'];
+  const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel);
+  const { Route } = getModelsByChannel(channel, res, routeModel);
+  const { Order } = getModelsByChannel(channel, res, orderModel);
+
+  const routes = await Route.find(query).populate(
+    'listStore.storeInfo',
+    'storeId name address typeName taxId tel'
+  );
+  if (routes.length == 0) {
+    return res.status(404).json({
+      status: 404,
+      message: 'Not found route'
+    })
+  }
+
+
+  const orderIdList = routes.flatMap(u =>
+    (u.listStore || []).flatMap(i =>
+      (i.listOrder || []).map(order => order.orderId)
+    )
+  );
+  const orderDetail = await Order.find({ orderId: { $in: orderIdList } })
+
+  const routesTranFrom = routes.map(u => {
+    const totalSummary = u.listStore?.flatMap(i =>
+      i.listOrder?.map(order => {
+        const detail = orderDetail.find(d => d.orderId === order.orderId);
+        return detail?.total || 0;
+      }) || []
+    ).reduce((sum, val) => sum + val, 0) || 0;
+
+    return {
+      routeId: u.id,
+      route: u.id.slice(-3),
+      storeAll: u.storeAll,
+      storePending: u.storePending,
+      storeSell: u.storeSell,
+      storeNotSell: u.storeNotSell,
+      storeCheckInNotSell: u.storeCheckInNotSell,
+      storeTotal: u.storeTotal,
+      percentComplete: u.percentComplete || 0,
+      complete: u.complete || 0,
+      percentVisit: u.percentVisit || 0,
+      percentEffective: u.percentEffective || 0,
+      summary: totalSummary
+    };
+  });
+
+
+
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: routesTranFrom
+  })
+}
+
+
+exports.getAreaInRoute = async (req, res) => {
+
+  const { period } = req.body
+  const channel = req.headers['x-channel'];
+  const { Route } = getModelsByChannel(channel, res, routeModel);
+
+
+
+  const routes = await Route.aggregate([
+    {
+      $match: { period: period }
+    },
+    {
+      $addFields: {
+        area2: { $substrCP: ['$area', 0, 2] }
+      }
+    },
+    {
+      $group: {
+        _id: '$area2'
+      }
+    },
+    {
+      $project: {
+        zone: '$_id',
+        _id: 0
+      }
+    },
+    {
+      $sort: { zone: 1 }
+    }
+  ]);
+
+  if (routes.length == 0) {
+    return res.status(404).json({
+      status: 404,
+      message: 'Not found route'
+    })
+  }
+
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: routes
+  })
+}
+
+
+exports.getZoneInRoute = async (req, res) => {
+
+  const { zone, period } = req.body
+  const channel = req.headers['x-channel'];
+  const { Route } = getModelsByChannel(channel, res, routeModel);
+
+  const pipeline = [
+    {
+      $match: { period: period }
+    },
+    {
+      $addFields: {
+        area2: { $substrCP: ['$area', 0, 2] }
+      }
+    }
+  ];
+
+  if (zone) {
+    pipeline.push({
+      $match: { area2: zone }
+    });
+  }
+
+  pipeline.push(
+    {
+      $group: { _id: '$area' }
+    },
+    {
+      $project: { area: '$_id', _id: 0 }
+    },
+    {
+      $sort: { area: 1 }
+    }
+  );
+
+  const routes = await Route.aggregate(pipeline);
+
+  if (routes.length == 0) {
+    return res.status(404).json({
+      status: 404,
+      message: 'Not found zone'
+    })
+  }
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: routes
+  })
+}

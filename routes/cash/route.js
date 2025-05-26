@@ -12,7 +12,10 @@ const {
   routeTimeline,
   updateAndAddRoute,
   getRouteProvince,
-  getRouteEffective
+  getRouteEffective,
+  getRouteEffectiveAll,
+  getAreaInRoute,
+  getZoneInRoute
 } = require('../../controllers/route/routeController')
 
 const router = express.Router()
@@ -30,6 +33,10 @@ router.post('/routeTimeline', routeTimeline)
 router.post('/updateAndAddRoute', updateAndAddRoute)
 router.post('/getRouteProvince', getRouteProvince)
 router.post('/getRouteEffective', getRouteEffective)
+router.post('/getRouteEffectiveAll', getRouteEffectiveAll)
+router.post('/getAreaInRoute', getAreaInRoute)
+router.post('/getZoneInRoute', getZoneInRoute)
+
 
 
 

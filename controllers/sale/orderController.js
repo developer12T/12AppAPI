@@ -2194,3 +2194,5 @@ exports.getSaleSummaryByStore = async (req, res) => {
     data: routeData
   })
 }
+
+
