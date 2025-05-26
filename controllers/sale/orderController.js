@@ -2102,14 +2102,14 @@ exports.getSummarybyChoice = async (req, res) => {
 
 exports.getSaleSummaryByStore = async (req, res) => {
 
-  const { routeid } = req.body
+  const { routeId } = req.body
   const channel = req.headers['x-channel'];
   const { Route } = getModelsByChannel(channel, res, routeModel);
 
   const routeData = await Route.aggregate([
     {
       $match: {
-        id: routeCode
+        id: routeId
       }
     },
     { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
