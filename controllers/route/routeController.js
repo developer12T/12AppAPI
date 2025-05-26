@@ -1206,21 +1206,34 @@ exports.getRouteEffective = async (req, res) => {
 
 exports.getRouteEffectiveAll = async (req, res) => {
 
-  const { zone, area, period } = req.body
+  const { zone, area, period,day } = req.body
 
   const query = {};
   if (area) query.area = area;
   if (period) query.period = period;
+  if (day) query.day = day;
+
 
   const channel = req.headers['x-channel'];
   const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel);
   const { Route } = getModelsByChannel(channel, res, routeModel);
   const { Order } = getModelsByChannel(channel, res, orderModel);
 
-  const routes = await Route.find(query).populate(
+  let routes = await Route.find(query).populate(
     'listStore.storeInfo',
     'storeId name address typeName taxId tel'
   );
+
+
+if (zone) {
+  routes = routes.filter(u => u.area.slice(0, 2) === zone);
+   console.log(routes)
+}
+ 
+
+
+
+
   if (routes.length == 0) {
     return res.status(404).json({
       status: 404,
@@ -1228,39 +1241,32 @@ exports.getRouteEffectiveAll = async (req, res) => {
     })
   }
 
-
-  const orderIdList = routes.flatMap(u =>
-    (u.listStore || []).flatMap(i =>
-      (i.listOrder || []).map(order => order.orderId)
-    )
-  );
-  const orderDetail = await Order.find({ orderId: { $in: orderIdList } })
+  let totalVisit = 0;
+  let totalEffective = 0;
+  let count = 0;
 
   const routesTranFrom = routes.map(u => {
-    const totalSummary = u.listStore?.flatMap(i =>
-      i.listOrder?.map(order => {
-        const detail = orderDetail.find(d => d.orderId === order.orderId);
-        return detail?.total || 0;
-      }) || []
-    ).reduce((sum, val) => sum + val, 0) || 0;
+    const percentVisit = u.percentVisit || 0;
+    const percentEffective = u.percentEffective || 0;
+
+    totalVisit += percentVisit;
+    totalEffective += percentEffective;
+    count++;
 
     return {
-      routeId: u.id,
-      route: u.id.slice(-3),
-      storeAll: u.storeAll,
-      storePending: u.storePending,
-      storeSell: u.storeSell,
-      storeNotSell: u.storeNotSell,
-      storeCheckInNotSell: u.storeCheckInNotSell,
-      storeTotal: u.storeTotal,
-      percentComplete: u.percentComplete || 0,
-      complete: u.complete || 0,
-      percentVisit: u.percentVisit || 0,
-      percentEffective: u.percentEffective || 0,
-      summary: totalSummary
+      area: u.area,
+      percentVisit,
+      percentEffective
     };
   });
 
+  const percentVisitAvg = count > 0 ? totalVisit / count : 0;
+  const percentEffectiveAvg = count > 0 ? totalEffective / count : 0;
+
+// console.log({
+//   percentVisitAvg: percentVisitAvg,
+//   percentEffectiveAvg: percentEffectiveAvg
+// });
 
 
 
@@ -1268,7 +1274,10 @@ exports.getRouteEffectiveAll = async (req, res) => {
   res.status(200).json({
     status: 200,
     message: 'sucess',
-    data: routesTranFrom
+    // data: routesTranFrom
+    visit: percentVisitAvg,
+    effective: percentEffectiveAvg
+
   })
 }
 
