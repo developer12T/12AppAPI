@@ -65,21 +65,23 @@ const generateDistributionId = async (area, warehouse,channel,res) => {
 
 
     const latestOrder = await Distribution.findOne({
-        area,
-        created: {
-            $gte: new Date(`${new Date().getFullYear()}-${currentMonth}-01`),
-            $lt: new Date(`${new Date().getFullYear()}-${parseInt(currentMonth) + 1}-01`)
-        },
-        status: { $ne: 'canceled' }
+    area,
+    createdAt: {
+        $gte: new Date(`${new Date().getFullYear()}-${currentMonth}-01`),
+        $lt: new Date(`${new Date().getFullYear()}-${parseInt(currentMonth) + 1}-01`)
+    },
+    status: { $ne: 'canceled' }
     })
-        .sort({ created: -1 })
-        .select('orderId')
+    .sort({ orderId: -1 }) 
+    .select('orderId');
 
     let runningNumber = latestOrder ? parseInt(latestOrder.orderId.slice(-2)) + 1 : 1
 
-    console.log(`W${currentYear.toString().slice(2, 4)}${currentMonth}${warehouse}${runningNumber.toString().padStart(2, '0')}`)
+    const newOrderId = `W${currentYear.toString().slice(2, 4)}${currentMonth}${warehouse}${runningNumber.toString().padStart(2, '0')}`
 
-    return `W${currentYear.toString().slice(2, 4)}${currentMonth}${warehouse}${runningNumber.toString().padStart(2, '0')}`
+    // const oldOrderId = await Distribution.findOne({orderId:newOrderId}).select('orderId')
+
+    return newOrderId
 }
 
 const generateGiveawaysId = async (area, warehouse,channel,res) => {
