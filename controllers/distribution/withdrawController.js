@@ -5,11 +5,11 @@
 const { generateDistributionId } = require('../../utilities/genetateId')
 const { rangeDate } = require('../../utilities/datetime')
 
-const  cartModel  = require('../../models/cash/cart')
-const  productModel  = require('../../models/cash/product')
-const  distributionModel = require('../../models/cash/distribution')
-const  userModel  = require('../../models/cash/user')
-const  stockModel  = require('../../models/cash/stock')
+const cartModel = require('../../models/cash/cart')
+const productModel = require('../../models/cash/product')
+const distributionModel = require('../../models/cash/distribution')
+const userModel = require('../../models/cash/user')
+const stockModel = require('../../models/cash/stock')
 
 const { getModelsByChannel } = require('../../middleware/channel')
 
@@ -18,15 +18,15 @@ const { getModelsByChannel } = require('../../middleware/channel')
 
 exports.checkout = async (req, res) => {
   try {
-    const { type, area, shippingId, withdrawType, sendDate, note,period  } = req.body
+    const { type, area, shippingId, withdrawType, sendDate, note, period } = req.body
 
-      const channel = req.headers['x-channel'];
-      const { Cart } = getModelsByChannel(channel,res,cartModel); 
-      const { User } = getModelsByChannel(channel,res,userModel); 
-      const { Place } = getModelsByChannel(channel,res,distributionModel); 
-      const { Product } = getModelsByChannel(channel,res,productModel)
-      const { Distribution } = getModelsByChannel(channel,res,distributionModel)
-      const { Stock,StockMovementLog,StockMovement } = getModelsByChannel(channel, res, stockModel);
+    const channel = req.headers['x-channel'];
+    const { Cart } = getModelsByChannel(channel, res, cartModel);
+    const { User } = getModelsByChannel(channel, res, userModel);
+    const { Place } = getModelsByChannel(channel, res, distributionModel);
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+    const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(channel, res, stockModel);
 
 
 
@@ -130,7 +130,7 @@ exports.checkout = async (req, res) => {
 
     if (listProduct.includes(null)) return
     // if (listProduct.some(p => p === null)) return res.status(400).json({ status: 400, message: 'Invalid product in cart!' })
-    const orderId = await generateDistributionId(area, sale.warehouse,channel,res)
+    const orderId = await generateDistributionId(area, sale.warehouse, channel, res)
 
     const newOrder = new Distribution({
       orderId,
@@ -153,124 +153,128 @@ exports.checkout = async (req, res) => {
       createdBy: sale.username
     })
 
-        const calStock = {
-            // storeId: refundOrder.store.storeId,
-            orderId : newOrder.orderId,
-            area: newOrder.area,
-            saleCode: sale.saleCode,
-            period: period,
-            warehouse: newOrder.fromWarehouse,
-            status: 'pending',
-            action: "Withdraw",
-            type: "Withdraw",
-            product: newOrder.listProduct.map(u => {
-                return {
-                    productId: u.id,
-                    lot: u.lot,
-                    unit: u.unit,
-                    qty: u.qty,
-                }
-            })
+    const calStock = {
+      // storeId: refundOrder.store.storeId,
+      orderId: newOrder.orderId,
+      area: newOrder.area,
+      saleCode: sale.saleCode,
+      period: period,
+      warehouse: newOrder.fromWarehouse,
+      status: 'pending',
+      action: "Withdraw",
+      type: "Withdraw",
+      product: newOrder.listProduct.map(u => {
+        return {
+          productId: u.id,
+          lot: u.lot,
+          unit: u.unit,
+          qty: u.qty,
         }
+      })
+    }
 
 
 
-const productId = calStock.product.flatMap( u => u.productId)
+    const productId = calStock.product.flatMap(u => u.productId)
 
-const stock = await Stock.aggregate([
-            { $match: { area: area, period: period } },
-            { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
-            { $match: { "listProduct.productId":{$in: productId}}},
-            // { $match : { "listProduct.available.lot": u.lot } },
-              { $project: {
-                            _id: 0,
-                            productId: "$listProduct.productId",
-                            sumQtyPcs:"$listProduct.sumQtyPcs",
-                            sumQtyCtn:"$listProduct.sumQtyCtn",
-                            sumQtyPcsStockIn:"$listProduct.sumQtyPcsStockIn",
-                            sumQtyCtnStockIn:"$listProduct.sumQtyCtnStockIn",
-                            sumQtyPcsStockOut:"$listProduct.sumQtyPcsStockOut",
-                            sumQtyCtnStockOut:"$listProduct.sumQtyCtnStockOut",
-                            available:"$listProduct.available"
-                        }}
-        ]);
-
-let listProductWithDraw = []
-let updateLot = []
-
-
-        for (const stockDetail of stock) {
-            for (const lot of stockDetail.available) {
-              const calDetails = calStock.product.filter(
-                u => u.productId === stockDetail.productId && u.lot === lot.lot
-              );
-
-
-              let pcsQty = 0;
-              let ctnQty = 0;
-              
-              for (const cal of calDetails) {
-                if (cal.unit === 'PCS' || cal.unit === 'BOT') {
-                  pcsQty += cal.qty || 0;
-                }
-                if (cal.unit === 'CTN' ) {
-                  ctnQty += cal.qty || 0;
-                }
-              }
-              checkQtyPcs = lot.qtyPcs +  pcsQty
-              checkQtyCtn = lot.qtyCtn + ctnQty
-
-
-                updateLot.push({
-                    productId:stockDetail.productId,
-                    location:lot.location,
-                    lot:lot.lot,
-                    qtyPcs:Math.checkQtyPcs,
-                    qtyPcsStockIn:lot.qtyPcsStockIn + pcsQty,
-                    qtyPcsStockOut:lot.qtyPcsStockOut ,
-                    qtyCtn:Math.checkQtyCtn,
-                    qtyCtnStockIn:lot.qtyCtnStockIn + ctnQty,
-                    qtyCtnStockOut:lot.qtyCtnStockOut 
-                })
-              }
-            
-const relatedLots = updateLot.filter((u) => u.productId === stockDetail.productId);
-            listProductWithDraw.push({
-                productId: stockDetail.productId,
-                sumQtyPcs: relatedLots.reduce((total, item) => total + item.qtyPcs, 0),
-                sumQtyCtn: relatedLots.reduce((total, item) => total + item.qtyCtn, 0),
-                sumQtyPcsStockIn: relatedLots.reduce((total, item) => total + item.qtyPcsStockIn, 0),
-                sumQtyCtnStockIn: relatedLots.reduce((total, item) => total + item.qtyCtnStockIn, 0),
-                sumQtyPcsStockOut: relatedLots.reduce((total, item) => total + item.qtyPcsStockOut, 0),
-                sumQtyCtnStockOut: relatedLots.reduce((total, item) => total + item.qtyCtnStockOut, 0),
-                available: relatedLots.map(({ id, ...rest }) => rest), 
-            });
-            }
-            // console.log("listProductWithDraw:\n", JSON.stringify(listProductWithDraw, null, 2));
-        for (const updated of listProductWithDraw) {
-            await Stock.findOneAndUpdate(
-                {area:area, period:period},
-                { $set: {
-                        "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
-                        "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
-                        "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
-                        "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
-                        "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
-                        "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
-                        "listProduct.$[product].available":updated.available
-                }},
-                { arrayFilters : [{ "product.productId": updated.productId }] , new: true}
-            )
+    const stock = await Stock.aggregate([
+      { $match: { area: area, period: period } },
+      { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
+      { $match: { "listProduct.productId": { $in: productId } } },
+      // { $match : { "listProduct.available.lot": u.lot } },
+      {
+        $project: {
+          _id: 0,
+          productId: "$listProduct.productId",
+          sumQtyPcs: "$listProduct.sumQtyPcs",
+          sumQtyCtn: "$listProduct.sumQtyCtn",
+          sumQtyPcsStockIn: "$listProduct.sumQtyPcsStockIn",
+          sumQtyCtnStockIn: "$listProduct.sumQtyCtnStockIn",
+          sumQtyPcsStockOut: "$listProduct.sumQtyPcsStockOut",
+          sumQtyCtnStockOut: "$listProduct.sumQtyCtnStockOut",
+          available: "$listProduct.available"
         }
+      }
+    ]);
 
-        const createdMovement = await StockMovement.create({
-            ...calStock
-        });
+    let listProductWithDraw = []
+    let updateLot = []
 
-        await StockMovementLog.create({
-            ...calStock,
-            refOrderId: createdMovement._id
-        });
+
+    for (const stockDetail of stock) {
+      for (const lot of stockDetail.available) {
+        const calDetails = calStock.product.filter(
+          u => u.productId === stockDetail.productId && u.lot === lot.lot
+        );
+
+
+        let pcsQty = 0;
+        let ctnQty = 0;
+
+        for (const cal of calDetails) {
+          if (cal.unit === 'PCS' || cal.unit === 'BOT') {
+            pcsQty += cal.qty || 0;
+          }
+          if (cal.unit === 'CTN') {
+            ctnQty += cal.qty || 0;
+          }
+        }
+        checkQtyPcs = lot.qtyPcs + pcsQty
+        checkQtyCtn = lot.qtyCtn + ctnQty
+
+
+        updateLot.push({
+          productId: stockDetail.productId,
+          location: lot.location,
+          lot: lot.lot,
+          qtyPcs: Math.checkQtyPcs,
+          qtyPcsStockIn: lot.qtyPcsStockIn + pcsQty,
+          qtyPcsStockOut: lot.qtyPcsStockOut,
+          qtyCtn: Math.checkQtyCtn,
+          qtyCtnStockIn: lot.qtyCtnStockIn + ctnQty,
+          qtyCtnStockOut: lot.qtyCtnStockOut
+        })
+      }
+
+      const relatedLots = updateLot.filter((u) => u.productId === stockDetail.productId);
+      listProductWithDraw.push({
+        productId: stockDetail.productId,
+        sumQtyPcs: relatedLots.reduce((total, item) => total + item.qtyPcs, 0),
+        sumQtyCtn: relatedLots.reduce((total, item) => total + item.qtyCtn, 0),
+        sumQtyPcsStockIn: relatedLots.reduce((total, item) => total + item.qtyPcsStockIn, 0),
+        sumQtyCtnStockIn: relatedLots.reduce((total, item) => total + item.qtyCtnStockIn, 0),
+        sumQtyPcsStockOut: relatedLots.reduce((total, item) => total + item.qtyPcsStockOut, 0),
+        sumQtyCtnStockOut: relatedLots.reduce((total, item) => total + item.qtyCtnStockOut, 0),
+        available: relatedLots.map(({ id, ...rest }) => rest),
+      });
+    }
+    // console.log("listProductWithDraw:\n", JSON.stringify(listProductWithDraw, null, 2));
+    for (const updated of listProductWithDraw) {
+      await Stock.findOneAndUpdate(
+        { area: area, period: period },
+        {
+          $set: {
+            "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
+            "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
+            "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
+            "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
+            "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
+            "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
+            "listProduct.$[product].available": updated.available
+          }
+        },
+        { arrayFilters: [{ "product.productId": updated.productId }], new: true }
+      )
+    }
+
+    const createdMovement = await StockMovement.create({
+      ...calStock
+    });
+
+    await StockMovementLog.create({
+      ...calStock,
+      refOrderId: createdMovement._id
+    });
 
 
     await newOrder.save()
@@ -280,7 +284,7 @@ const relatedLots = updateLot.filter((u) => u.productId === stockDetail.productI
       status: 200,
       message: 'Checkout successful!',
       // data: { orderId, total: subtotal, qty: totalQty }
-      data:listProductWithDraw
+      data: listProductWithDraw
       // data:listProductWithDraw
     })
   } catch (error) {
@@ -294,7 +298,7 @@ exports.getOrder = async (req, res) => {
     const { type, area, period } = req.query
     const channel = req.headers['x-channel'];
 
-    const { Distribution } = getModelsByChannel(channel,res,distributionModel); 
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel);
 
 
     let response = []
@@ -356,55 +360,58 @@ exports.getDetail = async (req, res) => {
 
     const channel = req.headers['x-channel'];
 
-    const { Distribution } = getModelsByChannel(channel,res,distributionModel); 
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel);
     if (!orderId) {
       return res
         .status(400)
         .json({ status: 400, message: 'orderId is required!' })
     }
 
-    const order = await Distribution.findOne({ orderId })
-    if (! order ) {
+    const order = await Distribution.find({ orderId })
+
+    if (!order) {
       return res
-      .status(404)
-      .json({ status: 404, message: 'Distribution order not found!' })
+        .status(404)
+        .json({ status: 404, message: 'Distribution order not found!' })
     }
-    const data = {
-      order:order.order,
-      type: order.type,
-      _id: order._id,
-      orderId: order.orderId,
-      orderType: order.orderType,
-      orderTypeName:order.orderTypeName,
-      area: order.area,
-      fromWarehouse: order.fromWarehouse,
-      toWarehouse: order.toWarehouse,
-      shippingId: order.shippingId,
-      shippingRoute: order.shippingRoute,
-      shippingName: order.shippingName,
-      sendAddress: order.sendAddress,
-      sendDate: order.sendDate,
-      remark: order.remark,
-      listProduct:order.listProduct.map(u => {
-              return {
-                    id: u.id,
-                    name: u.name,
-                    group: u.group,
-                    brand: u.brand,
-                    size: u.size,
-                    flavour: u.flavour,
-                    qty: u.qty,
-                    unit: u.unit,
-                    qtyPcs: u.qtyPcs,
-                    price: u.price,
-                    total: u.total,
-                    weightGross: u.weightGross,
-                    weightNet: u.weightNet,
-                    receiveQty: u.receiveQty,
-                    _id: u._id
-              }
-      })
-    }
+    const data = order.map(u => {
+      return {
+        order: u.order,
+        type: u.type,
+        _id: u._id,
+        orderId: u.orderId,
+        orderType: u.orderType,
+        orderTypeName: u.orderTypeName,
+        area: u.area,
+        fromWarehouse: u.fromWarehouse,
+        toWarehouse: u.toWarehouse,
+        shippingId: u.shippingId,
+        shippingRoute: u.shippingRoute,
+        shippingName: u.shippingName,
+        sendAddress: u.sendAddress,
+        sendDate: u.sendDate,
+        remark: u.remark,
+        listProduct: u.listProduct.map(p => {
+          return {
+            id: p.id,
+            name: p.name,
+            group: p.group,
+            brand: p.brand,
+            size: p.size,
+            flavour: p.flavour,
+            qty: p.qty,
+            unit: p.unit,
+            qtyPcs: p.qtyPcs,
+            price: p.price,
+            total: p.total,
+            weightGross: p.weightGross,
+            weightNet: p.weightNet,
+            receiveQty: p.receiveQty,
+            _id: p._id
+          };
+        })
+      };
+    });
 
 
     res.status(200).json({
@@ -424,7 +431,7 @@ exports.updateStatus = async (req, res) => {
 
     const channel = req.headers['x-channel'];
 
-    const { Distribution } = getModelsByChannel(channel,res,distributionModel); 
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel);
 
     if (!orderId || !status) {
       return res
