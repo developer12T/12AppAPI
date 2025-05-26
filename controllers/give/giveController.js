@@ -418,7 +418,7 @@ exports.getOrder = async (req, res) => {
         let response = []
 
         const channel = req.headers['x-channel']; 
-        const { Giveaways } = getModelsByChannel(channel,res,giveawaysModel); 
+        const { Giveaway } = getModelsByChannel(channel,res,giveawaysModel); 
 
         if (!type || !area || !period) {
             return res.status(400).json({ status: 400, message: 'type, area, period are required!' })
@@ -436,7 +436,7 @@ exports.getOrder = async (req, res) => {
             query['store.storeId'] = store
         }
 
-        const order = await Giveaways.find(query)
+        const order = await Giveaway.find(query)
             .select('orderId giveInfo.name store.createdAt store.storeId store.name store.address total status')
             .lean()
 
@@ -479,10 +479,10 @@ exports.getDetail = async (req, res) => {
         }
 
         const channel = req.headers['x-channel']; 
-        const { Giveaways } = getModelsByChannel(channel,res,giveawaysModel); 
+        const { Giveaway } = getModelsByChannel(channel,res,giveawaysModel); 
 
 
-        const order = await Giveaways.findOne({ orderId })
+        const order = await Giveaway.findOne({ orderId })
 
         res.status(200).json({
             status: 200,
