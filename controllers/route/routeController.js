@@ -1206,7 +1206,7 @@ exports.getRouteEffective = async (req, res) => {
 
 exports.getRouteEffectiveAll = async (req, res) => {
 
-  const { zone, area, period,day } = req.body
+  const { zone, area, period,day } = req.query
 
   const query = {};
   if (area) query.area = area;
@@ -1334,7 +1334,7 @@ exports.getAreaInRoute = async (req, res) => {
 
 exports.getZoneInRoute = async (req, res) => {
 
-  const { zone, period } = req.body
+  const { zone, period } = req.query
   const channel = req.headers['x-channel'];
   const { Route } = getModelsByChannel(channel, res, routeModel);
 
@@ -1383,3 +1383,4 @@ exports.getZoneInRoute = async (req, res) => {
     data: routes
   })
 }
+
