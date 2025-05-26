@@ -369,7 +369,7 @@ exports.getDetail = async (req, res) => {
 
     const order = await Distribution.find({ orderId })
 
-    if (!order) {
+    if (order.length === 0) {
       return res
         .status(404)
         .json({ status: 404, message: 'Distribution order not found!' })

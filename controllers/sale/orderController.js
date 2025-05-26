@@ -1497,7 +1497,7 @@ exports.getSummarybyMonth = async (req, res) => {
 
 exports.getSummarybyArea = async (req, res) => {
   try {
-    const { period, year } = req.query
+    const { period, year, type } = req.query
 
     const channel = req.headers['x-channel']; // 'credit' or 'cash'
 
@@ -1510,132 +1510,295 @@ exports.getSummarybyArea = async (req, res) => {
       })
     }
 
-
-    const modelRouteValue = await Route.aggregate([
-      { $match: { period: period } },
-      { $project: { area: 1, day: 1, listStore: 1 } },
-      { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
-      { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
-      {
-        $addFields: {
-          convertedDate: {
-            $dateToString: {
-              format: "%Y-%m-%dT%H:%M:%S",
-              date: "$listStore.listOrder.date",
-              timezone: "Asia/Bangkok"
-            }
-          }
-        }
-      },
-      {
-        $match: {
-          $expr: {
-            $cond: {
-              if: { $eq: [year, null] },
-              then: true,
-              else: {
-                $eq: [
-                  { $substr: [{ $toString: "$convertedDate" }, 0, 4] },
-                  { $toString: year }
-                ]
+    if (type == 'route') {
+      const modelRouteValue = await Route.aggregate([
+        { $match: { period: period } },
+        { $project: { area: 1, day: 1, listStore: 1 } },
+        { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
+        {
+          $addFields: {
+            convertedDate: {
+              $dateToString: {
+                format: "%Y-%m-%dT%H:%M:%S",
+                date: "$listStore.listOrder.date",
+                timezone: "Asia/Bangkok"
               }
             }
           }
-        }
-      },
-      {
-        $lookup: {
-          from: "orders",
-          localField: "listStore.listOrder.orderId",
-          foreignField: "orderId",
-          as: "orderDetails",
-        }
-      },
-      { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } },
-      {
-        $group: {
-          _id: { area: "$area", day: "$day" },
-          totalAmount: { $sum: "$orderDetails.total" }
-        }
-      },
-      {
-        $project: {
-          area: "$_id.area",
-          day: "$_id.day",
-          totalAmount: 1,
-          _id: 0
-        }
-      },
-      { $sort: { area: 1, day: 1 } }
-    ]);
+        },
+        {
+          $match: {
+            $expr: {
+              $cond: {
+                if: { $eq: [year, null] },
+                then: true,
+                else: {
+                  $eq: [
+                    { $substr: [{ $toString: "$convertedDate" }, 0, 4] },
+                    { $toString: year }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          $lookup: {
+            from: "orders",
+            localField: "listStore.listOrder.orderId",
+            foreignField: "orderId",
+            as: "orderDetails",
+          }
+        },
+        { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } },
+        {
+          $group: {
+            _id: { area: "$area", day: "$day" },
+            totalAmount: { $sum: "$orderDetails.total" }
+          }
+        },
+        {
+          $project: {
+            area: "$_id.area",
+            day: "$_id.day",
+            totalAmount: 1,
+            _id: 0
+          }
+        },
+        { $sort: { area: 1, day: 1 } }
+      ]);
 
 
-    const haveArea = [...new Set(modelRouteValue.map(i => i.area))];
-    otherModelRoute = await Route.aggregate([
-      {
-        $match: {
-          period: period,
-          area: { $nin: haveArea }  // เลือกเฉพาะ area ที่ไม่อยู่ใน haveArea
-        }
-      },
-      { $project: { area: 1, day: 1, listStore: 1 } },
-      { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
-      { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
-      {
-        $lookup: {
-          from: "orders",
-          localField: "listStore.listOrder.orderId",
-          foreignField: "orderId",
-          as: "orderDetails",
-        }
-      },
-      { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } },
-      {
-        $group: {
-          _id: { area: "$area", day: "$day" },
-          totalAmount: { $sum: "$orderDetails.total" }
-        }
-      },
-      {
-        $project: {
-          area: "$_id.area",
-          day: "$_id.day",
-          totalAmount: 1,
-          _id: 0
-        }
-      },
-      { $sort: { area: 1, day: 1 } }
-    ]);
+      const haveArea = [...new Set(modelRouteValue.map(i => i.area))];
+      otherModelRoute = await Route.aggregate([
+        {
+          $match: {
+            period: period,
+            area: { $nin: haveArea }  // เลือกเฉพาะ area ที่ไม่อยู่ใน haveArea
+          }
+        },
+        { $project: { area: 1, day: 1, listStore: 1 } },
+        { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: "orders",
+            localField: "listStore.listOrder.orderId",
+            foreignField: "orderId",
+            as: "orderDetails",
+          }
+        },
+        { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } },
+        {
+          $group: {
+            _id: { area: "$area", day: "$day" },
+            totalAmount: { $sum: "$orderDetails.total" }
+          }
+        },
+        {
+          $project: {
+            area: "$_id.area",
+            day: "$_id.day",
+            totalAmount: 1,
+            _id: 0
+          }
+        },
+        { $sort: { area: 1, day: 1 } }
+      ]);
 
-    if (modelRouteValue.length === 0) {
-      return res.status(404).json({
-        status: 404,
-        message: 'Not Found Route This period'
-      })
-    }
-    modelRoute = [...modelRouteValue, ...otherModelRoute];
-    const areaList = [...new Set(modelRoute.map(item => item.area))].sort();
-    const data = areaList.map(area => {
-      const filtered = modelRoute.filter(item => item.area === area);
-      const filledDays = Array.from({ length: 27 }, (_, i) => {
-        const day = String(i + 1).padStart(2, '0');
-        const found = filtered.find(item => item.day === day);
-        return found || {
-          totalAmount: 0,
+      if (modelRouteValue.length === 0) {
+        return res.status(404).json({
+          status: 404,
+          message: 'Not Found Route This period'
+        })
+      }
+      modelRoute = [...modelRouteValue, ...otherModelRoute];
+      const areaList = [...new Set(modelRoute.map(item => item.area))].sort();
+      const data = areaList.map(area => {
+        const filtered = modelRoute.filter(item => item.area === area);
+        const filledDays = Array.from({ length: 27 }, (_, i) => {
+          const day = String(i + 1).padStart(2, '0');
+          const found = filtered.find(item => item.day === day);
+          return found || {
+            totalAmount: 0,
+            area: area,
+            day: day,
+          };
+        });
+        return {
           area: area,
-          day: day,
+          summary: filledDays.map(item => item.totalAmount),
         };
       });
-      return {
-        area: area,
-        summary: filledDays.map(item => item.totalAmount),
-      };
-    });
-    res.status(200).json({
-      status: 200,
-      message: 'Success',
-      data: data
-    })
+      res.status(200).json({
+        status: 200,
+        message: 'Success',
+        data: data
+      })
+    }
+    if (type == 'year') {
+      const modelRouteValue = await Route.aggregate([
+        { $match: { period } },
+        { $project: { area: 1, day: 1, listStore: 1 } },
+        { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
+        {
+          $addFields: {
+            convertedDate: {
+              $dateToString: {
+                format: "%Y-%m-%dT%H:%M:%S",
+                date: "$listStore.listOrder.date",
+                timezone: "Asia/Bangkok"
+              }
+            },
+            month: { $month: "$listStore.listOrder.date" }
+          }
+        },
+        {
+          $match: {
+            $expr: {
+              $cond: {
+                if: { $eq: [year, null] },
+                then: true,
+                else: {
+                  $eq: [
+                    { $substr: ["$convertedDate", 0, 4] },
+                    { $toString: year }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          $lookup: {
+            from: "orders",
+            localField: "listStore.listOrder.orderId",
+            foreignField: "orderId",
+            as: "orderDetails"
+          }
+        },
+        { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } },
+        {
+          $group: {
+            _id: { area: "$area", month: "$month" },
+            totalAmount: { $sum: "$orderDetails.total" }
+          }
+        },
+        {
+          $project: {
+            area: "$_id.area",
+            month: "$_id.month",
+            totalAmount: 1,
+            _id: 0
+          }
+        },
+        { $sort: { area: 1, month: 1 } }
+      ]);
+
+      const haveArea = [...new Set(modelRouteValue.map(i => i.area))];
+
+      const otherModelRoute = await Route.aggregate([
+        {
+          $match: {
+            period,
+            area: { $nin: haveArea }
+          }
+        },
+        { $project: { area: 1, listStore: 1 } },
+        { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
+        {
+          $addFields: {
+            convertedDate: {
+              $dateToString: {
+                format: "%Y-%m-%dT%H:%M:%S",
+                date: "$listStore.listOrder.date",
+                timezone: "Asia/Bangkok"
+              }
+            },
+            month: { $month: "$listStore.listOrder.date" }
+          }
+        },
+        {
+          $match: {
+            $expr: {
+              $cond: {
+                if: { $eq: [year, null] },
+                then: true,
+                else: {
+                  $eq: [
+                    { $substr: ["$convertedDate", 0, 4] },
+                    { $toString: year }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          $lookup: {
+            from: "orders",
+            localField: "listStore.listOrder.orderId",
+            foreignField: "orderId",
+            as: "orderDetails"
+          }
+        },
+        { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } },
+        {
+          $group: {
+            _id: { area: "$area", month: "$month" },
+            totalAmount: { $sum: "$orderDetails.total" }
+          }
+        },
+        {
+          $project: {
+            area: "$_id.area",
+            month: "$_id.month",
+            totalAmount: 1,
+            _id: 0
+          }
+        },
+        { $sort: { area: 1, month: 1 } }
+      ]);
+
+      if (modelRouteValue.length === 0) {
+        return res.status(404).json({
+          status: 404,
+          message: 'Not Found Route This period'
+        });
+      }
+
+      const modelRoute = [...modelRouteValue, ...otherModelRoute];
+      const areaList = [...new Set(modelRoute.map(item => item.area))].sort();
+
+      const data = areaList.map(area => {
+        const filtered = modelRoute.filter(item => item.area === area);
+        const filledMonths = Array.from({ length: 12 }, (_, i) => {
+          const month = String(i + 1).padStart(2, '0');
+          const found = filtered.find(item => String(item.month).padStart(2, '0') === month);
+          return found || {
+            totalAmount: 0,
+            area,
+            month
+          };
+        });
+        return {
+          area,
+          summary: filledMonths.map(item => item.totalAmount)
+        };
+      });
+      res.status(200).json({
+        status: 200,
+        message: 'Success',
+        data: data
+      })
+
+
+    }
+
+
 
   } catch (error) {
     console.error(error)
@@ -2003,25 +2166,25 @@ exports.getSaleSummaryByStore = async (req, res) => {
             { $toString: { $arrayElemAt: ['$storeDetail.longtitude', 0] } }
           ]
         },
-    datetime: {
-      $cond: {
-        if: { $ne: ['$listStore.listOrder.date', null] },
-        then: {
-          $dateToString: {
-            date: {
-              $dateAdd: {
-                startDate: '$listStore.listOrder.date',
-                unit: 'hour',
-                amount: 7
+        datetime: {
+          $cond: {
+            if: { $ne: ['$listStore.listOrder.date', null] },
+            then: {
+              $dateToString: {
+                date: {
+                  $dateAdd: {
+                    startDate: '$listStore.listOrder.date',
+                    unit: 'hour',
+                    amount: 7
+                  }
+                },
+                format: '%Y-%m-%d %H:%M:%S',
+                timezone: 'Asia/Bangkok'
               }
             },
-            format: '%Y-%m-%d %H:%M:%S',
-            timezone: 'Asia/Bangkok'
+            else: ''
           }
         },
-        else: ''
-      }
-    },
       }
     }
   ])
