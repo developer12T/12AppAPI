@@ -1384,3 +1384,35 @@ exports.getZoneInRoute = async (req, res) => {
   })
 }
 
+exports.getRouteByArea = async (req,res) => {
+
+  const { area, period } = req.query
+  const channel = req.headers['x-channel'];
+  const { Route } = getModelsByChannel(channel, res, routeModel);
+
+  const match = {}
+  if (period) match.period = period
+  if (area) match.area = area
+
+  const data = await Route.aggregate([
+    { $match: match },
+    {$project:{
+      routeId:'$id',
+      route:'$day',
+      _id:0
+    }}
+  ])
+if (data.length ==0) {
+  return res.status(404).message({
+    status:404,
+    message:'Not found route'
+  })
+}
+
+  
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: data
+  })
+}
