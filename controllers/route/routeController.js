@@ -1266,44 +1266,65 @@ exports.getRouteEffectiveAll = async (req, res) => {
     })
   }
 
-  let totalVisit = 0;
-  let totalEffective = 0;
+let totalVisit = 0;
+let totalEffective = 0;
+let totalStoreAll = 0;
+let totalStorePending = 0;
+let totalStoreSell = 0;
+let totalStoreNotSell = 0;
+let totalStoreCheckInNotSell = 0;
 
-  
-  let count = 0;
+let count = 0;
 
-  const routesTranFrom = routes.map(u => {
-    const percentVisit = u.percentVisit || 0;
-    const percentEffective = u.percentEffective || 0;
+const routesTranFrom = routes.map(u => {
+  const percentVisit = u.percentVisit || 0;
+  const percentEffective = u.percentEffective || 0;
 
-    totalVisit += percentVisit;
-    totalEffective += percentEffective;
-    count++;
+  const storeAll = u.storeAll || 0;
+  const storePending = u.storePending || 0;
+  const storeSell = u.storeSell || 0;
+  const storeNotSell = u.storeNotSell || 0;
+  const storeCheckInNotSell = u.storeCheckInNotSell || 0; // ✅ แก้ชื่อจาก storehCeckInNotSell
 
-    return {
-      area: u.area,
-      percentVisit,
-      percentEffective
-    };
-  });
+  totalVisit += percentVisit;
+  totalEffective += percentEffective;
 
-  const percentVisitAvg = count > 0 ? totalVisit / count : 0;
-  const percentEffectiveAvg = count > 0 ? totalEffective / count : 0;
+  totalStoreAll += storeAll;
+  totalStorePending += storePending;
+  totalStoreSell += storeSell;
+  totalStoreNotSell += storeNotSell;
+  totalStoreCheckInNotSell += storeCheckInNotSell;
 
-  // console.log({
-  //   percentVisitAvg: percentVisitAvg,
-  //   percentEffectiveAvg: percentEffectiveAvg
-  // });
+  count++;
 
+  return {
+    area: u.area,
+    percentVisit,
+    percentEffective,
+    storeAll,
+    storePending,
+    storeSell,
+    storeNotSell,
+    storeCheckInNotSell
+  };
+});
 
-
+const percentVisitAvg = count > 0 ? totalVisit / count : 0;
+const percentEffectiveAvg = count > 0 ? totalEffective / count : 0;
 
   res.status(200).json({
     status: 200,
     message: 'sucess',
     // data: routesTranFrom
     visit: percentVisitAvg,
-    effective: percentEffectiveAvg
+    effective: percentEffectiveAvg,
+    totalStoreAll:totalStoreAll,
+    totalStorePending:totalStorePending,
+    totalStoreSell:totalStoreSell,
+    totalStoreNotSell:totalStoreNotSell,
+    totalStoreCheckInNotSell:totalStoreCheckInNotSell
+
+
 
   })
 }
