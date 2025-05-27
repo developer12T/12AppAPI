@@ -1,5 +1,6 @@
 const mongoose = require('mongoose')
-const { dbCA } = require('../../config/db')
+const { dbCA } = require('../../config/db');
+const { ARRAY } = require('sequelize');
 
 const promotionSchema = new mongoose.Schema({
     proId: { type: String, required: true, unique: true },
@@ -62,14 +63,47 @@ const promotionSchema = new mongoose.Schema({
     validTo: { type: Date, required: true },
 
     status: { type: String, enum: ['active', 'inactive'], default: 'active' },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
 })
+
+
+
+const promotionLimitSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    type: { type: String, required: true },
+    startDate: { type: String },
+    endDate: { type: String },
+    giftItem: {
+        productId: { type: String, required: true },
+        name: { type: String, required: true },
+        qtyPerStore: { type: Number }
+    },
+    limitTotal: { type: Number },
+    condition: {
+        minOrderAmount: { type: Number },
+        applicableStores: [{ type: String }],
+        applicableProducts: [{ type: String }],
+    },
+    tracking: {
+        totalUsed: { type: Number },
+        storeUsed: [
+            {
+                storeId: { type: String, required: true },
+                minOrderAmount: { type: Number }
+            }
+        ]
+    },
+    status: { type: String, required: true },
+})
+
+
 
 // const Promotion = dbCA.model('Promotion', promotionSchema)
 // module.exports = { Promotion }
 module.exports = (conn) => {
     return {
         Promotion: conn.model('Promotion', promotionSchema),
+        PromotionLimit : conn.model('promotionlimit', promotionLimitSchema,'promotionlimit'),
     };
-  };
+};

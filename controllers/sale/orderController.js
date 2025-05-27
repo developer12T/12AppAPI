@@ -2144,13 +2144,7 @@ exports.getSaleSummaryByStore = async (req, res) => {
         orderId: {
           $ifNull: ['$listStore.listOrder.orderId', '']
         },
-        status: {
-          $cond: {
-            if: { $gt: [{ $size: '$order' }, 0] },
-            then: 'ขายได้',
-            else: 'ขายไม่ได้'
-          }
-        }
+        status: '$listStore.statusText'
         ,
 
         sum: {

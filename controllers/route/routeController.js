@@ -12,9 +12,12 @@ const upload = multer({ storage: multer.memoryStorage() }).array(
 const orderModel = require('../../models/cash/sale')
 const routeModel = require('../../models/cash/route')
 const storeModel = require('../../models/cash/store')
+const productModel = require('../../models/cash/product')
+
 const { getModelsByChannel } = require('../../middleware/channel')
 const path = require('path')
 const { json } = require('body-parser')
+const { flatMap } = require('lodash')
 
 exports.getRoute = async (req, res) => {
   try {
@@ -1143,6 +1146,8 @@ exports.getRouteEffective = async (req, res) => {
   const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel);
   const { Route } = getModelsByChannel(channel, res, routeModel);
   const { Order } = getModelsByChannel(channel, res, orderModel);
+  const { Product } = getModelsByChannel(channel, res, productModel);
+
 
 
   const routes = await Route.find({ area: area, period: period }).populate(
@@ -1158,8 +1163,6 @@ exports.getRouteEffective = async (req, res) => {
     })
   }
 
-
-
   const orderIdList = routes.flatMap(u =>
     (u.listStore || []).flatMap(i =>
       (i.listOrder || []).map(order => order.orderId)
@@ -1167,30 +1170,49 @@ exports.getRouteEffective = async (req, res) => {
   );
   const orderDetail = await Order.find({ orderId: { $in: orderIdList } })
 
-  const routesTranFrom = routes.map(u => {
-    const totalSummary = u.listStore?.flatMap(i =>
-      i.listOrder?.map(order => {
-        const detail = orderDetail.find(d => d.orderId === order.orderId);
-        return detail?.total || 0;
-      }) || []
-    ).reduce((sum, val) => sum + val, 0) || 0;
+  const productId = orderDetail.flatMap( u => u.listProduct.map(i => i.id))
 
-    return {
-      routeId: u.id,
-      route: u.id.slice(-3),
-      storeAll: u.storeAll,
-      storePending: u.storePending,
-      storeSell: u.storeSell,
-      storeNotSell: u.storeNotSell,
-      storeCheckInNotSell: u.storeCheckInNotSell,
-      storeTotal: u.storeTotal,
-      percentComplete: u.percentComplete,
-      complete: u.complete,
-      percentVisit: u.percentVisit,
-      percentEffective: u.percentEffective,
-      summary: totalSummary
-    };
-  });
+  const productFactor = await Order.aggregate([
+    {$match:{
+      orderId: {$in:orderIdList }
+    }},
+    { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
+    {$lookup: {
+      from : 'products',
+      localField: ' '
+    }}
+  ])
+
+console.log("productFactor:\n", JSON.stringify(productFactor, null, 2));
+
+const routesTranFrom = routes.map(u => {
+  const totalSummary = u.listStore?.flatMap(i =>
+    i.listOrder?.map(order => {
+      const detail = orderDetail.find(d => d.orderId === order.orderId);
+      return detail?.total || 0;
+    }) || []
+  ).reduce((sum, val) => sum + val, 0) || 0;
+
+
+
+
+
+  return {
+    routeId: u.id,
+    route: u.id.slice(-3),
+    storeAll: u.storeAll,
+    storePending: u.storePending,
+    storeSell: u.storeSell,
+    storeNotSell: u.storeNotSell,
+    storeCheckInNotSell: u.storeCheckInNotSell,
+    storeTotal: u.storeTotal,
+    percentComplete: u.percentComplete,
+    complete: u.complete,
+    percentVisit: u.percentVisit,
+    percentEffective: u.percentEffective,
+    summary: totalSummary 
+  };
+});
 
 
 
@@ -1206,7 +1228,7 @@ exports.getRouteEffective = async (req, res) => {
 
 exports.getRouteEffectiveAll = async (req, res) => {
 
-  const { zone, area, period,day } = req.query
+  const { zone, area, period, day } = req.query
 
   const query = {};
   if (area) query.area = area;
@@ -1225,11 +1247,11 @@ exports.getRouteEffectiveAll = async (req, res) => {
   );
 
 
-if (zone) {
-  routes = routes.filter(u => u.area.slice(0, 2) === zone);
-   console.log(routes)
-}
- 
+  if (zone) {
+    routes = routes.filter(u => u.area.slice(0, 2) === zone);
+    console.log(routes)
+  }
+
 
 
 
@@ -1263,10 +1285,10 @@ if (zone) {
   const percentVisitAvg = count > 0 ? totalVisit / count : 0;
   const percentEffectiveAvg = count > 0 ? totalEffective / count : 0;
 
-// console.log({
-//   percentVisitAvg: percentVisitAvg,
-//   percentEffectiveAvg: percentEffectiveAvg
-// });
+  // console.log({
+  //   percentVisitAvg: percentVisitAvg,
+  //   percentEffectiveAvg: percentEffectiveAvg
+  // });
 
 
 
@@ -1384,7 +1406,7 @@ exports.getZoneInRoute = async (req, res) => {
   })
 }
 
-exports.getRouteByArea = async (req,res) => {
+exports.getRouteByArea = async (req, res) => {
 
   const { area, period } = req.query
   const channel = req.headers['x-channel'];
@@ -1396,21 +1418,23 @@ exports.getRouteByArea = async (req,res) => {
 
   const data = await Route.aggregate([
     { $match: match },
-    {$project:{
-      routeId:'$id',
-      route: {$concat : ['R','$day'] },
-      day:'$day',
-      _id:0
-    }}
+    {
+      $project: {
+        routeId: '$id',
+        route: { $concat: ['R', '$day'] },
+        day: '$day',
+        _id: 0
+      }
+    }
   ])
-if (data.length ==0) {
-  return res.status(404).message({
-    status:404,
-    message:'Not found route'
-  })
-}
+  if (data.length == 0) {
+    return res.status(404).message({
+      status: 404,
+      message: 'Not found route'
+    })
+  }
 
-  
+
   res.status(200).json({
     status: 200,
     message: 'sucess',
