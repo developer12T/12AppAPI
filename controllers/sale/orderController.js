@@ -2190,3 +2190,34 @@ exports.getSaleSummaryByStore = async (req, res) => {
 }
 
 
+exports.getGroup = async (req, res) => {
+
+  const channel = req.headers['x-channel'];
+  const { Product } = getModelsByChannel(channel, res, productModel);
+const product = await Product.aggregate([
+  {
+    $group: {
+      _id: {
+        groupCode: "$groupCode",
+        group: "$group"
+      },
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      groupCode: "$_id.groupCode",
+      group: "$_id.group"
+    }
+  },
+  {
+    $sort: { groupCode: 1 } // ✅ เรียงตาม groupCode
+  }
+]);
+
+
+  res.status(200).json({
+    message: product
+  })
+
+}
