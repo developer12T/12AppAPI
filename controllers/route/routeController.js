@@ -1170,49 +1170,55 @@ exports.getRouteEffective = async (req, res) => {
   );
   const orderDetail = await Order.find({ orderId: { $in: orderIdList } })
 
-  const productId = orderDetail.flatMap( u => u.listProduct.map(i => i.id))
+  const productId = orderDetail.flatMap(u => u.listProduct.map(i => i.id))
 
-  const productFactor = await Order.aggregate([
+  const productFactor = await Product.aggregate([
     {$match:{
-      orderId: {$in:orderIdList }
+      id:{$in : productId}
     }},
-    { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
-    {$lookup: {
-      from : 'products',
-      localField: ' '
+    { $unwind: { path: '$listUnit', preserveNullAndEmptyArrays: true } },
+    { $project:{
+      _id: 0,
+      productId:'$id',
+      unit:'$listUnit.unit',
+      factor: '$listUnit.factor'
     }}
   ])
 
-console.log("productFactor:\n", JSON.stringify(productFactor, null, 2));
+  const routesTranFrom = routes.map(u => {
+    const totalSummary = u.listStore?.flatMap(i =>
+      i.listOrder?.map(order => {
+        const detail = orderDetail.find(d => d.orderId === order.orderId);
+        return detail?.total || 0;
+      }) || []
+    ).reduce((sum, val) => sum + val, 0) || 0;
 
-const routesTranFrom = routes.map(u => {
-  const totalSummary = u.listStore?.flatMap(i =>
-    i.listOrder?.map(order => {
-      const detail = orderDetail.find(d => d.orderId === order.orderId);
-      return detail?.total || 0;
-    }) || []
-  ).reduce((sum, val) => sum + val, 0) || 0;
+    const totalQty = u.listStore?.flatMap(i =>
+      i.listOrder?.map(order => {
+        const detail = orderDetail.find(d => d.orderId === order.orderId);
+        
+        // return detail?.total || 0;
+      }) || [] )
+
+    console.log("totalQty",totalQty)
 
 
-
-
-
-  return {
-    routeId: u.id,
-    route: u.id.slice(-3),
-    storeAll: u.storeAll,
-    storePending: u.storePending,
-    storeSell: u.storeSell,
-    storeNotSell: u.storeNotSell,
-    storeCheckInNotSell: u.storeCheckInNotSell,
-    storeTotal: u.storeTotal,
-    percentComplete: u.percentComplete,
-    complete: u.complete,
-    percentVisit: u.percentVisit,
-    percentEffective: u.percentEffective,
-    summary: totalSummary 
-  };
-});
+    return {
+      routeId: u.id,
+      route: u.id.slice(-3),
+      storeAll: u.storeAll,
+      storePending: u.storePending,
+      storeSell: u.storeSell,
+      storeNotSell: u.storeNotSell,
+      storeCheckInNotSell: u.storeCheckInNotSell,
+      storeTotal: u.storeTotal,
+      percentComplete: u.percentComplete,
+      complete: u.complete,
+      percentVisit: u.percentVisit,
+      percentEffective: u.percentEffective,
+      summary: totalSummary
+    };
+  });
 
 
 
@@ -1253,9 +1259,6 @@ exports.getRouteEffectiveAll = async (req, res) => {
   }
 
 
-
-
-
   if (routes.length == 0) {
     return res.status(404).json({
       status: 404,
@@ -1265,6 +1268,8 @@ exports.getRouteEffectiveAll = async (req, res) => {
 
   let totalVisit = 0;
   let totalEffective = 0;
+
+  
   let count = 0;
 
   const routesTranFrom = routes.map(u => {
