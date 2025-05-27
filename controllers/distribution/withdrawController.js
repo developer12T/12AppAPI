@@ -316,7 +316,16 @@ exports.getDetail = async (req, res) => {
             receiveQty: p.receiveQty,
             _id: p._id
           };
-        })
+        }),
+        total: u.total,
+        totalQty: u.totalQty,
+        totalWeightGross: u.totalWeightGross,
+        totalWeightNet: u.totalWeightNet,
+        receivetotal: u.receivetotal,
+        receivetotalQty: u.receivetotalQty,
+        receivetotalWeightGross: u.receivetotalWeightGross,
+        receivetotalWeightNet: u.receivetotalWeightNet,
+        status: u.status
       };
     });
 

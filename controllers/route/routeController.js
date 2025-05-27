@@ -1185,6 +1185,30 @@ exports.getRouteEffective = async (req, res) => {
     }}
   ])
 
+  // console.log(productFactor)
+
+
+  const orderQty =  orderDetail.map(i => i.listProduct.map( product => {
+    const qty = productFactor.find(u => u.productId === product.id && u.unit == product.unit )
+    const factorPcs = ( product.qty * qty.factor)
+    const factorCtn = productFactor.find(u => u.productId === product.id && u.unit == "CTN" )
+    // console.log(factorCtn)
+    const qtyCtn =  (factorPcs / factorCtn.factor )
+
+    return {
+      id: product.id,
+      factorPcs : factorPcs,
+      factorCtn : factorCtn.factor,
+      // factor : factorCtn.factor ,
+      qtyCtn : qtyCtn
+    }
+  }))
+
+
+// console.log("orderQty",orderQty)
+
+
+
   const routesTranFrom = routes.map(u => {
     const totalSummary = u.listStore?.flatMap(i =>
       i.listOrder?.map(order => {
@@ -1193,14 +1217,15 @@ exports.getRouteEffective = async (req, res) => {
       }) || []
     ).reduce((sum, val) => sum + val, 0) || 0;
 
-    const totalQty = u.listStore?.flatMap(i =>
+    const totalqty = u.listStore?.flatMap(i =>
       i.listOrder?.map(order => {
-        const detail = orderDetail.find(d => d.orderId === order.orderId);
-        
-        // return detail?.total || 0;
-      }) || [] )
-
-    console.log("totalQty",totalQty)
+        const productId = orderDetail.find(d => d.orderId === order.orderId).listProduct.map(u =>{return {
+          id:u.id
+        }});
+        const qtyProduct = orderQty.find(u => u.id === productId.id)
+        // return detail;
+      }) || []
+    )
 
 
     return {
