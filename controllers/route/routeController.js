@@ -1173,40 +1173,40 @@ exports.getRouteEffective = async (req, res) => {
   const productId = orderDetail.flatMap(u => u.listProduct.map(i => i.id))
 
   const productFactor = await Product.aggregate([
-    {$match:{
-      id:{$in : productId}
-    }},
+    {
+      $match: {
+        id: { $in: productId }
+      }
+    },
     { $unwind: { path: '$listUnit', preserveNullAndEmptyArrays: true } },
-    { $project:{
-      _id: 0,
-      productId:'$id',
-      unit:'$listUnit.unit',
-      factor: '$listUnit.factor'
-    }}
+    {
+      $project: {
+        _id: 0,
+        productId: '$id',
+        unit: '$listUnit.unit',
+        factor: '$listUnit.factor'
+      }
+    }
   ])
 
   // console.log(productFactor)
 
 
-  const orderQty =  orderDetail.map(i => i.listProduct.map( product => {
-    const qty = productFactor.find(u => u.productId === product.id && u.unit == product.unit )
-    const factorPcs = ( product.qty * qty.factor)
-    const factorCtn = productFactor.find(u => u.productId === product.id && u.unit == "CTN" )
+  const orderQty = orderDetail.map(i => i.listProduct.map(product => {
+    const qty = productFactor.find(u => u.productId === product.id && u.unit == product.unit)
+    const factorPcs = (product.qty * qty.factor)
+    const factorCtn = productFactor.find(u => u.productId === product.id && u.unit == "CTN")
     // console.log(factorCtn)
-    const qtyCtn =  (factorPcs / factorCtn.factor )
+    const qtyCtn = Math.floor((factorPcs / factorCtn.factor))
 
     return {
       id: product.id,
-      factorPcs : factorPcs,
-      factorCtn : factorCtn.factor,
+      factorPcs: factorPcs,
+      factorCtn: factorCtn.factor,
       // factor : factorCtn.factor ,
-      qtyCtn : qtyCtn
+      qtyCtn: qtyCtn
     }
   }))
-
-
-// console.log("orderQty",orderQty)
-
 
 
   const routesTranFrom = routes.map(u => {
@@ -1217,16 +1217,22 @@ exports.getRouteEffective = async (req, res) => {
       }) || []
     ).reduce((sum, val) => sum + val, 0) || 0;
 
-    const totalqty = u.listStore?.flatMap(i =>
-      i.listOrder?.map(order => {
-        const productId = orderDetail.find(d => d.orderId === order.orderId).listProduct.map(u =>{return {
-          id:u.id
-        }});
-        const qtyProduct = orderQty.find(u => u.id === productId.id)
-        // return detail;
-      }) || []
-    )
+    const totalQty = u.listStore?.flatMap(store =>
+      store.listOrder?.flatMap(order => {
+        const matchedOrder = orderDetail.find(d => d.orderId === order.orderId);
+        if (!matchedOrder) return [];
 
+        return matchedOrder.listProduct.map(product => {
+          const flatOrderQty = orderQty.flat(); 
+          const qty = flatOrderQty.find(q => q.id === product.id);
+          console.log(qty)
+          return qty;
+        }).filter(Boolean);
+      }) || []
+    ) || []; 
+
+
+    const totalQtyCtnSum = totalQty.reduce((sum, item) => sum + (item.qtyCtn || 0), 0);
 
     return {
       routeId: u.id,
@@ -1241,10 +1247,10 @@ exports.getRouteEffective = async (req, res) => {
       complete: u.complete,
       percentVisit: u.percentVisit,
       percentEffective: u.percentEffective,
-      summary: totalSummary
+      summary: totalSummary,
+      totalqty: totalQtyCtnSum
     };
   });
-
 
 
   res.status(200).json({
@@ -1291,51 +1297,51 @@ exports.getRouteEffectiveAll = async (req, res) => {
     })
   }
 
-let totalVisit = 0;
-let totalEffective = 0;
-let totalStoreAll = 0;
-let totalStorePending = 0;
-let totalStoreSell = 0;
-let totalStoreNotSell = 0;
-let totalStoreCheckInNotSell = 0;
+  let totalVisit = 0;
+  let totalEffective = 0;
+  let totalStoreAll = 0;
+  let totalStorePending = 0;
+  let totalStoreSell = 0;
+  let totalStoreNotSell = 0;
+  let totalStoreCheckInNotSell = 0;
 
-let count = 0;
+  let count = 0;
 
-const routesTranFrom = routes.map(u => {
-  const percentVisit = u.percentVisit || 0;
-  const percentEffective = u.percentEffective || 0;
+  const routesTranFrom = routes.map(u => {
+    const percentVisit = u.percentVisit || 0;
+    const percentEffective = u.percentEffective || 0;
 
-  const storeAll = u.storeAll || 0;
-  const storePending = u.storePending || 0;
-  const storeSell = u.storeSell || 0;
-  const storeNotSell = u.storeNotSell || 0;
-  const storeCheckInNotSell = u.storeCheckInNotSell || 0; // ✅ แก้ชื่อจาก storehCeckInNotSell
+    const storeAll = u.storeAll || 0;
+    const storePending = u.storePending || 0;
+    const storeSell = u.storeSell || 0;
+    const storeNotSell = u.storeNotSell || 0;
+    const storeCheckInNotSell = u.storeCheckInNotSell || 0; // ✅ แก้ชื่อจาก storehCeckInNotSell
 
-  totalVisit += percentVisit;
-  totalEffective += percentEffective;
+    totalVisit += percentVisit;
+    totalEffective += percentEffective;
 
-  totalStoreAll += storeAll;
-  totalStorePending += storePending;
-  totalStoreSell += storeSell;
-  totalStoreNotSell += storeNotSell;
-  totalStoreCheckInNotSell += storeCheckInNotSell;
+    totalStoreAll += storeAll;
+    totalStorePending += storePending;
+    totalStoreSell += storeSell;
+    totalStoreNotSell += storeNotSell;
+    totalStoreCheckInNotSell += storeCheckInNotSell;
 
-  count++;
+    count++;
 
-  return {
-    area: u.area,
-    percentVisit,
-    percentEffective,
-    storeAll,
-    storePending,
-    storeSell,
-    storeNotSell,
-    storeCheckInNotSell
-  };
-});
+    return {
+      area: u.area,
+      percentVisit,
+      percentEffective,
+      storeAll,
+      storePending,
+      storeSell,
+      storeNotSell,
+      storeCheckInNotSell
+    };
+  });
 
-const percentVisitAvg = count > 0 ? totalVisit / count : 0;
-const percentEffectiveAvg = count > 0 ? totalEffective / count : 0;
+  const percentVisitAvg = count > 0 ? totalVisit / count : 0;
+  const percentEffectiveAvg = count > 0 ? totalEffective / count : 0;
 
   res.status(200).json({
     status: 200,
@@ -1343,11 +1349,11 @@ const percentEffectiveAvg = count > 0 ? totalEffective / count : 0;
     // data: routesTranFrom
     visit: percentVisitAvg,
     effective: percentEffectiveAvg,
-    totalStoreAll:totalStoreAll,
-    totalStorePending:totalStorePending,
-    totalStoreSell:totalStoreSell,
-    totalStoreNotSell:totalStoreNotSell,
-    totalStoreCheckInNotSell:totalStoreCheckInNotSell
+    totalStoreAll: totalStoreAll,
+    totalStorePending: totalStorePending,
+    totalStoreSell: totalStoreSell,
+    totalStoreNotSell: totalStoreNotSell,
+    totalStoreCheckInNotSell: totalStoreCheckInNotSell
 
 
 
