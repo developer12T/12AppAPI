@@ -35,6 +35,7 @@ const xlsx = require('xlsx');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
+const { group } = require('console')
 
 
 
@@ -1497,7 +1498,7 @@ exports.getSummarybyMonth = async (req, res) => {
 
 exports.getSummarybyArea = async (req, res) => {
   try {
-    const { period, year, type } = req.query
+    const { period, year, type,zone,area } = req.query
 
     const channel = req.headers['x-channel']; // 'credit' or 'cash'
 
@@ -1516,6 +1517,7 @@ exports.getSummarybyArea = async (req, res) => {
         { $project: { area: 1, day: 1, listStore: 1 } },
         { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
         { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
+
         {
           $addFields: {
             convertedDate: {
@@ -2229,6 +2231,8 @@ exports.getSummaryProduct = async (req, res) => {
   const channel = req.headers['x-channel']
 
   const { Route } = getModelsByChannel(channel, res, routeModel)
+  const { Product } = getModelsByChannel(channel, res, productModel)
+
 
   const route = await Route.aggregate([
     {
@@ -2261,22 +2265,88 @@ exports.getSummaryProduct = async (req, res) => {
         $expr: { $gt: [{ $size: "$order" }, 0] }
       }
     },
-    {$project:{
-      'order':1
-    }},
+    {
+      $project: {
+        'order': 1
+      }
+    },
     { $unwind: { path: '$order', preserveNullAndEmptyArrays: true } },
     { $unwind: { path: '$order.listProduct', preserveNullAndEmptyArrays: true } },
+    {
+      $project: {
+        '_id': 0,
+        area: '$order.store.area',
+        productId: '$order.listProduct.id',
+        unit: '$order.listProduct.unit',
+        qty: '$order.listProduct.qty'
+      }
+    },
+  ])
+
+  const productId = route.flatMap(u => u.productId)
+
+  const productFactor = await Product.aggregate([
+    {
+      $match: {
+        id: { $in: productId }
+      }
+    },
+    { $unwind: { path: '$listUnit', preserveNullAndEmptyArrays: true } },
+    {
+      $project: {
+        _id: 0,
+        productId: '$id',
+        unit: '$listUnit.unit',
+        factor: '$listUnit.factor'
+      }
+    }
+  ])
+
+  const productQty = route.map(u => {
+    const qty = productFactor.find(i => i.productId === u.productId && i.unit == u.unit)
+    const factorPcs = (u.qty * qty.factor)
+    const factorCtn = productFactor.find(i => i.productId === u.productId && i.unit == "CTN")
+    const qtyCtn = Math.floor((factorPcs / factorCtn.factor))
+
+    return {
+      area:u.area,
+      productId:u.productId,
+      unit:'CTN',
+      qty:qtyCtn
+    }
+  })
+
+  const product = await Product.aggregate([
+    {
+      $addFields: {
+        groupSize: {
+          $concat: ['$groupCode', ' ', '$size']
+        }
+      }
+    },
+    {
+      $group: {
+        _id: {
+          productId: '$id',
+          groupCode: "$groupSize",
+        }
+      }
+    },
     {$project:{
-      '_id':0,
-      'order.listProduct':1
+      _id:0,
+      productId:'$_id.productId',
+      groupSize:'$_id.groupCode'
     }}
   ])
+
+
+
 
 
   res.status(200).json({
     status: 200,
     message: "getSummaryProduct",
-    data: route
+    data: product
   })
 
 }
