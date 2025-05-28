@@ -34,7 +34,8 @@ const getUploadMiddleware = (channel) => {
 const storeModel = require('../../models/cash/store')
 const { getModelsByChannel } = require('../../middleware/channel')
 const path = require('path')
-const { v4: uuidv4 } = require('uuid')
+const { v4: uuidv4 } = require('uuid');
+const { stat } = require('fs');
 uuidv4() // ⇨ '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed'
 
 exports.getStore = async (req, res) => {
@@ -215,6 +216,15 @@ exports.updateImage = async (req, res) => {
 }
 
 exports.addStore = async (req, res) => {
+
+  const channel = req.headers['x-channel'] // 'credit' or 'cash'
+
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+
+  const upload = getUploadMiddleware(channel);
+
+
+
   upload(req, res, async err => {
     if (err) {
       return res.status(400).json({ status: '400', message: err.message })
@@ -244,9 +254,7 @@ exports.addStore = async (req, res) => {
           message: 'Number of files and types do not match'
         })
       }
-      const channel = req.headers['x-channel'] // 'credit' or 'cash'
-
-      const { Store } = getModelsByChannel(channel, res, storeModel)
+  
       const existingStores = await Store.find(
         {},
         { _id: 0, __v: 0, idIndex: 0 }
@@ -897,5 +905,6 @@ exports.getBueatyStore = async (req, res) => {
     message: storeBueaty
   })
 }
+
 
 

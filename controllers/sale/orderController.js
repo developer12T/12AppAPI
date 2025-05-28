@@ -2194,26 +2194,26 @@ exports.getGroup = async (req, res) => {
 
   const channel = req.headers['x-channel'];
   const { Product } = getModelsByChannel(channel, res, productModel);
-const product = await Product.aggregate([
-  {
-    $group: {
-      _id: {
-        groupCode: "$groupCode",
-        group: "$group"
-      },
+  const product = await Product.aggregate([
+    {
+      $group: {
+        _id: {
+          groupCode: "$groupCode",
+          group: "$group"
+        },
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        groupCode: "$_id.groupCode",
+        group: "$_id.group"
+      }
+    },
+    {
+      $sort: { groupCode: 1 } // ✅ เรียงตาม groupCode
     }
-  },
-  {
-    $project: {
-      _id: 0,
-      groupCode: "$_id.groupCode",
-      group: "$_id.group"
-    }
-  },
-  {
-    $sort: { groupCode: 1 } // ✅ เรียงตาม groupCode
-  }
-]);
+  ]);
 
 
   res.status(200).json({
@@ -2221,3 +2221,63 @@ const product = await Product.aggregate([
   })
 
 }
+
+exports.getSummaryProduct = async (req, res) => {
+
+  const { zone } = req.query
+
+  const channel = req.headers['x-channel']
+
+  const { Route } = getModelsByChannel(channel, res, routeModel)
+
+  const route = await Route.aggregate([
+    {
+      $addFields: {
+        shortArea: { $substr: ["$area", 0, 2] }
+      }
+    },
+    {
+      $match: {
+        shortArea: zone
+      }
+    },
+    { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: '$listStore.listOrder', preserveNullAndEmptyArrays: true } },
+    {
+      $addFields: {
+        storeObjId: { $toObjectId: "$listStore.storeInfo" }
+      }
+    },
+    {
+      $lookup: {
+        from: 'orders',
+        localField: 'listStore.listOrder.orderId',
+        foreignField: 'orderId',
+        as: 'order'
+      }
+    },
+    {
+      $match: {
+        $expr: { $gt: [{ $size: "$order" }, 0] }
+      }
+    },
+    {$project:{
+      'order':1
+    }},
+    { $unwind: { path: '$order', preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: '$order.listProduct', preserveNullAndEmptyArrays: true } },
+    {$project:{
+      '_id':0,
+      'order.listProduct':1
+    }}
+  ])
+
+
+  res.status(200).json({
+    status: 200,
+    message: "getSummaryProduct",
+    data: route
+  })
+
+}
+
