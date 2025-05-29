@@ -1689,7 +1689,7 @@ exports.getSummarybyArea = async (req, res) => {
       ...new Set(
         modelRoute
           .map(item => item.area)
-          .filter(areaItem => areaItem && (area ? areaItem.startsWith(area) : true))
+          .filter(areaItem => areaItem && (zone ? areaItem.startsWith(zone) : true))
       )
     ].sort();
 
