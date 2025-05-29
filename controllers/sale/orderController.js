@@ -2205,6 +2205,8 @@ exports.getSummaryProduct = async (req, res) => {
         store: '$order.store.storeId',
         area: '$order.store.area',
         productId: '$order.listProduct.id',
+        group: '$order.listProduct.groupCode',
+        size: '$order.listProduct.size',
         unit: '$order.listProduct.unit',
         qty: '$order.listProduct.qty'
       }
@@ -2224,6 +2226,8 @@ exports.getSummaryProduct = async (req, res) => {
       $project: {
         _id: 0,
         productId: '$id',
+        group: '$listUnit.groupCode',
+        size: '$listUnit.size',
         unit: '$listUnit.unit',
         factor: '$listUnit.factor'
       }
@@ -2240,6 +2244,8 @@ exports.getSummaryProduct = async (req, res) => {
       store: u.store,
       area: u.area,
       productId: u.productId,
+      group: u.group,
+      size: u.size,
       unit: 'CTN',
       qty: qtyCtn
     }
@@ -2253,6 +2259,8 @@ exports.getSummaryProduct = async (req, res) => {
       g.store === item.store &&
       g.area === item.area &&
       g.productId === item.productId &&
+      g.group === item.group &&
+      g.size === item.size &&
       g.unit === item.unit
     );
 
@@ -2262,6 +2270,7 @@ exports.getSummaryProduct = async (req, res) => {
       grouped.push({ ...item });
     }
   });
+
 
   const product = await Product.aggregate([
     {
@@ -2370,6 +2379,8 @@ exports.getSummaryProduct = async (req, res) => {
     }
   ])
 
+  // console.log("areaProduct",areaProduct)
+
 
   const productTran = areaProduct.map(item => {
     const productDetail = productQty.find(u => u.productId == item.productId && u.area == item.area)
@@ -2383,7 +2394,7 @@ exports.getSummaryProduct = async (req, res) => {
 
 
     return {
-      productId: item.productId,
+      // productId: item.productId,
       area: item.area,
       [`TRAGET ${item.groupSize}`]: 0,
       [`SELL ${item.groupSize}`]: productDetail?.qty || 0,
@@ -2393,6 +2404,11 @@ exports.getSummaryProduct = async (req, res) => {
       [`PERCENT STORE ${item.groupSize}`]: Number(percentStore)
     }
   })
+  const areaId = [...new Set(productTran.map(u => u.area))].map(area => ({ area }));
+  // console.log(areaId)
+
+  
+
 
   const summaryTarget = productTran.reduce((sum, item) => {
     const key = Object.keys(item).find(k =>
@@ -2441,10 +2457,24 @@ exports.getSummaryProduct = async (req, res) => {
     : 0
 
 
+const data = areaId.map(item => {
+    const productDetail = productTran.filter(u => u.area && item.area)
+    // console.log(productDetail)
+    const mergedDetail = productDetail.reduce((acc, curr) => {
+          const { area, ...rest } = curr; // ตัด area ออก
 
+      return { ...acc, ...rest };
+    }, {});
 
-  const data = {
-    zone: [...productTran],
+    return {
+      area: item.area,
+      ...mergedDetail
+    };
+  });
+
+  
+  const dataFinal = {
+    data,
     summaryTarget: summaryTarget,
     summarySell: summarySell,
     summaryPercent: summaryPercent,
@@ -2460,7 +2490,7 @@ exports.getSummaryProduct = async (req, res) => {
   res.status(200).json({
     status: 200,
     message: "Success",
-    data: data
+    data: dataFinal
   })
 
 }
