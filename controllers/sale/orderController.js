@@ -2263,11 +2263,11 @@ exports.getSummaryProduct = async (req, res) => {
         as: 'order'
       }
     },
-    // {
-    //   $match: {
-    //     $expr: { $gt: [{ $size: "$order" }, 0] }
-    //   }
-    // },
+    {
+      $match: {
+        $expr: { $gt: [{ $size: "$order" }, 0] }
+      }
+    },
     {
       $project: {
         'order': 1
@@ -2287,18 +2287,6 @@ exports.getSummaryProduct = async (req, res) => {
     },
   ])
 
-
-
-
-  // if (route.length ==0 ){
-  //   return res.status(404).json({
-  //       status:404,
-  //       message:'Not found zone'
-  //   })
-  // }
-
-
-
   const productId = route.flatMap(u => u.productId)
 
   const productFactor = await Product.aggregate([
@@ -2317,10 +2305,6 @@ exports.getSummaryProduct = async (req, res) => {
       }
     }
   ])
-
-  console.log(productId)
-
-
 
   const productQty = route.map(u => {
     const qty = productFactor.find(i => i.productId === u.productId && i.unit == u.unit) || {}
@@ -2382,6 +2366,14 @@ exports.getSummaryProduct = async (req, res) => {
 
   const area = await User.aggregate([
     {
+      $addFields: {
+        shortArea: { $substr: ["$area", 0, 2] }
+      }
+    },
+    {$match:{
+      shortArea:zone
+    }},
+    {
       $group: {
         _id: '$area'
       }
@@ -2394,6 +2386,13 @@ exports.getSummaryProduct = async (req, res) => {
     }
   ])
 
+
+  if (area.length ==0 ){
+    return res.status(404).json({
+        status:404,
+        message:'Not found zone'
+    })
+  }
 
   const result = area.map(({ area }) => {
     return product.map(product => ({
@@ -2444,15 +2443,6 @@ exports.getSummaryProduct = async (req, res) => {
       }
     }
   ])
-
-
-
-  // let summaryTarget = {}
-  // let summarySell = {}
-  // let summaryPercent = {}
-  // let summaryTargetStore = {}
-  // let summaryStore = {}
-  // let summaryPercentStore = {}
 
 
   const productTran = areaProduct.map(item => {
