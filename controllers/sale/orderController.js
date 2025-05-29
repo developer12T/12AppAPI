@@ -28,6 +28,7 @@ const cartModel = require('../../models/cash/cart')
 const userModel = require('../../models/cash/user')
 const productModel = require('../../models/cash/product')
 const routeModel = require('../../models/cash/route')
+
 const storeModel = require('../../models/cash/store');
 const { getModelsByChannel } = require('../../middleware/channel')
 
@@ -1498,7 +1499,7 @@ exports.getSummarybyMonth = async (req, res) => {
 
 exports.getSummarybyArea = async (req, res) => {
   try {
-    const { period, year, type,zone,area } = req.query
+    const { period, year, type, zone, area } = req.query
 
     const channel = req.headers['x-channel']; // 'credit' or 'cash'
 
@@ -2232,6 +2233,8 @@ exports.getSummaryProduct = async (req, res) => {
 
   const { Route } = getModelsByChannel(channel, res, routeModel)
   const { Product } = getModelsByChannel(channel, res, productModel)
+  const { User } = getModelsByChannel(channel, res, userModel)
+  const { Store } = getModelsByChannel(channel, res, storeModel)
 
 
   const route = await Route.aggregate([
@@ -2260,11 +2263,11 @@ exports.getSummaryProduct = async (req, res) => {
         as: 'order'
       }
     },
-    {
-      $match: {
-        $expr: { $gt: [{ $size: "$order" }, 0] }
-      }
-    },
+    // {
+    //   $match: {
+    //     $expr: { $gt: [{ $size: "$order" }, 0] }
+    //   }
+    // },
     {
       $project: {
         'order': 1
@@ -2275,6 +2278,7 @@ exports.getSummaryProduct = async (req, res) => {
     {
       $project: {
         '_id': 0,
+        store: '$order.store.storeId',
         area: '$order.store.area',
         productId: '$order.listProduct.id',
         unit: '$order.listProduct.unit',
@@ -2282,6 +2286,18 @@ exports.getSummaryProduct = async (req, res) => {
       }
     },
   ])
+
+
+
+
+  // if (route.length ==0 ){
+  //   return res.status(404).json({
+  //       status:404,
+  //       message:'Not found zone'
+  //   })
+  // }
+
+
 
   const productId = route.flatMap(u => u.productId)
 
@@ -2302,19 +2318,42 @@ exports.getSummaryProduct = async (req, res) => {
     }
   ])
 
+  console.log(productId)
+
+
+
   const productQty = route.map(u => {
-    const qty = productFactor.find(i => i.productId === u.productId && i.unit == u.unit)
+    const qty = productFactor.find(i => i.productId === u.productId && i.unit == u.unit) || {}
     const factorPcs = (u.qty * qty.factor)
-    const factorCtn = productFactor.find(i => i.productId === u.productId && i.unit == "CTN")
+    const factorCtn = productFactor.find(i => i.productId === u.productId && i.unit == "CTN") || {}
     const qtyCtn = Math.floor((factorPcs / factorCtn.factor))
 
     return {
-      area:u.area,
-      productId:u.productId,
-      unit:'CTN',
-      qty:qtyCtn
+      store: u.store,
+      area: u.area,
+      productId: u.productId,
+      unit: 'CTN',
+      qty: qtyCtn
     }
   })
+
+
+  const grouped = [];
+
+  productQty.forEach(item => {
+    const existing = grouped.find(g =>
+      g.store === item.store &&
+      g.area === item.area &&
+      g.productId === item.productId &&
+      g.unit === item.unit
+    );
+
+    if (existing) {
+      existing.qty += item.qty;
+    } else {
+      grouped.push({ ...item });
+    }
+  });
 
   const product = await Product.aggregate([
     {
@@ -2332,12 +2371,171 @@ exports.getSummaryProduct = async (req, res) => {
         }
       }
     },
-    {$project:{
-      _id:0,
-      productId:'$_id.productId',
-      groupSize:'$_id.groupCode'
-    }}
+    {
+      $project: {
+        _id: 0,
+        productId: '$_id.productId',
+        groupSize: '$_id.groupCode'
+      }
+    }
   ])
+
+  const area = await User.aggregate([
+    {
+      $group: {
+        _id: '$area'
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        area: '$_id'
+      }
+    }
+  ])
+
+
+  const result = area.map(({ area }) => {
+    return product.map(product => ({
+      ...product,
+      area
+    }));
+  });
+
+  // ถ้าอยากให้เป็น flat array (ไม่เป็นกลุ่ม area): ใช้ .flat()
+  const areaProduct = result.flat();
+
+
+  const countStore = [];
+
+  grouped.forEach(item => {
+    const existing = countStore.find(g =>
+      g.store === item.store &&
+      g.area === item.area &&
+      g.productId === item.productId &&
+      g.unit === item.unit
+    );
+
+    if (existing) {
+      existing.count += 1; // เพิ่มจำนวนที่เจอซ้ำ
+    } else {
+      countStore.push({
+        store: item.store,
+        area: item.area,
+        productId: item.productId,
+        unit: item.unit,
+        count: 1 // เริ่มต้นนับเป็น 1
+      });
+    }
+  });
+
+  const constStoreOnArea = await Store.aggregate([
+    {
+      $group: {
+        _id: '$area',
+        storeIds: { $addToSet: '$storeId' } // เก็บ storeId ที่ไม่ซ้ำใน array
+      }
+    },
+    {
+      $project: {
+        area: '$_id',
+        constStore: { $size: '$storeIds' }, // นับจำนวน storeId ที่ไม่ซ้ำ
+        _id: 0
+      }
+    }
+  ])
+
+
+
+  // let summaryTarget = {}
+  // let summarySell = {}
+  // let summaryPercent = {}
+  // let summaryTargetStore = {}
+  // let summaryStore = {}
+  // let summaryPercentStore = {}
+
+
+  const productTran = areaProduct.map(item => {
+    const productDetail = productQty.find(u => u.productId == item.productId && u.area == item.area)
+    const storeCount = countStore.find(u => u.productId == item.productId && u.area == item.area)
+    const allStoreCount = constStoreOnArea.find(u => u.area == item.area)
+
+    const percentStore = allStoreCount?.constStore
+      ? ((storeCount?.count || 0) / allStoreCount.constStore * 100).toFixed(2)
+      : 0;
+
+
+
+    return {
+      productId: item.productId,
+      area: item.area,
+      [`TRAGET ${item.groupSize}`]: 0,
+      [`SELL ${item.groupSize}`]: productDetail?.qty || 0,
+      [`PERCENT ${item.groupSize}`]: 0,
+      [`TRAGET STORE ${item.groupSize}`]: 0,
+      [`STORE ${item.groupSize}`]: storeCount?.count || 0,
+      [`PERCENT STORE ${item.groupSize}`]: Number(percentStore)
+    }
+  })
+
+  const summaryTarget = productTran.reduce((sum, item) => {
+    const key = Object.keys(item).find(k =>
+      k.startsWith("TRAGET ") && !k.includes("TRAGET STORE")
+    )
+    return sum + (item[key] || 0)
+  }, 0)
+
+
+  const summarySell = productTran.reduce((sum, item) => {
+    const key = Object.keys(item).find(k => k.startsWith("SELL "))
+    return sum + (item[key] || 0)
+  }, 0)
+
+  const summaryPercent = productTran.reduce((sum, item) => {
+    const key = Object.keys(item).find(k =>
+      k.startsWith("PERCENT ") && !k.includes("PERCENT STORE")
+    )
+    return sum + (item[key] || 0)
+  }, 0)
+
+  const summaryTargetStore = productTran.reduce((sum, item) => {
+    const key = Object.keys(item).find(k => k.startsWith("TRAGET STORE "))
+    return sum + (item[key] || 0)
+  }, 0)
+
+  const summaryStore = productTran.reduce((sum, item) => {
+    const key = Object.keys(item).find(k => k.startsWith("STORE "))
+    return sum + (item[key] || 0)
+  }, 0)
+
+
+const totalStoreCount = productTran.reduce((sum, item) => {
+  const key = Object.keys(item).find(k => k.startsWith("STORE "))
+  return sum + (item[key] || 0)
+}, 0)
+
+
+const totalAllStoreCount = constStoreOnArea.reduce((sum, item) => {
+  return sum + (item.constStore || 0)
+}, 0)
+
+
+const summaryPercentStore = totalAllStoreCount > 0
+  ? Number(((totalStoreCount / totalAllStoreCount) * 100).toFixed(2))
+  : 0
+
+
+
+
+  const data = {
+    zone: [...productTran],
+    summaryTarget:summaryTarget,
+    summarySell:summarySell,
+    summaryPercent:summaryPercent,
+    summaryTargetStore:summaryTargetStore,
+    summaryStore:summaryStore,
+    summaryPercentStore:summaryPercentStore,
+  }
 
 
 
@@ -2345,8 +2543,8 @@ exports.getSummaryProduct = async (req, res) => {
 
   res.status(200).json({
     status: 200,
-    message: "getSummaryProduct",
-    data: product
+    message: "Success",
+    data: data
   })
 
 }
