@@ -121,7 +121,7 @@ exports.getProduct = async (req, res) => {
       }}
     ])
 
-    // console.log("stock",stock)
+    // console.log("products",products)
 
     if (!products.length) {
       return res
@@ -162,6 +162,7 @@ exports.getProduct = async (req, res) => {
       }
       return modifiedProduct
     })
+    console.log(stock)
 
   const data = products.map( u => {
     const qty = stock.find(s => s._id === u.id) || {}; 
