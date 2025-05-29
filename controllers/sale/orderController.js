@@ -1502,10 +1502,10 @@ exports.getSummarybyArea = async (req, res) => {
     const { period, year, type, zone, area } = req.query
     let query = {}
 
-    if (zone) {
+    if (area) {
       query = {
         $match: {
-          area: zone
+          area: area
         }
       }
     }
@@ -1531,7 +1531,7 @@ exports.getSummarybyArea = async (req, res) => {
     // if (type == 'route') {
 
     let groupStage = {}
-    if (area && type == 'route') {
+    if (zone && type == 'route') {
       groupStage = {
         $group: {
           _id: { area: "$area", route: "$day" },
@@ -1539,7 +1539,7 @@ exports.getSummarybyArea = async (req, res) => {
         }
       }
     }
-    else if (zone && type == 'route') {
+    else if (area && type == 'route') {
       groupStage = {
         $group: {
           _id: { area: "$area", route: "$day" },
@@ -1555,7 +1555,7 @@ exports.getSummarybyArea = async (req, res) => {
         }
       }
     }
-    else if (area && type == 'year') {
+    else if (zone && type == 'year') {
       groupStage = {
         $group: {
           _id: { area: "$area", route: "$month" },
@@ -1563,7 +1563,7 @@ exports.getSummarybyArea = async (req, res) => {
         }
       }
     }
-    else if (zone && type == 'year') {
+    else if (area && type == 'year') {
       groupStage = {
         $group: {
           _id: { area: "$area", route: "$month" },
