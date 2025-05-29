@@ -1539,6 +1539,14 @@ exports.getSummarybyArea = async (req, res) => {
         }
       }
     }
+    else if (zone && type == 'route') {
+      groupStage = {
+        $group: {
+          _id: { area: "$area", route: "$day" },
+          totalAmount: { $sum: "$orderDetails.total" }
+        }
+      }
+    }
     else if (type == 'route') {
       groupStage = {
         $group: {
@@ -1548,6 +1556,14 @@ exports.getSummarybyArea = async (req, res) => {
       }
     }
     else if (area && type == 'year') {
+      groupStage = {
+        $group: {
+          _id: { area: "$area", route: "$month" },
+          totalAmount: { $sum: "$orderDetails.total" }
+        }
+      }
+    }
+    else if (zone && type == 'year') {
       groupStage = {
         $group: {
           _id: { area: "$area", route: "$month" },
@@ -1665,7 +1681,17 @@ exports.getSummarybyArea = async (req, res) => {
 
 
     modelRoute = [...modelRouteValue, ...otherModelRoute];
-    const areaList = [...new Set(modelRoute.map(item => item.area))].filter(area => area !== undefined).sort();
+
+
+    // const areaList = [...new Set(modelRoute.map(item => item.area))].filter(area => area !== undefined).sort();
+
+    const areaList = [
+      ...new Set(
+        modelRoute
+          .map(item => item.area)
+          .filter(areaItem => areaItem && (area ? areaItem.startsWith(area) : true))
+      )
+    ].sort();
 
     let data = [];
 
