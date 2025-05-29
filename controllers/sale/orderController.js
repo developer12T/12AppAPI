@@ -1501,6 +1501,13 @@ exports.getSummarybyArea = async (req, res) => {
   try {
     const { period, year, type, zone, area } = req.query
 
+
+    let query = {}
+    // if (zone) query.zone = zone;
+    if (area) query.area2 = area;
+    if (zone) query.area = zone;
+
+
     const channel = req.headers['x-channel']; // 'credit' or 'cash'
 
     const { Route } = getModelsByChannel(channel, res, routeModel);
@@ -1548,6 +1555,8 @@ exports.getSummarybyArea = async (req, res) => {
             }
           }
         },
+        { $match: query},
+
         {
           $lookup: {
             from: "orders",
@@ -1576,6 +1585,8 @@ exports.getSummarybyArea = async (req, res) => {
         { $sort: { area: 1, month: 1 } }
       ]);
 
+      // console.log("modelRouteValue", modelRouteValue)
+
       const haveArea = [...new Set(modelRouteValue.map(i => i.area))];
       otherModelRoute = await Route.aggregate([
         {
@@ -1602,6 +1613,7 @@ exports.getSummarybyArea = async (req, res) => {
           }
         },
         { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } },
+        { $match:  query },
         {
           $group: {
             _id: { area: "$area2", month: "$month" }, // ✅ group ด้วย area2 + month
@@ -1618,6 +1630,9 @@ exports.getSummarybyArea = async (req, res) => {
         },
         { $sort: { area: 1, month: 1 } }
       ]);
+
+      console.log("otherModelRoute",otherModelRoute)
+
 
       if (modelRouteValue.length === 0) {
         return res.status(404).json({
@@ -1690,6 +1705,7 @@ exports.getSummarybyArea = async (req, res) => {
             }
           }
         },
+        { $match: query},
         {
           $lookup: {
             from: "orders",
@@ -1750,6 +1766,7 @@ exports.getSummarybyArea = async (req, res) => {
             area2: { $substrCP: ["$area", 0, 2] }
           }
         },
+        { $match: query},
         {
           $group: {
             _id: { area: "$area2", day: "$month" },
@@ -2370,9 +2387,11 @@ exports.getSummaryProduct = async (req, res) => {
         shortArea: { $substr: ["$area", 0, 2] }
       }
     },
-    {$match:{
-      shortArea:zone
-    }},
+    {
+      $match: {
+        shortArea: zone
+      }
+    },
     {
       $group: {
         _id: '$area'
@@ -2387,10 +2406,10 @@ exports.getSummaryProduct = async (req, res) => {
   ])
 
 
-  if (area.length ==0 ){
+  if (area.length == 0) {
     return res.status(404).json({
-        status:404,
-        message:'Not found zone'
+      status: 404,
+      message: 'Not found zone'
     })
   }
 
@@ -2499,32 +2518,32 @@ exports.getSummaryProduct = async (req, res) => {
   }, 0)
 
 
-const totalStoreCount = productTran.reduce((sum, item) => {
-  const key = Object.keys(item).find(k => k.startsWith("STORE "))
-  return sum + (item[key] || 0)
-}, 0)
+  const totalStoreCount = productTran.reduce((sum, item) => {
+    const key = Object.keys(item).find(k => k.startsWith("STORE "))
+    return sum + (item[key] || 0)
+  }, 0)
 
 
-const totalAllStoreCount = constStoreOnArea.reduce((sum, item) => {
-  return sum + (item.constStore || 0)
-}, 0)
+  const totalAllStoreCount = constStoreOnArea.reduce((sum, item) => {
+    return sum + (item.constStore || 0)
+  }, 0)
 
 
-const summaryPercentStore = totalAllStoreCount > 0
-  ? Number(((totalStoreCount / totalAllStoreCount) * 100).toFixed(2))
-  : 0
+  const summaryPercentStore = totalAllStoreCount > 0
+    ? Number(((totalStoreCount / totalAllStoreCount) * 100).toFixed(2))
+    : 0
 
 
 
 
   const data = {
     zone: [...productTran],
-    summaryTarget:summaryTarget,
-    summarySell:summarySell,
-    summaryPercent:summaryPercent,
-    summaryTargetStore:summaryTargetStore,
-    summaryStore:summaryStore,
-    summaryPercentStore:summaryPercentStore,
+    summaryTarget: summaryTarget,
+    summarySell: summarySell,
+    summaryPercent: summaryPercent,
+    summaryTargetStore: summaryTargetStore,
+    summaryStore: summaryStore,
+    summaryPercentStore: summaryPercentStore,
   }
 
 

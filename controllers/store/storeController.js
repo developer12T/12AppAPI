@@ -2,10 +2,8 @@ const { uploadFiles } = require('../../utilities/upload')
 const { calculateSimilarity } = require('../../utilities/utility')
 const axios = require('axios')
 const multer = require('multer')
-// const upload = multer({ storage: multer.memoryStorage() }).array(
-//   'storeImages',
-//   3
-// )
+const addUpload = multer({ storage: multer.memoryStorage() }).array('storeImages')
+
 
 
 const getUploadMiddleware = (channel) => {
@@ -135,10 +133,9 @@ exports.updateImage = async (req, res) => {
 
   const { Store } = getModelsByChannel(channel, res, storeModel)
 
-  const upload = getUploadMiddleware(channel);
 
 
-    upload(req, res, async err => {
+    addUpload(req, res, async err => {
       if (err) {
         return res.status(400).json({ status: '400', message: err.message })
       }
