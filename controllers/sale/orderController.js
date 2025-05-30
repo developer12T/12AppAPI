@@ -2353,7 +2353,6 @@ exports.getSummaryProduct = async (req, res) => {
       g.productId === item.productId &&
       g.unit === item.unit
     );
-
     if (existing) {
       existing.count += 1; // เพิ่มจำนวนที่เจอซ้ำ
     } else {
@@ -2387,7 +2386,8 @@ exports.getSummaryProduct = async (req, res) => {
 
 
   const productTran = areaProduct.map(item => {
-    const productDetail = productQty.find(u => u.productId == item.productId && u.area == item.area)
+    const productDetail = grouped.find(u => u.productId == item.productId && u.area == item.area)
+
     const storeCount = countStore.find(u => u.productId == item.productId && u.area == item.area)
     const allStoreCount = constStoreOnArea.find(u => u.area == item.area)
 
@@ -2408,11 +2408,23 @@ exports.getSummaryProduct = async (req, res) => {
       [`PERCENT STORE ${item.groupSize}`]: Number(percentStore)
     }
   })
+
   const areaId = [...new Set(productTran.map(u => u.area))].map(area => ({ area }));
-  // console.log(areaId)
 
-  
+  const data = areaId.map(item => {
+    const productDetail = productTran.filter(u => u.area === item.area)
+    
+    const mergedDetail = productDetail.reduce((acc, curr) => {
+      const { area, ...rest } = curr; 
 
+      return { ...acc, ...rest };
+    }, {});
+
+    return {
+      area: item.area,
+      ...mergedDetail
+    };
+  });
 
   const summaryTarget = productTran.reduce((sum, item) => {
     const key = Object.keys(item).find(k =>
@@ -2460,24 +2472,7 @@ exports.getSummaryProduct = async (req, res) => {
     ? Number(((totalStoreCount / totalAllStoreCount) * 100).toFixed(2))
     : 0
 
-
-const data = areaId.map(item => {
-    const productDetail = productTran.filter(u => u.area && item.area)
-    // console.log(productDetail)
-    const mergedDetail = productDetail.reduce((acc, curr) => {
-          const { area, ...rest } = curr; // ตัด area ออก
-
-      return { ...acc, ...rest };
-    }, {});
-
-    return {
-      area: item.area,
-      ...mergedDetail
-    };
-  });
-
-  
-  const dataFinal = {
+  const dataTran = {
     data,
     summaryTarget: summaryTarget,
     summarySell: summarySell,
@@ -2494,7 +2489,7 @@ const data = areaId.map(item => {
   res.status(200).json({
     status: 200,
     message: "Success",
-    data: dataFinal
+    ...dataTran
   })
 
 }
@@ -2512,35 +2507,35 @@ const data = areaId.map(item => {
 
 exports.getProductLimit = async (req, res) => {
 
-    const { storeId,area,type} = req.query
-    const channel = req.headers['x-channel'];
-    const { Cart } = getModelsByChannel(channel, res, cartModel);
-    const { User } = getModelsByChannel(channel, res, userModel);
-    const { Product } = getModelsByChannel(channel, res, productModel);
-    const { PromotionLimit } = getModelsByChannel(channel, res, promotionModel);
-    const cart = await Cart.findOne({ type, area, storeId })
-    if (!cart || cart.listProduct.length === 0) {
-      return res.status(404).json({ status: 404, message: 'Cart is empty!' })
+  const { storeId, area, type } = req.query
+  const channel = req.headers['x-channel'];
+  const { Cart } = getModelsByChannel(channel, res, cartModel);
+  const { User } = getModelsByChannel(channel, res, userModel);
+  const { Product } = getModelsByChannel(channel, res, productModel);
+  const { PromotionLimit } = getModelsByChannel(channel, res, promotionModel);
+  const cart = await Cart.findOne({ type, area, storeId })
+  if (!cart || cart.listProduct.length === 0) {
+    return res.status(404).json({ status: 404, message: 'Cart is empty!' })
+  }
+
+  const productLimit = cart.listPromotion.map(item => {
+    return {
+      proId: item.proId
     }
+  })
+  let productLimitList = []
+  for (const i of productLimit) {
 
-    const productLimit = cart.listPromotion.map( item => {
-      return {
-        proId:item.proId
-      }
-    })
-    let productLimitList = []
-    for (const i of productLimit) {
+    const productLimitDetail = await PromotionLimit.findOne({ proId: i.proId })
+    productLimitList.push(productLimitDetail)
 
-      const productLimitDetail = await PromotionLimit.findOne({proId:i.proId})
-      productLimitList.push(productLimitDetail)
-
-    }
+  }
 
 
 
 
   res.status(200).json({
-    status:200,
-    message:productLimitList
+    status: 200,
+    message: productLimitList
   })
 }
