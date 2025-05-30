@@ -57,7 +57,7 @@ async function applyPromotion(order,channel,res) {
     let appliedPromotions = []
 
     const promotions = await Promotion.find({ status: 'active' })
-
+    // console.log("order.listProduct",order.listProduct)
     for (const promo of promotions) {
         let promoApplied = false
         let promoDiscount = 0

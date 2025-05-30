@@ -90,17 +90,18 @@ exports.checkout = async (req, res) => {
     }
 
     let summary = ''
+    let data = ''
     if (changePromotionStatus == 0) {
       summary = await summaryOrder(cart, channel, res)
+      // data = applyPromotion(summary,channel,res)
     } else if (changePromotionStatus == 1) {
       summary = await summaryOrderProStatusOne(cart, listPromotion, channel, res)
+      // data = applyPromotion(summary,channel,res)
     }
     // const shippingData = store.shippingAddress.find(s => s.shippingId === shipping)
     // if (!shippingData) {
     //     return res.status(404).json({ status: 404, message: 'Shipping address not found!' })
     // }
-
-
 
     const productIds = cart.listProduct.map(p => p.id)
     const products = await Product.find({ id: { $in: productIds } }).select(
@@ -309,36 +310,36 @@ exports.checkout = async (req, res) => {
       });
     }
 
-    // for (const updated of listProductStock) {
-    //   await Stock.findOneAndUpdate(
-    //     { area: area, period: period },
-    //     {
-    //       $set: {
-    //         "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
-    //         "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
-    //         "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
-    //         "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
-    //         "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
-    //         "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
-    //         "listProduct.$[product].available": updated.available
-    //       }
-    //     },
-    //     { arrayFilters: [{ "product.productId": updated.productId }], new: true }
-    //   )
-    // }
+    for (const updated of listProductStock) {
+      await Stock.findOneAndUpdate(
+        { area: area, period: period },
+        {
+          $set: {
+            "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
+            "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
+            "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
+            "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
+            "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
+            "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
+            "listProduct.$[product].available": updated.available
+          }
+        },
+        { arrayFilters: [{ "product.productId": updated.productId }], new: true }
+      )
+    }
 
-    // const createdMovement = await StockMovement.create({
-    //   ...calStock
-    // });
+    const createdMovement = await StockMovement.create({
+      ...calStock
+    });
 
-    // await StockMovementLog.create({
-    //   ...calStock,
-    //   refOrderId: createdMovement._id
-    // });
+    await StockMovementLog.create({
+      ...calStock,
+      refOrderId: createdMovement._id
+    });
 
 
-    // await newOrder.save()
-    // await Cart.deleteOne({ type, area, storeId })
+    await newOrder.save()
+    await Cart.deleteOne({ type, area, storeId })
 
     const checkIn = await checkInRoute({
       storeId: storeId,
@@ -353,6 +354,8 @@ exports.checkout = async (req, res) => {
       status: 200,
       message: 'Checkout successful!',
       data: newOrder
+      // data:summary
+      // data:data
     })
 
 
@@ -2253,7 +2256,6 @@ exports.getSummaryProduct = async (req, res) => {
     }
   })
 
-
   const grouped = [];
 
   productQty.forEach(item => {
@@ -2492,7 +2494,7 @@ const data = areaId.map(item => {
   res.status(200).json({
     status: 200,
     message: "Success",
-    data: dataFinal.data
+    data: dataFinal
   })
 
 }

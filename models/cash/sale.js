@@ -43,7 +43,7 @@ const listOrderProductSchema = new mongoose.Schema({
 
 
 const listOrderPromotionSchema = new mongoose.Schema({
-    // promoId: { type: String, require: true },
+    proId: { type: String, require: true },
     proCode: { type: String, require: true },
     proName: { type: String, require: true },
     proType: { type: String, require: true },

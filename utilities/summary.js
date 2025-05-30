@@ -410,76 +410,137 @@ async function summaryOrderProStatusOne (cart, listPromotion,channel,res) {
       id: { $in: productIds }
     }).lean()
 
-    let listProducts = []
-    enrichedProducts = listPromotion
-    listPromotion.forEach(promotion => {
-      // เก็บข้อมูลใน listProduct ของแต่ละโปรโมชั่นลงในตัวแปร listProducts
-      listProducts.push(promotion.listProduct)
+ 
+ let enrichedProducts = [] // ประกาศตัวแปรไว้ก่อน
+    // if (changePromotionStatus == 0) {
+    // console.log('changePromotionStatus = 0', changePromotionStatus);
+    enrichedProducts = cart.listProduct.map(cartItem => {
+      const productInfo = productDetails.find(p => p.id === cartItem.id) || {}
+      const unitData =
+        productInfo.listUnit?.find(u => u.unit === cartItem.unit) || {}
+      const factor = parseInt(unitData?.factor, 10) || 1
+      // console.log("factor",factor);
+      const qtyPcs = cartItem.qty * factor
+      const totalPrice = cartItem.qty * cartItem.price
+      return {
+        id: cartItem.id,
+        lot: cartItem.lot,
+        name: cartItem.name,
+        groupCode: productInfo.groupCode || '',
+        group: productInfo.group || '',
+        brandCode: productInfo.brandCode || '',
+        brand: productInfo.brand || '',
+        size: productInfo.size || '',
+        flavourCode: productInfo.flavourCode || '',
+        flavour: productInfo.flavour || '',
+        qty: cartItem.qty,
+        unit: cartItem.unit,
+        unitName: unitData.name || '',
+        price: cartItem.price,
+        total: totalPrice,
+        qtyPcs
+      }
     })
-    // วนลูปผ่านแต่ละอาร์เรย์ใน listProducts
-    let unitDataArray = []
 
-    listProducts.forEach(innerArray => {
-      innerArray.forEach(item => {
-        const productInfo = productDetails.find(p => p.id === item.id) || {}
 
-        if (productInfo.listUnit) {
-          const foundUnit = productInfo.listUnit.find(u => u.unit === item.unit)
-          if (foundUnit) {
-            // เก็บ item.id ร่วมกับข้อมูล unit ที่พบ
-            unitDataArray.push({
-              itemId: item.id,
-              unit: foundUnit.unit,
-              name: foundUnit.name,
-              factor: foundUnit.factor,
-              sale: foundUnit.price.sale,
-              refund: foundUnit.price.refund
-            })
-          }
-        }
+
+
+    // let unitDataArray = []
+    // listProducts.forEach(innerArray => {
+    //   innerArray.forEach(item => {
+    //     const productInfo = productDetails.find(p => p.id === item.id) || {}
+
+    //     if (productInfo.listUnit) {
+    //       const foundUnit = productInfo.listUnit.find(u => u.unit === item.unit)
+    //       if (foundUnit) {
+    //         // เก็บ item.id ร่วมกับข้อมูล unit ที่พบ
+    //         unitDataArray.push({
+    //           itemId: item.id,
+    //           unit: foundUnit.unit,
+    //           name: foundUnit.name,
+    //           factor: foundUnit.factor,
+    //           sale: foundUnit.price.sale,
+    //           refund: foundUnit.price.refund
+    //         })
+    //       }
+    //     }
+    //   })
+    // })
+
+    // listPromotion.forEach(promo => {
+    //   promo.listProduct.forEach(product => {
+    //     const unitData = unitDataArray.find(unit => unit.itemId === product.id)
+
+    //     if (unitData) {
+    //       product.unitData = {
+    //         unit: unitData.unit,
+    //         name: unitData.name,
+    //         factor: unitData.factor,
+    //         sale: unitData.sale,
+    //         refund: unitData.refund
+    //       }
+    //     }
+    //   })
+    // })
+
+const enrichedPromotions = (cart.listPromotion || []).map(promo => {
+  const plainPromo = promo.toObject ? promo.toObject() : promo;
+
+  const enrichedProducts = plainPromo.listProduct.map(promoProduct => {
+    const productInfo = productDetails.find(p => p.id === promoProduct.id) || {};
+    const unitData = productInfo.listUnit?.find(u => u.unit === promoProduct.unit) || {};
+    const factor = parseInt(unitData?.factor, 10) || 1;
+    const qtyPcs = promoProduct.qty * factor;
+
+    return {
+      ...promoProduct,
+      qtyPcs
+    };
+  });
+
+  return {
+    ...plainPromo,
+    listProduct: enrichedProducts
+  };
+});
+  
+
+      const mergedMap = new Map();
+
+      listPromotion.forEach(promo => {
+        mergedMap.set(promo.proId,promo)
       })
-    })
 
-    listPromotion.forEach(promo => {
-      promo.listProduct.forEach(product => {
-        const unitData = unitDataArray.find(unit => unit.itemId === product.id)
-
-        if (unitData) {
-          product.unitData = {
-            unit: unitData.unit,
-            name: unitData.name,
-            factor: unitData.factor,
-            sale: unitData.sale,
-            refund: unitData.refund
-          }
-        }
+      enrichedPromotions.forEach(promo => {
+        mergedMap.set(promo.proId,promo)
       })
-    })
 
-    const enrichedPromotionExtract = listPromotion.map(promo => ({
-      proCode: promo?.proCode || '',
-      proName: promo.proName,
-      proType: promo.proType,
-      proQty: promo.proQty || 0,
-      discount: promo.discount || 0,
-      listProduct: promo.listProduct.map(product => ({
-        id: product.id,
-        name: product.name,
-        groupCode: product.groupCode,
-        group: product.group,
-        size: product.size,
-        flavourCode: product.flavourCode,
-        flavour: product.flavour,
-        brandCode: product.brandCode,
-        brand: product.brand,
-        qty: product.qty,
-        unit: product.unit,
-        unitName: product.unitName,
-        price: 0,
-        total: 0,
-        qtyPcs: product.qty * (product.unitData?.factor || 0) // ใช้ product.unitData.factor
-      }))
-    }))
+      const promoProduct = Array.from(mergedMap.values());
+
+    // const enrichedPromotionExtract = listPromotion.map(promo => ({
+    //   proCode: promo?.proCode || '',
+    //   proName: promo.proName,
+    //   proType: promo.proType,
+    //   proQty: promo.proQty || 0,
+    //   discount: promo.discount || 0,
+    //   listProduct: promo.listProduct.map(product => ({
+    //     id: product.id,
+    //     name: product.name,
+    //     groupCode: product.groupCode,
+    //     group: product.group,
+    //     size: product.size,
+    //     flavourCode: product.flavourCode,
+    //     flavour: product.flavour,
+    //     brandCode: product.brandCode,
+    //     brand: product.brand,
+    //     qty: product.qty,
+    //     unit: product.unit,
+    //     unitName: product.unitName,
+    //     price: 0,
+    //     total: 0,
+    //     qtyPcs: product.qty * (product.unitData?.factor || 0) // ใช้ product.unitData.factor
+    //   }))
+    // }))
 
     return {
       type: cart.type,
@@ -487,7 +548,7 @@ async function summaryOrderProStatusOne (cart, listPromotion,channel,res) {
       shipping: [],
       listProduct: enrichedProducts,
       // listRefund: [],
-      listPromotion: enrichedPromotionExtract,
+      listPromotion: promoProduct,
       total: parseFloat(cart.total.toFixed(2)),
       subtotal: 0,
       discount: 0,
