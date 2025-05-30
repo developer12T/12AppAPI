@@ -21,13 +21,15 @@ const upload = multer({ storage: multer.memoryStorage() }).single('image')
 const _ = require('lodash')
 const { DateTime } = require("luxon");
 const { getSocket } = require('../../socket')
-
+const { applyPromotion } = require('../promotion/calculate')
 const stockModel = require('../../models/cash/stock')
 const orderModel = require('../../models/cash/sale')
 const cartModel = require('../../models/cash/cart')
 const userModel = require('../../models/cash/user')
 const productModel = require('../../models/cash/product')
 const routeModel = require('../../models/cash/route')
+const promotionModel = require('../../models/cash/promotion')
+
 
 const storeModel = require('../../models/cash/store');
 const { getModelsByChannel } = require('../../middleware/channel')
@@ -307,36 +309,36 @@ exports.checkout = async (req, res) => {
       });
     }
 
-    for (const updated of listProductStock) {
-      await Stock.findOneAndUpdate(
-        { area: area, period: period },
-        {
-          $set: {
-            "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
-            "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
-            "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
-            "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
-            "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
-            "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
-            "listProduct.$[product].available": updated.available
-          }
-        },
-        { arrayFilters: [{ "product.productId": updated.productId }], new: true }
-      )
-    }
+    // for (const updated of listProductStock) {
+    //   await Stock.findOneAndUpdate(
+    //     { area: area, period: period },
+    //     {
+    //       $set: {
+    //         "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
+    //         "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
+    //         "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
+    //         "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
+    //         "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
+    //         "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
+    //         "listProduct.$[product].available": updated.available
+    //       }
+    //     },
+    //     { arrayFilters: [{ "product.productId": updated.productId }], new: true }
+    //   )
+    // }
 
-    const createdMovement = await StockMovement.create({
-      ...calStock
-    });
+    // const createdMovement = await StockMovement.create({
+    //   ...calStock
+    // });
 
-    await StockMovementLog.create({
-      ...calStock,
-      refOrderId: createdMovement._id
-    });
+    // await StockMovementLog.create({
+    //   ...calStock,
+    //   refOrderId: createdMovement._id
+    // });
 
 
-    await newOrder.save()
-    await Cart.deleteOne({ type, area, storeId })
+    // await newOrder.save()
+    // await Cart.deleteOne({ type, area, storeId })
 
     const checkIn = await checkInRoute({
       storeId: storeId,
@@ -2490,8 +2492,53 @@ const data = areaId.map(item => {
   res.status(200).json({
     status: 200,
     message: "Success",
-    data: dataFinal
+    data: dataFinal.data
   })
 
 }
 
+
+
+
+
+
+
+
+
+
+
+
+exports.getProductLimit = async (req, res) => {
+
+    const { storeId,area,type} = req.query
+    const channel = req.headers['x-channel'];
+    const { Cart } = getModelsByChannel(channel, res, cartModel);
+    const { User } = getModelsByChannel(channel, res, userModel);
+    const { Product } = getModelsByChannel(channel, res, productModel);
+    const { PromotionLimit } = getModelsByChannel(channel, res, promotionModel);
+    const cart = await Cart.findOne({ type, area, storeId })
+    if (!cart || cart.listProduct.length === 0) {
+      return res.status(404).json({ status: 404, message: 'Cart is empty!' })
+    }
+
+    const productLimit = cart.listPromotion.map( item => {
+      return {
+        proId:item.proId
+      }
+    })
+    let productLimitList = []
+    for (const i of productLimit) {
+
+      const productLimitDetail = await PromotionLimit.findOne({proId:i.proId})
+      productLimitList.push(productLimitDetail)
+
+    }
+
+
+
+
+  res.status(200).json({
+    status:200,
+    message:productLimitList
+  })
+}

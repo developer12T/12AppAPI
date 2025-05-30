@@ -3,16 +3,16 @@ const { getRewardProduct } = require('./calculate')
 // const { Promotion } = require('../../models/cash/promotion')
 // const { Cart } = require('../../models/cash/cart')
 // const { Product } = require('../../models/cash/product')
-const  promotionModel = require('../../models/cash/promotion');
-const  CartModel  = require('../../models/cash/cart')
-const  productModel  = require('../../models/cash/product')
+const promotionModel = require('../../models/cash/promotion');
+const CartModel = require('../../models/cash/cart')
+const productModel = require('../../models/cash/product')
 
 const { getModelsByChannel } = require('../../middleware/channel')
 
 exports.addPromotion = async (req, res) => {
   try {
-    const channel = req.headers['x-channel']; 
-    const { Promotion } = getModelsByChannel(channel,res,promotionModel); 
+    const channel = req.headers['x-channel'];
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel);
     const {
       name,
       description,
@@ -34,7 +34,7 @@ exports.addPromotion = async (req, res) => {
         .json({ status: 400, message: 'Missing required fields!' })
     }
 
-    const proId = await generatePromotionId(channel,res)
+    const proId = await generatePromotionId(channel, res)
 
     const newPromotion = new Promotion({
       proId,
@@ -71,7 +71,7 @@ exports.getPromotionProduct = async (req, res) => {
     const { type, storeId, proId } = req.body
 
     const channel = req.headers['x-channel']; // 'credit' or 'cash'
-    const { Cart } = getModelsByChannel(channel,res,CartModel); 
+    const { Cart } = getModelsByChannel(channel, res, CartModel);
 
 
     if (!type || !storeId || !proId) {
@@ -102,7 +102,7 @@ exports.getPromotionProduct = async (req, res) => {
         .json({ status: 404, message: 'Promotion not found in the cart!' })
     }
 
-    const rewardProducts = await getRewardProduct(proId,channel,res)
+    const rewardProducts = await getRewardProduct(proId, channel, res)
 
     if (!rewardProducts.length) {
       return res
@@ -126,9 +126,9 @@ exports.getPromotionProduct = async (req, res) => {
       groupedProducts[key].product.push({
         id: product.id,
         group: product.group,
-        flavour : product.flavour,
-        brand : product.brand, 
-        size : product.size,
+        flavour: product.flavour,
+        brand: product.brand,
+        size: product.size,
         unit: product.unit,
         qty: 1,
         name: product.name
@@ -170,7 +170,7 @@ exports.updateCartPromotion = async (req, res) => {
         .json({ status: 400, message: 'Missing required fields!' })
     }
     const channel = req.headers['x-channel']; // 'credit' or 'cash'
-    const { Cart } = getModelsByChannel(channel,res,CartModel); 
+    const { Cart } = getModelsByChannel(channel, res, CartModel);
 
     let cart = await Cart.findOne({ type, area, storeId })
     if (!cart) {
@@ -184,7 +184,7 @@ exports.updateCartPromotion = async (req, res) => {
         .json({ status: 404, message: 'Promotion not found!' })
     }
 
-    const { Product } = getModelsByChannel(channel,res,productModel); 
+    const { Product } = getModelsByChannel(channel, res, productModel);
 
 
     const product = await Product.findOne({ id: productId }).lean()
@@ -237,25 +237,128 @@ exports.updateCartPromotion = async (req, res) => {
   }
 }
 
-exports.getPromotion = async (req,res) =>{
+exports.getPromotion = async (req, res) => {
 
   const channel = req.headers['x-channel']; // 'credit' or 'cash'
-  const { Promotion } = getModelsByChannel(channel,res,promotionModel); 
+  const { Promotion } = getModelsByChannel(channel, res, promotionModel);
 
   const data = await Promotion.find()
 
-  if (data.length ==0) {
-    return  res.status(404).json({
-      status:200,
-      message:"Not Found Promotion"
+  if (data.length == 0) {
+    return res.status(404).json({
+      status: 200,
+      message: "Not Found Promotion"
     })
   }
 
 
 
   res.status(200).json({
-    status:200,
-    message:data
+    status: 200,
+    message: data
   })
+}
+
+exports.addPromotionLimit = async (req, res) => {
+
+  const channel = req.headers['x-channel'];
+  const { PromotionLimit } = getModelsByChannel(channel, res, promotionModel);
+  const {
+    name,
+    description,
+    proType,
+    proCode,
+    coupon,
+    startDate,
+    endDate,
+    giftItem,
+    limitTotal,
+    condition,
+    tracking,
+    status
+  } = req.body
+
+  if (!name || !proType) {
+    return res
+      .status(400)
+      .json({ status: 400, message: 'Missing required fields!' })
+  }
+
+  const proId = await generatePromotionId(channel, res)
+
+  const newPromotionLimit = new PromotionLimit({
+    proId,
+    name,
+    description,
+    proType,
+    proCode,
+    coupon,
+    startDate,
+    endDate,
+    giftItem,
+    limitTotal,
+    condition,
+    tracking,
+    status
+  })
+
+  await newPromotionLimit.save()
+
+  res.status(201).json({
+    status: 201,
+    message: 'Promotion created successfully!',
+    data: newPromotionLimit
+  })
+
+}
+
+
+exports.updatePromotionLimit = async (req, res) => {
+
+  const channel = req.headers['x-channel'];
+  const { PromotionLimit } = getModelsByChannel(channel, res, promotionModel);
+  const {
+    proId,
+    name,
+    description,
+    proType,
+    proCode,
+    coupon,
+    startDate,
+    endDate,
+    giftItem,
+    limitTotal,
+    condition,
+    tracking,
+    status
+  } = req.body
+
+  const existing = await PromotionLimit.findOne({ proId });
+
+  if (!existing) {
+    return res.status(404).json({ status: 404, message: 'Promotion not found' });
+  }
+
+  await PromotionLimit.updateOne(
+    { proId },
+    {
+      $set: {
+        name,
+        description,
+        proType,
+        proCode,
+        coupon,
+        startDate,
+        endDate,
+        giftItem,
+        limitTotal,
+        condition,
+        tracking,
+        status
+      }
+    }
+  );
+
+  return res.status(200).json({ status: 200, message: 'Updated successfully' });
 }
 

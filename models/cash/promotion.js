@@ -70,8 +70,16 @@ const promotionSchema = new mongoose.Schema({
 
 
 const promotionLimitSchema = new mongoose.Schema({
+    proId: { type: String, required: true },
     name: { type: String, required: true },
-    type: { type: String, required: true },
+    description: { type: String },
+    proType: {
+        type: String,
+        required: true,
+        enum: ['amount', 'free', 'discount']
+    },
+    proCode: { type: String },
+    coupon: { type: String },
     startDate: { type: String },
     endDate: { type: String },
     giftItem: {
@@ -94,7 +102,7 @@ const promotionLimitSchema = new mongoose.Schema({
             }
         ]
     },
-    status: { type: String, required: true },
+    status: { type: String, enum: ['active', 'inactive'], default: 'active' },
 })
 
 
