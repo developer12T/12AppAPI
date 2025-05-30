@@ -21,7 +21,7 @@ const upload = multer({ storage: multer.memoryStorage() }).single('image')
 const _ = require('lodash')
 const { DateTime } = require("luxon");
 const { getSocket } = require('../../socket')
-const { applyPromotion } = require('../promotion/calculate')
+const { applyPromotion,applyPromotionUsage } = require('../promotion/calculate')
 const stockModel = require('../../models/cash/stock')
 const orderModel = require('../../models/cash/sale')
 const cartModel = require('../../models/cash/cart')
@@ -195,23 +195,8 @@ exports.checkout = async (req, res) => {
       paymentStatus: 'paid',
       createdBy: sale.username
     })
+    applyPromotionUsage(newOrder.store.storeId,newOrder.listPromotions,channel,res)
 
-    // console.log(JSON.stringify(newOrder.listProduct, null, 2));
-
-    // const calStock = {
-    //     // storeId: refundOrder.store.storeId,
-    //     area: newOrder.store.area,
-    //     period: period,
-    //     type: "Sale",
-    //     listProduct: newOrder.listProduct.map(u => {
-    //         return {
-    //             id: u.id,
-    //             lot: u.lot,
-    //             unit: u.unit,
-    //             qty: u.qty,
-    //         }
-    //     })
-    // }
     const calStock = {
       // storeId: refundOrder.store.storeId,
       orderId: newOrder.orderId,
@@ -310,45 +295,45 @@ exports.checkout = async (req, res) => {
       });
     }
 
-    for (const updated of listProductStock) {
-      await Stock.findOneAndUpdate(
-        { area: area, period: period },
-        {
-          $set: {
-            "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
-            "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
-            "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
-            "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
-            "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
-            "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
-            "listProduct.$[product].available": updated.available
-          }
-        },
-        { arrayFilters: [{ "product.productId": updated.productId }], new: true }
-      )
-    }
+    // for (const updated of listProductStock) {
+    //   await Stock.findOneAndUpdate(
+    //     { area: area, period: period },
+    //     {
+    //       $set: {
+    //         "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
+    //         "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
+    //         "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
+    //         "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
+    //         "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
+    //         "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
+    //         "listProduct.$[product].available": updated.available
+    //       }
+    //     },
+    //     { arrayFilters: [{ "product.productId": updated.productId }], new: true }
+    //   )
+    // }
 
-    const createdMovement = await StockMovement.create({
-      ...calStock
-    });
+    // const createdMovement = await StockMovement.create({
+    //   ...calStock
+    // });
 
-    await StockMovementLog.create({
-      ...calStock,
-      refOrderId: createdMovement._id
-    });
+    // await StockMovementLog.create({
+    //   ...calStock,
+    //   refOrderId: createdMovement._id
+    // });
 
 
-    await newOrder.save()
-    await Cart.deleteOne({ type, area, storeId })
+    // await newOrder.save()
+    // await Cart.deleteOne({ type, area, storeId })
 
-    const checkIn = await checkInRoute({
-      storeId: storeId,
-      routeId: routeId,
-      orderId: orderId,
-      note: note,
-      latitude: latitude,
-      longitude: longitude
-    }, channel, res)
+    // const checkIn = await checkInRoute({
+    //   storeId: storeId,
+    //   routeId: routeId,
+    //   orderId: orderId,
+    //   note: note,
+    //   latitude: latitude,
+    //   longitude: longitude
+    // }, channel, res)
 
     res.status(200).json({
       status: 200,

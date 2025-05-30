@@ -3,6 +3,7 @@ const { Product } = require('../../models/cash/product')
 const  promotionModel  = require('../../models/cash/promotion')
 const  productModel  = require('../../models/cash/product')
 const { getModelsByChannel } = require('../../middleware/channel')
+const promotionLimitModel = require('../../models/cash/promotion');
 
 
 async function rewardProduct(rewards, multiplier,channel,res) {
@@ -196,4 +197,34 @@ async function getRewardProduct(proId,channel,res) {
     }))
 }
 
-module.exports = { applyPromotion, rewardProduct, getRewardProduct }
+async function applyPromotionUsage(storeId,promotion,channel,res) {
+    
+    // const { Promotion } = getModelsByChannel(channel,res,promotionModel); 
+      const { PromotionLimit } = getModelsByChannel(channel, res, promotionLimitModel);
+    
+
+    const proIds = promotion.map(u => u.proId)
+    const promotionData = await PromotionLimit.find({proId:{$in:proIds}})
+    // console.log(JSON.stringify(promotion, null, 2));
+
+    const data = promotionData.map(u => {
+            console.log(JSON.stringify(u, null, 2));
+
+        // const productPromo = promotion.listProduct.find({id:})
+        return {
+                proId:u.proId,
+                giftItem:{
+                    productId:"",
+                    qtyPerStore:'',
+                }
+        }
+    })
+
+    // console.log(data)
+
+
+}
+
+
+
+module.exports = { applyPromotion, rewardProduct, getRewardProduct,applyPromotionUsage }
