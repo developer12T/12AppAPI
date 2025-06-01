@@ -295,23 +295,23 @@ exports.checkout = async (req, res) => {
       });
     }
 
-    // for (const updated of listProductStock) {
-    //   await Stock.findOneAndUpdate(
-    //     { area: area, period: period },
-    //     {
-    //       $set: {
-    //         "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
-    //         "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
-    //         "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
-    //         "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
-    //         "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
-    //         "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
-    //         "listProduct.$[product].available": updated.available
-    //       }
-    //     },
-    //     { arrayFilters: [{ "product.productId": updated.productId }], new: true }
-    //   )
-    // }
+    for (const updated of listProductStock) {
+      await Stock.findOneAndUpdate(
+        { area: area, period: period },
+        {
+          $set: {
+            "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
+            "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
+            "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
+            "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
+            "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
+            "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
+            "listProduct.$[product].available": updated.available
+          }
+        },
+        { arrayFilters: [{ "product.productId": updated.productId }], new: true }
+      )
+    }
 
     // const createdMovement = await StockMovement.create({
     //   ...calStock
@@ -323,24 +323,22 @@ exports.checkout = async (req, res) => {
     // });
 
 
-    // await newOrder.save()
-    // await Cart.deleteOne({ type, area, storeId })
+    await newOrder.save()
+    await Cart.deleteOne({ type, area, storeId })
 
-    // const checkIn = await checkInRoute({
-    //   storeId: storeId,
-    //   routeId: routeId,
-    //   orderId: orderId,
-    //   note: note,
-    //   latitude: latitude,
-    //   longitude: longitude
-    // }, channel, res)
+    const checkIn = await checkInRoute({
+      storeId: storeId,
+      routeId: routeId,
+      orderId: orderId,
+      note: note,
+      latitude: latitude,
+      longitude: longitude
+    }, channel, res)
 
     res.status(200).json({
       status: 200,
       message: 'Checkout successful!',
       data: newOrder
-      // data:summary
-      // data:data
     })
 
 

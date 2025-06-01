@@ -21,90 +21,97 @@ const { flatMap } = require('lodash')
 
 exports.getRoute = async (req, res) => {
   try {
-    const { period, area, district, province, routeId } = req.query;
-    const channel = req.headers['x-channel'];
+    const { period, area, district, province, routeId, storeId } = req.query
+    const channel = req.headers['x-channel']
 
-    const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel);
-    const { Route } = getModelsByChannel(channel, res, routeModel);
+    const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
+    const { Route } = getModelsByChannel(channel, res, routeModel)
     if (!period) {
-      return res.status(400).json({ status: 400, message: 'period is required' });
+      return res
+        .status(400)
+        .json({ status: 400, message: 'period is required' })
     }
 
-    const query = { period };
-    if (area) query.area = area;
-    if (routeId) query.id = routeId;
+    const query = { period }
+    if (area) query.area = area
+    if (routeId) query.id = routeId
 
     const routes = await Route.find(query).populate(
       'listStore.storeInfo',
       'storeId name address typeName taxId tel'
-    );
+    )
+
+    
 
     const filteredRoutes = routes
       .map(route => {
         const filteredListStore = route.listStore.filter(store => {
-          const addr = (store.storeInfo?.address || '').toLowerCase();
+          const addr = (store.storeInfo?.address || '').toLowerCase()
 
-          const matchDistrict = district ? addr.includes(district.toLowerCase()) : true;
-          const matchProvince = province ? addr.includes(province.toLowerCase()) : true;
+          const matchDistrict = district
+            ? addr.includes(district.toLowerCase())
+            : true
+          const matchProvince = province
+            ? addr.includes(province.toLowerCase())
+            : true
 
-          return matchDistrict && matchProvince;
-        });
+            const matchStoreId = storeId
+            ? store.storeInfo?.storeId === storeId
+            : true
+
+          return matchDistrict && matchProvince && matchStoreId
+        })
 
         return {
           ...route.toObject(),
           listStore: filteredListStore
-        };
+        }
       })
-      .filter(route => route.listStore.length > 0);
+      .filter(route => route.listStore.length > 0)
 
     // console.log(filteredRoutes)
 
-
     const allStoreIds = filteredRoutes.flatMap(route =>
       route.listStore.map(s => s.storeInfo?.storeId).filter(Boolean)
-    );
-
+    )
 
     const storeTypes = await TypeStore.find({
       storeId: { $in: allStoreIds }
-    }).select('storeId type');
+    }).select('storeId type')
 
-
-    const storeTypeMap = new Map(
-      storeTypes.map(s => [s.storeId, s.type])
-    );
-
+    const storeTypeMap = new Map(storeTypes.map(s => [s.storeId, s.type]))
 
     const enrichedRoutes = filteredRoutes.map(route => {
       const enrichedListStore = route.listStore.map(itemRaw => {
-        const item = itemRaw.toObject ? itemRaw.toObject() : itemRaw;
-        const storeInfo = item.storeInfo?.toObject ? item.storeInfo.toObject() : item.storeInfo || {};
-        const type = storeTypeMap.get(storeInfo.storeId);
+        const item = itemRaw.toObject ? itemRaw.toObject() : itemRaw
+        const storeInfo = item.storeInfo?.toObject
+          ? item.storeInfo.toObject()
+          : item.storeInfo || {}
+        const type = storeTypeMap.get(storeInfo.storeId)
 
         return {
           ...item,
           storeInfo,
           storeType: type || []
-        };
-      });
+        }
+      })
 
       return {
         ...route,
         listStore: enrichedListStore
-      };
-    });
+      }
+    })
 
     res.status(200).json({
       status: 200,
       message: 'Success',
       data: enrichedRoutes
-    });
-
+    })
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ status: 500, message: err.message });
+    console.error(err)
+    res.status(500).json({ status: 500, message: err.message })
   }
-};
+}
 
 exports.addFromERP = async (req, res) => {
   try {
@@ -315,12 +322,9 @@ exports.checkIn = async (req, res) => {
 }
 
 exports.checkInVisit = async (req, res) => {
-
-  const channel = req.headers['x-channel'];
-  const { Store } = getModelsByChannel(channel, res, storeModel);
-  const { Route } = getModelsByChannel(channel, res, routeModel);
-
-
+  const channel = req.headers['x-channel']
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const { Route } = getModelsByChannel(channel, res, routeModel)
 
   upload(req, res, async err => {
     if (err) {
@@ -468,7 +472,6 @@ exports.createRoute = async (req, res) => {
 
     const { Route } = getModelsByChannel(channel, res, routeModel)
     const { RouteChangeLog } = getModelsByChannel(channel, res, routeModel)
-
 
     if (!period || !area || area.length === 0) {
       return res.status(400).json({ message: 'Period and area are required.' })
@@ -945,9 +948,7 @@ exports.routeTimeline = async (req, res) => {
   }
 }
 
-
 exports.updateAndAddRoute = async (req, res) => {
-
   const channel = req.headers['x-channel']
 
   const { Route } = getModelsByChannel(channel, res, routeModel)
@@ -980,7 +981,6 @@ exports.updateAndAddRoute = async (req, res) => {
   let routeId
   const latestRoute = route.sort((a, b) => b.id.localeCompare(a.id))[0]
 
-
   if (!latestRoute) {
     routeId = `${period()}${response.data.area}R01`
     console.log('route', routeId)
@@ -998,8 +998,6 @@ exports.updateAndAddRoute = async (req, res) => {
     const existingRoute = routeMap.get(storeList.id)
     // console.log(existingRoute)
     if (existingRoute) {
-
-
       for (const list of storeList.storeInfo || []) {
         const store = await Store.findOne({ storeId: list })
         // if (!store) {
@@ -1027,9 +1025,8 @@ exports.updateAndAddRoute = async (req, res) => {
       }
 
       await existingRoute.save()
-      console.log("existingRoute")
+      console.log('existingRoute')
     } else {
-
       const listStore = []
 
       for (const storeId of storeList.listStore || []) {
@@ -1072,7 +1069,6 @@ exports.updateAndAddRoute = async (req, res) => {
 }
 
 exports.getRouteProvince = async (req, res) => {
-
   const { area, period } = req.body
 
   const channel = req.headers['x-channel']
@@ -1090,7 +1086,7 @@ exports.getRouteProvince = async (req, res) => {
     { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
     {
       $addFields: {
-        storeObjId: { $toObjectId: "$listStore.storeInfo" }
+        storeObjId: { $toObjectId: '$listStore.storeInfo' }
       }
     },
     {
@@ -1114,46 +1110,43 @@ exports.getRouteProvince = async (req, res) => {
     {
       $project: {
         _id: 0,
-        province: "$_id",
+        province: '$_id'
       }
-    },
+    }
   ])
 
   if (route.length == 0) {
     return res.status(404).json({
       status: 404,
-      message: "Not found province this area"
+      message: 'Not found province this area'
     })
   }
 
-
-  const result = route.flatMap(item => item.province).filter(p => p && p.trim() !== '');
+  const result = route
+    .flatMap(item => item.province)
+    .filter(p => p && p.trim() !== '')
 
   res.status(200).json({
     status: 200,
-    message: "successful",
+    message: 'successful',
     data: result
   })
 }
 
-
 exports.getRouteEffective = async (req, res) => {
-
   const { area, period } = req.body
 
   const channel = req.headers['x-channel']
 
-  const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel);
-  const { Route } = getModelsByChannel(channel, res, routeModel);
-  const { Order } = getModelsByChannel(channel, res, orderModel);
-  const { Product } = getModelsByChannel(channel, res, productModel);
-
-
+  const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
+  const { Route } = getModelsByChannel(channel, res, routeModel)
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+  const { Product } = getModelsByChannel(channel, res, productModel)
 
   const routes = await Route.find({ area: area, period: period }).populate(
     'listStore.storeInfo',
     'storeId name address typeName taxId tel'
-  );
+  )
 
   // console.log("routes",routes)
   if (routes.length == 0) {
@@ -1167,7 +1160,7 @@ exports.getRouteEffective = async (req, res) => {
     (u.listStore || []).flatMap(i =>
       (i.listOrder || []).map(order => order.orderId)
     )
-  );
+  )
   const orderDetail = await Order.find({ orderId: { $in: orderIdList } })
 
   const productId = orderDetail.flatMap(u => u.listProduct.map(i => i.id))
@@ -1191,48 +1184,64 @@ exports.getRouteEffective = async (req, res) => {
 
   // console.log(productFactor)
 
+  const orderQty = orderDetail.map(i =>
+    i.listProduct.map(product => {
+      const qty = productFactor.find(
+        u => u.productId === product.id && u.unit == product.unit
+      )
+      const factorPcs = product.qty * qty.factor
+      const factorCtn = productFactor.find(
+        u => u.productId === product.id && u.unit == 'CTN'
+      )
+      // console.log(factorCtn)
+      const qtyCtn = Math.floor(factorPcs / factorCtn.factor)
 
-  const orderQty = orderDetail.map(i => i.listProduct.map(product => {
-    const qty = productFactor.find(u => u.productId === product.id && u.unit == product.unit)
-    const factorPcs = (product.qty * qty.factor)
-    const factorCtn = productFactor.find(u => u.productId === product.id && u.unit == "CTN")
-    // console.log(factorCtn)
-    const qtyCtn = Math.floor((factorPcs / factorCtn.factor))
-
-    return {
-      id: product.id,
-      factorPcs: factorPcs,
-      factorCtn: factorCtn.factor,
-      // factor : factorCtn.factor ,
-      qtyCtn: qtyCtn
-    }
-  }))
-
+      return {
+        id: product.id,
+        factorPcs: factorPcs,
+        factorCtn: factorCtn.factor,
+        // factor : factorCtn.factor ,
+        qtyCtn: qtyCtn
+      }
+    })
+  )
 
   const routesTranFrom = routes.map(u => {
-    const totalSummary = u.listStore?.flatMap(i =>
-      i.listOrder?.map(order => {
-        const detail = orderDetail.find(d => d.orderId === order.orderId);
-        return detail?.total || 0;
-      }) || []
-    ).reduce((sum, val) => sum + val, 0) || 0;
+    const totalSummary =
+      u.listStore
+        ?.flatMap(
+          i =>
+            i.listOrder?.map(order => {
+              const detail = orderDetail.find(d => d.orderId === order.orderId)
+              return detail?.total || 0
+            }) || []
+        )
+        .reduce((sum, val) => sum + val, 0) || 0
 
-    const totalQty = u.listStore?.flatMap(store =>
-      store.listOrder?.flatMap(order => {
-        const matchedOrder = orderDetail.find(d => d.orderId === order.orderId);
-        if (!matchedOrder) return [];
+    const totalQty =
+      u.listStore?.flatMap(
+        store =>
+          store.listOrder?.flatMap(order => {
+            const matchedOrder = orderDetail.find(
+              d => d.orderId === order.orderId
+            )
+            if (!matchedOrder) return []
 
-        return matchedOrder.listProduct.map(product => {
-          const flatOrderQty = orderQty.flat(); 
-          const qty = flatOrderQty.find(q => q.id === product.id);
-          console.log(qty)
-          return qty;
-        }).filter(Boolean);
-      }) || []
-    ) || []; 
+            return matchedOrder.listProduct
+              .map(product => {
+                const flatOrderQty = orderQty.flat()
+                const qty = flatOrderQty.find(q => q.id === product.id)
+                console.log(qty)
+                return qty
+              })
+              .filter(Boolean)
+          }) || []
+      ) || []
 
-
-    const totalQtyCtnSum = totalQty.reduce((sum, item) => sum + (item.qtyCtn || 0), 0);
+    const totalQtyCtnSum = totalQty.reduce(
+      (sum, item) => sum + (item.qtyCtn || 0),
+      0
+    )
 
     return {
       routeId: u.id,
@@ -1249,46 +1258,38 @@ exports.getRouteEffective = async (req, res) => {
       percentEffective: u.percentEffective,
       summary: totalSummary,
       totalqty: totalQtyCtnSum
-    };
-  });
-
+    }
+  })
 
   res.status(200).json({
     status: 200,
-    message: "successful",
+    message: 'successful',
     data: routesTranFrom
   })
-
 }
 
-
-
 exports.getRouteEffectiveAll = async (req, res) => {
-
   const { zone, area, period, day } = req.query
 
-  const query = {};
-  if (area) query.area = area;
-  if (period) query.period = period;
-  if (day) query.day = day;
+  const query = {}
+  if (area) query.area = area
+  if (period) query.period = period
+  if (day) query.day = day
 
-
-  const channel = req.headers['x-channel'];
-  const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel);
-  const { Route } = getModelsByChannel(channel, res, routeModel);
-  const { Order } = getModelsByChannel(channel, res, orderModel);
+  const channel = req.headers['x-channel']
+  const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
+  const { Route } = getModelsByChannel(channel, res, routeModel)
+  const { Order } = getModelsByChannel(channel, res, orderModel)
 
   let routes = await Route.find(query).populate(
     'listStore.storeInfo',
     'storeId name address typeName taxId tel'
-  );
-
+  )
 
   if (zone) {
-    routes = routes.filter(u => u.area.slice(0, 2) === zone);
+    routes = routes.filter(u => u.area.slice(0, 2) === zone)
     console.log(routes)
   }
-
 
   if (routes.length == 0) {
     return res.status(404).json({
@@ -1297,36 +1298,36 @@ exports.getRouteEffectiveAll = async (req, res) => {
     })
   }
 
-  let totalVisit = 0;
-  let totalEffective = 0;
-  let totalStoreAll = 0;
-  let totalStorePending = 0;
-  let totalStoreSell = 0;
-  let totalStoreNotSell = 0;
-  let totalStoreCheckInNotSell = 0;
+  let totalVisit = 0
+  let totalEffective = 0
+  let totalStoreAll = 0
+  let totalStorePending = 0
+  let totalStoreSell = 0
+  let totalStoreNotSell = 0
+  let totalStoreCheckInNotSell = 0
 
-  let count = 0;
+  let count = 0
 
   const routesTranFrom = routes.map(u => {
-    const percentVisit = u.percentVisit || 0;
-    const percentEffective = u.percentEffective || 0;
+    const percentVisit = u.percentVisit || 0
+    const percentEffective = u.percentEffective || 0
 
-    const storeAll = u.storeAll || 0;
-    const storePending = u.storePending || 0;
-    const storeSell = u.storeSell || 0;
-    const storeNotSell = u.storeNotSell || 0;
-    const storeCheckInNotSell = u.storeCheckInNotSell || 0; // ✅ แก้ชื่อจาก storehCeckInNotSell
+    const storeAll = u.storeAll || 0
+    const storePending = u.storePending || 0
+    const storeSell = u.storeSell || 0
+    const storeNotSell = u.storeNotSell || 0
+    const storeCheckInNotSell = u.storeCheckInNotSell || 0 // ✅ แก้ชื่อจาก storehCeckInNotSell
 
-    totalVisit += percentVisit;
-    totalEffective += percentEffective;
+    totalVisit += percentVisit
+    totalEffective += percentEffective
 
-    totalStoreAll += storeAll;
-    totalStorePending += storePending;
-    totalStoreSell += storeSell;
-    totalStoreNotSell += storeNotSell;
-    totalStoreCheckInNotSell += storeCheckInNotSell;
+    totalStoreAll += storeAll
+    totalStorePending += storePending
+    totalStoreSell += storeSell
+    totalStoreNotSell += storeNotSell
+    totalStoreCheckInNotSell += storeCheckInNotSell
 
-    count++;
+    count++
 
     return {
       area: u.area,
@@ -1337,11 +1338,11 @@ exports.getRouteEffectiveAll = async (req, res) => {
       storeSell,
       storeNotSell,
       storeCheckInNotSell
-    };
-  });
+    }
+  })
 
-  const percentVisitAvg = count > 0 ? totalVisit / count : 0;
-  const percentEffectiveAvg = count > 0 ? totalEffective / count : 0;
+  const percentVisitAvg = count > 0 ? totalVisit / count : 0
+  const percentEffectiveAvg = count > 0 ? totalEffective / count : 0
 
   res.status(200).json({
     status: 200,
@@ -1354,20 +1355,13 @@ exports.getRouteEffectiveAll = async (req, res) => {
     totalStoreSell: totalStoreSell,
     totalStoreNotSell: totalStoreNotSell,
     totalStoreCheckInNotSell: totalStoreCheckInNotSell
-
-
-
   })
 }
 
-
 exports.getAreaInRoute = async (req, res) => {
-
   const { period } = req.query
-  const channel = req.headers['x-channel'];
-  const { Route } = getModelsByChannel(channel, res, routeModel);
-
-
+  const channel = req.headers['x-channel']
+  const { Route } = getModelsByChannel(channel, res, routeModel)
 
   const routes = await Route.aggregate([
     {
@@ -1392,7 +1386,7 @@ exports.getAreaInRoute = async (req, res) => {
     {
       $sort: { zone: 1 }
     }
-  ]);
+  ])
 
   if (routes.length == 0) {
     return res.status(404).json({
@@ -1401,8 +1395,6 @@ exports.getAreaInRoute = async (req, res) => {
     })
   }
 
-
-
   res.status(200).json({
     status: 200,
     message: 'sucess',
@@ -1410,12 +1402,10 @@ exports.getAreaInRoute = async (req, res) => {
   })
 }
 
-
 exports.getZoneInRoute = async (req, res) => {
-
   const { zone, period } = req.query
-  const channel = req.headers['x-channel'];
-  const { Route } = getModelsByChannel(channel, res, routeModel);
+  const channel = req.headers['x-channel']
+  const { Route } = getModelsByChannel(channel, res, routeModel)
 
   const pipeline = [
     {
@@ -1426,12 +1416,12 @@ exports.getZoneInRoute = async (req, res) => {
         area2: { $substrCP: ['$area', 0, 2] }
       }
     }
-  ];
+  ]
 
   if (zone) {
     pipeline.push({
       $match: { area2: zone }
-    });
+    })
   }
 
   pipeline.push(
@@ -1444,9 +1434,9 @@ exports.getZoneInRoute = async (req, res) => {
     {
       $sort: { area: 1 }
     }
-  );
+  )
 
-  const routes = await Route.aggregate(pipeline);
+  const routes = await Route.aggregate(pipeline)
 
   if (routes.length == 0) {
     return res.status(404).json({
@@ -1454,7 +1444,6 @@ exports.getZoneInRoute = async (req, res) => {
       message: 'Not found zone'
     })
   }
-
 
   res.status(200).json({
     status: 200,
@@ -1464,10 +1453,9 @@ exports.getZoneInRoute = async (req, res) => {
 }
 
 exports.getRouteByArea = async (req, res) => {
-
   const { area, period } = req.query
-  const channel = req.headers['x-channel'];
-  const { Route } = getModelsByChannel(channel, res, routeModel);
+  const channel = req.headers['x-channel']
+  const { Route } = getModelsByChannel(channel, res, routeModel)
 
   const match = {}
   if (period) match.period = period
@@ -1490,7 +1478,6 @@ exports.getRouteByArea = async (req, res) => {
       message: 'Not found route'
     })
   }
-
 
   res.status(200).json({
     status: 200,
