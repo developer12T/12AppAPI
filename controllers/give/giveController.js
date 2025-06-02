@@ -360,14 +360,14 @@ exports.checkout = async (req, res) => {
                 { arrayFilters: [{ "product.productId": updated.productId }], new: true }
             )
         }
-        const createdMovement = await StockMovement.create({
-            ...calStock
-        });
+        // const createdMovement = await StockMovement.create({
+        //     ...calStock
+        // });
 
-        await StockMovementLog.create({
-            ...calStock,
-            refOrderId: createdMovement._id
-        });
+        // await StockMovementLog.create({
+        //     ...calStock,
+        //     refOrderId: createdMovement._id
+        // });
 
 
 
