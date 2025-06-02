@@ -13,9 +13,9 @@ function initSocket (server) {
   io.on('connection', socket => {
     console.log('A user connected:', socket.id)
 
-    socket.on('request_sale', data => {
+    socket.on('request_sale_summary', data => {
       console.log('Sale request received:', data)
-      io.emit('sale_response', {
+      io.emit('sale_getSummarybyArea', {
         message: 'Sale processed',
         saleCode: data.saleCode
       })

@@ -4,7 +4,6 @@
 // const { Product } = require('../../models/cash/product')
 // const { Route } = require('../../models/cash/route')
 
-
 const { Warehouse, Locate, Balance, Sale } = require('../../models/cash/master')
 const { generateOrderId } = require('../../utilities/genetateId')
 const {
@@ -19,9 +18,12 @@ const { checkInRoute } = require('../route/checkIn')
 const multer = require('multer')
 const upload = multer({ storage: multer.memoryStorage() }).single('image')
 const _ = require('lodash')
-const { DateTime } = require("luxon");
+const { DateTime } = require('luxon')
 const { getSocket } = require('../../socket')
-const { applyPromotion,applyPromotionUsage } = require('../promotion/calculate')
+const {
+  applyPromotion,
+  applyPromotionUsage
+} = require('../promotion/calculate')
 const stockModel = require('../../models/cash/stock')
 const orderModel = require('../../models/cash/sale')
 const cartModel = require('../../models/cash/cart')
@@ -30,19 +32,14 @@ const productModel = require('../../models/cash/product')
 const routeModel = require('../../models/cash/route')
 const promotionModel = require('../../models/cash/promotion')
 
-
-const storeModel = require('../../models/cash/store');
+const storeModel = require('../../models/cash/store')
 const { getModelsByChannel } = require('../../middleware/channel')
 
-const xlsx = require('xlsx');
-const path = require('path');
-const os = require('os');
-const fs = require('fs');
+const xlsx = require('xlsx')
+const path = require('path')
+const os = require('os')
+const fs = require('fs')
 const { group } = require('console')
-
-
-
-
 
 exports.checkout = async (req, res) => {
   try {
@@ -61,14 +58,17 @@ exports.checkout = async (req, res) => {
       listPromotion = []
     } = req.body
 
-    const channel = req.headers['x-channel'];
+    const channel = req.headers['x-channel']
 
-    const { Cart } = getModelsByChannel(channel, res, cartModel);
-    const { User } = getModelsByChannel(channel, res, userModel);
-    const { Product } = getModelsByChannel(channel, res, productModel);
-    const { Order } = getModelsByChannel(channel, res, orderModel);
-    const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(channel, res, stockModel);
-
+    const { Cart } = getModelsByChannel(channel, res, cartModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
+      channel,
+      res,
+      stockModel
+    )
 
     if (!type || !area || !storeId || !shipping || !payment) {
       return res
@@ -95,7 +95,12 @@ exports.checkout = async (req, res) => {
       summary = await summaryOrder(cart, channel, res)
       // data = applyPromotion(summary,channel,res)
     } else if (changePromotionStatus == 1) {
-      summary = await summaryOrderProStatusOne(cart, listPromotion, channel, res)
+      summary = await summaryOrderProStatusOne(
+        cart,
+        listPromotion,
+        channel,
+        res
+      )
       // data = applyPromotion(summary,channel,res)
     }
     // const shippingData = store.shippingAddress.find(s => s.shippingId === shipping)
@@ -115,12 +120,10 @@ exports.checkout = async (req, res) => {
 
       const unitData = product.listUnit.find(u => u.unit === item.unit)
       if (!unitData) {
-        return res
-          .status(400)
-          .json({
-            status: 400,
-            message: `Invalid unit for product ${item.id}`
-          })
+        return res.status(400).json({
+          status: 400,
+          message: `Invalid unit for product ${item.id}`
+        })
       }
 
       const totalPrice = item.qty * unitData.price.sale
@@ -178,7 +181,7 @@ exports.checkout = async (req, res) => {
       subtotal,
       discount: 0,
       discountProduct: 0,
-      vat: parseFloat((subtotal - (subtotal / 1.07)).toFixed(2)),
+      vat: parseFloat((subtotal - subtotal / 1.07).toFixed(2)),
       totalExVat: parseFloat((subtotal / 1.07).toFixed(2)),
       total: subtotal,
       // shipping: {
@@ -195,7 +198,12 @@ exports.checkout = async (req, res) => {
       paymentStatus: 'paid',
       createdBy: sale.username
     })
-    applyPromotionUsage(newOrder.store.storeId,newOrder.listPromotions,channel,res)
+    applyPromotionUsage(
+      newOrder.store.storeId,
+      newOrder.listPromotions,
+      channel,
+      res
+    )
 
     const calStock = {
       // storeId: refundOrder.store.storeId,
@@ -205,14 +213,14 @@ exports.checkout = async (req, res) => {
       period: period,
       warehouse: newOrder.sale.warehouse,
       status: 'pending',
-      action: "Sale",
-      type: "Sale",
+      action: 'Sale',
+      type: 'Sale',
       product: newOrder.listProduct.map(u => {
         return {
           productId: u.id,
           lot: u.lot,
           unit: u.unit,
-          qty: u.qty,
+          qty: u.qty
         }
       })
     }
@@ -222,42 +230,41 @@ exports.checkout = async (req, res) => {
     const stock = await Stock.aggregate([
       { $match: { area: area, period: period } },
       { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
-      { $match: { "listProduct.productId": { $in: productId } } },
+      { $match: { 'listProduct.productId': { $in: productId } } },
       // { $match : { "listProduct.available.lot": u.lot } },
       {
         $project: {
           _id: 0,
-          productId: "$listProduct.productId",
-          sumQtyPcs: "$listProduct.sumQtyPcs",
-          sumQtyCtn: "$listProduct.sumQtyCtn",
-          sumQtyPcsStockIn: "$listProduct.sumQtyPcsStockIn",
-          sumQtyCtnStockIn: "$listProduct.sumQtyCtnStockIn",
-          sumQtyPcsStockOut: "$listProduct.sumQtyPcsStockOut",
-          sumQtyCtnStockOut: "$listProduct.sumQtyCtnStockOut",
-          available: "$listProduct.available"
+          productId: '$listProduct.productId',
+          sumQtyPcs: '$listProduct.sumQtyPcs',
+          sumQtyCtn: '$listProduct.sumQtyCtn',
+          sumQtyPcsStockIn: '$listProduct.sumQtyPcsStockIn',
+          sumQtyCtnStockIn: '$listProduct.sumQtyCtnStockIn',
+          sumQtyPcsStockOut: '$listProduct.sumQtyPcsStockOut',
+          sumQtyCtnStockOut: '$listProduct.sumQtyCtnStockOut',
+          available: '$listProduct.available'
         }
       }
-    ]);
+    ])
 
     let listProductStock = []
     let updateLot = []
 
     for (const stockDetail of stock) {
       for (const lot of stockDetail.available) {
-
         const calDetails = calStock.product.filter(
           u => u.productId === stockDetail.productId && u.lot === lot.lot
-        );
+        )
 
-        let pcsQty = 0;
-        let ctnQty = 0;
+        let pcsQty = 0
+        let ctnQty = 0
 
         for (const cal of calDetails) {
           if (cal.unit === 'PCS' || cal.unit === 'BOT') {
-            pcsQty += cal.qty || 0;
+            pcsQty += cal.qty || 0
           }
           if (cal.unit === 'CTN') {
-            ctnQty += cal.qty || 0;
+            ctnQty += cal.qty || 0
           }
         }
         checkQtyPcs = lot.qtyPcs - pcsQty
@@ -282,17 +289,31 @@ exports.checkout = async (req, res) => {
           qtyCtnStockOut: lot.qtyCtnStockOut + ctnQty
         })
       }
-      const relatedLots = updateLot.filter((u) => u.productId === stockDetail.productId);
+      const relatedLots = updateLot.filter(
+        u => u.productId === stockDetail.productId
+      )
       listProductStock.push({
         productId: stockDetail.productId,
         sumQtyPcs: relatedLots.reduce((total, item) => total + item.qtyPcs, 0),
         sumQtyCtn: relatedLots.reduce((total, item) => total + item.qtyCtn, 0),
-        sumQtyPcsStockIn: relatedLots.reduce((total, item) => total + item.qtyPcsStockIn, 0),
-        sumQtyCtnStockIn: relatedLots.reduce((total, item) => total + item.qtyCtnStockIn, 0),
-        sumQtyPcsStockOut: relatedLots.reduce((total, item) => total + item.qtyPcsStockOut, 0),
-        sumQtyCtnStockOut: relatedLots.reduce((total, item) => total + item.qtyCtnStockOut, 0),
-        available: relatedLots.map(({ id, ...rest }) => rest),
-      });
+        sumQtyPcsStockIn: relatedLots.reduce(
+          (total, item) => total + item.qtyPcsStockIn,
+          0
+        ),
+        sumQtyCtnStockIn: relatedLots.reduce(
+          (total, item) => total + item.qtyCtnStockIn,
+          0
+        ),
+        sumQtyPcsStockOut: relatedLots.reduce(
+          (total, item) => total + item.qtyPcsStockOut,
+          0
+        ),
+        sumQtyCtnStockOut: relatedLots.reduce(
+          (total, item) => total + item.qtyCtnStockOut,
+          0
+        ),
+        available: relatedLots.map(({ id, ...rest }) => rest)
+      })
     }
 
     for (const updated of listProductStock) {
@@ -300,16 +321,21 @@ exports.checkout = async (req, res) => {
         { area: area, period: period },
         {
           $set: {
-            "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
-            "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
-            "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
-            "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
-            "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
-            "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
-            "listProduct.$[product].available": updated.available
+            'listProduct.$[product].sumQtyPcs': updated.sumQtyPcs,
+            'listProduct.$[product].sumQtyCtn': updated.sumQtyCtn,
+            'listProduct.$[product].sumQtyPcsStockIn': updated.sumQtyPcsStockIn,
+            'listProduct.$[product].sumQtyCtnStockIn': updated.sumQtyCtnStockIn,
+            'listProduct.$[product].sumQtyPcsStockOut':
+              updated.sumQtyPcsStockOut,
+            'listProduct.$[product].sumQtyCtnStockOut':
+              updated.sumQtyCtnStockOut,
+            'listProduct.$[product].available': updated.available
           }
         },
-        { arrayFilters: [{ "product.productId": updated.productId }], new: true }
+        {
+          arrayFilters: [{ 'product.productId': updated.productId }],
+          new: true
+        }
       )
     }
 
@@ -322,26 +348,27 @@ exports.checkout = async (req, res) => {
     //   refOrderId: createdMovement._id
     // });
 
-
     await newOrder.save()
     await Cart.deleteOne({ type, area, storeId })
 
-    const checkIn = await checkInRoute({
-      storeId: storeId,
-      routeId: routeId,
-      orderId: orderId,
-      note: note,
-      latitude: latitude,
-      longitude: longitude
-    }, channel, res)
+    const checkIn = await checkInRoute(
+      {
+        storeId: storeId,
+        routeId: routeId,
+        orderId: orderId,
+        note: note,
+        latitude: latitude,
+        longitude: longitude
+      },
+      channel,
+      res
+    )
 
     res.status(200).json({
       status: 200,
       message: 'Checkout successful!',
       data: newOrder
     })
-
-
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
@@ -352,12 +379,9 @@ exports.getOrder = async (req, res) => {
   try {
     const { type, area, store, period } = req.query
 
-    const channel = req.headers['x-channel'];
+    const channel = req.headers['x-channel']
 
-
-    const { Order } = getModelsByChannel(channel, res, orderModel);
-
-
+    const { Order } = getModelsByChannel(channel, res, orderModel)
 
     let response = []
 
@@ -419,10 +443,9 @@ exports.getDetail = async (req, res) => {
   try {
     const { orderId } = req.params
 
-    const channel = req.headers['x-channel'];
+    const channel = req.headers['x-channel']
 
-
-    const { Order } = getModelsByChannel(channel, res, orderModel);
+    const { Order } = getModelsByChannel(channel, res, orderModel)
 
     if (!orderId) {
       return res
@@ -436,9 +459,8 @@ exports.getDetail = async (req, res) => {
       return res.status(404).json({
         status: 404,
         message: `Not found this ${orderId}`
-      });
+      })
     }
-
 
     res.status(200).json({
       status: 200,
@@ -455,11 +477,9 @@ exports.updateStatus = async (req, res) => {
   try {
     const { orderId, status } = req.body
 
-    const channel = req.headers['x-channel'];
+    const channel = req.headers['x-channel']
 
-
-    const { Order } = getModelsByChannel(channel, res, orderModel);
-
+    const { Order } = getModelsByChannel(channel, res, orderModel)
 
     if (!orderId || !status) {
       return res
@@ -512,10 +532,9 @@ exports.updateStatus = async (req, res) => {
 
 exports.addSlip = async (req, res) => {
   try {
+    const channel = req.headers['x-channel']
 
-    const channel = req.headers['x-channel'];
-
-    const { Order } = getModelsByChannel(channel, res, orderModel);
+    const { Order } = getModelsByChannel(channel, res, orderModel)
 
     upload(req, res, async err => {
       if (err) {
@@ -579,28 +598,32 @@ exports.addSlip = async (req, res) => {
 }
 
 exports.OrderToExcel = async (req, res) => {
-  const { channel, date } = req.query;
+  const { channel, date } = req.query
 
   console.log(channel, date)
 
   if (!date || date === 'null') {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0'); // เดือนเริ่มที่ 0
-    const day = String(today.getDate()).padStart(2, '0');
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = String(today.getMonth() + 1).padStart(2, '0') // เดือนเริ่มที่ 0
+    const day = String(today.getDate()).padStart(2, '0')
 
-    date = `${year}${month}${day}`;
-    console.log("📅 date:", date);
-
+    date = `${year}${month}${day}`
+    console.log('📅 date:', date)
   }
 
-  const start = new Date(`${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00+07:00`);
-  const end = new Date(`${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T23:59:59.999+07:00`);
-
+  const start = new Date(
+    `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00+07:00`
+  )
+  const end = new Date(
+    `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(
+      6,
+      8
+    )}T23:59:59.999+07:00`
+  )
 
   // const channel = 'cash';
-  const { Order } = getModelsByChannel(channel, res, orderModel);
-
+  const { Order } = getModelsByChannel(channel, res, orderModel)
 
   // const modelOrder = await Order.find({
   //   orderId: { $not: /CC/ },
@@ -631,8 +654,7 @@ exports.OrderToExcel = async (req, res) => {
         }
       }
     }
-  ]);
-
+  ])
 
   // console.log(modelOrder)
   const tranFromOrder = modelOrder.flatMap(order => {
@@ -739,60 +761,63 @@ exports.OrderToExcel = async (req, res) => {
 
   if (tranFromOrder.length == 0) {
     return res.status(404).json({
-      status: (404),
-      message: "Not Found Order"
+      status: 404,
+      message: 'Not Found Order'
     })
   }
 
-  const wb = xlsx.utils.book_new();
-  const ws = xlsx.utils.json_to_sheet(tranFromOrder);
-  xlsx.utils.book_append_sheet(wb, ws, 'Orders');
+  const wb = xlsx.utils.book_new()
+  const ws = xlsx.utils.json_to_sheet(tranFromOrder)
+  xlsx.utils.book_append_sheet(wb, ws, 'Orders')
 
-  const tempPath = path.join(os.tmpdir(), `Order_${Date.now()}.xlsx`);
-  xlsx.writeFile(wb, tempPath);
+  const tempPath = path.join(os.tmpdir(), `Order_${Date.now()}.xlsx`)
+  xlsx.writeFile(wb, tempPath)
 
-  res.download(tempPath, 'Order.xlsx', (err) => {
+  res.download(tempPath, 'Order.xlsx', err => {
     if (err) {
-      console.error('❌ Download error:', err);
+      console.error('❌ Download error:', err)
       // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
       if (!res.headersSent) {
-        res.status(500).send('Download failed');
+        res.status(500).send('Download failed')
       }
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => { });
-  });
-
-
+    fs.unlink(tempPath, () => {})
+  })
 
   // res.status(200).json({
   //   message: 'Create file successful!'
   // })
 }
 
-
 exports.OrderToExcelConJob = async (req, res) => {
-
   channel = ['cash', 'credit']
 
   for (const ch of channel) {
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = String(today.getMonth() + 1).padStart(2, '0') // เดือนเริ่มที่ 0
+    const day = String(today.getDate()).padStart(2, '0')
 
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0'); // เดือนเริ่มที่ 0
-    const day = String(today.getDate()).padStart(2, '0');
+    date = `${year}${month}${day}`
+    console.log('📅 date:', date)
 
-    date = `${year}${month}${day}`;
-    console.log("📅 date:", date);
-
-    const start = new Date(`${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00+07:00`);
-    const end = new Date(`${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T23:59:59.999+07:00`);
-
+    const start = new Date(
+      `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(
+        6,
+        8
+      )}T00:00:00+07:00`
+    )
+    const end = new Date(
+      `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(
+        6,
+        8
+      )}T23:59:59.999+07:00`
+    )
 
     // const channel = req.headers['x-channel'];
-    const { Order } = getModelsByChannel(ch, res, orderModel);
-
+    const { Order } = getModelsByChannel(ch, res, orderModel)
 
     // const modelOrder = await Order.find({
     //   orderId: { $not: /CC/ },
@@ -823,8 +848,7 @@ exports.OrderToExcelConJob = async (req, res) => {
           }
         }
       }
-    ]);
-
+    ])
 
     // console.log(modelOrder)
     const tranFromOrder = modelOrder.flatMap(order => {
@@ -931,14 +955,18 @@ exports.OrderToExcelConJob = async (req, res) => {
 
     if (tranFromOrder.length == 0) {
       return res.status(404).json({
-        status: (404),
-        message: "Not Found Order"
+        status: 404,
+        message: 'Not Found Order'
       })
     }
 
     const ws = xlsx.utils.json_to_sheet(tranFromOrder)
 
-    const downloadsPath = path.join(os.homedir(), 'Downloads', `Order${ch}.xlsx`)
+    const downloadsPath = path.join(
+      os.homedir(),
+      'Downloads',
+      `Order${ch}.xlsx`
+    )
 
     const wb = xlsx.utils.book_new()
     xlsx.utils.book_append_sheet(wb, ws, 'Orders')
@@ -951,27 +979,15 @@ exports.OrderToExcelConJob = async (req, res) => {
   // res.status(200).json({
   //   message: 'Create file successful!'
   // })
-
-
 }
-
-
-
-
-
-
-
-
-
-
 
 exports.getAllOrder = async (req, res) => {
   try {
     const { period } = req.query
 
-    const channel = req.headers['x-channel'];
+    const channel = req.headers['x-channel']
 
-    const { Order } = getModelsByChannel(channel, res, orderModel);
+    const { Order } = getModelsByChannel(channel, res, orderModel)
 
     if (period) {
       const periodYear = period.slice(0, 4)
@@ -1012,7 +1028,7 @@ exports.getAllOrder = async (req, res) => {
       if (modelOrder.length == 0) {
         return res.status(404).json({
           status: 404,
-          message: "Not Found Order"
+          message: 'Not Found Order'
         })
       }
 
@@ -1076,12 +1092,10 @@ exports.getSummaryItem = async (req, res) => {
 
     const { area, period, group, brand, flavour, size, type } = req.body
 
-    const channel = req.headers['x-channel'];
+    const channel = req.headers['x-channel']
 
-
-    const { Product } = getModelsByChannel(channel, res, productModel);
-    const { Order } = getModelsByChannel(channel, res, orderModel);
-
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
 
     const periodYear = period.slice(0, 4)
     const month = period.slice(4, 6)
@@ -1119,12 +1133,11 @@ exports.getSummaryItem = async (req, res) => {
     }
     // console.log("modelOrder",modelOrder)
 
-
-    const productIds = modelOrder.map(order => order.listProduct.id);
+    const productIds = modelOrder.map(order => order.listProduct.id)
     // .listProduct.map(product => product.id)
     // console.log("productIds",productIds)
 
-    const parseArrayParam = (param) => {
+    const parseArrayParam = param => {
       if (!param) return []
       try {
         return typeof param === 'string' ? JSON.parse(param) : param
@@ -1143,14 +1156,13 @@ exports.getSummaryItem = async (req, res) => {
     if (productIds.length) conditions.push({ id: { $in: productIds } })
     if (groupArray.length) conditions.push({ groupCode: { $in: groupArray } })
     if (brandArray.length) conditions.push({ brandCode: { $in: brandArray } })
-    if (flavourArray.length) conditions.push({ flavourCode: { $in: flavourArray } })
+    if (flavourArray.length)
+      conditions.push({ flavourCode: { $in: flavourArray } })
     if (sizeArray.length) conditions.push({ size: { $in: sizeArray } })
 
     if (conditions.length) filter.$and = conditions
 
-    const products = await Product.aggregate([
-      { $match: filter }
-    ]);
+    const products = await Product.aggregate([{ $match: filter }])
 
     if (products.length == 0) {
       return res.status(404).json({
@@ -1160,7 +1172,9 @@ exports.getSummaryItem = async (req, res) => {
     }
 
     const data = products.map(product => {
-      const netTotal = modelOrder.find(order => order.listProduct.id === product.id);
+      const netTotal = modelOrder.find(
+        order => order.listProduct.id === product.id
+      )
       return {
         id: product.id,
         groupCode: product.groupCode,
@@ -1178,91 +1192,73 @@ exports.getSummaryItem = async (req, res) => {
       })
     }
 
-
     let result = []
 
-    if (type == "group") {
+    if (type == 'group') {
       const groupedByGroupCode = data.reduce((acc, item) => {
-
         if (!acc[item.groupCode]) {
           acc[item.groupCode] = {
             groupCode: item.groupCode,
             totalNetTotal: 0
-          };
+          }
         }
 
-        acc[item.groupCode].totalNetTotal += item.netTotal;
+        acc[item.groupCode].totalNetTotal += item.netTotal
 
-        return acc;
-      }, {});
+        return acc
+      }, {})
 
-
-      result = Object.values(groupedByGroupCode);
+      result = Object.values(groupedByGroupCode)
       // console.log(result)
-    }
-    else if (type == "flavour") {
-
+    } else if (type == 'flavour') {
       const groupedByFlavourCode = data.reduce((acc, item) => {
-
         if (!acc[item.flavourCode]) {
           acc[item.flavourCode] = {
             flavourCode: item.flavourCode,
             totalNetTotal: 0
-          };
+          }
         }
 
-        acc[item.flavourCode].totalNetTotal += item.netTotal;
+        acc[item.flavourCode].totalNetTotal += item.netTotal
 
-        return acc;
-      }, {});
+        return acc
+      }, {})
 
-
-      result = Object.values(groupedByFlavourCode);
+      result = Object.values(groupedByFlavourCode)
       // console.log(result)
-    }
-
-    else if (type == "size") {
-
+    } else if (type == 'size') {
       const groupedBySize = data.reduce((acc, item) => {
-
         if (!acc[item.size]) {
           acc[item.size] = {
             size: item.size,
             totalNetTotal: 0
-          };
+          }
         }
 
-        acc[item.size].totalNetTotal += item.netTotal;
+        acc[item.size].totalNetTotal += item.netTotal
 
-        return acc;
-      }, {});
+        return acc
+      }, {})
 
-
-      result = Object.values(groupedBySize);
+      result = Object.values(groupedBySize)
       // console.log(result)
-    }
-
-    else if (type == "brand") {
-
+    } else if (type == 'brand') {
       const groupedByBrandCode = data.reduce((acc, item) => {
-
         if (!acc[item.brandCode]) {
           acc[item.brandCode] = {
             brandCode: item.brandCode,
             totalNetTotal: 0
-          };
+          }
         }
 
-        acc[item.brandCode].totalNetTotal += item.netTotal;
+        acc[item.brandCode].totalNetTotal += item.netTotal
 
-        return acc;
-      }, {});
+        return acc
+      }, {})
 
-
-      result = Object.values(groupedByBrandCode);
+      result = Object.values(groupedByBrandCode)
       // console.log(result)
     }
-
 
     res.status(200).json({
       status: 200,
@@ -1275,17 +1271,13 @@ exports.getSummaryItem = async (req, res) => {
   }
 }
 
-
-
 exports.getSummarybyRoute = async (req, res) => {
   try {
     const { area, period } = req.query
 
-    const channel = req.headers['x-channel'];
+    const channel = req.headers['x-channel']
 
-    const { Route } = getModelsByChannel(channel, res, routeModel);
-
-
+    const { Route } = getModelsByChannel(channel, res, routeModel)
 
     const modelRoute = await Route.aggregate([
       { $match: { area, period } },
@@ -1371,11 +1363,11 @@ exports.getSummarybyRoute = async (req, res) => {
 exports.getSummarybyMonth = async (req, res) => {
   try {
     const { area, year, storeId, day } = req.query
-    const channel = req.headers['x-channel']; // 'credit' or 'cash'
+    const channel = req.headers['x-channel'] // 'credit' or 'cash'
 
-    // const { Store } = getModelsByChannel(channel,res,storeModel); 
-    // const { Route } = getModelsByChannel(channel,res,routeModel); 
-    const { Order } = getModelsByChannel(channel, res, orderModel);
+    // const { Store } = getModelsByChannel(channel,res,storeModel);
+    // const { Route } = getModelsByChannel(channel,res,routeModel);
+    const { Order } = getModelsByChannel(channel, res, orderModel)
 
     let pipeline = []
 
@@ -1466,13 +1458,12 @@ exports.getSummarybyMonth = async (req, res) => {
     const result = Array.from({ length: 12 }, (_, i) => ({
       month: i + 1,
       summary: 0
-    }));
+    }))
 
     // อัปเดตผลลัพธ์จาก data ที่มีอยู่
     modelOrderValue.forEach(d => {
-      result[d.month - 1].summary = d.summary;
-    });
-
+      result[d.month - 1].summary = d.summary
+    })
 
     res.status(200).json({
       status: 200,
@@ -1496,8 +1487,7 @@ exports.getSummarybyArea = async (req, res) => {
           area: area
         }
       }
-    }
-    else {
+    } else {
       query = {
         $match: {
           area: { $ne: null }
@@ -1505,14 +1495,14 @@ exports.getSummarybyArea = async (req, res) => {
       }
     }
 
-    const channel = req.headers['x-channel']; // 'credit' or 'cash'
+    const channel = req.headers['x-channel'] // 'credit' or 'cash'
 
-    const { Route } = getModelsByChannel(channel, res, routeModel);
+    const { Route } = getModelsByChannel(channel, res, routeModel)
 
     if (!period) {
       return res.status(404).json({
         status: 404,
-        message: "period is require"
+        message: 'period is require'
       })
     }
 
@@ -1522,48 +1512,43 @@ exports.getSummarybyArea = async (req, res) => {
     if (zone && type == 'route') {
       groupStage = {
         $group: {
-          _id: { area: "$area", route: "$day" },
-          totalAmount: { $sum: "$orderDetails.total" }
+          _id: { area: '$area', route: '$day' },
+          totalAmount: { $sum: '$orderDetails.total' }
         }
       }
-    }
-    else if (area && type == 'route') {
+    } else if (area && type == 'route') {
       groupStage = {
         $group: {
-          _id: { area: "$area", route: "$day" },
-          totalAmount: { $sum: "$orderDetails.total" }
+          _id: { area: '$area', route: '$day' },
+          totalAmount: { $sum: '$orderDetails.total' }
         }
       }
-    }
-    else if (type == 'route') {
+    } else if (type == 'route') {
       groupStage = {
         $group: {
-          _id: { area: "$area2", route: "$day" },
-          totalAmount: { $sum: "$orderDetails.total" }
+          _id: { area: '$area2', route: '$day' },
+          totalAmount: { $sum: '$orderDetails.total' }
         }
       }
-    }
-    else if (zone && type == 'year') {
+    } else if (zone && type == 'year') {
       groupStage = {
         $group: {
-          _id: { area: "$area", route: "$month" },
-          totalAmount: { $sum: "$orderDetails.total" }
+          _id: { area: '$area', route: '$month' },
+          totalAmount: { $sum: '$orderDetails.total' }
         }
       }
-    }
-    else if (area && type == 'year') {
+    } else if (area && type == 'year') {
       groupStage = {
         $group: {
-          _id: { area: "$area", route: "$month" },
-          totalAmount: { $sum: "$orderDetails.total" }
+          _id: { area: '$area', route: '$month' },
+          totalAmount: { $sum: '$orderDetails.total' }
         }
       }
-    }
-    else if (type == 'year') {
+    } else if (type == 'year') {
       groupStage = {
         $group: {
-          _id: { area: "$area2", route: "$month" },
-          totalAmount: { $sum: "$orderDetails.total" }
+          _id: { area: '$area2', route: '$month' },
+          totalAmount: { $sum: '$orderDetails.total' }
         }
       }
     }
@@ -1572,20 +1557,25 @@ exports.getSummarybyArea = async (req, res) => {
     const modelRouteValue = await Route.aggregate([
       { $match: { period } },
       { $project: { area: 1, day: 1, listStore: 1 } },
-      { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
-      { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
+      {
+        $unwind: {
+          path: '$listStore.listOrder',
+          preserveNullAndEmptyArrays: true
+        }
+      },
 
       {
         $addFields: {
           convertedDate: {
             $dateToString: {
-              format: "%Y-%m-%dT%H:%M:%S",
-              date: "$listStore.listOrder.date",
-              timezone: "Asia/Bangkok"
+              format: '%Y-%m-%dT%H:%M:%S',
+              date: '$listStore.listOrder.date',
+              timezone: 'Asia/Bangkok'
             }
           },
-          month: { $month: "$listStore.listOrder.date" },
-          area2: { $substrCP: ["$area", 0, 2] }
+          month: { $month: '$listStore.listOrder.date' },
+          area2: { $substrCP: ['$area', 0, 2] }
         }
       },
       {
@@ -1596,7 +1586,7 @@ exports.getSummarybyArea = async (req, res) => {
               then: true,
               else: {
                 $eq: [
-                  { $substr: ["$convertedDate", 0, 4] },
+                  { $substr: ['$convertedDate', 0, 4] },
                   { $toString: year }
                 ]
               }
@@ -1607,20 +1597,19 @@ exports.getSummarybyArea = async (req, res) => {
       query,
       {
         $lookup: {
-          from: "orders",
-          localField: "listStore.listOrder.orderId",
-          foreignField: "orderId",
-          as: "orderDetails"
+          from: 'orders',
+          localField: 'listStore.listOrder.orderId',
+          foreignField: 'orderId',
+          as: 'orderDetails'
         }
       },
-      { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } },
-      groupStage,
-
-    ]);
+      { $unwind: { path: '$orderDetails', preserveNullAndEmptyArrays: true } },
+      groupStage
+    ])
 
     // console.log("modelRouteValue",modelRouteValue)
 
-    const haveArea = [...new Set(modelRouteValue.map(i => i.area))];
+    const haveArea = [...new Set(modelRouteValue.map(i => i.area))]
     otherModelRoute = await Route.aggregate([
       {
         $match: {
@@ -1629,36 +1618,40 @@ exports.getSummarybyArea = async (req, res) => {
         }
       },
       { $project: { area: 1, day: 1, listStore: 1 } },
-      { $unwind: { path: "$listStore", preserveNullAndEmptyArrays: true } },
-      { $unwind: { path: "$listStore.listOrder", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
+      {
+        $unwind: {
+          path: '$listStore.listOrder',
+          preserveNullAndEmptyArrays: true
+        }
+      },
       {
         $addFields: {
-          month: { $month: "$listStore.listOrder.date" },
-          area2: { $substrCP: ["$area", 0, 2] }
+          month: { $month: '$listStore.listOrder.date' },
+          area2: { $substrCP: ['$area', 0, 2] }
         }
       },
       {
         $lookup: {
-          from: "orders",
-          localField: "listStore.listOrder.orderId",
-          foreignField: "orderId",
-          as: "orderDetails"
+          from: 'orders',
+          localField: 'listStore.listOrder.orderId',
+          foreignField: 'orderId',
+          as: 'orderDetails'
         }
       },
-      { $unwind: { path: "$orderDetails", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: '$orderDetails', preserveNullAndEmptyArrays: true } },
       query,
       groupStage,
       {
         $project: {
-          area: "$_id.area",
-          route: "$_id.route",
+          area: '$_id.area',
+          route: '$_id.route',
           totalAmount: 1,
           _id: 0
         }
       },
       { $sort: { area: 1, route: 1 } }
-    ]);
-
+    ])
 
     if (modelRouteValue.length === 0) {
       return res.status(404).json({
@@ -1667,9 +1660,7 @@ exports.getSummarybyArea = async (req, res) => {
       })
     }
 
-
-    modelRoute = [...modelRouteValue, ...otherModelRoute];
-
+    modelRoute = [...modelRouteValue, ...otherModelRoute]
 
     // const areaList = [...new Set(modelRoute.map(item => item.area))].filter(area => area !== undefined).sort();
 
@@ -1677,34 +1668,40 @@ exports.getSummarybyArea = async (req, res) => {
       ...new Set(
         modelRoute
           .map(item => item.area)
-          .filter(areaItem => areaItem && (zone ? areaItem.startsWith(zone) : true))
+          .filter(
+            areaItem => areaItem && (zone ? areaItem.startsWith(zone) : true)
+          )
       )
-    ].sort();
+    ].sort()
 
-    let data = [];
+    let data = []
 
     if (type === 'route' || type === 'year') {
-      const totalMonths = type === 'route' ? 27 : 12;
+      const totalMonths = type === 'route' ? 27 : 12
 
       data = areaList.map(area => {
-        const filtered = modelRoute.filter(item => item.area === area);
+        const filtered = modelRoute.filter(item => item.area === area)
 
         const filledMonths = Array.from({ length: totalMonths }, (_, i) => {
-          const month = String(i + 1).padStart(2, '0');
-          const found = filtered.find(item => String(item.route).padStart(2, '0') === month);
+          const month = String(i + 1).padStart(2, '0')
+          const found = filtered.find(
+            item => String(item.route).padStart(2, '0') === month
+          )
 
-          return found || {
-            totalAmount: 0,
-            area,
-            month
-          };
-        });
+          return (
+            found || {
+              totalAmount: 0,
+              area,
+              month
+            }
+          )
+        })
 
         return {
           area,
           summary: filledMonths.map(item => item.totalAmount)
-        };
-      });
+        }
+      })
     }
 
     res.status(200).json({
@@ -1713,40 +1710,48 @@ exports.getSummarybyArea = async (req, res) => {
       data: data
     })
     // }
-
   } catch (error) {
     console.error(error)
     res.status(500).json({ message: 'Internal server error.' })
   }
 }
 
-
 exports.getSummarybyGroup = async (req, res) => {
   try {
     const { zone, group, period } = req.body
 
-    const channel = req.headers['x-channel']; // 'credit' or 'cash'
+    const channel = req.headers['x-channel'] // 'credit' or 'cash'
 
-    const { Order } = getModelsByChannel(channel, res, orderModel);
-    const { Product } = getModelsByChannel(channel, res, productModel);
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
 
-
-    const year = parseInt(period.slice(0, 4));
+    const year = parseInt(period.slice(0, 4))
     const month = period.slice(4, 6)
 
-    const start = DateTime.fromObject({ year, month, day: 1 }, { zone: 'Asia/Bangkok' }).toUTC().toJSDate();
-    const end = DateTime.fromObject({ year, month, day: 1 }, { zone: 'Asia/Bangkok' }).plus({ months: 1 }).toUTC().toJSDate();
+    const start = DateTime.fromObject(
+      { year, month, day: 1 },
+      { zone: 'Asia/Bangkok' }
+    )
+      .toUTC()
+      .toJSDate()
+    const end = DateTime.fromObject(
+      { year, month, day: 1 },
+      { zone: 'Asia/Bangkok' }
+    )
+      .plus({ months: 1 })
+      .toUTC()
+      .toJSDate()
 
     const modelOrder = await Order.aggregate([
       {
         $match: {
-          "store.zone": zone,  // กรองตาม zone
-          createdAt: { $gte: start, $lt: end },
+          'store.zone': zone, // กรองตาม zone
+          createdAt: { $gte: start, $lt: end }
         }
       },
-      { $unwind: { path: "$listProduct", preserveNullAndEmptyArrays: false } },
-      { $match: { "listProduct.groupCode": group } },
-    ]);
+      { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: false } },
+      { $match: { 'listProduct.groupCode': group } }
+    ])
 
     const order = modelOrder.map(u => {
       return {
@@ -1755,7 +1760,6 @@ exports.getSummarybyGroup = async (req, res) => {
         size: u.listProduct.size,
         flavourCode: u.listProduct.flavourCode,
         qty: u.listProduct.qty
-
       }
     })
 
@@ -1765,21 +1769,20 @@ exports.getSummarybyGroup = async (req, res) => {
       { $match: { groupCode: group } },
       {
         $group: {
-
-          _id: "$size",
+          _id: '$size',
           entries: {
             $push: {
-              k: "$flavourCode",
+              k: '$flavourCode',
               v: 0
             }
           },
-          total: { $sum: "$value" }
+          total: { $sum: '$value' }
         }
       },
 
       {
         $addFields: {
-          entriesObject: { $arrayToObject: "$entries" }
+          entriesObject: { $arrayToObject: '$entries' }
         }
       },
 
@@ -1787,13 +1790,13 @@ exports.getSummarybyGroup = async (req, res) => {
         $addFields: {
           fullObject: {
             $mergeObjects: [
-              "$entriesObject",
+              '$entriesObject',
               {
                 $arrayToObject: [
                   [
                     {
-                      k: { $concat: ["รวม", "$_id"] }, // ต่อข้อความ "รวม" + ขนาด
-                      v: "$total"
+                      k: { $concat: ['รวม', '$_id'] }, // ต่อข้อความ "รวม" + ขนาด
+                      v: '$total'
                     }
                   ]
                 ]
@@ -1801,39 +1804,35 @@ exports.getSummarybyGroup = async (req, res) => {
             ]
           }
         }
-      }
-      ,
+      },
       {
         $replaceRoot: {
           newRoot: {
-            $arrayToObject: [[
-              { k: "$_id", v: "$fullObject" }
-            ]]
+            $arrayToObject: [[{ k: '$_id', v: '$fullObject' }]]
           }
         }
-      },
-
-    ]);
+      }
+    ])
 
     if (!modelProduct || modelProduct.length === 0) {
       return res.status(404).json({
         status: 404,
         message: `Not found order for group ${group} and period ${period} `
-      });
+      })
     }
 
     for (const item of order) {
-      const { size, flavourCode, qty } = item;
+      const { size, flavourCode, qty } = item
 
-      const model = modelProduct.find(obj => obj[size]);
-      if (!model) continue;
+      const model = modelProduct.find(obj => obj[size])
+      if (!model) continue
 
       if (model[size][flavourCode] !== undefined) {
-        model[size][flavourCode] += qty;
+        model[size][flavourCode] += qty
 
-        const sumKey = `รวม${size}`;
+        const sumKey = `รวม${size}`
         if (model[size][sumKey] !== undefined) {
-          model[size][sumKey] += qty;
+          model[size][sumKey] += qty
         }
       }
     }
@@ -1851,12 +1850,9 @@ exports.getSummarybyGroup = async (req, res) => {
 
 exports.erpApiCheck = async (req, res) => {
   try {
-
-    const channel = req.headers['x-channel'];
-
-    const { Order } = getModelsByChannel(channel, res, orderModel);
-
-
+    const { data } = req.body
+    const channel = req.headers['x-channel']
+    const { Order } = getModelsByChannel(channel, res, orderModel)
     // const modelSale = await Sale.findAll({
     //   attributes: [
     //     'OAORNO',
@@ -1864,7 +1860,6 @@ exports.erpApiCheck = async (req, res) => {
     //   ],
     //   group: ['OAORNO']
     // })
-
     // const saleId = modelSale.map(row => row.get('OAORNO'))
     // // notInmodelOrder = await Order.find({
     // //   orderId: { $nin: saleId }
@@ -1877,7 +1872,6 @@ exports.erpApiCheck = async (req, res) => {
     //     }
     //   }
     // )
-
     // console.log(data.modifiedCount)
 
     // if (data.modifiedCount == 0) {
@@ -1896,26 +1890,21 @@ exports.erpApiCheck = async (req, res) => {
       'sale_getSummarybyGroup',
       'sale_getRouteCheckinAll',
       'sale_getTimelineCheckin',
-      'sale_routeTimeline',
+      'sale_routeTimeline'
     ]
 
     events.forEach(event => {
       io.emit(event, {
         status: 200,
         message: 'New Update Data',
-        // data: data
+        data: data
       })
     })
 
-    res.status(200).json(
-      {
-        status: 200,
-        message: 'Update status Sucess'
-      }
-    )
-
-
-
+    res.status(200).json({
+      status: 200,
+      message: 'Update status Sucess'
+    })
   } catch (error) {
     console.error(error)
     res.status(500).json({ message: 'Internal server error.' })
@@ -1923,44 +1912,37 @@ exports.erpApiCheck = async (req, res) => {
 }
 
 exports.getSummarybyChoice = async (req, res) => {
+  const { storeId, area, date, type } = req.body
+  let dayStr, monthStr, yearStr
 
-  const { storeId, area, date, type, } = req.body
-  let dayStr, monthStr, yearStr;
+  const channel = req.headers['x-channel']
 
-  const channel = req.headers['x-channel'];
-
-  const { Order } = getModelsByChannel(channel, res, orderModel);
-
-
+  const { Order } = getModelsByChannel(channel, res, orderModel)
 
   if (!date) {
     return res.status(400).json({
       status: 400,
-      message: "Date is required"
+      message: 'Date is required'
     })
   }
 
   if (type == 'day') {
-    dayStr = parseInt(date.substring(0, 2), 10);
-  }
-  else if (type == 'month') {
-    monthStr = parseInt(date.substring(2, 4), 10);
-  }
-  else if (type == 'year') {
-    yearStr = parseInt(date.substring(4, 8), 10);
+    dayStr = parseInt(date.substring(0, 2), 10)
+  } else if (type == 'month') {
+    monthStr = parseInt(date.substring(2, 4), 10)
+  } else if (type == 'year') {
+    yearStr = parseInt(date.substring(4, 8), 10)
   }
 
   let matchStage = {}
-  matchStage["store.area"] = area;
+  matchStage['store.area'] = area
   if (storeId) {
-    matchStage["store.storeId"] = storeId;
+    matchStage['store.storeId'] = storeId
   }
   const match = {}
   if (dayStr) match.day = dayStr
   if (monthStr) match.month = monthStr
   if (yearStr) match.year = yearStr
-
-
 
   const modelOrder = await Order.aggregate([
     { $match: matchStage },
@@ -1968,8 +1950,8 @@ exports.getSummarybyChoice = async (req, res) => {
       $addFields: {
         createdAtThai: {
           $dateAdd: {
-            startDate: "$createdAt",
-            unit: "hour",
+            startDate: '$createdAt',
+            unit: 'hour',
             amount: 7
           }
         }
@@ -1977,9 +1959,9 @@ exports.getSummarybyChoice = async (req, res) => {
     },
     {
       $addFields: {
-        day: { $dayOfMonth: "$createdAtThai" },
-        month: { $month: "$createdAtThai" },
-        year: { $year: "$createdAtThai" }
+        day: { $dayOfMonth: '$createdAtThai' },
+        month: { $month: '$createdAtThai' },
+        year: { $year: '$createdAtThai' }
       }
     },
     {
@@ -1988,7 +1970,7 @@ exports.getSummarybyChoice = async (req, res) => {
     {
       $group: {
         _id: type,
-        total: { $sum: "$total" }
+        total: { $sum: '$total' }
       }
     },
     {
@@ -2002,24 +1984,21 @@ exports.getSummarybyChoice = async (req, res) => {
   if (modelOrder.length === 0) {
     return res.status(404).json({
       status: 404,
-      message: "Not found order"
+      message: 'Not found order'
     })
   }
 
-
-
   res.status(200).json({
     status: 200,
-    message: "Successful",
+    message: 'Successful',
     total: modelOrder[0].total
   })
 }
 
 exports.getSaleSummaryByStore = async (req, res) => {
-
   const { routeId } = req.body
-  const channel = req.headers['x-channel'];
-  const { Route } = getModelsByChannel(channel, res, routeModel);
+  const channel = req.headers['x-channel']
+  const { Route } = getModelsByChannel(channel, res, routeModel)
 
   const routeData = await Route.aggregate([
     {
@@ -2028,11 +2007,16 @@ exports.getSaleSummaryByStore = async (req, res) => {
       }
     },
     { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
-    { $unwind: { path: '$listStore.listOrder', preserveNullAndEmptyArrays: true } },
+    {
+      $unwind: {
+        path: '$listStore.listOrder',
+        preserveNullAndEmptyArrays: true
+      }
+    },
 
     {
       $addFields: {
-        storeObjId: { $toObjectId: "$listStore.storeInfo" }
+        storeObjId: { $toObjectId: '$listStore.storeInfo' }
       }
     },
     {
@@ -2059,9 +2043,7 @@ exports.getSaleSummaryByStore = async (req, res) => {
         orderId: {
           $ifNull: ['$listStore.listOrder.orderId', '']
         },
-        status: '$listStore.statusText'
-        ,
-
+        status: '$listStore.statusText',
         sum: {
           $ifNull: [{ $arrayElemAt: ['$order.total', 0] }, 0]
         },
@@ -2092,7 +2074,7 @@ exports.getSaleSummaryByStore = async (req, res) => {
             },
             else: ''
           }
-        },
+        }
       }
     }
   ])
@@ -2104,41 +2086,36 @@ exports.getSaleSummaryByStore = async (req, res) => {
   })
 }
 
-
 exports.getGroup = async (req, res) => {
-
-  const channel = req.headers['x-channel'];
-  const { Product } = getModelsByChannel(channel, res, productModel);
+  const channel = req.headers['x-channel']
+  const { Product } = getModelsByChannel(channel, res, productModel)
   const product = await Product.aggregate([
     {
       $group: {
         _id: {
-          groupCode: "$groupCode",
-          group: "$group"
-        },
+          groupCode: '$groupCode',
+          group: '$group'
+        }
       }
     },
     {
       $project: {
         _id: 0,
-        groupCode: "$_id.groupCode",
-        group: "$_id.group"
+        groupCode: '$_id.groupCode',
+        group: '$_id.group'
       }
     },
     {
       $sort: { groupCode: 1 } // ✅ เรียงตาม groupCode
     }
-  ]);
-
+  ])
 
   res.status(200).json({
     message: product
   })
-
 }
 
 exports.getSummaryProduct = async (req, res) => {
-
   const { zone } = req.query
 
   const channel = req.headers['x-channel']
@@ -2148,11 +2125,10 @@ exports.getSummaryProduct = async (req, res) => {
   const { User } = getModelsByChannel(channel, res, userModel)
   const { Store } = getModelsByChannel(channel, res, storeModel)
 
-
   const route = await Route.aggregate([
     {
       $addFields: {
-        shortArea: { $substr: ["$area", 0, 2] }
+        shortArea: { $substr: ['$area', 0, 2] }
       }
     },
     {
@@ -2161,10 +2137,15 @@ exports.getSummaryProduct = async (req, res) => {
       }
     },
     { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
-    { $unwind: { path: '$listStore.listOrder', preserveNullAndEmptyArrays: true } },
+    {
+      $unwind: {
+        path: '$listStore.listOrder',
+        preserveNullAndEmptyArrays: true
+      }
+    },
     {
       $addFields: {
-        storeObjId: { $toObjectId: "$listStore.storeInfo" }
+        storeObjId: { $toObjectId: '$listStore.storeInfo' }
       }
     },
     {
@@ -2177,19 +2158,21 @@ exports.getSummaryProduct = async (req, res) => {
     },
     {
       $match: {
-        $expr: { $gt: [{ $size: "$order" }, 0] }
+        $expr: { $gt: [{ $size: '$order' }, 0] }
       }
     },
     {
       $project: {
-        'order': 1
+        order: 1
       }
     },
     { $unwind: { path: '$order', preserveNullAndEmptyArrays: true } },
-    { $unwind: { path: '$order.listProduct', preserveNullAndEmptyArrays: true } },
+    {
+      $unwind: { path: '$order.listProduct', preserveNullAndEmptyArrays: true }
+    },
     {
       $project: {
-        '_id': 0,
+        _id: 0,
         store: '$order.store.storeId',
         area: '$order.store.area',
         productId: '$order.listProduct.id',
@@ -2198,7 +2181,7 @@ exports.getSummaryProduct = async (req, res) => {
         unit: '$order.listProduct.unit',
         qty: '$order.listProduct.qty'
       }
-    },
+    }
   ])
 
   const productId = route.flatMap(u => u.productId)
@@ -2223,10 +2206,15 @@ exports.getSummaryProduct = async (req, res) => {
   ])
 
   const productQty = route.map(u => {
-    const qty = productFactor.find(i => i.productId === u.productId && i.unit == u.unit) || {}
-    const factorPcs = (u.qty * qty.factor)
-    const factorCtn = productFactor.find(i => i.productId === u.productId && i.unit == "CTN") || {}
-    const qtyCtn = Math.floor((factorPcs / factorCtn.factor))
+    const qty =
+      productFactor.find(
+        i => i.productId === u.productId && i.unit == u.unit
+      ) || {}
+    const factorPcs = u.qty * qty.factor
+    const factorCtn =
+      productFactor.find(i => i.productId === u.productId && i.unit == 'CTN') ||
+      {}
+    const qtyCtn = Math.floor(factorPcs / factorCtn.factor)
 
     return {
       store: u.store,
@@ -2239,25 +2227,25 @@ exports.getSummaryProduct = async (req, res) => {
     }
   })
 
-  const grouped = [];
+  const grouped = []
 
   productQty.forEach(item => {
-    const existing = grouped.find(g =>
-      g.store === item.store &&
-      g.area === item.area &&
-      g.productId === item.productId &&
-      g.group === item.group &&
-      g.size === item.size &&
-      g.unit === item.unit
-    );
+    const existing = grouped.find(
+      g =>
+        g.store === item.store &&
+        g.area === item.area &&
+        g.productId === item.productId &&
+        g.group === item.group &&
+        g.size === item.size &&
+        g.unit === item.unit
+    )
 
     if (existing) {
-      existing.qty += item.qty;
+      existing.qty += item.qty
     } else {
-      grouped.push({ ...item });
+      grouped.push({ ...item })
     }
-  });
-
+  })
 
   const product = await Product.aggregate([
     {
@@ -2271,7 +2259,7 @@ exports.getSummaryProduct = async (req, res) => {
       $group: {
         _id: {
           productId: '$id',
-          groupCode: "$groupSize",
+          groupCode: '$groupSize'
         }
       }
     },
@@ -2287,7 +2275,7 @@ exports.getSummaryProduct = async (req, res) => {
   const area = await User.aggregate([
     {
       $addFields: {
-        shortArea: { $substr: ["$area", 0, 2] }
+        shortArea: { $substr: ['$area', 0, 2] }
       }
     },
     {
@@ -2308,7 +2296,6 @@ exports.getSummaryProduct = async (req, res) => {
     }
   ])
 
-
   if (area.length == 0) {
     return res.status(404).json({
       status: 404,
@@ -2320,24 +2307,24 @@ exports.getSummaryProduct = async (req, res) => {
     return product.map(product => ({
       ...product,
       area
-    }));
-  });
+    }))
+  })
 
   // ถ้าอยากให้เป็น flat array (ไม่เป็นกลุ่ม area): ใช้ .flat()
-  const areaProduct = result.flat();
+  const areaProduct = result.flat()
 
-
-  const countStore = [];
+  const countStore = []
 
   grouped.forEach(item => {
-    const existing = countStore.find(g =>
-      g.store === item.store &&
-      g.area === item.area &&
-      g.productId === item.productId &&
-      g.unit === item.unit
-    );
+    const existing = countStore.find(
+      g =>
+        g.store === item.store &&
+        g.area === item.area &&
+        g.productId === item.productId &&
+        g.unit === item.unit
+    )
     if (existing) {
-      existing.count += 1; // เพิ่มจำนวนที่เจอซ้ำ
+      existing.count += 1 // เพิ่มจำนวนที่เจอซ้ำ
     } else {
       countStore.push({
         store: item.store,
@@ -2345,9 +2332,9 @@ exports.getSummaryProduct = async (req, res) => {
         productId: item.productId,
         unit: item.unit,
         count: 1 // เริ่มต้นนับเป็น 1
-      });
+      })
     }
-  });
+  })
 
   const constStoreOnArea = await Store.aggregate([
     {
@@ -2367,18 +2354,19 @@ exports.getSummaryProduct = async (req, res) => {
 
   // console.log("areaProduct",areaProduct)
 
-
   const productTran = areaProduct.map(item => {
-    const productDetail = grouped.find(u => u.productId == item.productId && u.area == item.area)
+    const productDetail = grouped.find(
+      u => u.productId == item.productId && u.area == item.area
+    )
 
-    const storeCount = countStore.find(u => u.productId == item.productId && u.area == item.area)
+    const storeCount = countStore.find(
+      u => u.productId == item.productId && u.area == item.area
+    )
     const allStoreCount = constStoreOnArea.find(u => u.area == item.area)
 
     const percentStore = allStoreCount?.constStore
-      ? ((storeCount?.count || 0) / allStoreCount.constStore * 100).toFixed(2)
-      : 0;
-
-
+      ? (((storeCount?.count || 0) / allStoreCount.constStore) * 100).toFixed(2)
+      : 0
 
     return {
       // productId: item.productId,
@@ -2392,68 +2380,67 @@ exports.getSummaryProduct = async (req, res) => {
     }
   })
 
-  const areaId = [...new Set(productTran.map(u => u.area))].map(area => ({ area }));
+  const areaId = [...new Set(productTran.map(u => u.area))].map(area => ({
+    area
+  }))
 
   const data = areaId.map(item => {
     const productDetail = productTran.filter(u => u.area === item.area)
-    
-    const mergedDetail = productDetail.reduce((acc, curr) => {
-      const { area, ...rest } = curr; 
 
-      return { ...acc, ...rest };
-    }, {});
+    const mergedDetail = productDetail.reduce((acc, curr) => {
+      const { area, ...rest } = curr
+
+      return { ...acc, ...rest }
+    }, {})
 
     return {
       area: item.area,
       ...mergedDetail
-    };
-  });
+    }
+  })
 
   const summaryTarget = productTran.reduce((sum, item) => {
-    const key = Object.keys(item).find(k =>
-      k.startsWith("TRAGET ") && !k.includes("TRAGET STORE")
+    const key = Object.keys(item).find(
+      k => k.startsWith('TRAGET ') && !k.includes('TRAGET STORE')
     )
     return sum + (item[key] || 0)
   }, 0)
 
-
   const summarySell = productTran.reduce((sum, item) => {
-    const key = Object.keys(item).find(k => k.startsWith("SELL "))
+    const key = Object.keys(item).find(k => k.startsWith('SELL '))
     return sum + (item[key] || 0)
   }, 0)
 
   const summaryPercent = productTran.reduce((sum, item) => {
-    const key = Object.keys(item).find(k =>
-      k.startsWith("PERCENT ") && !k.includes("PERCENT STORE")
+    const key = Object.keys(item).find(
+      k => k.startsWith('PERCENT ') && !k.includes('PERCENT STORE')
     )
     return sum + (item[key] || 0)
   }, 0)
 
   const summaryTargetStore = productTran.reduce((sum, item) => {
-    const key = Object.keys(item).find(k => k.startsWith("TRAGET STORE "))
+    const key = Object.keys(item).find(k => k.startsWith('TRAGET STORE '))
     return sum + (item[key] || 0)
   }, 0)
 
   const summaryStore = productTran.reduce((sum, item) => {
-    const key = Object.keys(item).find(k => k.startsWith("STORE "))
+    const key = Object.keys(item).find(k => k.startsWith('STORE '))
     return sum + (item[key] || 0)
   }, 0)
-
 
   const totalStoreCount = productTran.reduce((sum, item) => {
-    const key = Object.keys(item).find(k => k.startsWith("STORE "))
+    const key = Object.keys(item).find(k => k.startsWith('STORE '))
     return sum + (item[key] || 0)
   }, 0)
-
 
   const totalAllStoreCount = constStoreOnArea.reduce((sum, item) => {
     return sum + (item.constStore || 0)
   }, 0)
 
-
-  const summaryPercentStore = totalAllStoreCount > 0
-    ? Number(((totalStoreCount / totalAllStoreCount) * 100).toFixed(2))
-    : 0
+  const summaryPercentStore =
+    totalAllStoreCount > 0
+      ? Number(((totalStoreCount / totalAllStoreCount) * 100).toFixed(2))
+      : 0
 
   const dataTran = {
     data,
@@ -2462,40 +2449,23 @@ exports.getSummaryProduct = async (req, res) => {
     summaryPercent: summaryPercent,
     summaryTargetStore: summaryTargetStore,
     summaryStore: summaryStore,
-    summaryPercentStore: summaryPercentStore,
+    summaryPercentStore: summaryPercentStore
   }
-
-
-
-
 
   res.status(200).json({
     status: 200,
-    message: "Success",
+    message: 'Success',
     ...dataTran
   })
-
 }
 
-
-
-
-
-
-
-
-
-
-
-
 exports.getProductLimit = async (req, res) => {
-
   const { storeId, area, type } = req.query
-  const channel = req.headers['x-channel'];
-  const { Cart } = getModelsByChannel(channel, res, cartModel);
-  const { User } = getModelsByChannel(channel, res, userModel);
-  const { Product } = getModelsByChannel(channel, res, productModel);
-  const { PromotionLimit } = getModelsByChannel(channel, res, promotionModel);
+  const channel = req.headers['x-channel']
+  const { Cart } = getModelsByChannel(channel, res, cartModel)
+  const { User } = getModelsByChannel(channel, res, userModel)
+  const { Product } = getModelsByChannel(channel, res, productModel)
+  const { PromotionLimit } = getModelsByChannel(channel, res, promotionModel)
   const cart = await Cart.findOne({ type, area, storeId })
   if (!cart || cart.listProduct.length === 0) {
     return res.status(404).json({ status: 404, message: 'Cart is empty!' })
@@ -2508,14 +2478,9 @@ exports.getProductLimit = async (req, res) => {
   })
   let productLimitList = []
   for (const i of productLimit) {
-
     const productLimitDetail = await PromotionLimit.findOne({ proId: i.proId })
     productLimitList.push(productLimitDetail)
-
   }
-
-
-
 
   res.status(200).json({
     status: 200,
