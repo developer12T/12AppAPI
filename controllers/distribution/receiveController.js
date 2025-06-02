@@ -13,8 +13,8 @@ const { getModelsByChannel } = require('../../middleware/channel')
 exports.addReceive = async (req, res) => {
     try {
       const today = moment().format('YYYYMMDD')
-      // const response = await axios.post(`${process.env.API_URL_12ERP}/receive/getReceiveAll`, { transdate: today })
-      const response = await axios.post(`${process.env.API_URL_12ERP}/receive/getReceiveAll`, { area: 'BE215', peroid: "202503" })
+      const response = await axios.post(`${process.env.API_URL_12ERP}/receive/getReceiveAll`, { transdate: today })
+      // const response = await axios.post(`${process.env.API_URL_12ERP}/receive/getReceiveAll`, { area: 'BE215', peroid: "202503" })
       const receiveData = response.data
 
       const channel = req.headers['x-channel'];
