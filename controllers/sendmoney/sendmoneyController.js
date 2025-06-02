@@ -95,26 +95,13 @@ exports.addSendMoneyImage = async (req, res) => {
 exports.getSendMoney = async (req, res) => {
 
   const channel = req.headers['x-channel'];
-  const { area, date } = req.body
+  const { area } = req.body
   const { Route } = getModelsByChannel(channel, res, routeModel);
+  
+  const year = new Date().getFullYear().toString();
 
-  const year = parseInt(date.toString().slice(0, 4), 10);
-  const month = parseInt(date.toString().slice(4, 6), 10);
-  const day = parseInt(date.toString().slice(6, 8), 10);
-
-
-  const startDate = new Date(Date.UTC(year, month - 1, day - 1, 17, 0, 0));
-  const endDate = new Date(Date.UTC(year, month - 1, day, 17, 0, 0));
-
-  const fullMonth = month.toString().padStart(2, '0');
-  const period = `${year}${fullMonth}`
-
-
-
-  // console.log(startDate)
-  // console.log(endDate)
   const routeData = await Route.aggregate([
-    { $match: { area: area, period: period } },
+    { $match: { area: area} },
     { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
     { $unwind: { path: '$listStore.listOrder', preserveNullAndEmptyArrays: true } },
     {
@@ -133,14 +120,13 @@ exports.getSendMoney = async (req, res) => {
         }
       }
     },
-    {
-      $match: {
-        thaiDate: {
-          $gte: startDate,
-          $lt: endDate
-        }
+{
+    $match: {
+      $expr: {
+        $eq: [ { $year: "$thaiDate" }, Number(year) ]
       }
-    },
+    }
+  },
     {
       $project: {
         _id: 0,

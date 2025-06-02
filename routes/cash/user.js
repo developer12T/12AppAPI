@@ -7,7 +7,8 @@ const {
   addUser,
   addUserOne,
   updateUserOne,
-  addAndUpdateUser
+  addAndUpdateUser,
+  
 } = require('../../controllers/user/userController')
 
 const router = express.Router()
@@ -20,4 +21,5 @@ router.post('/addUser', addUser)
 router.post('/addUserOne', addUserOne)
 router.patch('/updateUserOne', updateUserOne)
 router.post('/addAndUpdateUser', addAndUpdateUser)
+
 module.exports = router

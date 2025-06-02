@@ -105,13 +105,26 @@ const promotionLimitSchema = new mongoose.Schema({
     status: { type: String, enum: ['active', 'inactive'], default: 'active' },
 })
 
-
+const quotaSchema = new mongoose.Schema({
+    quotaId: { type: String, required: true },
+    detail: { type: String, required: true },
+    proCode: { type: String, required: true },
+    id: { type: String,  },
+    quotaGroup: { type: String, required: true },
+    quotaWeight: { type: String, required: true },
+    quota: { type: Number },
+    quotaUse: { type: Number },
+    area: { type: Array },
+    zone: { type: Array },
+    ExpDate : { type: String, required: true },
+})
 
 // const Promotion = dbCA.model('Promotion', promotionSchema)
 // module.exports = { Promotion }
 module.exports = (conn) => {
     return {
         Promotion: conn.model('Promotion', promotionSchema),
-        PromotionLimit : conn.model('promotionlimit', promotionLimitSchema,'promotionlimit'),
+        PromotionLimit: conn.model('promotionlimit', promotionLimitSchema, 'promotionlimit'),
+        Quota: conn.model('quota',quotaSchema,'quota')
     };
 };

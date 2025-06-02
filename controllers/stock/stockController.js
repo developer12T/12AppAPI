@@ -349,7 +349,7 @@ exports.addStockNew = async (req, res) => {
   res.status(200).json({
     status: 200,
     message: 'Stock added successfully',
-    data: test
+    // data: test
   })
 
 }

@@ -362,3 +362,18 @@ exports.updatePromotionLimit = async (req, res) => {
   return res.status(200).json({ status: 200, message: 'Updated successfully' });
 }
 
+exports.addQuota = async (req,res) => {
+  
+  const { quotaId,detail,proCode, } = req.body
+
+
+  const channel = req.headers['x-channel'];
+  const { Quota } = getModelsByChannel(channel, res, promotionModel);
+
+  const data = await Quota.create({
+
+  })
+
+
+
+}

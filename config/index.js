@@ -15,7 +15,7 @@ module.exports = {
   ANT_PASSWORD: process.env.ANT_PASSWORD,
   SECRET_KEY: process.env.SECRET_KEY,
   ERP_API_BASE_URL: process.env.ERP_API_BASE_URL,
-
-
+  ERP_API_BASE_URL: process.env.ERP_API_BASE_URL,
+  CA_DB_URI_PRD: process.env.CA_DB_URI_PRD,
 
 };
