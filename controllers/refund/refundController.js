@@ -162,7 +162,6 @@ exports.checkout = async (req, res) => {
             { $match: { area: area, period: period } },
             { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
             { $match: { "listProduct.productId": { $in: productId } } },
-            // { $match : { "listProduct.available.lot": u.lot } },
             {
                 $project: {
                     _id: 0,

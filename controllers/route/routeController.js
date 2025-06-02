@@ -577,10 +577,10 @@ exports.createRoute = async (req, res) => {
         newRoutes.push(newRoute)
       }
 
-      // await RouteChangeLog.updateMany(
-      //   { area: currentArea, period, status: '0' },
-      //   { $set: { status: '1' } }
-      // )
+      await RouteChangeLog.updateMany(
+        { area: currentArea, period, status: '0' },
+        { $set: { status: '1' } }
+      )
     }
 
     res.status(200).json({
@@ -763,25 +763,6 @@ exports.getRouteCheckinAll = async (req, res) => {
 
     const { Route } = getModelsByChannel(channel, res, routeModel)
 
-    // const routeAll = await Route.aggregate([
-    //   { $unwind: '$listStore' },
-    //   { $match: { 'listStore.status': { $ne: '0' } } },
-    //   {
-    //     $group: {
-    //       _id: { area: '$area', period: '$priod' },
-    //       count: { $sum: 1 }
-    //     }
-    //   },
-    //   { $sort: { count: -1 } },
-    //   {
-    //     $project: {
-    //       area: '$_id.area',
-    //       period: '$period',
-    //       count: 1,
-    //       _id: 0
-    //     }
-    //   }
-    // ])
     let query = [
       { $unwind: '$listStore' },
       {

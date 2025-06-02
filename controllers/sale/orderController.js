@@ -90,18 +90,11 @@ exports.checkout = async (req, res) => {
     }
 
     let summary = ''
-    let data = ''
     if (changePromotionStatus == 0) {
       summary = await summaryOrder(cart, channel, res)
-      // data = applyPromotion(summary,channel,res)
     } else if (changePromotionStatus == 1) {
       summary = await summaryOrderProStatusOne(cart, listPromotion, channel, res)
-      // data = applyPromotion(summary,channel,res)
     }
-    // const shippingData = store.shippingAddress.find(s => s.shippingId === shipping)
-    // if (!shippingData) {
-    //     return res.status(404).json({ status: 404, message: 'Shipping address not found!' })
-    // }
 
     const productIds = cart.listProduct.map(p => p.id)
     const products = await Product.find({ id: { $in: productIds } }).select(
@@ -181,12 +174,6 @@ exports.checkout = async (req, res) => {
       vat: parseFloat((subtotal - (subtotal / 1.07)).toFixed(2)),
       totalExVat: parseFloat((subtotal / 1.07).toFixed(2)),
       total: subtotal,
-      // shipping: {
-      //     shippingId: shippingData.shippingId,
-      //     address: shippingData.address,
-      //     dateRequest: shipping.dateRequest,
-      //     note: shipping.note
-      // },
       shipping: {
         shippingId: '',
         address: ''
@@ -216,14 +203,12 @@ exports.checkout = async (req, res) => {
         }
       })
     }
-    // console.log("calStock",calStock)
     const productId = calStock.product.flatMap(u => u.productId)
 
     const stock = await Stock.aggregate([
       { $match: { area: area, period: period } },
       { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
       { $match: { "listProduct.productId": { $in: productId } } },
-      // { $match : { "listProduct.available.lot": u.lot } },
       {
         $project: {
           _id: 0,
@@ -313,14 +298,14 @@ exports.checkout = async (req, res) => {
       )
     }
 
-    // const createdMovement = await StockMovement.create({
-    //   ...calStock
-    // });
+    const createdMovement = await StockMovement.create({
+      ...calStock
+    });
 
-    // await StockMovementLog.create({
-    //   ...calStock,
-    //   refOrderId: createdMovement._id
-    // });
+    await StockMovementLog.create({
+      ...calStock,
+      refOrderId: createdMovement._id
+    });
 
 
     await newOrder.save()
@@ -1866,9 +1851,9 @@ exports.erpApiCheck = async (req, res) => {
     })
 
     const saleId = modelSale.map(row => row.get('OAORNO'))
-    // notInmodelOrder = await Order.find({
-    //   orderId: { $nin: saleId }
-    // }).select("orderId")
+    notInmodelOrder = await Order.find({
+      orderId: { $nin: saleId }
+    }).select("orderId")
     const data = await Order.updateMany(
       { orderId: { $in: saleId } },
       {
@@ -1878,7 +1863,7 @@ exports.erpApiCheck = async (req, res) => {
       }
     )
 
-    // console.log(data.modifiedCount)
+    console.log(data.modifiedCount)
 
     if (data.modifiedCount == 0) {
       return res.status(404).json({

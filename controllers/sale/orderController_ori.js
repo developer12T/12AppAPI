@@ -47,12 +47,6 @@ exports.checkout = async (req, res) => {
     }
 
     const summary = await summaryOrder(cart)
-
-    // const shippingData = store.shippingAddress.find(s => s.shippingId === shipping)
-    // if (!shippingData) {
-    //     return res.status(404).json({ status: 404, message: 'Shipping address not found!' })
-    // }
-
     const productIds = cart.listProduct.map(p => p.id)
     const products = await Product.find({ id: { $in: productIds } }).select(
       'id name group brand size flavour listUnit'
@@ -125,12 +119,6 @@ exports.checkout = async (req, res) => {
       vat: parseFloat((subtotal - subtotal / 1.07).toFixed(2)),
       totalExVat: parseFloat((subtotal / 1.07).toFixed(2)),
       total: subtotal,
-      // shipping: {
-      //     shippingId: shippingData.shippingId,
-      //     address: shippingData.address,
-      //     dateRequest: shipping.dateRequest,
-      //     note: shipping.note
-      // },
       shipping: {
         shippingId: '',
         address: ''

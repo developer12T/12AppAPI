@@ -234,35 +234,12 @@ exports.checkout = async (req, res) => {
             totalVat: summary.totalVat,
             totalExVat: summary.totalExVat,
             total: summary.total,
-            // shipping: {
-            //     shippingId: shippingData.shippingId,
-            //     address: shippingData.address,
-            //     dateRequest: shipping.dateRequest,
-            //     note: shipping.note
-            // },
             shipping: {
                 shippingId: "",
                 address: ""
             },
             createdBy: sale.username
         })
-
-        // console.log(newOrder.listProduct)
-        //  const calStock = {
-        //     // storeId: refundOrder.store.storeId,
-        //     area: newOrder.store.area,
-        //     period: period,
-        //     type: "Give",
-        //     listProduct: newOrder.listProduct.map(u => {
-        //         return {
-        //             productId: u.id,
-        //             lot: u.lot,
-        //             unit: u.unit,
-        //             qty: u.qty,
-        //             // condition: u.condition
-        //         }
-        //     })
-        // }
 
         const calStock = {
             // storeId: refundOrder.store.storeId,
@@ -272,8 +249,8 @@ exports.checkout = async (req, res) => {
             period: period,
             warehouse: newOrder.sale.warehouse,
             status: 'pending',
-            action: "Give",
-            type: "Give",
+            action: "give",
+            type: "give",
             product: newOrder.listProduct.map(u => {
                 return {
                     productId: u.id,
@@ -292,7 +269,6 @@ exports.checkout = async (req, res) => {
             { $match: { area: area, period: period } },
             { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
             { $match: { "listProduct.productId": { $in: productId } } },
-            // { $match : { "listProduct.available.lot": u.lot } },
             {
                 $project: {
                     _id: 0,
@@ -307,9 +283,7 @@ exports.checkout = async (req, res) => {
                 }
             }
         ]);
-        // console.dir(calStock, { depth: null, colors: true });
 
-        // console.dir(stock, { depth: null, colors: true });
         let product = []
         let updateLot = []
 
