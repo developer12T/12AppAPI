@@ -2,38 +2,33 @@ const { uploadFiles } = require('../../utilities/upload')
 const { calculateSimilarity } = require('../../utilities/utility')
 const axios = require('axios')
 const multer = require('multer')
-const addUpload = multer({ storage: multer.memoryStorage() }).array('storeImages')
+const addUpload = multer({ storage: multer.memoryStorage() }).array(
+  'storeImages'
+)
 
-
-
-const getUploadMiddleware = (channel) => {
-  const storage = multer.memoryStorage();
+const getUploadMiddleware = channel => {
+  const storage = multer.memoryStorage()
   let limits = {}
 
   if (channel == 'cash') {
     limits = {
       files: 3
     }
-  }
-  else if (channel == 'credit') {
+  } else if (channel == 'credit') {
     limits = {
       files: 6
     }
   }
 
-  return multer({ storage, limits }).array('storeImages');
-};
-
-
-
-
-
+  return multer({ storage, limits }).array('storeImages')
+}
 
 const storeModel = require('../../models/cash/store')
 const { getModelsByChannel } = require('../../middleware/channel')
 const path = require('path')
-const { v4: uuidv4 } = require('uuid');
-const { stat } = require('fs');
+const { v4: uuidv4 } = require('uuid')
+const { stat } = require('fs')
+const { create } = require('lodash')
 uuidv4() // ⇨ '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed'
 
 exports.getStore = async (req, res) => {
@@ -62,14 +57,13 @@ exports.getStore = async (req, res) => {
         $gte: startMonth,
         $lt: NextMonth
       }
-      // query.status = '10'
     } else if (type === 'all') {
-      // query.createdAt = {
-      //   $not: {
-      //     $gte: startMonth,
-      //     $lt: NextMonth
-      //   }
-      // }
+      query.createdAt = {
+        $not: {
+          $gte: startMonth,
+          $lt: NextMonth
+        }
+      }
     }
 
     if (route) {
@@ -128,99 +122,92 @@ exports.getStore = async (req, res) => {
 }
 
 exports.updateImage = async (req, res) => {
-
   const channel = req.headers['x-channel'] // 'credit' or 'cash'
 
   const { Store } = getModelsByChannel(channel, res, storeModel)
 
-
-
-    addUpload(req, res, async err => {
-      if (err) {
-        return res.status(400).json({ status: '400', message: err.message })
-      }
-      try {
-        if (!req.body.storeId) {
-          return res.status(400).json({
-            status: '400',
-            message: 'Store ID is required'
-          })
-        }
-        const files = req.files
-        const storeId = req.body.storeId
-        const types = req.body.types ? req.body.types.split(',') : []
-
-        if (files.length !== types.length) {
-          return res.status(400).json({
-            status: '400',
-            message: 'Number of files and types do not match'
-          })
-        }
-        const store = await Store.findOne({ storeId: storeId })
-
-        if (!store) {
-          return res
-            .status(404)
-            .json({ status: '404', message: 'Store not found' })
-        }
-
-        const existingImageList = store.imageList || []
-        const existingTypes = new Set(existingImageList.map(item => item.type))
-
-        const uploadedFiles = []
-        for (let i = 0; i < files.length; i++) {
-          const type = types[i]
-
-          // ถ้ามี type นี้อยู่แล้วใน DB, ไม่ต้องอัปโหลด
-          if (existingTypes.has(type)) {
-            continue
-          }
-
-          const uploadedFile = await uploadFiles(
-            [files[i]],
-            path.join(__dirname, '../../public/images/stores'),
-            store.area,
-            type
-          )
-
-          uploadedFiles.push({
-            name: uploadedFile[0].name,
-            path: uploadedFile[0].fullPath,
-            type: type
-          })
-        }
-
-        const imageList = uploadedFiles
-
-        if (uploadedFiles.length > 0) {
-          await Store.updateOne(
-            { storeId: storeId },
-            { $push: { imageList: { $each: uploadedFiles } } }
-          )
-        }
-
-        res.status(200).json({
-          status: '200',
-          message: 'Store update successfully'
-          // data:storeData
+  addUpload(req, res, async err => {
+    if (err) {
+      return res.status(400).json({ status: '400', message: err.message })
+    }
+    try {
+      if (!req.body.storeId) {
+        return res.status(400).json({
+          status: '400',
+          message: 'Store ID is required'
         })
-      } catch (error) {
-        console.error('Error saving store to MongoDB:', error)
-        res.status(500).json({ status: '500', message: 'Server Error' })
       }
-    })
+      const files = req.files
+      const storeId = req.body.storeId
+      const types = req.body.types ? req.body.types.split(',') : []
 
+      if (files.length !== types.length) {
+        return res.status(400).json({
+          status: '400',
+          message: 'Number of files and types do not match'
+        })
+      }
+      const store = await Store.findOne({ storeId: storeId })
+
+      if (!store) {
+        return res
+          .status(404)
+          .json({ status: '404', message: 'Store not found' })
+      }
+
+      const existingImageList = store.imageList || []
+      const existingTypes = new Set(existingImageList.map(item => item.type))
+
+      const uploadedFiles = []
+      for (let i = 0; i < files.length; i++) {
+        const type = types[i]
+
+        // ถ้ามี type นี้อยู่แล้วใน DB, ไม่ต้องอัปโหลด
+        if (existingTypes.has(type)) {
+          continue
+        }
+
+        const uploadedFile = await uploadFiles(
+          [files[i]],
+          path.join(__dirname, '../../public/images/stores'),
+          store.area,
+          type
+        )
+
+        uploadedFiles.push({
+          name: uploadedFile[0].name,
+          path: uploadedFile[0].fullPath,
+          type: type
+        })
+      }
+
+      const imageList = uploadedFiles
+
+      if (uploadedFiles.length > 0) {
+        await Store.updateOne(
+          { storeId: storeId },
+          { $push: { imageList: { $each: uploadedFiles } } }
+        )
+      }
+
+      res.status(200).json({
+        status: '200',
+        message: 'Store update successfully'
+        // data:storeData
+      })
+    } catch (error) {
+      console.error('Error saving store to MongoDB:', error)
+      res.status(500).json({ status: '500', message: 'Server Error' })
+    }
+  })
 }
 
 exports.addStore = async (req, res) => {
-
   const channel = req.headers['x-channel'] // 'credit' or 'cash'
 
   const { Store } = getModelsByChannel(channel, res, storeModel)
 
-  const upload = getUploadMiddleware(channel);
-
-
+  const upload = getUploadMiddleware(channel)
 
   upload(req, res, async err => {
     if (err) {
@@ -251,7 +238,7 @@ exports.addStore = async (req, res) => {
           message: 'Number of files and types do not match'
         })
       }
-  
+
       const existingStores = await Store.find(
         {},
         { _id: 0, __v: 0, idIndex: 0 }
@@ -491,7 +478,7 @@ exports.addFromERP = async (req, res) => {
         imageList: [],
         shippingAddress: splitData.shippingAddress,
         checkIn: {},
-        createdDate: splitData.createdDate,
+        createdAt: splitData.createdAt,
         updatedDate: Date()
       }
 
@@ -697,7 +684,7 @@ exports.addAndUpdateStore = async (req, res) => {
       imageList: [],
       shippingAddress: splitData.shippingAddress,
       checkIn: {},
-      createdDate: splitData.createdDate,
+      createdAt: splitData.createdAt,
       updatedDate: Date()
     }
 
@@ -902,6 +889,3 @@ exports.getBueatyStore = async (req, res) => {
     message: storeBueaty
   })
 }
-
-
-

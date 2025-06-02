@@ -1,5 +1,6 @@
 const mongoose = require('mongoose')
 const { dbCA } = require('../../config/db')
+const { create } = require('lodash')
 
 const approveSchema = mongoose.Schema({
     dateSend: { type: Date, default: Date.now },
@@ -62,7 +63,7 @@ const storeSchema = mongoose.Schema({
     imageList: [imageSchema],
     shippingAddress: [shippingSchema],
     checkIn: checkinSchema,
-    createdDate: { type: Date, default: Date.now },
+    createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
     date: {
         type: Date,
