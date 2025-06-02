@@ -1857,35 +1857,35 @@ exports.erpApiCheck = async (req, res) => {
     const { Order } = getModelsByChannel(channel, res, orderModel);
 
 
-    const modelSale = await Sale.findAll({
-      attributes: [
-        'OAORNO',
-        [sequelize.fn('COUNT', sequelize.col('OAORNO')), 'count']
-      ],
-      group: ['OAORNO']
-    })
+    // const modelSale = await Sale.findAll({
+    //   attributes: [
+    //     'OAORNO',
+    //     [sequelize.fn('COUNT', sequelize.col('OAORNO')), 'count']
+    //   ],
+    //   group: ['OAORNO']
+    // })
 
-    const saleId = modelSale.map(row => row.get('OAORNO'))
-    // notInmodelOrder = await Order.find({
-    //   orderId: { $nin: saleId }
-    // }).select("orderId")
-    const data = await Order.updateMany(
-      { orderId: { $in: saleId } },
-      {
-        $set: {
-          status: 'success',
-        }
-      }
-    )
+    // const saleId = modelSale.map(row => row.get('OAORNO'))
+    // // notInmodelOrder = await Order.find({
+    // //   orderId: { $nin: saleId }
+    // // }).select("orderId")
+    // const data = await Order.updateMany(
+    //   { orderId: { $in: saleId } },
+    //   {
+    //     $set: {
+    //       status: 'success',
+    //     }
+    //   }
+    // )
 
     // console.log(data.modifiedCount)
 
-    if (data.modifiedCount == 0) {
-      return res.status(404).json({
-        status: 404,
-        message: 'No new orders found in the M3 system'
-      })
-    }
+    // if (data.modifiedCount == 0) {
+    //   return res.status(404).json({
+    //     status: 404,
+    //     message: 'No new orders found in the M3 system'
+    //   })
+    // }
 
     const io = getSocket()
     const events = [
