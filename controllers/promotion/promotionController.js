@@ -362,18 +362,89 @@ exports.updatePromotionLimit = async (req, res) => {
   return res.status(200).json({ status: 200, message: 'Updated successfully' });
 }
 
-exports.addQuota = async (req,res) => {
-  
-  const { quotaId,detail,proCode, } = req.body
+exports.addQuota = async (req, res) => {
+
+  const { quotaId, detail, proCode, id, quotaGroup, quotaWeight,
+    quota, quotaUse, area, zone, ExpDate
+  } = req.body
 
 
   const channel = req.headers['x-channel'];
   const { Quota } = getModelsByChannel(channel, res, promotionModel);
 
-  const data = await Quota.create({
+  const exitQuota = await Quota.findOne({quotaId:quotaId})
+  if (exitQuota) {
+    return res.status(400).json({
+      status:400,
+      message:'This quotaId already in database'
+    })
+  }
 
+  const data = await Quota.create({
+    quotaId: quotaId,
+    detail: detail,
+    proCode: proCode,
+    id: id,
+    quotaGroup: quotaGroup,
+    quotaWeight: quotaWeight,
+    quota: quota,
+    quotaUse: quotaUse,
+    area: area,
+    zone: zone,
+    ExpDate: ExpDate
   })
 
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: data
+  })
 
+}
+
+
+exports.updateQuota = async (req, res) => {
+
+  const { quotaId, detail, proCode, id, quotaGroup, quotaWeight,
+    quota, quotaUse, area, zone, ExpDate
+  } = req.body
+
+
+  const channel = req.headers['x-channel'];
+  const { Quota } = getModelsByChannel(channel, res, promotionModel);
+
+  const exitQuota = await Quota.findOne({quotaId:quotaId})
+  if (!exitQuota) {
+    return res.status(404).json({
+      status:404,
+      message:'This quotaId not found'
+    })
+  }
+
+
+
+  const data = await Quota.updateOne(
+    { quotaId: quotaId },
+    {
+      $set: {
+        detail: detail,
+        proCode: proCode,
+        id: id,
+        quotaGroup: quotaGroup,
+        quotaWeight: quotaWeight,
+        quota: quota,
+        quotaUse: quotaUse,
+        area: area,
+        zone: zone,
+        ExpDate: ExpDate
+      }
+    }
+
+  )
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+  })
 
 }
