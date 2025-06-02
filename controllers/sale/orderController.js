@@ -93,17 +93,7 @@ exports.checkout = async (req, res) => {
     if (changePromotionStatus == 0) {
       summary = await summaryOrder(cart, channel, res)
     } else if (changePromotionStatus == 1) {
-<<<<<<< HEAD
       summary = await summaryOrderProStatusOne(cart, listPromotion, channel, res)
-=======
-      summary = await summaryOrderProStatusOne(
-        cart,
-        listPromotion,
-        channel,
-        res
-      )
-      // data = applyPromotion(summary,channel,res)
->>>>>>> c3803586c6d9cb870c932f7f77d679fd9969e659
     }
 
     const productIds = cart.listProduct.map(p => p.id)
@@ -221,12 +211,7 @@ exports.checkout = async (req, res) => {
     const stock = await Stock.aggregate([
       { $match: { area: area, period: period } },
       { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
-<<<<<<< HEAD
       { $match: { "listProduct.productId": { $in: productId } } },
-=======
-      { $match: { 'listProduct.productId': { $in: productId } } },
-      // { $match : { "listProduct.available.lot": u.lot } },
->>>>>>> c3803586c6d9cb870c932f7f77d679fd9969e659
       {
         $project: {
           _id: 0,
