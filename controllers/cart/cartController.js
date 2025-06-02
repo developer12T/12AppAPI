@@ -103,6 +103,7 @@ exports.addProduct = async (req, res) => {
 
     const channel = req.headers['x-channel']
     const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Stock } = getModelsByChannel(channel, res, stockModel);
 
     if (!type || !area || !id || !qty || !unit) {
       return res.status(400).json({
@@ -142,8 +143,6 @@ exports.addProduct = async (req, res) => {
     const { Cart } = getModelsByChannel(channel, res, cartModel)
 
     let cart = await Cart.findOne(cartQuery)
-
-    // console.log("cart", JSON.stringify(cart, null, 2));
 
     if (!cart) {
       cart = await Cart.create({
@@ -243,6 +242,123 @@ exports.addProduct = async (req, res) => {
     }
     cart.createdAt = new Date()
     await cart.save()
+    //// ยังไม่ใช้จริง กำลัง Test
+
+    // const period = "202505"
+    // const productId = cart.listProduct.flatMap(u => u.id)
+    // const stock = await Stock.aggregate([
+    //   { $match: { area: area, period: period } },
+    //   { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
+    //   { $match: { "listProduct.productId": { $in: productId } } },
+    //   {
+    //     $project: {
+    //       _id: 0,
+    //       productId: "$listProduct.productId",
+    //       sumQtyPcs: "$listProduct.sumQtyPcs",
+    //       sumQtyCtn: "$listProduct.sumQtyCtn",
+    //       sumQtyPcsStockIn: "$listProduct.sumQtyPcsStockIn",
+    //       sumQtyCtnStockIn: "$listProduct.sumQtyCtnStockIn",
+    //       sumQtyPcsStockOut: "$listProduct.sumQtyPcsStockOut",
+    //       sumQtyCtnStockOut: "$listProduct.sumQtyCtnStockOut",
+    //       available: "$listProduct.available"
+    //     }
+    //   }
+    // ]);
+    // if (type == 'sale') {
+    //   for (const stockDetail of stock) {
+    //     for (const lot of stockDetail.available) {
+    //       const calDetails = cart.listProduct.filter(
+    //         u => u.id === stockDetail.productId && u.lot === lot.lot
+    //       );
+    //       let pcsQty = 0;
+    //       let ctnQty = 0;
+    //       for (const cal of calDetails) {
+    //         if (cal.unit === 'PCS' || cal.unit === 'BOT') {
+    //           pcsQty += cal.qty || 0;
+    //         }
+    //         if (cal.unit === 'CTN') {
+    //           ctnQty += cal.qty || 0;
+    //         }
+    //       }
+    //       checkQtyPcs = lot.qtyPcs - pcsQty
+    //       checkQtyCtn = lot.qtyCtn - ctnQty
+    //       if (checkQtyPcs < 0 || checkQtyCtn < 0) {
+    //         return res.status(400).json({
+    //           status: 400,
+    //           message: `This lot ${lot.lot} is not enough to sale`
+    //         })
+    //       }
+    //     }
+    //   }
+    // }
+    // else if (type == 'give') {
+    //   for (const stockDetail of stock) {
+    //     for (const lot of stockDetail.available) {
+    //       const calDetails = calStock.product.filter(
+    //         u => u.productId === stockDetail.productId && u.lot === lot.lot
+    //       );
+    //       let pcsQty = 0;
+    //       let ctnQty = 0;
+    //       for (const cal of calDetails) {
+    //         if (cal.unit === 'PCS' || cal.unit === 'BOT') {
+    //           pcsQty += cal.qty || 0;
+    //         }
+    //         if (cal.unit === 'CTN') {
+    //           ctnQty += cal.qty || 0;
+    //         }
+    //       }
+    //       checkQtyPcs = lot.qtyPcs - pcsQty
+    //       checkQtyCtn = lot.qtyCtn - ctnQty
+    //       if (checkQtyPcs < 0 || checkQtyCtn < 0) {
+    //         return res.status(400).json({
+    //           status: 400,
+    //           message: `This lot ${lot.lot} is not enough to give`
+    //         })
+    //       }
+    //     }
+    //   }
+    // }
+    // else if (type == 'refund') {
+    //   for (const stockDetail of stock) {
+    //     for (const lot of stockDetail.available) {
+    //       const calDetails = calStock.product.filter(
+    //         u => u.productId === stockDetail.productId && u.lot === lot.lot
+    //       );
+    //       let pcsQtyGood = 0;
+    //       let pcsQtyDamaged = 0;
+    //       let ctnQtyGood = 0;
+    //       let ctnQtyDamaged = 0;
+    //       for (const cal of calDetails) {
+    //         if ((cal.unit === 'PCS' || cal.unit === 'BOT') && cal.condition === 'good') {
+    //           pcsQtyGood += cal.qty || 0;
+    //         }
+    //         if ((cal.unit === 'PCS' || cal.unit === 'BOT') && cal.condition === 'damaged') {
+    //           pcsQtyDamaged += cal.qty || 0;
+    //         }
+    //         if (cal.unit === 'CTN' && cal.condition === 'good') {
+    //           ctnQtyGood += cal.qty || 0;
+    //         }
+    //         if (cal.unit === 'CTN' && cal.condition === 'damaged') {
+    //           ctnQtyDamaged += cal.qty || 0;
+    //         }
+    //       }
+    //       checkQtyPcs = lot.qtyPcs + pcsQtyGood - pcsQtyDamaged
+    //       checkQtyCtn = lot.qtyCtn + ctnQtyGood - ctnQtyDamaged
+    //       if (checkQtyPcs < 0 || checkQtyCtn < 0) {
+    //         return res.status(400).json({
+    //           status: 400,
+    //           message: `This lot ${lot.lot} is not enough to refund`
+    //         })
+    //       }
+    //     }
+    //   }
+    // }
+
+
+
+
+
+
 
     res.status(200).json({
       status: 200,

@@ -175,7 +175,7 @@ exports.checkout = async (req, res) => {
         const { User } = getModelsByChannel(channel,res,userModel); 
         const { Givetype } = getModelsByChannel(channel,res,giveawaysModel); 
         const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel);
-        const { Stock,StockMovement,StockMovementLog } = getModelsByChannel(channel, res, stockModel);
+        const { Stock } = getModelsByChannel(channel, res, stockModel);
 
 
         if (!type || !area || !storeId || !giveId || !shipping) {
@@ -289,11 +289,9 @@ exports.checkout = async (req, res) => {
 
         for (const stockDetail of stock) {
             for (const lot of stockDetail.available) {
-
                 const calDetails = calStock.product.filter(
                     u => u.productId === stockDetail.productId && u.lot === lot.lot
                 );
-
                 let pcsQty = 0;
                 let ctnQty = 0;
 
