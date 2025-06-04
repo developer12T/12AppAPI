@@ -166,6 +166,17 @@ const Locate = sequelize.define(
 
 
 
+
+
+
+
+
+
+
+
+  
+
+
   module.exports = {
     // ItemFac,
     // ItemMaster,

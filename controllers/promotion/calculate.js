@@ -1,14 +1,15 @@
 const { Promotion } = require('../../models/cash/promotion')
 const { Product } = require('../../models/cash/product')
-const  promotionModel  = require('../../models/cash/promotion')
-const  productModel  = require('../../models/cash/product')
+const promotionModel = require('../../models/cash/promotion')
+const productModel = require('../../models/cash/product')
 const { getModelsByChannel } = require('../../middleware/channel')
 const promotionLimitModel = require('../../models/cash/promotion');
+const { each, forEach } = require('lodash')
 
 
-async function rewardProduct(rewards, multiplier,channel,res) {
+async function rewardProduct(rewards, multiplier, channel, res) {
     if (!rewards || rewards.length === 0) return []
-    const { Product } = getModelsByChannel(channel,res,productModel); 
+    const { Product } = getModelsByChannel(channel, res, productModel);
 
     const rewardFilters = rewards.map(r => ({
         ...(r.productGroup ? { group: r.productGroup } : {}),
@@ -32,9 +33,9 @@ async function rewardProduct(rewards, multiplier,channel,res) {
         if (!product) return null
 
         const unitData = product.listUnit.find(unit => unit.unit === r.productUnit)
-        const factor = parseInt(unitData?.factor, 10) || 1 
+        const factor = parseInt(unitData?.factor, 10) || 1
         const productQty = r.limitType === 'limited' ? r.productQty : r.productQty * multiplier
-        const productQtyPcs = productQty * factor  
+        const productQtyPcs = productQty * factor
 
         return {
             productId: product.id,
@@ -46,14 +47,14 @@ async function rewardProduct(rewards, multiplier,channel,res) {
             productUnit: r.productUnit,
             productUnitName: unitData?.name || '',
             productQty,
-            productQtyPcs 
+            productQtyPcs
         }
     }).filter(Boolean)
 }
 
-async function applyPromotion(order,channel,res) {
+async function applyPromotion(order, channel, res) {
 
-    const { Promotion } = getModelsByChannel(channel,res,promotionModel); 
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel);
     let discountTotal = 0
     let appliedPromotions = []
 
@@ -68,7 +69,6 @@ async function applyPromotion(order,channel,res) {
         if (promo.applicableTo?.typeStore?.length > 0 && !promo.applicableTo.typeStore.includes(order.store?.storeType)) continue
         if (promo.applicableTo?.zone?.length > 0 && !promo.applicableTo.zone.includes(order.store?.zone)) continue
         if (promo.applicableTo?.area?.length > 0 && !promo.applicableTo.area.includes(order.store?.area)) continue
-
         let matchedProducts = order.listProduct.filter((product) =>
             promo.conditions.some((condition) =>
                 (condition.productId.length === 0 || condition.productId.includes(product.id)) &&
@@ -108,7 +108,7 @@ async function applyPromotion(order,channel,res) {
         switch (promo.proType) {
             case 'amount':
             case 'free':
-                freeProducts = await rewardProduct(promo.rewards, multiplier,channel,res)
+                freeProducts = await rewardProduct(promo.rewards, multiplier, channel, res)
                 promoApplied = true
                 break
 
@@ -129,12 +129,12 @@ async function applyPromotion(order,channel,res) {
 
             appliedPromotions.push({
                 proId: promo.proId,
-                proCode:promo.proCode,
+                proCode: promo.proCode,
                 proName: promo.name,
                 proType: promo.proType,
                 proQty: selectedProduct.productQty,
                 discount: promoDiscount,
-                test:"dawd",
+                test: "dawd",
                 // ...(selectedProduct && { ...selectedProduct })
                 listProduct: [{
                     proId: promo.proId,
@@ -159,10 +159,10 @@ async function applyPromotion(order,channel,res) {
 }
 
 
-async function getRewardProduct(proId,channel,res) {
+async function getRewardProduct(proId, channel, res) {
 
-    const { Promotion } = getModelsByChannel(channel,res,promotionModel); 
-    const { Product } = getModelsByChannel(channel,res,productModel); 
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel);
+    const { Product } = getModelsByChannel(channel, res, productModel);
 
     const promotion = await Promotion.findOne({ proId, status: 'active' }).lean()
     if (!promotion || !promotion.rewards || promotion.rewards.length === 0) {
@@ -197,34 +197,45 @@ async function getRewardProduct(proId,channel,res) {
     }))
 }
 
-async function applyPromotionUsage(storeId,promotion,channel,res) {
-    
+async function applyPromotionUsage(storeId, promotion, channel, res) {
+
     // const { Promotion } = getModelsByChannel(channel,res,promotionModel); 
-      const { PromotionLimit } = getModelsByChannel(channel, res, promotionLimitModel);
-    
+    const { PromotionLimit } = getModelsByChannel(channel, res, promotionLimitModel);
+
 
     const proIds = promotion.map(u => u.proId)
-    const promotionData = await PromotionLimit.find({proId:{$in:proIds}})
+    const promotionData = await PromotionLimit.find({ proId: { $in: proIds } })
     // console.log(JSON.stringify(promotion, null, 2));
 
-    const data = promotionData.map(u => {
-            console.log(JSON.stringify(u, null, 2));
+    // const data = promotionData.map(u => {
+    //     console.log(u)
+    //     const productPromo = promotion.find(p => p.proId === u.proId);
+    //     return {
+    //         proId: u.proId,
+    //         // qty: productPromo.proQty
+    //         listProduct:u.listProduct.map(item => {
+    //             return {
+    //                 id:item.id,
+    //                 qty:item.qty
+    //             }
+    //         }
 
-        // const productPromo = promotion.listProduct.find({id:})
-        return {
-                proId:u.proId,
-                giftItem:{
-                    productId:"",
-                    qtyPerStore:'',
-                }
-        }
-    })
+    //         )
+    //     }
+    // })
+    //     console.log(data)
+// for (const item  of data) {
+//     const promoqty = await PromotionLimit.findOne({ proId:item.proId })
+//     console.log(promoqty)
+//     const divqty = promoqty.qty - item.qty
+//     // console.log(divqty)
+// }
 
-    // console.log(data)
+
 
 
 }
 
 
 
-module.exports = { applyPromotion, rewardProduct, getRewardProduct,applyPromotionUsage }
+module.exports = { applyPromotion, rewardProduct, getRewardProduct, applyPromotionUsage }

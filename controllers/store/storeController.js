@@ -510,6 +510,17 @@ exports.addFromERP = async (req, res) => {
   }
 }
 
+
+
+
+
+
+
+
+
+
+
+
 exports.checkInStore = async (req, res) => {
   const { storeId } = req.params
   const { latitude, longtitude } = req.body

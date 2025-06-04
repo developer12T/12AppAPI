@@ -2,138 +2,140 @@ const { Product } = require('../models/cash/product')
 const { Store } = require('../models/cash/store')
 const { User } = require('../models/cash/user')
 
-const  productModel  = require('../models/cash/product')
-const  storeModel  = require('../models/cash/store')
-const  userModel  = require('../models/cash/user')
+const productModel = require('../models/cash/product')
+const storeModel = require('../models/cash/store')
+const userModel = require('../models/cash/user')
 const { getModelsByChannel } = require('../middleware/channel')
+const {
+  applyPromotion,
+} = require('../controllers/promotion/calculate')
 
-
-async function summaryOrder (cart,channel,res) {
-  try {
-    if (!cart) {
-      throw new Error('Cart data is required')
-    }
-
-    const { Store } = getModelsByChannel(channel,res,storeModel); 
-    const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
-    const store = storeData
-      ? {
-          _id: storeData._id,
-          storeId: storeData.storeId,
-          name: storeData.name || '',
-          taxId: storeData.taxId || '',
-          tel: storeData.tel || '',
-          route: storeData.route || '',
-          storeType: storeData.type || '',
-          typeName: storeData.typeName || '',
-          address: storeData.address || '',
-          subDistrict: storeData.subDistrict || '',
-          district: storeData.district || '',
-          province: storeData.province || '',
-          zone: storeData.zone || '',
-          area: storeData.area || ''
-        }
-      : {}
-
-    const productIds = [
-      ...cart.listProduct.map(p => p.id),
-      ...(cart.listPromotion
-        ? cart.listPromotion.flatMap(promo => promo.listProduct.map(p => p.id))
-        : [])
-    ]
-
-    const { Product } = getModelsByChannel(channel,res,productModel); 
-
-    const productDetails = await Product.find({
-      id: { $in: productIds }
-    }).lean()
-    // หา Product ที่อยู่ใน อาร์เรย์ productIds แล้วเอาแต่ id
-
-    let enrichedProducts = [] // ประกาศตัวแปรไว้ก่อน
-    // if (changePromotionStatus == 0) {
-    // console.log('changePromotionStatus = 0', changePromotionStatus);
-    enrichedProducts = cart.listProduct.map(cartItem => {
-      const productInfo = productDetails.find(p => p.id === cartItem.id) || {}
-      const unitData =
-        productInfo.listUnit?.find(u => u.unit === cartItem.unit) || {}
-      const factor = parseInt(unitData?.factor, 10) || 1
-      // console.log("factor",factor);
-      const qtyPcs = cartItem.qty * factor
-      const totalPrice = cartItem.qty * cartItem.price
-      return {
-        id: cartItem.id,
-        lot: cartItem.lot,
-        name: cartItem.name,
-        groupCode: productInfo.groupCode || '',
-        group: productInfo.group || '',
-        brandCode: productInfo.brandCode || '',
-        brand: productInfo.brand || '',
-        size: productInfo.size || '',
-        flavourCode: productInfo.flavourCode || '',
-        flavour: productInfo.flavour || '',
-        qty: cartItem.qty,
-        unit: cartItem.unit,
-        unitName: unitData.name || '',
-        price: cartItem.price,
-        total: totalPrice,
-        qtyPcs
-      }
-    })
-
-    const enrichedPromotions =
-      cart.listPromotion?.map(promo => ({
-        ...promo,
-        listProduct: promo.listProduct.map(promoProduct => {
-          const productInfo =
-            productDetails.find(p => p.id === promoProduct.id) || {}
-          const unitData =
-            productInfo.listUnit?.find(u => u.unit === promoProduct.unit) || {}
-          const factor = parseInt(unitData?.factor, 10) || 1
-          const qtyPcs = promoProduct.qty * factor
-
-          return {
-            ...promoProduct,
-            // test: promo.id,
-            // test: 'dawdaw',
-            qtyPcs
-          }
-        })
-      })) || []
-
-    // console.log('enrichedPromotions',enrichedPromotions)
-
-    return {
-      type: cart.type,
-      store,
-      shipping: [],
-      listProduct: enrichedProducts,
-      // listRefund: [],
-      listPromotion: enrichedPromotions,
-      total: parseFloat(cart.total.toFixed(2)),
-      subtotal: parseFloat(cart.total.toFixed(2)),
-      discount: 0,
-      discountProduct: 0,
-      vat: parseFloat((cart.total - cart.total / 1.07).toFixed(2)),
-      totalExVat: parseFloat((cart.total / 1.07).toFixed(2))
-    }
-    // }
-
-
-    // console.log(enrichedProducts) // สามารถใช้งาน enrichedProducts ได้
-
-    // console.log('enrichedPromotions',enrichedProducts)
-  } catch (error) {
-    console.error('Error transforming cart data:', error.message)
-    return null
+async function summaryOrder(cart, channel, res) {
+  // try {
+  if (!cart) {
+    throw new Error('Cart data is required')
   }
+
+  const { Store } = getModelsByChannel(channel, res, storeModel);
+  const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
+  const store = storeData
+    ? {
+      _id: storeData._id,
+      storeId: storeData.storeId,
+      name: storeData.name || '',
+      taxId: storeData.taxId || '',
+      tel: storeData.tel || '',
+      route: storeData.route || '',
+      storeType: storeData.type || '',
+      typeName: storeData.typeName || '',
+      address: storeData.address || '',
+      subDistrict: storeData.subDistrict || '',
+      district: storeData.district || '',
+      province: storeData.province || '',
+      zone: storeData.zone || '',
+      area: storeData.area || ''
+    }
+    : {}
+
+  const productIds = [
+    ...cart.listProduct.map(p => p.id),
+    ...(cart.listPromotion
+      ? cart.listPromotion.flatMap(promo => promo.listProduct.map(p => p.id))
+      : [])
+  ]
+
+  const { Product } = getModelsByChannel(channel, res, productModel);
+
+  const productDetails = await Product.find({
+    id: { $in: productIds }
+  }).lean()
+  // หา Product ที่อยู่ใน อาร์เรย์ productIds แล้วเอาแต่ id
+
+  let enrichedProducts = [] // ประกาศตัวแปรไว้ก่อน
+  // if (changePromotionStatus == 0) {
+  // console.log('changePromotionStatus = 0', changePromotionStatus);
+  enrichedProducts = cart.listProduct.map(cartItem => {
+    const productInfo = productDetails.find(p => p.id === cartItem.id) || {}
+    const unitData =
+      productInfo.listUnit?.find(u => u.unit === cartItem.unit) || {}
+    const factor = parseInt(unitData?.factor, 10) || 1
+    // console.log("factor",factor);
+    const qtyPcs = cartItem.qty * factor
+    const totalPrice = cartItem.qty * cartItem.price
+    return {
+      id: cartItem.id,
+      lot: cartItem.lot,
+      name: cartItem.name,
+      groupCode: productInfo.groupCode || '',
+      group: productInfo.group || '',
+      brandCode: productInfo.brandCode || '',
+      brand: productInfo.brand || '',
+      size: productInfo.size || '',
+      flavourCode: productInfo.flavourCode || '',
+      flavour: productInfo.flavour || '',
+      qty: cartItem.qty,
+      unit: cartItem.unit,
+      unitName: unitData.name || '',
+      price: cartItem.price,
+      total: totalPrice,
+      qtyPcs
+    }
+  })
+
+  const enrichedPromotions =
+    cart.listPromotion?.map(promo => ({
+      ...promo,
+      listProduct: promo.listProduct.map(promoProduct => {
+        const productInfo =
+          productDetails.find(p => p.id === promoProduct.id) || {}
+        const unitData =
+          productInfo.listUnit?.find(u => u.unit === promoProduct.unit) || {}
+        const factor = parseInt(unitData?.factor, 10) || 1
+        const qtyPcs = promoProduct.qty * factor
+
+        return {
+          ...promoProduct,
+          // test: promo.id,
+          // test: 'dawdaw',
+          qtyPcs
+        }
+      })
+    })) || []
+
+  // console.log('enrichedPromotions',enrichedPromotions)
+
+  return {
+    type: cart.type,
+    store,
+    shipping: [],
+    listProduct: enrichedProducts,
+    // listRefund: [],
+    listPromotion: enrichedPromotions,
+    total: parseFloat(cart.total.toFixed(2)),
+    subtotal: parseFloat(cart.total.toFixed(2)),
+    discount: 0,
+    discountProduct: 0,
+    vat: parseFloat((cart.total - cart.total / 1.07).toFixed(2)),
+    totalExVat: parseFloat((cart.total / 1.07).toFixed(2))
+  }
+  // }
+
+
+  // console.log(enrichedProducts) // สามารถใช้งาน enrichedProducts ได้
+
+  // console.log('enrichedPromotions',enrichedProducts)
+  // } catch (error) {
+  //   console.error('Error transforming cart data:', error.message)
+  //   return null
+  // }
 }
 
-async function summaryWithdraw (cart,channel,res) {
+async function summaryWithdraw(cart, channel, res) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
     }
-    const { Product } = getModelsByChannel(channel,res,productModel); 
+    const { Product } = getModelsByChannel(channel, res, productModel);
 
     const productIds = cart.listProduct.map(p => p.id)
     const productDetails = await Product.find({
@@ -295,35 +297,35 @@ async function summaryWithdraw (cart,channel,res) {
 //   // }
 // }
 
-async function summaryGive (cart,channel,res) {
+async function summaryGive(cart, channel, res) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
     }
     // console.log('summaryGive', cart.storeId)
-    const { Store } = getModelsByChannel(channel,res,storeModel); 
+    const { Store } = getModelsByChannel(channel, res, storeModel);
 
     const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
     const store = storeData
       ? {
-          storeId: storeData.storeId,
-          name: storeData.name || '',
-          taxId: storeData.taxId || '',
-          tel: storeData.tel || '',
-          route: storeData.route || '',
-          storeType: storeData.type || '',
-          typeName: storeData.typeName || '',
-          address: storeData.address || '',
-          subDistrict: storeData.subDistrict || '',
-          district: storeData.district || '',
-          province: storeData.province || '',
-          zone: storeData.zone || '',
-          area: storeData.area || ''
-        }
+        storeId: storeData.storeId,
+        name: storeData.name || '',
+        taxId: storeData.taxId || '',
+        tel: storeData.tel || '',
+        route: storeData.route || '',
+        storeType: storeData.type || '',
+        typeName: storeData.typeName || '',
+        address: storeData.address || '',
+        subDistrict: storeData.subDistrict || '',
+        district: storeData.district || '',
+        province: storeData.province || '',
+        zone: storeData.zone || '',
+        area: storeData.area || ''
+      }
       : {}
 
     const productIds = cart.listProduct.map(p => p.id)
-    const { Product } = getModelsByChannel(channel,res,productModel); 
+    const { Product } = getModelsByChannel(channel, res, productModel);
     const productDetails = await Product.find({
       id: { $in: productIds }
     }).lean()
@@ -338,7 +340,7 @@ async function summaryGive (cart,channel,res) {
       return {
         id: cartItem.id,
         name: cartItem.name,
-        lot:cartItem.lot,
+        lot: cartItem.lot,
         group: productInfo.group || '',
         brand: productInfo.brand || '',
         size: productInfo.size || '',
@@ -349,7 +351,7 @@ async function summaryGive (cart,channel,res) {
         qtyPcs: qtyPcs * cartItem.qty,
         price: cartItem.price,
         total: totalPrice,
-        condition : cartItem.condition
+        condition: cartItem.condition
       }
     })
 
@@ -370,204 +372,210 @@ async function summaryGive (cart,channel,res) {
   }
 }
 
-async function summaryOrderProStatusOne (cart, listPromotion,channel,res) {
+async function summaryOrderProStatusOne(cart, listPromotion, channel, res) {
   try {
-    if (!cart) {
-      throw new Error('Cart data is required')
+  if (!cart) {
+    throw new Error('Cart data is required')
+  }
+  const { Store } = getModelsByChannel(channel, res, storeModel);
+
+  const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
+
+  const store = storeData
+    ? {
+      _id: storeData._id,
+      storeId: storeData.storeId,
+      name: storeData.name || '',
+      taxId: storeData.taxId || '',
+      tel: storeData.tel || '',
+      route: storeData.route || '',
+      storeType: storeData.type || '',
+      typeName: storeData.typeName || '',
+      address: storeData.address || '',
+      subDistrict: storeData.subDistrict || '',
+      district: storeData.district || '',
+      province: storeData.province || '',
+      zone: storeData.zone || '',
+      area: storeData.area || ''
     }
-    const { Store } = getModelsByChannel(channel,res,storeModel); 
+    : {}
 
-    const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
+  const productIds = [
+    ...cart.listProduct.map(p => p.id),
+    ...(cart.listPromotion
+      ? cart.listPromotion.flatMap(promo => promo.listProduct.map(p => p.id))
+      : [])
+  ]
+  const { Product } = getModelsByChannel(channel, res, productModel);
 
-    const store = storeData
-      ? {
-          _id: storeData._id,
-          storeId: storeData.storeId,
-          name: storeData.name || '',
-          taxId: storeData.taxId || '',
-          tel: storeData.tel || '',
-          route: storeData.route || '',
-          storeType: storeData.type || '',
-          typeName: storeData.typeName || '',
-          address: storeData.address || '',
-          subDistrict: storeData.subDistrict || '',
-          district: storeData.district || '',
-          province: storeData.province || '',
-          zone: storeData.zone || '',
-          area: storeData.area || ''
-        }
-      : {}
+  const productDetails = await Product.find({
+    id: { $in: productIds }
+  }).lean()
 
-    const productIds = [
-      ...cart.listProduct.map(p => p.id),
-      ...(cart.listPromotion
-        ? cart.listPromotion.flatMap(promo => promo.listProduct.map(p => p.id))
-        : [])
-    ]
-    const { Product } = getModelsByChannel(channel,res,productModel); 
 
-    const productDetails = await Product.find({
-      id: { $in: productIds }
-    }).lean()
+  let enrichedProducts = [] // ประกาศตัวแปรไว้ก่อน
+  // if (changePromotionStatus == 0) {
+  // console.log('changePromotionStatus = 0', changePromotionStatus);
+  enrichedProducts = cart.listProduct.map(cartItem => {
+    const productInfo = productDetails.find(p => p.id === cartItem.id) || {}
+    const unitData =
+      productInfo.listUnit?.find(u => u.unit === cartItem.unit) || {}
+    const factor = parseInt(unitData?.factor, 10) || 1
+    // console.log("factor",factor);
+    const qtyPcs = cartItem.qty * factor
+    const totalPrice = cartItem.qty * cartItem.price
+    return {
+      id: cartItem.id,
+      lot: cartItem.lot,
+      name: cartItem.name,
+      groupCode: productInfo.groupCode || '',
+      group: productInfo.group || '',
+      brandCode: productInfo.brandCode || '',
+      brand: productInfo.brand || '',
+      size: productInfo.size || '',
+      flavourCode: productInfo.flavourCode || '',
+      flavour: productInfo.flavour || '',
+      qty: cartItem.qty,
+      unit: cartItem.unit,
+      unitName: unitData.name || '',
+      price: cartItem.price,
+      total: totalPrice,
+      qtyPcs
+    }
+  })
 
- 
- let enrichedProducts = [] // ประกาศตัวแปรไว้ก่อน
-    // if (changePromotionStatus == 0) {
-    // console.log('changePromotionStatus = 0', changePromotionStatus);
-    enrichedProducts = cart.listProduct.map(cartItem => {
-      const productInfo = productDetails.find(p => p.id === cartItem.id) || {}
-      const unitData =
-        productInfo.listUnit?.find(u => u.unit === cartItem.unit) || {}
-      const factor = parseInt(unitData?.factor, 10) || 1
-      // console.log("factor",factor);
-      const qtyPcs = cartItem.qty * factor
-      const totalPrice = cartItem.qty * cartItem.price
+
+
+
+  // let unitDataArray = []
+  // listProducts.forEach(innerArray => {
+  //   innerArray.forEach(item => {
+  //     const productInfo = productDetails.find(p => p.id === item.id) || {}
+
+  //     if (productInfo.listUnit) {
+  //       const foundUnit = productInfo.listUnit.find(u => u.unit === item.unit)
+  //       if (foundUnit) {
+  //         // เก็บ item.id ร่วมกับข้อมูล unit ที่พบ
+  //         unitDataArray.push({
+  //           itemId: item.id,
+  //           unit: foundUnit.unit,
+  //           name: foundUnit.name,
+  //           factor: foundUnit.factor,
+  //           sale: foundUnit.price.sale,
+  //           refund: foundUnit.price.refund
+  //         })
+  //       }
+  //     }
+  //   })
+  // })
+
+  // listPromotion.forEach(promo => {
+  //   promo.listProduct.forEach(product => {
+  //     const unitData = unitDataArray.find(unit => unit.itemId === product.id)
+
+  //     if (unitData) {
+  //       product.unitData = {
+  //         unit: unitData.unit,
+  //         name: unitData.name,
+  //         factor: unitData.factor,
+  //         sale: unitData.sale,
+  //         refund: unitData.refund
+  //       }
+  //     }
+  //   })
+  // })
+  // console.log(cart.listPromotion)
+  const enrichedPromotions = (cart.listPromotion || []).map(promo => {
+    const plainPromo = promo.toObject ? promo.toObject() : promo;
+
+    const enrichedProducts = plainPromo.listProduct.map(promoProduct => {
+      const productInfo = productDetails.find(p => p.id === promoProduct.id) || {};
+      const unitData = productInfo.listUnit?.find(u => u.unit === promoProduct.unit) || {};
+      const factor = parseInt(unitData?.factor, 10) || 1;
+      const qtyPcs = promoProduct.qty * factor;
+
       return {
-        id: cartItem.id,
-        lot: cartItem.lot,
-        name: cartItem.name,
-        groupCode: productInfo.groupCode || '',
-        group: productInfo.group || '',
-        brandCode: productInfo.brandCode || '',
-        brand: productInfo.brand || '',
-        size: productInfo.size || '',
-        flavourCode: productInfo.flavourCode || '',
-        flavour: productInfo.flavour || '',
-        qty: cartItem.qty,
-        unit: cartItem.unit,
-        unitName: unitData.name || '',
-        price: cartItem.price,
-        total: totalPrice,
+        ...promoProduct,
         qtyPcs
-      }
-    })
-
-
-
-
-    // let unitDataArray = []
-    // listProducts.forEach(innerArray => {
-    //   innerArray.forEach(item => {
-    //     const productInfo = productDetails.find(p => p.id === item.id) || {}
-
-    //     if (productInfo.listUnit) {
-    //       const foundUnit = productInfo.listUnit.find(u => u.unit === item.unit)
-    //       if (foundUnit) {
-    //         // เก็บ item.id ร่วมกับข้อมูล unit ที่พบ
-    //         unitDataArray.push({
-    //           itemId: item.id,
-    //           unit: foundUnit.unit,
-    //           name: foundUnit.name,
-    //           factor: foundUnit.factor,
-    //           sale: foundUnit.price.sale,
-    //           refund: foundUnit.price.refund
-    //         })
-    //       }
-    //     }
-    //   })
-    // })
-
-    // listPromotion.forEach(promo => {
-    //   promo.listProduct.forEach(product => {
-    //     const unitData = unitDataArray.find(unit => unit.itemId === product.id)
-
-    //     if (unitData) {
-    //       product.unitData = {
-    //         unit: unitData.unit,
-    //         name: unitData.name,
-    //         factor: unitData.factor,
-    //         sale: unitData.sale,
-    //         refund: unitData.refund
-    //       }
-    //     }
-    //   })
-    // })
-
-const enrichedPromotions = (cart.listPromotion || []).map(promo => {
-  const plainPromo = promo.toObject ? promo.toObject() : promo;
-
-  const enrichedProducts = plainPromo.listProduct.map(promoProduct => {
-    const productInfo = productDetails.find(p => p.id === promoProduct.id) || {};
-    const unitData = productInfo.listUnit?.find(u => u.unit === promoProduct.unit) || {};
-    const factor = parseInt(unitData?.factor, 10) || 1;
-    const qtyPcs = promoProduct.qty * factor;
+      };
+    });
 
     return {
-      ...promoProduct,
-      qtyPcs
+      ...plainPromo,
+      listProduct: enrichedProducts
     };
   });
 
-  return {
-    ...plainPromo,
+  const order = {
+    order: {
+      store: store.storeId,
+    },
     listProduct: enrichedProducts
-  };
-});
-  
+  }
+  const promotion = await applyPromotion(order, channel, res)
 
-      const mergedMap = new Map();
 
-      listPromotion.forEach(promo => {
-        mergedMap.set(promo.proId,promo)
-      })
+  const mergedMap = new Map();
 
-      enrichedPromotions.forEach(promo => {
-        mergedMap.set(promo.proId,promo)
-      })
+  // listPromotion.forEach(promo => {
+  // mergedMap.set(promo.proId, promo)
+  // })
 
-      const promoProduct = Array.from(mergedMap.values());
+  let listPromotionNew = ''
 
-    // const enrichedPromotionExtract = listPromotion.map(promo => ({
-    //   proCode: promo?.proCode || '',
-    //   proName: promo.proName,
-    //   proType: promo.proType,
-    //   proQty: promo.proQty || 0,
-    //   discount: promo.discount || 0,
-    //   listProduct: promo.listProduct.map(product => ({
-    //     id: product.id,
-    //     name: product.name,
-    //     groupCode: product.groupCode,
-    //     group: product.group,
-    //     size: product.size,
-    //     flavourCode: product.flavourCode,
-    //     flavour: product.flavour,
-    //     brandCode: product.brandCode,
-    //     brand: product.brand,
-    //     qty: product.qty,
-    //     unit: product.unit,
-    //     unitName: product.unitName,
-    //     price: 0,
-    //     total: 0,
-    //     qtyPcs: product.qty * (product.unitData?.factor || 0) // ใช้ product.unitData.factor
-    //   }))
-    // }))
+  listPromotionNew = listPromotion.map(listItem => {
+    const promo = promotion.appliedPromotions.find(p => p.proId === listItem.proId);
 
-    return {
-      type: cart.type,
-      store,
-      shipping: [],
-      listProduct: enrichedProducts,
-      // listRefund: [],
-      listPromotion: promoProduct,
-      total: parseFloat(cart.total.toFixed(2)),
-      subtotal: 0,
-      discount: 0,
-      discountProduct: 0,
-      vat: 0,
-      totalExVat: 0
+    if (promo && promo.proQty !== listItem.proQty) {
+      return promo;
     }
+
+    return listItem;
+  });
+
+
+
+  enrichedPromotions.forEach(promo => {
+    mergedMap.set(promo.proId, promo)
+  })
+
+  listPromotionNew.forEach(promo => {
+    mergedMap.set(promo.proId, promo)
+  })
+
+
+
+  const promoProduct = Array.from(mergedMap.values());
+
+  // console.log(listPromotionNew)
+
+
+  return {
+    type: cart.type,
+    store,
+    shipping: [],
+    listProduct: enrichedProducts,
+    // listRefund: [],
+    listPromotion: promoProduct,
+    total: parseFloat(cart.total.toFixed(2)),
+    subtotal: 0,
+    discount: 0,
+    discountProduct: 0,
+    vat: 0,
+    totalExVat: 0
+  }
   } catch (error) {
     console.error('Error transforming cart data:', error.message)
     return null
   }
 }
 
-async function summaryWithdraw (cart,channel,res) {
+async function summaryWithdraw(cart, channel, res) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
     }
-    const { Product } = getModelsByChannel(channel,res,productModel); 
+    const { Product } = getModelsByChannel(channel, res, productModel);
 
     const productIds = cart.listProduct.map(p => p.id)
     const productDetails = await Product.find({
@@ -612,37 +620,37 @@ async function summaryWithdraw (cart,channel,res) {
   }
 }
 
-async function summaryRefund (cart,channel,res) {
+async function summaryRefund(cart, channel, res) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
     }
-    const { Store } = getModelsByChannel(channel,res,storeModel); 
+    const { Store } = getModelsByChannel(channel, res, storeModel);
     const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
     // console.log(storeData)
     const store = storeData
       ? {
-          storeId: storeData.storeId,
-          name: storeData.name || '',
-          taxId: storeData.taxId || '',
-          tel: storeData.tel || '',
-          route: storeData.route || '',
-          storeType: storeData.type || '',
-          typeName: storeData.typeName || '',
-          address: storeData.address || '',
-          subDistrict: storeData.subDistrict || '',
-          district: storeData.district || '',
-          province: storeData.province || '',
-          zone: storeData.zone || '',
-          area: storeData.area || ''
-        }
+        storeId: storeData.storeId,
+        name: storeData.name || '',
+        taxId: storeData.taxId || '',
+        tel: storeData.tel || '',
+        route: storeData.route || '',
+        storeType: storeData.type || '',
+        typeName: storeData.typeName || '',
+        address: storeData.address || '',
+        subDistrict: storeData.subDistrict || '',
+        district: storeData.district || '',
+        province: storeData.province || '',
+        zone: storeData.zone || '',
+        area: storeData.area || ''
+      }
       : {}
 
     const productIds = [
       ...cart.listProduct.map(p => p.id),
       ...cart.listRefund.map(p => p.id)
     ]
-    const { Product } = getModelsByChannel(channel,res,productModel); 
+    const { Product } = getModelsByChannel(channel, res, productModel);
 
     const productDetails = await Product.find({
       id: { $in: productIds }
@@ -659,7 +667,7 @@ async function summaryRefund (cart,channel,res) {
       const totalPrice = cartItem.qty * cartItem.price
       totalProduct += totalPrice
 
-      
+
 
       return {
         id: cartItem.id,
