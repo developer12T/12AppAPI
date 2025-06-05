@@ -296,7 +296,7 @@ SELECT a.Area AS area,
 
    `;
   }
-
+await sql.close();
   const return_arr = [];
 
   for (const row of result.recordset) {

@@ -619,7 +619,7 @@ exports.addFromERPnew = async (req, res) => {
             LEFT JOIN [dbo].[data_shoptype] ON OKCFC6 = type_id COLLATE Thai_CI_AS
   `;
   }
-
+  await sql.close();
   const return_arr = [];
 
   for (const row of result.recordset) {
