@@ -9,6 +9,8 @@ const upload = multer({ storage: multer.memoryStorage() }).array(
   'checkInImage',
   1
 )
+const sql = require('mssql');
+
 const orderModel = require('../../models/cash/sale')
 const routeModel = require('../../models/cash/route')
 const storeModel = require('../../models/cash/store')
@@ -16,8 +18,7 @@ const productModel = require('../../models/cash/product')
 
 const { getModelsByChannel } = require('../../middleware/channel')
 const path = require('path')
-const { json } = require('body-parser')
-const { flatMap } = require('lodash')
+
 
 exports.getRoute = async (req, res) => {
   try {
@@ -238,6 +239,126 @@ exports.addFromERP = async (req, res) => {
     })
   }
 }
+
+
+exports.addFromERPnew = async (req, res) => {
+
+  const channel = req.headers['x-channel']
+
+
+  const config = {
+    user: 'sa',
+    password: 'P@ssw0rd',
+    server: '192.168.2.97',
+    database: 'DATA_API_TOHOME',
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  };
+
+  await sql.connect(config);
+
+  let result = ''
+  if (channel === 'cash') {
+    result = await sql.query`
+  SELECT a.Area AS area, 
+                    CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
+                    RIGHT(RouteSet, 2) AS day, 
+                    CONVERT(nvarchar(6), GETDATE(), 112) AS period, 
+                    StoreID AS storeId
+             FROM [DATA_OMS].[dbo].[DATA_StoreSet] a
+             LEFT JOIN [DATA_OMS].[dbo].[OCUSMA] ON StoreID = OKCUNO COLLATE Latin1_General_BIN
+             LEFT JOIN [dbo].[data_store] b ON StoreID = customerCode
+            --  WHERE a.Area IN ('BE215','NE211','NS211','CT211','NH211','SH211')
+            WHERE store_status <> '90'
+               AND OKCFC3 <> 'DEL'
+               AND LEFT(OKRGDT, 6) <> CONVERT(nvarchar(6), GETDATE(), 112)
+               AND a.Channel = '103'
+             ORDER BY a.Area, RouteSet"
+  `;
+  }
+  else if (channel === 'credit') {
+    result = await sql.query`
+SELECT a.Area AS area, 
+                    CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
+                    RIGHT(RouteSet, 2) AS day, 
+                    CONVERT(nvarchar(6), GETDATE(), 112) AS period, 
+                    StoreID AS storeId
+             FROM [DATA_OMS].[dbo].[DATA_StoreSet] a
+             LEFT JOIN [DATA_OMS].[dbo].[OCUSMA] ON StoreID = OKCUNO COLLATE Latin1_General_BIN
+             LEFT JOIN [dbo].[store_credit] b ON StoreID = customerCode
+            --  WHERE a.Area IN ('BE215','NE211','NS211','CT211','NH211','SH211')
+            -- WHERE store_status <> '90'
+            --    AND OKCFC3 <> 'DEL'
+            --    AND LEFT(OKRGDT, 6) <> CONVERT(nvarchar(6), GETDATE(), 112)
+            WHERE a.Channel = '102'
+            ORDER BY a.Area, RouteSet
+
+   `;
+  }
+
+  const return_arr = [];
+
+  for (const row of result) {
+    const area = String(row.area ?? '').trim();
+    const id = String(row.id ?? '').trim();
+    const day = String(row.day ?? '').trim();
+    const period = String(row.period ?? '').trim();
+    const storeId = String(row.storeId ?? '').trim();
+
+    const storeInfo = {
+      storeInfo: storeId,
+      latitude: '',
+      longtitude: '',
+      note: '',
+      status: '0',
+      statusText: '',
+      date: '',
+      listOrder: []
+    };
+
+    let groupFound = false;
+
+    for (const group of return_arr) {
+      if (group.id === id && group.area === area) {
+        group.listStore.push(storeInfo);
+        groupFound = true;
+        break;
+      }
+    }
+
+    if (!groupFound) {
+      return_arr.push({
+        id,
+        area,
+        period,
+        day,
+        listStore: [storeInfo]
+      });
+    }
+  }
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: return_arr.slice(0, 10000)
+
+  })
+
+
+
+
+}
+
+
+
+
+
+
+
+
+
 
 exports.checkIn = async (req, res) => {
   upload(req, res, async err => {
@@ -1048,6 +1169,13 @@ exports.updateAndAddRoute = async (req, res) => {
     message: 'Add Route Successfully'
   })
 }
+
+
+
+
+
+
+
 
 exports.getRouteProvince = async (req, res) => {
   const { area, period } = req.body

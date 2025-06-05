@@ -579,7 +579,7 @@ exports.addFromERPnew = async (req, res) => {
             WHERE store_status <> '90' 
   `;
   }
-  if (channel === 'credit') {
+  else if (channel === 'credit') {
     result = await sql.query`
                     SELECT 
                     area,
