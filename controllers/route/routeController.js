@@ -41,7 +41,7 @@ exports.getRoute = async (req, res) => {
       'storeId name address typeName taxId tel'
     )
 
-    
+
 
     const filteredRoutes = routes
       .map(route => {
@@ -55,7 +55,7 @@ exports.getRoute = async (req, res) => {
             ? addr.includes(province.toLowerCase())
             : true
 
-            const matchStoreId = storeId
+          const matchStoreId = storeId
             ? store.storeInfo?.storeId === storeId
             : true
 

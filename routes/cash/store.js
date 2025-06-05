@@ -12,7 +12,8 @@ const {
   createRunningNumber,
   updateRunningNumber,
   addBueatyStore,
-  getBueatyStore
+  getBueatyStore,
+  addFromERPnew
 } = require('../../controllers/store/storeController')
 
 const router = express.Router()
@@ -21,6 +22,8 @@ router.get('/getStore', getStore)
 router.post('/addStore', addStore)
 router.post('/updateImage', updateImage)
 router.post('/addFromERP', addFromERP)
+router.post('/addFromERPnew', addFromERPnew)
+
 router.patch('/editStore/:storeId', editStore)
 router.post('/checkIn/:storeId', checkInStore)
 router.post('/updateStoreStatus', updateStoreStatus)

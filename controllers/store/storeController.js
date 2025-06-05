@@ -5,6 +5,9 @@ const multer = require('multer')
 const addUpload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages'
 )
+const sql = require('mssql');
+// const odbc = require('odbc');
+const iconv = require('iconv-lite');
 
 const getUploadMiddleware = channel => {
   const storage = multer.memoryStorage()
@@ -510,7 +513,206 @@ exports.addFromERP = async (req, res) => {
   }
 }
 
+exports.addFromERPnew = async (req, res) => {
 
+  const config = {
+    user: 'sa',
+    password: 'P@ssw0rd',
+    server: '192.168.2.97',
+    database: 'DATA_API_TOHOME',
+    options: {
+      encrypt: false, // true ถ้าใช้ Azure หรือ SSL
+      trustServerCertificate: true // true ถ้า dev environment
+    }
+  };
+
+  await sql.connect(config);
+
+  const result = await sql.query`
+  SELECT            area,
+                    saleCode,
+                    TRIM(customerCode) AS customerCode,
+                    customerName,
+                    address,
+                    subDistrict,
+                    district,
+                    province,
+                    OKECAR AS provinceCode,
+                    postCode,
+                    customerTax,
+                    customerTel,
+                    customerMobile,
+                    lat,
+                    long,
+                    customerShoptype,
+                    enable,
+                    storeAbout,
+                    api_status,
+                    head_no,
+                    run_no,
+                    store_status,
+                    run_id,
+                    OKCUA1,
+                    OKCFC3,
+                    OKCFC6,
+                    OKECAR,
+                    OKSDST,
+                    type_name, 
+                    CONVERT(date,(CONVERT(VARCHAR,OKRGDT))) AS date_create,
+                    CASE WHEN OPADID = 'INVTSP' THEN 0 ELSE 1 END AS ship_default,
+                    OPADID AS shippingId,
+                    OPCUA1 AS ship_address,
+                    OPCUA2 AS ship_subDistrict,
+                    OPCUA2 AS ship_district,
+                    OPCUA3 AS ship_province,
+                    OPPONO AS ship_postcode,
+                    OPGEOX AS ship_lat,
+                    OPGEOY AS ship_long
+            FROM [dbo].[data_store] a
+            LEFT JOIN [192.168.2.74].[M3FDBPRD].[MVXJDTA].[OCUSMA] ON customerCode = OKCUNO COLLATE Latin1_General_BIN AND OKCONO = 410
+            LEFT JOIN [192.168.2.74].[M3FDBPRD].[MVXJDTA].[OCUSAD] ON OKCUNO = OPCUNO AND OPCONO = 410
+            LEFT JOIN [dbo].[data_shoptype] ON OKCFC6 = type_id COLLATE Thai_CI_AS
+            WHERE store_status <> '90' 
+
+  `;
+
+  const return_arr = [];
+
+  for (const row of result.recordset) {
+    // console.log(row)
+    const storeId = row.customerCode?.trim();
+    const name = row.customerName || '' .trim();
+    const taxId = row.customerTax?.trim();
+    const tel = row.customerTel?.trim();
+    const route = row.OKCFC3?.trim();
+    const type = row.OKCFC6?.trim();
+    const typeName = row.type_name || ''.trim();
+    const address = row.address || ''.trim();
+    const subDistrict = row.subDistrict || ''.trim();
+    const district = row.district || ''.trim();
+    const province = row.province || ''.trim();
+    const provinceCode = row.provinceCode || ''.trim();
+    const postCode = row.postCode?.trim();
+    const zone = row.OKSDST?.trim();
+    const area = row.area?.trim();
+    const latitude = row.lat?.trim();
+    const longtitude = row.long?.trim();
+    const createdAt = row.date_create ? String(row.date_create).trim() : '';
+
+    const defaultShipping = String(row.ship_default)?.trim();
+    const shippingId = String(row.shippingId)?.trim();
+    const ship_address = row.ship_address || ''.trim();
+    const ship_subDistrict = row.ship_subDistrict || ''.trim();
+    const ship_district = row.ship_district || ''.trim();
+    const ship_province = row.ship_province || ''.trim();
+    const ship_postCode = row.ship_postcode?.trim();
+    const ship_latitude = String(row.ship_lat ?? '').trim();
+    const ship_longtitude = String(row.ship_long ?? '').trim();
+
+    const shippingAddress = {
+      default: defaultShipping,
+      shippingId,
+      address: ship_address,
+      subDistrict: ship_subDistrict,
+      district: ship_district,
+      province: ship_province,
+      postCode: ship_postCode,
+      latitude: ship_latitude,
+      longtitude: ship_longtitude,
+    };
+
+    const existingStore = return_arr.find(store => store.storeId === storeId);
+
+    if (existingStore) {
+      existingStore.shippingAddress.push(shippingAddress);
+    } else {
+      return_arr.push({
+        storeId,
+        name,
+        taxId,
+        tel,
+        route,
+        type,
+        typeName,
+        address,
+        subDistrict,
+        district,
+        province,
+        provinceCode,
+        zone,
+        area,
+        latitude,
+        longtitude,
+        createdAt,
+        shippingAddress: [shippingAddress],
+      });
+    }
+  }
+const dataArray = []
+
+for (const splitData of return_arr) {
+      const approveData = {
+        dateSend: new Date(),
+        dateAction: new Date(),
+        appPerson: 'system'
+      }
+      const poliAgree = {
+        status: 'Agree',
+        date: new Date()
+      }
+      const mainData = {
+        storeId: splitData.storeId,
+        name: splitData.name,
+        taxId: splitData.taxId,
+        tel: splitData.tel,
+        route: splitData.route,
+        type: splitData.type,
+        typeName: splitData.typeName,
+        address: splitData.address,
+        district: splitData.district,
+        subDistrict: splitData.subDistrict,
+        province: splitData.province,
+        provinceCode: splitData.provinceCode,
+        'postCode ': splitData.postCode,
+        zone: splitData.zone,
+        area: splitData.area,
+        latitude: splitData.latitude,
+        longtitude: splitData.longtitude,
+        lineId: '',
+        'note ': '',
+        approve: approveData,
+        status: '20',
+        policyConsent: poliAgree,
+        imageList: [],
+        shippingAddress: splitData.shippingAddress,
+        checkIn: {},
+        createdAt: splitData.createdAt,
+        updatedDate: Date()
+      }
+
+      const channel = req.headers['x-channel'] // 'credit' or 'cash'
+
+      const { Store } = getModelsByChannel(channel, res, storeModel)
+      const StoreIf = await Store.findOne({ storeId: splitData.storeId })
+      if (!StoreIf) {
+        await Store.create(mainData)
+      } else {
+        const idStoreReplace = {
+          idStore: splitData.storeId,
+          name: splitData.name
+        }
+        dataArray.push(idStoreReplace)
+      }
+    }
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    // data: return_arr.slice(0, 10000)
+
+  })
+}
 
 
 
