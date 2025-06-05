@@ -32,6 +32,7 @@ const path = require('path')
 const { v4: uuidv4 } = require('uuid')
 const { stat } = require('fs')
 const { create } = require('lodash')
+const { channel } = require('diagnostics_channel')
 uuidv4() // ⇨ '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed'
 
 exports.getStore = async (req, res) => {
@@ -514,6 +515,7 @@ exports.addFromERP = async (req, res) => {
 }
 
 exports.addFromERPnew = async (req, res) => {
+  const channel = req.headers['x-channel']
 
   const config = {
     user: 'sa',
@@ -521,15 +523,17 @@ exports.addFromERPnew = async (req, res) => {
     server: '192.168.2.97',
     database: 'DATA_API_TOHOME',
     options: {
-      encrypt: false, // true ถ้าใช้ Azure หรือ SSL
-      trustServerCertificate: true // true ถ้า dev environment
+      encrypt: false,
+      trustServerCertificate: true
     }
   };
-
+  let result = ''
   await sql.connect(config);
 
-  const result = await sql.query`
-  SELECT            area,
+  if (channel === 'cash') {
+    result = await sql.query`
+                    SELECT            
+                    area,
                     saleCode,
                     TRIM(customerCode) AS customerCode,
                     customerName,
@@ -573,15 +577,53 @@ exports.addFromERPnew = async (req, res) => {
             LEFT JOIN [192.168.2.74].[M3FDBPRD].[MVXJDTA].[OCUSAD] ON OKCUNO = OPCUNO AND OPCONO = 410
             LEFT JOIN [dbo].[data_shoptype] ON OKCFC6 = type_id COLLATE Thai_CI_AS
             WHERE store_status <> '90' 
-
   `;
+  }
+  if (channel === 'credit') {
+    result = await sql.query`
+                    SELECT 
+                    area,
+                    saleCode,
+                    TRIM(customerCode) AS customerCode,
+                    customerName,
+                    address,
+                    subDistrict,
+                    district,
+                    province,
+                    OKECAR AS provinceCode,
+                    postCode,
+                    customerTax,
+                    customerTel,
+                    customerMobile,
+                    OKCUA1,
+                    OKCFC3,
+                    OKCFC6,
+                    OKECAR,
+                    OKSDST,
+                    type_name, 
+                    CONVERT(date,(CONVERT(VARCHAR,OKRGDT))) AS date_create,
+                    CASE WHEN OPADID = 'INVTSP' THEN 0 ELSE 1 END AS ship_default,
+                    OPADID AS shippingId,
+                    OPCUA1 AS ship_address,
+                    OPCUA2 AS ship_subDistrict,
+                    OPCUA2 AS ship_district,
+                    OPCUA3 AS ship_province,
+                    OPPONO AS ship_postcode,
+                    OPGEOX AS ship_lat,
+                    OPGEOY AS ship_long
+            FROM [dbo].[store_credit] a
+            LEFT JOIN [192.168.2.74].[M3FDBPRD].[MVXJDTA].[OCUSMA] ON customerCode = OKCUNO COLLATE Latin1_General_BIN AND OKCONO = 410
+            LEFT JOIN [192.168.2.74].[M3FDBPRD].[MVXJDTA].[OCUSAD] ON OKCUNO = OPCUNO AND OPCONO = 410
+            LEFT JOIN [dbo].[data_shoptype] ON OKCFC6 = type_id COLLATE Thai_CI_AS
+  `;
+  }
 
   const return_arr = [];
 
   for (const row of result.recordset) {
     // console.log(row)
     const storeId = row.customerCode?.trim();
-    const name = row.customerName || '' .trim();
+    const name = row.customerName || ''.trim();
     const taxId = row.customerTax?.trim();
     const tel = row.customerTel?.trim();
     const route = row.OKCFC3?.trim();
@@ -648,62 +690,62 @@ exports.addFromERPnew = async (req, res) => {
       });
     }
   }
-const dataArray = []
+  const dataArray = []
 
-for (const splitData of return_arr) {
-      const approveData = {
-        dateSend: new Date(),
-        dateAction: new Date(),
-        appPerson: 'system'
-      }
-      const poliAgree = {
-        status: 'Agree',
-        date: new Date()
-      }
-      const mainData = {
-        storeId: splitData.storeId,
-        name: splitData.name,
-        taxId: splitData.taxId,
-        tel: splitData.tel,
-        route: splitData.route,
-        type: splitData.type,
-        typeName: splitData.typeName,
-        address: splitData.address,
-        district: splitData.district,
-        subDistrict: splitData.subDistrict,
-        province: splitData.province,
-        provinceCode: splitData.provinceCode,
-        'postCode ': splitData.postCode,
-        zone: splitData.zone,
-        area: splitData.area,
-        latitude: splitData.latitude,
-        longtitude: splitData.longtitude,
-        lineId: '',
-        'note ': '',
-        approve: approveData,
-        status: '20',
-        policyConsent: poliAgree,
-        imageList: [],
-        shippingAddress: splitData.shippingAddress,
-        checkIn: {},
-        createdAt: splitData.createdAt,
-        updatedDate: Date()
-      }
-
-      const channel = req.headers['x-channel'] // 'credit' or 'cash'
-
-      const { Store } = getModelsByChannel(channel, res, storeModel)
-      const StoreIf = await Store.findOne({ storeId: splitData.storeId })
-      if (!StoreIf) {
-        await Store.create(mainData)
-      } else {
-        const idStoreReplace = {
-          idStore: splitData.storeId,
-          name: splitData.name
-        }
-        dataArray.push(idStoreReplace)
-      }
+  for (const splitData of return_arr) {
+    const approveData = {
+      dateSend: new Date(),
+      dateAction: new Date(),
+      appPerson: 'system'
     }
+    const poliAgree = {
+      status: 'Agree',
+      date: new Date()
+    }
+    const mainData = {
+      storeId: splitData.storeId,
+      name: splitData.name,
+      taxId: splitData.taxId,
+      tel: splitData.tel,
+      route: splitData.route,
+      type: splitData.type,
+      typeName: splitData.typeName,
+      address: splitData.address,
+      district: splitData.district,
+      subDistrict: splitData.subDistrict,
+      province: splitData.province,
+      provinceCode: splitData.provinceCode,
+      'postCode ': splitData.postCode,
+      zone: splitData.zone,
+      area: splitData.area,
+      latitude: splitData.latitude,
+      longtitude: splitData.longtitude,
+      lineId: '',
+      'note ': '',
+      approve: approveData,
+      status: '20',
+      policyConsent: poliAgree,
+      imageList: [],
+      shippingAddress: splitData.shippingAddress,
+      checkIn: {},
+      createdAt: splitData.createdAt,
+      updatedDate: Date()
+    }
+
+    const channel = req.headers['x-channel'] // 'credit' or 'cash'
+
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const StoreIf = await Store.findOne({ storeId: splitData.storeId })
+    if (!StoreIf) {
+      await Store.create(mainData)
+    } else {
+      const idStoreReplace = {
+        idStore: splitData.storeId,
+        name: splitData.name
+      }
+      dataArray.push(idStoreReplace)
+    }
+  }
 
 
   res.status(200).json({

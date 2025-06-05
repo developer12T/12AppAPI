@@ -1,4 +1,5 @@
 // const { User } = require('../../models/cash/user')
+const { period, previousPeriod } = require('../../utilities/datetime')
 
 const { uploadFiles } = require('../../utilities/upload')
 const multer = require('multer')
@@ -198,6 +199,7 @@ exports.addUser = async (req, res) => {
           role: sale.role,
           status: sale.status,
           qrCodeImage: sale.qrCodeImage,
+          period:period(),
           image: ''
         })
         await newUser.save()

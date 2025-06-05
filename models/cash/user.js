@@ -21,6 +21,7 @@ const userSchema = mongoose.Schema({
   role: { type: String, require: true },
   status: { type: String, require: true },
   qrCodeImage: { type: String, require: true },
+  period: { type: String, require: true },
   image: { imageSchema }
 })
 
