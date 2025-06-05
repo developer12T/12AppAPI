@@ -6,6 +6,7 @@ const productModel = require('../../models/cash/product')
 const stockModel = require('../../models/cash/stock')
 
 const { getModelsByChannel } = require('../../middleware/channel')
+const { productQuery } = require('../../controllers/queryFromM3/querySctipt')
 
 exports.getProductAll = async (req, res) => {
   try {
@@ -613,4 +614,82 @@ exports.addFromERP = async (req, res) => {
       message: e.message
     })
   }
+}
+exports.addFromERPnew = async (req, res) => {
+
+  const channel = req.headers['x-channel']
+  const result = await productQuery(channel)
+
+const { Product } = getModelsByChannel(channel, res, productModel)
+
+    if (!result || !Array.isArray(result)) {
+      return res.status(400).json({
+        status: 400,
+        message: 'Invalid response data from external API'
+      })
+    }
+
+    data = []
+
+    for (const listProduct of result) {
+      const productId = listProduct.id
+
+      const existingProduct = await Product.findOne({ id: productId })
+      if (existingProduct) {
+        console.log(`Product ID ${productId} already exists. Skipping.`)
+        continue
+      }
+
+      const itemConvertResponse = await axios.post(
+        'http://192.168.2.97:8383/M3API/ItemManage/Item/getItemConvertItemcode',
+        { itcode: productId }
+      )
+
+      // console.log("itemConvertResponse",itemConvertResponse)
+      const unitData = itemConvertResponse.data
+      // console.log(JSON.stringify(listProduct, null, 2));
+
+      const listUnit = listProduct.unitList.map(unit => {
+        const matchingUnit = unitData[0]?.type.find(u => u.unit === unit.unit)
+        return {
+          unit: unit.unit,
+          name: unit.name,
+          factor: matchingUnit ? matchingUnit.factor : 1,
+          price: {
+            sale: unit.pricePerUnitSale,
+            refund: unit.pricePerUnitRefund
+          }
+        }
+      })
+      .sort((a, b) => b.factor - a.factor);
+      // console.log(JSON.stringify(listUnit, null, 2));
+
+      const newProduct = new Product({
+        id: listProduct.id,
+        name: listProduct.name,
+        groupCode: listProduct.groupCode,
+        group: listProduct.group,
+        brandCode: listProduct.brandCode,
+        brand: listProduct.brand,
+        size: listProduct.size,
+        flavourCode: listProduct.flavourCode,
+        flavour: listProduct.flavour,
+        type: listProduct.type,
+        weightGross: listProduct.weightGross,
+        weightNet: listProduct.weightNet,
+        statusSale: listProduct.statusSale,
+        statusRefund: listProduct.statusRefund,
+        statusWithdraw: listProduct.statusWithdraw,
+        listUnit: listUnit
+      })
+      // console.log(newProduct)
+      await newProduct.save()
+      data.push(newProduct) 
+    }
+    res.status(200).json({
+      status: 200,
+      message: 'Products added successfully',
+      // data:data
+    })
+
 }

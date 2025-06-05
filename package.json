@@ -27,7 +27,7 @@
     "morgan": "^1.10.0",
     "mssql": "^11.0.1",
     "multer": "^1.4.5-lts.1",
-    "mysql2": "^3.14.0",
+    "mysql2": "^3.14.1",
     "node-cron": "^4.0.5",
     "sequelize": "^6.37.7",
     "socket.io": "^4.8.1",

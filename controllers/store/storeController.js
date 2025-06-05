@@ -6,9 +6,7 @@ const addUpload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages'
 )
 const sql = require('mssql');
-// const odbc = require('odbc');
-const iconv = require('iconv-lite');
-
+const { storeQuery } = require('../../controllers/queryFromM3/querySctipt')
 const getUploadMiddleware = channel => {
   const storage = multer.memoryStorage()
   let limits = {}
@@ -34,7 +32,7 @@ const { stat } = require('fs')
 const { create } = require('lodash')
 const { channel } = require('diagnostics_channel')
 uuidv4() // ⇨ '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed'
-
+const { productQuery } = require('../../controllers/queryFromM3/querySctipt')
 exports.getStore = async (req, res) => {
   try {
     const { area, type, route } = req.query
@@ -518,111 +516,11 @@ exports.addFromERPnew = async (req, res) => {
   try {
 
   const channel = req.headers['x-channel']
-
-  const config = {
-    user: 'sa',
-    password: 'P@ssw0rd',
-    server: '192.168.2.97',
-    database: 'DATA_API_TOHOME',
-    options: {
-      encrypt: false,
-      trustServerCertificate: true
-    }
-  };
-  let result = ''
-  await sql.connect(config);
-
-  if (channel === 'cash') {
-    result = await sql.query`
-                    SELECT            
-                    area,
-                    saleCode,
-                    TRIM(customerCode) AS customerCode,
-                    customerName,
-                    address,
-                    subDistrict,
-                    district,
-                    province,
-                    OKECAR AS provinceCode,
-                    postCode,
-                    customerTax,
-                    customerTel,
-                    customerMobile,
-                    lat,
-                    long,
-                    customerShoptype,
-                    enable,
-                    storeAbout,
-                    api_status,
-                    head_no,
-                    run_no,
-                    store_status,
-                    run_id,
-                    OKCUA1,
-                    OKCFC3,
-                    OKCFC6,
-                    OKECAR,
-                    OKSDST,
-                    type_name, 
-                    CONVERT(date,(CONVERT(VARCHAR,OKRGDT))) AS date_create,
-                    CASE WHEN OPADID = 'INVTSP' THEN 0 ELSE 1 END AS ship_default,
-                    OPADID AS shippingId,
-                    OPCUA1 AS ship_address,
-                    OPCUA2 AS ship_subDistrict,
-                    OPCUA2 AS ship_district,
-                    OPCUA3 AS ship_province,
-                    OPPONO AS ship_postcode,
-                    OPGEOX AS ship_lat,
-                    OPGEOY AS ship_long
-            FROM [dbo].[data_store] a
-            LEFT JOIN [192.168.2.74].[M3FDBPRD].[MVXJDTA].[OCUSMA] ON customerCode = OKCUNO COLLATE Latin1_General_BIN AND OKCONO = 410
-            LEFT JOIN [192.168.2.74].[M3FDBPRD].[MVXJDTA].[OCUSAD] ON OKCUNO = OPCUNO AND OPCONO = 410
-            LEFT JOIN [dbo].[data_shoptype] ON OKCFC6 = type_id COLLATE Thai_CI_AS
-            WHERE store_status <> '90' 
-  `;
-  }
-  else if (channel === 'credit') {
-    result = await sql.query`
-                    SELECT 
-                    area,
-                    saleCode,
-                    TRIM(customerCode) AS customerCode,
-                    customerName,
-                    address,
-                    subDistrict,
-                    district,
-                    province,
-                    OKECAR AS provinceCode,
-                    postCode,
-                    customerTax,
-                    customerTel,
-                    customerMobile,
-                    OKCUA1,
-                    OKCFC3,
-                    OKCFC6,
-                    OKECAR,
-                    OKSDST,
-                    type_name, 
-                    CONVERT(date,(CONVERT(VARCHAR,OKRGDT))) AS date_create,
-                    CASE WHEN OPADID = 'INVTSP' THEN 0 ELSE 1 END AS ship_default,
-                    OPADID AS shippingId,
-                    OPCUA1 AS ship_address,
-                    OPCUA2 AS ship_subDistrict,
-                    OPCUA2 AS ship_district,
-                    OPCUA3 AS ship_province,
-                    OPPONO AS ship_postcode,
-                    OPGEOX AS ship_lat,
-                    OPGEOY AS ship_long
-            FROM [dbo].[store_credit] a
-            LEFT JOIN [192.168.2.74].[M3FDBPRD].[MVXJDTA].[OCUSMA] ON customerCode = OKCUNO COLLATE Latin1_General_BIN AND OKCONO = 410
-            LEFT JOIN [192.168.2.74].[M3FDBPRD].[MVXJDTA].[OCUSAD] ON OKCUNO = OPCUNO AND OPCONO = 410
-            LEFT JOIN [dbo].[data_shoptype] ON OKCFC6 = type_id COLLATE Thai_CI_AS
-  `;
-  }
-  await sql.close();
+  const result = await storeQuery(channel)
+  
   const return_arr = [];
 
-  for (const row of result.recordset) {
+  for (const row of result) {
     // console.log(row)
     const storeId = row.customerCode?.trim();
     const name = row.customerName || ''.trim();

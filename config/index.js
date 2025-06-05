@@ -17,5 +17,8 @@ module.exports = {
   ERP_API_BASE_URL: process.env.ERP_API_BASE_URL,
   ERP_API_BASE_URL: process.env.ERP_API_BASE_URL,
   CA_DB_URI_PRD: process.env.CA_DB_URI_PRD,
-
+  MS_SQL_USER: process.env.MS_SQL_USER,
+  MS_SQL_PASSWORD: process.env.MS_SQL_PASSWORD,
+  MS_SQL_SERVER: process.env.MS_SQL_SERVER,
+  MS_SQL_DATABASE: process.env.MS_SQL_DATABASE,
 };

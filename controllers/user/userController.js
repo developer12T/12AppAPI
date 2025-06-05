@@ -10,8 +10,9 @@ const bcrypt = require('bcrypt')
 const axios = require('axios')
 const userModel = require('../../models/cash/user')
 const { getModelsByChannel } = require('../../middleware/channel')
-const { Types } = require('mongoose')
-
+const { Types } = require('mongoose');
+const { forEach } = require('lodash');
+const { userQuery } = require('../../controllers/queryFromM3/querySctipt')
 exports.getUser = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
@@ -372,9 +373,10 @@ exports.addAndUpdateUser = async (req, res) => {
 
 exports.addUserManeger = async (req, res) => {
   try {
-  const channel = req.headers['x-channel']
-  const { User } = getModelsByChannel(channel, res, userModel)
-  const userMongo = await User.find()
+    // const channel = req.headers['x-channel']
+
+
+    
 
     const config = {
       user: 'sa',
@@ -412,59 +414,63 @@ exports.addUserManeger = async (req, res) => {
 
     await sql.close();
 
-  let update = 0
-  let addNew = 0
-  for (const m3 of result.recordset) {
-    const userInMongo = userMongo.find(id => id.saleCode == m3.saleCode)
+    let update = 0
+    let addNew = 0
+    channel = ['cash', 'credit']
+    for (const c of channel) {
+      const { User } = getModelsByChannel(c, res, userModel)
+      const userMongo = await User.find()
+      for (const m3 of result.recordset) {
+        const userInMongo = userMongo.find(id => id.saleCode == m3.saleCode)
 
-    if (userInMongo) {
-      const hasChanged = Object.keys(m3).some(
-        key =>
-          !['saleCode', '__v'].includes(key) && m3[key] !== userInMongo[key]
-      )
+        if (userInMongo) {
+          const hasChanged = Object.keys(m3).some(
+            key =>
+              !['saleCode', '__v'].includes(key) && m3[key] !== userInMongo[key]
+          )
 
-      if (hasChanged) {
-        await User.updateOne(
-          { saleCode: m3.saleCode },
-          {
-            $set: {
-              salePayer: m3.salePayer,
-              username: m3.username,
-              firstName: m3.firstName,
-              surName: m3.surName,
-              password: m3.password,
-              tel: m3.tel,
-              zone: m3.zone,
-              area: m3.area,
-              warehouse: m3.warehouse,
-              role: m3.role,
-              status: m3.status
-              // __v: m3.__v + 1
-            }
+          if (hasChanged) {
+            await User.updateOne(
+              { saleCode: m3.saleCode },
+              {
+                $set: {
+                  salePayer: m3.salePayer,
+                  username: m3.username,
+                  firstName: m3.firstName,
+                  surName: m3.surName,
+                  password: m3.password,
+                  tel: m3.tel,
+                  zone: m3.zone,
+                  area: m3.area,
+                  warehouse: m3.warehouse,
+                  role: m3.role,
+                  status: m3.status
+                  // __v: m3.__v + 1
+                }
+              }
+            )
+            update += 1
           }
-        )
-        update += 1
+        } else {
+          await User.create({
+            saleCode: m3.saleCode,
+            salePayer: m3.salePayer,
+            username: m3.username,
+            firstName: m3.firstName,
+            surName: m3.surName,
+            password: m3.password,
+            tel: m3.tel,
+            zone: m3.zone,
+            area: m3.area,
+            warehouse: m3.warehouse,
+            role: m3.role,
+            status: m3.status
+            // __v: 0
+          })
+          addNew += 1
+        }
       }
-    } else {
-      await User.create({
-        saleCode: m3.saleCode,
-        salePayer: m3.salePayer,
-        username: m3.username,
-        firstName: m3.firstName,
-        surName: m3.surName,
-        password: m3.password,
-        tel: m3.tel,
-        zone: m3.zone,
-        area: m3.area,
-        warehouse: m3.warehouse,
-        role: m3.role,
-        status: m3.status
-        // __v: 0
-      })
-      addNew += 1
     }
-  }
-
     res.status(200).json({
       status: 200,
       message: 'successful',
@@ -475,4 +481,42 @@ exports.addUserManeger = async (req, res) => {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
   }
+}
+
+exports.addUserNew = async (req,res) => {
+
+  const channel = req.headers['x-channel']
+
+  const data = await userQuery(channel)
+  const { User } = getModelsByChannel(channel, res, userModel)
+
+ for (const sale of data) {
+      const saleInData = await User.findOne({ saleCode: sale.saleCode })
+      if (!saleInData) {
+        const newUser = new User({
+          saleCode: sale.saleCode,
+          salePayer: sale.salePayer,
+          username: sale.username,
+          firstName: sale.firstName,
+          surName: sale.surName,
+          password: sale.password,
+          tel: sale.tel,
+          zone: sale.zone,
+          area: sale.area,
+          warehouse: sale.warehouse,
+          role: sale.role,
+          status: sale.status,
+          qrCodeImage: sale.qrCodeImage,
+          period: period(),
+          image: ''
+        })
+        await newUser.save()
+      }
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'Insert User Success'
+    })
+
 }
