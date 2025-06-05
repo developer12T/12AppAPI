@@ -242,7 +242,7 @@ exports.addFromERP = async (req, res) => {
 
 
 exports.addFromERPnew = async (req, res) => {
-
+try {
   const channel = req.headers['x-channel']
 
 
@@ -270,12 +270,11 @@ exports.addFromERPnew = async (req, res) => {
              FROM [DATA_OMS].[dbo].[DATA_StoreSet] a
              LEFT JOIN [DATA_OMS].[dbo].[OCUSMA] ON StoreID = OKCUNO COLLATE Latin1_General_BIN
              LEFT JOIN [dbo].[data_store] b ON StoreID = customerCode
-            --  WHERE a.Area IN ('BE215','NE211','NS211','CT211','NH211','SH211')
             WHERE store_status <> '90'
                AND OKCFC3 <> 'DEL'
                AND LEFT(OKRGDT, 6) <> CONVERT(nvarchar(6), GETDATE(), 112)
                AND a.Channel = '103'
-             ORDER BY a.Area, RouteSet"
+             ORDER BY a.Area, RouteSet
   `;
   }
   else if (channel === 'credit') {
@@ -300,7 +299,7 @@ SELECT a.Area AS area,
 
   const return_arr = [];
 
-  for (const row of result) {
+  for (const row of result.recordset) {
     const area = String(row.area ?? '').trim();
     const id = String(row.id ?? '').trim();
     const day = String(row.day ?? '').trim();
@@ -339,15 +338,107 @@ SELECT a.Area AS area,
     }
   }
 
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const { Route } = getModelsByChannel(channel, res, routeModel)
+  const route = await Route.find({ period: period() })
+  const routeMap = new Map(route.map(route => [route.id, route]))
+  let routeId
+  const latestRoute = route.sort((a, b) => b.id.localeCompare(a.id))[0]
+  if (!latestRoute) {
+    routeId = `${period()}${return_arr.area}R01`
+    console.log('route', routeId)
+    console.log('period', period())
+  } else {
+    const prefix = latestRoute.id.slice(0, 6)
+    const subfix = (parseInt(latestRoute.id.slice(7)) + 1)
+      .toString()
+      .padStart(2, '0')
+    routeId = prefix + subfix
+  }
+
+  for (const storeList of return_arr) {
+    try {
+      const existingRoute = routeMap.get(storeList.id)
+
+      if (existingRoute) {
+        for (const list of storeList.storeInfo || []) {
+          const store = await Store.findOne({ storeId: list })
+          if (!store) {
+            console.warn(`Store with storeId ${list} not found`)
+            continue
+          }
+
+          const storeExists = existingRoute.listStore.some(
+            store => store.storeInfo.toString() === store._id.toString()
+          )
+          if (!storeExists) {
+            const newData = {
+              storeInfo: store._id,
+              note: '',
+              image: '',
+              latitude: '',
+              longtitude: '',
+              status: 0,
+              statusText: 'รอเยี่ยม',
+              listOrder: [],
+              date: ''
+            }
+            existingRoute.listStore.push(newData)
+          }
+        }
+        await existingRoute.save()
+      } else {
+        const listStore = []
+
+        for (const storeId of storeList.listStore || []) {
+          const idStore = storeId.storeInfo
+          const store = await Store.findOne({ storeId: idStore })
+          if (store) {
+            listStore.push({
+              storeInfo: store._id,
+              latitude: '',
+              longtitude: '',
+              status: 0,
+              statusText: 'รอเยี่ยม',
+              note: '',
+              date: '',
+              listOrder: []
+            })
+          } else {
+            console.warn(`Store with storeId ${storeId} not found`)
+          }
+        }
+
+        const data = {
+          id: storeList.id,
+          area: storeList.area,
+          period: period(),
+          day: storeList.day,
+          listStore
+        }
+        await Route.create(data)
+      }
+    } catch (err) {
+      console.error(
+        `Error processing storeList with id ${storeList.id}:`,
+        err.message
+      )
+      continue
+    }
+  }
+
   res.status(200).json({
     status: 200,
     message: 'sucess',
-    data: return_arr.slice(0, 10000)
+    // data: return_arr
 
   })
 
 
-
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
 
 }
 

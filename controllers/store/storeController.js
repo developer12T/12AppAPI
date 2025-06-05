@@ -515,6 +515,8 @@ exports.addFromERP = async (req, res) => {
 }
 
 exports.addFromERPnew = async (req, res) => {
+  try {
+
   const channel = req.headers['x-channel']
 
   const config = {
@@ -754,6 +756,11 @@ exports.addFromERPnew = async (req, res) => {
     // data: return_arr.slice(0, 10000)
 
   })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+
 }
 
 
