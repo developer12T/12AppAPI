@@ -1,5 +1,6 @@
 // const { User } = require('../../models/cash/user')
 const { period, previousPeriod } = require('../../utilities/datetime')
+const sql = require('mssql');
 
 const { uploadFiles } = require('../../utilities/upload')
 const multer = require('multer')
@@ -199,7 +200,7 @@ exports.addUser = async (req, res) => {
           role: sale.role,
           status: sale.status,
           qrCodeImage: sale.qrCodeImage,
-          period:period(),
+          period: period(),
           image: ''
         })
         await newUser.save()
@@ -320,7 +321,7 @@ exports.addAndUpdateUser = async (req, res) => {
       )
 
       if (hasChanged) {
-        console.log(m3)
+        // console.log(m3)
         await User.updateOne(
           { saleCode: m3.saleCode },
           {
@@ -367,4 +368,111 @@ exports.addAndUpdateUser = async (req, res) => {
     Update: update,
     Add: addNew
   })
+}
+
+exports.addUserManeger = async (req, res) => {
+  try {
+  const channel = req.headers['x-channel']
+  const { User } = getModelsByChannel(channel, res, userModel)
+  const userMongo = await User.find()
+
+    const config = {
+      user: 'sa',
+      password: 'P@ssw0rd',
+      server: '192.168.2.97',
+      database: 'DATA_API_TOHOME',
+      options: {
+        encrypt: false,
+        trustServerCertificate: true
+      }
+    };
+    const hash = '$2b$10$DqTAeJ.dZ67XVLky203dn.77idSGjHqbOJ7ztOTeEpr1VeycWngua';
+
+    await sql.connect(config);
+
+    let result = ''
+    result = await sql.query`
+    SELECT 
+     '' AS saleCode,
+     '' AS salePayer,
+    Col_LoginName AS username,
+    LEFT(Col_Name, CHARINDEX(' ', Col_Name + ' ') - 1) AS firstName,
+    SUBSTRING(Col_Name, CHARINDEX(' ', Col_Name + ' ') + 1, LEN(Col_Name)) AS surName,
+    ${hash} AS password,
+    '' AS tel,
+    '' AS zone,
+    '' AS area,
+    '' AS warehouse,
+    Col_o_JobTitle AS role,
+    '1' AS status
+    FROM [192.168.0.3].[AntDB].[dbo].[hs_User] AS hr
+    WHERE 
+      Col_o_JobTitle in ('Developer','IT Support','Sale_Manager','Supervisor','Area_Manager','IT')
+    `;
+
+    await sql.close();
+
+  let update = 0
+  let addNew = 0
+  for (const m3 of result.recordset) {
+    const userInMongo = userMongo.find(id => id.saleCode == m3.saleCode)
+
+    if (userInMongo) {
+      const hasChanged = Object.keys(m3).some(
+        key =>
+          !['saleCode', '__v'].includes(key) && m3[key] !== userInMongo[key]
+      )
+
+      if (hasChanged) {
+        await User.updateOne(
+          { saleCode: m3.saleCode },
+          {
+            $set: {
+              salePayer: m3.salePayer,
+              username: m3.username,
+              firstName: m3.firstName,
+              surName: m3.surName,
+              password: m3.password,
+              tel: m3.tel,
+              zone: m3.zone,
+              area: m3.area,
+              warehouse: m3.warehouse,
+              role: m3.role,
+              status: m3.status
+              // __v: m3.__v + 1
+            }
+          }
+        )
+        update += 1
+      }
+    } else {
+      await User.create({
+        saleCode: m3.saleCode,
+        salePayer: m3.salePayer,
+        username: m3.username,
+        firstName: m3.firstName,
+        surName: m3.surName,
+        password: m3.password,
+        tel: m3.tel,
+        zone: m3.zone,
+        area: m3.area,
+        warehouse: m3.warehouse,
+        role: m3.role,
+        status: m3.status
+        // __v: 0
+      })
+      addNew += 1
+    }
+  }
+
+    res.status(200).json({
+      status: 200,
+      message: 'successful',
+      // data: result.recordset
+    })
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
 }
