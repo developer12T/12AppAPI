@@ -10,7 +10,7 @@ const upload = multer({ storage: multer.memoryStorage() }).array(
   1
 )
 const sql = require('mssql');
-
+const { routeQuery } = require('../../controllers/queryFromM3/querySctipt')
 const orderModel = require('../../models/cash/sale')
 const routeModel = require('../../models/cash/route')
 const storeModel = require('../../models/cash/store')
@@ -245,61 +245,10 @@ exports.addFromERPnew = async (req, res) => {
 try {
   const channel = req.headers['x-channel']
 
-
-  const config = {
-    user: 'sa',
-    password: 'P@ssw0rd',
-    server: '192.168.2.97',
-    database: 'DATA_API_TOHOME',
-    options: {
-      encrypt: false,
-      trustServerCertificate: true
-    }
-  };
-
-  await sql.connect(config);
-
-  let result = ''
-  if (channel === 'cash') {
-    result = await sql.query`
-  SELECT a.Area AS area, 
-                    CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
-                    RIGHT(RouteSet, 2) AS day, 
-                    CONVERT(nvarchar(6), GETDATE(), 112) AS period, 
-                    StoreID AS storeId
-             FROM [DATA_OMS].[dbo].[DATA_StoreSet] a
-             LEFT JOIN [DATA_OMS].[dbo].[OCUSMA] ON StoreID = OKCUNO COLLATE Latin1_General_BIN
-             LEFT JOIN [dbo].[data_store] b ON StoreID = customerCode
-            WHERE store_status <> '90'
-               AND OKCFC3 <> 'DEL'
-               AND LEFT(OKRGDT, 6) <> CONVERT(nvarchar(6), GETDATE(), 112)
-               AND a.Channel = '103'
-             ORDER BY a.Area, RouteSet
-  `;
-  }
-  else if (channel === 'credit') {
-    result = await sql.query`
-SELECT a.Area AS area, 
-                    CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
-                    RIGHT(RouteSet, 2) AS day, 
-                    CONVERT(nvarchar(6), GETDATE(), 112) AS period, 
-                    StoreID AS storeId
-             FROM [DATA_OMS].[dbo].[DATA_StoreSet] a
-             LEFT JOIN [DATA_OMS].[dbo].[OCUSMA] ON StoreID = OKCUNO COLLATE Latin1_General_BIN
-             LEFT JOIN [dbo].[store_credit] b ON StoreID = customerCode
-            --  WHERE a.Area IN ('BE215','NE211','NS211','CT211','NH211','SH211')
-            -- WHERE store_status <> '90'
-            --    AND OKCFC3 <> 'DEL'
-            --    AND LEFT(OKRGDT, 6) <> CONVERT(nvarchar(6), GETDATE(), 112)
-            WHERE a.Channel = '102'
-            ORDER BY a.Area, RouteSet
-
-   `;
-  }
-await sql.close();
+  const result = await routeQuery(channel)
   const return_arr = [];
 
-  for (const row of result.recordset) {
+  for (const row of result) {
     const area = String(row.area ?? '').trim();
     const id = String(row.id ?? '').trim();
     const day = String(row.day ?? '').trim();
