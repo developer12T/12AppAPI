@@ -181,60 +181,28 @@ exports.storeQuery = async function (channel) {
 
 exports.productQuery = async function (channel) {
 
-
+  const config = {
+    host: process.env.MY_SQL_SERVER,
+    user: process.env.MY_SQL_USER,
+    password: process.env.MY_SQL_PASSWORD,
+    database: process.env.MY_SQL_DATABASE,
+  };
 
   const connection = await mysql.createConnection(config);
 
-  //   const [rows] = await connection.execute('SELECT * FROM your_table'); // แทน query ตรงนี้
-  //   console.log(rows);
-
-
-
-
-
   let result = ''
-  await sql.connect(config);
-
   if (channel === 'cash') {
-    const [result] = await connection.execute(`
-
-        SELECT 
-        id,
-        [name],
-        GRP_CODE,
-        [group],
-        BRAND_CODE,
-        brand,
-        size,
-        FLAVOUR_CODE,
-        flavour,
-        type,
-        CTN_Gross,
-        CTN_Net,
-        statusSale,
-        statusRefund,
-        statusWithdraw,
-        unit,
-        nameEng,
-        nameThai,
-        pricePerUnitSale,
-        pricePerUnitRefund,
-        pricePerUnitChange
-FROM (
+   [result] = await connection.execute(`
   SELECT 
     id,
-    name,
---     GRP_CODE,
-    CASE 
-      WHEN [group] = 'พรีเมียม' THEN 'พรีเมี่ยม'
-      WHEN [group] = 'ฮอทพอท' THEN 'ซุป HOT POT'
-      ELSE [group]
-    END AS [group],
+    \`name\`,
+    GRP_CODE,
+    \`group\`,
     BRAND_CODE,
     brand,
     size,
-    d.FLAVOUR as FLAVOUR_CODE,
-    a.flavour,
+    FLAVOUR_CODE,
+    flavour,
     type,
     CTN_Gross,
     CTN_Net,
@@ -247,55 +215,138 @@ FROM (
     pricePerUnitSale,
     pricePerUnitRefund,
     pricePerUnitChange
-  FROM ca_product_new a
-  LEFT JOIN ca_unit b ON a.unit = b.idUnit
-  LEFT JOIN ca_factor c ON a.id = c.itemcode
-  LEFT JOIN ( 
-      SELECT DISTINCT ITNO, FLAVOUR FROM c_product
-  ) d ON a.id = d.ITNO
-  LEFT JOIN c_brand f ON a.brand = f.BRAND_DESC
-) AS main
-  LEFT JOIN c_group e ON main.[group] = e.GRP_DESC
-`)
+  FROM (
+    SELECT 
+      id,
+      \`name\`,
+      CASE 
+        WHEN \`group\` = 'พรีเมียม' THEN 'พรีเมี่ยม'
+        WHEN \`group\` = 'ฮอทพอท' THEN 'ซุป HOT POT'
+        ELSE \`group\`
+      END AS \`group\`,
+      BRAND_CODE,
+      brand,
+      size,
+      d.FLAVOUR as FLAVOUR_CODE,
+      a.flavour,
+      type,
+      CTN_Gross,
+      CTN_Net,
+      statusSale,
+      statusRefund,
+      statusWithdraw,
+      unit,
+      nameEng,
+      nameThai,
+      pricePerUnitSale,
+      pricePerUnitRefund,
+      pricePerUnitChange
+    FROM ca_product_new a
+    LEFT JOIN ca_unit b ON a.unit = b.idUnit 
+    LEFT JOIN ca_factor c ON a.id = c.itemcode 
+    LEFT JOIN ( 
+        SELECT DISTINCT ITNO, FLAVOUR FROM c_product
+    ) d ON a.id = d.ITNO
+    LEFT JOIN c_brand f ON a.brand = f.BRAND_DESC
+  ) AS main
+  LEFT JOIN c_group e ON main.\`group\` = e.GRP_DESC
+`);
+  
   }
   if (channel === 'credit') {
-    result = await sql.query`
-SELECT 
--- *
-CP.ITNO as id,
-CP.NAME_BILL as name,
-CP.GRP as [GRP_CODE],
-CG.GRP_DESC AS [group],
-CP.BRAND AS [BRAND_CODE],
-CB.BRAND_DESC AS [brand],
-CP.WEIGHT AS [size],
-CP.FLAVOUR AS [FLAVOUR],
-CF.FAV_DESC as [flavour],
-'' as [type],
-CFA.CTN_Gross as [weightGross],
-CFA.CTN_Net as [weightNet],
-'Y' as [statusSale],
-'Y' as [statusWithdraw],
-'Y' as [statusRefund],
-CU.UNIT_CODE_BC AS [unitId],
-CP.UNIT as [unit] ,
-CU.UNIT_DESC,
-CP.PRICE  AS [pricePerUnitSale],
-CP.PRICE  AS [pricePerUnitRefund],
-CP.PRICE  AS [pricePerUnitChange]
-FROM [c_product] as [CP]
-join (select UNIT_CODE, UNIT_DESC,UNIT_CODE_BC from c_unit where UNIT_DESC in ('ผืน' , 'ชุด', 'หีบ') ) as CU ON
-CP.UNIT = CU.UNIT_CODE
-LEFT JOIN ca_factor CFA ON CP.ITNO = CFA.itemcode
-LEFT JOIN c_flavour CF on CP.FLAVOUR = CF.FAV_CODE
-LEFT JOIN c_group CG ON CP.GRP = CG.GRP_CODE
-LEFT JOIN c_brand CB ON CP.brand = CB.BRAND_CODE
-where CP.UNIT = 'CTN' or CP.NAME_STD like '%ผ้า%'
-`
+    [result] = await connection.execute(`
+  SELECT 
+    CP.ITNO as id,
+    CP.NAME_BILL as name,
+    CP.GRP as GRP_CODE,
+    CG.GRP_DESC AS \`group\`,
+    CP.BRAND AS BRAND_CODE,
+    CB.BRAND_DESC AS brand,
+    CP.WEIGHT AS size,
+    CP.FLAVOUR AS FLAVOUR_CODE,
+    CF.FAV_DESC as flavour,
+    '' as type,
+    CFA.CTN_Gross,
+    CFA.CTN_Net,
+    'Y' as statusSale,
+    'Y' as statusWithdraw,
+    'Y' as statusRefund,
+    CU.UNIT_CODE_BC AS unit,  
+    CP.UNIT  as nameEng,
+    CU.UNIT_DESC as nameThai,
+    CP.PRICE AS pricePerUnitSale,
+    CP.PRICE AS pricePerUnitRefund,
+    CP.PRICE AS pricePerUnitChange
+  FROM c_product as CP
+  JOIN (
+    SELECT UNIT_CODE, UNIT_DESC, UNIT_CODE_BC
+    FROM c_unit
+    WHERE UNIT_DESC IN ('ผืน', 'ชุด', 'หีบ')
+  ) AS CU ON CP.UNIT = CU.UNIT_CODE
+  LEFT JOIN ca_factor CFA ON CP.ITNO = CFA.itemcode
+  LEFT JOIN c_flavour CF ON CP.FLAVOUR = CF.FAV_CODE
+  LEFT JOIN c_group CG ON CP.GRP = CG.GRP_CODE
+  LEFT JOIN c_brand CB ON CP.brand = CB.BRAND_CODE
+  WHERE CP.UNIT = 'CTN' OR CP.NAME_STD LIKE '%ผ้า%'
+`);
   }
 
+
+const returnArr = [];
+
+for (const row of result) {
+  // console.log(row)
+  const id = String(row.id).trim();
+  const unitId = parseInt(row.unit);
+  const unit = row.nameEng?.trim() || '';
+  const name = row.nameThai?.trim() || '';
+  const priceSale = row.pricePerUnitSale;
+  const priceRefund = row.pricePerUnitRefund;
+  const priceChange = row.pricePerUnitChange;
+
+  const existingItem = returnArr.find(item => item.id === id);
+
+  const unitData = {
+    id: unitId,
+    unit: unit,
+    name: name,
+    pricePerUnitSale: priceSale,
+    pricePerUnitRefund: priceRefund,
+    pricePerUnitChange: priceChange,
+  };
+  // console.log(unitData)
+  if (existingItem) {
+    existingItem.unitList.push(unitData);
+  } else {
+    const newItem = {
+      id: id,
+      name: row.name?.trim() || '',
+      groupCode: row.GRP_CODE?.trim() || '',
+      group: row.group?.trim() || '',
+      brandCode: row.BRAND_CODE?.trim() || '',
+      brand: row.brand?.trim() || '',
+      size: row.size?.trim() || '',
+      flavourCode: row.FLAVOUR_CODE?.trim() || '',
+      flavour: row.flavour?.trim() || '',
+      type: row.type?.trim() || '',
+      weightGross: row.CTN_Gross?.toString().trim() || '',
+      weightNet: row.CTN_Net?.toString().trim() || '',
+      statusSale: row.statusSale?.trim() || '',
+      statusRefund: row.statusRefund?.trim() || '',
+      statusWithdraw: row.statusWithdraw?.trim() || '',
+      unitList: [unitData],
+    };
+
+    returnArr.push(newItem);
+  }
+}
+
+
+
+
+
   await sql.close();
-  return result.recordset
+  return returnArr
 
 }
 

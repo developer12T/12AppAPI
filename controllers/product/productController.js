@@ -65,7 +65,7 @@ exports.getProductSwitch = async (req, res) => {
 
 exports.getProduct = async (req, res) => {
   try {
-    const { type, group,area,period, brand, size, flavour } = req.body
+    const { type, group, area, period, brand, size, flavour } = req.body
     const channel = req.headers['x-channel']
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Stock } = getModelsByChannel(channel, res, stockModel)
@@ -109,17 +109,21 @@ exports.getProduct = async (req, res) => {
     let products = await Product.find(filter).lean()
 
     const stock = await Stock.aggregate([
-      {$match :{
-        period:period,
-        area:area
-      }},
+      {
+        $match: {
+          period: period,
+          area: area
+        }
+      },
       { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
-      { $group :{
-        _id: "$listProduct.productId",
-        // sumQtyPcs: { $sum: '$listProduct.sumQtyPcs' },
-        sumQtyCtn: { $sum: '$listProduct.sumQtyCtn' },
+      {
+        $group: {
+          _id: "$listProduct.productId",
+          // sumQtyPcs: { $sum: '$listProduct.sumQtyPcs' },
+          sumQtyCtn: { $sum: '$listProduct.sumQtyCtn' },
 
-      }}
+        }
+      }
     ])
 
     // console.log("products",products)
@@ -132,7 +136,7 @@ exports.getProduct = async (req, res) => {
 
     products = products.map(product => {
       let modifiedProduct = { ...product }
-          // console.log("modifiedProduct",modifiedProduct)
+      // console.log("modifiedProduct",modifiedProduct)
 
       if (type === 'sale') {
         modifiedProduct.listUnit = modifiedProduct.listUnit.map(unit => ({
@@ -165,14 +169,14 @@ exports.getProduct = async (req, res) => {
     })
     console.log(stock)
 
-  const data = products.map( u => {
-    const qty = stock.find(s => s._id === u.id) || {}; 
-    return {
-      ...u,
-      qty:qty.sumQtyCtn || 0
-    }
-  }).sort((a,b) => b.qty - a.qty)
-  // .map(({qty,...rest}) => rest)
+    const data = products.map(u => {
+      const qty = stock.find(s => s._id === u.id) || {};
+      return {
+        ...u,
+        qty: qty.sumQtyCtn || 0
+      }
+    }).sort((a, b) => b.qty - a.qty)
+    // .map(({qty,...rest}) => rest)
 
 
 
@@ -180,7 +184,7 @@ exports.getProduct = async (req, res) => {
     res.status(200).json({
       status: '200',
       message: 'Products fetched successfully!',
-      data: data  
+      data: data
     })
   } catch (error) {
     console.error(error)
@@ -577,7 +581,7 @@ exports.addFromERP = async (req, res) => {
           }
         }
       })
-      .sort((a, b) => b.factor - a.factor);
+        .sort((a, b) => b.factor - a.factor);
       // console.log(JSON.stringify(listUnit, null, 2));
 
       const newProduct = new Product({
@@ -600,7 +604,7 @@ exports.addFromERP = async (req, res) => {
       })
       // console.log(newProduct)
       await newProduct.save()
-      data.push(newProduct) 
+      data.push(newProduct)
     }
     res.status(200).json({
       status: 200,
@@ -620,76 +624,75 @@ exports.addFromERPnew = async (req, res) => {
   const channel = req.headers['x-channel']
   const result = await productQuery(channel)
 
-const { Product } = getModelsByChannel(channel, res, productModel)
+  const { Product } = getModelsByChannel(channel, res, productModel)
 
-    if (!result || !Array.isArray(result)) {
-      return res.status(400).json({
-        status: 400,
-        message: 'Invalid response data from external API'
-      })
+  // if (!result || !Array.isArray(result)) {
+  //   return res.status(400).json({
+  //     status: 400,
+  //     message: 'Invalid response data from external API'
+  //   })
+  // }
+
+  data = []
+
+  for (const listProduct of result) {
+    const productId = listProduct.id
+
+    const existingProduct = await Product.findOne({ id: productId })
+    if (existingProduct) {
+      console.log(`Product ID ${productId} already exists. Skipping.`)
+      continue
     }
+    const itemConvertResponse = await axios.post(
+      'http://192.168.2.97:8383/M3API/ItemManage/Item/getItemConvertItemcode',
+      { itcode: productId }
+    )
 
-    data = []
+    // console.log("itemConvertResponse",itemConvertResponse)
+    const unitData = itemConvertResponse.data
+    // console.log(JSON.stringify(listProduct, null, 2));
 
-    for (const listProduct of result) {
-      const productId = listProduct.id
-
-      const existingProduct = await Product.findOne({ id: productId })
-      if (existingProduct) {
-        console.log(`Product ID ${productId} already exists. Skipping.`)
-        continue
-      }
-
-      const itemConvertResponse = await axios.post(
-        'http://192.168.2.97:8383/M3API/ItemManage/Item/getItemConvertItemcode',
-        { itcode: productId }
-      )
-
-      // console.log("itemConvertResponse",itemConvertResponse)
-      const unitData = itemConvertResponse.data
-      // console.log(JSON.stringify(listProduct, null, 2));
-
-      const listUnit = listProduct.unitList.map(unit => {
-        const matchingUnit = unitData[0]?.type.find(u => u.unit === unit.unit)
-        return {
-          unit: unit.unit,
-          name: unit.name,
-          factor: matchingUnit ? matchingUnit.factor : 1,
-          price: {
-            sale: unit.pricePerUnitSale,
-            refund: unit.pricePerUnitRefund
-          }
+    const listUnit = listProduct.unitList.map(unit => {
+      const matchingUnit = unitData[0]?.type.find(u => u.unit === unit.unit)
+      return {
+        unit: unit.unit,
+        name: unit.name,
+        factor: matchingUnit ? matchingUnit.factor : 1,
+        price: {
+          sale: unit.pricePerUnitSale,
+          refund: unit.pricePerUnitRefund
         }
-      })
-      .sort((a, b) => b.factor - a.factor);
-      // console.log(JSON.stringify(listUnit, null, 2));
-
-      const newProduct = new Product({
-        id: listProduct.id,
-        name: listProduct.name,
-        groupCode: listProduct.groupCode,
-        group: listProduct.group,
-        brandCode: listProduct.brandCode,
-        brand: listProduct.brand,
-        size: listProduct.size,
-        flavourCode: listProduct.flavourCode,
-        flavour: listProduct.flavour,
-        type: listProduct.type,
-        weightGross: listProduct.weightGross,
-        weightNet: listProduct.weightNet,
-        statusSale: listProduct.statusSale,
-        statusRefund: listProduct.statusRefund,
-        statusWithdraw: listProduct.statusWithdraw,
-        listUnit: listUnit
-      })
-      // console.log(newProduct)
-      await newProduct.save()
-      data.push(newProduct) 
-    }
-    res.status(200).json({
-      status: 200,
-      message: 'Products added successfully',
-      // data:data
+      }
     })
+      .sort((a, b) => b.factor - a.factor);
+    // console.log(JSON.stringify(listUnit, null, 2));
+
+    const newProduct = new Product({
+      id: listProduct.id,
+      name: listProduct.name,
+      groupCode: listProduct.groupCode,
+      group: listProduct.group,
+      brandCode: listProduct.brandCode,
+      brand: listProduct.brand,
+      size: listProduct.size,
+      flavourCode: listProduct.flavourCode,
+      flavour: listProduct.flavour,
+      type: listProduct.type,
+      weightGross: listProduct.weightGross,
+      weightNet: listProduct.weightNet,
+      statusSale: listProduct.statusSale,
+      statusRefund: listProduct.statusRefund,
+      statusWithdraw: listProduct.statusWithdraw,
+      listUnit: listUnit
+    })
+    // console.log(newProduct)
+    await newProduct.save()
+    data.push(newProduct)
+  }
+  res.status(200).json({
+    status: 200,
+    message: 'Products added successfully',
+    // data:data
+  })
 
 }
