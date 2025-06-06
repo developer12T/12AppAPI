@@ -364,7 +364,7 @@ exports.updatePromotionLimit = async (req, res) => {
 
 exports.addQuota = async (req, res) => {
 
-  const { quotaId, detail, proCode, id, quotaGroup, quotaWeight,
+  const { quotaId, detail, proCode, id, quotaGroup, rewards, quotaWeight,
     quota, quotaUse, area, zone, ExpDate
   } = req.body
 
@@ -389,6 +389,7 @@ exports.addQuota = async (req, res) => {
     quotaWeight: quotaWeight,
     quota: quota,
     quotaUse: quotaUse,
+    rewards: rewards,
     area: area,
     zone: zone,
     ExpDate: ExpDate
@@ -406,7 +407,7 @@ exports.addQuota = async (req, res) => {
 exports.updateQuota = async (req, res) => {
 
   const { quotaId, detail, proCode, id, quotaGroup, quotaWeight,
-    quota, quotaUse, area, zone, ExpDate
+    quota, quotaUse,rewards, area, zone, ExpDate
   } = req.body
 
 
@@ -434,6 +435,7 @@ exports.updateQuota = async (req, res) => {
         quotaWeight: quotaWeight,
         quota: quota,
         quotaUse: quotaUse,
+        rewards: rewards,
         area: area,
         zone: zone,
         ExpDate: ExpDate

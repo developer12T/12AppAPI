@@ -114,6 +114,18 @@ const quotaSchema = new mongoose.Schema({
     quotaWeight: { type: String, required: true },
     quota: { type: Number },
     quotaUse: { type: Number },
+    rewards: [
+        {
+            productId: { type: String },
+            productGroup: { type: String },
+            productFlavour: { type: String },
+            productBrand: { type: String },
+            productSize: { type: String },
+            productUnit: { type: String },
+            productQty: { type: Number, required: true },
+            limitType: { type: String }
+        }
+    ],
     area: { type: Array },
     zone: { type: Array },
     ExpDate: { type: String, required: true },
@@ -123,7 +135,7 @@ const promotionShelfSchema = new mongoose.Schema({
     proShelfId: { type: String, required: true },
     storeId: { type: String, required: true },
     period: { type: String, required: true },
-    qty: { type: Number , default:1},
+    qty: { type: Number, default: 1 },
     price: { type: Number },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
