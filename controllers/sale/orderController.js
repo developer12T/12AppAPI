@@ -64,6 +64,7 @@ exports.checkout = async (req, res) => {
     const { User } = getModelsByChannel(channel, res, userModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { PromotionShelf } = getModelsByChannel(channel, res, promotionModel);
     const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
       channel,
       res,
@@ -95,7 +96,6 @@ exports.checkout = async (req, res) => {
     } else if (changePromotionStatus == 1) {
       summary = await summaryOrderProStatusOne(cart, listPromotion, channel, res)
     }
-
     const productIds = cart.listProduct.map(p => p.id)
     const products = await Product.find({ id: { $in: productIds } }).select(
       'id name groupCode group brandCode brand size flavourCode flavour listUnit'
@@ -139,6 +139,9 @@ exports.checkout = async (req, res) => {
     })
     if (listProduct.includes(null)) return
     const orderId = await generateOrderId(area, sale.warehouse, channel, res)
+    const promotionshelf = await PromotionShelf.findOne({ storeId: storeId, period: period, qty: 1 }) || {}
+    const discountProduct = promotionshelf.price ?? 0
+    const total = subtotal - discountProduct
     const newOrder = new Order({
       orderId,
       type,
@@ -167,10 +170,10 @@ exports.checkout = async (req, res) => {
       listPromotions: summary.listPromotion,
       subtotal,
       discount: 0,
-      discountProduct: 0,
-      vat: parseFloat((subtotal - subtotal / 1.07).toFixed(2)),
-      totalExVat: parseFloat((subtotal / 1.07).toFixed(2)),
-      total: subtotal,
+      discountProduct: discountProduct,
+      vat: parseFloat((total - total / 1.07).toFixed(2)),
+      totalExVat: parseFloat((total / 1.07).toFixed(2)),
+      total: total,
       shipping: {
         shippingId: '',
         address: ''
@@ -227,9 +230,12 @@ exports.checkout = async (req, res) => {
     //   ...calStock,
     //   refOrderId: createdMovement._id
     // });
-
     await newOrder.save()
-    await Cart.deleteOne({ type, area, storeId })
+    await PromotionShelf.findOneAndUpdate(
+      { proShelfId: promotionshelf.proShelfId },
+      { $set: { qty: 0 } }
+    )
+    // await Cart.deleteOne({ type, area, storeId })
 
     const checkIn = await checkInRoute(
       {

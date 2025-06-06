@@ -372,11 +372,11 @@ exports.addQuota = async (req, res) => {
   const channel = req.headers['x-channel'];
   const { Quota } = getModelsByChannel(channel, res, promotionModel);
 
-  const exitQuota = await Quota.findOne({quotaId:quotaId})
+  const exitQuota = await Quota.findOne({ quotaId: quotaId })
   if (exitQuota) {
     return res.status(400).json({
-      status:400,
-      message:'This quotaId already in database'
+      status: 400,
+      message: 'This quotaId already in database'
     })
   }
 
@@ -413,11 +413,11 @@ exports.updateQuota = async (req, res) => {
   const channel = req.headers['x-channel'];
   const { Quota } = getModelsByChannel(channel, res, promotionModel);
 
-  const exitQuota = await Quota.findOne({quotaId:quotaId})
+  const exitQuota = await Quota.findOne({ quotaId: quotaId })
   if (!exitQuota) {
     return res.status(404).json({
-      status:404,
-      message:'This quotaId not found'
+      status: 404,
+      message: 'This quotaId not found'
     })
   }
 
@@ -447,4 +447,36 @@ exports.updateQuota = async (req, res) => {
     message: 'sucess',
   })
 
+}
+
+
+exports.addPromotionShelf = async (req, res) => {
+
+  const { proShelfId, period, storeId, price } = req.body
+
+  const channel = req.headers['x-channel'];
+  const { PromotionShelf } = getModelsByChannel(channel, res, promotionModel);
+
+  const dataExist = await PromotionShelf.findOne({ proShelfId: proShelfId, storeId: storeId, period: period })
+  if (dataExist) {
+
+    return res.status(400).json({
+      status: 400,
+      message: 'already in database',
+    })
+  }
+  const data = await PromotionShelf.create({
+    proShelfId: proShelfId,
+    storeId: storeId,
+    period: period,
+    price: price
+  })
+
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'addPromotionShelf',
+    data: data
+  })
 }

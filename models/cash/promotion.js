@@ -109,15 +109,28 @@ const quotaSchema = new mongoose.Schema({
     quotaId: { type: String, required: true },
     detail: { type: String, required: true },
     proCode: { type: String, required: true },
-    id: { type: String,  },
+    id: { type: String, },
     quotaGroup: { type: String, required: true },
     quotaWeight: { type: String, required: true },
     quota: { type: Number },
     quotaUse: { type: Number },
     area: { type: Array },
     zone: { type: Array },
-    ExpDate : { type: String, required: true },
+    ExpDate: { type: String, required: true },
 })
+
+const promotionShelfSchema = new mongoose.Schema({
+    proShelfId: { type: String, required: true },
+    storeId: { type: String, required: true },
+    period: { type: String, required: true },
+    qty: { type: Number , default:1},
+    price: { type: Number },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+})
+
+
+
 
 // const Promotion = dbCA.model('Promotion', promotionSchema)
 // module.exports = { Promotion }
@@ -125,6 +138,7 @@ module.exports = (conn) => {
     return {
         Promotion: conn.model('Promotion', promotionSchema),
         PromotionLimit: conn.model('promotionlimit', promotionLimitSchema, 'promotionlimit'),
-        Quota: conn.model('quota',quotaSchema,'quota')
+        Quota: conn.model('quota', quotaSchema, 'quota'),
+        PromotionShelf: conn.model('promotionshelf', promotionShelfSchema, 'promotionshelf')
     };
 };

@@ -21,5 +21,6 @@ router.post('/onOff', updateStatus)
 router.post('/addFromERP', addFromERP)
 router.post('/addFromERPnew', addFromERPnew)
 
+
 // router.get('/searchProduct', searchProduct)
 module.exports = router
