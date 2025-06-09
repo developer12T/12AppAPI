@@ -518,136 +518,19 @@ exports.addFromERPnew = async (req, res) => {
     const channel = req.headers['x-channel']
     const result = await storeQuery(channel)
 
-    const return_arr = [];
-
-    for (const row of result) {
-      // console.log(row)
-      const storeId = row.customerCode?.trim();
-      const name = row.customerName || ''.trim();
-      const taxId = row.customerTax?.trim();
-      const tel = row.customerTel?.trim();
-      const route = row.OKCFC3?.trim();
-      const type = row.OKCFC6?.trim();
-      const typeName = row.type_name || ''.trim();
-      const address = row.address || ''.trim();
-      const subDistrict = row.subDistrict || ''.trim();
-      const district = row.district || ''.trim();
-      const province = row.province || ''.trim();
-      const provinceCode = row.provinceCode || ''.trim();
-      const postCode = row.postCode?.trim();
-      const zone = row.OKSDST?.trim();
-      const area = row.area?.trim();
-      const latitude = row.lat?.trim();
-      const longtitude = row.long?.trim();
-      const createdAt = row.date_create ? String(row.date_create).trim() : '';
-
-      const defaultShipping = String(row.ship_default)?.trim();
-      const shippingId = String(row.shippingId)?.trim();
-      const ship_address = row.ship_address || ''.trim();
-      const ship_subDistrict = row.ship_subDistrict || ''.trim();
-      const ship_district = row.ship_district || ''.trim();
-      const ship_province = row.ship_province || ''.trim();
-      const ship_postCode = row.ship_postcode?.trim();
-      const ship_latitude = String(row.ship_lat ?? '').trim();
-      const ship_longtitude = String(row.ship_long ?? '').trim();
-
-      const shippingAddress = {
-        default: defaultShipping,
-        shippingId,
-        address: ship_address,
-        subDistrict: ship_subDistrict,
-        district: ship_district,
-        province: ship_province,
-        postCode: ship_postCode,
-        latitude: ship_latitude,
-        longtitude: ship_longtitude,
-      };
-
-      const existingStore = return_arr.find(store => store.storeId === storeId);
-
-      if (existingStore) {
-        existingStore.shippingAddress.push(shippingAddress);
-      } else {
-        return_arr.push({
-          storeId,
-          name,
-          taxId,
-          tel,
-          route,
-          type,
-          typeName,
-          address,
-          subDistrict,
-          district,
-          province,
-          provinceCode,
-          zone,
-          area,
-          latitude,
-          longtitude,
-          createdAt,
-          shippingAddress: [shippingAddress],
-        });
-      }
-    }
-    const dataArray = []
-
-    for (const splitData of return_arr) {
-      const approveData = {
-        dateSend: new Date(),
-        dateAction: new Date(),
-        appPerson: 'system'
-      }
-      const poliAgree = {
-        status: 'Agree',
-        date: new Date()
-      }
-      const mainData = {
-        storeId: splitData.storeId,
-        name: splitData.name,
-        taxId: splitData.taxId,
-        tel: splitData.tel,
-        route: splitData.route,
-        type: splitData.type,
-        typeName: splitData.typeName,
-        address: splitData.address,
-        district: splitData.district,
-        subDistrict: splitData.subDistrict,
-        province: splitData.province,
-        provinceCode: splitData.provinceCode,
-        'postCode ': splitData.postCode,
-        zone: splitData.zone,
-        area: splitData.area,
-        latitude: splitData.latitude,
-        longtitude: splitData.longtitude,
-        lineId: '',
-        'note ': '',
-        approve: approveData,
-        status: '20',
-        policyConsent: poliAgree,
-        imageList: [],
-        shippingAddress: splitData.shippingAddress,
-        checkIn: {},
-        createdAt: splitData.createdAt,
-        updatedDate: Date()
-      }
-
-      const channel = req.headers['x-channel'] // 'credit' or 'cash'
-
+    for (const item of result) {
       const { Store } = getModelsByChannel(channel, res, storeModel)
-      const StoreIf = await Store.findOne({ storeId: splitData.storeId })
+      const StoreIf = await Store.findOne({ storeId: item.storeId })
       if (!StoreIf) {
-        await Store.create(mainData)
+        await Store.create(item)
       } else {
         const idStoreReplace = {
-          idStore: splitData.storeId,
-          name: splitData.name
+          idStore: item.storeId,
+          name: item.name
         }
         dataArray.push(idStoreReplace)
       }
     }
-
-
     res.status(200).json({
       status: 200,
       message: 'sucess',
@@ -660,10 +543,6 @@ exports.addFromERPnew = async (req, res) => {
   }
 
 }
-
-
-
-
 
 
 
@@ -1052,141 +931,94 @@ exports.getBueatyStore = async (req, res) => {
 
 exports.addStoreArray = async (req, res) => {
 
-  const { area } = req.body
+  const { storeId } = req.body
   const channel = req.headers['x-channel']
-  const result = await storeQueryFilter(channel, area)
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const result = await storeQueryFilter(channel, storeId)
 
-  const return_arr = [];
+  const insertedStores = [];
+  const existingStores = [];
 
-  for (const row of result) {
-    // console.log(row)
-    const storeId = row.customerCode?.trim();
-    const name = row.customerName || ''.trim();
-    const taxId = row.customerTax?.trim();
-    const tel = row.customerTel?.trim();
-    const route = row.OKCFC3?.trim();
-    const type = row.OKCFC6?.trim();
-    const typeName = row.type_name || ''.trim();
-    const address = row.address || ''.trim();
-    const subDistrict = row.subDistrict || ''.trim();
-    const district = row.district || ''.trim();
-    const province = row.province || ''.trim();
-    const provinceCode = row.provinceCode || ''.trim();
-    const postCode = row.postCode?.trim();
-    const zone = row.OKSDST?.trim();
-    const area = row.area?.trim();
-    const latitude = row.lat?.trim();
-    const longtitude = row.long?.trim();
-    const createdAt = row.date_create ? String(row.date_create).trim() : '';
+  for (const item of result) {
+    const storeInDb = await Store.findOne({ storeId: item.storeId });
 
-    const defaultShipping = String(row.ship_default)?.trim();
-    const shippingId = String(row.shippingId)?.trim();
-    const ship_address = row.ship_address || ''.trim();
-    const ship_subDistrict = row.ship_subDistrict || ''.trim();
-    const ship_district = row.ship_district || ''.trim();
-    const ship_province = row.ship_province || ''.trim();
-    const ship_postCode = row.ship_postcode?.trim();
-    const ship_latitude = String(row.ship_lat ?? '').trim();
-    const ship_longtitude = String(row.ship_long ?? '').trim();
-
-    const shippingAddress = {
-      default: defaultShipping,
-      shippingId,
-      address: ship_address,
-      subDistrict: ship_subDistrict,
-      district: ship_district,
-      province: ship_province,
-      postCode: ship_postCode,
-      latitude: ship_latitude,
-      longtitude: ship_longtitude,
-    };
-
-    const existingStore = return_arr.find(store => store.storeId === storeId);
-
-    if (existingStore) {
-      existingStore.shippingAddress.push(shippingAddress);
-    } else {
-      return_arr.push({
-        storeId,
-        name,
-        taxId,
-        tel,
-        route,
-        type,
-        typeName,
-        address,
-        subDistrict,
-        district,
-        province,
-        provinceCode,
-        zone,
-        area,
-        latitude,
-        longtitude,
-        createdAt,
-        shippingAddress: [shippingAddress],
+    if (!storeInDb) {
+      await Store.create(item);
+      insertedStores.push({
+        idStore: item.storeId,
+        name: item.name
       });
-    }
-  }
-  const dataArray = []
-
-  for (const splitData of return_arr) {
-    const approveData = {
-      dateSend: new Date(),
-      dateAction: new Date(),
-      appPerson: 'system'
-    }
-    const poliAgree = {
-      status: 'Agree',
-      date: new Date()
-    }
-    const mainData = {
-      storeId: splitData.storeId,
-      name: splitData.name,
-      taxId: splitData.taxId,
-      tel: splitData.tel,
-      route: splitData.route,
-      type: splitData.type,
-      typeName: splitData.typeName,
-      address: splitData.address,
-      district: splitData.district,
-      subDistrict: splitData.subDistrict,
-      province: splitData.province,
-      provinceCode: splitData.provinceCode,
-      'postCode ': splitData.postCode,
-      zone: splitData.zone,
-      area: splitData.area,
-      latitude: splitData.latitude,
-      longtitude: splitData.longtitude,
-      lineId: '',
-      'note ': '',
-      approve: approveData,
-      status: '20',
-      policyConsent: poliAgree,
-      imageList: [],
-      shippingAddress: splitData.shippingAddress,
-      checkIn: {},
-      createdAt: splitData.createdAt,
-      updatedDate: Date()
-    }
-    const channel = req.headers['x-channel'] // 'credit' or 'cash'
-    const { Store } = getModelsByChannel(channel, res, storeModel)
-    const StoreIf = await Store.findOne({ storeId: splitData.storeId })
-    if (!StoreIf) {
-      // console.log(mainData.area)
-      await Store.create(mainData)
     } else {
-      const idStoreReplace = {
-        idStore: splitData.storeId,
-        name: splitData.name
-      }
-      dataArray.push(idStoreReplace)
+      existingStores.push({
+        idStore: item.storeId,
+        name: item.name
+      });
     }
   }
 
   res.status(200).json({
     status: 200,
-    // message: data
-  })
+    message: 'Store sync completed',
+    inserted: insertedStores,
+    alreadyExists: existingStores
+  });
+}
+
+
+exports.updateStoreArray = async (req, res) => {
+
+  const { storeId } = req.body
+  const channel = req.headers['x-channel']
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const result = await storeQueryFilter(channel, storeId)
+
+  const updatedStores = [];
+  const unchangedStores = [];
+
+  for (const item of result) {
+    const storeInDb = await Store.findOne({ storeId: item.storeId });
+
+    if (storeInDb) {
+      const isChanged = Object.keys(item).some(key => {
+        return item[key] !== storeInDb[key];
+      });
+
+      if (isChanged) {
+        await Store.updateOne({ storeId: item.storeId }, { $set: item });
+        updatedStores.push({
+          idStore: item.storeId,
+          name: item.name
+        });
+      } else {
+        unchangedStores.push({
+          idStore: item.storeId,
+          name: item.name
+        });
+      }
+    }
+  }
+  res.status(200).json({
+    status: 200,
+    message: 'Store update check completed',
+    updated: updatedStores,
+    unchanged: unchangedStores
+  });
+}
+
+exports.deleteStoreArray = async (req, res) => {
+  const { storeId } = req.body; 
+  const channel = req.headers['x-channel'];
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+
+  const storeToDelete = await Store.find({ storeId: { $in: storeId } });
+  const deletedStoreId = storeToDelete.map(store => store.storeId);
+
+  await Store.deleteMany({ storeId: { $in: storeId } });
+
+  res.status(200).json({
+    status: 200,
+    message: 'Deleted successfully',
+    deletedStore: deletedStoreId
+  });
 }
 

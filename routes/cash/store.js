@@ -14,7 +14,9 @@ const {
   addBueatyStore,
   getBueatyStore,
   addFromERPnew,
-  addStoreArray
+  addStoreArray,
+  updateStoreArray,
+  deleteStoreArray
 } = require('../../controllers/store/storeController')
 
 const router = express.Router()
@@ -37,6 +39,10 @@ router.post('/addBueatyStore', addBueatyStore)
 
 router.post('/getBueatyStore', getBueatyStore)
 router.post('/addStoreArray', addStoreArray)
+router.post('/updateStoreArray', updateStoreArray)
+router.post('/deleteStoreArray', deleteStoreArray)
+
+
 
 
 
