@@ -12,7 +12,7 @@ const userModel = require('../../models/cash/user')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { Types } = require('mongoose');
 const { forEach } = require('lodash');
-const { userQuery } = require('../../controllers/queryFromM3/querySctipt')
+const { userQuery, userQueryFilter } = require('../../controllers/queryFromM3/querySctipt')
 exports.getUser = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
@@ -257,6 +257,8 @@ exports.addUserOne = async (req, res) => {
 
 exports.updateUserOne = async (req, res) => {
   const channel = req.headers['x-channel']
+  const data = await userQuery(channel)
+
   const { User } = getModelsByChannel(channel, res, userModel)
   const user = await User.updateOne(
     { saleCode: req.body.saleCode },
@@ -376,7 +378,7 @@ exports.addUserManeger = async (req, res) => {
     // const channel = req.headers['x-channel']
 
 
-    
+
 
     const config = {
       user: 'sa',
@@ -483,40 +485,140 @@ exports.addUserManeger = async (req, res) => {
   }
 }
 
-exports.addUserNew = async (req,res) => {
+exports.addUserNew = async (req, res) => {
 
   const channel = req.headers['x-channel']
-
-  const data = await userQuery(channel)
   const { User } = getModelsByChannel(channel, res, userModel)
 
- for (const sale of data) {
-      const saleInData = await User.findOne({ saleCode: sale.saleCode })
-      if (!saleInData) {
-        const newUser = new User({
-          saleCode: sale.saleCode,
-          salePayer: sale.salePayer,
-          username: sale.username,
-          firstName: sale.firstName,
-          surName: sale.surName,
-          password: sale.password,
-          tel: sale.tel,
-          zone: sale.zone,
-          area: sale.area,
-          warehouse: sale.warehouse,
-          role: sale.role,
-          status: sale.status,
-          qrCodeImage: sale.qrCodeImage,
-          period: period(),
-          image: ''
-        })
-        await newUser.save()
-      }
+  const data = await userQuery(channel)
+
+  for (const sale of data) {
+    const saleInData = await User.findOne({ saleCode: sale.saleCode })
+    if (!saleInData) {
+      const newUser = new User({
+        saleCode: sale.saleCode,
+        salePayer: sale.salePayer,
+        username: sale.username,
+        firstName: sale.firstName,
+        surName: sale.surName,
+        password: sale.password,
+        tel: sale.tel,
+        zone: sale.zone,
+        area: sale.area,
+        warehouse: sale.warehouse,
+        role: sale.role,
+        status: sale.status,
+        qrCodeImage: sale.qrCodeImage,
+        period: period(),
+        image: ''
+      })
+      await newUser.save()
     }
+  }
 
-    res.status(200).json({
-      status: 200,
-      message: 'Insert User Success'
+  res.status(200).json({
+    status: 200,
+    message: 'Insert User Success'
+  })
+
+}
+
+exports.addUserArray = async (req, res) => {
+  const { area } = req.body
+  const channel = req.headers['x-channel']
+  const data = await userQueryFilter(channel, area)
+  const { User } = getModelsByChannel(channel, res, userModel)
+  let areaInDb = [];
+  let areaInserted = [];
+
+  for (const item of data) {
+    const mongoUser = await User.findOne({ area: item.area });
+
+    if (!mongoUser) {
+      await new User(item).save();
+      areaInserted.push(item.area);
+    } else {
+      areaInDb.push(item.area);
+    }
+  }
+
+  if (data.length === 0) {
+    return res.status(404).json({
+      status: 404,
+      message: 'Not found area'
+    });
+  }
+
+  res.status(200).json({
+    status: 200,
+    message: 'Process complete',
+    insertedAreas: areaInserted,
+    alreadyExists: areaInDb
+  })
+}
+
+
+
+exports.updateUserArray = async (req, res) => {
+
+  const { area } = req.body
+  const channel = req.headers['x-channel']
+  const data = await userQueryFilter(channel, area)
+
+  const { User } = getModelsByChannel(channel, res, userModel)
+  for (const item of data) {
+    const mongoUser = await User.findOne({ area: item.area });
+    if (mongoUser) {
+      userNew = await User.updateOne(
+        { area: item.area },
+        {
+          $set: {
+            salePayer: item.salePayer,
+            username: item.username,
+            firstName: item.firstName,
+            surName: item.surName,
+            password: item.password,
+            tel: item.tel,
+            zone: item.zone,
+            area: item.area,
+            warehouse: item.warehouse,
+            role: item.role,
+            status: item.status,
+            image: item.image
+          }
+        }
+      )
+    }
+  }
+
+  if (data.length == 0) {
+    return res.status(404).json({
+      status: 404,
+      message: 'Not found area'
     })
+  }
 
+  res.status(200).json({
+    status: 200,
+    message: 'Update User Success',
+    area: data
+  })
+}
+
+
+exports.deleteUserArray = async (req, res) => {
+  const { area } = req.body; // array: ['BE212', 'BE213']
+  const channel = req.headers['x-channel'];
+  const { User } = getModelsByChannel(channel, res, userModel);
+
+  const usersToDelete = await User.find({ area: { $in: area } });
+  const deletedAreas = usersToDelete.map(user => user.area);
+
+  await User.deleteMany({ area: { $in: area } });
+
+  res.status(200).json({
+    status: 200,
+    message: 'Deleted successfully',
+    deletedAreas: deletedAreas
+  });
 }

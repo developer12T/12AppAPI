@@ -6,7 +6,7 @@ const addUpload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages'
 )
 const sql = require('mssql');
-const { storeQuery } = require('../../controllers/queryFromM3/querySctipt')
+const { storeQuery, storeQueryFilter } = require('../../controllers/queryFromM3/querySctipt')
 const getUploadMiddleware = channel => {
   const storage = multer.memoryStorage()
   let limits = {}
@@ -515,145 +515,145 @@ exports.addFromERP = async (req, res) => {
 exports.addFromERPnew = async (req, res) => {
   try {
 
-  const channel = req.headers['x-channel']
-  const result = await storeQuery(channel)
-  
-  const return_arr = [];
+    const channel = req.headers['x-channel']
+    const result = await storeQuery(channel)
 
-  for (const row of result) {
-    // console.log(row)
-    const storeId = row.customerCode?.trim();
-    const name = row.customerName || ''.trim();
-    const taxId = row.customerTax?.trim();
-    const tel = row.customerTel?.trim();
-    const route = row.OKCFC3?.trim();
-    const type = row.OKCFC6?.trim();
-    const typeName = row.type_name || ''.trim();
-    const address = row.address || ''.trim();
-    const subDistrict = row.subDistrict || ''.trim();
-    const district = row.district || ''.trim();
-    const province = row.province || ''.trim();
-    const provinceCode = row.provinceCode || ''.trim();
-    const postCode = row.postCode?.trim();
-    const zone = row.OKSDST?.trim();
-    const area = row.area?.trim();
-    const latitude = row.lat?.trim();
-    const longtitude = row.long?.trim();
-    const createdAt = row.date_create ? String(row.date_create).trim() : '';
+    const return_arr = [];
 
-    const defaultShipping = String(row.ship_default)?.trim();
-    const shippingId = String(row.shippingId)?.trim();
-    const ship_address = row.ship_address || ''.trim();
-    const ship_subDistrict = row.ship_subDistrict || ''.trim();
-    const ship_district = row.ship_district || ''.trim();
-    const ship_province = row.ship_province || ''.trim();
-    const ship_postCode = row.ship_postcode?.trim();
-    const ship_latitude = String(row.ship_lat ?? '').trim();
-    const ship_longtitude = String(row.ship_long ?? '').trim();
+    for (const row of result) {
+      // console.log(row)
+      const storeId = row.customerCode?.trim();
+      const name = row.customerName || ''.trim();
+      const taxId = row.customerTax?.trim();
+      const tel = row.customerTel?.trim();
+      const route = row.OKCFC3?.trim();
+      const type = row.OKCFC6?.trim();
+      const typeName = row.type_name || ''.trim();
+      const address = row.address || ''.trim();
+      const subDistrict = row.subDistrict || ''.trim();
+      const district = row.district || ''.trim();
+      const province = row.province || ''.trim();
+      const provinceCode = row.provinceCode || ''.trim();
+      const postCode = row.postCode?.trim();
+      const zone = row.OKSDST?.trim();
+      const area = row.area?.trim();
+      const latitude = row.lat?.trim();
+      const longtitude = row.long?.trim();
+      const createdAt = row.date_create ? String(row.date_create).trim() : '';
 
-    const shippingAddress = {
-      default: defaultShipping,
-      shippingId,
-      address: ship_address,
-      subDistrict: ship_subDistrict,
-      district: ship_district,
-      province: ship_province,
-      postCode: ship_postCode,
-      latitude: ship_latitude,
-      longtitude: ship_longtitude,
-    };
+      const defaultShipping = String(row.ship_default)?.trim();
+      const shippingId = String(row.shippingId)?.trim();
+      const ship_address = row.ship_address || ''.trim();
+      const ship_subDistrict = row.ship_subDistrict || ''.trim();
+      const ship_district = row.ship_district || ''.trim();
+      const ship_province = row.ship_province || ''.trim();
+      const ship_postCode = row.ship_postcode?.trim();
+      const ship_latitude = String(row.ship_lat ?? '').trim();
+      const ship_longtitude = String(row.ship_long ?? '').trim();
 
-    const existingStore = return_arr.find(store => store.storeId === storeId);
+      const shippingAddress = {
+        default: defaultShipping,
+        shippingId,
+        address: ship_address,
+        subDistrict: ship_subDistrict,
+        district: ship_district,
+        province: ship_province,
+        postCode: ship_postCode,
+        latitude: ship_latitude,
+        longtitude: ship_longtitude,
+      };
 
-    if (existingStore) {
-      existingStore.shippingAddress.push(shippingAddress);
-    } else {
-      return_arr.push({
-        storeId,
-        name,
-        taxId,
-        tel,
-        route,
-        type,
-        typeName,
-        address,
-        subDistrict,
-        district,
-        province,
-        provinceCode,
-        zone,
-        area,
-        latitude,
-        longtitude,
-        createdAt,
-        shippingAddress: [shippingAddress],
-      });
-    }
-  }
-  const dataArray = []
+      const existingStore = return_arr.find(store => store.storeId === storeId);
 
-  for (const splitData of return_arr) {
-    const approveData = {
-      dateSend: new Date(),
-      dateAction: new Date(),
-      appPerson: 'system'
-    }
-    const poliAgree = {
-      status: 'Agree',
-      date: new Date()
-    }
-    const mainData = {
-      storeId: splitData.storeId,
-      name: splitData.name,
-      taxId: splitData.taxId,
-      tel: splitData.tel,
-      route: splitData.route,
-      type: splitData.type,
-      typeName: splitData.typeName,
-      address: splitData.address,
-      district: splitData.district,
-      subDistrict: splitData.subDistrict,
-      province: splitData.province,
-      provinceCode: splitData.provinceCode,
-      'postCode ': splitData.postCode,
-      zone: splitData.zone,
-      area: splitData.area,
-      latitude: splitData.latitude,
-      longtitude: splitData.longtitude,
-      lineId: '',
-      'note ': '',
-      approve: approveData,
-      status: '20',
-      policyConsent: poliAgree,
-      imageList: [],
-      shippingAddress: splitData.shippingAddress,
-      checkIn: {},
-      createdAt: splitData.createdAt,
-      updatedDate: Date()
-    }
-
-    const channel = req.headers['x-channel'] // 'credit' or 'cash'
-
-    const { Store } = getModelsByChannel(channel, res, storeModel)
-    const StoreIf = await Store.findOne({ storeId: splitData.storeId })
-    if (!StoreIf) {
-      await Store.create(mainData)
-    } else {
-      const idStoreReplace = {
-        idStore: splitData.storeId,
-        name: splitData.name
+      if (existingStore) {
+        existingStore.shippingAddress.push(shippingAddress);
+      } else {
+        return_arr.push({
+          storeId,
+          name,
+          taxId,
+          tel,
+          route,
+          type,
+          typeName,
+          address,
+          subDistrict,
+          district,
+          province,
+          provinceCode,
+          zone,
+          area,
+          latitude,
+          longtitude,
+          createdAt,
+          shippingAddress: [shippingAddress],
+        });
       }
-      dataArray.push(idStoreReplace)
     }
-  }
+    const dataArray = []
+
+    for (const splitData of return_arr) {
+      const approveData = {
+        dateSend: new Date(),
+        dateAction: new Date(),
+        appPerson: 'system'
+      }
+      const poliAgree = {
+        status: 'Agree',
+        date: new Date()
+      }
+      const mainData = {
+        storeId: splitData.storeId,
+        name: splitData.name,
+        taxId: splitData.taxId,
+        tel: splitData.tel,
+        route: splitData.route,
+        type: splitData.type,
+        typeName: splitData.typeName,
+        address: splitData.address,
+        district: splitData.district,
+        subDistrict: splitData.subDistrict,
+        province: splitData.province,
+        provinceCode: splitData.provinceCode,
+        'postCode ': splitData.postCode,
+        zone: splitData.zone,
+        area: splitData.area,
+        latitude: splitData.latitude,
+        longtitude: splitData.longtitude,
+        lineId: '',
+        'note ': '',
+        approve: approveData,
+        status: '20',
+        policyConsent: poliAgree,
+        imageList: [],
+        shippingAddress: splitData.shippingAddress,
+        checkIn: {},
+        createdAt: splitData.createdAt,
+        updatedDate: Date()
+      }
+
+      const channel = req.headers['x-channel'] // 'credit' or 'cash'
+
+      const { Store } = getModelsByChannel(channel, res, storeModel)
+      const StoreIf = await Store.findOne({ storeId: splitData.storeId })
+      if (!StoreIf) {
+        await Store.create(mainData)
+      } else {
+        const idStoreReplace = {
+          idStore: splitData.storeId,
+          name: splitData.name
+        }
+        dataArray.push(idStoreReplace)
+      }
+    }
 
 
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    // data: return_arr.slice(0, 10000)
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      // data: return_arr.slice(0, 10000)
 
-  })
+    })
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
@@ -1049,3 +1049,144 @@ exports.getBueatyStore = async (req, res) => {
     message: storeBueaty
   })
 }
+
+exports.addStoreArray = async (req, res) => {
+
+  const { area } = req.body
+  const channel = req.headers['x-channel']
+  const result = await storeQueryFilter(channel, area)
+
+  const return_arr = [];
+
+  for (const row of result) {
+    // console.log(row)
+    const storeId = row.customerCode?.trim();
+    const name = row.customerName || ''.trim();
+    const taxId = row.customerTax?.trim();
+    const tel = row.customerTel?.trim();
+    const route = row.OKCFC3?.trim();
+    const type = row.OKCFC6?.trim();
+    const typeName = row.type_name || ''.trim();
+    const address = row.address || ''.trim();
+    const subDistrict = row.subDistrict || ''.trim();
+    const district = row.district || ''.trim();
+    const province = row.province || ''.trim();
+    const provinceCode = row.provinceCode || ''.trim();
+    const postCode = row.postCode?.trim();
+    const zone = row.OKSDST?.trim();
+    const area = row.area?.trim();
+    const latitude = row.lat?.trim();
+    const longtitude = row.long?.trim();
+    const createdAt = row.date_create ? String(row.date_create).trim() : '';
+
+    const defaultShipping = String(row.ship_default)?.trim();
+    const shippingId = String(row.shippingId)?.trim();
+    const ship_address = row.ship_address || ''.trim();
+    const ship_subDistrict = row.ship_subDistrict || ''.trim();
+    const ship_district = row.ship_district || ''.trim();
+    const ship_province = row.ship_province || ''.trim();
+    const ship_postCode = row.ship_postcode?.trim();
+    const ship_latitude = String(row.ship_lat ?? '').trim();
+    const ship_longtitude = String(row.ship_long ?? '').trim();
+
+    const shippingAddress = {
+      default: defaultShipping,
+      shippingId,
+      address: ship_address,
+      subDistrict: ship_subDistrict,
+      district: ship_district,
+      province: ship_province,
+      postCode: ship_postCode,
+      latitude: ship_latitude,
+      longtitude: ship_longtitude,
+    };
+
+    const existingStore = return_arr.find(store => store.storeId === storeId);
+
+    if (existingStore) {
+      existingStore.shippingAddress.push(shippingAddress);
+    } else {
+      return_arr.push({
+        storeId,
+        name,
+        taxId,
+        tel,
+        route,
+        type,
+        typeName,
+        address,
+        subDistrict,
+        district,
+        province,
+        provinceCode,
+        zone,
+        area,
+        latitude,
+        longtitude,
+        createdAt,
+        shippingAddress: [shippingAddress],
+      });
+    }
+  }
+  const dataArray = []
+
+  for (const splitData of return_arr) {
+    const approveData = {
+      dateSend: new Date(),
+      dateAction: new Date(),
+      appPerson: 'system'
+    }
+    const poliAgree = {
+      status: 'Agree',
+      date: new Date()
+    }
+    const mainData = {
+      storeId: splitData.storeId,
+      name: splitData.name,
+      taxId: splitData.taxId,
+      tel: splitData.tel,
+      route: splitData.route,
+      type: splitData.type,
+      typeName: splitData.typeName,
+      address: splitData.address,
+      district: splitData.district,
+      subDistrict: splitData.subDistrict,
+      province: splitData.province,
+      provinceCode: splitData.provinceCode,
+      'postCode ': splitData.postCode,
+      zone: splitData.zone,
+      area: splitData.area,
+      latitude: splitData.latitude,
+      longtitude: splitData.longtitude,
+      lineId: '',
+      'note ': '',
+      approve: approveData,
+      status: '20',
+      policyConsent: poliAgree,
+      imageList: [],
+      shippingAddress: splitData.shippingAddress,
+      checkIn: {},
+      createdAt: splitData.createdAt,
+      updatedDate: Date()
+    }
+    const channel = req.headers['x-channel'] // 'credit' or 'cash'
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const StoreIf = await Store.findOne({ storeId: splitData.storeId })
+    if (!StoreIf) {
+      // console.log(mainData.area)
+      await Store.create(mainData)
+    } else {
+      const idStoreReplace = {
+        idStore: splitData.storeId,
+        name: splitData.name
+      }
+      dataArray.push(idStoreReplace)
+    }
+  }
+
+  res.status(200).json({
+    status: 200,
+    // message: data
+  })
+}
+

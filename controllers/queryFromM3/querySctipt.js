@@ -41,7 +41,9 @@ FROM
   [DATA_OMS].[dbo].[DATA_Area] AS DA
 WHERE 
   DA.CHANNEL_NAME = 'Cash' AND 
-  DA.Sale_Code is not NULL`
+  DA.Sale_Code is not NULL AND
+  DA.Sale_Code != 'ว่าง'
+  `
   }
   else if (channel == 'credit') {
     result = await sql.query`
@@ -63,7 +65,8 @@ FROM
   [DATA_OMS].[dbo].[DATA_Area] AS DA 
 WHERE 
   DA.CHANNEL_NAME = 'Credit' AND 
-  DA.Sale_Code is not NULL
+  DA.Sale_Code is not NULL AND
+  DA.Sale_Code != 'ว่าง'
 `
   }
 
@@ -71,6 +74,82 @@ WHERE
   return result.recordset
 
 }
+
+
+exports.userQueryFilter = async function (channel, area) {
+
+  const array = area.map(code => `'${code}'`).join(',');
+  console.log(`(${array})`)
+  const config = {
+    user: process.env.MS_SQL_USER,
+    password: process.env.MS_SQL_PASSWORD,
+    server: process.env.MS_SQL_SERVER,
+    database: process.env.MS_SQL_DATABASE,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  };
+  const hash = '$2b$10$DqTAeJ.dZ67XVLky203dn.77idSGjHqbOJ7ztOTeEpr1VeycWngua';
+  await sql.connect(config);
+
+  let result = ''
+  if (channel == 'cash') {
+    query = `
+  SELECT
+    DA.Sale_Code as saleCode,
+    DA.Sale_Player as salePayer,
+    DA.Col_LoginName as username,
+    LEFT(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') - 1) AS firstName,
+    SUBSTRING(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') + 1, LEN(DA.Col_NameTH)) AS surName,
+    '${hash}' AS password,
+    'TEL' AS tel,
+    DA.ZONE AS zone,
+    DA.AREA AS area,
+    DA.WH AS warehouse,
+    'sale' AS role,
+    '1' AS status,
+    'http://192.168.2.81/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
+  FROM 
+    [DATA_OMS].[dbo].[DATA_Area] AS DA 
+  WHERE 
+    DA.CHANNEL_NAME = 'Cash' AND 
+    DA.Sale_Code IS NOT NULL AND
+    DA.AREA IN (${array})
+`;
+    result = await sql.query(query);
+  }
+  else if (channel == 'credit') {
+    query = `
+  SELECT
+    DA.Sale_Code as saleCode,
+    DA.Sale_Player as salePayer,
+    DA.Col_LoginName as username,
+    LEFT(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') - 1) AS firstName,
+    SUBSTRING(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') + 1, LEN(DA.Col_NameTH)) AS surName,
+    '${hash}' AS password,
+    'TEL' AS tel,
+    DA.ZONE AS zone,
+    DA.AREA AS area,
+    DA.WH AS warehouse,
+    'sale' AS role,
+    '1' AS status,
+    'http://192.168.2.81/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
+  FROM 
+    [DATA_OMS].[dbo].[DATA_Area] AS DA 
+  WHERE 
+    DA.CHANNEL_NAME = 'Credit' AND 
+    DA.Sale_Code IS NOT NULL AND
+    DA.AREA IN (${array})
+`;
+    result = await sql.query(query);
+
+  }
+  await sql.close();
+  return result.recordset
+
+}
+
 
 
 exports.storeQuery = async function (channel) {
@@ -179,6 +258,122 @@ exports.storeQuery = async function (channel) {
   return result.recordset
 }
 
+exports.storeQueryFilter = async function (channel,area) {
+  const array = area.map(code => `'${code}'`).join(',');
+
+  const config = {
+    user: process.env.MS_SQL_USER,
+    password: process.env.MS_SQL_PASSWORD,
+    server: process.env.MS_SQL_SERVER,
+    database: process.env.MS_SQL_DATABASE,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  };
+  let result = ''
+  await sql.connect(config);
+
+  if (channel === 'cash') {
+    query = `
+                    SELECT            
+                    area,
+                    saleCode,
+                    TRIM(customerCode) AS customerCode,
+                    customerName,
+                    address,
+                    subDistrict,
+                    district,
+                    province,
+                    OKECAR AS provinceCode,
+                    postCode,
+                    customerTax,
+                    customerTel,
+                    customerMobile,
+                    lat,
+                    long,
+                    customerShoptype,
+                    enable,
+                    storeAbout,
+                    api_status,
+                    head_no,
+                    run_no,
+                    store_status,
+                    run_id,
+                    OKCUA1,
+                    OKCFC3,
+                    OKCFC6,
+                    OKECAR,
+                    OKSDST,
+                    type_name, 
+                    CONVERT(date,(CONVERT(VARCHAR,OKRGDT))) AS date_create,
+                    CASE WHEN OPADID = 'INVTSP' THEN 0 ELSE 1 END AS ship_default,
+                    OPADID AS shippingId,
+                    OPCUA1 AS ship_address,
+                    OPCUA2 AS ship_subDistrict,
+                    OPCUA2 AS ship_district,
+                    OPCUA3 AS ship_province,
+                    OPPONO AS ship_postcode,
+                    OPGEOX AS ship_lat,
+                    OPGEOY AS ship_long
+            FROM [dbo].[data_store] a
+            LEFT JOIN [192.168.2.74].[M3FDBPRD].[MVXJDTA].[OCUSMA] ON customerCode = OKCUNO COLLATE Latin1_General_BIN AND OKCONO = 410
+            LEFT JOIN [192.168.2.74].[M3FDBPRD].[MVXJDTA].[OCUSAD] ON OKCUNO = OPCUNO AND OPCONO = 410
+            LEFT JOIN [dbo].[data_shoptype] ON OKCFC6 = type_id COLLATE Thai_CI_AS
+            WHERE store_status <> '90' AND area in (${array})
+  `;
+    result = await sql.query(query);
+
+  }
+  else if (channel === 'credit') {
+    query = `
+                    SELECT 
+                    area,
+                    saleCode,
+                    TRIM(customerCode) AS customerCode,
+                    customerName,
+                    address,
+                    subDistrict,
+                    district,
+                    province,
+                    OKECAR AS provinceCode,
+                    postCode,
+                    customerTax,
+                    customerTel,
+                    customerMobile,
+                    OKCUA1,
+                    OKCFC3,
+                    OKCFC6,
+                    OKECAR,
+                    OKSDST,
+                    type_name, 
+                    CONVERT(date,(CONVERT(VARCHAR,OKRGDT))) AS date_create,
+                    CASE WHEN OPADID = 'INVTSP' THEN 0 ELSE 1 END AS ship_default,
+                    OPADID AS shippingId,
+                    OPCUA1 AS ship_address,
+                    OPCUA2 AS ship_subDistrict,
+                    OPCUA2 AS ship_district,
+                    OPCUA3 AS ship_province,
+                    OPPONO AS ship_postcode,
+                    OPGEOX AS ship_lat,
+                    OPGEOY AS ship_long
+            FROM [dbo].[store_credit] a
+            LEFT JOIN [192.168.2.74].[M3FDBPRD].[MVXJDTA].[OCUSMA] ON customerCode = OKCUNO COLLATE Latin1_General_BIN AND OKCONO = 410
+            LEFT JOIN [192.168.2.74].[M3FDBPRD].[MVXJDTA].[OCUSAD] ON OKCUNO = OPCUNO AND OPCONO = 410
+            LEFT JOIN [dbo].[data_shoptype] ON OKCFC6 = type_id COLLATE Thai_CI_AS
+            where  area in (${array})
+  `;
+    result = await sql.query(query);
+  }
+  await sql.close();
+  return result.recordset
+}
+
+
+
+
+
+
 exports.productQuery = async function (channel) {
 
   const config = {
@@ -192,7 +387,7 @@ exports.productQuery = async function (channel) {
 
   let result = ''
   if (channel === 'cash') {
-   [result] = await connection.execute(`
+    [result] = await connection.execute(`
   SELECT 
     id,
     \`name\`,
@@ -251,7 +446,7 @@ exports.productQuery = async function (channel) {
   ) AS main
   LEFT JOIN c_group e ON main.\`group\` = e.GRP_DESC
 `);
-  
+
   }
   if (channel === 'credit') {
     [result] = await connection.execute(`
@@ -292,54 +487,54 @@ exports.productQuery = async function (channel) {
   }
 
 
-const returnArr = [];
+  const returnArr = [];
 
-for (const row of result) {
-  // console.log(row)
-  const id = String(row.id).trim();
-  const unitId = parseInt(row.unit);
-  const unit = row.nameEng?.trim() || '';
-  const name = row.nameThai?.trim() || '';
-  const priceSale = row.pricePerUnitSale;
-  const priceRefund = row.pricePerUnitRefund;
-  const priceChange = row.pricePerUnitChange;
+  for (const row of result) {
+    // console.log(row)
+    const id = String(row.id).trim();
+    const unitId = parseInt(row.unit);
+    const unit = row.nameEng?.trim() || '';
+    const name = row.nameThai?.trim() || '';
+    const priceSale = row.pricePerUnitSale;
+    const priceRefund = row.pricePerUnitRefund;
+    const priceChange = row.pricePerUnitChange;
 
-  const existingItem = returnArr.find(item => item.id === id);
+    const existingItem = returnArr.find(item => item.id === id);
 
-  const unitData = {
-    id: unitId,
-    unit: unit,
-    name: name,
-    pricePerUnitSale: priceSale,
-    pricePerUnitRefund: priceRefund,
-    pricePerUnitChange: priceChange,
-  };
-  // console.log(unitData)
-  if (existingItem) {
-    existingItem.unitList.push(unitData);
-  } else {
-    const newItem = {
-      id: id,
-      name: row.name?.trim() || '',
-      groupCode: row.GRP_CODE?.trim() || '',
-      group: row.group?.trim() || '',
-      brandCode: row.BRAND_CODE?.trim() || '',
-      brand: row.brand?.trim() || '',
-      size: row.size?.trim() || '',
-      flavourCode: row.FLAVOUR_CODE?.trim() || '',
-      flavour: row.flavour?.trim() || '',
-      type: row.type?.trim() || '',
-      weightGross: row.CTN_Gross?.toString().trim() || '',
-      weightNet: row.CTN_Net?.toString().trim() || '',
-      statusSale: row.statusSale?.trim() || '',
-      statusRefund: row.statusRefund?.trim() || '',
-      statusWithdraw: row.statusWithdraw?.trim() || '',
-      unitList: [unitData],
+    const unitData = {
+      id: unitId,
+      unit: unit,
+      name: name,
+      pricePerUnitSale: priceSale,
+      pricePerUnitRefund: priceRefund,
+      pricePerUnitChange: priceChange,
     };
+    // console.log(unitData)
+    if (existingItem) {
+      existingItem.unitList.push(unitData);
+    } else {
+      const newItem = {
+        id: id,
+        name: row.name?.trim() || '',
+        groupCode: row.GRP_CODE?.trim() || '',
+        group: row.group?.trim() || '',
+        brandCode: row.BRAND_CODE?.trim() || '',
+        brand: row.brand?.trim() || '',
+        size: row.size?.trim() || '',
+        flavourCode: row.FLAVOUR_CODE?.trim() || '',
+        flavour: row.flavour?.trim() || '',
+        type: row.type?.trim() || '',
+        weightGross: row.CTN_Gross?.toString().trim() || '',
+        weightNet: row.CTN_Net?.toString().trim() || '',
+        statusSale: row.statusSale?.trim() || '',
+        statusRefund: row.statusRefund?.trim() || '',
+        statusWithdraw: row.statusWithdraw?.trim() || '',
+        unitList: [unitData],
+      };
 
-    returnArr.push(newItem);
+      returnArr.push(newItem);
+    }
   }
-}
 
 
 
