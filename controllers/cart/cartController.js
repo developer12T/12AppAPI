@@ -2,7 +2,7 @@ const crypto = require('crypto')
 const { Cart } = require('../../models/cash/cart')
 const { Product } = require('../../models/cash/product')
 const { Stock } = require('../../models/cash/stock')
-const { applyPromotion } = require('../promotion/calculate')
+const { applyPromotion, applyQuota } = require('../promotion/calculate')
 const {
   summaryOrder,
   summaryWithdraw,
@@ -64,13 +64,17 @@ exports.getCart = async (req, res) => {
 
       // if (shouldRecalculatePromotion) {
       const promotion = await applyPromotion(summary, channel, res)
-      // console.log("promotion",promotion)
+      const quota = await applyQuota(summary, channel, res)
+
+      cart.listQuota = quota.appliedPromotions
       cart.listPromotion = promotion.appliedPromotions
       cart.cartHashProduct = newCartHashProduct
       cart.cartHashPromotion = newCartHashPromotion
       await cart.save()
       // }
       summary.listPromotion = cart.listPromotion
+      summary.listQuota = quota.appliedPromotions
+
     }
 
     if (type === 'withdraw') {
@@ -84,6 +88,8 @@ exports.getCart = async (req, res) => {
     if (type === 'give') {
       summary = await summaryGive(cart, channel, res)
     }
+
+
 
     res.status(200).json({
       status: '200',

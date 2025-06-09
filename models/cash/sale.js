@@ -68,6 +68,32 @@ const listOrderPromotionSchema = new mongoose.Schema({
         }
     ]
 })
+const listQuotaSchema = new mongoose.Schema({
+    quotaId: { type: String, required: true },
+    detail: { type: String, required: true },
+    proCode: { type: String, required: true },
+    quota: { type: Number },
+    listProduct: [
+        {
+            id: { type: String },
+            name: { type: String },
+            lot: { type: String },
+            groupCode: { type: String },
+            group: { type: String },
+            brandCode: { type: String },
+            brand: { type: String },
+            size: { type: String },
+            flavourCode: { type: String },
+            flavour: { type: String },
+            qty: { type: Number },
+            unit: { type: String },
+            unitName: { type: String },
+            qtyPcs: { type: Number }
+        }
+    ]
+})
+
+
 
 const orderShipingSchema = new mongoose.Schema({
     shippingId: { type: String, require: true },
@@ -92,6 +118,7 @@ const orderSchema = new mongoose.Schema({
     status: { type: String, require: true, enum: ['pending', 'completed', 'canceled', 'rejected'], default: 'pending' },
     listProduct: [listOrderProductSchema],
     listPromotions: [listOrderPromotionSchema],
+    listQuota: [listQuotaSchema],
     subtotal: { type: Number, require: true },
     discount: { type: Number, default: 0 },
     discountProductId: [

@@ -109,11 +109,26 @@ const quotaSchema = new mongoose.Schema({
     quotaId: { type: String, required: true },
     detail: { type: String, required: true },
     proCode: { type: String, required: true },
-    id: { type: String, },
-    quotaGroup: { type: String, required: true },
-    quotaWeight: { type: String, required: true },
     quota: { type: Number },
-    quotaUse: { type: Number },
+    applicableTo: {
+        store: { type: String },
+        typeStore: { type: String },
+        zone: { type: String },
+        area: { type: String },
+    },
+    conditions: [
+        {
+            productId: [{ type: String }],
+            productGroup: [{ type: String }],
+            productFlavour: [{ type: String }],
+            productBrand: [{ type: String }],
+            productSize: [{ type: String }],
+            productUnit: [{ type: String }],
+            productQty: { type: Number, default: 0 },
+            productAmount: { type: Number, default: 0 }
+        }
+    ],
+
     rewards: [
         {
             productId: { type: String },
@@ -123,12 +138,25 @@ const quotaSchema = new mongoose.Schema({
             productSize: { type: String },
             productUnit: { type: String },
             productQty: { type: Number, required: true },
-            limitType: { type: String }
+            limitType: { type: String, enum: ['limited', 'unlimited'], default: 'limited' }
         }
     ],
-    area: { type: Array },
-    zone: { type: Array },
-    ExpDate: { type: String, required: true },
+
+    discounts: [
+        {
+            minOrderAmount: { type: Number, default: 0 },
+            discountType: { type: String, enum: ['percent', 'amount'] },
+            discountValue: { type: Number, required: true },
+            limitType: { type: String, enum: ['limited', 'unlimited'], default: 'limited' }
+        }
+    ],
+
+    validFrom: { type: Date, required: true },
+    validTo: { type: Date, required: true },
+
+    status: { type: String, enum: ['active', 'inactive'], default: 'active' },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
 })
 
 const promotionShelfSchema = new mongoose.Schema({

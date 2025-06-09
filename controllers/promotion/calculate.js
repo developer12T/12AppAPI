@@ -159,6 +159,71 @@ async function applyPromotion(order, channel, res) {
 }
 
 
+async function applyQuota(order, channel, res) {
+
+
+    const { Quota } = getModelsByChannel(channel, res, promotionModel);
+    let discountTotal = 0
+    let appliedPromotions = []
+
+    const quota = await Quota.find()
+
+    const validPromos = [];
+    let multiplier = 1
+
+    for (const promo of quota) {
+        if (promo.applicableTo?.store?.length > 0 && !promo.applicableTo.store.includes(order.store?.storeId)) continue;
+        if (promo.applicableTo?.typeStore?.length > 0 && !promo.applicableTo.typeStore.includes(order.store?.storeType)) continue;
+        if (promo.applicableTo?.zone?.length > 0 && !promo.applicableTo.zone.includes(order.store?.zone)) continue;
+        if (promo.applicableTo?.area?.length > 0 && !promo.applicableTo.area.includes(order.store?.area)) continue;
+
+        let matchedProducts = order.listProduct.filter((product) =>
+            promo.conditions.some((condition) =>
+                (condition.productId.length === 0 || condition.productId.includes(product.id)) &&
+                (condition.productGroup.length === 0 || condition.productGroup.includes(product.group)) &&
+                (condition.productBrand.length === 0 || condition.productBrand.includes(product.brand)) &&
+                (condition.productFlavour.length === 0 || condition.productFlavour.includes(product.flavour)) &&
+                (condition.productSize.length === 0 || condition.productSize.includes(product.size)) &&
+                (condition.productUnit.length === 0 || condition.productUnit.includes(product.unit))
+            )
+        )
+        freeProducts = await rewardProduct(promo.rewards, multiplier, channel, res)
+
+        if (freeProducts) {
+            let selectedProduct = freeProducts.length > 0 ? freeProducts[Math.floor(Math.random() * freeProducts.length)] : null
+            // console.log("selectedProduct",selectedProduct)
+
+            appliedPromotions.push({
+                quotaId: promo.quotaId,
+                detail: promo.detail,
+                proCode: promo.proCode,
+                quota: promo.quota,
+                listProduct: [{
+                    id: selectedProduct.productId,
+                    name: selectedProduct.productName,
+                    lot: selectedProduct.lot,
+                    groupCode: selectedProduct.groupCode,
+                    group: selectedProduct.group,
+                    brandCode: selectedProduct.brandCode,
+                    brand: selectedProduct.brand,
+                    unit: selectedProduct.unit,
+                    productUnitName: selectedProduct.productUnitName,
+                    productQty: selectedProduct.productQtyPcs
+                }]
+            })
+        }
+    }
+
+
+    return { appliedPromotions }
+}
+
+
+
+
+
+
+
 async function getRewardProduct(proId, channel, res) {
 
     const { Promotion } = getModelsByChannel(channel, res, promotionModel);
@@ -224,12 +289,12 @@ async function applyPromotionUsage(storeId, promotion, channel, res) {
     //     }
     // })
     //     console.log(data)
-// for (const item  of data) {
-//     const promoqty = await PromotionLimit.findOne({ proId:item.proId })
-//     console.log(promoqty)
-//     const divqty = promoqty.qty - item.qty
-//     // console.log(divqty)
-// }
+    // for (const item  of data) {
+    //     const promoqty = await PromotionLimit.findOne({ proId:item.proId })
+    //     console.log(promoqty)
+    //     const divqty = promoqty.qty - item.qty
+    //     // console.log(divqty)
+    // }
 
 
 
@@ -238,4 +303,4 @@ async function applyPromotionUsage(storeId, promotion, channel, res) {
 
 
 
-module.exports = { applyPromotion, rewardProduct, getRewardProduct, applyPromotionUsage }
+module.exports = { applyPromotion, rewardProduct, getRewardProduct, applyPromotionUsage, applyQuota }
