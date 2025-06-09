@@ -23,7 +23,7 @@ const orderStoreSchema = new mongoose.Schema({
 const listOrderProductSchema = new mongoose.Schema({
     id: { type: String, require: true },
     name: { type: String, require: true },
-    lot : { type: String, require: true },
+    lot: { type: String, require: true },
     groupCode: { type: String, require: true },
     group: { type: String, require: true },
     brandCode: { type: String, require: true },
@@ -94,6 +94,11 @@ const orderSchema = new mongoose.Schema({
     listPromotions: [listOrderPromotionSchema],
     subtotal: { type: Number, require: true },
     discount: { type: Number, default: 0 },
+    discountProductId: [
+        {
+            proShelfId: { type: String, required: true }
+        }
+    ],
     discountProduct: { type: Number, default: 0 },
     vat: { type: Number, default: 0 },
     totalExVat: { type: Number, default: 0 },
@@ -114,4 +119,4 @@ module.exports = (conn) => {
     return {
         Order: conn.model('Order', orderSchema),
     };
-  };
+};
