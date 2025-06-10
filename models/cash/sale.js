@@ -18,6 +18,7 @@ const orderStoreSchema = new mongoose.Schema({
     tel: { type: String, require: true },
     area: { type: String, require: true },
     zone: { type: String, require: true },
+    isBeauty: { type: String, require: false }
 })
 
 const listOrderProductSchema = new mongoose.Schema({

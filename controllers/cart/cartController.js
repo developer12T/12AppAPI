@@ -74,6 +74,7 @@ exports.getCart = async (req, res) => {
       // }
       summary.listPromotion = cart.listPromotion
       summary.listQuota = quota.appliedPromotions
+// console.log(JSON.stringify(summary.listQuota, null, 2));
 
     }
 
@@ -248,6 +249,7 @@ exports.addProduct = async (req, res) => {
     }
     cart.createdAt = new Date()
     await cart.save()
+    
     //// ยังไม่ใช้จริง กำลัง Test
 
     // const period = "202505"
