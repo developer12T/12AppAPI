@@ -64,7 +64,7 @@ exports.checkout = async (req, res) => {
     const { User } = getModelsByChannel(channel, res, userModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
-    const { PromotionShelf } = getModelsByChannel(channel, res, promotionModel);
+    const { PromotionShelf, Quota } = getModelsByChannel(channel, res, promotionModel);
     const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
       channel,
       res,
@@ -163,13 +163,15 @@ exports.checkout = async (req, res) => {
         taxId: summary.store.taxId,
         tel: summary.store.tel,
         area: summary.store.area,
-        zone: summary.store.zone
+        zone: summary.store.zone,
+        isBeauty: summary.store.isBeauty,
       },
       note,
       latitude,
       longitude,
       listProduct,
       listPromotions: summary.listPromotion,
+      listQuota: summary.listQuota,
       subtotal,
       discount: 0,
       discountProductId: promotionshelf.map(item => ({ proShelfId: item.proShelfId })),
@@ -225,6 +227,24 @@ exports.checkout = async (req, res) => {
       })
     }
 
+    for (const item of newOrder.listQuota) {
+      await Quota.findOneAndUpdate(
+        { quotaId: item.quotaId },
+        {
+          $inc: {
+            quota: -item.quota  ,
+            quotaUse: + item.quota
+          }
+        }
+      )
+    }
+
+
+
+
+
+    // console.log(calStock)
+
     // const createdMovement = await StockMovement.create({
     //   ...calStock
     // });
@@ -233,11 +253,11 @@ exports.checkout = async (req, res) => {
     //   ...calStock,
     //   refOrderId: createdMovement._id
     // });
-    await newOrder.save()
-    await PromotionShelf.findOneAndUpdate(
-      { proShelfId: promotionshelf.proShelfId },
-      { $set: { qty: 0 } }
-    )
+    // await newOrder.save()
+    // await PromotionShelf.findOneAndUpdate(
+    //   { proShelfId: promotionshelf.proShelfId },
+    //   { $set: { qty: 0 } }
+    // )
     // await Cart.deleteOne({ type, area, storeId })
 
     const checkIn = await checkInRoute(

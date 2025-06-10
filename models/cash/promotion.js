@@ -20,6 +20,8 @@ const promotionSchema = new mongoose.Schema({
         typeStore: [{ type: String }],
         zone: [{ type: String }],
         area: [{ type: String }],
+        isBeauty: { type: String, require: false }
+
     },
 
     except: [{ type: String }],
@@ -110,11 +112,14 @@ const quotaSchema = new mongoose.Schema({
     detail: { type: String, required: true },
     proCode: { type: String, required: true },
     quota: { type: Number },
+    quotaUse: { type: Number },
     applicableTo: {
         store: { type: String },
         typeStore: { type: String },
         zone: { type: String },
         area: { type: String },
+        isBeauty: { type: String, require: false }
+
     },
     conditions: [
         {

@@ -142,9 +142,9 @@ try {
     // console.log("areaList",areaList)
     for (const user of areaList) {
 
-        const withdrawT04 = await Withdraw.findOne({ Des_Area:user,ZType:"T04" });
+        const withdrawT04 = await Withdraw.findOne({ Des_Area:user,ZType:"T04" }) || {};
 
-        const withdrawT05 = await Withdraw.findOne({ Des_Area:user,ZType:"T05" });
+        const withdrawT05 = await Withdraw.findOne({ Des_Area:user,ZType:"T05" }) || {};
 
         const checkPlace = await Place.findOne({ area:user })
 

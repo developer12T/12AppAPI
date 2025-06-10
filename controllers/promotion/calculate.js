@@ -173,10 +173,10 @@ async function applyQuota(order, channel, res) {
     // console.log(order)
     for (const promo of quota) {
         if (promo.applicableTo?.store?.length > 0 && !promo.applicableTo.store.includes(order.store?.storeId)) continue;
-        // if (promo.applicableTo?.typeStore?.length > 0 && !promo.applicableTo.typeStore.includes(order.store?.storeType)) continue;
+        if (promo.applicableTo?.typeStore?.length > 0 && !promo.applicableTo.typeStore.includes(order.store?.storeType)) continue;
         if (promo.applicableTo?.zone?.length > 0 && !promo.applicableTo.zone.includes(order.store?.zone)) continue;
         if (promo.applicableTo?.area?.length > 0 && !promo.applicableTo.area.includes(order.store?.area)) continue;
-        if (promo.applicableTo?.typeStore?.length > 0 && !promo.applicableTo.typeStore.includes(order.store?.isBeauty)) continue;
+        if (promo.applicableTo?.isBeauty?.length > 0 && !promo.applicableTo.isBeauty.includes(order.store?.isBeauty)) continue;
 
         // let matchedProducts = order.listProduct.filter((product) =>
         //     promo.conditions.some((condition) =>

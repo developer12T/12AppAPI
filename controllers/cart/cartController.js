@@ -70,10 +70,11 @@ exports.getCart = async (req, res) => {
       cart.listPromotion = promotion.appliedPromotions
       cart.cartHashProduct = newCartHashProduct
       cart.cartHashPromotion = newCartHashPromotion
-      await cart.save()
-      // }
       summary.listPromotion = cart.listPromotion
       summary.listQuota = quota.appliedPromotions
+      await cart.save()
+      // }
+
 // console.log(JSON.stringify(summary.listQuota, null, 2));
 
     }

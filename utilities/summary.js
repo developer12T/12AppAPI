@@ -18,7 +18,7 @@ async function summaryOrder(cart, channel, res) {
 
     const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel);
     const storeData = await Store.findOne({ storeId: cart.storeId, area: cart.area }).lean()
-    const isBeauty = await TypeStore.findOne({ storeId: cart.storeId, area: cart.area }) 
+    const isBeauty = await TypeStore.findOne({ storeId: cart.storeId, area: cart.area })
 
     if (!storeData) {
       return res.status(404).json({
@@ -124,6 +124,7 @@ async function summaryOrder(cart, channel, res) {
       listProduct: enrichedProducts,
       // listRefund: [],
       listPromotion: enrichedPromotions,
+      listQuota: cart.listQuota,
       total: parseFloat(cart.total.toFixed(2)),
       subtotal: parseFloat(cart.total.toFixed(2)),
       discount: 0,
@@ -570,6 +571,7 @@ async function summaryOrderProStatusOne(cart, listPromotion, channel, res) {
       listProduct: enrichedProducts,
       // listRefund: [],
       listPromotion: promoProduct,
+      listQuota: cart.listQuota,
       total: parseFloat(cart.total.toFixed(2)),
       subtotal: 0,
       discount: 0,
