@@ -48,25 +48,25 @@ exports.getRoute = async (req, res) => {
 
       for (const item of routes) {
         enrichedRoutes.push({
-          id:item.id,
-          period:item.period,
-          area:item.area,
-          day:item.day,
-          storeAll:item.storeAll,
-          storePending:item.storePending,
-          storeSell:item.storeSell,
-          storeNotSell:item.storeNotSell,
-          storeCheckInNotSell:item.storeCheckInNotSell,
-          storeTotal:item.storeTotal,
-          percentComplete:item.percentComplete,
-          complete:item.complete,
-          percentVisit:item.percentVisit,
-          percentEffective:item.percentEffective
+          id: item.id,
+          period: item.period,
+          area: item.area,
+          day: item.day,
+          storeAll: item.storeAll,
+          storePending: item.storePending,
+          storeSell: item.storeSell,
+          storeNotSell: item.storeNotSell,
+          storeCheckInNotSell: item.storeCheckInNotSell,
+          storeTotal: item.storeTotal,
+          percentComplete: item.percentComplete,
+          complete: item.complete,
+          percentVisit: item.percentVisit,
+          percentEffective: item.percentEffective
         })
       }
     }
     else {
-      
+
       const routes = await Route.find(query).populate(
         'listStore.storeInfo',
         'storeId name address typeName taxId tel'
@@ -110,19 +110,24 @@ exports.getRoute = async (req, res) => {
       const storeTypeMap = new Map(storeTypes.map(s => [s.storeId, s.type]))
 
       enrichedRoutes = filteredRoutes.map(route => {
-        const enrichedListStore = route.listStore.map(itemRaw => {
-          const item = itemRaw.toObject ? itemRaw.toObject() : itemRaw
-          const storeInfo = item.storeInfo?.toObject
-            ? item.storeInfo.toObject()
-            : item.storeInfo || {}
-          const type = storeTypeMap.get(storeInfo.storeId)
-          // console.log(item)
-          return {
-            ...item,
-            storeInfo,
-            storeType: type || []
-          }
-        })
+        const enrichedListStore = route.listStore
+          .sort((a, b) => {
+            const statusA = parseInt(a.status) || 0;
+            const statusB = parseInt(b.status) || 0;
+            return statusA - statusB;
+          })
+          .map(itemRaw => {
+            const item = itemRaw.toObject ? itemRaw.toObject() : itemRaw;
+            const storeInfo = item.storeInfo?.toObject
+              ? item.storeInfo.toObject()
+              : item.storeInfo || {};
+            const type = storeTypeMap.get(storeInfo.storeId);
+            return {
+              ...item,
+              storeInfo,
+              storeType: type || []
+            };
+          });
 
         return {
           ...route,
@@ -130,6 +135,7 @@ exports.getRoute = async (req, res) => {
         }
       })
 
+      // console.log(enrichedRoutes)
 
     }
 
