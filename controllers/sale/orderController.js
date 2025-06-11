@@ -19,7 +19,7 @@ const multer = require('multer')
 const upload = multer({ storage: multer.memoryStorage() }).single('image')
 const _ = require('lodash')
 const { DateTime } = require('luxon')
-const { getSocket } = require('../../socket')
+// const { getSocket } = require('../../socket')
 const {
   applyPromotion,
   applyPromotionUsage
@@ -1788,25 +1788,25 @@ exports.erpApiCheck = async (req, res) => {
       })
     }
 
-    const io = getSocket()
-    const events = [
-      'sale_getSummarybyArea',
-      'sale_getSummarybyMonth',
-      'sale_getSummarybyRoute',
-      'sale_getSummaryItem',
-      'sale_getSummarybyGroup',
-      'sale_getRouteCheckinAll',
-      'sale_getTimelineCheckin',
-      'sale_routeTimeline'
-    ]
+    // const io = getSocket()
+    // const events = [
+    //   'sale_getSummarybyArea',
+    //   'sale_getSummarybyMonth',
+    //   'sale_getSummarybyRoute',
+    //   'sale_getSummaryItem',
+    //   'sale_getSummarybyGroup',
+    //   'sale_getRouteCheckinAll',
+    //   'sale_getTimelineCheckin',
+    //   'sale_routeTimeline'
+    // ]
 
-    events.forEach(event => {
-      io.emit(event, {
-        status: 200,
-        message: 'New Update Data',
-        data: data
-      })
-    })
+    // events.forEach(event => {
+    //   io.emit(event, {
+    //     status: 200,
+    //     message: 'New Update Data',
+    //     data: data
+    //   })
+    // })
 
     res.status(200).json({
       status: 200,

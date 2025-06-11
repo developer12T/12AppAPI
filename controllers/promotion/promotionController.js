@@ -66,6 +66,74 @@ exports.addPromotion = async (req, res) => {
   }
 }
 
+exports.updatePromotion = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel'];
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel);
+    const {
+      proId,
+      name,
+      description,
+      proType,
+      proCode,
+      coupon,
+      applicableTo,
+      except,
+      conditions,
+      rewards,
+      discounts,
+      validFrom,
+      validTo
+    } = req.body
+
+    if (!name || !proType || !validFrom || !validTo) {
+      return res
+        .status(400)
+        .json({ status: 400, message: 'Missing required fields!' })
+    }
+    const updatedPromotion = await Promotion.findOneAndUpdate(
+      { proId }, // เงื่อนไขการค้นหา
+      {
+        $set: {
+          name,
+          description,
+          proType,
+          proCode,
+          coupon,
+          applicableTo,
+          except,
+          conditions,
+          rewards,
+          discounts,
+          validFrom,
+          validTo,
+          status: 'active'
+        }
+      },
+      { upsert: true, new: true } // upsert = ถ้าไม่เจอให้สร้างใหม่, new = คืนค่าหลังอัปเดต
+    )
+
+    res.status(201).json({
+      status: 201,
+      message: 'Promotion created successfully!',
+      data: updatedPromotion
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
 exports.getPromotionProduct = async (req, res) => {
   try {
     const { type, storeId, proId } = req.body
@@ -389,7 +457,7 @@ exports.addQuota = async (req, res) => {
     rewards: rewards,
     discounts: discounts,
     validFrom: validFrom,
-    validTo:validTo
+    validTo: validTo
   })
 
   res.status(200).json({
@@ -404,7 +472,7 @@ exports.addQuota = async (req, res) => {
 exports.updateQuota = async (req, res) => {
 
   const { quotaId, detail, proCode, id, quotaGroup, quotaWeight,
-    quota, quotaUse,rewards, area, zone, ExpDate
+    quota, quotaUse, rewards, area, zone, ExpDate
   } = req.body
 
 

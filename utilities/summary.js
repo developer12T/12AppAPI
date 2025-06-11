@@ -44,9 +44,6 @@ async function summaryOrder(cart, channel, res) {
         province: storeData.province || '',
         zone: storeData.zone || '',
         area: storeData.area || '',
-        isBeauty: Array.isArray(isBeauty.type) && isBeauty.type.some(t => t.toLowerCase() === 'beauty')
-          ? 'beauty'
-          : ''
       }
       : {}
 

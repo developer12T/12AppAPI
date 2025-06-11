@@ -19,7 +19,6 @@ async function rewardProduct(rewards, multiplier, channel, res) {
     }))
 
     const eligibleProducts = await Product.find({ $or: rewardFilters }).lean()
-
     if (!eligibleProducts.length) return []
 
     return rewards.map(r => {
@@ -36,6 +35,7 @@ async function rewardProduct(rewards, multiplier, channel, res) {
         const factor = parseInt(unitData?.factor, 10) || 1
         const productQty = r.limitType === 'limited' ? r.productQty : r.productQty * multiplier
         const productQtyPcs = productQty * factor
+
 
         return {
             productId: product.id,
@@ -57,9 +57,8 @@ async function applyPromotion(order, channel, res) {
     const { Promotion } = getModelsByChannel(channel, res, promotionModel);
     let discountTotal = 0
     let appliedPromotions = []
-
     const promotions = await Promotion.find({ status: 'active' })
-    // console.log("order.listProduct",order.listProduct)
+
     for (const promo of promotions) {
         let promoApplied = false
         let promoDiscount = 0
@@ -69,6 +68,7 @@ async function applyPromotion(order, channel, res) {
         if (promo.applicableTo?.typeStore?.length > 0 && !promo.applicableTo.typeStore.includes(order.store?.storeType)) continue
         if (promo.applicableTo?.zone?.length > 0 && !promo.applicableTo.zone.includes(order.store?.zone)) continue
         if (promo.applicableTo?.area?.length > 0 && !promo.applicableTo.area.includes(order.store?.area)) continue
+
         let matchedProducts = order.listProduct.filter((product) =>
             promo.conditions.some((condition) =>
                 (condition.productId.length === 0 || condition.productId.includes(product.id)) &&
@@ -81,13 +81,12 @@ async function applyPromotion(order, channel, res) {
         )
 
         if (matchedProducts.length === 0) continue
-
         let totalAmount = matchedProducts.reduce((sum, p) => sum + (p.qty * p.price), 0)
         let totalQty = matchedProducts.reduce((sum, p) => sum + p.qty, 0)
 
         let meetsCondition = promo.conditions.some(condition =>
-            (promo.proType === 'free' && condition.productQty > 0 && totalQty >= condition.productQty) ||
-            (promo.proType === 'amount' && condition.productAmount > 0 && totalAmount >= condition.productAmount)
+            (promo.proType === 'free' && condition.productQty >= 0 && totalQty >= condition.productQty) ||
+            (promo.proType === 'amount' && condition.productAmount >= 0 && totalAmount >= condition.productAmount)
         )
 
         if (!meetsCondition) continue
@@ -176,7 +175,6 @@ async function applyQuota(order, channel, res) {
         if (promo.applicableTo?.typeStore?.length > 0 && !promo.applicableTo.typeStore.includes(order.store?.storeType)) continue;
         if (promo.applicableTo?.zone?.length > 0 && !promo.applicableTo.zone.includes(order.store?.zone)) continue;
         if (promo.applicableTo?.area?.length > 0 && !promo.applicableTo.area.includes(order.store?.area)) continue;
-        if (promo.applicableTo?.isBeauty?.length > 0 && !promo.applicableTo.isBeauty.includes(order.store?.isBeauty)) continue;
 
         // let matchedProducts = order.listProduct.filter((product) =>
         //     promo.conditions.some((condition) =>
@@ -208,8 +206,8 @@ async function applyQuota(order, channel, res) {
                     size: selectedProduct.productSize,
                     qty: selectedProduct.productQty,
                     unit: selectedProduct.productUnit,
-                    unitName : selectedProduct.productUnitName,
-                    qtyPcs : selectedProduct.productQtyPcs
+                    unitName: selectedProduct.productUnitName,
+                    qtyPcs: selectedProduct.productQtyPcs
                 }]
             })
             // console.log(JSON.stringify(appliedPromotions, null, 2));

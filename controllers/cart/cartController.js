@@ -63,9 +63,9 @@ exports.getCart = async (req, res) => {
         cart.cartHashProduct !== newCartHashProduct
 
       // if (shouldRecalculatePromotion) {
+      
       const promotion = await applyPromotion(summary, channel, res)
       const quota = await applyQuota(summary, channel, res)
-
       cart.listQuota = quota.appliedPromotions
       cart.listPromotion = promotion.appliedPromotions
       cart.cartHashProduct = newCartHashProduct

@@ -5,7 +5,7 @@ const cors = require('cors')
 const routeIndex = require('./routes/index')
 // const startCronJob = require('./controllers/sale/conJob')
 const app = express()
-const { startCronJobErpApiCheck } = require('../12AppAPI/controllers/sale/conJob');
+// const { startCronJobErpApiCheck } = require('../12AppAPI/controllers/sale/conJob');
 
 // startCronJobErpApiCheck()
 // startCronJobOrderToExcel()
