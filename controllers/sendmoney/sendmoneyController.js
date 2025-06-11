@@ -266,6 +266,7 @@ exports.getSendMoney = async (req, res) => {
     data = routeData[0];
   }
 
+ 
 
   const sendMoney = await SendMoney.aggregate([
     {
@@ -302,9 +303,19 @@ exports.getSendMoney = async (req, res) => {
         sendmoney: { $sum: '$sendmoney' }
       }
     }
-  ])
+  ]) 
+
+  let checksendMoney = 0
+
+    if (sendMoney.length > 0) {
+       checksendMoney = sendMoney[0].sendmoney 
+    }
+
+ 
+
   let status = ''
-  const calSendMoney = data.sendmoney - sendMoney[0].sendmoney
+       
+  const calSendMoney = data.sendmoney - checksendMoney
   if (calSendMoney == 0) {
     status = 'ส่งเงินครบ'
   } else {
