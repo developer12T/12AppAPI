@@ -16,20 +16,69 @@ exports.addSendMoney = async (req, res) => {
   const { area, date, sendmoney } = req.body
 
   const year = parseInt(date.slice(0, 4), 10)
-  const month = parseInt(date.slice(4, 6), 10) - 1
+  const month = parseInt(date.slice(4, 6), 10)
   const day = parseInt(date.slice(6, 8), 10)
+  const dateObj = new Date(Date.UTC(year, (month - 1), day - 1, 17, 0, 0))
 
-  const dateObj = new Date(year, month, day)
+  const existData = await SendMoney.aggregate([
+    { $match: { area: area } },
+    {
+      $addFields: {
+        thaiDate: {
+          $dateAdd: {
+            startDate: "$createdAt",
+            unit: "hour",
+            amount: 7
+          }
+        }
+      }
+    },
+    {
+      $match: {
+        $expr: {
+          $and: [
+            { $eq: [{ $year: "$thaiDate" }, year] },
+            { $eq: [{ $month: "$thaiDate" }, month] },
+            { $eq: [{ $dayOfMonth: "$thaiDate" }, day] }
 
-  const sendmoneyData = await SendMoney.create({
-    area: area,
-    date: dateObj,
-    sendmoney: sendmoney
-  })
+          ]
+        }
+      }
+    },
+  ]
+  )
+  let sendmoneyData = {}
+  if (existData.length == 0) {
+    sendmoneyData = await SendMoney.create({
+      area: area,
+      date: dateObj,
+      sendmoney: sendmoney
+    })
+  } else {
+
+    sendmoneyData = await SendMoney.findOneAndUpdate(
+      { _id: existData[0]._id },
+      {
+        $inc: {
+          sendmoney: + sendmoney
+        }
+      }
+    )
+
+  }
+
+
+
+  // const sendmoneyData = await SendMoney.create({
+  //   area: area,
+  //   date: dateObj,
+  //   sendmoney: sendmoney
+  // })
 
   res.status(200).json({
     status: 200,
-    message: 'success'
+    message: 'success',
+    data: dateObj
   })
 }
 
@@ -50,6 +99,11 @@ exports.addSendMoneyImage = async (req, res) => {
       const area = req.body.area
       const date = req.body.date
 
+      const year = parseInt(date.slice(0, 4), 10)
+      const month = parseInt(date.slice(4, 6), 10)
+      const day = parseInt(date.slice(6, 8), 10)
+      const dateObj = new Date(Date.UTC(year, (month - 1), day - 1, 17, 0, 0))
+
       const uploadedFiles = []
       for (let i = 0; i < files.length; i++) {
         const uploadedFile = await uploadFiles(
@@ -65,19 +119,45 @@ exports.addSendMoneyImage = async (req, res) => {
       }
 
       const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
-      const sendMoney = await SendMoney.findOne({ date: date })
+      const existData = await SendMoney.aggregate([
+        { $match: { area: area } },
+        {
+          $addFields: {
+            thaiDate: {
+              $dateAdd: {
+                startDate: "$createdAt",
+                unit: "hour",
+                amount: 7
+              }
+            }
+          }
+        },
+        {
+          $match: {
+            $expr: {
+              $and: [
+                { $eq: [{ $year: "$thaiDate" }, year] },
+                { $eq: [{ $month: "$thaiDate" }, month] },
+                { $eq: [{ $dayOfMonth: "$thaiDate" }, day] }
 
-      const rawDate = '20250523'
-      const year = parseInt(rawDate.slice(0, 4))
-      const month = parseInt(rawDate.slice(4, 6)) - 1
-      const day = parseInt(rawDate.slice(6, 8))
+              ]
+            }
+          }
+        },
+      ]
+      )
 
-      // Create date that matches 00:00 in Thailand (UTC+7)
-      const dateObj = new Date(Date.UTC(year, month, day - 1, 17, 0, 0)) // 17:00 UTC = next day 00:00 in Bangkok
+      if (existData.length == 0) {
+        return res.status(404).json({
+          status:404,
+          message:'Not found Sendmoney data'
+        })
+      }
+
 
       if (uploadedFiles.length > 0) {
         await SendMoney.updateOne(
-          { date: dateObj },
+          { _id: existData[0]._id },
           { $push: { imageList: { $each: uploadedFiles } } }
         )
       }
@@ -99,9 +179,10 @@ exports.getSendMoney = async (req, res) => {
   const { Route } = getModelsByChannel(channel, res, routeModel);
   const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
   const now = new Date();
-  const period = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const period = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
   const year = Number(period.slice(0, 4));
   const month = Number(period.slice(4, 6));
+  const day = Number(period.slice(6, 8));
 
   const routeData = await Route.aggregate([
     { $match: { area: area } },
@@ -128,7 +209,7 @@ exports.getSendMoney = async (req, res) => {
         $expr: {
           $and: [
             { $eq: [{ $year: "$thaiDate" }, year] },
-            { $eq: [{ $month: "$thaiDate" }, month] }
+            { $eq: [{ $month: "$thaiDate" }, month] },
           ]
         }
       }
@@ -208,24 +289,31 @@ exports.getSendMoney = async (req, res) => {
         $expr: {
           $and: [
             { $eq: [{ $year: "$thaiDate" }, year] },
-            { $eq: [{ $month: "$thaiDate" }, month] }
+            { $eq: [{ $month: "$thaiDate" }, month] },
+            { $eq: [{ $dayOfMonth: "$thaiDate" }, day] }
+
           ]
         }
       }
     },
-{$group:{
-  _id:'$area',
-  sendmoney:{$sum:'$sendmoney'}
-}}
+    {
+      $group: {
+        _id: '$area',
+        sendmoney: { $sum: '$sendmoney' }
+      }
+    }
   ])
-
-
-
-  console.log(JSON.stringify(data, null, 2));
+  let status = ''
+  const calSendMoney = data.sendmoney - sendMoney[0].sendmoney
+  if (calSendMoney == 0) {
+    status = 'ส่งเงินครบ'
+  } else {
+    status = 'ยังส่งเงินไม่ครบ'
+  }
   res.status(200).json({
     // status:200,
     message: "success",
-    sendmoney: data.sendmoney-sendMoney[0].sendmoney,
-    status: data.status
+    sendmoney: calSendMoney,
+    status: status
   })
 }
