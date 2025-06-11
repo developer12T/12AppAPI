@@ -97,11 +97,14 @@ exports.getSendMoney = async (req, res) => {
   const channel = req.headers['x-channel'];
   const { area } = req.body
   const { Route } = getModelsByChannel(channel, res, routeModel);
-  
-  const year = new Date().getFullYear().toString();
+  const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+  const now = new Date();
+  const period = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const year = Number(period.slice(0, 4));
+  const month = Number(period.slice(4, 6));
 
   const routeData = await Route.aggregate([
-    { $match: { area: area} },
+    { $match: { area: area } },
     { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
     { $unwind: { path: '$listStore.listOrder', preserveNullAndEmptyArrays: true } },
     {
@@ -120,13 +123,16 @@ exports.getSendMoney = async (req, res) => {
         }
       }
     },
-{
-    $match: {
-      $expr: {
-        $eq: [ { $year: "$thaiDate" }, Number(year) ]
+    {
+      $match: {
+        $expr: {
+          $and: [
+            { $eq: [{ $year: "$thaiDate" }, year] },
+            { $eq: [{ $month: "$thaiDate" }, month] }
+          ]
+        }
       }
-    }
-  },
+    },
     {
       $project: {
         _id: 0,
@@ -179,14 +185,47 @@ exports.getSendMoney = async (req, res) => {
     data = routeData[0];
   }
 
-  
+
+  const sendMoney = await SendMoney.aggregate([
+    {
+      $match: {
+        area: area
+      }
+    },
+    {
+      $addFields: {
+        thaiDate: {
+          $dateAdd: {
+            startDate: "$createdAt",
+            unit: "hour",
+            amount: 7
+          }
+        }
+      }
+    },
+    {
+      $match: {
+        $expr: {
+          $and: [
+            { $eq: [{ $year: "$thaiDate" }, year] },
+            { $eq: [{ $month: "$thaiDate" }, month] }
+          ]
+        }
+      }
+    },
+{$group:{
+  _id:'$area',
+  sendmoney:{$sum:'$sendmoney'}
+}}
+  ])
+
 
 
   console.log(JSON.stringify(data, null, 2));
   res.status(200).json({
     // status:200,
     message: "success",
-    sendmoney: data.sendmoney,
+    sendmoney: data.sendmoney-sendMoney[0].sendmoney,
     status: data.status
   })
 }

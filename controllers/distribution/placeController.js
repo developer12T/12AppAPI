@@ -98,7 +98,6 @@ exports.getType = async (req, res) => {
         }
 
         let allAddresses = places.flatMap(place => place.listAddress)
-
         let uniqueTypes = []
         let typeSet = new Set()
 
@@ -106,16 +105,16 @@ exports.getType = async (req, res) => {
             const typeKey = `${address.type}-${address.typeNameTH}-${address.typeNameEN}`
             if (!typeSet.has(typeKey)) {
                 typeSet.add(typeKey)
+                // console.log(address)
+                if (address.type && address.typeNameTH && address.typeNameEN ){
                 uniqueTypes.push({
                     type: address.type,
                     typeNameTH: address.typeNameTH,
                     typeNameEN: address.typeNameEN
                 })
+                }
             }
         }
-
-        console.log(uniqueTypes)
-
         res.status(200).json({
             status: '200',
             message: 'Type list fetched successfully!',
