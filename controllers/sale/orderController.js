@@ -1356,6 +1356,8 @@ exports.getSummarybyMonth = async (req, res) => {
       }
     )
 
+    console.log()
+
     const modelOrder = await Order.aggregate(pipeline)
     const modelOrderValue = modelOrder.map(item => {
       return {
@@ -1462,7 +1464,6 @@ exports.getSummarybyArea = async (req, res) => {
       }
     }
 
-    // console.log("groupStage",groupStage)
     const modelRouteValue = await Route.aggregate([
       { $match: { period } },
       { $project: { area: 1, day: 1, listStore: 1 } },
@@ -1516,7 +1517,7 @@ exports.getSummarybyArea = async (req, res) => {
       groupStage
     ])
 
-    // console.log("modelRouteValue",modelRouteValue)
+    console.log("modelRouteValue",modelRouteValue)
 
     const haveArea = [...new Set(modelRouteValue.map(i => i.area))]
     otherModelRoute = await Route.aggregate([

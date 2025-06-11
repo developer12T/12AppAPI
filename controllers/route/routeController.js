@@ -63,6 +63,7 @@ exports.getRoute = async (req, res) => {
           percentVisit: item.percentVisit,
           percentEffective: item.percentEffective
         })
+
       }
     }
     else {
