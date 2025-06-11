@@ -74,7 +74,7 @@ exports.addPlace = async (req, res) => {
         res.status(200).json({
             status: '200',
             message: 'Place added successfully!',
-            // data: cart
+            data: cart
         })
 
     } catch (error) {
@@ -114,6 +114,8 @@ exports.getType = async (req, res) => {
             }
         }
 
+        console.log(uniqueTypes)
+
         res.status(200).json({
             status: '200',
             message: 'Type list fetched successfully!',
@@ -136,7 +138,7 @@ try {
 
     areaList = users.map(user => user.area)
 
-    data =[]
+    let data =[]
 
     areaAdded = []
     // console.log("areaList",areaList)
@@ -202,7 +204,7 @@ try {
               }
               data.push(combineData)
               areaAdded.push(combineData.area)
-              const placeDoc = new Place(combineData)
+                placeDoc = new Place(combineData)
               await placeDoc.save()
         }
     
@@ -213,7 +215,8 @@ try {
 
     res.status(200).json({
         status:200,
-        message: `add place ${areaAdded} fetched successfully!`
+        message: `add place ${areaAdded} fetched successfully!`,
+        data:data
     })
 
 
