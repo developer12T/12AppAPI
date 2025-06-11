@@ -37,71 +37,103 @@ exports.getRoute = async (req, res) => {
     if (area) query.area = area
     if (routeId) query.id = routeId
 
-    const routes = await Route.find(query).populate(
-      'listStore.storeInfo',
-      'storeId name address typeName taxId tel'
-    )
 
+    let enrichedRoutes = []
 
+    if (period && area && !district && !province && !routeId && !storeId) {
+      const routes = await Route.find(query).populate(
+        'listStore.storeInfo',
+        'storeId name address typeName taxId tel'
+      )
 
-    const filteredRoutes = routes
-      .map(route => {
-        const filteredListStore = route.listStore.filter(store => {
-          const addr = (store.storeInfo?.address || '').toLowerCase()
+      for (const item of routes) {
+        enrichedRoutes.push({
+          id:item.id,
+          period:item.period,
+          area:item.area,
+          day:item.day,
+          storeAll:item.storeAll,
+          storePending:item.storePending,
+          storeSell:item.storeSell,
+          storeNotSell:item.storeNotSell,
+          storeCheckInNotSell:item.storeCheckInNotSell,
+          storeTotal:item.storeTotal,
+          percentComplete:item.percentComplete,
+          complete:item.complete,
+          percentVisit:item.percentVisit,
+          percentEffective:item.percentEffective
+        })
+      }
+    }
+    else {
+      
+      const routes = await Route.find(query).populate(
+        'listStore.storeInfo',
+        'storeId name address typeName taxId tel'
+      )
+      const filteredRoutes = routes
+        .map(route => {
+          const filteredListStore = route.listStore.filter(store => {
+            const addr = (store.storeInfo?.address || '').toLowerCase()
 
-          const matchDistrict = district
-            ? addr.includes(district.toLowerCase())
-            : true
-          const matchProvince = province
-            ? addr.includes(province.toLowerCase())
-            : true
+            const matchDistrict = district
+              ? addr.includes(district.toLowerCase())
+              : true
+            const matchProvince = province
+              ? addr.includes(province.toLowerCase())
+              : true
 
-          const matchStoreId = storeId
-            ? store.storeInfo?.storeId === storeId
-            : true
+            const matchStoreId = storeId
+              ? store.storeInfo?.storeId === storeId
+              : true
 
-          return matchDistrict && matchProvince && matchStoreId
+            return matchDistrict && matchProvince && matchStoreId
+          })
+
+          return {
+            ...route.toObject(),
+            listStore: filteredListStore
+          }
+        })
+        .filter(route => route.listStore.length > 0)
+
+      // console.log(filteredRoutes)
+
+      const allStoreIds = filteredRoutes.flatMap(route =>
+        route.listStore.map(s => s.storeInfo?.storeId).filter(Boolean)
+      )
+
+      const storeTypes = await TypeStore.find({
+        storeId: { $in: allStoreIds }
+      }).select('storeId type')
+
+      const storeTypeMap = new Map(storeTypes.map(s => [s.storeId, s.type]))
+
+      enrichedRoutes = filteredRoutes.map(route => {
+        const enrichedListStore = route.listStore.map(itemRaw => {
+          const item = itemRaw.toObject ? itemRaw.toObject() : itemRaw
+          const storeInfo = item.storeInfo?.toObject
+            ? item.storeInfo.toObject()
+            : item.storeInfo || {}
+          const type = storeTypeMap.get(storeInfo.storeId)
+          // console.log(item)
+          return {
+            ...item,
+            storeInfo,
+            storeType: type || []
+          }
         })
 
         return {
-          ...route.toObject(),
-          listStore: filteredListStore
-        }
-      })
-      .filter(route => route.listStore.length > 0)
-
-    // console.log(filteredRoutes)
-
-    const allStoreIds = filteredRoutes.flatMap(route =>
-      route.listStore.map(s => s.storeInfo?.storeId).filter(Boolean)
-    )
-
-    const storeTypes = await TypeStore.find({
-      storeId: { $in: allStoreIds }
-    }).select('storeId type')
-
-    const storeTypeMap = new Map(storeTypes.map(s => [s.storeId, s.type]))
-
-    const enrichedRoutes = filteredRoutes.map(route => {
-      const enrichedListStore = route.listStore.map(itemRaw => {
-        const item = itemRaw.toObject ? itemRaw.toObject() : itemRaw
-        const storeInfo = item.storeInfo?.toObject
-          ? item.storeInfo.toObject()
-          : item.storeInfo || {}
-        const type = storeTypeMap.get(storeInfo.storeId)
-
-        return {
-          ...item,
-          storeInfo,
-          storeType: type || []
+          ...route,
+          listStore: enrichedListStore
         }
       })
 
-      return {
-        ...route,
-        listStore: enrichedListStore
-      }
-    })
+
+    }
+
+
 
     res.status(200).json({
       status: 200,
@@ -242,146 +274,146 @@ exports.addFromERP = async (req, res) => {
 
 
 exports.addFromERPnew = async (req, res) => {
-try {
-  const channel = req.headers['x-channel']
+  try {
+    const channel = req.headers['x-channel']
 
-  const result = await routeQuery(channel)
-  const return_arr = [];
+    const result = await routeQuery(channel)
+    const return_arr = [];
 
-  for (const row of result) {
-    const area = String(row.area ?? '').trim();
-    const id = String(row.id ?? '').trim();
-    const day = String(row.day ?? '').trim();
-    const period = String(row.period ?? '').trim();
-    const storeId = String(row.storeId ?? '').trim();
+    for (const row of result) {
+      const area = String(row.area ?? '').trim();
+      const id = String(row.id ?? '').trim();
+      const day = String(row.day ?? '').trim();
+      const period = String(row.period ?? '').trim();
+      const storeId = String(row.storeId ?? '').trim();
 
-    const storeInfo = {
-      storeInfo: storeId,
-      latitude: '',
-      longtitude: '',
-      note: '',
-      status: '0',
-      statusText: '',
-      date: '',
-      listOrder: []
-    };
+      const storeInfo = {
+        storeInfo: storeId,
+        latitude: '',
+        longtitude: '',
+        note: '',
+        status: '0',
+        statusText: '',
+        date: '',
+        listOrder: []
+      };
 
-    let groupFound = false;
+      let groupFound = false;
 
-    for (const group of return_arr) {
-      if (group.id === id && group.area === area) {
-        group.listStore.push(storeInfo);
-        groupFound = true;
-        break;
+      for (const group of return_arr) {
+        if (group.id === id && group.area === area) {
+          group.listStore.push(storeInfo);
+          groupFound = true;
+          break;
+        }
+      }
+
+      if (!groupFound) {
+        return_arr.push({
+          id,
+          area,
+          period,
+          day,
+          listStore: [storeInfo]
+        });
       }
     }
 
-    if (!groupFound) {
-      return_arr.push({
-        id,
-        area,
-        period,
-        day,
-        listStore: [storeInfo]
-      });
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+    const route = await Route.find({ period: period() })
+    const routeMap = new Map(route.map(route => [route.id, route]))
+    let routeId
+    const latestRoute = route.sort((a, b) => b.id.localeCompare(a.id))[0]
+    if (!latestRoute) {
+      routeId = `${period()}${return_arr.area}R01`
+      console.log('route', routeId)
+      console.log('period', period())
+    } else {
+      const prefix = latestRoute.id.slice(0, 6)
+      const subfix = (parseInt(latestRoute.id.slice(7)) + 1)
+        .toString()
+        .padStart(2, '0')
+      routeId = prefix + subfix
     }
-  }
 
-  const { Store } = getModelsByChannel(channel, res, storeModel)
-  const { Route } = getModelsByChannel(channel, res, routeModel)
-  const route = await Route.find({ period: period() })
-  const routeMap = new Map(route.map(route => [route.id, route]))
-  let routeId
-  const latestRoute = route.sort((a, b) => b.id.localeCompare(a.id))[0]
-  if (!latestRoute) {
-    routeId = `${period()}${return_arr.area}R01`
-    console.log('route', routeId)
-    console.log('period', period())
-  } else {
-    const prefix = latestRoute.id.slice(0, 6)
-    const subfix = (parseInt(latestRoute.id.slice(7)) + 1)
-      .toString()
-      .padStart(2, '0')
-    routeId = prefix + subfix
-  }
+    for (const storeList of return_arr) {
+      try {
+        const existingRoute = routeMap.get(storeList.id)
 
-  for (const storeList of return_arr) {
-    try {
-      const existingRoute = routeMap.get(storeList.id)
-
-      if (existingRoute) {
-        for (const list of storeList.storeInfo || []) {
-          const store = await Store.findOne({ storeId: list })
-          if (!store) {
-            console.warn(`Store with storeId ${list} not found`)
-            continue
-          }
-
-          const storeExists = existingRoute.listStore.some(
-            store => store.storeInfo.toString() === store._id.toString()
-          )
-          if (!storeExists) {
-            const newData = {
-              storeInfo: store._id,
-              note: '',
-              image: '',
-              latitude: '',
-              longtitude: '',
-              status: 0,
-              statusText: 'รอเยี่ยม',
-              listOrder: [],
-              date: ''
+        if (existingRoute) {
+          for (const list of storeList.storeInfo || []) {
+            const store = await Store.findOne({ storeId: list })
+            if (!store) {
+              console.warn(`Store with storeId ${list} not found`)
+              continue
             }
-            existingRoute.listStore.push(newData)
-          }
-        }
-        await existingRoute.save()
-      } else {
-        const listStore = []
 
-        for (const storeId of storeList.listStore || []) {
-          const idStore = storeId.storeInfo
-          const store = await Store.findOne({ storeId: idStore })
-          if (store) {
-            listStore.push({
-              storeInfo: store._id,
-              latitude: '',
-              longtitude: '',
-              status: 0,
-              statusText: 'รอเยี่ยม',
-              note: '',
-              date: '',
-              listOrder: []
-            })
-          } else {
-            console.warn(`Store with storeId ${storeId} not found`)
+            const storeExists = existingRoute.listStore.some(
+              store => store.storeInfo.toString() === store._id.toString()
+            )
+            if (!storeExists) {
+              const newData = {
+                storeInfo: store._id,
+                note: '',
+                image: '',
+                latitude: '',
+                longtitude: '',
+                status: 0,
+                statusText: 'รอเยี่ยม',
+                listOrder: [],
+                date: ''
+              }
+              existingRoute.listStore.push(newData)
+            }
           }
-        }
+          await existingRoute.save()
+        } else {
+          const listStore = []
 
-        const data = {
-          id: storeList.id,
-          area: storeList.area,
-          period: period(),
-          day: storeList.day,
-          listStore
+          for (const storeId of storeList.listStore || []) {
+            const idStore = storeId.storeInfo
+            const store = await Store.findOne({ storeId: idStore })
+            if (store) {
+              listStore.push({
+                storeInfo: store._id,
+                latitude: '',
+                longtitude: '',
+                status: 0,
+                statusText: 'รอเยี่ยม',
+                note: '',
+                date: '',
+                listOrder: []
+              })
+            } else {
+              console.warn(`Store with storeId ${storeId} not found`)
+            }
+          }
+
+          const data = {
+            id: storeList.id,
+            area: storeList.area,
+            period: period(),
+            day: storeList.day,
+            listStore
+          }
+          await Route.create(data)
         }
-        await Route.create(data)
+      } catch (err) {
+        console.error(
+          `Error processing storeList with id ${storeList.id}:`,
+          err.message
+        )
+        continue
       }
-    } catch (err) {
-      console.error(
-        `Error processing storeList with id ${storeList.id}:`,
-        err.message
-      )
-      continue
     }
-  }
 
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    // data: return_arr
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      // data: return_arr
 
-  })
+    })
 
 
   } catch (error) {
