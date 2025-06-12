@@ -14,7 +14,7 @@ const { Warehouse, Locate, Balance } = require('../../models/cash/master')
 const { Op } = require('sequelize')
 const XLSX = require('xlsx')
 // const { Refund } = require('../../models/cash/refund')
-
+const { stockQuery } = require('../../controllers/queryFromM3/querySctipt')
 const userModel = require('../../models/cash/user')
 const productModel = require('../../models/cash/product')
 const stockModel = require('../../models/cash/stock')
@@ -640,57 +640,57 @@ exports.availableStock = async (req, res, next) => {
       // console.log("lot",lot)
       const tranFromProduct = product
         ? {
-            // ...product,
-            _id: product._id,
-            id: product.id,
-            name: product.name,
-            group: product.group,
-            groupCode: product.groupCode,
-            brandCode: product.brandCode,
-            brand: product.brand,
-            size: product.size,
-            flavourCode: product.flavourCode,
-            flavour: product.flavour,
-            type: product.type,
-            weightGross: product.weightGross,
-            weightNet: product.weightNet,
-            statusSale: product.statusSale,
-            statusWithdraw: product.statusWithdraw,
-            statusRefund: product.statusRefund,
-            image: product.image,
+          // ...product,
+          _id: product._id,
+          id: product.id,
+          name: product.name,
+          group: product.group,
+          groupCode: product.groupCode,
+          brandCode: product.brandCode,
+          brand: product.brand,
+          size: product.size,
+          flavourCode: product.flavourCode,
+          flavour: product.flavour,
+          type: product.type,
+          weightGross: product.weightGross,
+          weightNet: product.weightNet,
+          statusSale: product.statusSale,
+          statusWithdraw: product.statusWithdraw,
+          statusRefund: product.statusRefund,
+          image: product.image,
 
-            listUnit: product.listUnit.map(unit => {
-              // console.log("lot",lot)
-              // const totalQtyPcsToCtn = Math.floor(
-              //   lot.available.reduce((sum, item) => {
-              //     return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor
-              //   }, 0)
-              // )
-              if (unit.unit == 'CTN') {
-                qty = lot.available.reduce((total, u) => total + u.qtyCtn, 0)
-              } else if (unit.unit == 'PCS') {
-                qty = lot.available.reduce((total, u) => total + u.qtyPcs, 0)
-              } else {
-                qty = 0
+          listUnit: product.listUnit.map(unit => {
+            // console.log("lot",lot)
+            // const totalQtyPcsToCtn = Math.floor(
+            //   lot.available.reduce((sum, item) => {
+            //     return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor
+            //   }, 0)
+            // )
+            if (unit.unit == 'CTN') {
+              qty = lot.available.reduce((total, u) => total + u.qtyCtn, 0)
+            } else if (unit.unit == 'PCS') {
+              qty = lot.available.reduce((total, u) => total + u.qtyPcs, 0)
+            } else {
+              qty = 0
+            }
+
+            return {
+              unit: unit.unit,
+              name: unit.name,
+              factor: unit.factor,
+              // qty: totalQtyPcsToCtn,
+
+              qty: qty,
+              price: {
+                sale: unit.price.sale,
+                Refund: unit.price.refund
               }
-
-              return {
-                unit: unit.unit,
-                name: unit.name,
-                factor: unit.factor,
-                // qty: totalQtyPcsToCtn,
-
-                qty: qty,
-                price: {
-                  sale: unit.price.sale,
-                  Refund: unit.price.refund
-                }
-              }
-            }),
-            created: product.created,
-            updated: product.updated,
-            __v: product.__v
-          }
+            }
+          }),
+          created: product.created,
+          updated: product.updated,
+          __v: product.__v
+        }
         : null
 
       // console.log(lot)
@@ -718,7 +718,7 @@ exports.availableStock = async (req, res, next) => {
       }
     })
 
-    function parseSize (sizeStr) {
+    function parseSize(sizeStr) {
       if (!sizeStr) return 0
 
       const units = {
@@ -769,6 +769,64 @@ exports.availableStock = async (req, res, next) => {
     next(error)
   }
 }
+
+exports.addStockFromERP = async (req, res) => {
+
+  const { period } = req.body
+  const channel = req.headers['x-channel']
+  const data = await stockQuery(channel, period)
+  const cleanPeriod = period.replace('-', ''); // "202506"
+  const { User } = getModelsByChannel(channel, res, userModel)
+  const { Stock } = getModelsByChannel(channel, res, stockModel)
+  const { Product } = getModelsByChannel(channel, res, productModel)
+  const users = await User.find().select('area saleCode warehouse').lean()
+  const result = [];
+
+  // for (const item of users) {
+  //   const datastock = data.filter(i => i.WH == item.warehouse);
+
+  //   const record = {
+  //     area: item.area,
+  //     saleCode: item.saleCode,
+  //     period: cleanPeriod,
+  //     warehouse: item.warehouse,
+  //     listProduct: datastock.map(stock => {
+  //       const factorCtn = await Product.findOne({id:stock.ITEM_CODE})
+  //       return {
+  //       productId: stock.ITEM_CODE,
+  //       stock: stock.ITEM_QTY,
+  //       stockIn: 0,
+  //       stockOut: 0,
+  //       balance: 0
+  //       }
+  //   })
+  // }
+
+  //   result.push(record);
+
+    // const stockDoc = new Stock(record);
+    // await stockDoc.save();
+  // }
+
+
+
+
+  res.status(200).json({
+    status: 200,
+    message: "addStockFromERP",
+    data: result
+  })
+
+
+}
+
+
+
+
+
+
+
+
 
 // exports.rollbackStock = async (req, res, next) => {
 //   try {

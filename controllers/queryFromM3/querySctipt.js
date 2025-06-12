@@ -257,7 +257,7 @@ exports.storeQuery = async function (channel) {
   await sql.close();
 
 
-  
+
   const return_arr = [];
   for (const row of result.recordset) {
     // console.log(row)
@@ -330,49 +330,49 @@ exports.storeQuery = async function (channel) {
     }
   }
 
-    const data = []
+  const data = []
 
-    for (const splitData of return_arr) {
-      const approveData = {
-        dateSend: new Date(),
-        dateAction: new Date(),
-        appPerson: 'system'
-      }
-      const poliAgree = {
-        status: 'Agree',
-        date: new Date()
-      }
-      mainData = {
-        storeId: splitData.storeId,
-        name: splitData.name,
-        taxId: splitData.taxId,
-        tel: splitData.tel,
-        route: splitData.route,
-        type: splitData.type,
-        typeName: splitData.typeName,
-        address: splitData.address,
-        district: splitData.district,
-        subDistrict: splitData.subDistrict,
-        province: splitData.province,
-        provinceCode: splitData.provinceCode,
-        'postCode ': splitData.postCode,
-        zone: splitData.zone,
-        area: splitData.area,
-        latitude: splitData.latitude,
-        longtitude: splitData.longtitude,
-        lineId: '',
-        'note ': '',
-        approve: approveData,
-        status: '20',
-        policyConsent: poliAgree,
-        imageList: [],
-        shippingAddress: splitData.shippingAddress,
-        checkIn: {},
-        createdAt: splitData.createdAt,
-        updatedDate: Date()
-      },
-      data.push(mainData)
+  for (const splitData of return_arr) {
+    const approveData = {
+      dateSend: new Date(),
+      dateAction: new Date(),
+      appPerson: 'system'
     }
+    const poliAgree = {
+      status: 'Agree',
+      date: new Date()
+    }
+    mainData = {
+      storeId: splitData.storeId,
+      name: splitData.name,
+      taxId: splitData.taxId,
+      tel: splitData.tel,
+      route: splitData.route,
+      type: splitData.type,
+      typeName: splitData.typeName,
+      address: splitData.address,
+      district: splitData.district,
+      subDistrict: splitData.subDistrict,
+      province: splitData.province,
+      provinceCode: splitData.provinceCode,
+      'postCode ': splitData.postCode,
+      zone: splitData.zone,
+      area: splitData.area,
+      latitude: splitData.latitude,
+      longtitude: splitData.longtitude,
+      lineId: '',
+      'note ': '',
+      approve: approveData,
+      status: '20',
+      policyConsent: poliAgree,
+      imageList: [],
+      shippingAddress: splitData.shippingAddress,
+      checkIn: {},
+      createdAt: splitData.createdAt,
+      updatedDate: Date()
+    },
+      data.push(mainData)
+  }
 
 
 
@@ -559,49 +559,49 @@ exports.storeQueryFilter = async function (channel, storeId) {
     }
   }
 
-    const data = []
+  const data = []
 
-    for (const splitData of return_arr) {
-      const approveData = {
-        dateSend: new Date(),
-        dateAction: new Date(),
-        appPerson: 'system'
-      }
-      const poliAgree = {
-        status: 'Agree',
-        date: new Date()
-      }
-      mainData = {
-        storeId: splitData.storeId,
-        name: splitData.name,
-        taxId: splitData.taxId,
-        tel: splitData.tel,
-        route: splitData.route,
-        type: splitData.type,
-        typeName: splitData.typeName,
-        address: splitData.address,
-        district: splitData.district,
-        subDistrict: splitData.subDistrict,
-        province: splitData.province,
-        provinceCode: splitData.provinceCode,
-        'postCode ': splitData.postCode,
-        zone: splitData.zone,
-        area: splitData.area,
-        latitude: splitData.latitude,
-        longtitude: splitData.longtitude,
-        lineId: '',
-        'note ': '',
-        approve: approveData,
-        status: '20',
-        policyConsent: poliAgree,
-        imageList: [],
-        shippingAddress: splitData.shippingAddress,
-        checkIn: {},
-        createdAt: splitData.createdAt,
-        updatedDate: Date()
-      },
-      data.push(mainData)
+  for (const splitData of return_arr) {
+    const approveData = {
+      dateSend: new Date(),
+      dateAction: new Date(),
+      appPerson: 'system'
     }
+    const poliAgree = {
+      status: 'Agree',
+      date: new Date()
+    }
+    mainData = {
+      storeId: splitData.storeId,
+      name: splitData.name,
+      taxId: splitData.taxId,
+      tel: splitData.tel,
+      route: splitData.route,
+      type: splitData.type,
+      typeName: splitData.typeName,
+      address: splitData.address,
+      district: splitData.district,
+      subDistrict: splitData.subDistrict,
+      province: splitData.province,
+      provinceCode: splitData.provinceCode,
+      'postCode ': splitData.postCode,
+      zone: splitData.zone,
+      area: splitData.area,
+      latitude: splitData.latitude,
+      longtitude: splitData.longtitude,
+      lineId: '',
+      'note ': '',
+      approve: approveData,
+      status: '20',
+      policyConsent: poliAgree,
+      imageList: [],
+      shippingAddress: splitData.shippingAddress,
+      checkIn: {},
+      createdAt: splitData.createdAt,
+      updatedDate: Date()
+    },
+      data.push(mainData)
+  }
 
 
 
@@ -836,4 +836,69 @@ SELECT a.Area AS area,
   }
   await sql.close();
   return result.recordset
+}
+
+
+exports.stockQuery = async function (channel,period) {
+
+  const keyword = `%${period}%`;
+
+  const config = {
+    user: process.env.MS_SQL_USER,
+    password: process.env.MS_SQL_PASSWORD,
+    server: process.env.MS_SQL_SERVER,
+    database: process.env.MS_SQL_DATABASE,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  };
+  const hash = '$2b$10$DqTAeJ.dZ67XVLky203dn.77idSGjHqbOJ7ztOTeEpr1VeycWngua';
+
+  await sql.connect(config);
+  let result = ''
+  if (channel == 'cash') {
+    result = await sql.query`
+  SELECT WH, ITEM_CODE, SUM(ITEM_QTY) AS ITEM_QTY
+  FROM [dbo].[data_stock_van]
+  WHERE Stock_Date LIKE ${keyword}
+  GROUP BY WH, ITEM_CODE
+`;
+  }
+  else if (channel == 'credit') {
+    result = await sql.query`
+SELECT
+    DA.Sale_Code as saleCode,
+    DA.Sale_Player as salePayer,
+    DA.Col_LoginName as username,
+    LEFT(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') - 1) AS firstName,
+    SUBSTRING(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') + 1, LEN(DA.Col_NameTH)) AS surName,
+    ${hash} AS password,
+    'TEL' AS tel,
+    DA.ZONE AS zone,
+    DA.AREA AS area,
+    DA.WH AS warehouse,
+    'sale' AS role,
+    '1' AS status,
+    'http://192.168.2.81/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
+FROM 
+  [DATA_OMS].[dbo].[DATA_Area] AS DA 
+WHERE 
+  DA.CHANNEL_NAME = 'Credit' AND 
+  DA.Sale_Code is not NULL AND
+  DA.Sale_Code != 'ว่าง'
+`
+  }
+
+  await sql.close();
+
+  return result.recordset
+
+
+
+
+
+
+
+
 }
