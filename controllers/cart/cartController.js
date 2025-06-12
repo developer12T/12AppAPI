@@ -61,9 +61,8 @@ exports.getCart = async (req, res) => {
 
       let shouldRecalculatePromotion =
         cart.cartHashProduct !== newCartHashProduct
-
+      // console.log(summary)
       // if (shouldRecalculatePromotion) {
-      
       const promotion = await applyPromotion(summary, channel, res)
       const quota = await applyQuota(summary, channel, res)
       cart.listQuota = quota.appliedPromotions

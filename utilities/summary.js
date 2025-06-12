@@ -17,16 +17,7 @@ async function summaryOrder(cart, channel, res) {
     }
 
     const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel);
-    const storeData = await Store.findOne({ storeId: cart.storeId, area: cart.area }).lean()
-    const isBeauty = await TypeStore.findOne({ storeId: cart.storeId, area: cart.area })
-
-    if (!storeData) {
-      return res.status(404).json({
-        status: 404,
-        message: 'Not found store'
-      });
-    }
-
+    const storeData = await Store.findOne({ storeId: cart.storeId, area: cart.area }).lean() || {}
 
     const store = storeData
       ? {
@@ -46,7 +37,6 @@ async function summaryOrder(cart, channel, res) {
         area: storeData.area || '',
       }
       : {}
-
     const productIds = [
       ...cart.listProduct.map(p => p.id),
       ...(cart.listPromotion
@@ -112,10 +102,9 @@ async function summaryOrder(cart, channel, res) {
         })
       })) || []
 
-    // console.log('enrichedPromotions',enrichedPromotions)
 
     return {
-      type: cart.type,
+      type: cart.type ,
       store,
       shipping: [],
       listProduct: enrichedProducts,

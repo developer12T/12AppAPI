@@ -17,35 +17,35 @@ const availableSchema = new mongoose.Schema(
   { _id: false }
 )
 
-// const listProductSchema = new mongoose.Schema(
-//   {
-//     productId: { type: String, required: true },
-//     sumQtyPcs: { type: Number, required: true },
-//     sumQtyCtn: { type: Number, required: true },
-//     sumQtyPcsStockIn: { type: Number, required: true , default: 0},
-//     sumQtyCtnStockIn: { type: Number, required: true , default: 0},
-//     sumQtyPcsStockOut: { type: Number, required: true , default: 0},
-//     sumQtyCtnStockOut: { type: Number, required: true , default: 0},
-
-//     available: { type: [availableSchema], default: [] }
-//   },
-//   { _id: false }
-// )
-
 const listProductSchema = new mongoose.Schema(
   {
     productId: { type: String, required: true },
-    stockPcs: { type: Number, required: true },
-    stockInPcs: { type: Number, required: true, default: 0 },
-    stockOutPcs: { type: Number, required: true, default: 0 },
-    balancePcs: { type: Number, required: true, default: 0 },
-    stockCtn: { type: Number, required: true },
-    stockInCtn: { type: Number, required: true, default: 0 },
-    stockOutCtn: { type: Number, required: true, default: 0 },
-    balanceCtn: { type: Number, required: true, default: 0 },
+    sumQtyPcs: { type: Number, required: true },
+    sumQtyCtn: { type: Number, required: true },
+    sumQtyPcsStockIn: { type: Number, required: true , default: 0},
+    sumQtyCtnStockIn: { type: Number, required: true , default: 0},
+    sumQtyPcsStockOut: { type: Number, required: true , default: 0},
+    sumQtyCtnStockOut: { type: Number, required: true , default: 0},
+
+    available: { type: [availableSchema], default: [] }
   },
   { _id: false }
 )
+
+// const listProductSchema = new mongoose.Schema(
+//   {
+//     productId: { type: String, required: true },
+//     stockPcs: { type: Number, required: true },
+//     stockInPcs: { type: Number, required: true, default: 0 },
+//     stockOutPcs: { type: Number, required: true, default: 0 },
+//     balancePcs: { type: Number, required: true, default: 0 },
+//     stockCtn: { type: Number, required: true },
+//     stockInCtn: { type: Number, required: true, default: 0 },
+//     stockOutCtn: { type: Number, required: true, default: 0 },
+//     balanceCtn: { type: Number, required: true, default: 0 },
+//   },
+//   { _id: false }
+// )
 
 
 
@@ -101,8 +101,8 @@ const stockMovementLogSchema = new mongoose.Schema({
 
 module.exports = (conn) => {
   return {
-    // Stock: conn.model('Stock', stockSchema),
-    Stock: conn.model('stockTest', stockSchema, 'stockTest'),
+    Stock: conn.model('Stock', stockSchema),
+    // Stock: conn.model('stockTest', stockSchema, 'stockTest'),
     StockMovementLog: conn.model('stockMovementLog', stockMovementLogSchema, 'stockmovementlogs'),
     StockMovement: conn.model('StockMovement', stockMovementSchema)
   };

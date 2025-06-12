@@ -34,6 +34,7 @@ exports.addPromotion = async (req, res) => {
         .json({ status: 400, message: 'Missing required fields!' })
     }
 
+
     const proId = await generatePromotionId(channel, res)
 
     const newPromotion = new Promotion({

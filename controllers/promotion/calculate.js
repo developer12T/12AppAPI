@@ -4,6 +4,8 @@ const promotionModel = require('../../models/cash/promotion')
 const productModel = require('../../models/cash/product')
 const { getModelsByChannel } = require('../../middleware/channel')
 const promotionLimitModel = require('../../models/cash/promotion');
+const storeModel = require('../../models/cash/store')
+
 const { each, forEach } = require('lodash')
 
 
@@ -54,11 +56,17 @@ async function rewardProduct(rewards, multiplier, channel, res) {
 
 async function applyPromotion(order, channel, res) {
 
+    // console.log(order)
     const { Promotion } = getModelsByChannel(channel, res, promotionModel);
+    const { TypeStore } = getModelsByChannel(channel, res, storeModel);
     let discountTotal = 0
     let appliedPromotions = []
     const promotions = await Promotion.find({ status: 'active' })
-
+    const beautyStore = await TypeStore.findOne({
+        storeId: order.store.storeId,
+        type: { $in: ["beauty"] } 
+    });
+    // console.log(order.store.storeId)
     for (const promo of promotions) {
         let promoApplied = false
         let promoDiscount = 0
@@ -68,7 +76,13 @@ async function applyPromotion(order, channel, res) {
         if (promo.applicableTo?.typeStore?.length > 0 && !promo.applicableTo.typeStore.includes(order.store?.storeType)) continue
         if (promo.applicableTo?.zone?.length > 0 && !promo.applicableTo.zone.includes(order.store?.zone)) continue
         if (promo.applicableTo?.area?.length > 0 && !promo.applicableTo.area.includes(order.store?.area)) continue
+        if (promo.applicableTo?.isbeauty === true && !beautyStore) {
+            // console.log('ข้าม')
+            continue
+        };
 
+
+        // console.log(promo)
         let matchedProducts = order.listProduct.filter((product) =>
             promo.conditions.some((condition) =>
                 (condition.productId.length === 0 || condition.productId.includes(product.id)) &&
