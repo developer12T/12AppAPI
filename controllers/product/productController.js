@@ -697,3 +697,33 @@ exports.addFromERPnew = async (req, res) => {
 
 }
 
+exports.groupProductId = async (req, res) => {
+
+  const channel = req.headers['x-channel']
+  const { Product } = getModelsByChannel(channel, res, productModel)
+  const data = await Product.aggregate([
+    {
+      $group: {
+        _id: {
+          id: '$id',
+          name: "$name"
+        }
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        id: '$_id.id',
+        name: "$_id.name"
+      }
+    }
+  ]);
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: data
+  })
+}
+
+

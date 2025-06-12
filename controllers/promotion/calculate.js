@@ -66,7 +66,6 @@ async function applyPromotion(order, channel, res) {
         storeId: order.store.storeId,
         type: { $in: ["beauty"] } 
     });
-    // console.log(order.store.storeId)
     for (const promo of promotions) {
         let promoApplied = false
         let promoDiscount = 0
@@ -136,10 +135,8 @@ async function applyPromotion(order, channel, res) {
                 promoApplied = true
                 break
         }
-
         if (promoApplied) {
-            let selectedProduct = freeProducts.length > 0 ? freeProducts[Math.floor(Math.random() * freeProducts.length)] : null
-
+            let selectedProduct = freeProducts.length > 0 ? freeProducts[0] : null
             appliedPromotions.push({
                 proId: promo.proId,
                 proCode: promo.proCode,

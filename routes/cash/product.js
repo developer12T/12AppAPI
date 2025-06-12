@@ -7,7 +7,8 @@ const {
   updateStatus,
   addFromERP,
   getProductSwitch,
-  addFromERPnew
+  addFromERPnew,
+  groupProductId
 } = require('../../controllers/product/productController')
 
 const router = express.Router()
@@ -20,6 +21,7 @@ router.post('/filter', getFilters)
 router.post('/onOff', updateStatus)
 router.post('/addFromERP', addFromERP)
 router.post('/addFromERPnew', addFromERPnew)
+router.get('/groupProductId', groupProductId)
 
 
 // router.get('/searchProduct', searchProduct)
