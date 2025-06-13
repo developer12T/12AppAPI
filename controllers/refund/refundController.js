@@ -156,6 +156,23 @@ exports.checkout = async (req, res) => {
         }
         // console.log("calStock",calStock)
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
         const productId = calStock.product.flatMap(u => u.productId)
 
         const stock = await Stock.aggregate([

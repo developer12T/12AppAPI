@@ -211,7 +211,7 @@ exports.checkout = async (req, res) => {
         { quotaId: item.quotaId },
         {
           $inc: {
-            quota: -item.quota  ,
+            quota: -item.quota,
             quotaUse: + item.quota
           }
         }
@@ -219,26 +219,87 @@ exports.checkout = async (req, res) => {
     }
 
     const qtyproduct = newOrder.listProduct.map(u => {
+      return {
+        productId: u.id,
+        // lot: u.lot,
+        unit: u.unit,
+        qty: u.qty
+      }
+    })
+    const qtyproductPro = newOrder.listPromotions.flatMap(u => {
+      const promoDetail = u.listProduct.map(item => {
         return {
-          productId: u.id,
-          // lot: u.lot,
-          unit: u.unit,
-          qty: u.qty
-        }})
-    const qtyproductPro = newOrder.listPromotions.map(u => {
-        // return {
-        //   productId: u.id,
-        //   // lot: u.lot,
-        //   unit: u.unit,
-        //   qty: u.qty
-        // }
-        console.log(u)
+          productId: item.id,
+          unit: item.unit,
+          qty: item.qty
+        }
       })
+      return promoDetail
+    })
+
+    // console.log(qtyproductPro)
+
+    const productQty = qtyproductPro.concat(qtyproduct);
 
 
+    for (const item of productQty) {
+      const factorPcsResult = await Product.aggregate([
+        { $match: { id: item.productId } },
+        {
+          $project: {
+            id: 1,
+            listUnit: {
+              $filter: {
+                input: "$listUnit",
+                as: "unitItem",
+                cond: { $eq: ["$$unitItem.unit", item.unit] }
+              }
+            }
+          }
+        }
+      ]);
 
-
-
+      const factorCtnResult = await Product.aggregate([
+        { $match: { id: item.productId } },
+        {
+          $project: {
+            id: 1,
+            listUnit: {
+              $filter: {
+                input: "$listUnit",
+                as: "unitItem",
+                cond: { $eq: ["$$unitItem.unit", "CTN"] }
+              }
+            }
+          }
+        }
+      ]);
+      const factorCtn = factorCtnResult[0].listUnit[0].factor
+      const factorPcs = factorPcsResult[0].listUnit[0].factor
+      const factorPcsQty = item.qty * factorPcs
+      const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
+      const data = await Stock.findOneAndUpdate(
+        {
+          area: area,
+          period: period,
+          'listProduct.productId': item.productId
+        },
+        {
+          $inc: {
+            'listProduct.$[elem].stockOutPcs': +factorPcsQty,
+            'listProduct.$[elem].balancePcs': -factorPcsQty,
+            'listProduct.$[elem].stockOutCtn': +factorCtnQty,
+            'listProduct.$[elem].balanceCtn': -factorCtnQty
+          }
+        },
+        {
+          arrayFilters: [
+            { 'elem.productId': item.productId }
+          ],
+          new: true
+        }
+      );
+    }
 
     const calStock = {
       // storeId: refundOrder.store.storeId,
@@ -250,14 +311,7 @@ exports.checkout = async (req, res) => {
       status: 'pending',
       action: 'Sale',
       type: 'Sale',
-      product: newOrder.listProduct.map(u => {
-        return {
-          productId: u.id,
-          // lot: u.lot,
-          unit: u.unit,
-          qty: u.qty
-        }
-      })
+      product: [...productQty]
     }
 
 
@@ -266,7 +320,7 @@ exports.checkout = async (req, res) => {
 
 
 
-    console.log(qtyproduct)
+    // console.log(calStock)
 
     // const createdMovement = await StockMovement.create({
     //   ...calStock
@@ -276,12 +330,12 @@ exports.checkout = async (req, res) => {
     //   ...calStock,
     //   refOrderId: createdMovement._id
     // });
-    // await newOrder.save()
+    await newOrder.save()
     // await PromotionShelf.findOneAndUpdate(
     //   { proShelfId: promotionshelf.proShelfId },
     //   { $set: { qty: 0 } }
     // )
-    // await Cart.deleteOne({ type, area, storeId })
+    await Cart.deleteOne({ type, area, storeId })
 
     const checkIn = await checkInRoute(
       {
@@ -1540,7 +1594,7 @@ exports.getSummarybyArea = async (req, res) => {
       groupStage
     ])
 
-    console.log("modelRouteValue",modelRouteValue)
+    console.log("modelRouteValue", modelRouteValue)
 
     const haveArea = [...new Set(modelRouteValue.map(i => i.area))]
     otherModelRoute = await Route.aggregate([
@@ -2042,7 +2096,9 @@ exports.getGroup = async (req, res) => {
   ])
 
   res.status(200).json({
-    message: product
+
+    message: 'Success',
+    data: product
   })
 }
 

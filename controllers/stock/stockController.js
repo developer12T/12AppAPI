@@ -422,30 +422,19 @@ exports.getQty = async (req, res, next) => {
       }
     })
 
-    console.log(stockmatchList)
-
-
-    const qtyList = stockmatchList.flatMap(product =>
-      product.available.map(lot => lot.qtyPcs)
-    )
-    const lotList = stockmatchList.flatMap(product =>
-      product.available.map(lot => lot.lot)
-    )
-
-    const totalQtyPcs = qtyList.reduce((sum, qty) => sum + qty, 0)
-
-    const productUnit = unitData.find(p => p.unit === unit)
-
-    const lotFirst = lotList[0]
-
+    if (!stockmatchList) {
+      return res.status(404).json({
+        status:404,
+        message:'Not Found This ItemId'
+      })
+    }
 
     const data = {
       area: area,
       productId: productId,
-      sumQtyPcs: totalQtyPcs,
-      qty: Math.floor(totalQtyPcs / productUnit.factor),
+      sumQtyPcs: stockmatchList[0].balancePcs,
+      qty: stockmatchList[0].balanceCtn,
       unit: unit,
-      lot: lotFirst
     }
 
     res.status(200).json({
@@ -825,11 +814,11 @@ exports.addStockFromERP = async (req, res) => {
           stockPcs: stock.ITEM_QTY,
           stockInPcs: 0,
           stockOutPcs: 0,
-          balancePcs: 0,
+          balancePcs: stock.ITEM_QTY,
           stockCtn: qtyCtn,
           stockInCtn: 0,
           stockOutCtn: 0,
-          balanceCtn: 0,
+          balanceCtn: qtyCtn,
         }
       })
     }
