@@ -873,8 +873,8 @@ exports.getStockQty = async (req, res) => {
     })
 
     const finalProductStock = {
-      id:stockItem.productId,
-      name:productDetail.name,
+      productId:stockItem.productId,
+      productName:productDetail.name,
       listUnit:[...listUnitStock]
     }
     data.push(finalProductStock)
