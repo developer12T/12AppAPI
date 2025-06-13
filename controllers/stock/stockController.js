@@ -844,8 +844,43 @@ exports.getStockQty = async (req, res) => {
   const { area, period } = req.body
   const channel = req.headers['x-channel']
   const { Stock } = getModelsByChannel(channel, res, stockModel)
-
+  const { Product } = getModelsByChannel(channel, res, productModel)
   const dataStock = await Stock.find({ area: area, period: period }).select('listProduct -_id')
+  const dataStockTran = dataStock[0]
+  const productId = dataStockTran.listProduct.flatMap(item => item.productId)
+  const dataProduct = await Product.find({id:{$in:productId}}).select('id name listUnit')
+
+  let data = []
+  for (const stockItem of dataStockTran.listProduct) {
+    const productDetail = dataProduct.find(u => u.id == stockItem.productId)
+    const stock = stockItem.stockPcs
+    const stockIn = stockItem.stockInPcs
+    const stockOut = stockItem.stockOutPcs
+    const balance = stockItem.balancePcs
+
+
+    const listUnitStock = productDetail.listUnit.map(u => {
+        const factor = u.factor
+      // console.log(u)
+        return {
+          unit:u.unit,
+          stock:Math.floor(stock / factor),
+          stockIn:Math.floor(stockIn / factor),
+          stockOut:Math.floor(stockOut / factor),
+          balance:Math.floor(balance / factor),
+
+        }
+    })
+
+    const finalProductStock = {
+      id:stockItem.productId,
+      name:productDetail.name,
+      listUnit:[...listUnitStock]
+    }
+    data.push(finalProductStock)
+  }
+
+
   if (dataStock.length == 0) {
     res.status(404).json({
       status:404,
@@ -853,11 +888,12 @@ exports.getStockQty = async (req, res) => {
     })
   }
 
-  const data = dataStock[0]
+  
   res.status(200).json({
     status: 200,
     message: "suceesful",
-    data:data.listProduct
+    data : data
+    // data:data.listProduct
   })
 }
 
