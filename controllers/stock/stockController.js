@@ -845,18 +845,19 @@ exports.getStockQty = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Stock } = getModelsByChannel(channel, res, stockModel)
 
-  const data = await Stock.find({ area: area, period: period })
-  if (data.length == 0) {
+  const dataStock = await Stock.find({ area: area, period: period }).select('listProduct -_id')
+  if (dataStock.length == 0) {
     res.status(404).json({
       status:404,
       message:'Not found this area'
     })
   }
 
+  const data = dataStock[0]
   res.status(200).json({
     status: 200,
     message: "suceesful",
-    data: data
+    data:data.listProduct
   })
 }
 
