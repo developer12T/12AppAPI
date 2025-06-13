@@ -13,6 +13,7 @@ const upload = multer({ storage: multer.memoryStorage() }).single('image')
 const refundModel = require('../../models/cash/refund')
 const orderModel = require('../../models/cash/sale')
 const cartModel = require('../../models/cash/cart')
+const productModel = require('../../models/cash/product')
 const userModel = require('../../models/cash/user')
 const stockModel = require('../../models/cash/stock')
 const { getModelsByChannel } = require('../../middleware/channel')
@@ -29,7 +30,9 @@ exports.checkout = async (req, res) => {
         const { User } = getModelsByChannel(channel, res, userModel);
         const { Refund } = getModelsByChannel(channel, res, refundModel);
         const { Order } = getModelsByChannel(channel, res, orderModel);
-        const { Stock,StockMovementLog,StockMovement } = getModelsByChannel(channel, res, stockModel);
+        const { Product } = getModelsByChannel(channel, res, productModel)
+        
+        const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(channel, res, stockModel);
 
 
         if (!type || type !== 'refund') {
@@ -136,7 +139,7 @@ exports.checkout = async (req, res) => {
         // console.log(refundOrder)
         const calStock = {
             // storeId: refundOrder.store.storeId,
-            orderId : refundOrder.orderId,
+            orderId: refundOrder.orderId,
             area: refundOrder.store.area,
             saleCode: refundOrder.sale.saleCode,
             period: period,
@@ -157,145 +160,164 @@ exports.checkout = async (req, res) => {
         // console.log("calStock",calStock)
 
 
+        const qtyproduct = refundOrder.listProduct
+            .filter(u => u.condition === 'good')
+            .map(u => ({
+                productId: u.id,
+                unit: u.unit,
+                qty: u.qty,
+                condition: u.condition
+            }));
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-        
-        const productId = calStock.product.flatMap(u => u.productId)
-
-        const stock = await Stock.aggregate([
-            { $match: { area: area, period: period } },
-            { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
-            { $match: { "listProduct.productId": { $in: productId } } },
-            {
-                $project: {
-                    _id: 0,
-                    productId: "$listProduct.productId",
-                    sumQtyPcs: "$listProduct.sumQtyPcs",
-                    sumQtyCtn: "$listProduct.sumQtyCtn",
-                    sumQtyPcsStockIn: "$listProduct.sumQtyPcsStockIn",
-                    sumQtyCtnStockIn: "$listProduct.sumQtyCtnStockIn",
-                    sumQtyPcsStockOut: "$listProduct.sumQtyPcsStockOut",
-                    sumQtyCtnStockOut: "$listProduct.sumQtyCtnStockOut",
-                    available: "$listProduct.available"
-                }
+        const qtyproductchange = changeOrder.listProduct.map(u => {
+            //   const promoDetail = u.listProduct.map(item => {
+            return {
+                productId: u.id,
+                unit: u.unit,
+                qty: u.qty
             }
-        ]);
-        // console.log(JSON.stringify(stock, null, 2));
-
-        let listProduct = []
-        let updateLot = []
-
-        for (const stockDetail of stock) {
-            for (const lot of stockDetail.available) {
-
-                const calDetails = calStock.product.filter(
-                    u => u.productId === stockDetail.productId && u.lot === lot.lot
-                );
-                    let pcsQtyGood = 0;
-                    let pcsQtyDamaged = 0;
-                    let ctnQtyGood = 0;
-                    let ctnQtyDamaged = 0;
-
-                    for (const cal of calDetails) {
-                        if ((cal.unit === 'PCS' || cal.unit === 'BOT') && cal.condition === 'good') {
-                        pcsQtyGood += cal.qty || 0;
-                        }
-                        if ((cal.unit === 'PCS' || cal.unit === 'BOT') && cal.condition === 'damaged') {
-                        pcsQtyDamaged += cal.qty || 0;
-                        }
-                        if (cal.unit === 'CTN' && cal.condition === 'good') {
-                        ctnQtyGood += cal.qty || 0;
-                        }
-                        if (cal.unit === 'CTN' && cal.condition === 'damaged') {
-                        ctnQtyDamaged += cal.qty || 0;
-                        }
-                    }
-                    
-                    checkQtyPcs = lot.qtyPcs + pcsQtyGood - pcsQtyDamaged
-                    checkQtyCtn = lot.qtyCtn + ctnQtyGood - ctnQtyDamaged
-
-                    if (checkQtyPcs < 0 || checkQtyCtn < 0) {
-                        return res.status(400).json({
-                            status:400,
-                            message: `This lot ${lot.lot} is not enough to refund`
-                        })
-                    }
+            //   })
+        })
+        // console.log(qtyproductchange)
 
 
-                    updateLot.push({
-                        productId: stockDetail.productId,
-                        location: lot.location,
-                        lot: lot.lot,
-                        qtyPcs: checkQtyPcs,
-                        qtyPcsStockIn: lot.qtyPcsStockIn + pcsQtyGood,
-                        qtyPcsStockOut: lot.qtyPcsStockOut + pcsQtyDamaged,
-                        qtyCtn: checkQtyCtn,
-                        qtyCtnStockIn: lot.qtyCtnStockIn + ctnQtyGood,
-                        qtyCtnStockOut: lot.qtyCtnStockOut + ctnQtyDamaged
-                    });
 
-            }
+        // const productQty = qtyproductPro.concat(qtyproduct);
 
 
-  
-            const relatedLots = updateLot.filter((u) => u.productId === stockDetail.productId);
-            listProduct.push({
-                productId: stockDetail.productId,
-                sumQtyPcs: relatedLots.reduce((total, item) => total + item.qtyPcs, 0),
-                sumQtyCtn: relatedLots.reduce((total, item) => total + item.qtyCtn, 0),
-                sumQtyPcsStockIn: relatedLots.reduce((total, item) => total + item.qtyPcsStockIn, 0),
-                sumQtyCtnStockIn: relatedLots.reduce((total, item) => total + item.qtyCtnStockIn, 0),
-                sumQtyPcsStockOut: relatedLots.reduce((total, item) => total + item.qtyPcsStockOut, 0),
-                sumQtyCtnStockOut: relatedLots.reduce((total, item) => total + item.qtyCtnStockOut, 0),
-                available: relatedLots.map(({ id, ...rest }) => rest),
-            });
-        }
-        // console.log("listProduct",listProduct)
-
-        for (const updated of listProduct) {
-            await Stock.findOneAndUpdate(
-                { area: area, period: period },
+        for (const item of qtyproduct) {
+            const factorPcsResult = await Product.aggregate([
+                { $match: { id: item.productId } },
                 {
-                    $set: {
-                        "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
-                        "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
-                        "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
-                        "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
-                        "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
-                        "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
-                        "listProduct.$[product].available": updated.available
+                    $project: {
+                        id: 1,
+                        listUnit: {
+                            $filter: {
+                                input: "$listUnit",
+                                as: "unitItem",
+                                cond: { $eq: ["$$unitItem.unit", item.unit] }
+                            }
+                        }
                     }
+                }
+            ]);
+
+            const factorCtnResult = await Product.aggregate([
+                { $match: { id: item.productId } },
+                {
+                    $project: {
+                        id: 1,
+                        listUnit: {
+                            $filter: {
+                                input: "$listUnit",
+                                as: "unitItem",
+                                cond: { $eq: ["$$unitItem.unit", "CTN"] }
+                            }
+                        }
+                    }
+                }
+            ]);
+            const factorCtn = factorCtnResult[0].listUnit[0].factor
+            const factorPcs = factorPcsResult[0].listUnit[0].factor
+            const factorPcsQty = item.qty * factorPcs
+            const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
+              const data = await Stock.findOneAndUpdate(
+                {
+                  area: area,
+                  period: period,
+                  'listProduct.productId': item.productId
                 },
-                { arrayFilters: [{ "product.productId": updated.productId }], new: true }
-            )
+                {
+                  $inc: {
+                    'listProduct.$[elem].stockInPcs': +factorPcsQty,
+                    'listProduct.$[elem].balancePcs': +factorPcsQty,
+                    'listProduct.$[elem].stockInCtn': +factorCtnQty,
+                    'listProduct.$[elem].balanceCtn': +factorCtnQty
+                  }
+                },
+                {
+                  arrayFilters: [
+                    { 'elem.productId': item.productId }
+                  ],
+                  new: true
+                }
+              );
         }
-           
-        // const createdMovement = await StockMovement.create({
-        //     ...calStock
-        // });
 
-        // await StockMovementLog.create({
-        //     ...calStock,
-        //     refOrderId: createdMovement._id
-        // });
+        for (const item of qtyproductchange) {
+            const factorPcsResult = await Product.aggregate([
+                { $match: { id: item.productId } },
+                {
+                    $project: {
+                        id: 1,
+                        listUnit: {
+                            $filter: {
+                                input: "$listUnit",
+                                as: "unitItem",
+                                cond: { $eq: ["$$unitItem.unit", item.unit] }
+                            }
+                        }
+                    }
+                }
+            ]);
+
+            const factorCtnResult = await Product.aggregate([
+                { $match: { id: item.productId } },
+                {
+                    $project: {
+                        id: 1,
+                        listUnit: {
+                            $filter: {
+                                input: "$listUnit",
+                                as: "unitItem",
+                                cond: { $eq: ["$$unitItem.unit", "CTN"] }
+                            }
+                        }
+                    }
+                }
+            ]);
+            const factorCtn = factorCtnResult[0].listUnit[0].factor
+            const factorPcs = factorPcsResult[0].listUnit[0].factor
+            const factorPcsQty = item.qty * factorPcs
+            const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
+              const data = await Stock.findOneAndUpdate(
+                {
+                  area: area,
+                  period: period,
+                  'listProduct.productId': item.productId
+                },
+                {
+                  $inc: {
+                    'listProduct.$[elem].stockOutPcs': +factorPcsQty,
+                    'listProduct.$[elem].balancePcs': -factorPcsQty,
+                    'listProduct.$[elem].stockOutCtn': +factorCtnQty,
+                    'listProduct.$[elem].balanceCtn': -factorCtnQty
+                  }
+                },
+                {
+                  arrayFilters: [
+                    { 'elem.productId': item.productId }
+                  ],
+                  new: true
+                }
+              );
+        }
+
+        // // const createdMovement = await StockMovement.create({
+        // //     ...calStock
+        // // });
+
+        // // await StockMovementLog.create({
+        // //     ...calStock,
+        // //     refOrderId: createdMovement._id
+        // // });
 
 
-        await refundOrder.save()
-        await changeOrder.save()
-        await Cart.deleteOne({ type, area, storeId })
+        // await refundOrder.save()
+        // await changeOrder.save()
+        // await Cart.deleteOne({ type, area, storeId })
         res.status(200).json({
             status: 200,
             message: 'Checkout successful!',
