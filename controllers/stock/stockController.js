@@ -383,7 +383,6 @@ exports.getStock = async (req, res, next) => {
 }
 
 exports.getQty = async (req, res, next) => {
-  try {
     const { area, productId, unit, period } = req.body
 
     const channel = req.headers['x-channel']
@@ -423,6 +422,9 @@ exports.getQty = async (req, res, next) => {
       }
     })
 
+    console.log(stockmatchList)
+
+
     const qtyList = stockmatchList.flatMap(product =>
       product.available.map(lot => lot.qtyPcs)
     )
@@ -435,6 +437,7 @@ exports.getQty = async (req, res, next) => {
     const productUnit = unitData.find(p => p.unit === unit)
 
     const lotFirst = lotList[0]
+
 
     const data = {
       area: area,
@@ -450,10 +453,7 @@ exports.getQty = async (req, res, next) => {
       message: 'Stock Quantity fetched successfully!',
       data: data
     })
-  } catch (error) {
-    console.error('Error transforming cart data:', error.message)
-    return { status: 500, message: 'Server error' }
-  }
+
 }
 
 // check updateStockMovement
