@@ -820,7 +820,7 @@ exports.addStockFromERP = async (req, res) => {
       listProduct: datastock.map(stock => {
         const ctn = factorCtn.find(i => i.id === stock.ITEM_CODE) || {};
         const factor = Number(ctn?.listUnit?.factor);
-        const qtyCtn = factor > 0 ? stock.ITEM_QTY / factor : 0;
+        const qtyCtn = factor > 0 ? Math.floor(stock.ITEM_QTY / factor) : 0;
         return {
           productId: stock.ITEM_CODE,
           stockPcs: stock.ITEM_QTY,
@@ -837,8 +837,8 @@ exports.addStockFromERP = async (req, res) => {
 
     result.push(record);
 
-    // const stockDoc = new Stock(record);
-    // await stockDoc.save();
+    const stockDoc = new Stock(record);
+    await stockDoc.save();
   }
 
 

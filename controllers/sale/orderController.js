@@ -119,7 +119,7 @@ exports.checkout = async (req, res) => {
 
       return {
         id: product.id,
-        lot: item.lot,
+        // lot: item.lot,
         name: product.name,
         group: product.group,
         groupCode: product.groupCode,
@@ -206,6 +206,39 @@ exports.checkout = async (req, res) => {
     //   }
     // });
 
+    for (const item of newOrder.listQuota) {
+      await Quota.findOneAndUpdate(
+        { quotaId: item.quotaId },
+        {
+          $inc: {
+            quota: -item.quota  ,
+            quotaUse: + item.quota
+          }
+        }
+      )
+    }
+
+    const qtyproduct = newOrder.listProduct.map(u => {
+        return {
+          productId: u.id,
+          // lot: u.lot,
+          unit: u.unit,
+          qty: u.qty
+        }})
+    const qtyproductPro = newOrder.listPromotions.map(u => {
+        // return {
+        //   productId: u.id,
+        //   // lot: u.lot,
+        //   unit: u.unit,
+        //   qty: u.qty
+        // }
+        console.log(u)
+      })
+
+
+
+
+
 
     const calStock = {
       // storeId: refundOrder.store.storeId,
@@ -220,30 +253,20 @@ exports.checkout = async (req, res) => {
       product: newOrder.listProduct.map(u => {
         return {
           productId: u.id,
-          lot: u.lot,
+          // lot: u.lot,
           unit: u.unit,
           qty: u.qty
         }
       })
     }
 
-    for (const item of newOrder.listQuota) {
-      await Quota.findOneAndUpdate(
-        { quotaId: item.quotaId },
-        {
-          $inc: {
-            quota: -item.quota  ,
-            quotaUse: + item.quota
-          }
-        }
-      )
-    }
 
 
 
 
 
-    // console.log(calStock)
+
+    console.log(qtyproduct)
 
     // const createdMovement = await StockMovement.create({
     //   ...calStock
@@ -253,12 +276,12 @@ exports.checkout = async (req, res) => {
     //   ...calStock,
     //   refOrderId: createdMovement._id
     // });
-    await newOrder.save()
+    // await newOrder.save()
     // await PromotionShelf.findOneAndUpdate(
     //   { proShelfId: promotionshelf.proShelfId },
     //   { $set: { qty: 0 } }
     // )
-    await Cart.deleteOne({ type, area, storeId })
+    // await Cart.deleteOne({ type, area, storeId })
 
     const checkIn = await checkInRoute(
       {

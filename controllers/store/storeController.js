@@ -6,7 +6,7 @@ const addUpload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages'
 )
 const sql = require('mssql');
-const { storeQuery, storeQueryFilter } = require('../../controllers/queryFromM3/querySctipt')
+const { storeQuery, storeQueryFilter, groupStoreType } = require('../../controllers/queryFromM3/querySctipt')
 const getUploadMiddleware = channel => {
   const storage = multer.memoryStorage()
   let limits = {}
@@ -1006,7 +1006,7 @@ exports.updateStoreArray = async (req, res) => {
 }
 
 exports.deleteStoreArray = async (req, res) => {
-  const { storeId } = req.body; 
+  const { storeId } = req.body;
   const channel = req.headers['x-channel'];
   const { Store } = getModelsByChannel(channel, res, storeModel)
 
@@ -1022,4 +1022,36 @@ exports.deleteStoreArray = async (req, res) => {
   });
 }
 
+exports.addTypeStore = async (req, res) => {
+  const channel = req.headers['x-channel']
+  const result = await groupStoreType()
+  const { StoreType } = getModelsByChannel(channel, res, storeModel)
+  for ( const item of result ){
+      const exist = await StoreType.findOne({id:item.id})
+      if (!exist) {
+        await StoreType.create(item)
+      }
+  }
 
+
+    res.status(200).json({
+    status: 200,
+    message: 'successfully',
+    deletedStore: result
+  });
+}
+
+
+
+
+exports.getTypeStore = async (req, res) => {
+  const channel = req.headers['x-channel']
+  const { StoreType } = getModelsByChannel(channel, res, storeModel)
+  const storeType = await StoreType.find().select('id name status -_id')
+
+  res.status(200).json({
+    status: 200,
+    message: 'successfully',
+    deletedStore: storeType
+  });
+}

@@ -74,7 +74,7 @@ exports.getCart = async (req, res) => {
       await cart.save()
       // }
 
-// console.log(JSON.stringify(summary.listQuota, null, 2));
+      // console.log(JSON.stringify(summary.listQuota, null, 2));
 
     }
 
@@ -105,7 +105,9 @@ exports.getCart = async (req, res) => {
 
 exports.addProduct = async (req, res) => {
   try {
-    const { type, area, storeId, id, qty, unit, condition, expire, lot } =
+    const { type, area, storeId, id, qty, unit, condition, expire, 
+      // lot 
+    } =
       req.body
 
     const channel = req.headers['x-channel']
@@ -168,20 +170,20 @@ exports.addProduct = async (req, res) => {
           p =>
             p.id === id &&
             p.unit === unit &&
-            p.lot === lot &&
+            // p.lot === lot &&
             p.condition === condition &&
             p.expireDate === expire
         )
         if (
           existingRefund &&
-          existingRefund.lot === lot &&
+          // existingRefund.lot === lot &&
           existingRefund.unit === unit
         ) {
           existingRefund.qty += qty
         } else {
           cart.listRefund.push({
             id,
-            lot,
+            // lot,
             name: product.name,
             qty,
             unit,
@@ -192,22 +194,24 @@ exports.addProduct = async (req, res) => {
         }
       } else {
         const existingProduct = cart.listProduct.find(
-          p => p.id === id && p.unit === unit && p.lot === lot
+          p => p.id === id && p.unit === unit 
+          // && p.lot === lot
         )
         if (
           existingProduct &&
-          existingProduct.lot === lot &&
+          // existingProduct.lot === lot &&
           existingProduct.unit === unit
         ) {
           existingProduct.qty += qty
         } else {
           cart.listProduct.push({
             id,
-            lot,
+            // lot,
             name: product.name,
             qty,
             unit,
-            price
+            price,
+            
           })
         }
       }
@@ -224,12 +228,13 @@ exports.addProduct = async (req, res) => {
     } else {
       // console.log(cart.listProduct)
       const existingProduct = cart.listProduct.find(
-        p => p.id === id && p.unit === unit && p.lot === lot
+        p => p.id === id && p.unit === unit 
+        // && p.lot === lot
       )
       // console.log(JSON.stringify(existingProduct, null, 2));
       if (
         existingProduct &&
-        existingProduct.lot === lot &&
+        // existingProduct.lot === lot &&
         existingProduct.unit === unit
       ) {
         existingProduct.qty += qty
@@ -237,23 +242,25 @@ exports.addProduct = async (req, res) => {
         // console.log("test")
         cart.listProduct.push({
           id,
-          lot,
+          // lot,
           name: product.name,
           qty,
           unit,
-          price
+          price,
+          condition
         })
       }
 
       cart.total = cart.listProduct.reduce((sum, p) => sum + p.qty * p.price, 0)
     }
     cart.createdAt = new Date()
+    // const period = "202506"
     await cart.save()
-    
+
+
+
     //// ยังไม่ใช้จริง กำลัง Test
 
-    // const period = "202505"
-    // const productId = cart.listProduct.flatMap(u => u.id)
     // const stock = await Stock.aggregate([
     //   { $match: { area: area, period: period } },
     //   { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
@@ -262,16 +269,18 @@ exports.addProduct = async (req, res) => {
     //     $project: {
     //       _id: 0,
     //       productId: "$listProduct.productId",
-    //       sumQtyPcs: "$listProduct.sumQtyPcs",
-    //       sumQtyCtn: "$listProduct.sumQtyCtn",
-    //       sumQtyPcsStockIn: "$listProduct.sumQtyPcsStockIn",
-    //       sumQtyCtnStockIn: "$listProduct.sumQtyCtnStockIn",
-    //       sumQtyPcsStockOut: "$listProduct.sumQtyPcsStockOut",
-    //       sumQtyCtnStockOut: "$listProduct.sumQtyCtnStockOut",
-    //       available: "$listProduct.available"
+    //       stockPcs: "$listProduct.stockPcs",
+    //       stockInPcs: "$listProduct.stockInPcs",
+    //       stockOutPcs: "$listProduct.stockOutPcs",
+    //       balancePcs: "$listProduct.balancePcs",
+    //       stockCtn: "$listProduct.stockCtn",
+    //       stockInCtn: "$listProduct.stockInCtn",
+    //       stockOutCtn: "$listProduct.stockOutCtn",
+    //       balanceCtn: "$listProduct.balanceCtn"
     //     }
     //   }
     // ]);
+    // console.log(stock)
     // if (type == 'sale') {
     //   for (const stockDetail of stock) {
     //     for (const lot of stockDetail.available) {

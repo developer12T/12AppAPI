@@ -64,7 +64,7 @@ async function summaryOrder(cart, channel, res) {
       const totalPrice = cartItem.qty * cartItem.price
       return {
         id: cartItem.id,
-        lot: cartItem.lot,
+        // lot: cartItem.lot,
         name: cartItem.name,
         groupCode: productInfo.groupCode || '',
         group: productInfo.group || '',
@@ -426,7 +426,7 @@ async function summaryOrderProStatusOne(cart, listPromotion, channel, res) {
       const totalPrice = cartItem.qty * cartItem.price
       return {
         id: cartItem.id,
-        lot: cartItem.lot,
+        // lot: cartItem.lot,
         name: cartItem.name,
         groupCode: productInfo.groupCode || '',
         group: productInfo.group || '',

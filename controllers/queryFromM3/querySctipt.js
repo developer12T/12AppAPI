@@ -839,7 +839,7 @@ SELECT a.Area AS area,
 }
 
 
-exports.stockQuery = async function (channel,period) {
+exports.stockQuery = async function (channel, period) {
 
   const keyword = `%${period}%`;
 
@@ -893,12 +893,27 @@ WHERE
   await sql.close();
 
   return result.recordset
+}
 
 
+exports.groupStoreType = async function () {
+  const config = {
+    user: process.env.MS_SQL_USER,
+    password: process.env.MS_SQL_PASSWORD,
+    server: process.env.MS_SQL_SERVER,
+    database: process.env.MS_SQL_DATABASE,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  };
+  await sql.connect(config);
 
+  result = await sql.query`
+   select  type_id as id , type_name as name, '1' as status  FROM [dbo].[data_shoptype]
+   `
 
-
-
-
+  await sql.close();
+  return result.recordset
 
 }

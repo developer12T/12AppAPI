@@ -78,8 +78,7 @@ const storeSchema = mongoose.Schema({
 const typeStoreSchema = mongoose.Schema({
     id: { type: String, require: true },
     name: { type: String, require: true },
-    description: { type: String, require: true },
-    status: { type: String, require: true },
+    status: { type: String, default:'1' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
 })
@@ -110,11 +109,10 @@ const storeBueatySchema = mongoose.Schema({
 
 
 
-
 module.exports = (conn) => {
     return {
       Store: conn.model('Store', storeSchema),
-    //   TypeStore: conn.model('TypeStore', typeStoreSchema),
+      StoreType: conn.model('storetypes', typeStoreSchema,'storetypes'),
       RunningNumber: conn.model('runningnumber',runningNumberSchema,'runningnumber'),
       TypeStore: conn.model('typestores',storeBueatySchema,'typestores')
 

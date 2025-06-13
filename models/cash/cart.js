@@ -38,11 +38,12 @@ const listCartPromotion = mongoose.Schema({
 
 const listCartProduct = mongoose.Schema({
   id: { type: String, require: true, default: '' },
-  lot: { type: String, default: '' },
+  // lot: { type: String, default: '' },
   name: { type: String, require: true, default: '' },
   qty: { type: Number, require: true, default: 0 },
   unit: { type: String, require: true, default: '' },
-  price: { type: Number, require: true, default: 0 }
+  price: { type: Number, require: true, default: 0 },
+  condition: { type: String, default: '' },
 })
 
 const listQuotaSchema = new mongoose.Schema({
