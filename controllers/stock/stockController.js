@@ -780,39 +780,38 @@ exports.addStockFromERP = async (req, res) => {
   const { Stock } = getModelsByChannel(channel, res, stockModel)
   const { Product } = getModelsByChannel(channel, res, productModel)
   const users = await User.find().select('area saleCode warehouse').lean()
-  console.log(data)
-  // const productId = data.map(item => item.)
-  const factorCtn = await Product.find({id:stock.ITEM_CODE})
+  const productId = data.flatMap(item => item.ITEM_CODE)
+  const factorCtn = await Product.find({id:{$in:productId}})
+
+  console.log(factorCtn)
+
+  // const result = [];
+
+  // for (const item of users) {
+  //   const datastock = data.filter(i => i.WH == item.warehouse);
 
 
+  //   const record = {
+  //     area: item.area,
+  //     saleCode: item.saleCode,
+  //     period: cleanPeriod,
+  //     warehouse: item.warehouse,
+  //     listProduct: datastock.map(stock => {
+  //       return {
+  //       productId: stock.ITEM_CODE,
+  //       stock: stock.ITEM_QTY,
+  //       stockIn: 0,
+  //       stockOut: 0,
+  //       balance: 0
+  //       }
+  //   })
+  // }
 
-  const result = [];
+  //   result.push(record);
 
-  for (const item of users) {
-    const datastock = data.filter(i => i.WH == item.warehouse);
-
-
-    const record = {
-      area: item.area,
-      saleCode: item.saleCode,
-      period: cleanPeriod,
-      warehouse: item.warehouse,
-      listProduct: datastock.map(stock => {
-        return {
-        productId: stock.ITEM_CODE,
-        stock: stock.ITEM_QTY,
-        stockIn: 0,
-        stockOut: 0,
-        balance: 0
-        }
-    })
-  }
-
-    result.push(record);
-
-    // const stockDoc = new Stock(record);
-    // await stockDoc.save();
-  }
+  //   // const stockDoc = new Stock(record);
+  //   // await stockDoc.save();
+  // }
 
 
 
@@ -820,7 +819,7 @@ exports.addStockFromERP = async (req, res) => {
   res.status(200).json({
     status: 200,
     message: "addStockFromERP",
-    data: result
+    data: factorCtn
   })
 
 
