@@ -727,3 +727,87 @@ exports.groupProductId = async (req, res) => {
 }
 
 
+exports.groupBrandId = async (req, res) => {
+
+  const channel = req.headers['x-channel']
+  const { Product } = getModelsByChannel(channel, res, productModel)
+  const data = await Product.aggregate([
+    {
+      $group: {
+        _id: {
+          id: '$brandCode',
+          name: "$brand"
+        }
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        brandId: '$_id.id',
+        brandName: "$_id.name"
+      }
+    }
+  ]);
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: data
+  })
+}
+
+exports.groupSize = async (req, res) => {
+
+  const channel = req.headers['x-channel']
+  const { Product } = getModelsByChannel(channel, res, productModel)
+  const data = await Product.aggregate([
+    {
+      $group: {
+        _id: {
+          id: '$size',
+        }
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        size: '$_id.id',
+      }
+    }
+  ]);
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: data
+  })
+}
+
+exports.groupFlavourId = async (req, res) => {
+
+  const channel = req.headers['x-channel']
+  const { Product } = getModelsByChannel(channel, res, productModel)
+  const data = await Product.aggregate([
+    {
+      $group: {
+        _id: {
+          id: '$flavourCode',
+          name: "$flavour"
+        }
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        flavourId: '$_id.id',
+        flavourName: "$_id.name"
+      }
+    }
+  ]);
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: data
+  })
+}

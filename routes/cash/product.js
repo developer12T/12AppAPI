@@ -8,7 +8,11 @@ const {
   addFromERP,
   getProductSwitch,
   addFromERPnew,
-  groupProductId
+  groupProductId,
+  groupBrandId,
+  groupSize,
+  groupFlavourId,
+
 } = require('../../controllers/product/productController')
 
 const router = express.Router()
@@ -22,7 +26,9 @@ router.post('/onOff', updateStatus)
 router.post('/addFromERP', addFromERP)
 router.post('/addFromERPnew', addFromERPnew)
 router.get('/groupProductId', groupProductId)
-
+router.get('/groupBrandId', groupBrandId)
+router.get('/groupSize', groupSize)
+router.get('/groupFlavourId', groupFlavourId)
 
 // router.get('/searchProduct', searchProduct)
 module.exports = router
