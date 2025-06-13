@@ -129,12 +129,6 @@ exports.updatePromotion = async (req, res) => {
 
 
 
-
-
-
-
-
-
 exports.getPromotionProduct = async (req, res) => {
   try {
     const { type, storeId, proId } = req.body
@@ -305,6 +299,33 @@ exports.updateCartPromotion = async (req, res) => {
     res.status(500).json({ status: 500, message: error.message })
   }
 }
+
+exports.getPromotionDetail = async (req, res) => {
+  const { proId } = req.query
+  const channel = req.headers['x-channel']; 
+  const { Promotion } = getModelsByChannel(channel, res, promotionModel);
+  
+  const data = await Promotion.findOne({proId:proId})
+
+  if (data.length == 0) {
+    return res.status(404).json({
+      status: 200,
+      message: "Not Found Promotion"
+    })
+  }
+
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data:data
+  })
+
+}
+
+
+
 
 exports.getPromotion = async (req, res) => {
 

@@ -781,37 +781,65 @@ exports.addStockFromERP = async (req, res) => {
   const { Product } = getModelsByChannel(channel, res, productModel)
   const users = await User.find().select('area saleCode warehouse').lean()
   const productId = data.flatMap(item => item.ITEM_CODE)
-  const factorCtn = await Product.find({id:{$in:productId}})
+  const factorCtn = await Product.aggregate([
+    {
+      $match: {
+        id: { $in: productId }
+      }
+    },
+    {
+      $project: {
+        id: 1,
+        listUnit: {
+          $arrayElemAt: [
+            {
+              $filter: {
+                input: "$listUnit",
+                as: "unit",
+                cond: { $eq: ["$$unit.unit", "CTN"] }
+              }
+            },
+            0
+          ]
+        }
+      }
+    }
+  ]);
 
-  console.log(factorCtn)
+  const result = [];
 
-  // const result = [];
-
-  // for (const item of users) {
-  //   const datastock = data.filter(i => i.WH == item.warehouse);
+  for (const item of users) {
+    const datastock = data.filter(i => i.WH == item.warehouse);
 
 
-  //   const record = {
-  //     area: item.area,
-  //     saleCode: item.saleCode,
-  //     period: cleanPeriod,
-  //     warehouse: item.warehouse,
-  //     listProduct: datastock.map(stock => {
-  //       return {
-  //       productId: stock.ITEM_CODE,
-  //       stock: stock.ITEM_QTY,
-  //       stockIn: 0,
-  //       stockOut: 0,
-  //       balance: 0
-  //       }
-  //   })
-  // }
+    const record = {
+      area: item.area,
+      saleCode: item.saleCode,
+      period: cleanPeriod,
+      warehouse: item.warehouse,
+      listProduct: datastock.map(stock => {
+        const ctn = factorCtn.find(i => i.id === stock.ITEM_CODE) || {};
+        const factor = Number(ctn?.listUnit?.factor);
+        const qtyCtn = factor > 0 ? stock.ITEM_QTY / factor : 0;
+        return {
+          productId: stock.ITEM_CODE,
+          stockPcs: stock.ITEM_QTY,
+          stockInPcs: 0,
+          stockOutPcs: 0,
+          balancePcs: 0,
+          stockCtn: qtyCtn,
+          stockInCtn: 0,
+          stockOutCtn: 0,
+          balanceCtn: 0,
+        }
+      })
+    }
 
-  //   result.push(record);
+    result.push(record);
 
-  //   // const stockDoc = new Stock(record);
-  //   // await stockDoc.save();
-  // }
+    // const stockDoc = new Stock(record);
+    // await stockDoc.save();
+  }
 
 
 
@@ -819,7 +847,7 @@ exports.addStockFromERP = async (req, res) => {
   res.status(200).json({
     status: 200,
     message: "addStockFromERP",
-    data: factorCtn
+    data: result
   })
 
 
