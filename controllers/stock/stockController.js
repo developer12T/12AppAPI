@@ -383,65 +383,65 @@ exports.getStock = async (req, res, next) => {
 }
 
 exports.getQty = async (req, res, next) => {
-    const { area, productId, unit, period } = req.body
+  const { area, productId, unit, period } = req.body
 
-    const channel = req.headers['x-channel']
+  const channel = req.headers['x-channel']
 
-    const { Stock } = getModelsByChannel(channel, res, stockModel)
-    const { Product } = getModelsByChannel(channel, res, productModel)
+  const { Stock } = getModelsByChannel(channel, res, stockModel)
+  const { Product } = getModelsByChannel(channel, res, productModel)
 
-    const productStock = await Stock.find({
-      area: area,
-      period: period,
-      'listProduct.productId': productId
+  const productStock = await Stock.find({
+    area: area,
+    period: period,
+    'listProduct.productId': productId
+  })
+
+  const products = await Product.find({ id: productId })
+
+  let unitData = {}
+
+  const productUnitMatch = products?.find(p => p.id === productId)
+
+  if (productUnitMatch) {
+    unitData = productUnitMatch.listUnit.map(unit => ({
+      unit: unit.unit,
+      factor: unit.factor
+    }))
+  } else {
+    res.status(404).json({
+      message: 'Not Found This ItemId'
     })
+  }
 
-    const products = await Product.find({ id: productId })
+  const stockmatchList = []
 
-    let unitData = {}
-
-    const productUnitMatch = products?.find(p => p.id === productId)
-
-    if (productUnitMatch) {
-      unitData = productUnitMatch.listUnit.map(unit => ({
-        unit: unit.unit,
-        factor: unit.factor
-      }))
-    } else {
-      res.status(404).json({
-        message: 'Not Found This ItemId'
-      })
+  productStock.map(item => {
+    const stockmatch = item.listProduct.find(p => p.productId === productId)
+    if (stockmatch) {
+      stockmatchList.push(stockmatch)
     }
+  })
 
-    const stockmatchList = []
-
-    productStock.map(item => {
-      const stockmatch = item.listProduct.find(p => p.productId === productId)
-      if (stockmatch) {
-        stockmatchList.push(stockmatch)
-      }
+  if (!stockmatchList) {
+    return res.status(404).json({
+      status: 404,
+      message: 'Not Found This ItemId'
     })
+  }
 
-    if (!stockmatchList) {
-      return res.status(404).json({
-        status:404,
-        message:'Not Found This ItemId'
-      })
-    }
+  const data = {
+    area: area,
+    productId: productId,
+    sumQtyPcs: stockmatchList[0].balancePcs,
+    qty: stockmatchList[0].balanceCtn,
+    unit: unit,
+  }
 
-    const data = {
-      area: area,
-      productId: productId,
-      sumQtyPcs: stockmatchList[0].balancePcs,
-      qty: stockmatchList[0].balanceCtn,
-      unit: unit,
-    }
-
-    res.status(200).json({
-      status: 200,
-      message: 'Stock Quantity fetched successfully!',
-      data: data
-    })
+  res.status(200).json({
+    status: 200,
+    message: 'Stock Quantity fetched successfully!',
+    data: data
+  })
 
 }
 
@@ -840,7 +840,25 @@ exports.addStockFromERP = async (req, res) => {
 
 
 }
+exports.getStockQty = async (req, res) => {
+  const { area, period } = req.body
+  const channel = req.headers['x-channel']
+  const { Stock } = getModelsByChannel(channel, res, stockModel)
 
+  const data = await Stock.find({ area: area, period: period })
+  if (data.length == 0) {
+    res.status(404).json({
+      status:404,
+      message:'Not found this area'
+    })
+  }
+
+  res.status(200).json({
+    status: 200,
+    message: "suceesful",
+    data: data
+  })
+}
 
 
 

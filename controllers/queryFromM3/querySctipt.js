@@ -627,63 +627,43 @@ exports.productQuery = async function (channel) {
   let result = ''
   if (channel === 'cash') {
     [result] = await connection.execute(`
-  SELECT 
-    id,
-    \`name\`,
-    GRP_CODE,
-    \`group\`,
-    BRAND_CODE,
-    brand,
-    size,
-    FLAVOUR_CODE,
-    flavour,
-    type,
-    CTN_Gross,
-    CTN_Net,
-    statusSale,
-    statusRefund,
-    statusWithdraw,
-    unit,
-    nameEng,
-    nameThai,
-    pricePerUnitSale,
-    pricePerUnitRefund,
-    pricePerUnitChange
-  FROM (
-    SELECT 
-      id,
-      \`name\`,
-      CASE 
-        WHEN \`group\` = 'พรีเมียม' THEN 'พรีเมี่ยม'
-        WHEN \`group\` = 'ฮอทพอท' THEN 'ซุป HOT POT'
-        ELSE \`group\`
-      END AS \`group\`,
-      BRAND_CODE,
-      brand,
-      size,
-      d.FLAVOUR as FLAVOUR_CODE,
-      a.flavour,
-      type,
-      CTN_Gross,
-      CTN_Net,
-      statusSale,
-      statusRefund,
-      statusWithdraw,
-      unit,
-      nameEng,
-      nameThai,
-      pricePerUnitSale,
-      pricePerUnitRefund,
-      pricePerUnitChange
-    FROM ca_product_new a
-    LEFT JOIN ca_unit b ON a.unit = b.idUnit 
-    LEFT JOIN ca_factor c ON a.id = c.itemcode 
-    LEFT JOIN ( 
-        SELECT DISTINCT ITNO, FLAVOUR FROM c_product
-    ) d ON a.id = d.ITNO
-    LEFT JOIN c_brand f ON a.brand = f.BRAND_DESC
-  ) AS main
-  LEFT JOIN c_group e ON main.\`group\` = e.GRP_DESC
+SELECT 
+ITNO AS id,
+NAME_BILL as name,
+GRP as GRP_CODE,
+GRP_DESC as \`group\`,
+Brand as BRAND_CODE,
+BRAND_DESC as brand,
+WEIGHT AS size,
+FLAVOUR as FLAVOUR_CODE,
+FAV_DESC as flavour,
+case 
+when IS_OPEN = 'Y' then "ไม่แถม"
+when IS_OPEN = 'N' then "แถม"
+WHEN LEFT(ITNO, 2) = '60' THEN 'พรีเมียม'
+END AS type ,
+CTN_Gross,
+CTN_Net,
+'Y' as statusSale,
+'Y' as statusRefund,
+'Y' as statusWithdraw,
+unit_cal as unit ,
+UNIT_CODE as nameEng,
+UNIT_DESC as nameThai,
+price as pricePerUnitSale ,
+price as pricePerUnitRefund ,
+price as pricePerUnitChange 
+
+from m_product a
+LEFT JOIN c_group g ON a.GRP = g.GRP_CODE
+LEFT JOIN m_unit u ON a.unit_cal = u.UNIT_CODE_BC
+LEFT JOIN ca_factor c ON a.ITNO = c.itemcode 
+LEFT JOIN m_flavour f ON a.FLAVOUR = f.FAV_CODE 
+LEFT JOIN c_brand b ON a.Brand = b.BRAND_CODE
+
+
+
+
 `);
 
   }
