@@ -396,7 +396,6 @@ exports.getQty = async (req, res, next) => {
       period: period,
       'listProduct.productId': productId
     })
-    console.log(productStock)
 
     const products = await Product.find({ id: productId })
 
