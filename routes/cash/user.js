@@ -12,7 +12,8 @@ const {
   addUserNew,
   updateUserArray,
   deleteUserArray,
-  addUserArray
+  addUserArray,
+  getAreaAll
 } = require('../../controllers/user/userController')
 
 const router = express.Router()
@@ -30,6 +31,7 @@ router.post('/addUserNew', addUserNew)
 router.post('/updateUserArray', updateUserArray)
 router.post('/deleteUserArray', deleteUserArray)
 router.post('/addUserArray', addUserArray)
+router.get('/getAreaAll', getAreaAll)
 
 
 

@@ -10,9 +10,7 @@ const bcrypt = require('bcrypt')
 const axios = require('axios')
 const userModel = require('../../models/cash/user')
 const { getModelsByChannel } = require('../../middleware/channel')
-const { Types } = require('mongoose');
-const { forEach } = require('lodash');
-const { userQuery, userQueryFilter } = require('../../controllers/queryFromM3/querySctipt')
+const { userQuery, userQueryFilter } = require('../../controllers/queryFromM3/querySctipt');
 exports.getUser = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
@@ -621,4 +619,37 @@ exports.deleteUserArray = async (req, res) => {
     message: 'Deleted successfully',
     deletedAreas: deletedAreas
   });
+}
+
+
+exports.getAreaAll = async (req, res) => {
+  const channel = req.headers['x-channel'];
+  const { User } = getModelsByChannel(channel, res, userModel);
+
+  const data = await User.aggregate([
+    {
+      $match: {
+        area: { $ne: '' }
+      }
+    },
+    {
+      $group: {
+        _id: '$area'
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        area: '$_id'
+      }
+    },
+    { $sort: { area: 1 } }
+  ])
+
+  res.status(200).json({
+    status: 200,
+    message: 'successfully',
+    data: data
+  });
+
 }
