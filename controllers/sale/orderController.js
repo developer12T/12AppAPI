@@ -223,7 +223,8 @@ exports.checkout = async (req, res) => {
         productId: u.id,
         // lot: u.lot,
         unit: u.unit,
-        qty: u.qty
+        qty: u.qty,
+        statusMovement: 'OUT'
       }
     })
     const qtyproductPro = newOrder.listPromotions.flatMap(u => {
@@ -231,7 +232,8 @@ exports.checkout = async (req, res) => {
         return {
           productId: item.id,
           unit: item.unit,
-          qty: item.qty
+          qty: item.qty,
+          statusMovement: 'OUT'
         }
       })
       return promoDetail
@@ -239,7 +241,15 @@ exports.checkout = async (req, res) => {
 
     // console.log(qtyproductPro)
 
-    const productQty = qtyproductPro.concat(qtyproduct);
+    const productQty = Object.values(
+      [...qtyproductPro, ...qtyproduct].reduce((acc, cur) => {
+        const key = `${cur.productId}-${cur.unit}`;
+        acc[key] = acc[key]
+          ? { ...cur, qty: acc[key].qty + cur.qty }
+          : { ...cur };
+        return acc;
+      }, {})
+    );
 
 
     for (const item of productQty) {
@@ -320,16 +330,16 @@ exports.checkout = async (req, res) => {
 
 
 
-    // console.log(calStock)
+    console.log(calStock)
 
-    // const createdMovement = await StockMovement.create({
-    //   ...calStock
-    // });
+    const createdMovement = await StockMovement.create({
+      ...calStock
+    });
 
-    // await StockMovementLog.create({
-    //   ...calStock,
-    //   refOrderId: createdMovement._id
-    // });
+    await StockMovementLog.create({
+      ...calStock,
+      refOrderId: createdMovement._id
+    });
     await newOrder.save()
     // await PromotionShelf.findOneAndUpdate(
     //   { proShelfId: promotionshelf.proShelfId },

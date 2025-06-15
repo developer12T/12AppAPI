@@ -305,7 +305,8 @@ async function summaryGive(cart, channel, res) {
     // console.log('summaryGive', cart.storeId)
     const { Store } = getModelsByChannel(channel, res, storeModel);
 
-    const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
+    const storeData = await Store.findOne({ storeId: cart.storeId, area: cart.area }).lean()
+    // console.log(storeData)
     const store = storeData
       ? {
         storeId: storeData.storeId,

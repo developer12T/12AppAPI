@@ -178,7 +178,8 @@ exports.checkout = async (req, res) => {
 
         const { Givetype } = getModelsByChannel(channel, res, giveawaysModel);
         const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel);
-        const { Stock } = getModelsByChannel(channel, res, stockModel);
+        const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(channel, res, stockModel);
+
 
 
         if (!type || !area || !storeId || !giveId || !shipping) {
@@ -204,8 +205,6 @@ exports.checkout = async (req, res) => {
 
         const summary = await summaryGive(cart, channel, res)
 
-
-        // console.log(JSON.stringify(summary, null, 2));
 
 
         const newOrder = new Giveaway({
@@ -244,6 +243,16 @@ exports.checkout = async (req, res) => {
             createdBy: sale.username
         })
 
+
+        if (!newOrder.store.area) {
+
+            return res.status(400).json({
+                status:400,
+                message:'Not found store'
+            })
+        }
+
+        
         const calStock = {
             // storeId: refundOrder.store.storeId,
             orderId: newOrder.orderId,
@@ -252,14 +261,14 @@ exports.checkout = async (req, res) => {
             period: period,
             warehouse: newOrder.sale.warehouse,
             status: 'pending',
-            action: "give",
-            type: "give",
+            action: "Give",
+            type: "Give",
             product: newOrder.listProduct.map(u => {
                 return {
                     productId: u.id,
-                    lot: u.lot,
                     unit: u.unit,
                     qty: u.qty,
+                    statusMovement: 'OUT'
                 }
             })
         }
@@ -269,7 +278,6 @@ exports.checkout = async (req, res) => {
         const productQty = newOrder.listProduct.map(u => {
             return {
                 productId: u.id,
-                // lot: u.lot,
                 unit: u.unit,
                 qty: u.qty
             }
@@ -334,21 +342,21 @@ exports.checkout = async (req, res) => {
             );
         }
 
+        // console.log(newOrder)
 
 
 
 
 
 
+        const createdMovement = await StockMovement.create({
+            ...calStock
+        });
 
-        // const createdMovement = await StockMovement.create({
-        //     ...calStock
-        // });
-
-        // await StockMovementLog.create({
-        //     ...calStock,
-        //     refOrderId: createdMovement._id
-        // });
+        await StockMovementLog.create({
+            ...calStock,
+            refOrderId: createdMovement._id
+        });
 
 
 

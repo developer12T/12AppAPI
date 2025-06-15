@@ -136,29 +136,6 @@ exports.checkout = async (req, res) => {
             createdBy: sale.username
         })
 
-        // console.log(refundOrder)
-        const calStock = {
-            // storeId: refundOrder.store.storeId,
-            orderId: refundOrder.orderId,
-            area: refundOrder.store.area,
-            saleCode: refundOrder.sale.saleCode,
-            period: period,
-            warehouse: refundOrder.sale.warehouse,
-            status: 'pending',
-            action: "Refund",
-            type: "Refund",
-            product: refundOrder.listProduct.map(u => {
-                return {
-                    productId: u.id,
-                    lot: u.lot,
-                    unit: u.unit,
-                    qty: u.qty,
-                    condition: u.condition
-                }
-            })
-        }
-        // console.log("calStock",calStock)
-
 
         const qtyproduct = refundOrder.listProduct
             .filter(u => u.condition === 'good')
@@ -166,7 +143,8 @@ exports.checkout = async (req, res) => {
                 productId: u.id,
                 unit: u.unit,
                 qty: u.qty,
-                condition: u.condition
+                condition: u.condition,
+                statusMovement: 'IN'
             }));
 
 
@@ -176,11 +154,38 @@ exports.checkout = async (req, res) => {
             return {
                 productId: u.id,
                 unit: u.unit,
-                qty: u.qty
+                qty: u.qty,
+                statusMovement: 'OUT'
             }
             //   })
         })
         // console.log(qtyproductchange)
+
+        const refundCalStock = {
+            // storeId: refundOrder.store.storeId,
+            orderId: refundOrder.orderId,
+            area: refundOrder.store.area,
+            saleCode: refundOrder.sale.saleCode,
+            period: period,
+            warehouse: refundOrder.sale.warehouse,
+            status: 'pending',
+            action: "Refund",
+            type: "Refund",
+            product: qtyproduct
+        }
+
+        const changeCalStock = {
+            // storeId: refundOrder.store.storeId,
+            orderId: refundOrder.orderId,
+            area: refundOrder.store.area,
+            saleCode: refundOrder.sale.saleCode,
+            period: period,
+            warehouse: refundOrder.sale.warehouse,
+            status: 'pending',
+            action: "Change",
+            type: "Change",
+            product: qtyproductchange
+        }
 
 
 
@@ -305,19 +310,29 @@ exports.checkout = async (req, res) => {
               );
         }
 
-        // // const createdMovement = await StockMovement.create({
-        // //     ...calStock
-        // // });
+        const createdMovementRefund = await StockMovement.create({
+            ...refundCalStock
+        });
 
-        // // await StockMovementLog.create({
-        // //     ...calStock,
-        // //     refOrderId: createdMovement._id
-        // // });
+        await StockMovementLog.create({
+            ...refundCalStock,
+            refOrderId: createdMovementRefund._id
+        });
+
+        const createdMovementChange = await StockMovement.create({
+            ...changeCalStock
+        });
+
+        await StockMovementLog.create({
+            ...changeCalStock,
+            refOrderId: createdMovementChange._id
+        });
 
 
-        // await refundOrder.save()
-        // await changeOrder.save()
-        // await Cart.deleteOne({ type, area, storeId })
+
+        await refundOrder.save()
+        await changeOrder.save()
+        await Cart.deleteOne({ type, area, storeId })
         res.status(200).json({
             status: 200,
             message: 'Checkout successful!',

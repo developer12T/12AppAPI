@@ -161,7 +161,8 @@ exports.checkout = async (req, res) => {
         productId: u.id,
         // lot: u.lot,
         unit: u.unit,
-        qty: u.qty
+        qty: u.qty,
+        statusMovement: 'OUT'
       }
     })
 
@@ -245,29 +246,21 @@ exports.checkout = async (req, res) => {
       status: 'pending',
       action: "Withdraw",
       type: "Withdraw",
-      product: newOrder.listProduct.map(u => {
-        return {
-          productId: u.id,
-          lot: u.lot,
-          unit: u.unit,
-          qty: u.qty,
-          statusMovement: 'in'
-        }
-      })
+      product: productQty
     }
 
-    // const createdMovement = await StockMovement.create({
-    //   ...calStock
-    // });
+    const createdMovement = await StockMovement.create({
+      ...calStock
+    });
 
-    // await StockMovementLog.create({
-    //   ...calStock,
-    //   refOrderId: createdMovement._id
-    // });
+    await StockMovementLog.create({
+      ...calStock,
+      refOrderId: createdMovement._id
+    });
 
 
-    // await newOrder.save()
-    // await Cart.deleteOne({ type, area })
+    await newOrder.save()
+    await Cart.deleteOne({ type, area })
 
     res.status(200).json({
       status: 200,
