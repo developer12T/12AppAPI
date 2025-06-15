@@ -164,88 +164,110 @@ exports.addSendMoneyImage = async (req, res) => {
 }
 
 exports.getSendMoney = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { area } = req.body
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-  const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+  try {
+    const channel = req.headers['x-channel']
+    const { area } = req.body
 
-  // วันไทย (UTC+7)
-  const now = new Date()
-  const thaiNow = new Date(now.getTime() + 7 * 60 * 60 * 1000)
-  const year = thaiNow.getFullYear()
-  const month = thaiNow.getMonth() + 1
-  const day = thaiNow.getDate()
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
 
-  // หา Order ที่ status: pending และวันที่ตรงกับวันปัจจุบัน
-  const orders = await Order.aggregate([
-    {
-      $addFields: {
-        createdAtThai: {
-          $dateAdd: {
-            startDate: '$createdAt',
-            unit: 'hour',
-            amount: 7
+    // วันไทย (UTC+7)
+    const now = new Date()
+    const thaiNow = new Date(now.getTime() + 7 * 60 * 60 * 1000)
+    const year = thaiNow.getFullYear()
+    const month = thaiNow.getMonth() + 1
+    const day = thaiNow.getDate()
+
+    // Step 1: คำนวณยอดที่ควรส่งวันนี้ (เหมือน getSummarybyChoice type = day)
+    const orders = await Order.aggregate([
+      {
+        $addFields: {
+          createdAtThai: {
+            $dateAdd: {
+              startDate: '$createdAt',
+              unit: 'hour',
+              amount: 7
+            }
           }
         }
+      },
+      {
+        $addFields: {
+          day: { $dayOfMonth: '$createdAtThai' },
+          month: { $month: '$createdAtThai' },
+          year: { $year: '$createdAtThai' }
+        }
+      },
+      {
+        $match: {
+          'store.area': area,
+          status: 'pending',
+          day,
+          month,
+          year
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          sendmoney: { $sum: '$total' }
+        }
       }
-    },
-    {
-      $addFields: {
-        day: { $dayOfMonth: '$createdAtThai' },
-        month: { $month: '$createdAtThai' },
-        year: { $year: '$createdAtThai' }
-      }
-    },
-    {
-      $match: {
-        'store.area': area,
-        status: 'pending',
-        day: day,
-        month: month,
-        year: year
-      }
-    },
-    {
-      $group: {
-        _id: null,
-        sendmoney: { $sum: '$total' }
-      }
-    },
-    {
-      $project: {
-        _id: 0,
-        sendmoney: 1
-      }
-    }
-  ])
+    ])
 
-  const sendmoneyToday = orders.length > 0 ? orders[0].sendmoney : 0
+    const totalToSend = orders.length > 0 ? orders[0].sendmoney : 0
 
-  // หาเงินที่ส่งแล้ว
-  const startOfDay = new Date(Date.UTC(year, month - 1, day, 0, 0, 0))
-  const endOfDay = new Date(Date.UTC(year, month - 1, day + 1, 0, 0, 0))
-
-  const sendMoney = await SendMoney.aggregate([
-    {
-      $match: {
-        area: area,
-        createdAt: { $gte: startOfDay, $lt: endOfDay }
+    // Step 2: หายอดที่เคยส่งในวันนี้จาก collection sendmoney
+    const startOfDay = new Date(Date.UTC(year, month - 1, day, 0, 0, 0))
+    const endOfDay = new Date(Date.UTC(year, month - 1, day + 1, 0, 0, 0))
+    const alreadySentDocs = await SendMoney.aggregate([
+      {
+        $addFields: {
+          thaiDate: {
+            $dateAdd: {
+              startDate: '$createdAt',
+              unit: 'hour',
+              amount: 7
+            }
+          }
+        }
+      },
+      {
+        $match: {
+          area: area,
+          $expr: {
+            $and: [
+              { $eq: [{ $dayOfMonth: '$thaiDate' }, day] },
+              { $eq: [{ $month: '$thaiDate' }, month] },
+              { $eq: [{ $year: '$thaiDate' }, year] }
+            ]
+          }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalSent: { $sum: '$sendmoney' }
+        }
       }
-    },
-    {
-      $group: {
-        _id: null,
-        sendmoney: { $sum: '$sendmoney' }
-      }
-    }
-  ])
+    ])
 
-  const sentAmount = sendMoney.length > 0 ? sendMoney[0].sendmoney : 0
-  const remaining = parseFloat((sendmoneyToday - sentAmount).toFixed(2))
+    const alreadySent =
+      alreadySentDocs.length > 0 ? alreadySentDocs[0].totalSent : 0
 
-  res.status(200).json({
-    message: 'success',
-    sendmoney: remaining,
-    status: remaining === 0 ? 'ส่งเงินครบ' : 'ยังส่งเงินไม่ครบ'
-  })
+    const remaining = parseFloat((totalToSend - alreadySent).toFixed(2))
+
+    res.status(200).json({
+      message: 'success',
+      totalToSend,
+      alreadySent,
+      sendmoney: remaining,
+      status: remaining <= 0 ? 'ส่งเงินครบ' : 'ยังส่งเงินไม่ครบ'
+    })
+  } catch (err) {
+    console.error('[getSendMoney Error]', err)
+    res
+      .status(500)
+      .json({ message: 'Internal Server Error', error: err.message })
+  }
 }
