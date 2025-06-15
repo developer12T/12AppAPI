@@ -2,6 +2,7 @@
 // const { User } = require('../../models/cash/user')
 // const { Product } = require('../../models/cash/product')
 // const { Distribution, Place } = require('../../models/cash/distribution')
+const axios = require('axios')
 const { generateDistributionId } = require('../../utilities/genetateId')
 const { rangeDate } = require('../../utilities/datetime')
 const { period, previousPeriod } = require('../../utilities/datetime')
@@ -589,36 +590,117 @@ exports.updateStockWithdraw = async (req, res) => {
 
 exports.insertWithdrawToErp = async (req, res) => {
 
-  const { area,period } = req.body
+  const { area, period } = req.body
   const channel = req.headers['x-channel'];
   const { Distribution } = getModelsByChannel(channel, res, distributionModel);
-  console.log(  )
   const distributionData = await Distribution.find({ area: area })
 
-  let data = {}
+  let data = []
   for (const item of distributionData) {
-    // const sendDateTram = 
+    const sendDate = new Date(item.sendDate); // สร้าง Date object
+    const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, ''); // "20250222"
+    const MGNUGL = item.listProduct.map(i => i.id);
+    const uniqueCount = new Set(MGNUGL).size;
+
     const dataTran = {
-      Hcase:0,
-      orderNo:item.orderId,
-      statusLow:'22',
-      statusHigh:'22',
-      orderType:item.orderType,
-      tranferDate:'',
-      warehouse:'',
-      towarehouse:'',
-      routeCode:'',
-      addressCode:'',
-      location:'',
-      MGNUGL:'',
-      MGDEPT:'',
-      remark:''
+      Hcase: 0,
+      orderNo: item.orderId,
+      statusLow: '22',
+      statusHigh: '22',
+      orderType: item.orderType,
+      tranferDate: formattedDate,
+      warehouse: item.fromWarehouse,
+      towarehouse: item.toWarehouse,
+      routeCode: item.shippingRoute,
+      addressCode: item.shippingId,
+      location: '',
+      MGNUGL: uniqueCount,
+      MGDEPT: '',
+      remark: '',
+      item: item.listProduct.map(u => {
+        return {
+          itemCode: u.id,
+          itemStatus: '22',
+          MRWHLO: item.fromWarehouse,
+          itemQty: u.qty,
+          itemUnit: u.unit,
+          toLocation: '',
+          itemLot: '',
+          location: '',
+          itemLocation: ''
+        }
+      })
     }
+    data.push(dataTran)
   }
+
+  const response = await axios.post(
+    `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
+     data 
+  );
 
   res.status(200).json({
     status: 200,
     message: 'successfully',
-    distributionData
+    data
+  })
+}
+
+
+exports.insertOneWithdrawToErp = async (req, res) => {
+
+  const { orderId } = req.body
+  const channel = req.headers['x-channel'];
+  const { Distribution } = getModelsByChannel(channel, res, distributionModel);
+  const distributionData = await Distribution.find({ orderId: orderId })
+
+  let data = []
+  for (const item of distributionData) {
+    const sendDate = new Date(item.sendDate); // สร้าง Date object
+    const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, ''); // "20250222"
+    const MGNUGL = item.listProduct.map(i => i.id);
+    const uniqueCount = new Set(MGNUGL).size;
+
+    const dataTran = {
+      Hcase: 0,
+      orderNo: item.orderId,
+      statusLow: '22',
+      statusHigh: '22',
+      orderType: item.orderType,
+      tranferDate: formattedDate,
+      warehouse: item.fromWarehouse,
+      towarehouse: item.toWarehouse,
+      routeCode: item.shippingRoute,
+      addressCode: item.shippingId,
+      location: '',
+      MGNUGL: uniqueCount,
+      MGDEPT: '',
+      remark: '',
+      item: item.listProduct.map(u => {
+        return {
+          itemCode: u.id,
+          itemStatus: '22',
+          MRWHLO: item.fromWarehouse,
+          itemQty: u.qty,
+          itemUnit: u.unit,
+          toLocation: '',
+          itemLot: '',
+          location: '',
+          itemLocation: ''
+        }
+      })
+    }
+    data.push(dataTran)
+  }
+
+  const response = await axios.post(
+    `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
+     data 
+  );
+
+  res.status(200).json({
+    status: 200,
+    message: 'successfully',
+    data
   })
 }
