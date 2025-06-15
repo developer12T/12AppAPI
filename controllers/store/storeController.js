@@ -653,17 +653,24 @@ exports.updateStoreStatus = async (req, res) => {
     String(+n + 1).padStart(n.length, '0')
   )
 
-  await Store.findOneAndUpdate(
-    { storeId: storeId },
-    { $set: { storeId: newId, status: status, updatedDate: Date() } },
-    { new: true }
-  )
-
-  await RunningNumber.findOneAndUpdate(
-    { zone: store.zone },
-    { $set: { last: newId } },
-    { new: true }
-  )
+  if (status === '20') {
+    await RunningNumber.findOneAndUpdate(
+      { zone: store.zone },
+      { $set: { last: newId } },
+      { new: true }
+    )
+    await Store.findOneAndUpdate(
+      { storeId: storeId },
+      { $set: { storeId: newId, status: status, updatedDate: Date() } },
+      { new: true }
+    )
+  } else {
+    await Store.findOneAndUpdate(
+      { storeId: storeId },
+      { $set: { status: status, updatedDate: Date() } },
+      { new: true }
+    )
+  }
 
   res.status(200).json({
     status: 200,
