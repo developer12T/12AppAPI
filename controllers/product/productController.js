@@ -162,7 +162,7 @@ exports.getProduct = async (req, res) => {
       return modifiedProduct
     })
 
-    console.log('stock', stock) 
+    console.log('stock', stock)
 
     const data = products
       .map(product => {
@@ -201,12 +201,14 @@ exports.getFilters = async (req, res) => {
         isEmptyArray(size) &&
         isEmptyArray(flavour))
 
-    if (isEmptyRequest) {
-      const allGroups = await Product.aggregate([
-        { $group: { _id: '$group' } },
-        { $project: { _id: 0, group: '$_id' } }
-      ])
+    // ✅ กรอง group ที่ไม่ใช่ null ตอนดึงทั้งหมด
+    const allGroups = await Product.aggregate([
+      { $match: { group: { $ne: null } } },
+      { $group: { _id: '$group' } },
+      { $project: { _id: 0, group: '$_id' } }
+    ])
 
+    if (isEmptyRequest) {
       return res.status(200).json({
         status: '200',
         message: 'Filters fetched successfully!',
@@ -239,20 +241,22 @@ exports.getFilters = async (req, res) => {
       { $project: { _id: 0, brand: 1, size: 1, flavour: 1 } }
     ])
 
-    const allGroups = await Product.aggregate([
-      { $group: { _id: '$group' } },
-      { $project: { _id: 0, group: '$_id' } }
-    ])
+    // ✅ กรอง null ออกจากผลลัพธ์สุดท้ายด้วย
+    const clean = arr => (arr || []).filter(item => item !== null)
 
     res.status(200).json({
       status: '200',
       message: 'Filters fetched successfully!',
       data: {
-        group: allGroups.map(g => g.group),
-        brand: attributes.length ? attributes[0].brand : ['เลือกกลุ่มสินค้า'],
-        size: attributes.length ? attributes[0].size : ['เลือกกลุ่มสินค้า'],
+        group: clean(allGroups.map(g => g.group)),
+        brand: attributes.length
+          ? clean(attributes[0].brand)
+          : ['เลือกกลุ่มสินค้า'],
+        size: attributes.length
+          ? clean(attributes[0].size)
+          : ['เลือกกลุ่มสินค้า'],
         flavour: attributes.length
-          ? attributes[0].flavour
+          ? clean(attributes[0].flavour)
           : ['เลือกกลุ่มสินค้า']
       }
     })
