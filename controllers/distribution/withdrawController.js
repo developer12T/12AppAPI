@@ -246,6 +246,7 @@ exports.checkout = async (req, res) => {
       period: period,
       warehouse: newOrder.fromWarehouse,
       status: 'pending',
+      statusTH:'รอนำเข้า',
       action: "Withdraw",
       type: "Withdraw",
       product: productQty

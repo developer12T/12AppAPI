@@ -114,6 +114,7 @@ const distributionSchema = mongoose.Schema({
     receivetotalWeightGross: { type: Number, require: true, default: 0 },
     receivetotalWeightNet: { type: Number, require: true, default: 0 },
     status: { type: String, require: true, enum: ['pending', 'completed', 'canceled', 'rejected'], default: 'pending' },
+    statusTH: { type: String, require: true, enum: ['รอนำเข้า', 'สำเร็จ', 'ยกเลิก', 'ถูกปฏิเสธ'], default: 'รอนำเข้า' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
     period:{ type: String, require: true },

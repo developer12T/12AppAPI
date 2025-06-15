@@ -117,6 +117,7 @@ const orderSchema = new mongoose.Schema({
     latitude: { type: String, require: true },
     longitude: { type: String, require: true },
     status: { type: String, require: true, enum: ['pending', 'completed', 'canceled', 'rejected'], default: 'pending' },
+    statusTH: { type: String, require: true, enum: ['รอนำเข้า', 'สำเร็จ', 'ยกเลิก', 'ถูกปฏิเสธ'], default: 'รอนำเข้า' },
     listProduct: [listOrderProductSchema],
     listPromotions: [listOrderPromotionSchema],
     listQuota: [listQuotaSchema],

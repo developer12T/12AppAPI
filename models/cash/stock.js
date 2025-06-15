@@ -80,6 +80,7 @@ const stockMovementSchema = new mongoose.Schema({
   period: { type: String, required: true },
   warehouse: { type: String, required: true },
   status: { type: String, required: true },
+  statusTH: { type: String, required: true },
   action: { type: String, required: true },
   product: { type: [listProductMovementSchema], default: [] },
   createdAt: { type: Date, default: Date.now },
@@ -94,6 +95,7 @@ const stockMovementLogSchema = new mongoose.Schema({
   period: { type: String, required: true },
   warehouse: { type: String, required: true },
   status: { type: String, required: true },
+  statusTH: { type: String, required: true },
   action: { type: String, required: true },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }

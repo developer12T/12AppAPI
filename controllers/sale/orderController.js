@@ -5,7 +5,7 @@
 // const { Route } = require('../../models/cash/route')
 const { period, previousPeriod } = require('../../utilities/datetime')
 
-const { Warehouse, Locate, Balance, Sale } = require('../../models/cash/master')
+const { Warehouse, Locate, Balance, Sale, DisributionM3 } = require('../../models/cash/master')
 const { generateOrderId } = require('../../utilities/genetateId')
 const {
   summaryOrder,
@@ -20,12 +20,14 @@ const multer = require('multer')
 const upload = multer({ storage: multer.memoryStorage() }).single('image')
 const _ = require('lodash')
 const { DateTime } = require('luxon')
-// const { getSocket } = require('../../socket')
+const { getSocket } = require('../../socket')
 const {
   applyPromotion,
   applyPromotionUsage
 } = require('../promotion/calculate')
 const stockModel = require('../../models/cash/stock')
+const disributionModel = require('../../models/cash/distribution')
+
 const orderModel = require('../../models/cash/sale')
 const cartModel = require('../../models/cash/cart')
 const userModel = require('../../models/cash/user')
@@ -149,6 +151,7 @@ exports.checkout = async (req, res) => {
       orderId,
       type,
       status: 'pending',
+      statusTH:'รอนำเข้า',
       sale: {
         saleCode: sale.saleCode,
         salePayer: sale.salePayer,
@@ -321,18 +324,12 @@ exports.checkout = async (req, res) => {
       period: period,
       warehouse: newOrder.sale.warehouse,
       status: 'pending',
+      statusTH:'รอนำเข้า',
       action: 'Sale',
       type: 'Sale',
       product: [...productQty]
     }
 
-
-
-
-
-
-
-    console.log(calStock)
 
     const createdMovement = await StockMovement.create({
       ...calStock
@@ -1845,68 +1842,143 @@ exports.getSummarybyGroup = async (req, res) => {
   }
 }
 
-exports.erpApiCheck = async (req, res) => {
+exports.erpApiCheckOrder = async (req, res) => {
   try {
-    // const { data } = req.body
-    const channel = req.headers['x-channel']
-    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const channel = 'cash';
+    const { Order } = getModelsByChannel(channel, res, orderModel);
+
+    // 1. ดึง OAORNO ทั้งหมดจาก Sale
     const modelSale = await Sale.findAll({
       attributes: [
         'OAORNO',
         [sequelize.fn('COUNT', sequelize.col('OAORNO')), 'count']
       ],
       group: ['OAORNO']
-    })
-    const saleId = modelSale.map(row => row.get('OAORNO'))
-    notInmodelOrder = await Order.find({
-      orderId: { $nin: saleId }
-    }).select("orderId")
-    const data = await Order.updateMany(
-      { orderId: { $in: saleId } },
-      {
-        $set: {
-          status: 'success',
-        }
-      }
-    )
-    // console.log(data.modifiedCount)
+    });
 
-    if (data.modifiedCount == 0) {
-      return res.status(404).json({
-        status: 404,
-        message: 'No new orders found in the M3 system'
-      })
+    const saleId = modelSale.map(row => row.get('OAORNO'));
+
+    // 2. หาว่ามี order ไหนไม่อยู่ใน sale (optional ใช้ต่อได้ถ้าต้อง log/เก็บ)
+    const notInModelOrder = await Order.find({
+      orderId: { $nin: saleId }
+    }).select('orderId');
+
+    // 3. อัปเดตสถานะ success ให้ order ที่อยู่ใน saleId
+    const updateResult = await Order.updateMany(
+      { orderId: { $in: saleId } },
+      { $set: { status: 'success' } }
+    );
+
+    if (updateResult.modifiedCount === 0) {
+      return console.log('No new orders found in the M3 system')
+
     }
 
-    // const io = getSocket()
-    // const events = [
-    //   'sale_getSummarybyArea',
-    //   'sale_getSummarybyMonth',
-    //   'sale_getSummarybyRoute',
-    //   'sale_getSummaryItem',
-    //   'sale_getSummarybyGroup',
-    //   'sale_getRouteCheckinAll',
-    //   'sale_getTimelineCheckin',
-    //   'sale_routeTimeline'
-    // ]
+    console.log('✅ Updated orderIds:', saleId);
 
-    // events.forEach(event => {
-    //   io.emit(event, {
-    //     status: 200,
-    //     message: 'New Update Data',
-    //     data: data
-    //   })
-    // })
+    // 4. Broadcast ไปยังทุก event ที่ต้องการ
+    const io = getSocket();
+    const events = [
+      'sale_getSummarybyArea',
+      'sale_getSummarybyMonth',
+      'sale_getSummarybyRoute',
+      'sale_getSummaryItem',
+      'sale_getSummarybyGroup',
+      'sale_getRouteCheckinAll',
+      'sale_getTimelineCheckin',
+      'sale_routeTimeline'
+    ];
 
+    events.forEach(event => {
+      io.emit(event, {
+        status: 200,
+        message: 'New Update Data',
+        updatedCount: updateResult.modifiedCount
+      });
+    });
+
+    // 5. ตอบกลับสำเร็จ
     res.status(200).json({
       status: 200,
-      message: 'Update status Sucess'
-    })
+      message: 'Update status success',
+      updatedCount: updateResult.modifiedCount
+    });
+
   } catch (error) {
-    console.error(error)
-    res.status(500).json({ message: 'Internal server error.' })
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error.' });
   }
-}
+};
+
+exports.erpApiCheckDisributionM3 = async (req, res) => {
+  try {
+    const channel = 'cash';
+    const { Order } = getModelsByChannel(channel, res, orderModel);
+    const { Disribution } = getModelsByChannel(channel, res, disributionModel);
+
+    // 1. ดึง orderId จาก DisributionM3
+    const modelSale = await DisributionM3.findAll({
+      attributes: [
+        'MGTRNR',
+        [sequelize.fn('COUNT', sequelize.col('MGTRNR')), 'count']
+      ],
+      group: ['MGTRNR']
+    });
+
+    const orderIdList = modelSale.map(row => row.get('MGTRNR'));
+
+    // 2. อัปเดต status: 'success' สำหรับ orderId ที่เจอ
+    const updateResult = await Order.updateMany(
+      { orderId: { $in: orderIdList } },
+      { $set: { status: 'success' } }
+    );
+
+    // 3. ถ้าไม่มีอะไรอัปเดตเลย → return
+    if (updateResult.modifiedCount === 0) {
+      return console.log('No new order Distribution found in the M3 system')
+
+    }
+
+    console.log('✅ Updated Distribution Order IDs:', orderIdList);
+
+    // 4. Broadcast ให้ client อัปเดต
+    const io = getSocket();
+    const events = [
+      'sale_getSummarybyArea',
+      'sale_getSummarybyMonth',
+      'sale_getSummarybyRoute',
+      'sale_getSummaryItem',
+      'sale_getSummarybyGroup',
+      'sale_getRouteCheckinAll',
+      'sale_getTimelineCheckin',
+      'sale_routeTimeline'
+    ];
+
+    events.forEach(event => {
+      io.emit(event, {
+        status: 200,
+        message: 'New Update Data',
+        updatedCount: updateResult.modifiedCount
+      });
+    });
+
+    // 5. ตอบกลับ
+    res.status(200).json({
+      status: 200,
+      message: 'Update status success',
+      updatedCount: updateResult.modifiedCount
+    });
+  } catch (error) {
+    console.error('❌ Error in erpApiCheckDisributionM3:', error);
+    res.status(500).json({ status: 500, message: 'Internal server error' });
+  }
+};
+
+
+
+
+
+
 
 exports.getSummarybyChoice = async (req, res) => {
   const { storeId, area, date, type } = req.body

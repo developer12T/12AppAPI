@@ -3,11 +3,12 @@ const bodyParser = require('body-parser')
 const morgan = require('morgan')
 const cors = require('cors')
 const routeIndex = require('./routes/index')
-// const startCronJob = require('./controllers/sale/conJob')
+const startCronJob = require('./controllers/sale/conJob')
 const app = express()
-// const { startCronJobErpApiCheck } = require('../12AppAPI/controllers/sale/conJob');
+const { startCronJobErpApiCheck,startCronJobErpApiCheckDisribution } = require('../12AppAPI/controllers/sale/conJob');
 
-// startCronJobErpApiCheck()
+startCronJobErpApiCheck()
+startCronJobErpApiCheckDisribution()
 // startCronJobOrderToExcel()
 
 app.use(bodyParser.json({ limit: '50mb' }))

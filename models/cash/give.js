@@ -11,7 +11,7 @@ const giveawaysProduct = new mongoose.Schema({
     productQty: { type: Number, default: 0 },
     productAmount: { type: Number, default: 0 },
     limitType: { type: String, enum: ['limited', 'unlimited'], default: 'limited' },
-    lot : [{ type: String }],
+    lot: [{ type: String }],
 
 })
 
@@ -98,6 +98,7 @@ const giveawaysSchema = new mongoose.Schema({
     latitude: { type: String, require: true },
     longitude: { type: String, require: true },
     status: { type: String, require: true, enum: ['pending', 'completed', 'canceled', 'rejected'], default: 'pending' },
+    statusTH: { type: String, require: true, enum: ['รอนำเข้า', 'สำเร็จ', 'ยกเลิก', 'ถูกปฏิเสธ'], default: 'รอนำเข้า' },
     listProduct: [listGiveProductSchema],
     totalVat: { type: Number, default: 0 },
     totalExVat: { type: Number, default: 0 },
@@ -106,7 +107,7 @@ const giveawaysSchema = new mongoose.Schema({
     createdBy: { type: String, require: true },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
-    period:{ type: String, require: true },
+    period: { type: String, require: true },
 })
 
 // const Giveaway = dbCA.model('Giveaway', giveawaysSchema)
@@ -115,7 +116,7 @@ const giveawaysSchema = new mongoose.Schema({
 
 module.exports = (conn) => {
     return {
-      Giveaway: conn.model('Giveaway', giveawaysSchema),
-      Givetype: conn.model('Givetype', giveTypeSchema),
+        Giveaway: conn.model('Giveaway', giveawaysSchema),
+        Givetype: conn.model('Givetype', giveTypeSchema),
     };
-  };
+};

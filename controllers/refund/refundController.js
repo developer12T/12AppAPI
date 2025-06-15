@@ -89,6 +89,7 @@ exports.checkout = async (req, res) => {
             latitude,
             longitude,
             status: 'pending',
+            statusTH:'รอนำเข้า',
             listProduct: summary.listRefund,
             total: summary.totalRefund,
             totalExVat: parseFloat((summary.totalRefund / 1.07).toFixed(2)),
@@ -125,6 +126,7 @@ exports.checkout = async (req, res) => {
             latitude,
             longitude,
             status: 'pending',
+            statusTH:'รอนำเข้า',
             listProduct: summary.listProduct,
             subtotal: summary.totalChange,
             total: summary.totalChange,
@@ -171,6 +173,7 @@ exports.checkout = async (req, res) => {
             period: period,
             warehouse: refundOrder.sale.warehouse,
             status: 'pending',
+            statusTH:'รอนำเข้า',
             action: "Refund",
             type: "Refund",
             product: qtyproduct
@@ -184,6 +187,7 @@ exports.checkout = async (req, res) => {
             period: period,
             warehouse: refundOrder.sale.warehouse,
             status: 'pending',
+            statusTH:'รอนำเข้า',
             action: "Change",
             type: "Change",
             product: qtyproductchange

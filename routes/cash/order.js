@@ -1,7 +1,7 @@
 const express = require('express')
 const { getOrder, getDetail, updateStatus, checkout, addSlip, OrderToExcel, getAllOrder, getSummaryItem, getSummarybyRoute, 
     getSummarybyMonth, getSummarybyArea,getSummarybyGroup,erpApiCheck,getSummarybyChoice,getSaleSummaryByStore,getGroup,
-    getSummaryProduct, getProductLimit
+    getSummaryProduct, getProductLimit, erpApiCheckOrder, erpApiCheckDisributionM3
 
  } = require('../../controllers/sale/orderController')
 
@@ -21,7 +21,9 @@ router.get('/getSummarybyRoute', getSummarybyRoute)
 router.get('/getSummarybyMonth', getSummarybyMonth)
 router.get('/getSummarybyArea', getSummarybyArea)
 router.post('/getSummarybyGroup', getSummarybyGroup)
-router.get('/erpApiCheck', erpApiCheck)
+router.get('/erpApiCheck', erpApiCheckOrder)
+router.get('/erpApiCheckDisributionM3', erpApiCheckDisributionM3)
+
 router.post('/getSummarybyChoice', getSummarybyChoice)
 router.post('/getSaleSummaryByStore', getSaleSummaryByStore)
 router.get('/getGroup', getGroup)

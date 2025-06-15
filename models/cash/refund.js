@@ -34,8 +34,8 @@ const listRefundProductSchema = new mongoose.Schema({
     price: { type: Number, require: true },
     total: { type: Number, require: true },
     condition: { type: String, require: true },
-    expireDate: { type: String, require: true, default: ''},
-    lot: { type: String, require: true, default: ''}
+    expireDate: { type: String, require: true, default: '' },
+    lot: { type: String, require: true, default: '' }
 })
 
 const refundImageSchema = mongoose.Schema({
@@ -53,6 +53,7 @@ const refundSchema = new mongoose.Schema({
     latitude: { type: String, require: true },
     longitude: { type: String, require: true },
     status: { type: String, require: true, enum: ['pending', 'completed', 'canceled', 'rejected'], default: 'pending' },
+    statusTH: { type: String, require: true, enum: ['รอนำเข้า', 'สำเร็จ', 'ยกเลิก', 'ถูกปฏิเสธ'], default: 'รอนำเข้า' },
     listProduct: [listRefundProductSchema],
     vat: { type: Number, default: 0 },
     totalExVat: { type: Number, default: 0 },
@@ -62,7 +63,7 @@ const refundSchema = new mongoose.Schema({
     createdBy: { type: String, require: true },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
-    period:{ type: String, require: true }
+    period: { type: String, require: true }
 })
 
 // const Refund = dbCA.model('Refund', refundSchema)
@@ -71,6 +72,6 @@ const refundSchema = new mongoose.Schema({
 
 module.exports = (conn) => {
     return {
-      Refund: conn.model('Refund', refundSchema),
+        Refund: conn.model('Refund', refundSchema),
     };
-  };
+};

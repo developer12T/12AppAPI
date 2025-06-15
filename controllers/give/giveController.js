@@ -232,6 +232,7 @@ exports.checkout = async (req, res) => {
             latitude,
             longitude,
             status: 'pending',
+            statusTH:'รอนำเข้า',
             listProduct: summary.listProduct,
             totalVat: summary.totalVat,
             totalExVat: summary.totalExVat,
@@ -262,6 +263,7 @@ exports.checkout = async (req, res) => {
             period: period,
             warehouse: newOrder.sale.warehouse,
             status: 'pending',
+            statusTH:'รอนำเข้า',
             action: "Give",
             type: "Give",
             product: newOrder.listProduct.map(u => {

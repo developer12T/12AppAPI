@@ -1,39 +1,40 @@
-// const { Server } = require('socket.io');
+const { Server } = require('socket.io');
 
-// let io;
+let io;
 
-// function initSocket(server) {
-//   io = new Server(server, {
-//     cors: {
-//       origin: '*',
-//       methods: ['GET', 'POST']
-//     }
-//   });
+function initSocket(server) {
+  const io = new Server(server, {
+    cors: {
+      origin: "*"
+    }
+  });
 
-//   io.on('connection', socket => {
-//     console.log('✅ A user connected:', socket.id);
+  io.on("connection", (socket) => {
+    console.log("🟢 Client connected:", socket.id);
 
-//     socket.on('request_sale_summary', data => {
-//       console.log('Sale request received:', data)
-//       io.emit('sale_getSummarybyArea', {
-//         message: 'Sale processed',
-//         saleCode: data.saleCode
-//       });
-//     });
+    socket.on("request_sale", (payload) => {
+      console.log("📨 รับคำขอจาก client:", payload);
 
-//     socket.on('disconnect', () => {
-//       console.log('❌ User disconnected:', socket.id);
-//     });
-//   });
+      // ตอบกลับไปยัง client
+      socket.emit("sale_response", {
+        message: "ข้อมูลของ sale",
+        saleCode: payload.saleCode
+      });
+    });
 
-//   return io;
-// }
+    socket.on("disconnect", () => {
+      console.log("🔴 Client disconnected:", socket.id);
+    });
+  });
 
-// function getSocket() {
-//   if (!io) {
-//     throw new Error('Socket.io not initialized!');
-//   }
-//   return io;
-// }
+  return io;
+}
 
-// module.exports = { initSocket, getSocket };
+function getSocket() {
+  if (!io) {
+    throw new Error('Socket.io not initialized!');
+  }
+  return io;
+}
+
+module.exports = { initSocket, getSocket };

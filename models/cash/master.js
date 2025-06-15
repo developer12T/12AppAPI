@@ -163,6 +163,35 @@ const Locate = sequelize.define(
     }
   )
 
+  const DisributionM3 = sequelize.define(
+    'MGHEAD',
+    {
+      coNo: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        primaryKey: true,
+        field: 'MGTRNR'
+      },
+      // warehouse: {
+      //   type: DataTypes.INTEGER,
+      //   allowNull: false,
+      //   primaryKey: true,
+      //   field: 'MWWHLO'
+      // },
+      // warehouseName: {
+      //   type: DataTypes.STRING,
+      //   allowNull: false,
+      //   field: 'MWWHNM'
+      // }
+    },
+    {
+      freezeTableName: true,
+      timestamps: false,
+      createdAt: false,
+      updatedAt: false,
+      primaryKey: false
+    }
+  )
 
 
 
@@ -184,7 +213,8 @@ const Locate = sequelize.define(
     Warehouse,
     Locate,
     Balance,
-    Sale
+    Sale,
+    DisributionM3
     // Policy,
     // OOTYPE,
     // MGTYPE,
