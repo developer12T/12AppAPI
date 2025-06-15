@@ -164,98 +164,165 @@ exports.addSendMoneyImage = async (req, res) => {
 }
 
 exports.getSendMoney = async (req, res) => {
-  try {
-    const channel = req.headers['x-channel']
-    const { area } = req.body
+  const channel = req.headers['x-channel']
+  const { area } = req.body
+  const { Route } = getModelsByChannel(channel, res, routeModel)
+  const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+  const now = new Date()
+  const period = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(
+    2,
+    '0'
+  )}${String(now.getDate()).padStart(2, '0')}`
+  const year = Number(period.slice(0, 4))
+  const month = Number(period.slice(4, 6))
+  const day = Number(period.slice(6, 8))
 
-    const { Route } = getModelsByChannel(channel, res, routeModel)
-    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+  // เวลาเริ่มและจบของวันที่ต้องการในเขตเวลาไทย (UTC+7)
+  const startDate = new Date(Date.UTC(year, month, day - 1, 17, 0, 0)) // 00:00 +07
+  const endDate = new Date(Date.UTC(year, month, day, 17, 0, 0)) // 00:00 +07 ของวันถัดไป
 
-    const now = new Date()
-    const year = now.getFullYear()
-    const month = now.getMonth() // 0-indexed
-    const day = now.getDate()
-
-    // เวลาเริ่มและจบของวันที่ต้องการในเขตเวลาไทย (UTC+7)
-    const startDate = new Date(Date.UTC(year, month, day - 1, 17, 0, 0)) // 00:00 +07
-    const endDate = new Date(Date.UTC(year, month, day, 17, 0, 0)) // 00:00 +07 ของวันถัดไป
-
-    // คำสั่งซื้อที่ยังไม่ส่งเงิน
-    const routeData = await Route.aggregate([
-      { $match: { area } },
-      { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
-      {
-        $unwind: {
-          path: '$listStore.listOrder',
-          preserveNullAndEmptyArrays: true
-        }
-      },
-      { $match: { 'listStore.listOrder': { $ne: null } } },
-      {
-        $lookup: {
-          from: 'orders',
-          localField: 'listStore.listOrder.orderId',
-          foreignField: 'orderId',
-          as: 'order'
-        }
-      },
-      { $unwind: '$order' },
-      {
-        $match: {
-          'order.status': 'pending',
-          'order.createdAt': { $gte: startDate, $lt: endDate }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          sendmoney: { $sum: '$order.total' }
-        }
-      },
-      {
-        $project: {
-          _id: 0,
-          sendmoney: 1,
-          status: 'ยังไม่ได้ส่งเงิน'
+  const routeData = await Route.aggregate([
+    { $match: { area: area } },
+    { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
+    {
+      $unwind: {
+        path: '$listStore.listOrder',
+        preserveNullAndEmptyArrays: true
+      }
+    },
+    {
+      $match: {
+        'listStore.listOrder': { $ne: null }
+      }
+    },
+    {
+      $addFields: {
+        thaiDate: {
+          $dateAdd: {
+            startDate: '$listStore.listOrder.date',
+            unit: 'hour',
+            amount: 7
+          }
         }
       }
-    ])
-
-    const data =
-      routeData.length > 0
-        ? routeData[0]
-        : { sendmoney: 0, status: 'ยังไม่ได้ส่งเงิน' }
-
-    // เช็คยอดที่ส่งเงินไปแล้วในวันเดียวกัน
-    const sendMoney = await SendMoney.aggregate([
-      {
-        $match: {
-          area,
-          createdAt: { $gte: startDate, $lt: endDate }
-        }
-      },
-      {
-        $group: {
-          _id: '$area',
-          sendmoney: { $sum: '$sendmoney' }
+    },
+    {
+      $match: {
+        $expr: {
+          $and: [
+            { $eq: [{ $year: '$thaiDate' }, year] },
+            { $eq: [{ $month: '$thaiDate' }, month] }
+          ]
         }
       }
-    ])
+    },
+    {
+      $project: {
+        _id: 0,
+        'listStore.listOrder': 1
+      }
+    },
+    {
+      $lookup: {
+        from: 'orders',
+        localField: 'listStore.listOrder.orderId',
+        foreignField: 'orderId',
+        as: 'order'
+      }
+    },
+    {
+      $unwind: {
+        path: '$order',
+        preserveNullAndEmptyArrays: false
+      }
+    },
+    {
+      $match: {
+        'order.status': 'pending'
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        sendmoney: { $sum: '$order.total' }
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        sendmoney: 1,
+        status: 'ยังไม่ได้ส่งเงิน'
+      }
+    }
+  ])
 
-    const checksendMoney = sendMoney.length > 0 ? sendMoney[0].sendmoney : 0
+  let data = {}
 
-    const calSendMoney = data.sendmoney - checksendMoney
-    const status = calSendMoney <= 0 ? 'ส่งเงินครบ' : 'ยังส่งเงินไม่ครบ'
-
-    res.status(200).json({
-      message: 'success',
-      sendmoney: calSendMoney,
-      status
-    })
-  } catch (err) {
-    console.error('[getSendMoney Error]', err)
-    res
-      .status(500)
-      .json({ message: 'Internal Server Error', error: err.message })
+  if (routeData.length == 0) {
+    data = {
+      sendmoney: 0,
+      status: 'ยังไม่ได้ส่งเงิน'
+    }
+  } else {
+    data = routeData[0]
   }
+
+  const sendMoney = await SendMoney.aggregate([
+    {
+      $match: {
+        area: area
+      }
+    },
+    {
+      $addFields: {
+        thaiDate: {
+          $dateAdd: {
+            startDate: '$createdAt',
+            unit: 'hour',
+            amount: 7
+          }
+        }
+      }
+    },
+    {
+      $match: {
+        'sendmoney.createdAt': { $gte: startDate, $lt: endDate }
+        // $expr: {
+        //   $and: [
+
+        //     // { $eq: [{ $year: '$thaiDate' }, year] },
+        //     // { $eq: [{ $month: '$thaiDate' }, month] },
+        //     // { $eq: [{ $dayOfMonth: '$thaiDate' }, day] }
+        //   ]
+        // }
+      }
+    },
+    {
+      $group: {
+        _id: '$area',
+        sendmoney: { $sum: '$sendmoney' }
+      }
+    }
+  ])
+
+  let checksendMoney = 0
+
+  if (sendMoney.length > 0) {
+    checksendMoney = sendMoney[0].sendmoney
+  }
+
+  let status = ''
+
+  const calSendMoney = data.sendmoney - checksendMoney
+  if (calSendMoney == 0) {
+    status = 'ส่งเงินครบ'
+  } else {
+    status = 'ยังส่งเงินไม่ครบ'
+  }
+  res.status(200).json({
+    // status:200,
+    message: 'success',
+    sendmoney: calSendMoney,
+    status: status
+  })
 }
