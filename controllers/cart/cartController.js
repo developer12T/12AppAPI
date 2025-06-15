@@ -75,7 +75,6 @@ exports.getCart = async (req, res) => {
       // }
 
       // console.log(JSON.stringify(summary.listQuota, null, 2));
-
     }
 
     if (type === 'withdraw') {
@@ -90,8 +89,6 @@ exports.getCart = async (req, res) => {
       summary = await summaryGive(cart, channel, res)
     }
 
-
-
     res.status(200).json({
       status: '200',
       message: 'success',
@@ -105,14 +102,21 @@ exports.getCart = async (req, res) => {
 
 exports.addProduct = async (req, res) => {
   try {
-    const { type, area, storeId, id, qty, unit, condition, expire, 
-      // lot 
-    } =
-      req.body
+    const {
+      type,
+      area,
+      storeId,
+      id,
+      qty,
+      unit,
+      condition,
+      expire
+      // lot
+    } = req.body
 
     const channel = req.headers['x-channel']
     const { Product } = getModelsByChannel(channel, res, productModel)
-    const { Stock } = getModelsByChannel(channel, res, stockModel);
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
 
     if (!type || !area || !id || !qty || !unit) {
       return res.status(400).json({
@@ -194,7 +198,7 @@ exports.addProduct = async (req, res) => {
         }
       } else {
         const existingProduct = cart.listProduct.find(
-          p => p.id === id && p.unit === unit 
+          p => p.id === id && p.unit === unit
           // && p.lot === lot
         )
         if (
@@ -210,8 +214,7 @@ exports.addProduct = async (req, res) => {
             name: product.name,
             qty,
             unit,
-            price,
-            
+            price
           })
         }
       }
@@ -228,7 +231,7 @@ exports.addProduct = async (req, res) => {
     } else {
       // console.log(cart.listProduct)
       const existingProduct = cart.listProduct.find(
-        p => p.id === id && p.unit === unit 
+        p => p.id === id && p.unit === unit
         // && p.lot === lot
       )
       // console.log(JSON.stringify(existingProduct, null, 2));
@@ -256,8 +259,6 @@ exports.addProduct = async (req, res) => {
     cart.createdAt = new Date()
     // const period = "202506"
     await cart.save()
-
-
 
     //// ยังไม่ใช้จริง กำลัง Test
 
@@ -370,12 +371,6 @@ exports.addProduct = async (req, res) => {
     //     }
     //   }
     // }
-
-
-
-
-
-
 
     res.status(200).json({
       status: 200,
@@ -666,130 +661,90 @@ exports.updateCartPromotion = async (req, res) => {
 exports.updateStock = async (req, res) => {
   try {
     const { area, productId, period, unit, type } = req.body
+    let { qty } = req.body
     const channel = req.headers['x-channel']
 
     const { Stock } = getModelsByChannel(channel, res, stockModel)
-
-    let { qty } = req.body
-
-    const modelStock = await Stock.findOne({
-      area: area,
-      period: period
-    }).select('area listProduct')
-
-    if (!modelStock) {
-      return res.status(404).json({
-        status: 404,
-        errorMessage: 'Not Found This Area'
-      })
-    }
-
-    console.log('modelStock', modelStock)
-
-    const stockData = modelStock.listProduct.find(
-      product => product.productId === productId
-    )
-
-    console.log('stockData', stockData)
-
-    if (!stockData) {
-      return res.status(404).json({
-        status: 404,
-        errorMessage: 'Not Found This productId'
-      })
-    }
-
     const { Product } = getModelsByChannel(channel, res, productModel)
 
-    const modelProduct = await Product.findOne({
-      id: productId
-    }).select('id listUnit')
+    const stockDoc = await Stock.findOne({
+      area: area,
+      period: period
+    })
 
+    if (!stockDoc) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Stock document not found for this area and period'
+      })
+    }
+
+    const productStock = stockDoc.listProduct.find(
+      p => p.productId === productId
+    )
+
+    if (!productStock) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Product not found in stock'
+      })
+    }
+
+    const modelProduct = await Product.findOne({ id: productId })
+
+    if (!modelProduct) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Product not found'
+      })
+    }
+
+    // Convert to PCS if needed
     if (unit !== 'PCS') {
-      const qtyPCS = modelProduct.listUnit.find(item => item.unit === unit)
-      qty = parseInt(qtyPCS.factor) * qty
+      const unitData = modelProduct.listUnit.find(u => u.unit === unit)
+      if (!unitData) {
+        return res.status(400).json({
+          status: 400,
+          message: 'Invalid unit for this product'
+        })
+      }
+      qty = parseInt(unitData.factor) * qty
     }
 
-    const productCtn = modelProduct.listUnit.find(item => item.unit === 'CTN')
-    const productCtnFactor = productCtn ? { factor: productCtn.factor } : null
-
+    // Update based on IN or OUT
     if (type === 'IN') {
-      let remainingQty = qty // remaining quantity to distribute into lots
-
-      const available = stockData.available.map(lot => {
-        let addedQty = 0
-
-        if (remainingQty > 0) {
-          addedQty = Math.min(remainingQty, lot.qtyPcs) // optionally spread into existing lots
-          remainingQty -= addedQty
-        }
-
-        return {
-          location: lot.location,
-          lot: lot.lot,
-          qtyPcs: lot.qtyPcs + addedQty,
-          qtyCtn: Math.floor((lot.qtyPcs + addedQty) / productCtnFactor.factor)
-        }
-      })
-      const data = {
-        productId: stockData.productId,
-        sumQtyPcs: available.reduce((sum, item) => sum + item.qtyPcs, 0),
-        sumQtyCtn: available.reduce((sum, item) => sum + item.qtyCtn, 0),
-        available
-      }
-
-      await Stock.findOneAndUpdate(
-        { area: area, 'listProduct.productId': data.productId },
-        {
-          $set: {
-            'listProduct.$.sumQtyPcs': data.sumQtyPcs,
-            'listProduct.$.sumQtyCtn': data.sumQtyCtn,
-            'listProduct.$.available': data.available
-          }
-        },
-        { new: true }
-      )
-      // console.log('Response', data)
-
-      res.status(200).json({ status: 200, data })
+      productStock.stockInPcs += qty
+      productStock.balancePcs += qty
     } else if (type === 'OUT') {
-      let remainingQty = qty
-
-      const available = stockData.available.map(lot => {
-        const usedQty = Math.min(remainingQty, lot.qtyPcs)
-        remainingQty -= usedQty
-
-        return {
-          location: lot.location,
-          lot: lot.lot,
-          qtyPcs: lot.qtyPcs - usedQty,
-          qtyCtn: Math.floor((lot.qtyPcs - usedQty) / productCtnFactor.factor)
-        }
+      productStock.stockOutPcs += qty
+      productStock.balancePcs -= qty
+    } else {
+      return res.status(400).json({
+        status: 400,
+        message: 'Invalid type. Must be IN or OUT'
       })
-
-      const data = {
-        productId: stockData.productId,
-        sumQtyPcs: available.reduce((sum, item) => sum + item.qtyPcs, 0),
-        sumQtyCtn: available.reduce((sum, item) => sum + item.qtyCtn, 0),
-        available
-      }
-
-      await Stock.findOneAndUpdate(
-        { area: area, 'listProduct.productId': data.productId },
-        {
-          $set: {
-            'listProduct.$.sumQtyPcs': data.sumQtyPcs,
-            'listProduct.$.sumQtyCtn': data.sumQtyCtn,
-            'listProduct.$.available': data.available
-          }
-        },
-        { new: true }
-      )
-      // console.log('Response', data)
-      res.status(200).json({ status: 200, data })
     }
+
+    // Calculate CTN values from PCS using factor
+    const ctnUnit = modelProduct.listUnit.find(u => u.unit === 'CTN')
+    const factor = ctnUnit ? parseInt(ctnUnit.factor) : null
+
+    if (factor) {
+      productStock.stockInCtn = Math.floor(productStock.stockInPcs / factor)
+      productStock.stockOutCtn = Math.floor(productStock.stockOutPcs / factor)
+      productStock.balanceCtn = Math.floor(productStock.balancePcs / factor)
+    }
+
+    // Save updated document
+    await stockDoc.save()
+
+    res.status(200).json({
+      status: 200,
+      message: 'Stock updated successfully',
+      data: productStock
+    })
   } catch (error) {
-    console.error(error)
-    res.status(500).json({ status: '500', message: error.message })
+    console.error('[updateStock Error]', error)
+    res.status(500).json({ status: 500, message: error.message })
   }
 }
