@@ -623,7 +623,7 @@ exports.checkInStore = async (req, res) => {
 }
 
 exports.updateStoreStatus = async (req, res) => {
-  const { storeId } = req.body
+  const { storeId, status } = req.body
   const channel = req.headers['x-channel']
   const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
   const store = await Store.findOne({ storeId: storeId })
@@ -655,7 +655,7 @@ exports.updateStoreStatus = async (req, res) => {
 
   await Store.findOneAndUpdate(
     { storeId: storeId },
-    { $set: { storeId: newId, status: '20', updatedDate: Date() } },
+    { $set: { storeId: newId, status: status, updatedDate: Date() } },
     { new: true }
   )
 
