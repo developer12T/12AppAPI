@@ -13,7 +13,8 @@ const {
   availableStock,
   getStock,
   addStockFromERP,
-  getStockQty
+  getStockQty,
+  getWeightProduct
 } = require('../../controllers/stock/stockController')
 
 const router = express.Router()
@@ -32,7 +33,7 @@ router.post('/addNew', addStockNew)
 router.post('/availableStock', availableStock)
 router.post('/addStockFromERP', addStockFromERP)
 router.post('/getStockQty', getStockQty)
-
+router.post('/getWeightProduct', getWeightProduct)
 // router.post('/stocktoexcel', stockToExcel)
 // router.get('/movement', available)
 

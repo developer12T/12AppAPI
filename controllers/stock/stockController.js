@@ -848,7 +848,7 @@ exports.getStockQty = async (req, res) => {
   const dataStock = await Stock.find({ area: area, period: period }).select('listProduct -_id')
   const dataStockTran = dataStock[0]
   const productId = dataStockTran.listProduct.flatMap(item => item.productId)
-  const dataProduct = await Product.find({id:{$in:productId}}).select('id name listUnit')
+  const dataProduct = await Product.find({ id: { $in: productId } }).select('id name listUnit')
 
   let data = []
   for (const stockItem of dataStockTran.listProduct) {
@@ -860,22 +860,22 @@ exports.getStockQty = async (req, res) => {
 
 
     const listUnitStock = productDetail.listUnit.map(u => {
-        const factor = u.factor
+      const factor = u.factor
       // console.log(u)
-        return {
-          unit:u.unit,
-          stock:Math.floor(stock / factor),
-          stockIn:Math.floor(stockIn / factor),
-          stockOut:Math.floor(stockOut / factor),
-          balance:Math.floor(balance / factor),
+      return {
+        unit: u.unit,
+        stock: Math.floor(stock / factor),
+        stockIn: Math.floor(stockIn / factor),
+        stockOut: Math.floor(stockOut / factor),
+        balance: Math.floor(balance / factor),
 
-        }
+      }
     })
 
     const finalProductStock = {
-      productId:stockItem.productId,
-      productName:productDetail.name,
-      listUnit:[...listUnitStock]
+      productId: stockItem.productId,
+      productName: productDetail.name,
+      listUnit: [...listUnitStock]
     }
     data.push(finalProductStock)
   }
@@ -883,20 +883,70 @@ exports.getStockQty = async (req, res) => {
 
   if (dataStock.length == 0) {
     res.status(404).json({
-      status:404,
-      message:'Not found this area'
+      status: 404,
+      message: 'Not found this area'
     })
   }
 
-  
+
   res.status(200).json({
     status: 200,
     message: "suceesful",
-    data : data
+    data: data
     // data:data.listProduct
   })
 }
 
+exports.getWeightProduct = async (req, res) => {
+  const { area, period } = req.body;
+  const channel = req.headers['x-channel'];
+  const { Stock } = getModelsByChannel(channel, res, stockModel);
+  const { Product } = getModelsByChannel(channel, res, productModel);
+
+  const stockData = await Stock.aggregate([
+    { $match: { area: area, period: period } },
+    { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
+    {
+      $group: {
+        _id: '$listProduct.productId',
+        totalBalancePcs: { $sum: '$listProduct.balancePcs' }
+      }
+    }
+  ]);
+  let weightNet = 0;
+  let weightGross = 0;
+  if (stockData.length === 0) {
+    return res.status(404).json({
+      status: 404,
+      message: "Not found stock",
+    })
+  }
+
+  const productIds = stockData.map(item => item._id);
+
+  const products = await Product.find({ id: { $in: productIds } }).select('id weightGross weightNet');
+
+  const productMap = new Map(products.map(p => [p.id, p]));
+
+
+
+  for (const item of stockData) {
+    const productDetail = productMap.get(item._id);
+    const gross = Number(productDetail?.weightGross) || 0;
+    const net = Number(productDetail?.weightNet) || 0;
+    const qty = item.totalBalancePcs || 0;
+
+    weightGross += gross * qty;
+    weightNet += net * qty;
+  }
+
+  res.status(200).json({
+    status: 200,
+    message: "suceesful",
+    weightNet: Number(weightNet.toFixed(2)),
+    weightGross: Number(weightGross.toFixed(2))
+  });
+};
 
 
 
