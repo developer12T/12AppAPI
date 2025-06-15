@@ -514,35 +514,63 @@ exports.addFromERP = async (req, res) => {
 
 exports.addFromERPnew = async (req, res) => {
   try {
+    const channel = req.headers['x-channel'];
+    const { Store } = getModelsByChannel(channel, res, storeModel);
 
-    const channel = req.headers['x-channel']
-    const result = await storeQuery(channel)
+    const result = await storeQuery(channel); // ข้อมูลจาก ERP
+    const storeMap = new Map(result.map(item => [item.storeId, item])); 
+
+    const mongoStores = await Store.find();
+    const changes = {
+      added: [],
+      updated: [],
+      deleted: []
+    };
 
     for (const item of result) {
-      const { Store } = getModelsByChannel(channel, res, storeModel)
-      const StoreIf = await Store.findOne({ storeId: item.storeId })
-      if (!StoreIf) {
-        await Store.create(item)
+      const existing = await Store.findOne({ storeId: item.storeId });
+
+      if (!existing) {
+        await Store.create(item);
+        changes.added.push(item.storeId);
       } else {
-        const idStoreReplace = {
-          idStore: item.storeId,
-          name: item.name
+        // อัปเดตถ้ามีการเปลี่ยนแปลงจริง
+        let isModified = false;
+        const fields = Object.keys(item);
+
+        for (const field of fields) {
+          if (existing[field] !== item[field]) {
+            existing[field] = item[field];
+            isModified = true;
+          }
         }
-        dataArray.push(idStoreReplace)
+
+        if (isModified) {
+          await existing.save();
+          changes.updated.push(item.storeId);
+        }
       }
     }
+
+    // ลบ store ที่ไม่มีใน ERP (optional)
+    for (const store of mongoStores) {
+      if (!storeMap.has(store.storeId)) {
+        await Store.deleteOne({ _id: store._id });
+        changes.deleted.push(store.storeId);
+      }
+    }
+
     res.status(200).json({
       status: 200,
-      message: 'sucess',
-      // data: return_arr.slice(0, 10000)
+      message: 'Sync Store Success',
+      changes
+    });
 
-    })
   } catch (error) {
-    console.error(error)
-    res.status(500).json({ status: '500', message: error.message })
+    console.error(error);
+    res.status(500).json({ status: 500, message: error.message });
   }
-
-}
+};
 
 
 

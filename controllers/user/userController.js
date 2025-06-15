@@ -484,15 +484,41 @@ exports.addUserManeger = async (req, res) => {
 }
 
 exports.addUserNew = async (req, res) => {
+  const channel = req.headers['x-channel'];
+  const { User } = getModelsByChannel(channel, res, userModel);
 
-  const channel = req.headers['x-channel']
-  const { User } = getModelsByChannel(channel, res, userModel)
+  const tableData = await userQuery(channel); // ข้อมูลจาก table
+  const tableMap = new Map(tableData.map(item => [item.saleCode, item]));
 
-  const data = await userQuery(channel)
+  const mongoUsers = await User.find(); // ผู้ใช้ใน MongoDB
+  const result = [];
 
-  for (const sale of data) {
-    const saleInData = await User.findOne({ saleCode: sale.saleCode })
-    if (!saleInData) {
+  // STEP 1: อัปเดตหรือเพิ่มผู้ใช้
+  for (const sale of tableData) {
+    const existingUser = await User.findOne({ saleCode: sale.saleCode });
+
+    if (existingUser) {
+      // อัปเดตเฉพาะ field ที่เปลี่ยน
+      let isModified = false;
+      const fields = [
+        'salePayer', 'username', 'firstName', 'surName', 'password',
+        'tel', 'zone', 'area', 'warehouse', 'role', 'status', 'qrCodeImage'
+      ];
+
+      for (const field of fields) {
+        if (existingUser[field] !== sale[field]) {
+          existingUser[field] = sale[field];
+          isModified = true;
+        }
+      }
+
+      if (isModified) {
+        existingUser.period = period();
+        await existingUser.save();
+        result.push(existingUser);
+      }
+    } else {
+      // เพิ่มใหม่
       const newUser = new User({
         saleCode: sale.saleCode,
         salePayer: sale.salePayer,
@@ -509,17 +535,25 @@ exports.addUserNew = async (req, res) => {
         qrCodeImage: sale.qrCodeImage,
         period: period(),
         image: ''
-      })
-      await newUser.save()
+      });
+      await newUser.save();
+      result.push(newUser);
+    }
+  }
+
+  // STEP 2: ลบผู้ใช้ที่ไม่มีใน tableData
+  for (const user of mongoUsers) {
+    if (!tableMap.has(user.saleCode)) {
+      await User.deleteOne({ _id: user._id });
     }
   }
 
   res.status(200).json({
     status: 200,
-    message: 'Insert User Success'
-  })
-
-}
+    message: 'Sync User Success',
+    data: result
+  });
+};
 
 exports.addUserArray = async (req, res) => {
   const { area } = req.body

@@ -60,7 +60,7 @@ SELECT
     DA.WH AS warehouse,
     'sale' AS role,
     '1' AS status,
-    'http://192.168.2.81/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
+    'http://apps.onetwotrading.co.th/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
 FROM 
   [DATA_OMS].[dbo].[DATA_Area] AS DA 
 WHERE 
@@ -109,7 +109,7 @@ exports.userQueryFilter = async function (channel, area) {
     DA.WH AS warehouse,
     'sale' AS role,
     '1' AS status,
-    'http://192.168.2.81/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
+    'http://apps.onetwotrading.co.th/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
   FROM 
     [DATA_OMS].[dbo].[DATA_Area] AS DA 
   WHERE 
@@ -134,7 +134,7 @@ exports.userQueryFilter = async function (channel, area) {
     DA.WH AS warehouse,
     'sale' AS role,
     '1' AS status,
-    'http://192.168.2.81/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
+    'http://apps.onetwotrading.co.th/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
   FROM 
     [DATA_OMS].[dbo].[DATA_Area] AS DA 
   WHERE 
@@ -860,7 +860,7 @@ SELECT
     DA.WH AS warehouse,
     'sale' AS role,
     '1' AS status,
-    'http://192.168.2.81/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
+    'http://apps.onetwotrading.co.th/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
 FROM 
   [DATA_OMS].[dbo].[DATA_Area] AS DA 
 WHERE 
