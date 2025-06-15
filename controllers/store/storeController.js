@@ -56,7 +56,11 @@ exports.getStore = async (req, res) => {
       1
     )
 
-    let query = { area }
+    let query = {}
+
+    if (area) {
+      query.area = { $regex: `^${area}`, $options: 'i' } // ตรงกับคำที่ลงท้ายด้วย area
+    }
 
     if (type === 'new') {
       query.createdAt = {
@@ -623,7 +627,7 @@ exports.checkInStore = async (req, res) => {
 }
 
 exports.updateStoreStatus = async (req, res) => {
-  const { storeId, status } = req.body
+  const { storeId, status, user } = req.body
   const channel = req.headers['x-channel']
   const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
   const store = await Store.findOne({ storeId: storeId })
@@ -667,7 +671,14 @@ exports.updateStoreStatus = async (req, res) => {
   } else {
     await Store.findOneAndUpdate(
       { storeId: storeId },
-      { $set: { status: status, updatedDate: Date() } },
+      {
+        $set: {
+          status: status,
+          updatedDate: Date(),
+          'approve.dateAction': new Date(),
+          'approve.userApprove': user
+        }
+      },
       { new: true }
     )
   }
