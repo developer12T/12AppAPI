@@ -5,8 +5,12 @@ const multer = require('multer')
 const addUpload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages'
 )
-const sql = require('mssql');
-const { storeQuery, storeQueryFilter, groupStoreType } = require('../../controllers/queryFromM3/querySctipt')
+const sql = require('mssql')
+const {
+  storeQuery,
+  storeQueryFilter,
+  groupStoreType
+} = require('../../controllers/queryFromM3/querySctipt')
 const getUploadMiddleware = channel => {
   const storage = multer.memoryStorage()
   let limits = {}
@@ -514,40 +518,40 @@ exports.addFromERP = async (req, res) => {
 
 exports.addFromERPnew = async (req, res) => {
   try {
-    const channel = req.headers['x-channel'];
-    const { Store } = getModelsByChannel(channel, res, storeModel);
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
-    const result = await storeQuery(channel); // ข้อมูลจาก ERP
-    const storeMap = new Map(result.map(item => [item.storeId, item])); 
+    const result = await storeQuery(channel) // ข้อมูลจาก ERP
+    const storeMap = new Map(result.map(item => [item.storeId, item]))
 
-    const mongoStores = await Store.find();
+    const mongoStores = await Store.find()
     const changes = {
       added: [],
       updated: [],
       deleted: []
-    };
+    }
 
     for (const item of result) {
-      const existing = await Store.findOne({ storeId: item.storeId });
+      const existing = await Store.findOne({ storeId: item.storeId })
 
       if (!existing) {
-        await Store.create(item);
-        changes.added.push(item.storeId);
+        await Store.create(item)
+        changes.added.push(item.storeId)
       } else {
         // อัปเดตถ้ามีการเปลี่ยนแปลงจริง
-        let isModified = false;
-        const fields = Object.keys(item);
+        let isModified = false
+        const fields = Object.keys(item)
 
         for (const field of fields) {
           if (existing[field] !== item[field]) {
-            existing[field] = item[field];
-            isModified = true;
+            existing[field] = item[field]
+            isModified = true
           }
         }
 
         if (isModified) {
-          await existing.save();
-          changes.updated.push(item.storeId);
+          await existing.save()
+          changes.updated.push(item.storeId)
         }
       }
     }
@@ -555,8 +559,8 @@ exports.addFromERPnew = async (req, res) => {
     // ลบ store ที่ไม่มีใน ERP (optional)
     for (const store of mongoStores) {
       if (!storeMap.has(store.storeId)) {
-        await Store.deleteOne({ _id: store._id });
-        changes.deleted.push(store.storeId);
+        await Store.deleteOne({ _id: store._id })
+        changes.deleted.push(store.storeId)
       }
     }
 
@@ -564,18 +568,12 @@ exports.addFromERPnew = async (req, res) => {
       status: 200,
       message: 'Sync Store Success',
       changes
-    });
-
+    })
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ status: 500, message: error.message });
+    console.error(error)
+    res.status(500).json({ status: 500, message: error.message })
   }
-};
-
-
-
-
-
+}
 
 exports.checkInStore = async (req, res) => {
   const { storeId } = req.params
@@ -625,46 +623,51 @@ exports.checkInStore = async (req, res) => {
 }
 
 exports.updateStoreStatus = async (req, res) => {
-  const { storeId, area } = req.body
-
-  const areaPrefix = area.substring(0, 2)
+  const { storeId } = req.body
   const channel = req.headers['x-channel']
+  const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
+  const store = await Store.findOne({ storeId: storeId })
 
-  const { Store } = getModelsByChannel(channel, res, storeModel)
-  const latestStore = await Store.findOne({
-    storeId: { $regex: `^V${areaPrefix}`, $options: 'i' }
-  })
-    .sort({ storeId: -1 })
-    .select('storeId')
-
-  if (latestStore === null) {
+  if (!store) {
     return res.status(404).json({
       status: 404,
-      message: `Not Found This area:${area}`
+      message: 'Not found store'
     })
   }
-  const maxLength = 7 // กำหนดให้ไม่เกิน 7 หลัก
 
-  const newStoreId = latestStore.storeId.replace(/\d+$/, num => {
-    // เพิ่ม 1 ที่เลขท้าย
-    const newNum = (Number(num) + 1).toString()
-
-    // ถ้าหมายเลขมากกว่า maxLength ให้ตัดให้เป็น 7 หลัก
-    return newNum.length > maxLength
-      ? newNum.slice(0, maxLength)
-      : newNum.padStart(num.length, '0')
-  })
-
-  const result = await Store.updateOne(
-    { storeId: storeId },
-    { $set: { storeId: newStoreId, status: '20', updatedDate: Date() } }
+  const maxRunningAll = await Store.aggregate([
+    {
+      $match: {
+        zone: store.zone
+      }
+    },
+    {
+      $group: {
+        _id: '$zone',
+        maxStoreId: { $max: '$storeId' }
+      }
+    }
+  ])
+  const oldId = maxRunningAll.flatMap(u => u.maxStoreId)
+  const newId = oldId[0].replace(/\d+$/, n =>
+    String(+n + 1).padStart(n.length, '0')
   )
 
-  // console.log(newStoreId)
+  await Store.findOneAndUpdate(
+    { storeId: storeId },
+    { $set: { storeId: newId, status: '20', updatedDate: Date() } },
+    { new: true }
+  )
+
+  await RunningNumber.findOneAndUpdate(
+    { zone: store.zone },
+    { $set: { last: newId } },
+    { new: true }
+  )
 
   res.status(200).json({
     status: 200,
-    message: 'Update Success'
+    message: 'Update storeId successful'
   })
 }
 
@@ -884,9 +887,9 @@ exports.updateRunningNumber = async (req, res) => {
     String(+n + 1).padStart(n.length, '0')
   )
 
-  const newStore = await Store.findOneAndUpdate(
+  await Store.findOneAndUpdate(
     { storeId: storeId },
-    { $set: { storeId: newId } },
+    { $set: { storeId: newId, status: '20', updatedDate: Date() } },
     { new: true }
   )
 
@@ -958,29 +961,28 @@ exports.getBueatyStore = async (req, res) => {
 }
 
 exports.addStoreArray = async (req, res) => {
-
   const { storeId } = req.body
   const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const result = await storeQueryFilter(channel, storeId)
 
-  const insertedStores = [];
-  const existingStores = [];
+  const insertedStores = []
+  const existingStores = []
 
   for (const item of result) {
-    const storeInDb = await Store.findOne({ storeId: item.storeId });
+    const storeInDb = await Store.findOne({ storeId: item.storeId })
 
     if (!storeInDb) {
-      await Store.create(item);
+      await Store.create(item)
       insertedStores.push({
         idStore: item.storeId,
         name: item.name
-      });
+      })
     } else {
       existingStores.push({
         idStore: item.storeId,
         name: item.name
-      });
+      })
     }
   }
 
@@ -989,39 +991,37 @@ exports.addStoreArray = async (req, res) => {
     message: 'Store sync completed',
     inserted: insertedStores,
     alreadyExists: existingStores
-  });
+  })
 }
 
-
 exports.updateStoreArray = async (req, res) => {
-
   const { storeId } = req.body
   const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const result = await storeQueryFilter(channel, storeId)
 
-  const updatedStores = [];
-  const unchangedStores = [];
+  const updatedStores = []
+  const unchangedStores = []
 
   for (const item of result) {
-    const storeInDb = await Store.findOne({ storeId: item.storeId });
+    const storeInDb = await Store.findOne({ storeId: item.storeId })
 
     if (storeInDb) {
       const isChanged = Object.keys(item).some(key => {
-        return item[key] !== storeInDb[key];
-      });
+        return item[key] !== storeInDb[key]
+      })
 
       if (isChanged) {
-        await Store.updateOne({ storeId: item.storeId }, { $set: item });
+        await Store.updateOne({ storeId: item.storeId }, { $set: item })
         updatedStores.push({
           idStore: item.storeId,
           name: item.name
-        });
+        })
       } else {
         unchangedStores.push({
           idStore: item.storeId,
           name: item.name
-        });
+        })
       }
     }
   }
@@ -1030,47 +1030,43 @@ exports.updateStoreArray = async (req, res) => {
     message: 'Store update check completed',
     updated: updatedStores,
     unchanged: unchangedStores
-  });
+  })
 }
 
 exports.deleteStoreArray = async (req, res) => {
-  const { storeId } = req.body;
-  const channel = req.headers['x-channel'];
+  const { storeId } = req.body
+  const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
 
-  const storeToDelete = await Store.find({ storeId: { $in: storeId } });
-  const deletedStoreId = storeToDelete.map(store => store.storeId);
+  const storeToDelete = await Store.find({ storeId: { $in: storeId } })
+  const deletedStoreId = storeToDelete.map(store => store.storeId)
 
-  await Store.deleteMany({ storeId: { $in: storeId } });
+  await Store.deleteMany({ storeId: { $in: storeId } })
 
   res.status(200).json({
     status: 200,
     message: 'Deleted successfully',
     deletedStore: deletedStoreId
-  });
+  })
 }
 
 exports.addTypeStore = async (req, res) => {
   const channel = req.headers['x-channel']
   const result = await groupStoreType()
   const { StoreType } = getModelsByChannel(channel, res, storeModel)
-  for ( const item of result ){
-      const exist = await StoreType.findOne({id:item.id})
-      if (!exist) {
-        await StoreType.create(item)
-      }
+  for (const item of result) {
+    const exist = await StoreType.findOne({ id: item.id })
+    if (!exist) {
+      await StoreType.create(item)
+    }
   }
 
-
-    res.status(200).json({
+  res.status(200).json({
     status: 200,
     message: 'successfully',
     deletedStore: result
-  });
+  })
 }
-
-
-
 
 exports.getTypeStore = async (req, res) => {
   const channel = req.headers['x-channel']
@@ -1081,5 +1077,5 @@ exports.getTypeStore = async (req, res) => {
     status: 200,
     message: 'successfully',
     deletedStore: storeType
-  });
+  })
 }
