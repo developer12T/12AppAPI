@@ -153,6 +153,88 @@ exports.checkout = async (req, res) => {
       createdBy: sale.username
     })
 
+
+
+
+    const productQty = newOrder.listProduct.map(u => {
+      return {
+        productId: u.id,
+        // lot: u.lot,
+        unit: u.unit,
+        qty: u.qty
+      }
+    })
+
+
+    for (const item of productQty) {
+            const factorPcsResult = await Product.aggregate([
+                { $match: { id: item.productId } },
+                {
+                    $project: {
+                        id: 1,
+                        listUnit: {
+                            $filter: {
+                                input: "$listUnit",
+                                as: "unitItem",
+                                cond: { $eq: ["$$unitItem.unit", item.unit] }
+                            }
+                        }
+                    }
+                }
+            ]);
+
+            const factorCtnResult = await Product.aggregate([
+                { $match: { id: item.productId } },
+                {
+                    $project: {
+                        id: 1,
+                        listUnit: {
+                            $filter: {
+                                input: "$listUnit",
+                                as: "unitItem",
+                                cond: { $eq: ["$$unitItem.unit", "CTN"] }
+                            }
+                        }
+                    }
+                }
+            ]);
+            const factorCtn = factorCtnResult[0].listUnit[0].factor
+            const factorPcs = factorPcsResult[0].listUnit[0].factor
+            const factorPcsQty = item.qty * factorPcs
+            const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
+            const data = await Stock.findOneAndUpdate(
+                {
+                    area: area,
+                    period: period,
+                    'listProduct.productId': item.productId
+                },
+                {
+                    $inc: {
+                        'listProduct.$[elem].stockOutPcs': +factorPcsQty,
+                        'listProduct.$[elem].balancePcs': -factorPcsQty,
+                        'listProduct.$[elem].stockOutCtn': +factorCtnQty,
+                        'listProduct.$[elem].balanceCtn': -factorCtnQty
+                    }
+                },
+                {
+                    arrayFilters: [
+                        { 'elem.productId': item.productId }
+                    ],
+                    new: true
+                }
+            );
+        }
+
+
+
+
+
+
+
+
+
+
+
     const calStock = {
       // storeId: refundOrder.store.storeId,
       orderId: newOrder.orderId,
@@ -184,8 +266,8 @@ exports.checkout = async (req, res) => {
     // });
 
 
-    await newOrder.save()
-    await Cart.deleteOne({ type, area })
+    // await newOrder.save()
+    // await Cart.deleteOne({ type, area })
 
     res.status(200).json({
       status: 200,

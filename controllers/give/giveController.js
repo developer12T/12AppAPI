@@ -6,11 +6,12 @@ const { getProductGive, getStoreGive } = require('./giveProduct')
 const { summaryGive } = require('../../utilities/summary')
 const { rangeDate } = require('../../utilities/datetime')
 
+const productModel = require('../../models/cash/product')
 
 const stockModel = require('../../models/cash/stock')
-const  giveawaysModel = require('../../models/cash/give');
-const  cartModel  = require('../../models/cash/cart')
-const  userModel  = require('../../models/cash/user')
+const giveawaysModel = require('../../models/cash/give');
+const cartModel = require('../../models/cash/cart')
+const userModel = require('../../models/cash/user')
 const { getModelsByChannel } = require('../../middleware/channel')
 
 exports.addGiveType = async (req, res) => {
@@ -20,14 +21,14 @@ exports.addGiveType = async (req, res) => {
             dept, applicableTo, conditions, status
         } = req.body
 
-        const channel = req.headers['x-channel']; 
-        const { Givetype } = getModelsByChannel(channel,res,giveawaysModel); 
+        const channel = req.headers['x-channel'];
+        const { Givetype } = getModelsByChannel(channel, res, giveawaysModel);
 
         if (!name || !type || !remark || !dept) {
             return res.status(400).json({ status: 400, message: 'Missing required fields!' })
         }
 
-        const giveId = await generateGivetypeId(channel,res)
+        const giveId = await generateGivetypeId(channel, res)
 
         const newPromotion = new Givetype({
             giveId, name, description, type, remark,
@@ -51,8 +52,8 @@ exports.addGiveType = async (req, res) => {
 
 exports.getGiveType = async (req, res) => {
     try {
-        const channel = req.headers['x-channel']; 
-        const { Givetype } = getModelsByChannel(channel,res,giveawaysModel); 
+        const channel = req.headers['x-channel'];
+        const { Givetype } = getModelsByChannel(channel, res, giveawaysModel);
 
         const givetypes = await Givetype.find({}).select('-_id giveId name').lean()
 
@@ -79,7 +80,7 @@ exports.getGiveType = async (req, res) => {
 exports.getGiveProductFilter = async (req, res) => {
     try {
         const { area, giveId, group, brand, size, flavour } = req.body
-        const channel = req.headers['x-channel']; 
+        const channel = req.headers['x-channel'];
 
         if (!giveId || !area) {
             return res.status(400).json({
@@ -88,7 +89,7 @@ exports.getGiveProductFilter = async (req, res) => {
             })
         }
 
-        const products = await getProductGive(giveId, area,channel,res)
+        const products = await getProductGive(giveId, area, channel, res)
 
         if (!products.length) {
             return res.status(404).json({
@@ -154,8 +155,8 @@ exports.getGiveProductFilter = async (req, res) => {
 exports.getGiveStoreFilter = async (req, res) => {
     try {
         const { area, giveId } = req.query
-        const channel = req.headers['x-channel']; 
-        const store = await getStoreGive(giveId, area,channel,res)
+        const channel = req.headers['x-channel'];
+        const store = await getStoreGive(giveId, area, channel, res)
         res.status(200).json({
             status: 200,
             message: 'Successfully fetched give store filters!',
@@ -169,11 +170,13 @@ exports.getGiveStoreFilter = async (req, res) => {
 
 exports.checkout = async (req, res) => {
     try {
-        const { type, area, period,storeId, giveId, note, latitude, longitude, shipping } = req.body
-        const channel = req.headers['x-channel']; 
-        const { Cart } = getModelsByChannel(channel,res,cartModel); 
-        const { User } = getModelsByChannel(channel,res,userModel); 
-        const { Givetype } = getModelsByChannel(channel,res,giveawaysModel); 
+        const { type, area, period, storeId, giveId, note, latitude, longitude, shipping } = req.body
+        const channel = req.headers['x-channel'];
+        const { Cart } = getModelsByChannel(channel, res, cartModel);
+        const { User } = getModelsByChannel(channel, res, userModel);
+        const { Product } = getModelsByChannel(channel, res, productModel)
+
+        const { Givetype } = getModelsByChannel(channel, res, giveawaysModel);
         const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel);
         const { Stock } = getModelsByChannel(channel, res, stockModel);
 
@@ -197,9 +200,9 @@ exports.checkout = async (req, res) => {
             return res.status(404).json({ status: 404, message: 'Give type not found!' })
         }
 
-        const orderId = await generateGiveawaysId(area, sale.warehouse,channel,res)
+        const orderId = await generateGiveawaysId(area, sale.warehouse, channel, res)
 
-        const summary = await summaryGive(cart,channel,res)
+        const summary = await summaryGive(cart, channel, res)
 
 
         // console.log(JSON.stringify(summary, null, 2));
@@ -243,7 +246,7 @@ exports.checkout = async (req, res) => {
 
         const calStock = {
             // storeId: refundOrder.store.storeId,
-            orderId : newOrder.orderId,
+            orderId: newOrder.orderId,
             area: newOrder.store.area,
             saleCode: newOrder.sale.saleCode,
             period: period,
@@ -262,102 +265,82 @@ exports.checkout = async (req, res) => {
         }
 
 
-        // console.log("calStock",calStock)
-        const productId = calStock.product.flatMap(u => u.productId)
 
-        const stock = await Stock.aggregate([
-            { $match: { area: area, period: period } },
-            { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
-            { $match: { "listProduct.productId": { $in: productId } } },
-            {
-                $project: {
-                    _id: 0,
-                    productId: "$listProduct.productId",
-                    sumQtyPcs: "$listProduct.sumQtyPcs",
-                    sumQtyCtn: "$listProduct.sumQtyCtn",
-                    sumQtyPcsStockIn: "$listProduct.sumQtyPcsStockIn",
-                    sumQtyCtnStockIn: "$listProduct.sumQtyCtnStockIn",
-                    sumQtyPcsStockOut: "$listProduct.sumQtyPcsStockOut",
-                    sumQtyCtnStockOut: "$listProduct.sumQtyCtnStockOut",
-                    available: "$listProduct.available"
-                }
+        const productQty = newOrder.listProduct.map(u => {
+            return {
+                productId: u.id,
+                // lot: u.lot,
+                unit: u.unit,
+                qty: u.qty
             }
-        ]);
+        })
 
-        let product = []
-        let updateLot = []
-
-        for (const stockDetail of stock) {
-            for (const lot of stockDetail.available) {
-                const calDetails = calStock.product.filter(
-                    u => u.productId === stockDetail.productId && u.lot === lot.lot
-                );
-                let pcsQty = 0;
-                let ctnQty = 0;
-
-                for (const cal of calDetails) {
-                    if (cal.unit === 'PCS' || cal.unit === 'BOT') {
-                        pcsQty += cal.qty || 0;
-                    }
-                    if (cal.unit === 'CTN') {
-                        ctnQty += cal.qty || 0;
-                    }
-                }
-              checkQtyPcs = lot.qtyPcs - pcsQty
-              checkQtyCtn = lot.qtyCtn - ctnQty
-
-              if (checkQtyPcs < 0 || checkQtyCtn < 0) {
-                  return res.status(400).json({
-                      status:400,
-                      message: `This lot ${lot.lot} is not enough to give`
-                  })
-              }
-
-
-                updateLot.push({
-                    productId: stockDetail.productId,
-                    location: lot.location,
-                    lot: lot.lot,
-                    qtyPcs: checkQtyPcs,
-                    qtyPcsStockIn: lot.qtyPcsStockIn ,
-                    qtyPcsStockOut: lot.qtyPcsStockOut + pcsQty,
-                    qtyCtn: checkQtyCtn,
-                    qtyCtnStockIn: lot.qtyCtnStockIn ,
-                    qtyCtnStockOut: lot.qtyCtnStockOut + ctnQty
-                })
-            }
-            const relatedLots = updateLot.filter((u) => u.productId === stockDetail.productId);
-            product.push({
-                productId: stockDetail.productId,
-                sumQtyPcs: relatedLots.reduce((total, item) => total + item.qtyPcs, 0),
-                sumQtyCtn: relatedLots.reduce((total, item) => total + item.qtyCtn, 0),
-                sumQtyPcsStockIn: relatedLots.reduce((total, item) => total + item.qtyPcsStockIn, 0),
-                sumQtyCtnStockIn: relatedLots.reduce((total, item) => total + item.qtyCtnStockIn, 0),
-                sumQtyPcsStockOut: relatedLots.reduce((total, item) => total + item.qtyPcsStockOut, 0),
-                sumQtyCtnStockOut: relatedLots.reduce((total, item) => total + item.qtyCtnStockOut, 0),
-                available: relatedLots.map(({ id, ...rest }) => rest),
-            });
-                    
-
-        }
-        // console.log("product",product)
-        for (const updated of product) {
-            await Stock.findOneAndUpdate(
-                { area: area, period: period },
+        for (const item of productQty) {
+            const factorPcsResult = await Product.aggregate([
+                { $match: { id: item.productId } },
                 {
-                    $set: {
-                        "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
-                        "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
-                        "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
-                        "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
-                        "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
-                        "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
-                        "listProduct.$[product].available": updated.available
+                    $project: {
+                        id: 1,
+                        listUnit: {
+                            $filter: {
+                                input: "$listUnit",
+                                as: "unitItem",
+                                cond: { $eq: ["$$unitItem.unit", item.unit] }
+                            }
+                        }
+                    }
+                }
+            ]);
+
+            const factorCtnResult = await Product.aggregate([
+                { $match: { id: item.productId } },
+                {
+                    $project: {
+                        id: 1,
+                        listUnit: {
+                            $filter: {
+                                input: "$listUnit",
+                                as: "unitItem",
+                                cond: { $eq: ["$$unitItem.unit", "CTN"] }
+                            }
+                        }
+                    }
+                }
+            ]);
+            const factorCtn = factorCtnResult[0].listUnit[0].factor
+            const factorPcs = factorPcsResult[0].listUnit[0].factor
+            const factorPcsQty = item.qty * factorPcs
+            const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
+            const data = await Stock.findOneAndUpdate(
+                {
+                    area: area,
+                    period: period,
+                    'listProduct.productId': item.productId
+                },
+                {
+                    $inc: {
+                        'listProduct.$[elem].stockOutPcs': +factorPcsQty,
+                        'listProduct.$[elem].balancePcs': -factorPcsQty,
+                        'listProduct.$[elem].stockOutCtn': +factorCtnQty,
+                        'listProduct.$[elem].balanceCtn': -factorCtnQty
                     }
                 },
-                { arrayFilters: [{ "product.productId": updated.productId }], new: true }
-            )
+                {
+                    arrayFilters: [
+                        { 'elem.productId': item.productId }
+                    ],
+                    new: true
+                }
+            );
         }
+
+
+
+
+
+
+
+
         // const createdMovement = await StockMovement.create({
         //     ...calStock
         // });
@@ -375,7 +358,7 @@ exports.checkout = async (req, res) => {
         res.status(200).json({
             status: 200,
             message: 'Checkout successful!',
-            data : newOrder
+            data: newOrder
             // data: { orderId, total: summary.total }
         })
     } catch (error) {
@@ -389,8 +372,8 @@ exports.getOrder = async (req, res) => {
         const { type, area, store, period } = req.query
         let response = []
 
-        const channel = req.headers['x-channel']; 
-        const { Giveaway } = getModelsByChannel(channel,res,giveawaysModel); 
+        const channel = req.headers['x-channel'];
+        const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel);
 
         if (!type || !area || !period) {
             return res.status(400).json({ status: 400, message: 'type, area, period are required!' })
@@ -450,8 +433,8 @@ exports.getDetail = async (req, res) => {
             return res.status(400).json({ status: 400, message: 'orderId is required!' })
         }
 
-        const channel = req.headers['x-channel']; 
-        const { Giveaway } = getModelsByChannel(channel,res,giveawaysModel); 
+        const channel = req.headers['x-channel'];
+        const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel);
 
 
         const order = await Giveaway.findOne({ orderId })
