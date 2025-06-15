@@ -348,10 +348,9 @@ exports.addStockNew = async (req, res) => {
 
   res.status(200).json({
     status: 200,
-    message: 'Stock added successfully',
+    message: 'Stock added successfully'
     // data: test
   })
-
 }
 
 exports.getStock = async (req, res, next) => {
@@ -381,68 +380,90 @@ exports.getStock = async (req, res, next) => {
     console.log('Error in getStock', error)
   }
 }
-
 exports.getQty = async (req, res, next) => {
-  const { area, productId, unit, period } = req.body
+  try {
+    const { area, productId, unit, period } = req.body
+    const channel = req.headers['x-channel']
 
-  const channel = req.headers['x-channel']
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
 
-  const { Stock } = getModelsByChannel(channel, res, stockModel)
-  const { Product } = getModelsByChannel(channel, res, productModel)
+    // Find product
+    const product = await Product.findOne({ id: productId }).lean()
 
-  const productStock = await Stock.find({
-    area: area,
-    period: period,
-    'listProduct.productId': productId
-  })
+    if (!product) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not Found This ItemId in Product collection'
+      })
+    }
 
-  const products = await Product.find({ id: productId })
-
-  let unitData = {}
-
-  const productUnitMatch = products?.find(p => p.id === productId)
-
-  if (productUnitMatch) {
-    unitData = productUnitMatch.listUnit.map(unit => ({
+    const unitData = product.listUnit.map(unit => ({
       unit: unit.unit,
       factor: unit.factor
     }))
-  } else {
-    res.status(404).json({
-      message: 'Not Found This ItemId'
-    })
-  }
 
-  const stockmatchList = []
+    const unitMatch = product.listUnit.find(u => u.unit === unit)
+    const factor = unitMatch?.factor ?? 0
 
-  productStock.map(item => {
-    const stockmatch = item.listProduct.find(p => p.productId === productId)
-    if (stockmatch) {
-      stockmatchList.push(stockmatch)
+    if (!factor || factor <= 0) {
+      return res.status(400).json({
+        status: 400,
+        message: `Invalid or missing factor for unit "${unit}"`
+      })
     }
-  })
 
-  if (!stockmatchList) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not Found This ItemId'
+    // Find stock entries
+    const stockEntries = await Stock.find({
+      area,
+      period,
+      'listProduct.productId': productId
+    })
+
+    const stockmatchList = []
+
+    stockEntries.forEach(item => {
+      const match = item.listProduct.find(p => p.productId === productId)
+      if (match) stockmatchList.push(match)
+    })
+
+    if (!stockmatchList.length) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not Found This ItemId in Stock collection'
+      })
+    }
+
+    // Sum balancePcs
+    const totalBalancePcs = stockmatchList.reduce(
+      (sum, item) => sum + (item.balancePcs ?? 0),
+      0
+    )
+
+    const qtyByUnit = Math.floor(totalBalancePcs / factor)
+
+    const data = {
+      area,
+      productId,
+      unit,
+      factor,
+      sumQtyPcs: totalBalancePcs,
+      qty: qtyByUnit,
+      unitData
+    }
+
+    return res.status(200).json({
+      status: 200,
+      message: 'Stock Quantity fetched successfully!',
+      data
+    })
+  } catch (error) {
+    console.error('[getQty error]', error)
+    return res.status(500).json({
+      status: 500,
+      message: 'Internal server error: ' + error.message
     })
   }
-
-  const data = {
-    area: area,
-    productId: productId,
-    sumQtyPcs: stockmatchList[0].balancePcs,
-    qty: stockmatchList[0].balanceCtn,
-    unit: unit,
-  }
-
-  res.status(200).json({
-    status: 200,
-    message: 'Stock Quantity fetched successfully!',
-    data: data
-  })
-
 }
 
 // check updateStockMovement
@@ -628,57 +649,57 @@ exports.availableStock = async (req, res, next) => {
       // console.log("lot",lot)
       const tranFromProduct = product
         ? {
-          // ...product,
-          _id: product._id,
-          id: product.id,
-          name: product.name,
-          group: product.group,
-          groupCode: product.groupCode,
-          brandCode: product.brandCode,
-          brand: product.brand,
-          size: product.size,
-          flavourCode: product.flavourCode,
-          flavour: product.flavour,
-          type: product.type,
-          weightGross: product.weightGross,
-          weightNet: product.weightNet,
-          statusSale: product.statusSale,
-          statusWithdraw: product.statusWithdraw,
-          statusRefund: product.statusRefund,
-          image: product.image,
+            // ...product,
+            _id: product._id,
+            id: product.id,
+            name: product.name,
+            group: product.group,
+            groupCode: product.groupCode,
+            brandCode: product.brandCode,
+            brand: product.brand,
+            size: product.size,
+            flavourCode: product.flavourCode,
+            flavour: product.flavour,
+            type: product.type,
+            weightGross: product.weightGross,
+            weightNet: product.weightNet,
+            statusSale: product.statusSale,
+            statusWithdraw: product.statusWithdraw,
+            statusRefund: product.statusRefund,
+            image: product.image,
 
-          listUnit: product.listUnit.map(unit => {
-            // console.log("lot",lot)
-            // const totalQtyPcsToCtn = Math.floor(
-            //   lot.available.reduce((sum, item) => {
-            //     return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor
-            //   }, 0)
-            // )
-            if (unit.unit == 'CTN') {
-              qty = lot.available.reduce((total, u) => total + u.qtyCtn, 0)
-            } else if (unit.unit == 'PCS') {
-              qty = lot.available.reduce((total, u) => total + u.qtyPcs, 0)
-            } else {
-              qty = 0
-            }
-
-            return {
-              unit: unit.unit,
-              name: unit.name,
-              factor: unit.factor,
-              // qty: totalQtyPcsToCtn,
-
-              qty: qty,
-              price: {
-                sale: unit.price.sale,
-                Refund: unit.price.refund
+            listUnit: product.listUnit.map(unit => {
+              // console.log("lot",lot)
+              // const totalQtyPcsToCtn = Math.floor(
+              //   lot.available.reduce((sum, item) => {
+              //     return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor
+              //   }, 0)
+              // )
+              if (unit.unit == 'CTN') {
+                qty = lot.available.reduce((total, u) => total + u.qtyCtn, 0)
+              } else if (unit.unit == 'PCS') {
+                qty = lot.available.reduce((total, u) => total + u.qtyPcs, 0)
+              } else {
+                qty = 0
               }
-            }
-          }),
-          created: product.created,
-          updated: product.updated,
-          __v: product.__v
-        }
+
+              return {
+                unit: unit.unit,
+                name: unit.name,
+                factor: unit.factor,
+                // qty: totalQtyPcsToCtn,
+
+                qty: qty,
+                price: {
+                  sale: unit.price.sale,
+                  Refund: unit.price.refund
+                }
+              }
+            }),
+            created: product.created,
+            updated: product.updated,
+            __v: product.__v
+          }
         : null
 
       // console.log(lot)
@@ -706,7 +727,7 @@ exports.availableStock = async (req, res, next) => {
       }
     })
 
-    function parseSize(sizeStr) {
+    function parseSize (sizeStr) {
       if (!sizeStr) return 0
 
       const units = {
@@ -759,11 +780,10 @@ exports.availableStock = async (req, res, next) => {
 }
 
 exports.addStockFromERP = async (req, res) => {
-
   const { period } = req.body
   const channel = req.headers['x-channel']
   const data = await stockQuery(channel, period)
-  const cleanPeriod = period.replace('-', ''); // "202506"
+  const cleanPeriod = period.replace('-', '') // "202506"
   const { User } = getModelsByChannel(channel, res, userModel)
   const { Stock } = getModelsByChannel(channel, res, stockModel)
   const { Product } = getModelsByChannel(channel, res, productModel)
@@ -782,9 +802,9 @@ exports.addStockFromERP = async (req, res) => {
           $arrayElemAt: [
             {
               $filter: {
-                input: "$listUnit",
-                as: "unit",
-                cond: { $eq: ["$$unit.unit", "CTN"] }
+                input: '$listUnit',
+                as: 'unit',
+                cond: { $eq: ['$$unit.unit', 'CTN'] }
               }
             },
             0
@@ -792,13 +812,12 @@ exports.addStockFromERP = async (req, res) => {
         }
       }
     }
-  ]);
+  ])
 
-  const result = [];
+  const result = []
 
   for (const item of users) {
-    const datastock = data.filter(i => i.WH == item.warehouse);
-
+    const datastock = data.filter(i => i.WH == item.warehouse)
 
     const record = {
       area: item.area,
@@ -806,9 +825,9 @@ exports.addStockFromERP = async (req, res) => {
       period: cleanPeriod,
       warehouse: item.warehouse,
       listProduct: datastock.map(stock => {
-        const ctn = factorCtn.find(i => i.id === stock.ITEM_CODE) || {};
-        const factor = Number(ctn?.listUnit?.factor);
-        const qtyCtn = factor > 0 ? Math.floor(stock.ITEM_QTY / factor) : 0;
+        const ctn = factorCtn.find(i => i.id === stock.ITEM_CODE) || {}
+        const factor = Number(ctn?.listUnit?.factor)
+        const qtyCtn = factor > 0 ? Math.floor(stock.ITEM_QTY / factor) : 0
         return {
           productId: stock.ITEM_CODE,
           stockPcs: stock.ITEM_QTY,
@@ -818,37 +837,36 @@ exports.addStockFromERP = async (req, res) => {
           stockCtn: qtyCtn,
           stockInCtn: 0,
           stockOutCtn: 0,
-          balanceCtn: qtyCtn,
+          balanceCtn: qtyCtn
         }
       })
     }
 
-    result.push(record);
+    result.push(record)
 
-    const stockDoc = new Stock(record);
-    await stockDoc.save();
+    const stockDoc = new Stock(record)
+    await stockDoc.save()
   }
-
-
-
 
   res.status(200).json({
     status: 200,
-    message: "addStockFromERP",
+    message: 'addStockFromERP',
     data: result
   })
-
-
 }
 exports.getStockQty = async (req, res) => {
   const { area, period } = req.body
   const channel = req.headers['x-channel']
   const { Stock } = getModelsByChannel(channel, res, stockModel)
   const { Product } = getModelsByChannel(channel, res, productModel)
-  const dataStock = await Stock.find({ area: area, period: period }).select('listProduct -_id')
+  const dataStock = await Stock.find({ area: area, period: period }).select(
+    'listProduct -_id'
+  )
   const dataStockTran = dataStock[0]
   const productId = dataStockTran.listProduct.flatMap(item => item.productId)
-  const dataProduct = await Product.find({ id: { $in: productId } }).select('id name listUnit')
+  const dataProduct = await Product.find({ id: { $in: productId } }).select(
+    'id name listUnit'
+  )
 
   let data = []
   for (const stockItem of dataStockTran.listProduct) {
@@ -858,7 +876,6 @@ exports.getStockQty = async (req, res) => {
     const stockOut = stockItem.stockOutPcs
     const balance = stockItem.balancePcs
 
-
     const listUnitStock = productDetail.listUnit.map(u => {
       const factor = u.factor
       // console.log(u)
@@ -867,8 +884,7 @@ exports.getStockQty = async (req, res) => {
         stock: Math.floor(stock / factor),
         stockIn: Math.floor(stockIn / factor),
         stockOut: Math.floor(stockOut / factor),
-        balance: Math.floor(balance / factor),
-
+        balance: Math.floor(balance / factor)
       }
     })
 
@@ -880,7 +896,6 @@ exports.getStockQty = async (req, res) => {
     data.push(finalProductStock)
   }
 
-
   if (dataStock.length == 0) {
     res.status(404).json({
       status: 404,
@@ -888,20 +903,19 @@ exports.getStockQty = async (req, res) => {
     })
   }
 
-
   res.status(200).json({
     status: 200,
-    message: "suceesful",
+    message: 'suceesful',
     data: data
     // data:data.listProduct
   })
 }
 
 exports.getWeightProduct = async (req, res) => {
-  const { area, period } = req.body;
-  const channel = req.headers['x-channel'];
-  const { Stock } = getModelsByChannel(channel, res, stockModel);
-  const { Product } = getModelsByChannel(channel, res, productModel);
+  const { area, period } = req.body
+  const channel = req.headers['x-channel']
+  const { Stock } = getModelsByChannel(channel, res, stockModel)
+  const { Product } = getModelsByChannel(channel, res, productModel)
 
   const stockData = await Stock.aggregate([
     { $match: { area: area, period: period } },
@@ -912,47 +926,41 @@ exports.getWeightProduct = async (req, res) => {
         totalBalancePcs: { $sum: '$listProduct.balancePcs' }
       }
     }
-  ]);
-  let weightNet = 0;
-  let weightGross = 0;
+  ])
+  let weightNet = 0
+  let weightGross = 0
   if (stockData.length === 0) {
     return res.status(404).json({
       status: 404,
-      message: "Not found stock",
+      message: 'Not found stock'
     })
   }
 
-  const productIds = stockData.map(item => item._id);
+  const productIds = stockData.map(item => item._id)
 
-  const products = await Product.find({ id: { $in: productIds } }).select('id weightGross weightNet');
+  const products = await Product.find({ id: { $in: productIds } }).select(
+    'id weightGross weightNet'
+  )
 
-  const productMap = new Map(products.map(p => [p.id, p]));
-
-
+  const productMap = new Map(products.map(p => [p.id, p]))
 
   for (const item of stockData) {
-    const productDetail = productMap.get(item._id);
-    const gross = Number(productDetail?.weightGross) || 0;
-    const net = Number(productDetail?.weightNet) || 0;
-    const qty = item.totalBalancePcs || 0;
+    const productDetail = productMap.get(item._id)
+    const gross = Number(productDetail?.weightGross) || 0
+    const net = Number(productDetail?.weightNet) || 0
+    const qty = item.totalBalancePcs || 0
 
-    weightGross += gross * qty;
-    weightNet += net * qty;
+    weightGross += gross * qty
+    weightNet += net * qty
   }
 
   res.status(200).json({
     status: 200,
-    message: "suceesful",
+    message: 'suceesful',
     weightNet: Number(weightNet.toFixed(2)),
     weightGross: Number(weightGross.toFixed(2))
-  });
-};
-
-
-
-
-
-
+  })
+}
 
 // exports.rollbackStock = async (req, res, next) => {
 //   try {

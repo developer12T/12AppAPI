@@ -33,9 +33,6 @@ exports.getProductAll = async (req, res) => {
       return modifiedProduct
     })
 
-
-
-
     res.status(200).json({
       status: '200',
       message: 'Products fetched successfully!',
@@ -62,14 +59,13 @@ exports.getProductSwitch = async (req, res) => {
     res.status(500).json({ status: '501', message: error.message })
   }
 }
-
 exports.getProduct = async (req, res) => {
   try {
     const { type, group, area, period, brand, size, flavour } = req.body
     const channel = req.headers['x-channel']
+
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Stock } = getModelsByChannel(channel, res, stockModel)
-
 
     if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
       return res.status(400).json({
@@ -118,25 +114,22 @@ exports.getProduct = async (req, res) => {
       { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
       {
         $group: {
-          _id: "$listProduct.productId",
-          // sumQtyPcs: { $sum: '$listProduct.sumQtyPcs' },
-          sumQtyCtn: { $sum: '$listProduct.sumQtyCtn' },
-
+          _id: '$listProduct.productId',
+          balanceCtn: { $sum: '$listProduct.balanceCtn' },
+          balancePcs: { $sum: '$listProduct.balancePcs' }
         }
       }
     ])
 
-    // console.log("products",products)
-
     if (!products.length) {
-      return res
-        .status(404)
-        .json({ status: '404', message: 'No products found!' })
+      return res.status(404).json({
+        status: '404',
+        message: 'No products found!'
+      })
     }
 
     products = products.map(product => {
-      let modifiedProduct = { ...product }
-      // console.log("modifiedProduct",modifiedProduct)
+      const modifiedProduct = { ...product }
 
       if (type === 'sale') {
         modifiedProduct.listUnit = modifiedProduct.listUnit.map(unit => ({
@@ -165,21 +158,22 @@ exports.getProduct = async (req, res) => {
             factor: unit.factor
           }))
       }
+
       return modifiedProduct
     })
-    console.log(stock)
 
-    const data = products.map(u => {
-      const qty = stock.find(s => s._id === u.id) || {};
-      return {
-        ...u,
-        qty: qty.sumQtyCtn || 0
-      }
-    }).sort((a, b) => b.qty - a.qty)
-    // .map(({qty,...rest}) => rest)
+    console.log('stock', stock) 
 
-
-
+    const data = products
+      .map(product => {
+        const matchedStock = stock.find(s => s._id === product.id) || {}
+        return {
+          ...product,
+          qtyCtn: matchedStock.balanceCtn || 0,
+          qtyPcs: matchedStock.balancePcs || 0
+        }
+      })
+      .sort((a, b) => b.qtyCtn - a.qtyCtn) // เรียงตาม qtyCtn มาก → น้อย
 
     res.status(200).json({
       status: '200',
@@ -569,19 +563,20 @@ exports.addFromERP = async (req, res) => {
       const unitData = itemConvertResponse.data
       // console.log(JSON.stringify(listProduct, null, 2));
 
-      const listUnit = listProduct.unitList.map(unit => {
-        const matchingUnit = unitData[0]?.type.find(u => u.unit === unit.unit)
-        return {
-          unit: unit.unit,
-          name: unit.name,
-          factor: matchingUnit ? matchingUnit.factor : 1,
-          price: {
-            sale: unit.pricePerUnitSale,
-            refund: unit.pricePerUnitRefund
+      const listUnit = listProduct.unitList
+        .map(unit => {
+          const matchingUnit = unitData[0]?.type.find(u => u.unit === unit.unit)
+          return {
+            unit: unit.unit,
+            name: unit.name,
+            factor: matchingUnit ? matchingUnit.factor : 1,
+            price: {
+              sale: unit.pricePerUnitSale,
+              refund: unit.pricePerUnitRefund
+            }
           }
-        }
-      })
-        .sort((a, b) => b.factor - a.factor);
+        })
+        .sort((a, b) => b.factor - a.factor)
       // console.log(JSON.stringify(listUnit, null, 2));
 
       const newProduct = new Product({
@@ -608,7 +603,7 @@ exports.addFromERP = async (req, res) => {
     }
     res.status(200).json({
       status: 200,
-      message: 'Products added successfully',
+      message: 'Products added successfully'
       // data:data
     })
   } catch (e) {
@@ -620,7 +615,6 @@ exports.addFromERP = async (req, res) => {
   }
 }
 exports.addFromERPnew = async (req, res) => {
-
   const channel = req.headers['x-channel']
   const result = await productQuery(channel)
 
@@ -652,19 +646,20 @@ exports.addFromERPnew = async (req, res) => {
     const unitData = itemConvertResponse.data
     // console.log(JSON.stringify(listProduct, null, 2));
 
-    const listUnit = listProduct.unitList.map(unit => {
-      const matchingUnit = unitData[0]?.type.find(u => u.unit === unit.unit)
-      return {
-        unit: unit.unit,
-        name: unit.name,
-        factor: matchingUnit ? matchingUnit.factor : 1,
-        price: {
-          sale: unit.pricePerUnitSale,
-          refund: unit.pricePerUnitRefund
+    const listUnit = listProduct.unitList
+      .map(unit => {
+        const matchingUnit = unitData[0]?.type.find(u => u.unit === unit.unit)
+        return {
+          unit: unit.unit,
+          name: unit.name,
+          factor: matchingUnit ? matchingUnit.factor : 1,
+          price: {
+            sale: unit.pricePerUnitSale,
+            refund: unit.pricePerUnitRefund
+          }
         }
-      }
-    })
-      .sort((a, b) => b.factor - a.factor);
+      })
+      .sort((a, b) => b.factor - a.factor)
     // console.log(JSON.stringify(listUnit, null, 2));
 
     const newProduct = new Product({
@@ -691,14 +686,12 @@ exports.addFromERPnew = async (req, res) => {
   }
   res.status(200).json({
     status: 200,
-    message: 'Products added successfully',
+    message: 'Products added successfully'
     // data:data
   })
-
 }
 
 exports.groupProductId = async (req, res) => {
-
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
   const data = await Product.aggregate([
@@ -706,7 +699,7 @@ exports.groupProductId = async (req, res) => {
       $group: {
         _id: {
           id: '$id',
-          name: "$name"
+          name: '$name'
         }
       }
     },
@@ -714,10 +707,10 @@ exports.groupProductId = async (req, res) => {
       $project: {
         _id: 0,
         id: '$_id.id',
-        name: "$_id.name"
+        name: '$_id.name'
       }
     }
-  ]);
+  ])
 
   res.status(200).json({
     status: 200,
@@ -726,9 +719,7 @@ exports.groupProductId = async (req, res) => {
   })
 }
 
-
 exports.groupBrandId = async (req, res) => {
-
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
   const data = await Product.aggregate([
@@ -736,7 +727,7 @@ exports.groupBrandId = async (req, res) => {
       $group: {
         _id: {
           id: '$brandCode',
-          name: "$brand"
+          name: '$brand'
         }
       }
     },
@@ -744,10 +735,10 @@ exports.groupBrandId = async (req, res) => {
       $project: {
         _id: 0,
         brandId: '$_id.id',
-        brandName: "$_id.name"
+        brandName: '$_id.name'
       }
     }
-  ]);
+  ])
 
   res.status(200).json({
     status: 200,
@@ -757,24 +748,23 @@ exports.groupBrandId = async (req, res) => {
 }
 
 exports.groupSize = async (req, res) => {
-
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
   const data = await Product.aggregate([
     {
       $group: {
         _id: {
-          id: '$size',
+          id: '$size'
         }
       }
     },
     {
       $project: {
         _id: 0,
-        size: '$_id.id',
+        size: '$_id.id'
       }
     }
-  ]);
+  ])
 
   res.status(200).json({
     status: 200,
@@ -784,7 +774,6 @@ exports.groupSize = async (req, res) => {
 }
 
 exports.groupFlavourId = async (req, res) => {
-
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
   const data = await Product.aggregate([
@@ -792,7 +781,7 @@ exports.groupFlavourId = async (req, res) => {
       $group: {
         _id: {
           id: '$flavourCode',
-          name: "$flavour"
+          name: '$flavour'
         }
       }
     },
@@ -800,10 +789,10 @@ exports.groupFlavourId = async (req, res) => {
       $project: {
         _id: 0,
         flavourId: '$_id.id',
-        flavourName: "$_id.name"
+        flavourName: '$_id.name'
       }
     }
-  ]);
+  ])
 
   res.status(200).json({
     status: 200,
