@@ -400,7 +400,7 @@ exports.getOrder = async (req, res) => {
 
     const order = await Order.find(query)
       .select(
-        'orderId store.createdAt store.storeId store.name store.address total status createdAt'
+        'orderId store.createdAt store.storeId store.name store.address total status statusTH createdAt'
       )
       .lean()
     // console.log("order",order)
@@ -420,6 +420,7 @@ exports.getOrder = async (req, res) => {
       createAt: o.createdAt,
       total: o.total,
       status: o.status,
+      statusTH: o.statusTH,
       createdAt: o.createdAt
     }))
 
