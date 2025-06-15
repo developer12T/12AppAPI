@@ -665,7 +665,15 @@ exports.updateStoreStatus = async (req, res) => {
     )
     await Store.findOneAndUpdate(
       { storeId: storeId },
-      { $set: { storeId: newId, status: status, updatedDate: Date() } },
+      {
+        $set: {
+          storeId: newId,
+          status: status,
+          updatedDate: Date(),
+          'approve.dateAction': new Date(),
+          'approve.userApprove': user
+        }
+      },
       { new: true }
     )
   } else {
