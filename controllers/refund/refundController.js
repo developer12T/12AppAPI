@@ -9,7 +9,7 @@ const { uploadFiles } = require('../../utilities/upload')
 const path = require('path')
 const multer = require('multer')
 const upload = multer({ storage: multer.memoryStorage() }).single('image')
-
+const { period, previousPeriod } = require('../../utilities/datetime')
 const refundModel = require('../../models/cash/refund')
 const orderModel = require('../../models/cash/sale')
 const cartModel = require('../../models/cash/cart')
@@ -94,7 +94,8 @@ exports.checkout = async (req, res) => {
             totalExVat: parseFloat((summary.totalRefund / 1.07).toFixed(2)),
             vat: parseFloat((summary.totalRefund - (summary.totalRefund / 1.07)).toFixed(2)),
             listImage: [],
-            createdBy: sale.username
+            createdBy: sale.username,
+            period: period,
         })
 
         // console.log("refundOrder",refundOrder)
@@ -133,7 +134,8 @@ exports.checkout = async (req, res) => {
             listImage: [],
             paymentMethod: payment,
             paymentStatus: 'unpaid',
-            createdBy: sale.username
+            createdBy: sale.username,
+            period: period,
         })
 
 

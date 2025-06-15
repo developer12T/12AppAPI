@@ -4,7 +4,7 @@
 // const { Distribution, Place } = require('../../models/cash/distribution')
 const { generateDistributionId } = require('../../utilities/genetateId')
 const { rangeDate } = require('../../utilities/datetime')
-
+const { period, previousPeriod } = require('../../utilities/datetime')
 const cartModel = require('../../models/cash/cart')
 const productModel = require('../../models/cash/product')
 const distributionModel = require('../../models/cash/distribution')
@@ -150,7 +150,8 @@ exports.checkout = async (req, res) => {
       totalQty: totalQty,
       totalWeightGross: parseFloat(totalWeightGross.toFixed(2)),
       totalWeightNet: parseFloat(totalWeightNet.toFixed(2)),
-      createdBy: sale.username
+      createdBy: sale.username,
+      period: period
     })
 
 
@@ -168,63 +169,63 @@ exports.checkout = async (req, res) => {
 
 
     for (const item of productQty) {
-            const factorPcsResult = await Product.aggregate([
-                { $match: { id: item.productId } },
-                {
-                    $project: {
-                        id: 1,
-                        listUnit: {
-                            $filter: {
-                                input: "$listUnit",
-                                as: "unitItem",
-                                cond: { $eq: ["$$unitItem.unit", item.unit] }
-                            }
-                        }
-                    }
-                }
-            ]);
-
-            const factorCtnResult = await Product.aggregate([
-                { $match: { id: item.productId } },
-                {
-                    $project: {
-                        id: 1,
-                        listUnit: {
-                            $filter: {
-                                input: "$listUnit",
-                                as: "unitItem",
-                                cond: { $eq: ["$$unitItem.unit", "CTN"] }
-                            }
-                        }
-                    }
-                }
-            ]);
-            const factorCtn = factorCtnResult[0].listUnit[0].factor
-            const factorPcs = factorPcsResult[0].listUnit[0].factor
-            const factorPcsQty = item.qty * factorPcs
-            const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
-            const data = await Stock.findOneAndUpdate(
-                {
-                    area: area,
-                    period: period,
-                    'listProduct.productId': item.productId
-                },
-                {
-                    $inc: {
-                        'listProduct.$[elem].stockOutPcs': +factorPcsQty,
-                        'listProduct.$[elem].balancePcs': -factorPcsQty,
-                        'listProduct.$[elem].stockOutCtn': +factorCtnQty,
-                        'listProduct.$[elem].balanceCtn': -factorCtnQty
-                    }
-                },
-                {
-                    arrayFilters: [
-                        { 'elem.productId': item.productId }
-                    ],
-                    new: true
-                }
-            );
+      const factorPcsResult = await Product.aggregate([
+        { $match: { id: item.productId } },
+        {
+          $project: {
+            id: 1,
+            listUnit: {
+              $filter: {
+                input: "$listUnit",
+                as: "unitItem",
+                cond: { $eq: ["$$unitItem.unit", item.unit] }
+              }
+            }
+          }
         }
+      ]);
+
+      const factorCtnResult = await Product.aggregate([
+        { $match: { id: item.productId } },
+        {
+          $project: {
+            id: 1,
+            listUnit: {
+              $filter: {
+                input: "$listUnit",
+                as: "unitItem",
+                cond: { $eq: ["$$unitItem.unit", "CTN"] }
+              }
+            }
+          }
+        }
+      ]);
+      const factorCtn = factorCtnResult[0].listUnit[0].factor
+      const factorPcs = factorPcsResult[0].listUnit[0].factor
+      const factorPcsQty = item.qty * factorPcs
+      const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
+      const data = await Stock.findOneAndUpdate(
+        {
+          area: area,
+          period: period,
+          'listProduct.productId': item.productId
+        },
+        {
+          $inc: {
+            'listProduct.$[elem].stockOutPcs': +factorPcsQty,
+            'listProduct.$[elem].balancePcs': -factorPcsQty,
+            'listProduct.$[elem].stockOutCtn': +factorCtnQty,
+            'listProduct.$[elem].balanceCtn': -factorCtnQty
+          }
+        },
+        {
+          arrayFilters: [
+            { 'elem.productId': item.productId }
+          ],
+          new: true
+        }
+      );
+    }
 
 
 
@@ -581,7 +582,43 @@ exports.updateStockWithdraw = async (req, res) => {
 
   res.status(200).json({
     status: 200,
-    message: stock
+    message: "successfully",
+    stock
   })
 }
 
+exports.insertWithdrawToErp = async (req, res) => {
+
+  const { area,period } = req.body
+  const channel = req.headers['x-channel'];
+  const { Distribution } = getModelsByChannel(channel, res, distributionModel);
+  console.log(  )
+  const distributionData = await Distribution.find({ area: area })
+
+  let data = {}
+  for (const item of distributionData) {
+    // const sendDateTram = 
+    const dataTran = {
+      Hcase:0,
+      orderNo:item.orderId,
+      statusLow:'22',
+      statusHigh:'22',
+      orderType:item.orderType,
+      tranferDate:'',
+      warehouse:'',
+      towarehouse:'',
+      routeCode:'',
+      addressCode:'',
+      location:'',
+      MGNUGL:'',
+      MGDEPT:'',
+      remark:''
+    }
+  }
+
+  res.status(200).json({
+    status: 200,
+    message: 'successfully',
+    distributionData
+  })
+}

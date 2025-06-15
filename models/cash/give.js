@@ -12,6 +12,7 @@ const giveawaysProduct = new mongoose.Schema({
     productAmount: { type: Number, default: 0 },
     limitType: { type: String, enum: ['limited', 'unlimited'], default: 'limited' },
     lot : [{ type: String }],
+
 })
 
 const giveTypeSchema = new mongoose.Schema({
@@ -29,7 +30,7 @@ const giveTypeSchema = new mongoose.Schema({
     },
     conditions: [giveawaysProduct],
     status: { type: String, enum: ['active', 'inactive'], default: 'active' },
-    createdAt: { type: Date },
+    createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 })
 
@@ -104,7 +105,8 @@ const giveawaysSchema = new mongoose.Schema({
     listImage: [giveImageSchema],
     createdBy: { type: String, require: true },
     createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
+    updatedAt: { type: Date, default: Date.now },
+    period:{ type: String, require: true },
 })
 
 // const Giveaway = dbCA.model('Giveaway', giveawaysSchema)

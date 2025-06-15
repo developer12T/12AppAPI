@@ -137,7 +137,8 @@ const orderSchema = new mongoose.Schema({
     reference: { type: String, require: true, default: '' },
     createdBy: { type: String, require: true },
     createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
+    updatedAt: { type: Date, default: Date.now },
+    period:{ type: String, require: true },
 })
 
 // const Order = dbCA.model('Order', orderSchema)

@@ -61,7 +61,8 @@ const refundSchema = new mongoose.Schema({
     reference: { type: String },
     createdBy: { type: String, require: true },
     createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
+    updatedAt: { type: Date, default: Date.now },
+    period:{ type: String, require: true }
 })
 
 // const Refund = dbCA.model('Refund', refundSchema)

@@ -116,6 +116,7 @@ const distributionSchema = mongoose.Schema({
     status: { type: String, require: true, enum: ['pending', 'completed', 'canceled', 'rejected'], default: 'pending' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
+    period:{ type: String, require: true },
 })
 
 

@@ -5,7 +5,7 @@ const { generateGiveawaysId, generateGivetypeId } = require('../../utilities/gen
 const { getProductGive, getStoreGive } = require('./giveProduct')
 const { summaryGive } = require('../../utilities/summary')
 const { rangeDate } = require('../../utilities/datetime')
-
+const { period, previousPeriod } = require('../../utilities/datetime')
 const productModel = require('../../models/cash/product')
 
 const stockModel = require('../../models/cash/stock')
@@ -240,7 +240,8 @@ exports.checkout = async (req, res) => {
                 shippingId: "",
                 address: ""
             },
-            createdBy: sale.username
+            createdBy: sale.username,
+            period: period,
         })
 
 

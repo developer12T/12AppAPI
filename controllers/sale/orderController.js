@@ -3,6 +3,7 @@
 // const { User } = require('../../models/cash/user')
 // const { Product } = require('../../models/cash/product')
 // const { Route } = require('../../models/cash/route')
+const { period, previousPeriod } = require('../../utilities/datetime')
 
 const { Warehouse, Locate, Balance, Sale } = require('../../models/cash/master')
 const { generateOrderId } = require('../../utilities/genetateId')
@@ -185,7 +186,8 @@ exports.checkout = async (req, res) => {
       },
       paymentMethod: 'cash',
       paymentStatus: 'paid',
-      createdBy: sale.username
+      createdBy: sale.username,
+      period: period,
     })
     applyPromotionUsage(
       newOrder.store.storeId,
