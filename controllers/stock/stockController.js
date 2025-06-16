@@ -649,57 +649,57 @@ exports.availableStock = async (req, res, next) => {
       // console.log("lot",lot)
       const tranFromProduct = product
         ? {
-            // ...product,
-            _id: product._id,
-            id: product.id,
-            name: product.name,
-            group: product.group,
-            groupCode: product.groupCode,
-            brandCode: product.brandCode,
-            brand: product.brand,
-            size: product.size,
-            flavourCode: product.flavourCode,
-            flavour: product.flavour,
-            type: product.type,
-            weightGross: product.weightGross,
-            weightNet: product.weightNet,
-            statusSale: product.statusSale,
-            statusWithdraw: product.statusWithdraw,
-            statusRefund: product.statusRefund,
-            image: product.image,
+          // ...product,
+          _id: product._id,
+          id: product.id,
+          name: product.name,
+          group: product.group,
+          groupCode: product.groupCode,
+          brandCode: product.brandCode,
+          brand: product.brand,
+          size: product.size,
+          flavourCode: product.flavourCode,
+          flavour: product.flavour,
+          type: product.type,
+          weightGross: product.weightGross,
+          weightNet: product.weightNet,
+          statusSale: product.statusSale,
+          statusWithdraw: product.statusWithdraw,
+          statusRefund: product.statusRefund,
+          image: product.image,
 
-            listUnit: product.listUnit.map(unit => {
-              // console.log("lot",lot)
-              // const totalQtyPcsToCtn = Math.floor(
-              //   lot.available.reduce((sum, item) => {
-              //     return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor
-              //   }, 0)
-              // )
-              if (unit.unit == 'CTN') {
-                qty = lot.available.reduce((total, u) => total + u.qtyCtn, 0)
-              } else if (unit.unit == 'PCS') {
-                qty = lot.available.reduce((total, u) => total + u.qtyPcs, 0)
-              } else {
-                qty = 0
+          listUnit: product.listUnit.map(unit => {
+            // console.log("lot",lot)
+            // const totalQtyPcsToCtn = Math.floor(
+            //   lot.available.reduce((sum, item) => {
+            //     return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor
+            //   }, 0)
+            // )
+            if (unit.unit == 'CTN') {
+              qty = lot.available.reduce((total, u) => total + u.qtyCtn, 0)
+            } else if (unit.unit == 'PCS') {
+              qty = lot.available.reduce((total, u) => total + u.qtyPcs, 0)
+            } else {
+              qty = 0
+            }
+
+            return {
+              unit: unit.unit,
+              name: unit.name,
+              factor: unit.factor,
+              // qty: totalQtyPcsToCtn,
+
+              qty: qty,
+              price: {
+                sale: unit.price.sale,
+                Refund: unit.price.refund
               }
-
-              return {
-                unit: unit.unit,
-                name: unit.name,
-                factor: unit.factor,
-                // qty: totalQtyPcsToCtn,
-
-                qty: qty,
-                price: {
-                  sale: unit.price.sale,
-                  Refund: unit.price.refund
-                }
-              }
-            }),
-            created: product.created,
-            updated: product.updated,
-            __v: product.__v
-          }
+            }
+          }),
+          created: product.created,
+          updated: product.updated,
+          __v: product.__v
+        }
         : null
 
       // console.log(lot)
@@ -727,7 +727,7 @@ exports.availableStock = async (req, res, next) => {
       }
     })
 
-    function parseSize (sizeStr) {
+    function parseSize(sizeStr) {
       if (!sizeStr) return 0
 
       const units = {
@@ -869,6 +869,7 @@ exports.getStockQty = async (req, res) => {
   )
 
   let data = []
+
   for (const stockItem of dataStockTran.listProduct) {
     const productDetail = dataProduct.find(u => u.id == stockItem.productId)
     const stock = stockItem.stockPcs
@@ -878,7 +879,6 @@ exports.getStockQty = async (req, res) => {
 
     const listUnitStock = productDetail.listUnit.map(u => {
       const factor = u.factor
-      // console.log(u)
       return {
         unit: u.unit,
         stock: Math.floor(stock / factor),
@@ -895,6 +895,15 @@ exports.getStockQty = async (req, res) => {
     }
     data.push(finalProductStock)
   }
+
+  data.sort((a, b) => {
+    const balanceA = a.listUnit.find(u => u.unit === 'PCS')?.balance || 0;
+    const balanceB = b.listUnit.find(u => u.unit === 'PCS')?.balance || 0;
+    return balanceB - balanceA;
+  });
+
+
+
 
   if (dataStock.length == 0) {
     res.status(404).json({

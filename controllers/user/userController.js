@@ -402,7 +402,7 @@ exports.addUserManeger = async (req, res) => {
     SUBSTRING(Col_Name, CHARINDEX(' ', Col_Name + ' ') + 1, LEN(Col_Name)) AS surName,
     ${hash} AS password,
     '' AS tel,
-    '' AS zone,
+    Col_o_Address AS zone,
     '' AS area,
     '' AS warehouse,
     Col_o_JobTitle AS role,
