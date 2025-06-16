@@ -1907,7 +1907,7 @@ exports.erpApiCheckOrder = async (req, res) => {
 
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Internal server error.' });
+    // res.status(500).json({ message: 'Internal server error.' });
   }
 };
 
@@ -1971,7 +1971,7 @@ exports.erpApiCheckDisributionM3 = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error in erpApiCheckDisributionM3:', error);
-    res.status(500).json({ status: 500, message: 'Internal server error' });
+    // res.status(500).json({ status: 500, message: 'Internal server error' });
   }
 };
 
