@@ -1871,7 +1871,10 @@ exports.erpApiCheckOrder = async (req, res) => {
     );
 
     if (updateResult.modifiedCount === 0) {
-      return res.json({ message: 'No new orders found in the M3 system' });
+      return res.json({
+        // status: 200,
+        message: 'No new order found in the M3 system'
+      });
     }
 
     console.log('✅ Updated orderIds:', saleId);
