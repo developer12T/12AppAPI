@@ -31,14 +31,14 @@ async function erpApiCheckOrderJob(channel = 'cash') {
     //   orderId: { $nin: saleId }
     // }).select('orderId');
     
-    const updateResult = await Order.updateMany(
-      { orderId: { $in: saleId } },
-      { $set: { status: 'success' } }
-    );
-    if (updateResult.modifiedCount === 0) {
-      console.log('No new order found in the M3 system');
-      return { updated: false, updatedCount: 0 };
-    }
+    // const updateResult = await Order.updateMany(
+    //   { orderId: { $in: saleId } },
+    //   { $set: { status: 'success' } }
+    // );
+    // if (updateResult.modifiedCount === 0) {
+    //   console.log('No new order found in the M3 system');
+    //   return { updated: false, updatedCount: 0 };
+    // }
 
     // Broadcast
     const io = getSocket();
@@ -53,18 +53,18 @@ async function erpApiCheckOrderJob(channel = 'cash') {
       'sale_routeTimeline'
     ];
 
-    events.forEach(event => {
-      io.emit(event, {
-        status: 200,
-        message: 'New Update Data',
-        updatedCount: updateResult.modifiedCount
-      });
-    });
+    // events.forEach(event => {
+    //   io.emit(event, {
+    //     status: 200,
+    //     message: 'New Update Data',
+    //     updatedCount: updateResult.modifiedCount
+    //   });
+    // });
 
-    return {
-      updated: true,
-      updatedCount: updateResult.modifiedCount
-    };
+    // return {
+    //   updated: true,
+    //   updatedCount: updateResult.modifiedCount
+    // };
   } catch (error) {
     console.error('❌ Error in erpApiCheckOrderJob:', error);
     return { error: true, message: error.message };
