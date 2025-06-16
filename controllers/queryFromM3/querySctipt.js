@@ -75,6 +75,60 @@ WHERE
 
 }
 
+exports.userQueryManeger = async function (channel, area) {
+
+  const config = {
+    user: process.env.MS_SQL_USER,
+    password: process.env.MS_SQL_PASSWORD,
+    server: process.env.MS_SQL_SERVER,
+    database: process.env.MS_SQL_DATABASE,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  };
+  const hash = '$2b$10$DqTAeJ.dZ67XVLky203dn.77idSGjHqbOJ7ztOTeEpr1VeycWngua';
+
+  await sql.connect(config);
+
+
+  let result = ''
+  if (channel == 'cash') {
+    result = await sql.query`
+    SELECT 
+     '' AS saleCode,
+     '' AS salePayer,
+    Col_LoginName AS username,
+    LEFT(Col_Name, CHARINDEX(' ', Col_Name + ' ') - 1) AS firstName,
+    SUBSTRING(Col_Name, CHARINDEX(' ', Col_Name + ' ') + 1, LEN(Col_Name)) AS surName,
+    ${hash} AS password,
+    '' AS tel,
+     CASE
+    WHEN Col_o_JobTitle IN ('Developer', 'IT Support', 'Sale_Manager') THEN 'All'
+    ELSE Col_o_Address
+  END AS zone ,
+    '' AS area,
+    '' AS warehouse,
+    Col_o_JobTitle AS role,
+    '1' AS status
+    FROM [192.168.0.3].[AntDB].[dbo].[hs_User] AS hr
+    WHERE 
+      Col_o_JobTitle in ('Developer','IT Support','Sale_Manager','Supervisor','Area_Manager','IT')
+    `;
+  }
+
+
+  else if (channel == 'cash') {
+
+  }
+  await sql.close();
+
+  
+  return result.recordset
+
+
+
+}
 
 exports.userQueryFilter = async function (channel, area) {
 

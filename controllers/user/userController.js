@@ -10,7 +10,7 @@ const bcrypt = require('bcrypt')
 const axios = require('axios')
 const userModel = require('../../models/cash/user')
 const { getModelsByChannel } = require('../../middleware/channel')
-const { userQuery, userQueryFilter } = require('../../controllers/queryFromM3/querySctipt');
+const { userQuery, userQueryFilter,userQueryManeger } = require('../../controllers/queryFromM3/querySctipt');
 exports.getUser = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
@@ -373,46 +373,8 @@ exports.addAndUpdateUser = async (req, res) => {
 
 exports.addUserManeger = async (req, res) => {
   try {
-    // const channel = req.headers['x-channel']
-
-
-
-
-    const config = {
-      user: 'sa',
-      password: 'P@ssw0rd',
-      server: '192.168.2.97',
-      database: 'DATA_API_TOHOME',
-      options: {
-        encrypt: false,
-        trustServerCertificate: true
-      }
-    };
-    const hash = '$2b$10$DqTAeJ.dZ67XVLky203dn.77idSGjHqbOJ7ztOTeEpr1VeycWngua';
-
-    await sql.connect(config);
-
-    let result = ''
-    result = await sql.query`
-    SELECT 
-     '' AS saleCode,
-     '' AS salePayer,
-    Col_LoginName AS username,
-    LEFT(Col_Name, CHARINDEX(' ', Col_Name + ' ') - 1) AS firstName,
-    SUBSTRING(Col_Name, CHARINDEX(' ', Col_Name + ' ') + 1, LEN(Col_Name)) AS surName,
-    ${hash} AS password,
-    '' AS tel,
-    Col_o_Address AS zone,
-    '' AS area,
-    '' AS warehouse,
-    Col_o_JobTitle AS role,
-    '1' AS status
-    FROM [192.168.0.3].[AntDB].[dbo].[hs_User] AS hr
-    WHERE 
-      Col_o_JobTitle in ('Developer','IT Support','Sale_Manager','Supervisor','Area_Manager','IT')
-    `;
-
-    await sql.close();
+    const channelHeader = req.headers['x-channel']
+    const tableData = await userQueryManeger(channelHeader); 
 
     let update = 0
     let addNew = 0
@@ -420,7 +382,8 @@ exports.addUserManeger = async (req, res) => {
     for (const c of channel) {
       const { User } = getModelsByChannel(c, res, userModel)
       const userMongo = await User.find()
-      for (const m3 of result.recordset) {
+      
+      for (const m3 of tableData) {
         const userInMongo = userMongo.find(id => id.saleCode == m3.saleCode)
 
         if (userInMongo) {
