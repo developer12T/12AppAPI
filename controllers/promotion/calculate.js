@@ -14,6 +14,7 @@ async function rewardProduct(rewards, multiplier, channel, res) {
     const { Product } = getModelsByChannel(channel, res, productModel);
 
     const rewardFilters = rewards.map(r => ({
+        ...(r.productId ? { id: r.productId } : {}),
         ...(r.productGroup ? { group: r.productGroup } : {}),
         ...(r.productFlavour ? { flavour: r.productFlavour } : {}),
         ...(r.productBrand ? { brand: r.productBrand } : {}),
@@ -64,8 +65,9 @@ async function applyPromotion(order, channel, res) {
     const promotions = await Promotion.find({ status: 'active' })
     const beautyStore = await TypeStore.findOne({
         storeId: order.store.storeId,
-        type: { $in: ["beauty"] } 
+        type: { $in: ["beauty"] }
     });
+    // console.log('beautyStore',beautyStore)
     for (const promo of promotions) {
         let promoApplied = false
         let promoDiscount = 0
@@ -75,8 +77,9 @@ async function applyPromotion(order, channel, res) {
         if (promo.applicableTo?.typeStore?.length > 0 && !promo.applicableTo.typeStore.includes(order.store?.storeType)) continue
         if (promo.applicableTo?.zone?.length > 0 && !promo.applicableTo.zone.includes(order.store?.zone)) continue
         if (promo.applicableTo?.area?.length > 0 && !promo.applicableTo.area.includes(order.store?.area)) continue
+        console.log("promo", promo.applicableTo?.isbeauty)
         if (promo.applicableTo?.isbeauty === true && !beautyStore) {
-            // console.log('ข้าม')
+            console.log('ข้าม')
             continue
         };
 
@@ -94,6 +97,7 @@ async function applyPromotion(order, channel, res) {
         )
 
         if (matchedProducts.length === 0) continue
+
         let totalAmount = matchedProducts.reduce((sum, p) => sum + (p.qty * p.price), 0)
         let totalQty = matchedProducts.reduce((sum, p) => sum + p.qty, 0)
 
@@ -101,7 +105,7 @@ async function applyPromotion(order, channel, res) {
             (promo.proType === 'free' && condition.productQty >= 0 && totalQty >= condition.productQty) ||
             (promo.proType === 'amount' && condition.productAmount >= 0 && totalAmount >= condition.productAmount)
         )
-
+        console.log(meetsCondition)
         if (!meetsCondition) continue
 
         let multiplier = 1
@@ -116,9 +120,10 @@ async function applyPromotion(order, channel, res) {
                 return multiplier
             }, 1)
         }
-
         switch (promo.proType) {
             case 'amount':
+                freeProducts = await rewardProduct(promo.rewards, multiplier, channel, res)
+                promoApplied = true
             case 'free':
                 freeProducts = await rewardProduct(promo.rewards, multiplier, channel, res)
                 promoApplied = true
@@ -136,6 +141,7 @@ async function applyPromotion(order, channel, res) {
                 break
         }
         if (promoApplied) {
+            // console.log(promoApplied)
             let selectedProduct = freeProducts.length > 0 ? freeProducts[0] : null
             appliedPromotions.push({
                 proId: promo.proId,
@@ -164,6 +170,7 @@ async function applyPromotion(order, channel, res) {
 
             discountTotal += promoDiscount
         }
+        // console.log(appliedPromotions)
     }
     return { appliedPromotions }
 }

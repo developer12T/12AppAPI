@@ -2438,7 +2438,7 @@ exports.getSummaryProduct = async (req, res) => {
     const productDetail = grouped.find(
       u => u.productId == item.productId 
     )
-    console.log('item',productDetail)
+    // console.log('item',productDetail)
     const storeCount = countStore.find(
       u => u.productId == item.productId && u.area == item.area
     )
@@ -2469,7 +2469,7 @@ exports.getSummaryProduct = async (req, res) => {
 
   const data = areaId.map(item => {
     const productDetail = productTran.filter(u => u.area === item.area)
-
+    console.log(productDetail)
     const mergedDetail = productDetail.reduce((acc, curr) => {
       const { area, ...rest } = curr
 
