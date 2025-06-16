@@ -275,18 +275,37 @@ exports.getSendMoney = async (req, res) => {
 
 exports.getAllSendMoney = async (req, res) => {
 
-    const channel = req.headers['x-channel']
-    const { area } = req.body
+  const channel = req.headers['x-channel']
+  const { area, zone } = req.query
+  console.log(area, zone)
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+  const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+  let pipeline = [];
+  pipeline.push({
+    $addFields: {
+      zone: { $substrBytes: ["$area", 0, 2] }
+    }
+  });
 
-    const { Order } = getModelsByChannel(channel, res, orderModel)
-    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+  let matchStage = {};
 
-    const sendMoneyData = await SendMoney.find()
+  if (area) {
+    matchStage.area = area;
+  }
+  if (zone) {
+    matchStage.zone = zone;
+  }
 
-    res.status(200).json({
-      status:200,
-      message: 'success',
-      data:sendMoneyData
-    })
+  if (Object.keys(matchStage).length > 0) {
+    pipeline.push({ $match: matchStage });
+  }
+
+  const sendMoneyData = await SendMoney.aggregate(pipeline);
+
+  res.status(200).json({
+    status: 200,
+    message: 'success',
+    data: sendMoneyData
+  })
 
 }
