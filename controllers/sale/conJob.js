@@ -41,17 +41,17 @@ async function erpApiCheckOrderJob(channel = 'cash') {
     // }
 
     // Broadcast
-    const io = getSocket();
-    const events = [
-      'sale_getSummarybyArea',
-      'sale_getSummarybyMonth',
-      'sale_getSummarybyRoute',
-      'sale_getSummaryItem',
-      'sale_getSummarybyGroup',
-      'sale_getRouteCheckinAll',
-      'sale_getTimelineCheckin',
-      'sale_routeTimeline'
-    ];
+    // const io = getSocket();
+    // const events = [
+    //   'sale_getSummarybyArea',
+    //   'sale_getSummarybyMonth',
+    //   'sale_getSummarybyRoute',
+    //   'sale_getSummaryItem',
+    //   'sale_getSummarybyGroup',
+    //   'sale_getRouteCheckinAll',
+    //   'sale_getTimelineCheckin',
+    //   'sale_routeTimeline'
+    // ];
 
     // events.forEach(event => {
     //   io.emit(event, {
