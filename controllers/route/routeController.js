@@ -3,13 +3,13 @@ const axios = require('axios')
 const { Route, RouteChangeLog } = require('../../models/cash/route')
 const { period, previousPeriod } = require('../../utilities/datetime')
 const { Store } = require('../../models/cash/store')
-const { uploadFiles } = require('../../utilities/upload')
+const { uploadFilesCheckin } = require('../../utilities/upload')
 const multer = require('multer')
 const upload = multer({ storage: multer.memoryStorage() }).array(
   'checkInImage',
   1
 )
-const sql = require('mssql');
+const sql = require('mssql')
 const { routeQuery } = require('../../controllers/queryFromM3/querySctipt')
 const orderModel = require('../../models/cash/sale')
 const routeModel = require('../../models/cash/route')
@@ -19,7 +19,6 @@ const productModel = require('../../models/cash/product')
 const { getModelsByChannel } = require('../../middleware/channel')
 const path = require('path')
 
-
 exports.getRoute = async (req, res) => {
   try {
     const { period, area, district, province, routeId, storeId } = req.query
@@ -27,6 +26,7 @@ exports.getRoute = async (req, res) => {
 
     const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
     const { Route } = getModelsByChannel(channel, res, routeModel)
+
     if (!period) {
       return res
         .status(400)
@@ -37,110 +37,69 @@ exports.getRoute = async (req, res) => {
     if (area) query.area = area
     if (routeId) query.id = routeId
 
+    const routes = await Route.find(query).populate(
+      'listStore.storeInfo',
+      'storeId name address typeName taxId tel'
+    )
 
-    let enrichedRoutes = []
+    const filteredRoutes = routes
+      .map(route => {
+        const filteredListStore = route.listStore.filter(store => {
+          const addr = (store.storeInfo?.address || '').toLowerCase()
 
-    if (period && area && !district && !province && !routeId && !storeId) {
-      const routes = await Route.find(query).populate(
-        'listStore.storeInfo',
-        'storeId name address typeName taxId tel'
-      )
+          const matchDistrict = district
+            ? addr.includes(district.toLowerCase())
+            : true
+          const matchProvince = province
+            ? addr.includes(province.toLowerCase())
+            : true
 
-      for (const item of routes) {
-        enrichedRoutes.push({
-          id: item.id,
-          period: item.period,
-          area: item.area,
-          day: item.day,
-          storeAll: item.storeAll,
-          storePending: item.storePending,
-          storeSell: item.storeSell,
-          storeNotSell: item.storeNotSell,
-          storeCheckInNotSell: item.storeCheckInNotSell,
-          storeTotal: item.storeTotal,
-          percentComplete: item.percentComplete,
-          complete: item.complete,
-          percentVisit: item.percentVisit,
-          percentEffective: item.percentEffective
+          const matchStoreId = storeId
+            ? store.storeInfo?.storeId === storeId
+            : true
+
+          return matchDistrict && matchProvince && matchStoreId
         })
-
-      }
-    }
-    else {
-
-      const routes = await Route.find(query).populate(
-        'listStore.storeInfo',
-        'storeId name address typeName taxId tel'
-      )
-      const filteredRoutes = routes
-        .map(route => {
-          const filteredListStore = route.listStore.filter(store => {
-            const addr = (store.storeInfo?.address || '').toLowerCase()
-
-            const matchDistrict = district
-              ? addr.includes(district.toLowerCase())
-              : true
-            const matchProvince = province
-              ? addr.includes(province.toLowerCase())
-              : true
-
-            const matchStoreId = storeId
-              ? store.storeInfo?.storeId === storeId
-              : true
-
-            return matchDistrict && matchProvince && matchStoreId
-          })
-
-          return {
-            ...route.toObject(),
-            listStore: filteredListStore
-          }
-        })
-        .filter(route => route.listStore.length > 0)
-
-      // console.log(filteredRoutes)
-
-      const allStoreIds = filteredRoutes.flatMap(route =>
-        route.listStore.map(s => s.storeInfo?.storeId).filter(Boolean)
-      )
-
-      const storeTypes = await TypeStore.find({
-        storeId: { $in: allStoreIds }
-      }).select('storeId type')
-
-      const storeTypeMap = new Map(storeTypes.map(s => [s.storeId, s.type]))
-
-      enrichedRoutes = filteredRoutes.map(route => {
-        const enrichedListStore = route.listStore
-          .sort((a, b) => {
-            const statusA = parseInt(a.status) || 0;
-            const statusB = parseInt(b.status) || 0;
-            return statusA - statusB;
-          })
-          .map(itemRaw => {
-            const item = itemRaw.toObject ? itemRaw.toObject() : itemRaw;
-            const storeInfo = item.storeInfo?.toObject
-              ? item.storeInfo.toObject()
-              : item.storeInfo || {};
-            const type = storeTypeMap.get(storeInfo.storeId);
-            return {
-              ...item,
-              storeInfo,
-              storeType: type || []
-            };
-          });
 
         return {
-          ...route,
-          listStore: enrichedListStore
+          ...route.toObject(),
+          listStore: filteredListStore
+        }
+      })
+      .filter(route => route.listStore.length > 0)
+
+    // console.log(filteredRoutes)
+
+    const allStoreIds = filteredRoutes.flatMap(route =>
+      route.listStore.map(s => s.storeInfo?.storeId).filter(Boolean)
+    )
+
+    const storeTypes = await TypeStore.find({
+      storeId: { $in: allStoreIds }
+    }).select('storeId type')
+
+    const storeTypeMap = new Map(storeTypes.map(s => [s.storeId, s.type]))
+
+    const enrichedRoutes = filteredRoutes.map(route => {
+      const enrichedListStore = route.listStore.map(itemRaw => {
+        const item = itemRaw.toObject ? itemRaw.toObject() : itemRaw
+        const storeInfo = item.storeInfo?.toObject
+          ? item.storeInfo.toObject()
+          : item.storeInfo || {}
+        const type = storeTypeMap.get(storeInfo.storeId)
+
+        return {
+          ...item,
+          storeInfo,
+          storeType: type || []
         }
       })
 
-      // console.log(enrichedRoutes)
-
-    }
-
-
+      return {
+        ...route,
+        listStore: enrichedListStore
+      }
+    })
 
     res.status(200).json({
       status: 200,
@@ -180,6 +139,7 @@ exports.addFromERP = async (req, res) => {
     const { Store } = getModelsByChannel(channel, res, storeModel)
     const { Route } = getModelsByChannel(channel, res, routeModel)
     const route = await Route.find({ period: period() })
+
     const routeMap = new Map(route.map(route => [route.id, route]))
     let routeId
     const latestRoute = route.sort((a, b) => b.id.localeCompare(a.id))[0]
@@ -279,20 +239,19 @@ exports.addFromERP = async (req, res) => {
   }
 }
 
-
 exports.addFromERPnew = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
 
     const result = await routeQuery(channel)
-    const return_arr = [];
+    const return_arr = []
 
     for (const row of result) {
-      const area = String(row.area ?? '').trim();
-      const id = String(row.id ?? '').trim();
-      const day = String(row.day ?? '').trim();
-      const period = String(row.period ?? '').trim();
-      const storeId = String(row.storeId ?? '').trim();
+      const area = String(row.area ?? '').trim()
+      const id = String(row.id ?? '').trim()
+      const day = String(row.day ?? '').trim()
+      const period = String(row.period ?? '').trim()
+      const storeId = String(row.storeId ?? '').trim()
 
       const storeInfo = {
         storeInfo: storeId,
@@ -303,15 +262,15 @@ exports.addFromERPnew = async (req, res) => {
         statusText: '',
         date: '',
         listOrder: []
-      };
+      }
 
-      let groupFound = false;
+      let groupFound = false
 
       for (const group of return_arr) {
         if (group.id === id && group.area === area) {
-          group.listStore.push(storeInfo);
-          groupFound = true;
-          break;
+          group.listStore.push(storeInfo)
+          groupFound = true
+          break
         }
       }
 
@@ -322,7 +281,7 @@ exports.addFromERPnew = async (req, res) => {
           period,
           day,
           listStore: [storeInfo]
-        });
+        })
       }
     }
 
@@ -417,27 +376,14 @@ exports.addFromERPnew = async (req, res) => {
 
     res.status(200).json({
       status: 200,
-      message: 'sucess',
+      message: 'sucess'
       // data: return_arr
-
     })
-
-
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
   }
-
 }
-
-
-
-
-
-
-
-
-
 
 exports.checkIn = async (req, res) => {
   upload(req, res, async err => {
@@ -469,7 +415,7 @@ exports.checkIn = async (req, res) => {
       if (req.files) {
         try {
           const files = req.files
-          const uploadedFile = await uploadFiles(
+          const uploadedFile = await uploadFilesCheckin(
             files,
             path.join(__dirname, '../../public/images/stores/checkin'),
             store.area,
@@ -551,7 +497,7 @@ exports.checkInVisit = async (req, res) => {
       if (req.files) {
         try {
           const files = req.files
-          const uploadedFile = await uploadFiles(
+          const uploadedFile = await uploadFilesCheckin(
             files,
             path.join(__dirname, '../../public/images/stores/checkin'),
             store.area,
@@ -1248,13 +1194,6 @@ exports.updateAndAddRoute = async (req, res) => {
     message: 'Add Route Successfully'
   })
 }
-
-
-
-
-
-
-
 
 exports.getRouteProvince = async (req, res) => {
   const { area, period } = req.body
