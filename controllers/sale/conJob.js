@@ -31,10 +31,10 @@ async function erpApiCheckOrderJob(channel = 'cash') {
       orderId: { $nin: saleId }
     }).select('orderId');
     
-    const updateResult = await Order.updateMany(
-      { orderId: { $in: saleId } },
-      { $set: { status: 'success' } }
-    );
+    // const updateResult = await Order.updateMany(
+    //   { orderId: { $in: saleId } },
+    //   { $set: { status: 'success' } }
+    // );
 
     console.log('erpApiCheckOrderJob')
     // if (updateResult.modifiedCount === 0) {
