@@ -27,14 +27,14 @@ async function erpApiCheckOrderJob(channel = 'cash') {
     
     const saleId = modelSale.map(row => row.get('OAORNO'));
     
-    const notInModelOrder = await Order.find({
-      orderId: { $nin: saleId }
-    }).select('orderId');
+    // const notInModelOrder = await Order.find({
+    //   orderId: { $nin: saleId }
+    // }).select('orderId');
     
-    // const updateResult = await Order.updateMany(
-    //   { orderId: { $in: saleId } },
-    //   { $set: { status: 'success' } }
-    // );
+    const updateResult = await Order.updateMany(
+      { orderId: { $in: saleId } },
+      { $set: { status: 'success' } }
+    );
 
     console.log('erpApiCheckOrderJob')
     // if (updateResult.modifiedCount === 0) {
