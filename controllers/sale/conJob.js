@@ -1,6 +1,6 @@
 const cron = require('node-cron')
 // const { erpApiCheckOrder,erpApiCheckDisributionM3 } = require('../../controllers/sale/orderController')
-const { OrderToExcelConJob } = require('../../controllers/sale/orderController') 
+const { OrderToExcelConJob } = require('../../controllers/sale/orderController')
 
 
 const { Warehouse, Locate, Balance, Sale, DisributionM3 } = require('../../models/cash/master')
@@ -41,7 +41,7 @@ async function erpApiCheckOrderJob(channel = 'cash') {
       return { updated: false, updatedCount: 0 };
     }
 
-    console.log('✅ Updated orderIds:', saleId);
+    console.log(`✅ Updated ${saleId.length} orderIds`);
 
     // Broadcast
     const io = getSocket();

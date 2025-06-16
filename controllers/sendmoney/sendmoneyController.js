@@ -277,7 +277,6 @@ exports.getAllSendMoney = async (req, res) => {
 
   const channel = req.headers['x-channel']
   const { area, zone } = req.query
-  console.log(area, zone)
   const { Order } = getModelsByChannel(channel, res, orderModel)
   const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
   let pipeline = [];
