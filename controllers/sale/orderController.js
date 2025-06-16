@@ -1870,12 +1870,12 @@ exports.erpApiCheckOrder = async (req, res) => {
       { $set: { status: 'success' } }
     );
 
-if (updateResult.modifiedCount === 0) {
-  console.log('No new order found in the M3 system');
-  return res.status(200).json({
-    message: 'No new order found in the M3 system'
-  });
-}
+    if (updateResult.modifiedCount === 0) {
+      console.log('No new order found in the M3 system');
+      return res.status(200).json({
+        message: 'No new order found in the M3 system'
+      });
+    }
 
     console.log('✅ Updated orderIds:', saleId);
 
@@ -1938,12 +1938,12 @@ exports.erpApiCheckDisributionM3 = async (req, res) => {
 
     // 3. ถ้าไม่มีอะไรอัปเดตเลย → return
 
-if (updateResult.modifiedCount === 0) {
-  console.log('No new order Distribution found in the M3 system');
-  return res.status(200).json({
-    message: 'No new order Distribution found in the M3 system'
-  });
-}
+    if (updateResult.modifiedCount === 0) {
+      console.log('No new order Distribution found in the M3 system');
+      return res.status(200).json({
+        message: 'No new order Distribution found in the M3 system'
+      });
+    }
 
 
 
@@ -2310,7 +2310,7 @@ exports.getSummaryProduct = async (req, res) => {
   })
 
   const grouped = []
-  
+
   productQty.forEach(item => {
     const existing = grouped.find(
       g =>
@@ -2328,7 +2328,6 @@ exports.getSummaryProduct = async (req, res) => {
       grouped.push({ ...item })
     }
   })
-
   const product = await Product.aggregate([
     {
       $addFields: {
@@ -2353,6 +2352,7 @@ exports.getSummaryProduct = async (req, res) => {
       }
     }
   ])
+
   const area = await User.aggregate([
     {
       $addFields: {
@@ -2436,9 +2436,14 @@ exports.getSummaryProduct = async (req, res) => {
 
   const productTran = areaProduct.map(item => {
     const productDetail = grouped.find(
-      u => u.productId == item.productId 
+      u => u.productId == item.productId
+        && u.area == item.area
     )
-    // console.log('item',productDetail)
+    // if (productDetail && productDetail.qty > 1) {
+    //   console.log(item.groupSize)
+    //   console.log('item', productDetail)
+    // }
+
     const storeCount = countStore.find(
       u => u.productId == item.productId && u.area == item.area
     )
@@ -2448,7 +2453,7 @@ exports.getSummaryProduct = async (req, res) => {
       ? (((storeCount?.count || 0) / allStoreCount.constStore) * 100).toFixed(2)
       : 0
 
-    
+
     return {
       // productId: item.productId,
       area: item.area,
@@ -2461,15 +2466,13 @@ exports.getSummaryProduct = async (req, res) => {
     }
   })
 
-  
-
   const areaId = [...new Set(productTran.map(u => u.area))].map(area => ({
     area
   }))
 
   const data = areaId.map(item => {
     const productDetail = productTran.filter(u => u.area === item.area)
-    console.log(productDetail)
+
     const mergedDetail = productDetail.reduce((acc, curr) => {
       const { area, ...rest } = curr
 
@@ -2481,6 +2484,28 @@ exports.getSummaryProduct = async (req, res) => {
       ...mergedDetail
     }
   })
+
+  // console.log(data)
+
+data.forEach(u => {
+  const entries = Object.entries(u);     // ได้ทั้ง key และ value เป็น array [key, value]
+  const [key, field] = entries[2];       // ตำแหน่งที่ 2 คือฟิลด์ลำดับที่ 3
+
+  if (
+    !isNaN(field) &&
+    field !== null &&
+    field !== undefined &&
+    field !== '' &&
+    Number(field) !== 0
+  ) {
+    console.log(`Field[3] (${key}) is valid number ≠ 0:`, field);
+  }
+});
+
+
+
+
+
 
   const summaryTarget = productTran.reduce((sum, item) => {
     const key = Object.keys(item).find(
