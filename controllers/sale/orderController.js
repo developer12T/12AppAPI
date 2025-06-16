@@ -1870,13 +1870,12 @@ exports.erpApiCheckOrder = async (req, res) => {
       { $set: { status: 'success' } }
     );
 
-    if (updateResult.modifiedCount === 0) {
-      console.log('No new order found in the M3 system');
-      return res.send();
-    }
-
-
-
+if (updateResult.modifiedCount === 0) {
+  console.log('No new order found in the M3 system');
+  return res.status(200).json({
+    message: 'No new order found in the M3 system'
+  });
+}
 
     console.log('✅ Updated orderIds:', saleId);
 
@@ -1939,10 +1938,12 @@ exports.erpApiCheckDisributionM3 = async (req, res) => {
 
     // 3. ถ้าไม่มีอะไรอัปเดตเลย → return
 
-    if (updateResult.modifiedCount === 0) {
-      console.log('No new order Distribution found in the M3 system');
-      return res.send(); // ✅ ส่งเปล่ากลับไป → หยุด Express route อย่างสมบูรณ์
-    }
+if (updateResult.modifiedCount === 0) {
+  console.log('No new order Distribution found in the M3 system');
+  return res.status(200).json({
+    message: 'No new order Distribution found in the M3 system'
+  });
+}
 
 
 
@@ -2565,3 +2566,5 @@ exports.getProductLimit = async (req, res) => {
     message: productLimitList
   })
 }
+
+

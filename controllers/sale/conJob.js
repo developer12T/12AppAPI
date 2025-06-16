@@ -1,19 +1,150 @@
 const cron = require('node-cron')
-const { erpApiCheckOrder,erpApiCheckDisributionM3 } = require('../../controllers/sale/orderController')
-const { OrderToExcelConJob } = require('../../controllers/sale/orderController')
-const moment = require('moment-timezone');  
+// const { erpApiCheckOrder,erpApiCheckDisributionM3 } = require('../../controllers/sale/orderController')
+const { OrderToExcelConJob } = require('../../controllers/sale/orderController') 
+
+
+const { Warehouse, Locate, Balance, Sale, DisributionM3 } = require('../../models/cash/master')
+
+const { sequelize, DataTypes } = require('../../config/m3db')
+const { getSocket } = require('../../socket')
+
+const disributionModel = require('../../models/cash/distribution')
+
+const orderModel = require('../../models/cash/sale')
+const { getModelsByChannel } = require('../../middleware/channel')
+
+async function erpApiCheckOrderJob(channel = 'cash') {
+  try {
+    const { Order } = getModelsByChannel(channel, null, orderModel);
+
+    const modelSale = await Sale.findAll({
+      attributes: [
+        'OAORNO',
+        [sequelize.fn('COUNT', sequelize.col('OAORNO')), 'count']
+      ],
+      group: ['OAORNO']
+    });
+
+    const saleId = modelSale.map(row => row.get('OAORNO'));
+
+    const notInModelOrder = await Order.find({
+      orderId: { $nin: saleId }
+    }).select('orderId');
+
+    const updateResult = await Order.updateMany(
+      { orderId: { $in: saleId } },
+      { $set: { status: 'success' } }
+    );
+
+    if (updateResult.modifiedCount === 0) {
+      console.log('No new order found in the M3 system');
+      return { updated: false, updatedCount: 0 };
+    }
+
+    console.log('✅ Updated orderIds:', saleId);
+
+    // Broadcast
+    const io = getSocket();
+    const events = [
+      'sale_getSummarybyArea',
+      'sale_getSummarybyMonth',
+      'sale_getSummarybyRoute',
+      'sale_getSummaryItem',
+      'sale_getSummarybyGroup',
+      'sale_getRouteCheckinAll',
+      'sale_getTimelineCheckin',
+      'sale_routeTimeline'
+    ];
+
+    events.forEach(event => {
+      io.emit(event, {
+        status: 200,
+        message: 'New Update Data',
+        updatedCount: updateResult.modifiedCount
+      });
+    });
+
+    return {
+      updated: true,
+      updatedCount: updateResult.modifiedCount
+    };
+  } catch (error) {
+    console.error('❌ Error in erpApiCheckOrderJob:', error);
+    return { error: true, message: error.message };
+  }
+}
+
+
+async function erpApiCheckDisributionM3Job(channel = 'cash') {
+  try {
+    const { Order } = getModelsByChannel(channel, null, orderModel);
+    const { Disribution } = getModelsByChannel(channel, null, disributionModel);
+
+    const modelSale = await DisributionM3.findAll({
+      attributes: [
+        'MGTRNR',
+        [sequelize.fn('COUNT', sequelize.col('MGTRNR')), 'count']
+      ],
+      group: ['MGTRNR']
+    });
+
+    const orderIdList = modelSale.map(row => row.get('MGTRNR'));
+
+    const updateResult = await Order.updateMany(
+      { orderId: { $in: orderIdList } },
+      { $set: { status: 'success' } }
+    );
+
+    if (updateResult.modifiedCount === 0) {
+      console.log('No new order Distribution found in the M3 system');
+      return { updated: false, updatedCount: 0 };
+    }
+
+    console.log('✅ Updated Distribution Order IDs:', orderIdList);
+
+    const io = getSocket();
+    const events = [
+      'sale_getSummarybyArea',
+      'sale_getSummarybyMonth',
+      'sale_getSummarybyRoute',
+      'sale_getSummaryItem',
+      'sale_getSummarybyGroup',
+      'sale_getRouteCheckinAll',
+      'sale_getTimelineCheckin',
+      'sale_routeTimeline'
+    ];
+
+    events.forEach(event => {
+      io.emit(event, {
+        status: 200,
+        message: 'New Update Data',
+        updatedCount: updateResult.modifiedCount
+      });
+    });
+
+    return {
+      updated: true,
+      updatedCount: updateResult.modifiedCount
+    };
+
+  } catch (error) {
+    console.error('❌ Error in erpApiCheckDisributionM3Job:', error);
+    return { error: true, message: error.message };
+  }
+}
+
 
 const startCronJobErpApiCheck = () => {
   cron.schedule('*/5 * * * *', async () => {
     console.log('Running cron job startCronJobErpApiCheck every 5 minutes')
-    await erpApiCheckOrder()
+    await erpApiCheckOrderJob()
   })
 }
 
 const startCronJobErpApiCheckDisribution = () => {
   cron.schedule('*/5 * * * *', async () => {
     console.log('Running cron job startCronJobErpApiCheckDisribution every 5 minutes')
-    await erpApiCheckDisributionM3()
+    await erpApiCheckDisributionM3Job()
   })
 }
 
