@@ -1872,8 +1872,11 @@ exports.erpApiCheckOrder = async (req, res) => {
 
     if (updateResult.modifiedCount === 0) {
       console.log('No new order found in the M3 system');
-      return; 
+      return res.send();
     }
+
+
+
 
     console.log('✅ Updated orderIds:', saleId);
 
@@ -1935,10 +1938,13 @@ exports.erpApiCheckDisributionM3 = async (req, res) => {
     );
 
     // 3. ถ้าไม่มีอะไรอัปเดตเลย → return
+
     if (updateResult.modifiedCount === 0) {
       console.log('No new order Distribution found in the M3 system');
-      return;
+      return res.send(); // ✅ ส่งเปล่ากลับไป → หยุด Express route อย่างสมบูรณ์
     }
+
+
 
     console.log('✅ Updated Distribution Order IDs:', orderIdList);
 

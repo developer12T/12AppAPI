@@ -271,3 +271,22 @@ exports.getSendMoney = async (req, res) => {
       .json({ message: 'Internal Server Error', error: err.message })
   }
 }
+
+
+exports.getAllSendMoney = async (req, res) => {
+
+    const channel = req.headers['x-channel']
+    const { area } = req.body
+
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+
+    const sendMoneyData = await SendMoney.find()
+
+    res.status(200).json({
+      status:200,
+      message: 'success',
+      data:sendMoneyData
+    })
+
+}
