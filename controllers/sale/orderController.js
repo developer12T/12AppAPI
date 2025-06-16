@@ -151,7 +151,7 @@ exports.checkout = async (req, res) => {
       orderId,
       type,
       status: 'pending',
-      statusTH:'รอนำเข้า',
+      statusTH: 'รอนำเข้า',
       sale: {
         saleCode: sale.saleCode,
         salePayer: sale.salePayer,
@@ -324,7 +324,7 @@ exports.checkout = async (req, res) => {
       period: period,
       warehouse: newOrder.sale.warehouse,
       status: 'pending',
-      statusTH:'รอนำเข้า',
+      statusTH: 'รอนำเข้า',
       action: 'Sale',
       type: 'Sale',
       product: [...productQty]
@@ -1871,8 +1871,7 @@ exports.erpApiCheckOrder = async (req, res) => {
     );
 
     if (updateResult.modifiedCount === 0) {
-      return console.log('No new orders found in the M3 system')
-
+      return res.json({ message: 'No new orders found in the M3 system' });
     }
 
     console.log('✅ Updated orderIds:', saleId);
@@ -1936,8 +1935,10 @@ exports.erpApiCheckDisributionM3 = async (req, res) => {
 
     // 3. ถ้าไม่มีอะไรอัปเดตเลย → return
     if (updateResult.modifiedCount === 0) {
-      return console.log('No new order Distribution found in the M3 system')
-
+      return res.json({
+        // status: 200,
+        message: 'No new order Distribution found in the M3 system'
+      });
     }
 
     console.log('✅ Updated Distribution Order IDs:', orderIdList);
