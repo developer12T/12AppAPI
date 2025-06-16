@@ -2264,6 +2264,8 @@ exports.getSummaryProduct = async (req, res) => {
     }
   ])
 
+  // console.log("route",route)
+
   const productId = route.flatMap(u => u.productId)
 
   const productFactor = await Product.aggregate([
@@ -2308,7 +2310,7 @@ exports.getSummaryProduct = async (req, res) => {
   })
 
   const grouped = []
-
+  
   productQty.forEach(item => {
     const existing = grouped.find(
       g =>
@@ -2351,7 +2353,6 @@ exports.getSummaryProduct = async (req, res) => {
       }
     }
   ])
-
   const area = await User.aggregate([
     {
       $addFields: {
@@ -2432,13 +2433,12 @@ exports.getSummaryProduct = async (req, res) => {
     }
   ])
 
-  // console.log("areaProduct",areaProduct)
 
   const productTran = areaProduct.map(item => {
     const productDetail = grouped.find(
-      u => u.productId == item.productId && u.area == item.area
+      u => u.productId == item.productId 
     )
-
+    // console.log('item',productDetail)
     const storeCount = countStore.find(
       u => u.productId == item.productId && u.area == item.area
     )
@@ -2448,6 +2448,7 @@ exports.getSummaryProduct = async (req, res) => {
       ? (((storeCount?.count || 0) / allStoreCount.constStore) * 100).toFixed(2)
       : 0
 
+    
     return {
       // productId: item.productId,
       area: item.area,
@@ -2460,13 +2461,15 @@ exports.getSummaryProduct = async (req, res) => {
     }
   })
 
+  
+
   const areaId = [...new Set(productTran.map(u => u.area))].map(area => ({
     area
   }))
 
   const data = areaId.map(item => {
     const productDetail = productTran.filter(u => u.area === item.area)
-
+    console.log(productDetail)
     const mergedDetail = productDetail.reduce((acc, curr) => {
       const { area, ...rest } = curr
 

@@ -7,7 +7,7 @@ const startCronJob = require('./controllers/sale/conJob')
 const app = express()
 const { startCronJobErpApiCheck,startCronJobErpApiCheckDisribution } = require('../12AppAPI/controllers/sale/conJob');
 
-startCronJobErpApiCheck()
+// startCronJobErpApiCheck()
 // startCronJobErpApiCheckDisribution()
 // startCronJobOrderToExcel()
 
