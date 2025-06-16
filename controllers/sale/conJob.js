@@ -24,24 +24,21 @@ async function erpApiCheckOrderJob(channel = 'cash') {
       ],
       group: ['OAORNO']
     });
-
+    
     const saleId = modelSale.map(row => row.get('OAORNO'));
-
-    const notInModelOrder = await Order.find({
-      orderId: { $nin: saleId }
-    }).select('orderId');
-
+    
+    // const notInModelOrder = await Order.find({
+    //   orderId: { $nin: saleId }
+    // }).select('orderId');
+    
     const updateResult = await Order.updateMany(
       { orderId: { $in: saleId } },
       { $set: { status: 'success' } }
     );
-
     if (updateResult.modifiedCount === 0) {
       console.log('No new order found in the M3 system');
       return { updated: false, updatedCount: 0 };
     }
-
-    console.log(`✅ Updated ${saleId.length} orderIds`);
 
     // Broadcast
     const io = getSocket();
@@ -135,14 +132,14 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
 
 
 const startCronJobErpApiCheck = () => {
-  cron.schedule('*/5 * * * *', async () => {
+  cron.schedule('*/1 * * * *', async () => {
     console.log('Running cron job startCronJobErpApiCheck every 5 minutes')
     await erpApiCheckOrderJob()
   })
 }
 
 const startCronJobErpApiCheckDisribution = () => {
-  cron.schedule('*/5 * * * *', async () => {
+  cron.schedule('*/1 * * * *', async () => {
     console.log('Running cron job startCronJobErpApiCheckDisribution every 5 minutes')
     await erpApiCheckDisributionM3Job()
   })
