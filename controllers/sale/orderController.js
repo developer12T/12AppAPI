@@ -2133,6 +2133,7 @@ exports.getSaleSummaryByStore = async (req, res) => {
             { $toString: { $arrayElemAt: ['$storeDetail.longtitude', 0] } }
           ]
         },
+        imageLink: '$listStore.image',
         datetime: {
           $cond: {
             if: { $ne: ['$listStore.listOrder.date', null] },
