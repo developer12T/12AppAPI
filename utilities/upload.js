@@ -71,7 +71,7 @@ const uploadFilesCheckin = async (
     })
   )
 
-  return uploadFilesCheckin
+  return uploadedFiles
 }
 
 module.exports = { uploadFiles, uploadFilesCheckin }
@@ -108,4 +108,4 @@ module.exports = { uploadFiles, uploadFilesCheckin }
 // return uploadedFiles
 // }
 
-module.exports = { uploadFiles }
+// module.exports = { uploadFiles }

@@ -1031,11 +1031,15 @@ exports.getWeightProduct = async (req, res) => {
 
 
 
-exports.getStockQtyDetial = async (req,res) => {
+exports.getStockQtyDetail = async (req,res) => {
   const { area, period } = req.body
   const channel = req.headers['x-channel']
   const { Stock } = getModelsByChannel(channel, res, stockModel)
   const { Product } = getModelsByChannel(channel, res, productModel)
 
-
+  //     res.status(200).json({
+//       status: 200,
+//       message: 'Rollblack Stock successfully!',
+//       data:movement
+//     })
 }
