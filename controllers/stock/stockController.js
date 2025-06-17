@@ -16,8 +16,11 @@ const XLSX = require('xlsx')
 // const { Refund } = require('../../models/cash/refund')
 const { stockQuery } = require('../../controllers/queryFromM3/querySctipt')
 const userModel = require('../../models/cash/user')
+const distributionModel = require('../../models/cash/distribution')
 const productModel = require('../../models/cash/product')
 const stockModel = require('../../models/cash/stock')
+const orderModel = require('../../models/cash/sale')
+const refundModel = require('../../models/cash/refund')
 const { getModelsByChannel } = require('../../middleware/channel')
 
 const fetchArea = async warehouse => {
@@ -1036,6 +1039,9 @@ exports.getStockQtyDetail = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Stock } = getModelsByChannel(channel, res, stockModel)
   const { Product } = getModelsByChannel(channel, res, productModel)
+  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+  const { Refund } = getModelsByChannel(channel, res, refundModel)
+  const { Order } = getModelsByChannel(channel, res, orderModel)
   const productData = await Product.findOne({ id: productId }).select('id name listUnit')
 
   const stockData = await Stock.aggregate([
@@ -1046,29 +1052,219 @@ exports.getStockQtyDetail = async (req, res) => {
       }
     },
     {
-      $unwind: "$listProduct" // แยกแต่ละ item ออกจาก listProduct
+      $unwind: "$listProduct"
     },
     {
       $match: {
-        "listProduct.productId": { $lte: productId } // กรองที่ต้องการ
+        "listProduct.productId": { $eq: productId }
       }
     },
     {
-      $project: {
-        area: 1,
-        period: 1,
-        listProduct: 1
+      $addFields: {
+        createdAtTH: {
+          $dateAdd: {
+            startDate: "$createdAt",
+            unit: "hour",
+            amount: 7 // เพิ่ม 7 ชั่วโมงเป็นเวลาไทย
+          }
+        }
       }
-    }
+    },
   ]);
 
-  // const 
+  const getOrderByType = async (type, area, period, productId) => {
+    return await Order.aggregate([
+      {
+        $match: {
+          type,
+          'store.area': area,
+          period: period
+        }
+      },
+      {
+        $unwind: "$listProduct"
+      },
+      {
+        $match: {
+          "listProduct.id": { $lte: productId }
+        }
+      },
+      {
+        $addFields: {
+          createdAtTH: {
+            $dateAdd: {
+              startDate: "$createdAt",
+              unit: "hour",
+              amount: 7
+            }
+          }
+        }
+      },
+    ]);
+  };
+
+  const buildStock = (unitList, totalQty, date) => {
+    const stock = [];
+
+    for (const item of unitList) {
+      const factor = Number(item.factor);
+      const qty = Math.floor(totalQty / factor);
+      totalQty -= qty * factor;
+
+      stock.push({
+        unit: item.unit,
+        unitName: item.name,
+        qty
+      });
+    }
+
+    return { stock, date };
+  };
 
 
+  const orderWithdraw = await Distribution.aggregate([
+    {
+      $match: {
+        area: area,
+        period: period
+      }
+    },
+    {
+      $unwind: "$listProduct"
+    },
+    {
+      $match: {
+        "listProduct.id": { $lte: productId }
+      }
+    },
+    {
+      $addFields: {
+        createdAtTH: {
+          $dateAdd: {
+            startDate: "$createdAt",
+            unit: "hour",
+            amount: 7
+          }
+        }
+      }
+    },
+  ]);
+
+
+  const withdraw = orderWithdraw.map(item => {
+
+    return {
+      area: item.area,
+      orderId: item.orderId,
+      orderType: item.orderType,
+      orderTypeName: item.orderTypeName,
+      sendDate: item.sendDate,
+      total: item.listProduct.qty,
+      status: item.status
+    }
+  })
+
+
+const orderRefund = await Refund.aggregate([
+  {
+    $match: {
+      'store.area': area,
+      period: period
+    }
+  },
+  {
+    $addFields: {
+      createdAtTH: {
+        $dateAdd: {
+          startDate: "$createdAt",
+          unit: "hour",
+          amount: 7
+        }
+      },
+      listProduct: {
+        $filter: {
+          input: "$listProduct",
+          as: "item",
+          cond: { $lte: ["$$item.id", productId] }
+        }
+      }
+    }
+  },
+  {
+    $match: {
+      listProduct: { $ne: [] } // กรองเฉพาะ doc ที่ยังมี product หลังกรอง
+    }
+  }
+]);
+
+
+  // const
+  // const refund = orderRefund.map(item => {
+
+  //   return {
+  //         orderId: item.orderId,
+  //         storeId: item.store?.storeId || '',
+  //         storeName: item.store?.name || '',
+  //         storeAddress: item.store?.address || '',
+  //         // totalChange: totalChange.toFixed(2),
+  //         // totalRefund: totalRefund.toFixed(2),
+  //         // total: total,
+  //         status: item.status
+  //   }
+  // })
+
+  console.log(orderRefund)
+
+
+
+
+
+
+
+
+  const orderSale = await getOrderByType('sale', area, period, productId);
+  // const orderWithdraw = await getOrderByType('withdraw', area, period, productId) || [];
+  // const orderWithdraw = await Distribution.find({area: area,period: period})
+  // const orderRefund = await getOrderByType('refund', area, period, productId);
+  const orderChange = await getOrderByType('change', area, period, productId);
+  const date = stockData[0].createdAtTH;
+  let pcsStock = stockData[0].listProduct.stockPcs;
+  let pcsStockIn = stockData[0].listProduct.stockPcs;
+  const stockList = [];
+  const stockIn = []
+
+  const STOCK = buildStock(productData.listUnit, pcsStock, date);
+  const STOCKIN = buildStock(productData.listUnit, pcsStockIn,);
+
+  const withdrawStock = [];
+  const withdrawStockQty = withdraw.reduce((sum, item) => sum + item.total, 0);
+
+  for (const item of productData.listUnit) {
+    withdrawStock.push({
+      unit: item.unit,
+      unitName: item.name,
+      qty: item.unit === 'CTN' ? withdrawStockQty : 0
+    });
+  }
+
+
+
+
+
+
+
+
+
+  const data = {
+    productId: productData.id,
+    productName: productData.name,
+    STOCK: STOCK,
+    IN: STOCKIN, withdrawStock, withdraw
+  }
 
   res.status(200).json({
     status: 200,
     message: 'successfully!',
-    data: productData
+    data: data
   })
 }
