@@ -66,8 +66,9 @@ exports.checkout = async (req, res) => {
     const { Cart } = getModelsByChannel(channel, res, cartModel)
     const { User } = getModelsByChannel(channel, res, userModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
+    const { TypeStore } = getModelsByChannel(channel, res, storeModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
-    const { PromotionShelf, Quota } = getModelsByChannel(channel, res, promotionModel);
+    const { Promotion, PromotionShelf, Quota } = getModelsByChannel(channel, res, promotionModel);
     const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
       channel,
       res,
@@ -339,12 +340,31 @@ exports.checkout = async (req, res) => {
       ...calStock,
       refOrderId: createdMovement._id
     });
-    await newOrder.save()
+    // await newOrder.save()
     // await PromotionShelf.findOneAndUpdate(
     //   { proShelfId: promotionshelf.proShelfId },
     //   { $set: { qty: 0 } }
     // )
-    await Cart.deleteOne({ type, area, storeId })
+    // await Cart.deleteOne({ type, area, storeId })
+
+const promoIds = newOrder.listPromotions.map(u => u.proId);
+const promoDetail = await Promotion.find({ proId: { $in: promoIds } });
+
+for (const item of promoDetail) {
+  if (item.applicableTo.isbeauty === true) {
+    await TypeStore.findOneAndUpdate(
+      { storeId: newOrder.store.storeId },
+      {
+        $addToSet: {
+          usedPro: item.proId
+        }
+      }
+    );
+  }
+}
+
+
+
 
     const checkIn = await checkInRoute(
       {
@@ -2484,28 +2504,6 @@ exports.getSummaryProduct = async (req, res) => {
       ...mergedDetail
     }
   })
-
-  // console.log(data)
-
-data.forEach(u => {
-  const entries = Object.entries(u);     // ได้ทั้ง key และ value เป็น array [key, value]
-  const [key, field] = entries[2];       // ตำแหน่งที่ 2 คือฟิลด์ลำดับที่ 3
-
-  if (
-    !isNaN(field) &&
-    field !== null &&
-    field !== undefined &&
-    field !== '' &&
-    Number(field) !== 0
-  ) {
-    console.log(`Field[3] (${key}) is valid number ≠ 0:`, field);
-  }
-});
-
-
-
-
-
 
   const summaryTarget = productTran.reduce((sum, item) => {
     const key = Object.keys(item).find(

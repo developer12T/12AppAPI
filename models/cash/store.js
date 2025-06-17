@@ -97,15 +97,14 @@ const runningNumberSchema = mongoose.Schema({
     updatedAt: { type: Date, default: Date.now },
 })
 
-const storeBueatySchema = mongoose.Schema({
-    storeId: { type: String, require: true },
-    area: { type: String, require: true },
-    type: { type: [String], require: true },
+const storeBeautySchema = new mongoose.Schema({
+    storeId: { type: String, required: true },
+    area: { type: String, required: true },
+    type: { type: [String], required: true },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
-})
-
-
+    usedPro: { type: [String] }
+});
 
 
 
@@ -114,7 +113,7 @@ module.exports = (conn) => {
       Store: conn.model('Store', storeSchema),
       StoreType: conn.model('storetypes', typeStoreSchema,'storetypes'),
       RunningNumber: conn.model('runningnumber',runningNumberSchema,'runningnumber'),
-      TypeStore: conn.model('typestores',storeBueatySchema,'typestores')
+      TypeStore: conn.model('typestores',storeBeautySchema,'typestores')
 
     };
   };

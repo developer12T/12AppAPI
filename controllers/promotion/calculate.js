@@ -63,11 +63,7 @@ async function applyPromotion(order, channel, res) {
     let discountTotal = 0
     let appliedPromotions = []
     const promotions = await Promotion.find({ status: 'active' })
-    const beautyStore = await TypeStore.findOne({
-        storeId: order.store.storeId,
-        type: { $in: ["beauty"] }
-    });
-    // console.log('beautyStore',beautyStore)
+
     for (const promo of promotions) {
         let promoApplied = false
         let promoDiscount = 0
@@ -77,14 +73,19 @@ async function applyPromotion(order, channel, res) {
         if (promo.applicableTo?.typeStore?.length > 0 && !promo.applicableTo.typeStore.includes(order.store?.storeType)) continue
         if (promo.applicableTo?.zone?.length > 0 && !promo.applicableTo.zone.includes(order.store?.zone)) continue
         if (promo.applicableTo?.area?.length > 0 && !promo.applicableTo.area.includes(order.store?.area)) continue
-        console.log("promo", promo.applicableTo?.isbeauty)
+        // console.log("promo", promo.applicableTo?.isbeauty)
+        const beautyStore = await TypeStore.findOne({
+            storeId: order.store.storeId,
+            type: { $in: ["beauty"] },
+            usedPro: { $nin: [promo.proId] }
+        });
+
         if (promo.applicableTo?.isbeauty === true && !beautyStore) {
-            console.log('ข้าม')
+            // console.log('ข้าม')
             continue
         };
 
 
-        // console.log(promo)
         let matchedProducts = order.listProduct.filter((product) =>
             promo.conditions.some((condition) =>
                 (condition.productId.length === 0 || condition.productId.includes(product.id)) &&
@@ -95,6 +96,7 @@ async function applyPromotion(order, channel, res) {
                 (condition.productUnit.length === 0 || condition.productUnit.includes(product.unit))
             )
         )
+        // console.log("promo.conditions",promo.conditions)
 
         if (matchedProducts.length === 0) continue
 
@@ -104,8 +106,9 @@ async function applyPromotion(order, channel, res) {
         let meetsCondition = promo.conditions.some(condition =>
             (promo.proType === 'free' && condition.productQty >= 0 && totalQty >= condition.productQty) ||
             (promo.proType === 'amount' && condition.productAmount >= 0 && totalAmount >= condition.productAmount)
+
         )
-        console.log(meetsCondition)
+
         if (!meetsCondition) continue
 
         let multiplier = 1
@@ -120,13 +123,16 @@ async function applyPromotion(order, channel, res) {
                 return multiplier
             }, 1)
         }
+        // console.log(promo.rewards)
         switch (promo.proType) {
             case 'amount':
                 freeProducts = await rewardProduct(promo.rewards, multiplier, channel, res)
                 promoApplied = true
+                break
             case 'free':
                 freeProducts = await rewardProduct(promo.rewards, multiplier, channel, res)
                 promoApplied = true
+                
                 break
 
             case 'discount':

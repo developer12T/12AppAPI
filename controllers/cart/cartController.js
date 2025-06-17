@@ -20,7 +20,6 @@ exports.getCart = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
     const { Cart } = getModelsByChannel(channel, res, cartModel)
-
     const { type, area, storeId } = req.query
 
     if (!type || !area) {
@@ -72,9 +71,7 @@ exports.getCart = async (req, res) => {
       summary.listPromotion = cart.listPromotion
       summary.listQuota = quota.appliedPromotions
       await cart.save()
-      // }
-
-      // console.log(JSON.stringify(summary.listQuota, null, 2));
+      // console.log(JSON.stringify(summary.listPromotion, null, 2));
     }
 
     if (type === 'withdraw') {
