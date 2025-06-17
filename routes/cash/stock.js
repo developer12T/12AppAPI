@@ -14,7 +14,8 @@ const {
   getStock,
   addStockFromERP,
   getStockQty,
-  getWeightProduct
+  getWeightProduct,
+  getStockQtyDetail
 } = require('../../controllers/stock/stockController')
 
 const router = express.Router()
@@ -36,5 +37,7 @@ router.post('/getStockQty', getStockQty)
 router.post('/getWeightProduct', getWeightProduct)
 // router.post('/stocktoexcel', stockToExcel)
 // router.get('/movement', available)
+router.post('/getStockQtyDetail', getStockQtyDetail)
+
 
 module.exports = router

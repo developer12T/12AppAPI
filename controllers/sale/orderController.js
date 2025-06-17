@@ -2188,6 +2188,9 @@ exports.getGroup = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
   const product = await Product.aggregate([
+    {$match:{
+        group: { $nin: ['', null] }
+      }},
     {
       $group: {
         _id: {

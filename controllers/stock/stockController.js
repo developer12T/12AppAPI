@@ -881,14 +881,14 @@ exports.getStockQty = async (req, res) => {
       const factor = u.factor
       return {
         unit: u.unit,
-        unitName: u.name ,
+        unitName: u.name,
         stock: Math.floor(stock / factor),
         stockIn: Math.floor(stockIn / factor),
         stockOut: Math.floor(stockOut / factor),
         balance: Math.floor(balance / factor)
       }
     })
-    
+
     const finalProductStock = {
       productId: stockItem.productId,
       productName: productDetail.name,
@@ -1031,15 +1031,44 @@ exports.getWeightProduct = async (req, res) => {
 
 
 
-exports.getStockQtyDetail = async (req,res) => {
-  const { area, period } = req.body
+exports.getStockQtyDetail = async (req, res) => {
+  const { area, productId, period } = req.body
   const channel = req.headers['x-channel']
   const { Stock } = getModelsByChannel(channel, res, stockModel)
   const { Product } = getModelsByChannel(channel, res, productModel)
+  const productData = await Product.findOne({ id: productId }).select('id name listUnit')
 
-  //     res.status(200).json({
-//       status: 200,
-//       message: 'Rollblack Stock successfully!',
-//       data:movement
-//     })
+  const stockData = await Stock.aggregate([
+    {
+      $match: {
+        area: area,
+        period: period
+      }
+    },
+    {
+      $unwind: "$listProduct" // แยกแต่ละ item ออกจาก listProduct
+    },
+    {
+      $match: {
+        "listProduct.productId": { $lte: productId } // กรองที่ต้องการ
+      }
+    },
+    {
+      $project: {
+        area: 1,
+        period: 1,
+        listProduct: 1
+      }
+    }
+  ]);
+
+  // const 
+
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'successfully!',
+    data: productData
+  })
 }
