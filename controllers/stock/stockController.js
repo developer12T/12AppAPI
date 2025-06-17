@@ -881,13 +881,14 @@ exports.getStockQty = async (req, res) => {
       const factor = u.factor
       return {
         unit: u.unit,
+        unitName: u.name ,
         stock: Math.floor(stock / factor),
         stockIn: Math.floor(stockIn / factor),
         stockOut: Math.floor(stockOut / factor),
         balance: Math.floor(balance / factor)
       }
     })
-
+    
     const finalProductStock = {
       productId: stockItem.productId,
       productName: productDetail.name,
@@ -1027,3 +1028,14 @@ exports.getWeightProduct = async (req, res) => {
 //     next(error)
 //   }
 // }
+
+
+
+exports.getStockQtyDetial = async (req,res) => {
+  const { area, period } = req.body
+  const channel = req.headers['x-channel']
+  const { Stock } = getModelsByChannel(channel, res, stockModel)
+  const { Product } = getModelsByChannel(channel, res, productModel)
+
+
+}
