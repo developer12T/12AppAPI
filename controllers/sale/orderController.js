@@ -340,12 +340,12 @@ exports.checkout = async (req, res) => {
       ...calStock,
       refOrderId: createdMovement._id
     });
-    // await newOrder.save()
+    await newOrder.save()
     // await PromotionShelf.findOneAndUpdate(
     //   { proShelfId: promotionshelf.proShelfId },
     //   { $set: { qty: 0 } }
     // )
-    // await Cart.deleteOne({ type, area, storeId })
+    await Cart.deleteOne({ type, area, storeId })
 
 const promoIds = newOrder.listPromotions.map(u => u.proId);
 const promoDetail = await Promotion.find({ proId: { $in: promoIds } });
