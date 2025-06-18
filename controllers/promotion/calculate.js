@@ -115,15 +115,27 @@ async function applyPromotion(order, channel, res) {
         // console.log('promo.applicableTo?.isNewStore', promo.applicableTo?.isNewStore)
         // console.log('newStore',newStore)
 
-        if (
-            promo.applicableTo?.isNewStore === false &&
-            !promo.applicableTo.complete.includes(order.store?.storeId) &&
-            !newStore
-        ) {
-            console.log('ข้าม');
-            continue;
-        }
+        // if (
+        //     promo.applicableTo?.isNewStore === false &&
+        //     !promo.applicableTo.complete.includes(order.store?.storeId) &&
+        //     !newStore
+        // ) {
+        //     console.log('ข้าม');
+        //     continue;
+        // }
 
+        if (promo.applicableTo?.isNewStore === true) {
+            console.log('🔍 ไม่ใช่ร้านใหม่');
+
+            if (promo.applicableTo.complete.includes(order.store?.storeId)) {
+                console.log('🔍 อยู่ใน complete');
+
+                if (!newStore || newStore.length === 0) {
+                    console.log('⛔ ข้าม: ไม่มี newStore');
+                    continue;
+                }
+            }
+        }
 
 
 

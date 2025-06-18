@@ -918,9 +918,9 @@ exports.getStockQty = async (req, res) => {
   data.sort((a, b) => b.pcsMain - a.pcsMain);
 
 
-for (const item of data) {
-  delete item.pcsMain;
-}
+  for (const item of data) {
+    delete item.pcsMain;
+  }
 
   if (dataStock.length == 0) {
     res.status(404).json({
@@ -1140,35 +1140,88 @@ exports.getStockQtyDetail = async (req, res) => {
 
     const refundDocs = await Refund.aggregate([
       { $match: { 'store.area': area, period } },
-      { $addFields: {
-        createdAtTH: convertToTHTime("$createdAt"),
-        listProduct: filterByProductId("$listProduct", productId)
-      } },
+      {
+        $addFields: {
+          createdAtTH: convertToTHTime("$createdAt"),
+          listProduct: filterByProductId("$listProduct", productId)
+        }
+      },
       { $match: { listProduct: { $ne: [] } } }
     ]);
 
+
+
+    NewRefund = await Promise.all(
+      refundDocs.map(async refund => {
+        const orderChange = await Order.findOne({
+          reference: refund.orderId,
+          type: 'change'
+        })
+          .select('total')
+          .lean()
+
+        const totalChange = orderChange?.total || 0
+        const totalRefund = refund.total || 0
+        const total = (totalChange - totalRefund).toFixed(2)
+
+        return {
+          orderId: refund.orderId,
+          storeId: refund.store?.storeId || '',
+          storeName: refund.store?.name || '',
+          storeAddress: refund.store?.address || '',
+          totalChange: totalChange.toFixed(2),
+          totalRefund: totalRefund.toFixed(2),
+          total: total,
+          status: refund.status
+        }
+      })
+    )
+
+
+
+
+
     const allRefundProducts = refundDocs.flatMap(doc => doc.listProduct || []);
+    // console.log(refundDocs)
     const refundStock = calculateQtyByUnit(productData.listUnit, allRefundProducts);
 
     const orderSaleDocs = await Order.aggregate([
       { $match: { 'store.area': area, period, type: 'sale' } },
-      { $addFields: {
-        createdAtTH: convertToTHTime("$createdAt"),
-        listProduct: filterByProductId("$listProduct", productId),
-        listPromotions: {
-          $map: {
-            input: "$listPromotions",
-            as: "promo",
-            in: {
-              $mergeObjects: ["$$promo", {
-                listProduct: filterByProductId("$$promo.listProduct", productId)
-              }]
+      {
+        $addFields: {
+          createdAtTH: convertToTHTime("$createdAt"),
+          listProduct: filterByProductId("$listProduct", productId),
+          listPromotions: {
+            $map: {
+              input: "$listPromotions",
+              as: "promo",
+              in: {
+                $mergeObjects: ["$$promo", {
+                  listProduct: filterByProductId("$$promo.listProduct", productId)
+                }]
+              }
             }
           }
         }
-      } },
+      },
       { $match: { listProduct: { $ne: [] } } }
     ]);
+
+
+    orderDetail = orderSaleDocs.map(o => ({
+      orderId: o.orderId,
+      storeId: o.store?.storeId || '',
+      storeName: o.store?.name || '',
+      storeAddress: o.store?.address || '',
+      createAt: o.createdAt,
+      total: o.total,
+      status: o.status,
+      statusTH: o.statusTH,
+      createdAt: o.createdAt
+    }))
+
+
+
 
 
     const allOrderProducts = orderSaleDocs.flatMap(doc => doc.listProduct || []);
@@ -1179,10 +1232,12 @@ exports.getStockQtyDetail = async (req, res) => {
 
     const orderChangeDocs = await Order.aggregate([
       { $match: { 'store.area': area, period, type: 'change' } },
-      { $addFields: {
-        createdAtTH: convertToTHTime("$createdAt"),
-        listProduct: filterByProductId("$listProduct", productId)
-      } },
+      {
+        $addFields: {
+          createdAtTH: convertToTHTime("$createdAt"),
+          listProduct: filterByProductId("$listProduct", productId)
+        }
+      },
       { $match: { listProduct: { $ne: [] } } }
     ]);
 
@@ -1208,16 +1263,18 @@ exports.getStockQtyDetail = async (req, res) => {
           withdrawStock,
           withdraw,
           refundStock,
+          refund:NewRefund,
           summaryStock: calculateQtyByUnit(productData.listUnit, [...refundStock, ...withdrawStock, ...STOCKIN.stock]),
           summaryStockIn
         },
         OUT: {
           orderSum: summaryStockOrderPrice,
           orderStock,
+          order:orderDetail,
           promotionSum: summaryStockPromoPrice,
           promotionStock,
           change: changeStock,
-          changeSum:summaryStockChangePrice,
+          changeSum: summaryStockChangePrice,
           summaryStock: summaryStockOut,
           summaryStockInOut: summaryStockOutPrice
         },
