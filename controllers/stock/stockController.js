@@ -1170,6 +1170,7 @@ exports.getStockQtyDetail = async (req, res) => {
       { $match: { listProduct: { $ne: [] } } }
     ]);
 
+
     const allOrderProducts = orderSaleDocs.flatMap(doc => doc.listProduct || []);
     const orderStock = calculateQtyByUnit(productData.listUnit, allOrderProducts);
 

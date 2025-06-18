@@ -114,14 +114,15 @@ async function applyPromotion(order, channel, res) {
         // console.log('isNewStore:', promo.applicableTo?.isNewStore)
         // console.log('promo.applicableTo?.isNewStore', promo.applicableTo?.isNewStore)
         // console.log('newStore',newStore)
-        // if (
-        //     promo.applicableTo?.isNewStore === true &&
-        //     // promo.applicableTo.complete.includes(order.store?.storeId) &&
-        //     !newStore
-        // ) {
-        //     console.log('ข้าม');
-        //     continue;
-        // }
+
+        if (
+            promo.applicableTo?.isNewStore === false &&
+            !promo.applicableTo.complete.includes(order.store?.storeId) &&
+            !newStore
+        ) {
+            console.log('ข้าม');
+            continue;
+        }
 
 
 

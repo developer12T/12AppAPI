@@ -118,7 +118,7 @@ exports.getProduct = async (req, res) => {
           balanceCtn: { $sum: '$listProduct.balanceCtn' },
           balancePcs: { $sum: '$listProduct.balancePcs' }
         }
-      }
+      },
     ])
 
     if (!products.length) {
@@ -162,7 +162,7 @@ exports.getProduct = async (req, res) => {
       return modifiedProduct
     })
 
-    console.log('stock', stock)
+    // console.log('stock', stock)
 
     const data = products
       .map(product => {
@@ -173,7 +173,7 @@ exports.getProduct = async (req, res) => {
           qtyPcs: matchedStock.balancePcs || 0
         }
       })
-      .sort((a, b) => b.qtyCtn - a.qtyCtn) // เรียงตาม qtyCtn มาก → น้อย
+      .sort((a, b) => b.qtyPcs - a.qtyPcs) // เรียงตาม qtyCtn มาก → น้อย
 
     res.status(200).json({
       status: '200',
