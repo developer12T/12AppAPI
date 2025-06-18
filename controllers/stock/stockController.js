@@ -1194,7 +1194,7 @@ exports.getStockQtyDetail = async (req, res) => {
     const summaryStockBalancePrice = calculateTotalPrice(productData.listUnit, BALANCE.stock, 'sale');
     const summaryStockOrderPrice = calculateTotalPrice(productData.listUnit, orderStock, 'sale');
     const summaryStockPromoPrice = calculateTotalPrice(productData.listUnit, promotionStock, 'sale');
-
+    const summaryStockChangePrice = calculateTotalPrice(productData.listUnit, changeStock, 'sale');
     res.status(200).json({
       status: 200,
       message: 'successfully!',
@@ -1216,6 +1216,7 @@ exports.getStockQtyDetail = async (req, res) => {
           promotionSum: summaryStockPromoPrice,
           promotionStock,
           change: changeStock,
+          changeSum:summaryStockChangePrice,
           summaryStock: summaryStockOut,
           summaryStockInOut: summaryStockOutPrice
         },
