@@ -67,7 +67,7 @@ exports.checkout = async (req, res) => {
     const { Cart } = getModelsByChannel(channel, res, cartModel)
     const { User } = getModelsByChannel(channel, res, userModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
-    const { Store,TypeStore } = getModelsByChannel(channel, res, storeModel)
+    const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
     const { Promotion, PromotionShelf, Quota } = getModelsByChannel(channel, res, promotionModel);
     const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
@@ -347,7 +347,8 @@ exports.checkout = async (req, res) => {
     //   { $set: { qty: 0 } }
     // )
     await Cart.deleteOne({ type, area, storeId })
-
+    const currentDate = new Date()
+    let query = {}
     const promoIds = newOrder.listPromotions.map(u => u.proId);
     const promoDetail = await Promotion.find({ proId: { $in: promoIds } });
     const startMonth = new Date(
@@ -376,12 +377,14 @@ exports.checkout = async (req, res) => {
 
 
     for (const item of promoDetail) {
-      if (item.applicableTo.isbeauty === true || newStore.length > 0) {
-        await TypeStore.findOneAndUpdate(
-          { storeId: newOrder.store.storeId },
+      // console.log(item)
+      if (item.applicableTo.isbeauty === true || item.applicableTo.isNewStore === true) {
+        // console.log(item)
+        await Promotion.findOneAndUpdate(
+          { proId:item.proId },
           {
             $addToSet: {
-              usedPro: item.proId
+              'applicableTo.complete': newOrder.store.storeId
             }
           }
         );

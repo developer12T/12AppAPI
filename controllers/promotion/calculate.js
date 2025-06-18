@@ -59,12 +59,36 @@ async function applyPromotion(order, channel, res) {
 
     // console.log(order)
     const { Promotion } = getModelsByChannel(channel, res, promotionModel);
-    const { TypeStore } = getModelsByChannel(channel, res, storeModel);
+    const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel);
     let discountTotal = 0
     let appliedPromotions = []
+    const currentDate = new Date()
+    const startMonth = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth(),
+        1
+    )
+    const NextMonth = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth() + 1,
+        1
+    )
+    let query = {}
+    query.createdAt = {
+        $gte: startMonth,
+        $lt: NextMonth
+    }
+
     const promotions = await Promotion.find({ status: 'active' })
 
-
+    const newStore = await Store.aggregate([
+        { $match: query },
+        {
+            $match: {
+                storeId: order.store?.storeId
+            }
+        }])
+    // console.log(newStore)
 
 
     for (const promo of promotions) {
@@ -82,11 +106,18 @@ async function applyPromotion(order, channel, res) {
             type: { $in: ["beauty"] },
             usedPro: { $nin: [promo.proId] }
         });
-
         if (promo.applicableTo?.isbeauty === true && !beautyStore) {
             // console.log('ข้าม')
             continue
         };
+
+        if (promo.applicableTo?.isNewStore === true && !promo.applicableTo.complete.includes(order.store?.storeId) && newStore.length === 0) {
+            // console.log('ข้าม')
+            continue
+        };
+
+
+
 
 
         let matchedProducts = order.listProduct.filter((product) =>

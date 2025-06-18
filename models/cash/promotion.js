@@ -20,7 +20,9 @@ const promotionSchema = new mongoose.Schema({
         typeStore: [{ type: String }],
         zone: [{ type: String }],
         area: [{ type: String }],
-        isbeauty: { type:Boolean,default:false}
+        isbeauty: { type:Boolean,default:false},
+        isNewStore:{ type:Boolean,default:false},
+        complete: [{ type: String }],
     },
 
     except: [{ type: String }],
