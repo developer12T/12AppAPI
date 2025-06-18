@@ -5,6 +5,7 @@
 // const { Route } = require('../../models/cash/route')
 const { period, previousPeriod } = require('../../utilities/datetime')
 
+
 const { Warehouse, Locate, Balance, Sale, DisributionM3 } = require('../../models/cash/master')
 const { generateOrderId } = require('../../utilities/genetateId')
 const {
@@ -66,7 +67,7 @@ exports.checkout = async (req, res) => {
     const { Cart } = getModelsByChannel(channel, res, cartModel)
     const { User } = getModelsByChannel(channel, res, userModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
-    const { TypeStore } = getModelsByChannel(channel, res, storeModel)
+    const { Store,TypeStore } = getModelsByChannel(channel, res, storeModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
     const { Promotion, PromotionShelf, Quota } = getModelsByChannel(channel, res, promotionModel);
     const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
@@ -347,21 +348,45 @@ exports.checkout = async (req, res) => {
     // )
     await Cart.deleteOne({ type, area, storeId })
 
-const promoIds = newOrder.listPromotions.map(u => u.proId);
-const promoDetail = await Promotion.find({ proId: { $in: promoIds } });
+    const promoIds = newOrder.listPromotions.map(u => u.proId);
+    const promoDetail = await Promotion.find({ proId: { $in: promoIds } });
+    const startMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      1
+    )
+    const NextMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() + 1,
+      1
+    )
 
-for (const item of promoDetail) {
-  if (item.applicableTo.isbeauty === true) {
-    await TypeStore.findOneAndUpdate(
-      { storeId: newOrder.store.storeId },
+    query.createdAt = {
+      $gte: startMonth,
+      $lt: NextMonth
+    }
+    const newStore = await Store.aggregate([
+      { $match: query },
       {
-        $addToSet: {
-          usedPro: item.proId
+        $match: {
+          storeId: newOrder.store.storeId
         }
+      }])
+
+
+
+    for (const item of promoDetail) {
+      if (item.applicableTo.isbeauty === true || newStore.length > 0) {
+        await TypeStore.findOneAndUpdate(
+          { storeId: newOrder.store.storeId },
+          {
+            $addToSet: {
+              usedPro: item.proId
+            }
+          }
+        );
       }
-    );
-  }
-}
+    }
 
 
 
@@ -2188,9 +2213,11 @@ exports.getGroup = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
   const product = await Product.aggregate([
-    {$match:{
+    {
+      $match: {
         group: { $nin: ['', null] }
-      }},
+      }
+    },
     {
       $group: {
         _id: {

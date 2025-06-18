@@ -64,6 +64,9 @@ async function applyPromotion(order, channel, res) {
     let appliedPromotions = []
     const promotions = await Promotion.find({ status: 'active' })
 
+
+
+
     for (const promo of promotions) {
         let promoApplied = false
         let promoDiscount = 0
@@ -132,7 +135,7 @@ async function applyPromotion(order, channel, res) {
             case 'free':
                 freeProducts = await rewardProduct(promo.rewards, multiplier, channel, res)
                 promoApplied = true
-                
+
                 break
 
             case 'discount':
