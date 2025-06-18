@@ -22,7 +22,9 @@ const userSchema = mongoose.Schema({
   status: { type: String, require: true },
   qrCodeImage: { type: String, require: true },
   period: { type: String, require: true },
-  image: { imageSchema }
+  image: { imageSchema },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
 })
 
 // const User = dbCA.model('User', userSchema)

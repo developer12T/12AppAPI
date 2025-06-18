@@ -13,7 +13,8 @@ const {
   updateUserArray,
   deleteUserArray,
   addUserArray,
-  getAreaAll
+  getAreaAll,
+ checkUserLogin
 } = require('../../controllers/user/userController')
 
 const router = express.Router()
@@ -32,7 +33,6 @@ router.post('/updateUserArray', updateUserArray)
 router.post('/deleteUserArray', deleteUserArray)
 router.post('/addUserArray', addUserArray)
 router.get('/getAreaAll', getAreaAll)
-
-
+router.get('/checkUserLogin', checkUserLogin)
 
 module.exports = router

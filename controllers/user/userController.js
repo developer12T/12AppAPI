@@ -1,7 +1,9 @@
 // const { User } = require('../../models/cash/user')
 const { period, previousPeriod } = require('../../utilities/datetime')
 const sql = require('mssql');
-
+const fs = require('fs');
+const dayjs = require('dayjs');
+const XLSX = require('xlsx');
 const { uploadFiles } = require('../../utilities/upload')
 const multer = require('multer')
 const path = require('path')
@@ -10,7 +12,7 @@ const bcrypt = require('bcrypt')
 const axios = require('axios')
 const userModel = require('../../models/cash/user')
 const { getModelsByChannel } = require('../../middleware/channel')
-const { userQuery, userQueryFilter,userQueryManeger } = require('../../controllers/queryFromM3/querySctipt');
+const { userQuery, userQueryFilter, userQueryManeger } = require('../../controllers/queryFromM3/querySctipt');
 exports.getUser = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
@@ -374,7 +376,7 @@ exports.addAndUpdateUser = async (req, res) => {
 exports.addUserManeger = async (req, res) => {
   try {
     const channelHeader = req.headers['x-channel']
-    const tableData = await userQueryManeger(channelHeader); 
+    const tableData = await userQueryManeger(channelHeader);
 
     let update = 0
     let addNew = 0
@@ -382,7 +384,7 @@ exports.addUserManeger = async (req, res) => {
     for (const c of channel) {
       const { User } = getModelsByChannel(c, res, userModel)
       const userMongo = await User.find()
-      
+
       for (const m3 of tableData) {
         const userInMongo = userMongo.find(id => id.saleCode == m3.saleCode)
 
@@ -650,3 +652,64 @@ exports.getAreaAll = async (req, res) => {
   });
 
 }
+
+
+exports.checkUserLogin = async (req, res) => {
+  const channel = req.headers['x-channel'];
+  const { User } = getModelsByChannel(channel, res, userModel);
+
+  const dataUser = await User.aggregate([
+    {
+      $match: { role: 'sale' }
+    },
+    {
+      $addFields: {
+        fullName: {
+          $concat: [
+            { $ifNull: ["$firstName", ""] },
+            " ",
+            { $ifNull: ["$surName", ""] }
+          ]
+        }
+      }
+    },
+    {
+      $project: {
+        _id:0,
+        zone: 1,
+        area: 1,
+        saleCode: 1,
+        salePayer: 1,
+        fullName: 1,
+        updatedAt: 1,
+      }
+    }
+  ]);
+
+
+
+
+const exportData = dataUser.map(user => ({
+  zone:user.zone,
+  area:user.area,
+  saleCode:user.saleCode,
+  salePayer:user.salePayer,
+  fullName:user.fullName,
+  updatedAt: dayjs(user.updatedAt).format('YYYY-MM-DD HH:mm:ss')
+}));
+
+// Export to Excel
+const worksheet = XLSX.utils.json_to_sheet(exportData);
+const workbook = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
+XLSX.writeFile(workbook, "dataUser.xlsx");
+
+console.log("✅ สร้างไฟล์ Excel: dataUser.xlsx ด้วยวันที่ฟอร์แมตเรียบร้อยแล้ว");
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'successfully',
+    data: dataUser
+  });
+};

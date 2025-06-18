@@ -81,14 +81,14 @@ async function applyPromotion(order, channel, res) {
 
     const promotions = await Promotion.find({ status: 'active' })
 
-    const newStore = await Store.aggregate([
+    const dataStore = await Store.aggregate([
         { $match: query },
         {
             $match: {
                 storeId: order.store?.storeId
             }
         }])
-    // console.log(newStore)
+    const newStore = dataStore[0]
 
 
     for (const promo of promotions) {
@@ -111,15 +111,17 @@ async function applyPromotion(order, channel, res) {
             continue
         };
 
-        console.log('isNewStore:', promo.applicableTo?.isNewStore)
-        console.log('inComplete:', promo.applicableTo.complete.includes(order.store?.storeId))
-        console.log('newStore.length:', newStore.length)
-        if (promo.applicableTo?.isNewStore === true &&
-            !promo.applicableTo.complete.includes(order.store?.storeId) &&
-            newStore.length === 0) {
-            console.log('ข้าม')
-            continue
-        };
+        // console.log('isNewStore:', promo.applicableTo?.isNewStore)
+        // console.log('promo.applicableTo?.isNewStore', promo.applicableTo?.isNewStore)
+        // console.log('newStore',newStore)
+        // if (
+        //     promo.applicableTo?.isNewStore === true &&
+        //     // promo.applicableTo.complete.includes(order.store?.storeId) &&
+        //     !newStore
+        // ) {
+        //     console.log('ข้าม');
+        //     continue;
+        // }
 
 
 

@@ -27,6 +27,16 @@ exports.login = async (req, res) => {
           { expiresIn: '12h' }
         )
 
+        const currentDate = new Date()
+        console.log(currentDate)
+        await User.findOneAndUpdate(
+          { username: req.body.username },  
+          { $set: { updatedAt: currentDate } }, 
+          { new: true }  
+        );
+
+
+
         res.status(200).json({
           status: 201,
           message: 'log in complete',
