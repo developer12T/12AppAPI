@@ -874,40 +874,53 @@ exports.getStockQty = async (req, res) => {
   let data = []
 
   for (const stockItem of dataStockTran.listProduct) {
-    const productDetail = dataProduct.find(u => u.id == stockItem.productId)
-    const stock = stockItem.stockPcs
-    const stockIn = stockItem.stockInPcs
-    const stockOut = stockItem.stockOutPcs
-    const balance = stockItem.balancePcs
+    const productDetail = dataProduct.find(u => u.id == stockItem.productId);
+    let stockMain = stockItem.stockPcs;
+    let stock = stockItem.stockPcs;
+    let stockIn = stockItem.stockInPcs;
+    let stockOut = stockItem.stockOutPcs;
+    let balance = stockItem.balancePcs;
 
     const listUnitStock = productDetail.listUnit.map(u => {
-      const factor = u.factor
+      const factor = u.factor;
+
+      const stockQty = Math.floor(stock / factor) || 0;
+      const stockInQty = Math.floor(stockIn / factor) || 0;
+      const stockOutQty = Math.floor(stockOut / factor) || 0;
+      const balanceQty = Math.floor(balance / factor) || 0;
+
+      stock -= stockQty * factor;
+      stockIn -= stockInQty * factor;
+      stockOut -= stockOutQty * factor;
+      balance -= balanceQty * factor;
+
       return {
         unit: u.unit,
         unitName: u.name,
-        stock: Math.floor(stock / factor),
-        stockIn: Math.floor(stockIn / factor),
-        stockOut: Math.floor(stockOut / factor),
-        balance: Math.floor(balance / factor)
-      }
-    })
+        stock: stockQty,
+        stockIn: stockInQty,
+        stockOut: stockOutQty,
+        balance: balanceQty
+      };
+    });
 
     const finalProductStock = {
       productId: stockItem.productId,
       productName: productDetail.name,
-      listUnit: [...listUnitStock]
-    }
-    data.push(finalProductStock)
+      pcsMain: stockMain,
+      listUnit: listUnitStock
+    };
+
+    data.push(finalProductStock);
   }
 
-  data.sort((a, b) => {
-    const balanceA = a.listUnit.find(u => u.unit === 'PCS')?.balance || 0;
-    const balanceB = b.listUnit.find(u => u.unit === 'PCS')?.balance || 0;
-    return balanceB - balanceA;
-  });
+
+  data.sort((a, b) => b.pcsMain - a.pcsMain);
 
 
-
+for (const item of data) {
+  delete item.pcsMain;
+}
 
   if (dataStock.length == 0) {
     res.status(404).json({
@@ -1165,37 +1178,61 @@ exports.getStockQtyDetail = async (req, res) => {
   })
 
 
-const orderRefund = await Refund.aggregate([
-  {
-    $match: {
-      'store.area': area,
-      period: period
-    }
-  },
-  {
-    $addFields: {
-      createdAtTH: {
-        $dateAdd: {
-          startDate: "$createdAt",
-          unit: "hour",
-          amount: 7
-        }
-      },
-      listProduct: {
-        $filter: {
-          input: "$listProduct",
-          as: "item",
-          cond: { $lte: ["$$item.id", productId] }
+  const orderRefund = await Refund.aggregate([
+    {
+      $match: {
+        'store.area': area,
+        period: period
+      }
+    },
+    {
+      $addFields: {
+        createdAtTH: {
+          $dateAdd: {
+            startDate: "$createdAt",
+            unit: "hour",
+            amount: 7
+          }
+        },
+        listProduct: {
+          $filter: {
+            input: "$listProduct",
+            as: "item",
+            cond: {
+              $eq: [
+                { $toString: "$$item.id" },  // หรือ $toInt ถ้า id เป็น number
+                String(productId)            // แปลงให้ตรงชนิด
+              ]
+            }
+          }
         }
       }
+    },
+    {
+      $match: {
+        listProduct: { $ne: [] }
+      }
     }
-  },
-  {
-    $match: {
-      listProduct: { $ne: [] } // กรองเฉพาะ doc ที่ยังมี product หลังกรอง
-    }
+  ]);
+
+  let refundStock = []
+
+  const allRefundProducts = orderRefund.flatMap(doc => doc.listProduct || []);
+
+  for (const item of productData.listUnit) {
+    const refundQtyList = allRefundProducts.filter(u => u.unit === item.unit);
+    const totalQty = refundQtyList.reduce((sum, u) => sum + u.qty, 0); // รวมจำนวนทั้งหมด
+
+    const refund = ({
+      unit: item.unit,
+      unitName: item.name,
+      qty: totalQty
+    });
+
+    refundStock.push(refund)
   }
-]);
+  // console.log(refundStock)
+
 
 
   // const
@@ -1213,14 +1250,31 @@ const orderRefund = await Refund.aggregate([
   //   }
   // })
 
-  console.log(orderRefund)
+  refund = await Promise.all(
+    orderRefund.map(async refund => {
+      const orderChange = await Order.findOne({
+        reference: refund.orderId,
+        type: 'change'
+      })
+        .select('total')
+        .lean()
 
+      const totalChange = orderChange?.total || 0
+      const totalRefund = refund.total || 0
+      const total = (totalChange - totalRefund).toFixed(2)
 
-
-
-
-
-
+      return {
+        orderId: refund.orderId,
+        storeId: refund.store?.storeId || '',
+        storeName: refund.store?.name || '',
+        storeAddress: refund.store?.address || '',
+        totalChange: totalChange.toFixed(2),
+        totalRefund: totalRefund.toFixed(2),
+        total: total,
+        status: refund.status
+      }
+    })
+  )
 
   const orderSale = await getOrderByType('sale', area, period, productId);
   // const orderWithdraw = await getOrderByType('withdraw', area, period, productId) || [];
@@ -1247,10 +1301,30 @@ const orderRefund = await Refund.aggregate([
     });
   }
 
+  const summaryStock = productData.listUnit.map(unitInfo => {
+    const totalQty = [...refundStock, ...withdrawStock, ...STOCKIN.stock]
+      .filter(item => item.unit === unitInfo.unit)
+      .reduce((sum, item) => sum + item.qty, 0);
 
+    return {
+      unit: unitInfo.unit,
+      unitName: unitInfo.name,
+      qty: totalQty
+    };
+  });
 
+  let summaryStockIn = 0
 
+  for (const item of productData.listUnit) {
+    const stockWith = [...withdrawStock, ...STOCKIN.stock]
+    const stockRefund = [...refundStock]
+    const qtyStockWith = stockWith.filter(u => u.unit == item.unit).reduce((sum, i) => sum + i.qty, 0)
+    const qtyStockRefund = stockRefund.filter(u => u.unit == item.unit).reduce((sum, i) => sum + i.qty, 0)
+    summaryStockIn += item.price.sale * qtyStockWith
+    summaryStockIn += item.price.refund * qtyStockRefund
+  }
 
+  console.log(summaryStockIn)
 
 
 
@@ -1259,8 +1333,16 @@ const orderRefund = await Refund.aggregate([
     productId: productData.id,
     productName: productData.name,
     STOCK: STOCK,
-    IN: STOCKIN, withdrawStock, withdraw
-  }
+    IN: {
+      stock: STOCKIN,
+      withdrawStock: withdrawStock,
+      withdraw: withdraw,
+      refundStock: refundStock,
+      refund: refund,
+      summaryStock: summaryStock,
+      summaryStockIn: summaryStockIn
+    }
+  };
 
   res.status(200).json({
     status: 200,
