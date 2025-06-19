@@ -18,6 +18,8 @@ const productSchema = mongoose.Schema({
     name: { type: String, require: true },
     groupCode: { type: String, require: true },
     group: { type: String, require: true },
+    groupCodeM3 :{ type: String, require: true },
+    groupM3: { type: String, require: true },
     brandCode: { type: String, require: true },
     brand: { type: String, require: true },
     size: { type: String, require: true },

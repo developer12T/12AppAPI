@@ -639,24 +639,28 @@ exports.updateStoreStatus = async (req, res) => {
     })
   }
 
-  const maxRunningAll = await Store.aggregate([
-    {
-      $match: {
-        zone: store.zone
-      }
-    },
-    {
-      $group: {
-        _id: '$zone',
-        maxStoreId: { $max: '$storeId' }
+const maxRunningAll = await Store.aggregate([
+  {
+    $match: {
+      zone: store.zone,
+      storeId: {
+        $regex: /^V.{0,9}$/, 
+        $options: 'i' 
       }
     }
-  ])
+  },
+  {
+    $group: {
+      _id: '$zone',
+      maxStoreId: { $max: '$storeId' }
+    }
+  }
+]);
   const oldId = maxRunningAll.flatMap(u => u.maxStoreId)
   const newId = oldId[0].replace(/\d+$/, n =>
     String(+n + 1).padStart(n.length, '0')
   )
-
+  // console.log(maxRunningAll)
   if (status === '20') {
     await RunningNumber.findOneAndUpdate(
       { zone: store.zone },

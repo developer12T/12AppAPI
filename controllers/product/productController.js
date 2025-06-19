@@ -638,10 +638,10 @@ exports.addFromERPnew = async (req, res) => {
     const productId = listProduct.id
 
     const existingProduct = await Product.findOne({ id: productId })
-    if (existingProduct) {
-      console.log(`Product ID ${productId} already exists. Skipping.`)
-      continue
-    }
+    // if (existingProduct) {
+    //   console.log(`Product ID ${productId} already exists. Skipping.`)
+    //   continue
+    // }
     const itemConvertResponse = await axios.post(
       'http://192.168.2.97:8383/M3API/ItemManage/Item/getItemConvertItemcode',
       { itcode: productId }
@@ -672,6 +672,8 @@ exports.addFromERPnew = async (req, res) => {
       name: listProduct.name,
       groupCode: listProduct.groupCode,
       group: listProduct.group,
+      groupCodeM3:listProduct.groupCodeM3,
+      groupM3:listProduct.groupM3,
       brandCode: listProduct.brandCode,
       brand: listProduct.brand,
       size: listProduct.size,
@@ -686,13 +688,13 @@ exports.addFromERPnew = async (req, res) => {
       listUnit: listUnit
     })
     // console.log(newProduct)
-    await newProduct.save()
+    // await newProduct.save()
     data.push(newProduct)
   }
   res.status(200).json({
     status: 200,
-    message: 'Products added successfully'
-    // data:data
+    message: 'Products added successfully',
+    data:data
   })
 }
 
@@ -963,6 +965,57 @@ exports.sizeByFilter = async (req, res) => {
 
 exports.brandByFilter = async (req, res) => {
   const { flavour, size, group, unit } = req.body
+  const channel = req.headers['x-channel']
+  const { Product } = getModelsByChannel(channel, res, productModel)
+
+  let query = {};
+  if (flavour) query.flavour = flavour;
+  if (size) query.size = size;
+  if (group) query.group = group;
+
+  let queryUnit = {};
+  if (unit) queryUnit['listUnit.name'] = unit;
+
+  const dataProduct = await Product.aggregate([
+    { $match: query },
+    { $unwind: { path: '$listUnit' } },
+    { $match: queryUnit },
+    { $match: { brand: { $nin: ['', null] } } },
+    {
+      $group: {
+        _id: '$brand'
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        brand: '$_id'
+      }
+    },
+    {
+      $sort: {
+        brand: 1
+      }
+    }
+  ])
+
+  if (dataProduct.length === 0) {
+
+    return res.status(404).json({
+      status: 404,
+      message: 'Not found brand'
+    })
+  }
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: dataProduct
+  })
+}
+
+exports.unitByFilter = async (req, res) => {
+  const { flavour, size, group, brand } = req.body
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
 
