@@ -13,13 +13,19 @@ const axios = require('axios')
 const userModel = require('../../models/cash/user')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { userQuery, userQueryFilter, userQueryManeger } = require('../../controllers/queryFromM3/querySctipt');
+const user = require('../../models/cash/user');
 exports.getUser = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
     const { User } = getModelsByChannel(channel, res, userModel)
-    const users = await User.find({}).select(
-      '-_id salecode salePayer username firstName surName tel zone area warehouse role'
-    )
+    const users = await User.find({})
+      .select('-_id salecode salePayer username firstName surName tel zone area warehouse role qrCodeImage updatedAt')
+      .lean(); // ใช้ lean() เพื่อให้เป็น plain object และแก้ค่าภายในได้
+
+    const usersWithTHTime = users.map(item => ({
+      ...item,
+      updatedAt: new Date(new Date(item.updatedAt).getTime() + 7 * 60 * 60 * 1000)
+    }));
 
     if (!users || users.length === 0) {
       res.status(404).json({ status: 404, message: 'User is empty!' })
@@ -27,7 +33,7 @@ exports.getUser = async (req, res) => {
     res.status(200).json({
       status: 200,
       message: 'successful!',
-      data: users
+      data: usersWithTHTime
     })
   } catch (error) {
     console.error(error)
@@ -675,7 +681,7 @@ exports.checkUserLogin = async (req, res) => {
     },
     {
       $project: {
-        _id:0,
+        _id: 0,
         zone: 1,
         area: 1,
         saleCode: 1,
@@ -689,22 +695,22 @@ exports.checkUserLogin = async (req, res) => {
 
 
 
-const exportData = dataUser.map(user => ({
-  zone:user.zone,
-  area:user.area,
-  saleCode:user.saleCode,
-  salePayer:user.salePayer,
-  fullName:user.fullName,
-  updatedAt: dayjs(user.updatedAt).format('YYYY-MM-DD HH:mm:ss')
-}));
+  const exportData = dataUser.map(user => ({
+    zone: user.zone,
+    area: user.area,
+    saleCode: user.saleCode,
+    salePayer: user.salePayer,
+    fullName: user.fullName,
+    updatedAt: dayjs(user.updatedAt).format('YYYY-MM-DD HH:mm:ss')
+  }));
 
-// Export to Excel
-const worksheet = XLSX.utils.json_to_sheet(exportData);
-const workbook = XLSX.utils.book_new();
-XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
-XLSX.writeFile(workbook, "dataUser.xlsx");
+  // Export to Excel
+  const worksheet = XLSX.utils.json_to_sheet(exportData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
+  XLSX.writeFile(workbook, "dataUser.xlsx");
 
-console.log("✅ สร้างไฟล์ Excel: dataUser.xlsx ด้วยวันที่ฟอร์แมตเรียบร้อยแล้ว");
+  console.log("✅ สร้างไฟล์ Excel: dataUser.xlsx ด้วยวันที่ฟอร์แมตเรียบร้อยแล้ว");
 
 
   res.status(200).json({
