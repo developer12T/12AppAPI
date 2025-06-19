@@ -17,6 +17,7 @@ async function summaryOrder(cart, channel, res) {
     }
 
     const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel);
+    // console.log(cart.storeId, cart.area)
     const storeData = await Store.findOne({ storeId: cart.storeId, area: cart.area }).lean() || {}
 
     const store = storeData

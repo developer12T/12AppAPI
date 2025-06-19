@@ -7,6 +7,7 @@ const stockModel = require('../../models/cash/stock')
 
 const { getModelsByChannel } = require('../../middleware/channel')
 const { productQuery } = require('../../controllers/queryFromM3/querySctipt')
+const { group } = require('console')
 
 exports.getProductAll = async (req, res) => {
   try {
@@ -802,5 +803,51 @@ exports.groupFlavourId = async (req, res) => {
     status: 200,
     message: 'sucess',
     data: data
+  })
+}
+
+exports.groupByFilter = async (req, res) => {
+  const { size, brand, flavour, unit } = req.body
+  const channel = req.headers['x-channel']
+  const { Product } = getModelsByChannel(channel, res, productModel)
+
+let query = {};
+if (size) query.size = size;
+if (brand) query.brand = brand;
+if (flavour) query.flavour = flavour;
+
+let queryUnit = {};
+if (unit) queryUnit['listUnit.name'] = unit;
+
+const dataProduct = await Product.aggregate([
+  { $match: query },
+  { $unwind: { path: '$listUnit' } },
+  { $match: queryUnit },
+  { $match: { group: { $nin: ['',null] } } },
+    {
+      $group: {
+        _id: '$group'
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        group: '$_id'
+      }
+    }
+  ])
+
+  if (dataProduct.length === 0) {
+
+    return res.status(404).json({
+      status: 404,
+      message:'Not found group'
+    })
+  }
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: dataProduct
   })
 }

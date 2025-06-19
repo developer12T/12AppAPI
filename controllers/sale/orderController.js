@@ -317,7 +317,6 @@ exports.checkout = async (req, res) => {
     //     }
     //   );
     // }
-
     const calStock = {
       // storeId: refundOrder.store.storeId,
       orderId: newOrder.orderId,
