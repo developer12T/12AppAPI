@@ -834,6 +834,11 @@ exports.groupByFilter = async (req, res) => {
         _id: 0,
         group: '$_id'
       }
+    },
+    {
+      $sort: {
+        group: 1
+      }
     }
   ])
 
@@ -881,6 +886,11 @@ exports.flavourByFilter = async (req, res) => {
         _id: 0,
         flavour: '$_id'
       }
+    },
+    {
+      $sort: {
+        flavour: 1
+      }
     }
   ])
 
@@ -888,7 +898,7 @@ exports.flavourByFilter = async (req, res) => {
 
     return res.status(404).json({
       status: 404,
-      message: 'Not found group'
+      message: 'Not found flavour'
     })
   }
 
@@ -898,3 +908,56 @@ exports.flavourByFilter = async (req, res) => {
     data: dataProduct
   })
 }
+
+
+exports.sizeByFilter = async (req, res) => {
+  const { flavour, brand, group, unit } = req.body
+  const channel = req.headers['x-channel']
+  const { Product } = getModelsByChannel(channel, res, productModel)
+
+  let query = {};
+  if (flavour) query.flavour = flavour;
+  if (brand) query.brand = brand;
+  if (group) query.group = group;
+
+  let queryUnit = {};
+  if (unit) queryUnit['listUnit.name'] = unit;
+
+  const dataProduct = await Product.aggregate([
+    { $match: query },
+    { $unwind: { path: '$listUnit' } },
+    { $match: queryUnit },
+    { $match: { size: { $nin: ['', null] } } },
+    {
+      $group: {
+        _id: '$size'
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        size: '$_id'
+      }
+    },
+    {
+      $sort: {
+        size: 1
+      }
+    }
+  ])
+
+  if (dataProduct.length === 0) {
+
+    return res.status(404).json({
+      status: 404,
+      message: 'Not found size'
+    })
+  }
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: dataProduct
+  })
+}
+

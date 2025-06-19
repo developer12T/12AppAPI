@@ -13,7 +13,8 @@ const {
   groupSize,
   groupFlavourId,
   groupByFilter,
-  flavourByFilter
+  flavourByFilter,
+  sizeByFilter
 } = require('../../controllers/product/productController')
 
 const router = express.Router()
@@ -32,5 +33,6 @@ router.get('/groupSize', groupSize)
 router.get('/groupFlavourId', groupFlavourId)
 router.post('/groupByFilter', groupByFilter)
 router.post('/flavourByFilter', flavourByFilter)
+router.post('/sizeByFilter', sizeByFilter)
 // router.get('/searchProduct', searchProduct)
 module.exports = router
