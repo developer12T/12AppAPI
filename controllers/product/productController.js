@@ -811,19 +811,19 @@ exports.groupByFilter = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
 
-let query = {};
-if (size) query.size = size;
-if (brand) query.brand = brand;
-if (flavour) query.flavour = flavour;
+  let query = {};
+  if (size) query.size = size;
+  if (brand) query.brand = brand;
+  if (flavour) query.flavour = flavour;
 
-let queryUnit = {};
-if (unit) queryUnit['listUnit.name'] = unit;
+  let queryUnit = {};
+  if (unit) queryUnit['listUnit.name'] = unit;
 
-const dataProduct = await Product.aggregate([
-  { $match: query },
-  { $unwind: { path: '$listUnit' } },
-  { $match: queryUnit },
-  { $match: { group: { $nin: ['',null] } } },
+  const dataProduct = await Product.aggregate([
+    { $match: query },
+    { $unwind: { path: '$listUnit' } },
+    { $match: queryUnit },
+    { $match: { group: { $nin: ['', null] } } },
     {
       $group: {
         _id: '$group'
@@ -841,7 +841,54 @@ const dataProduct = await Product.aggregate([
 
     return res.status(404).json({
       status: 404,
-      message:'Not found group'
+      message: 'Not found group'
+    })
+  }
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: dataProduct
+  })
+}
+
+
+exports.flavourByFilter = async (req, res) => {
+  const { size, brand, group, unit } = req.body
+  const channel = req.headers['x-channel']
+  const { Product } = getModelsByChannel(channel, res, productModel)
+
+  let query = {};
+  if (size) query.size = size;
+  if (brand) query.brand = brand;
+  if (group) query.group = group;
+
+  let queryUnit = {};
+  if (unit) queryUnit['listUnit.name'] = unit;
+
+  const dataProduct = await Product.aggregate([
+    { $match: query },
+    { $unwind: { path: '$listUnit' } },
+    { $match: queryUnit },
+    { $match: { flavour: { $nin: ['', null] } } },
+    {
+      $group: {
+        _id: '$flavour'
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        flavour: '$_id'
+      }
+    }
+  ])
+
+  if (dataProduct.length === 0) {
+
+    return res.status(404).json({
+      status: 404,
+      message: 'Not found group'
     })
   }
 
