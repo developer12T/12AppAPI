@@ -36,7 +36,7 @@ async function checkInRoute(data,channel,res) {
 
         let updateData = {
             "listStore.$.note": data.note || '',
-            "listStore.$.image": '',
+            // "listStore.$.image": '',
             "listStore.$.latitude": data.latitude,
             "listStore.$.longtitude": data.longitude,
             "listStore.$.status": '3',
