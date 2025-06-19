@@ -96,20 +96,38 @@ async function applyPromotion(order, channel, res) {
         let promoDiscount = 0
         let freeProducts = []
 
-        if (promo.applicableTo?.store?.length > 0 && !promo.applicableTo.store.includes(order.store?.storeId)) continue
-        if (promo.applicableTo?.typeStore?.length > 0 && !promo.applicableTo.typeStore.includes(order.store?.storeType)) continue
-        if (promo.applicableTo?.zone?.length > 0 && !promo.applicableTo.zone.includes(order.store?.zone)) continue
-        if (promo.applicableTo?.area?.length > 0 && !promo.applicableTo.area.includes(order.store?.area)) continue
-        // console.log("promo", promo.applicableTo?.isbeauty)
+        if (promo.applicableTo?.store?.length > 0 && !promo.applicableTo.store.includes(order.store?.storeId)) continue;
+        if (promo.applicableTo?.typeStore?.length > 0 && !promo.applicableTo.typeStore.includes(order.store?.storeType)) continue;
+        if (promo.applicableTo?.zone?.length > 0 && !promo.applicableTo.zone.includes(order.store?.zone)) continue;
+        if (promo.applicableTo?.area?.length > 0 && !promo.applicableTo.area.includes(order.store?.area)) continue;
+
+        // beauty store check
         const beautyStore = await TypeStore.findOne({
             storeId: order.store.storeId,
             type: { $in: ["beauty"] },
             usedPro: { $nin: [promo.proId] }
         });
-        if (promo.applicableTo?.isbeauty === true && !beautyStore) {
-            // console.log('ข้าม')
-            continue
-        };
+        if (promo.applicableTo?.isbeauty === true && !beautyStore) continue;
+
+const isInComplete = promo.applicableTo?.complete?.includes(order.store?.storeId) === true;
+// console.log('isInComplete =', isInComplete);
+// console.log('newStore =', newStore?.name);
+// console.log('isNewStore =', promo.applicableTo?.isNewStore);
+
+if (promo.applicableTo?.isNewStore === true) {
+    if (
+        isInComplete === false &&  // ไม่อยู่ใน complete
+        newStore                   // newStore มีค่า (ไม่ null/undefined/false)
+    ) {
+        // console.log('✅ ผ่าน: ร้านใหม่ + ยังไม่ complete + มี newStore');
+        // ทำงานต่อได้
+    } else {
+        // console.log('⛔ ข้าม: ร้านใหม่ แต่ complete แล้ว หรือไม่มี newStore');
+        continue;
+    }
+}
+
+    console.log(promo.proId)
 
         // console.log('isNewStore:', promo.applicableTo?.isNewStore)
         // console.log('promo.applicableTo?.isNewStore', promo.applicableTo?.isNewStore)
@@ -123,19 +141,9 @@ async function applyPromotion(order, channel, res) {
         //     console.log('ข้าม');
         //     continue;
         // }
+        // console.log(promo.proId)
+        // console.log(promo.applicableTo?.isNewStore)
 
-        if (promo.applicableTo?.isNewStore === true) {
-            console.log('🔍 ไม่ใช่ร้านใหม่');
-
-            if (promo.applicableTo.complete.includes(order.store?.storeId)) {
-                console.log('🔍 อยู่ใน complete');
-
-                if (!newStore || newStore.length === 0) {
-                    console.log('⛔ ข้าม: ไม่มี newStore');
-                    continue;
-                }
-            }
-        }
 
 
 
