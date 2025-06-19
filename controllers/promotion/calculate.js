@@ -92,8 +92,7 @@ async function applyPromotion(order, channel, res) {
 
     const beautyStore = await TypeStore.findOne({
         storeId: order.store.storeId,
-        type: { $in: ["beauty"] },
-        usedPro: { $nin: [promo.proId] }
+        type: { $in: ["beauty"] }
     });
 
 
