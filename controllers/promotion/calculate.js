@@ -5,23 +5,50 @@ const productModel = require('../../models/cash/product')
 const { getModelsByChannel } = require('../../middleware/channel')
 const promotionLimitModel = require('../../models/cash/promotion');
 const storeModel = require('../../models/cash/store')
-
+const stockModel = require('../../models/cash/stock')
 const { each, forEach } = require('lodash')
+const { period, previousPeriod } = require('../../utilities/datetime')
 
 
-async function rewardProduct(rewards, multiplier, channel, res) {
+
+
+
+async function rewardProduct(rewards, order, multiplier, channel, res) {
     if (!rewards || rewards.length === 0) return []
     const { Product } = getModelsByChannel(channel, res, productModel);
-
+    const { Stock } = getModelsByChannel(channel, res, stockModel);
+    // console.log(order)
     const rewardFilters = rewards.map(r => ({
         ...(r.productId ? { id: r.productId } : {}),
         ...(r.productGroup ? { group: r.productGroup } : {}),
         ...(r.productFlavour ? { flavour: r.productFlavour } : {}),
         ...(r.productBrand ? { brand: r.productBrand } : {}),
-        ...(r.productSize ? { size: r.productSize } : {})
+        ...(r.productSize ? { size: r.productSize } : {}),
     }))
 
-    const eligibleProducts = await Product.find({ $or: rewardFilters }).lean()
+    const Allproduct = await Product.find({ $or: rewardFilters }).lean()
+
+    const productId = Allproduct.map(item => ({ id: item.id }))
+
+    const dataStock = await Stock.findOne({
+        area: order.store.area,
+        period: period()
+    })
+
+    const productStock = dataStock.listProduct
+        .flatMap(item => {
+            const inStock = productId.find(u => u.id == item.productId)
+            return inStock ? { id: inStock.id } : undefined
+        })
+        .filter(Boolean)
+
+    // ✨ แก้จุดนี้!
+    const eligibleProducts = await Product.find({
+        id: { $in: productStock.map(u => u.id) }
+    }).lean()
+
+
+
     if (!eligibleProducts.length) return []
 
     return rewards.map(r => {
@@ -132,27 +159,6 @@ async function applyPromotion(order, channel, res) {
             }
         }
 
-        // console.log(promo.proId)
-
-        // console.log('isNewStore:', promo.applicableTo?.isNewStore)
-        // console.log('promo.applicableTo?.isNewStore', promo.applicableTo?.isNewStore)
-        // console.log('newStore',newStore)
-
-        // if (
-        //     promo.applicableTo?.isNewStore === false &&
-        //     !promo.applicableTo.complete.includes(order.store?.storeId) &&
-        //     !newStore
-        // ) {
-        //     console.log('ข้าม');
-        //     continue;
-        // }
-        // console.log(promo.proId)
-        // console.log(promo.applicableTo?.isNewStore)
-
-
-
-
-
         let matchedProducts = order.listProduct.filter((product) =>
             promo.conditions.some((condition) =>
                 (condition.productId.length === 0 || condition.productId.includes(product.id)) &&
@@ -193,11 +199,11 @@ async function applyPromotion(order, channel, res) {
         // console.log(promo.rewards)
         switch (promo.proType) {
             case 'amount':
-                freeProducts = await rewardProduct(promo.rewards, multiplier, channel, res)
+                freeProducts = await rewardProduct(promo.rewards, order, multiplier, channel, res)
                 promoApplied = true
                 break
             case 'free':
-                freeProducts = await rewardProduct(promo.rewards, multiplier, channel, res)
+                freeProducts = await rewardProduct(promo.rewards, order, multiplier, channel, res)
                 promoApplied = true
 
                 break
@@ -214,7 +220,7 @@ async function applyPromotion(order, channel, res) {
                 break
         }
         if (promoApplied) {
-            // console.log(promoApplied)
+            // console.log("ssssssssssssss",freeProducts)
             let selectedProduct = freeProducts.length > 0 ? freeProducts[0] : null
             appliedPromotions.push({
                 proId: promo.proId,
