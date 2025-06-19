@@ -90,6 +90,13 @@ async function applyPromotion(order, channel, res) {
         }])
     const newStore = dataStore[0]
 
+    const beautyStore = await TypeStore.findOne({
+        storeId: order.store.storeId,
+        type: { $in: ["beauty"] },
+        usedPro: { $nin: [promo.proId] }
+    });
+
+
 
     for (const promo of promotions) {
         let promoApplied = false
@@ -102,32 +109,31 @@ async function applyPromotion(order, channel, res) {
         if (promo.applicableTo?.area?.length > 0 && !promo.applicableTo.area.includes(order.store?.area)) continue;
 
         // beauty store check
-        const beautyStore = await TypeStore.findOne({
-            storeId: order.store.storeId,
-            type: { $in: ["beauty"] },
-            usedPro: { $nin: [promo.proId] }
-        });
-        if (promo.applicableTo?.isbeauty === true && !beautyStore) continue;
+        const isInCompleteBeauty = promo.applicableTo?.completeStoreBeauty?.includes(order.store?.storeId) === true;
+        if (promo.applicableTo?.isbeauty === true) {
+            if (
+                isInCompleteBeauty === false &&
+                beautyStore
+            ) {
+            } else {
+                continue;
+            }
+        }
+        // if (promo.applicableTo?.isbeauty === true && !beautyStore) continue;
 
-const isInComplete = promo.applicableTo?.complete?.includes(order.store?.storeId) === true;
-// console.log('isInComplete =', isInComplete);
-// console.log('newStore =', newStore?.name);
-// console.log('isNewStore =', promo.applicableTo?.isNewStore);
 
-if (promo.applicableTo?.isNewStore === true) {
-    if (
-        isInComplete === false &&  // ไม่อยู่ใน complete
-        newStore                   // newStore มีค่า (ไม่ null/undefined/false)
-    ) {
-        // console.log('✅ ผ่าน: ร้านใหม่ + ยังไม่ complete + มี newStore');
-        // ทำงานต่อได้
-    } else {
-        // console.log('⛔ ข้าม: ร้านใหม่ แต่ complete แล้ว หรือไม่มี newStore');
-        continue;
-    }
-}
+        const isInCompleteNew = promo.applicableTo?.completeStoreNew?.includes(order.store?.storeId) === true;
+        if (promo.applicableTo?.isNewStore === true) {
+            if (
+                isInCompleteNew === false &&
+                newStore
+            ) {
+            } else {
+                continue;
+            }
+        }
 
-    console.log(promo.proId)
+        // console.log(promo.proId)
 
         // console.log('isNewStore:', promo.applicableTo?.isNewStore)
         // console.log('promo.applicableTo?.isNewStore', promo.applicableTo?.isNewStore)

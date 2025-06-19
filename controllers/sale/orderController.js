@@ -373,17 +373,25 @@ exports.checkout = async (req, res) => {
         }
       }])
 
-
+    // console.log(newOrder.store.storeId)
 
     for (const item of promoDetail) {
-      // console.log(item)
-      if (item.applicableTo.isbeauty === true || item.applicableTo.isNewStore === true) {
-        // console.log(item)
+      if (item.applicableTo.isNewStore === true) {
         await Promotion.findOneAndUpdate(
-          { proId:item.proId },
+          { proId: item.proId },
           {
             $addToSet: {
-              'applicableTo.complete': newOrder.store.storeId
+              'applicableTo.completeStoreNew': newOrder.store.storeId
+            }
+          }
+        );
+      }
+      else if (item.applicableTo.isbeauty === true) {
+        await Promotion.findOneAndUpdate(
+          { proId: item.proId },
+          {
+            $addToSet: {
+              'applicableTo.completeStoreBeauty': newOrder.store.storeId
             }
           }
         );
