@@ -968,7 +968,7 @@ exports.brandByFilter = async (req, res) => {
 
   let query = {};
   if (flavour) query.flavour = flavour;
-  if (size) query.brand = size;
+  if (size) query.size = size;
   if (group) query.group = group;
 
   let queryUnit = {};
