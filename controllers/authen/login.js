@@ -19,7 +19,7 @@ exports.login = async (req, res) => {
         req.body.password,
         data.password
       )
-      console.log(passwordMatch)
+      // console.log(data.password)
       if (passwordMatch) {
         const token = jwt.sign(
           { username: data.username },
@@ -28,7 +28,7 @@ exports.login = async (req, res) => {
         )
 
         const currentDate = new Date()
-        console.log(currentDate)
+        // console.log(currentDate)
         await User.findOneAndUpdate(
           { username: req.body.username },  
           { $set: { updatedAt: currentDate } }, 

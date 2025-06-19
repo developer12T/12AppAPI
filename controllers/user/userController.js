@@ -262,19 +262,30 @@ exports.addUserOne = async (req, res) => {
 }
 
 exports.updateUserOne = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const data = await userQuery(channel)
 
+  const channel = req.headers['x-channel']
   const { User } = getModelsByChannel(channel, res, userModel)
+  // const user = await User.findOne({saleCode:req.body.saleCode})
+
+    if (!req.body.saleCode && !req.body.username) {
+      return res.status(400).json({
+        status: 400,
+        message: 'saleCode or username is required!'
+      })
+    }
+
+  const saltRounds = 10;
+
+  const hashedPassword = await bcrypt.hash(req.body.password, saltRounds);
   const user = await User.updateOne(
-    { saleCode: req.body.saleCode },
+    { saleCode: req.body.saleCode,username:req.body.username },
     {
       $set: {
         salePayer: req.body.salePayer,
         username: req.body.username,
         firstName: req.body.firstName,
         surName: req.body.surName,
-        password: req.body.password,
+        password: hashedPassword,
         tel: req.body.tel,
         zone: req.body.zone,
         area: req.body.area,
@@ -286,16 +297,10 @@ exports.updateUserOne = async (req, res) => {
     }
   )
 
-  if (user.modifiedCount == 0) {
-    return res.status(409).json({
-      status: 409,
-      message: 'Not Found this saleCode'
-    })
-  }
-
   res.status(200).json({
     status: 200,
     message: 'Update User Success'
+    // user
   })
 }
 
