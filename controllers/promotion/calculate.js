@@ -50,7 +50,7 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
         id: { $in: productStock.map(u => u.id) }
     }).lean()
 
-    console.log(productStock)
+    // console.log(productStock)
 
 
 
@@ -68,7 +68,7 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
             (!r.productBrand || p.brand === r.productBrand) &&
             (!r.productSize || p.size === r.productSize)
         )
-
+        console.log("test",product)
         if (!product) return null
 
         const unitData = product.listUnit.find(unit => unit.unit === r.productUnit)
