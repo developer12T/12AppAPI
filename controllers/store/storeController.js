@@ -2,6 +2,9 @@ const { uploadFiles } = require('../../utilities/upload')
 const { calculateSimilarity } = require('../../utilities/utility')
 const axios = require('axios')
 const multer = require('multer')
+const userModel = require('../../models/cash/user')
+const ExcelJS = require('exceljs')
+
 const addUpload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages'
 )
@@ -28,15 +31,20 @@ const getUploadMiddleware = channel => {
   return multer({ storage, limits }).array('storeImages')
 }
 
+const orderModel = require('../../models/cash/sale')
 const storeModel = require('../../models/cash/store')
+const routeModel = require('../../models/cash/route')
+const refundModel = require('../../models/cash/refund')
+
+// const userModel = require('../../models/cash/user')
+const DistributionModel = require('../../models/cash/distribution')
+const promotionModel = require('../../models/cash/promotion')
 const { getModelsByChannel } = require('../../middleware/channel')
 const path = require('path')
 const { v4: uuidv4 } = require('uuid')
-const { stat } = require('fs')
-const { create } = require('lodash')
-const { channel } = require('diagnostics_channel')
 uuidv4() // ⇨ '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed'
 const { productQuery } = require('../../controllers/queryFromM3/querySctipt')
+
 exports.getStore = async (req, res) => {
   try {
     const { area, type, route } = req.query
@@ -639,23 +647,23 @@ exports.updateStoreStatus = async (req, res) => {
     })
   }
 
-const maxRunningAll = await Store.aggregate([
-  {
-    $match: {
-      zone: store.zone,
-      storeId: {
-        $regex: /^V.{0,9}$/, 
-        $options: 'i' 
+  const maxRunningAll = await Store.aggregate([
+    {
+      $match: {
+        zone: store.zone,
+        storeId: {
+          $regex: /^V.{0,9}$/,
+          $options: 'i'
+        }
+      }
+    },
+    {
+      $group: {
+        _id: '$zone',
+        maxStoreId: { $max: '$storeId' }
       }
     }
-  },
-  {
-    $group: {
-      _id: '$zone',
-      maxStoreId: { $max: '$storeId' }
-    }
-  }
-]);
+  ]);
   const oldId = maxRunningAll.flatMap(u => u.maxStoreId)
   const newId = oldId[0].replace(/\d+$/, n =>
     String(+n + 1).padStart(n.length, '0')
@@ -1109,3 +1117,4 @@ exports.getTypeStore = async (req, res) => {
     deletedStore: storeType
   })
 }
+

@@ -18,7 +18,8 @@ const {
   updateStoreArray,
   deleteStoreArray,
   getTypeStore,
-  addTypeStore
+  addTypeStore,
+  // test
 } = require('../../controllers/store/storeController')
 
 const router = express.Router()
@@ -46,7 +47,7 @@ router.post('/deleteStoreArray', deleteStoreArray)
 
 router.get('/getTypeStore', getTypeStore)
 router.post('/addTypeStore', addTypeStore)
-
+// router.get('/test', test)
 
 
 

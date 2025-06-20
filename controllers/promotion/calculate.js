@@ -38,14 +38,24 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
     const productStock = dataStock.listProduct
         .flatMap(item => {
             const inStock = productId.find(u => u.id == item.productId)
-            return inStock ? { id: inStock.id } : undefined
+            if (!inStock) return undefined // หรือ return []
+            return {
+                id: inStock.id,
+                balancePcs: item.balancePcs
+            }
         })
         .filter(Boolean)
 
-    // ✨ แก้จุดนี้!
     const eligibleProducts = await Product.find({
         id: { $in: productStock.map(u => u.id) }
     }).lean()
+
+    console.log(productStock)
+
+
+
+    // console.log(productQtyPcs)
+
 
 
 
@@ -65,7 +75,7 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
         const factor = parseInt(unitData?.factor, 10) || 1
         const productQty = r.limitType === 'limited' ? r.productQty : r.productQty * multiplier
         const productQtyPcs = productQty * factor
-
+        // console.log(productQtyPcs)
 
         return {
             productId: product.id,
@@ -220,7 +230,6 @@ async function applyPromotion(order, channel, res) {
                 break
         }
         if (promoApplied) {
-            // console.log("ssssssssssssss",freeProducts)
             let selectedProduct = freeProducts.length > 0 ? freeProducts[0] : null
             appliedPromotions.push({
                 proId: promo.proId,
@@ -230,10 +239,8 @@ async function applyPromotion(order, channel, res) {
                 proQty: selectedProduct.productQty,
                 discount: promoDiscount,
                 test: "dawd",
-                // ...(selectedProduct && { ...selectedProduct })
                 listProduct: [{
                     proId: promo.proId,
-                    // proName: 'dawd',
                     id: selectedProduct.productId,
                     name: selectedProduct.productName,
                     group: selectedProduct.productGroup,
