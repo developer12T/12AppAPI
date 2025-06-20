@@ -54,7 +54,7 @@ const uploadFilesCheckin = async (
 
       // ✅ แก้ตรงนี้: ให้ publicPath มี 'stores/checkin' เสมอ
       const publicPath = path.join(
-        '/images/stores/checkin',
+        '/stores/checkin',
         subFolder,
         imageName
       )
