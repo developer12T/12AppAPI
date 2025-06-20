@@ -178,7 +178,7 @@ exports.reportCheck = async (req, res) => {
 
 exports.reportCheckExcel = async (req, res) => {
   try {
-    const { start, end, channel } = req.query
+    let { start, end, channel } = req.query
 
     // console.log(start, end)
 
@@ -205,9 +205,8 @@ exports.reportCheckExcel = async (req, res) => {
 
       startStr = addHours(new Date(`${todayStr}T00:00:00.000Z`), 7)
       endStr = addHours(new Date(`${todayStr}T23:59:59.999Z`), 7)
-
-      console.log(startStr)
-      console.log(endStr)
+      start = todayStr
+      end = todayStr
     } else {
       startStr = addHours(new Date(`${start}T00:00:00.000Z`), 7)
       endStr = addHours(new Date(`${end}T23:59:59.999Z`), 7)
@@ -277,7 +276,7 @@ exports.reportCheckExcel = async (req, res) => {
     })
 
     const workbook = new ExcelJS.Workbook()
-    const worksheet = workbook.addWorksheet('StatusByArea')
+    const worksheet = workbook.addWorksheet(`${start} To ${end}`)
     worksheet.addRow(['เขต', 'โหลดโปรแกรม', 'เพิ่มร้านค้าใหม่', 'เข้าเยี่ยม', 'ขาย', 'เบิก', 'คืน'])
     result.forEach(row => {
       const excelRow = worksheet.addRow([

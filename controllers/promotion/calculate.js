@@ -53,11 +53,11 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
 
     for (const item of productStock) {
         // console.log(item)
-        const dataProduct = await Product.findOne({id:item.id}).lean()
+        const dataProduct = await Product.findOne({ id: item.id }).lean()
 
         const data = {
             ...dataProduct,
-            balancePcs:item.balancePcs
+            balancePcs: item.balancePcs
         }
         eligibleProducts.push(data)
     }
@@ -77,35 +77,53 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
 
     // if (!eligibleProducts.length) return []
 
-    return rewards.map(r => {
-        const product = eligibleProducts.find(p =>
-            (!r.productGroup || p.group === r.productGroup) &&
-            (!r.productFlavour || p.flavour === r.productFlavour) &&
-            (!r.productBrand || p.brand === r.productBrand) &&
-            (!r.productSize || p.size === r.productSize)
-        )
-        // console.log("test",product)
-        if (!product) return null
+return rewards.map(r => {
+    // 1. filter หา product ที่ตรงกับ reward นี้
+    const candidates = eligibleProducts.filter(p =>
+        (!r.productGroup   || p.group   === r.productGroup)   &&
+        (!r.productFlavour || p.flavour === r.productFlavour) &&
+        (!r.productBrand   || p.brand   === r.productBrand)   &&
+        (!r.productSize    || p.size    === r.productSize)
+    )
 
-        const unitData = product.listUnit.find(unit => unit.unit === r.productUnit)
+    // 2. หากไม่มี candidate เลย ข้าม
+    if (!candidates.length) return null
+
+    // 3. loop แต่ละ product candidate แล้วหา product ที่มี balancePcs >= จำนวนที่ต้องการ
+    const unit = r.productUnit
+    const productQty = r.limitType === 'limited' ? r.productQty : r.productQty * multiplier
+
+    // หา product ที่ balance เพียงพอ (ใช้ .find เพื่อหาอันแรกที่พอ)
+    const found = candidates.find(p => {
+        // หา unitData ของ product ตัวนี้ที่ตรงกับ unit ที่กำหนด
+        const unitData = Array.isArray(p.listUnit) ? p.listUnit.find(u => u.unit === unit) : null
         const factor = parseInt(unitData?.factor, 10) || 1
-        const productQty = r.limitType === 'limited' ? r.productQty : r.productQty * multiplier
         const productQtyPcs = productQty * factor
-        // console.log(productQtyPcs)
+        // ต้องมี balancePcs เพียงพอ
+        return p.balancePcs >= productQtyPcs
+    })
 
-        return {
-            productId: product.id,
-            productName: product.name,
-            productGroup: product.group,
-            productFlavour: product.flavour,
-            productBrand: product.brand,
-            productSize: product.size,
-            productUnit: r.productUnit,
-            productUnitName: unitData?.name || '',
-            productQty,
-            productQtyPcs
-        }
-    }).filter(Boolean)
+    // ถ้าไม่เจอ product ที่มี balance เพียงพอ ข้าม
+    if (!found) return null
+
+    // หา unitData อีกครั้งเพื่อเตรียมข้อมูลแสดงผล
+    const unitData = Array.isArray(found.listUnit) ? found.listUnit.find(u => u.unit === unit) : null
+    const factor = parseInt(unitData?.factor, 10) || 1
+    const productQtyPcs = productQty * factor
+
+    return {
+        productId: found.id,
+        productName: found.name,
+        productGroup: found.group,
+        productFlavour: found.flavour,
+        productBrand: found.brand,
+        productSize: found.size,
+        productUnit: unit,
+        productUnitName: unitData?.name || '',
+        productQty,
+        productQtyPcs
+    }
+}).filter(Boolean)
 }
 
 async function applyPromotion(order, channel, res) {
