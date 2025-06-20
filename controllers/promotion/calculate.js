@@ -46,9 +46,25 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
         })
         .filter(Boolean)
 
-    const eligibleProducts = await Product.find({
-        id: { $in: productStock.map(u => u.id) }
-    }).lean()
+    // const eligibleProducts = await Product.find({
+    //     id: { $in: productStock.map(u => u.id) }
+    // }).lean()
+    const eligibleProducts = []
+
+    for (const item of productStock) {
+        // console.log(item)
+        const dataProduct = await Product.findOne({id:item.id}).lean()
+
+        const data = {
+            ...dataProduct,
+            balancePcs:item.balancePcs
+        }
+        eligibleProducts.push(data)
+    }
+    // console.log(eligibleProducts)
+    // const productStockTest = await Product.find({
+    //     id: { $in: productStock.map(u => u.id) }
+    // }).lean()
 
     // console.log(productStock)
 
@@ -59,7 +75,7 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
 
 
 
-    if (!eligibleProducts.length) return []
+    // if (!eligibleProducts.length) return []
 
     return rewards.map(r => {
         const product = eligibleProducts.find(p =>
@@ -68,7 +84,7 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
             (!r.productBrand || p.brand === r.productBrand) &&
             (!r.productSize || p.size === r.productSize)
         )
-        console.log("test",product)
+        // console.log("test",product)
         if (!product) return null
 
         const unitData = product.listUnit.find(unit => unit.unit === r.productUnit)
