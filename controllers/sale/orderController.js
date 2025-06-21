@@ -2635,3 +2635,61 @@ exports.getProductLimit = async (req, res) => {
 }
 
 
+exports.summaryAllProduct = async (req, res) => {
+  const { area, period } = req.query
+  const channel = req.headers['x-channel']
+  const { Product } = getModelsByChannel(channel, res, productModel)
+  const { Stock } = getModelsByChannel(channel, res, stockModel)
+
+  const dataStock = await Stock.findOne({
+    area: area,
+    period: period
+  })
+
+  if (dataStock == 0) {
+    return res.status(404).json({
+      status:404,
+      message:'Not found Stock'
+    })
+  }
+
+  const productId = dataStock.listProduct.flatMap(item => item.productId)
+
+  const dataProduct = await Product.aggregate([
+    {
+      $match: {
+        id: { $in: productId }
+      }
+    },
+    { $unwind: '$listUnit' },
+    {
+      $project: {
+        _id: 0,
+        id: 1,
+        listUnit: 1
+      }
+    }
+  ])
+
+  let sumPrice = 0
+
+  for (const item of dataStock.listProduct) {
+    const getPcs = dataProduct.find(u => u.id == item.productId && u.listUnit.unit == 'PCS') || {}
+    // const getCtn = dataProduct.find(u => u.id == item.productId && u.listUnit.unit == 'CTN') || {}
+    if (getPcs && getPcs.listUnit && getPcs.listUnit.price.sale) {
+      sumPrice += item.balancePcs * getPcs.listUnit.price.sale;
+    }
+    // if (getCtn && getCtn.listUnit && getCtn.listUnit.price.sale) {
+    //   sumPrice += item.balanceCtn * getCtn.listUnit.price.sale;
+    // }
+
+  }
+
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: sumPrice
+  })
+}
