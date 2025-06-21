@@ -1015,37 +1015,37 @@ exports.brandByFilter = async (req, res) => {
 }
 
 exports.unitByFilter = async (req, res) => {
-  const { flavour, size, group, brand } = req.body
+ const { flavour, brand, group, size } = req.body
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
 
   let query = {};
   if (flavour) query.flavour = flavour;
-  if (size) query.size = size;
+  if (brand) query.brand = brand;
   if (group) query.group = group;
-
-  let queryUnit = {};
-  if (unit) queryUnit['listUnit.name'] = unit;
+  if (size) query.size = size
+  // let queryUnit = {};
+  // if (unit) queryUnit['listUnit.name'] = unit;
 
   const dataProduct = await Product.aggregate([
     { $match: query },
     { $unwind: { path: '$listUnit' } },
-    { $match: queryUnit },
-    { $match: { brand: { $nin: ['', null] } } },
+    // { $match: queryUnit },
+    { $match: { 'listUnit.unit': { $nin: ['', null] } } },
     {
       $group: {
-        _id: '$brand'
+        _id: '$listUnit.unit'
       }
     },
     {
       $project: {
         _id: 0,
-        brand: '$_id'
+        unit: '$_id'
       }
     },
     {
       $sort: {
-        brand: 1
+        unit: 1
       }
     }
   ])
@@ -1054,7 +1054,7 @@ exports.unitByFilter = async (req, res) => {
 
     return res.status(404).json({
       status: 404,
-      message: 'Not found brand'
+      message: 'Not found unit'
     })
   }
 

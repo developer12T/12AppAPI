@@ -8,6 +8,7 @@ const storeModel = require('../../models/cash/store')
 const stockModel = require('../../models/cash/stock')
 const { each, forEach } = require('lodash')
 const { period, previousPeriod } = require('../../utilities/datetime')
+const stock = require('../../models/cash/stock')
 
 
 
@@ -17,14 +18,62 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
     if (!rewards || rewards.length === 0) return []
     const { Product } = getModelsByChannel(channel, res, productModel);
     const { Stock } = getModelsByChannel(channel, res, stockModel);
-    // console.log(order)
     const rewardFilters = rewards.map(r => ({
         ...(r.productId ? { id: r.productId } : {}),
         ...(r.productGroup ? { group: r.productGroup } : {}),
         ...(r.productFlavour ? { flavour: r.productFlavour } : {}),
         ...(r.productBrand ? { brand: r.productBrand } : {}),
-        ...(r.productSize ? { size: r.productSize } : {}),
+        // ...(r.productUnit ? { unit: r.productUnit } : {}),
+        // ...(r.productQty: ? { balancePcs: r.productQty: } : {}),
     }))
+
+    const test = await Stock.aggregate([
+        {
+            $match: {
+                area: order.store.area,
+                period: period()
+            }
+        },
+        {
+            $project: {
+                _id: 0,
+                listProduct: 1
+            }
+        },
+        {
+            $unwind: '$listProduct'
+        },
+        {
+            $lookup: {
+                from: 'products',
+                localField: 'listProduct.productId',
+                foreignField: 'id',
+                as: 'productDetail'
+            }
+        },
+        {
+            $unwind: '$productDetail'   // <-- เอา array ออก เหลือเป็น object เดียว
+        },
+        {
+            $replaceRoot: {
+                newRoot: {
+                    $mergeObjects: ['$listProduct', '$productDetail']
+                }
+            }
+        }
+    ])
+    // console.log(test)
+    function matchFilter(obj, filter) {
+        // เช็คทุก key ใน filter ว่าตรงกับ obj มั้ย
+        return Object.keys(filter).every(key => obj[key] === filter[key])
+    }
+
+    // รวม filter หลายเงื่อนไขแบบ OR
+    const filtered = test.filter(item =>
+        rewardFilters.some(filter => matchFilter(item, filter))
+    )
+
+    // console.log(filtered)
 
     const Allproduct = await Product.find({ $or: rewardFilters }).lean()
 
@@ -65,65 +114,47 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
     // const productStockTest = await Product.find({
     //     id: { $in: productStock.map(u => u.id) }
     // }).lean()
+    // for (const item of rewards) {
+    //     const unitData = eligibleProducts.
 
-    // console.log(productStock)
+    // }
+
 
 
 
     // console.log(productQtyPcs)
 
+    if (!eligibleProducts.length) return []
 
+    return rewards.map(r => {
+        const product = eligibleProducts.find(p =>
+            (!r.productGroup || p.group === r.productGroup) &&
+            (!r.productFlavour || p.flavour === r.productFlavour) &&
+            (!r.productBrand || p.brand === r.productBrand) &&
+            (!r.productSize || p.size === r.productSize)
+        )
+        // console.log("test",product)
+        if (!product) return null
 
-
-    // if (!eligibleProducts.length) return []
-
-return rewards.map(r => {
-    // 1. filter หา product ที่ตรงกับ reward นี้
-    const candidates = eligibleProducts.filter(p =>
-        (!r.productGroup   || p.group   === r.productGroup)   &&
-        (!r.productFlavour || p.flavour === r.productFlavour) &&
-        (!r.productBrand   || p.brand   === r.productBrand)   &&
-        (!r.productSize    || p.size    === r.productSize)
-    )
-
-    // 2. หากไม่มี candidate เลย ข้าม
-    if (!candidates.length) return null
-
-    // 3. loop แต่ละ product candidate แล้วหา product ที่มี balancePcs >= จำนวนที่ต้องการ
-    const unit = r.productUnit
-    const productQty = r.limitType === 'limited' ? r.productQty : r.productQty * multiplier
-
-    // หา product ที่ balance เพียงพอ (ใช้ .find เพื่อหาอันแรกที่พอ)
-    const found = candidates.find(p => {
-        // หา unitData ของ product ตัวนี้ที่ตรงกับ unit ที่กำหนด
-        const unitData = Array.isArray(p.listUnit) ? p.listUnit.find(u => u.unit === unit) : null
+        const unitData = product.listUnit.find(unit => unit.unit === r.productUnit)
         const factor = parseInt(unitData?.factor, 10) || 1
+        const productQty = r.limitType === 'limited' ? r.productQty : r.productQty * multiplier
         const productQtyPcs = productQty * factor
-        // ต้องมี balancePcs เพียงพอ
-        return p.balancePcs >= productQtyPcs
-    })
+        // console.log(productQtyPcs)
 
-    // ถ้าไม่เจอ product ที่มี balance เพียงพอ ข้าม
-    if (!found) return null
-
-    // หา unitData อีกครั้งเพื่อเตรียมข้อมูลแสดงผล
-    const unitData = Array.isArray(found.listUnit) ? found.listUnit.find(u => u.unit === unit) : null
-    const factor = parseInt(unitData?.factor, 10) || 1
-    const productQtyPcs = productQty * factor
-
-    return {
-        productId: found.id,
-        productName: found.name,
-        productGroup: found.group,
-        productFlavour: found.flavour,
-        productBrand: found.brand,
-        productSize: found.size,
-        productUnit: unit,
-        productUnitName: unitData?.name || '',
-        productQty,
-        productQtyPcs
-    }
-}).filter(Boolean)
+        return {
+            productId: product.id,
+            productName: product.name,
+            productGroup: product.group,
+            productFlavour: product.flavour,
+            productBrand: product.brand,
+            productSize: product.size,
+            productUnit: r.productUnit,
+            productUnitName: unitData?.name || '',
+            productQty,
+            productQtyPcs
+        }
+    }).filter(Boolean)
 }
 
 async function applyPromotion(order, channel, res) {
