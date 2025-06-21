@@ -133,7 +133,7 @@ try {
     const { Place,Withdraw } = getModelsByChannel(channel,res,distributionModel); 
 
 
-    const users = await User.find()
+    const users = await User.find({role:'sale'})
 
     areaList = users.map(user => user.area)
 
