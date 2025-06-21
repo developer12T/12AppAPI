@@ -638,10 +638,10 @@ exports.addFromERPnew = async (req, res) => {
     const productId = listProduct.id
 
     const existingProduct = await Product.findOne({ id: productId })
-    // if (existingProduct) {
-    //   console.log(`Product ID ${productId} already exists. Skipping.`)
-    //   continue
-    // }
+    if (existingProduct) {
+      console.log(`Product ID ${productId} already exists. Skipping.`)
+      continue
+    }
     const itemConvertResponse = await axios.post(
       'http://192.168.2.97:8383/M3API/ItemManage/Item/getItemConvertItemcode',
       { itcode: productId }
@@ -653,14 +653,18 @@ exports.addFromERPnew = async (req, res) => {
 
     const listUnit = listProduct.unitList
       .map(unit => {
+        // console.log(unit)
         const matchingUnit = unitData[0]?.type.find(u => u.unit === unit.unit)
+
         return {
           unit: unit.unit,
           name: unit.name,
           factor: matchingUnit ? matchingUnit.factor : 1,
           price: {
             sale: unit.pricePerUnitSale,
-            refund: unit.pricePerUnitRefund
+            refund: unit.pricePerUnitRefund,
+            refundDmg:unit.pricePerUnitRefundDamage,
+            change:unit.pricePerUnitChange
           }
         }
       })
@@ -684,11 +688,12 @@ exports.addFromERPnew = async (req, res) => {
       weightNet: listProduct.weightNet,
       statusSale: listProduct.statusSale,
       statusRefund: listProduct.statusRefund,
+      statusRefundDmg: listProduct.statusRefundDamage,
       statusWithdraw: listProduct.statusWithdraw,
       listUnit: listUnit
     })
     // console.log(newProduct)
-    // await newProduct.save()
+    await newProduct.save()
     data.push(newProduct)
   }
   res.status(200).json({

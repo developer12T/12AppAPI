@@ -4,6 +4,8 @@ const { dbCA } = require('../../config/db')
 const price = mongoose.Schema({
     sale: { type: Number },
     refund: { type: Number },
+    refundDmg: { type: Number },
+    change: { type: Number },
 })
 
 const listUnit = mongoose.Schema({
@@ -18,7 +20,7 @@ const productSchema = mongoose.Schema({
     name: { type: String, require: true },
     groupCode: { type: String, require: true },
     group: { type: String, require: true },
-    groupCodeM3 :{ type: String, require: true },
+    groupCodeM3: { type: String, require: true },
     groupM3: { type: String, require: true },
     brandCode: { type: String, require: true },
     brand: { type: String, require: true },
@@ -31,10 +33,11 @@ const productSchema = mongoose.Schema({
     statusSale: { type: String, require: true },
     statusWithdraw: { type: String, require: true },
     statusRefund: { type: String, require: true },
+    statusRefundDmg: { type: String, require: true },
     image: { type: String, default: '' },
     listUnit: [listUnit],
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
 })
 
 // const Product = dbCA.model('Product', productSchema)
@@ -44,4 +47,4 @@ module.exports = (conn) => {
     return {
         Product: conn.model('Product', productSchema),
     };
-  };
+};

@@ -685,7 +685,9 @@ SELECT
 ITNO AS id,
 NAME_BILL as name,
 GRP as GRP_CODE,
-GRP_DESC as \`group\`,
+g.GRP_DESC as \`group\`,
+GREPORT AS groupCodeM3,
+gM3.GRP_DESC AS groupM3,
 Brand as BRAND_CODE,
 BRAND_DESC as brand,
 WEIGHT AS size,
@@ -698,23 +700,25 @@ WHEN LEFT(ITNO, 2) = '60' THEN 'พรีเมียม'
 END AS type ,
 CTN_Gross,
 CTN_Net,
-'Y' as statusSale,
-'Y' as statusRefund,
-'Y' as statusWithdraw,
+IS_OPEN as statusSale,
+IS_OPEN3 as statusRefund,
+IS_OPEN4 as statusRefundDamage,
+IS_OPEN5 as statusWithdraw,
 unit_cal as unit ,
 UNIT_CODE as nameEng,
 UNIT_DESC as nameThai,
 price as pricePerUnitSale ,
-price as pricePerUnitRefund ,
-price as pricePerUnitChange 
+price3 as pricePerUnitRefund ,
+price3 as pricePerUnitRefundDamage ,
+price5 as pricePerUnitChange 
 
 from m_product a
 LEFT JOIN c_group g ON a.GRP = g.GRP_CODE
+LEFT JOIN item_group_report gM3 ON a.GREPORT = gM3.GRP_CODE
 LEFT JOIN m_unit u ON a.unit_cal = u.UNIT_CODE_BC
 LEFT JOIN ca_factor c ON a.ITNO = c.itemcode 
 LEFT JOIN m_flavour f ON a.FLAVOUR = f.FAV_CODE 
 LEFT JOIN c_brand b ON a.Brand = b.BRAND_CODE
-
 
 
 
@@ -770,6 +774,7 @@ LEFT JOIN c_brand b ON a.Brand = b.BRAND_CODE
     const name = row.nameThai?.trim() || '';
     const priceSale = row.pricePerUnitSale;
     const priceRefund = row.pricePerUnitRefund;
+    const priceRefundDmg = row.pricePerUnitRefundDamage;
     const priceChange = row.pricePerUnitChange;
 
     const existingItem = returnArr.find(item => item.id === id);
@@ -780,6 +785,7 @@ LEFT JOIN c_brand b ON a.Brand = b.BRAND_CODE
       name: name,
       pricePerUnitSale: priceSale,
       pricePerUnitRefund: priceRefund,
+      pricePerUnitRefundDamage: priceRefundDmg,
       pricePerUnitChange: priceChange,
     };
     // console.log(unitData)
@@ -791,6 +797,8 @@ LEFT JOIN c_brand b ON a.Brand = b.BRAND_CODE
         name: row.name?.trim() || '',
         groupCode: row.GRP_CODE?.trim() || '',
         group: row.group?.trim() || '',
+        groupCodeM3 : row.groupCodeM3?.trim() || '',
+        groupM3 : row.groupM3?.trim() || '',
         brandCode: row.BRAND_CODE?.trim() || '',
         brand: row.brand?.trim() || '',
         size: row.size?.trim() || '',
@@ -801,6 +809,7 @@ LEFT JOIN c_brand b ON a.Brand = b.BRAND_CODE
         weightNet: row.CTN_Net?.toString().trim() || '',
         statusSale: row.statusSale?.trim() || '',
         statusRefund: row.statusRefund?.trim() || '',
+        statusRefundDamage: row.statusRefundDamage?.trim() || '',
         statusWithdraw: row.statusWithdraw?.trim() || '',
         unitList: [unitData],
       };
