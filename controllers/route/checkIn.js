@@ -23,6 +23,8 @@ async function checkInRoute(data,channel,res) {
         }
 
         let route = await Route.findOne({ id: data.routeId, "listStore.storeInfo": store._id })
+        // let route = await Route.findOne({ id: data.routeId, "listStore.storeInfo": store._id })
+
 
         if (!route) {
             return { status: 404, message: 'Route not found or listStore not matched' }

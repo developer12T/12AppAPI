@@ -40,10 +40,17 @@ const refundModel = require('../../models/cash/refund')
 const DistributionModel = require('../../models/cash/distribution')
 const promotionModel = require('../../models/cash/promotion')
 const { getModelsByChannel } = require('../../middleware/channel')
+const sharp = require('sharp')
+const fs = require('fs')
+const os = require('os')
 const path = require('path')
 const { v4: uuidv4 } = require('uuid')
+
 uuidv4() // ⇨ '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed'
 const { productQuery } = require('../../controllers/queryFromM3/querySctipt')
+
+
+
 
 exports.getStore = async (req, res) => {
   try {
@@ -639,14 +646,14 @@ exports.updateStoreStatus = async (req, res) => {
   const channel = req.headers['x-channel']
   const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
   const store = await Store.findOne({ storeId: storeId })
-
+  const storetest = await Store.findOne({ _id: store._id })
   if (!store) {
     return res.status(404).json({
       status: 404,
       message: 'Not found store'
     })
   }
-
+  console.log(store._id)
   const maxRunningAll = await Store.aggregate([
     {
       $match: {
@@ -676,27 +683,27 @@ exports.updateStoreStatus = async (req, res) => {
       { new: true }
     )
     await Store.findOneAndUpdate(
-      { storeId: storeId },
+      { _id: store._id },
       {
         $set: {
           storeId: newId,
           status: status,
           updatedDate: Date(),
           'approve.dateAction': new Date(),
-          'approve.userApprove': user
+          'approve.appPerson': user
         }
       },
       { new: true }
     )
   } else {
     await Store.findOneAndUpdate(
-      { storeId: storeId },
+      { _id: store._id },
       {
         $set: {
           status: status,
           updatedDate: Date(),
           'approve.dateAction': new Date(),
-          'approve.userApprove': user
+          'approve.appPerson': user
         }
       },
       { new: true }
