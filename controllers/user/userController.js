@@ -518,11 +518,11 @@ exports.addUserNew = async (req, res) => {
   }
 
   // STEP 2: ลบผู้ใช้ที่ไม่มีใน tableData
-  for (const user of mongoUsers) {
-    if (!tableMap.has(user.saleCode)) {
-      await User.deleteOne({ _id: user._id });
-    }
-  }
+  // for (const user of mongoUsers) {
+  //   if (!tableMap.has(user.saleCode)) {
+  //     await User.deleteOne({ _id: user._id });
+  //   }
+  // }
 
   res.status(200).json({
     status: 200,
