@@ -857,25 +857,49 @@ exports.addStockFromERP = async (req, res) => {
     data: result
   })
 }
+
 exports.getStockQty = async (req, res) => {
-  const { area, period } = req.body
-  const channel = req.headers['x-channel']
-  const { Stock } = getModelsByChannel(channel, res, stockModel)
-  const { Product } = getModelsByChannel(channel, res, productModel)
+  const { area, period } = req.body;
+  const channel = req.headers['x-channel'];
+  const { Stock } = getModelsByChannel(channel, res, stockModel);
+  const { Product } = getModelsByChannel(channel, res, productModel);
+
   const dataStock = await Stock.find({ area: area, period: period }).select(
     'listProduct -_id'
-  )
-  const dataStockTran = dataStock[0]
-  const productId = dataStockTran.listProduct.flatMap(item => item.productId)
+  );
+  if (dataStock.length === 0) {
+    return res.status(404).json({
+      status: 404,
+      message: 'Not found this area'
+    });
+  }
+
+  const dataStockTran = dataStock[0];
+  const productId = dataStockTran.listProduct.map(item => item.productId);
   const dataProduct = await Product.find({ id: { $in: productId } }).select(
     'id name listUnit'
-  )
+  );
 
-  let data = []
+  let data = [];
+  let summaryStock = 0;
+  let summaryStockIn = 0;
+  let summaryStockOut = 0;
+  let summaryStockBal = 0;
 
   for (const stockItem of dataStockTran.listProduct) {
     const productDetail = dataProduct.find(u => u.id == stockItem.productId);
-    let stockMain = stockItem.stockPcs;
+    if (!productDetail) continue;
+
+    // หา sale ของ unit 'PCS' เท่านั้น
+    const unitPCS = productDetail.listUnit.find(u => u.unit === 'PCS');
+    const sale = unitPCS ? unitPCS.price.sale : 0;
+
+    summaryStock += (stockItem.stockPcs || 0) * sale;
+    summaryStockIn += (stockItem.stockInPcs || 0) * sale;
+    summaryStockOut += (stockItem.stockOutPcs || 0) * sale;
+    summaryStockBal += (stockItem.balancePcs || 0) * sale;
+
+    // === สร้าง listUnit (ตามโค้ดเดิม) ===
     let stock = stockItem.stockPcs;
     let stockIn = stockItem.stockInPcs;
     let stockOut = stockItem.stockOutPcs;
@@ -883,7 +907,6 @@ exports.getStockQty = async (req, res) => {
 
     const listUnitStock = productDetail.listUnit.map(u => {
       const factor = u.factor;
-
       const stockQty = Math.floor(stock / factor) || 0;
       const stockInQty = Math.floor(stockIn / factor) || 0;
       const stockOutQty = Math.floor(stockOut / factor) || 0;
@@ -907,35 +930,29 @@ exports.getStockQty = async (req, res) => {
     const finalProductStock = {
       productId: stockItem.productId,
       productName: productDetail.name,
-      pcsMain: stockMain,
+      pcsMain: stockItem.stockPcs,
       listUnit: listUnitStock
     };
 
     data.push(finalProductStock);
   }
 
-
+  // sort และลบ pcsMain ก่อนส่งออก
   data.sort((a, b) => b.pcsMain - a.pcsMain);
+  data.forEach(item => { delete item.pcsMain; });
 
+res.status(200).json({
+  status: 200,
+  message: 'suceesful',
+  data: data,
+  summaryStock: Number(summaryStock.toFixed(2)),
+  summaryStockIn: Number(summaryStockIn.toFixed(2)),
+  summaryStockOut: Number(summaryStockOut.toFixed(2)),
+  summaryStockBal: Number(summaryStockBal.toFixed(2))
+});
 
-  for (const item of data) {
-    delete item.pcsMain;
-  }
-
-  if (dataStock.length == 0) {
-    res.status(404).json({
-      status: 404,
-      message: 'Not found this area'
-    })
-  }
-
-  res.status(200).json({
-    status: 200,
-    message: 'suceesful',
-    data: data
-    // data:data.listProduct
-  })
 }
+
 
 exports.getWeightProduct = async (req, res) => {
   const { area, period } = req.body
@@ -1263,14 +1280,14 @@ exports.getStockQtyDetail = async (req, res) => {
           withdrawStock,
           withdraw,
           refundStock,
-          refund:NewRefund,
+          refund: NewRefund,
           summaryStock: calculateQtyByUnit(productData.listUnit, [...refundStock, ...withdrawStock, ...STOCKIN.stock]),
           summaryStockIn
         },
         OUT: {
           orderSum: summaryStockOrderPrice,
           orderStock,
-          order:orderDetail,
+          order: orderDetail,
           promotionSum: summaryStockPromoPrice,
           promotionStock,
           change: changeStock,
