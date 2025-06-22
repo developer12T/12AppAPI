@@ -34,11 +34,26 @@ async function erpApiCheckOrderJob(channel = 'cash') {
     //   orderId: { $nin: cleanSaleId }
     // }).select('orderId');
     // console.log(cleanSaleId)
-    const dataOrder = await Order.find()
+    // const dataOrder = await Order.find()
     // const updateResult = await Order.updateMany(
     //   { orderId: { $in: cleanSaleId } },
     //   { $set: { status: 'success' } }
     // );
+
+    for (const id of cleanSaleId) {
+      try {
+        const result = await Order.updateOne(
+          { orderId: id },
+          { $set: { status: 'success' } }
+        );
+        // Log ผลลัพธ์ถ้าต้องการ
+        // console.log(`Updated orderId: ${id}, modified: ${result.modifiedCount}`);
+      } catch (err) {
+        console.error(`Error update orderId: ${id}`, err);
+      }
+    }
+
+
     // console.log('saleId ตัวอย่าง:', saleId.slice(0, 10), 'รวมทั้งหมด:', saleId.length)
 
     // console.log(notInModelOrder)
