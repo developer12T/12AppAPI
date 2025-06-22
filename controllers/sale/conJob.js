@@ -160,14 +160,14 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
 
 
 const startCronJobErpApiCheck = () => {
-  cron.schedule('*/1 * * * *', async () => {
+  cron.schedule('*/5 * * * *', async () => {
     console.log('Running cron job startCronJobErpApiCheck every 5 minutes')
     await erpApiCheckOrderJob()
   })
 }
 
 const startCronJobErpApiCheckDisribution = () => {
-  cron.schedule('*/1 * * * *', async () => {
+  cron.schedule('*/5 * * * *', async () => {
     console.log('Running cron job startCronJobErpApiCheckDisribution every 5 minutes')
     await erpApiCheckDisributionM3Job()
   })
