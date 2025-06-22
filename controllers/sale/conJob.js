@@ -30,14 +30,14 @@ async function erpApiCheckOrderJob(channel = 'cash') {
       .map(s => (typeof s === 'string' ? s.trim() : s))
       .filter(s => s && s.length > 0);
 
-    const notInModelOrder = await Order.find({
-      orderId: { $nin: cleanSaleId }
-    }).select('orderId');
+    // const notInModelOrder = await Order.find({
+    //   orderId: { $nin: cleanSaleId }
+    // }).select('orderId');
 
-    // const updateResult = await Order.updateMany(
-    //   { orderId: { $in: saleId } },
-    //   { $set: { status: 'success' } }
-    // );
+    const updateResult = await Order.updateMany(
+      { orderId: { $in: saleId } },
+      { $set: { status: 'success' } }
+    );
     // console.log('saleId ตัวอย่าง:', saleId.slice(0, 10), 'รวมทั้งหมด:', saleId.length)
 
     // console.log(notInModelOrder)
