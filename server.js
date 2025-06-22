@@ -3,13 +3,13 @@ require('dotenv').config()
 const app = require('./app')
 const { dbCA } = require('./config/db.js')
 const { Server } = require('socket.io');
-const { initSocket } = require("./socket.js");
+
 
 const { API_PORT } = process.env
 const PORT = process.env.PORT || API_PORT
 
 const server = http.createServer(app)
-
+const { initSocket } = require("./socket.js");
 const io = initSocket(server);
 
 

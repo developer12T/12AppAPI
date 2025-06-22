@@ -1,12 +1,9 @@
 const { Server } = require('socket.io');
-
 let io;
 
 function initSocket(server) {
-  const io = new Server(server, {
-    cors: {
-      origin: "*"
-    }
+  io = new Server(server, {
+    cors: { origin: "*" }
   });
 
   io.on("connection", (socket) => {
@@ -14,8 +11,6 @@ function initSocket(server) {
 
     socket.on("request_sale", (payload) => {
       console.log("📨 รับคำขอจาก client:", payload);
-
-      // ตอบกลับไปยัง client
       socket.emit("sale_response", {
         message: "ข้อมูลของ sale",
         saleCode: payload.saleCode
