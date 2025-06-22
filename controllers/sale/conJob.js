@@ -24,19 +24,23 @@ async function erpApiCheckOrderJob(channel = 'cash') {
       ],
       group: ['OAORNO']
     });
-    
-    const saleId = modelSale.map(row => row.get('OAORNO'));
-    
-    const notInModelOrder = await Order.find({
-      orderId: { $nin: saleId }
-    }).select('orderId');
-    
-    const updateResult = await Order.updateMany(
-      { orderId: { $in: saleId } },
-      { $set: { status: 'success' } }
-    );
 
-    console.log(updateResult)
+    const saleId = modelSale.map(row => row.get('OAORNO'));
+    const cleanSaleId = saleId
+      .map(s => (typeof s === 'string' ? s.trim() : s))
+      .filter(s => s && s.length > 0);
+
+    const notInModelOrder = await Order.find({
+      orderId: { $nin: cleanSaleId }
+    }).select('orderId');
+
+    // const updateResult = await Order.updateMany(
+    //   { orderId: { $in: saleId } },
+    //   { $set: { status: 'success' } }
+    // );
+    console.log('saleId ตัวอย่าง:', saleId.slice(0, 10), 'รวมทั้งหมด:', saleId.length)
+
+    // console.log(notInModelOrder)
     // if (updateResult.modifiedCount === 0) {
     //   console.log('No new order found in the M3 system');
     //   return { updated: false, updatedCount: 0 };
