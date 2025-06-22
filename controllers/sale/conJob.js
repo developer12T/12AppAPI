@@ -25,10 +25,10 @@ async function erpApiCheckOrderJob(channel = 'cash') {
       group: ['OAORNO']
     });
 
-    // const saleId = modelSale.map(row => row.get('OAORNO'));
-    // const cleanSaleId = saleId
-    //   .map(s => (typeof s === 'string' ? s.trim() : s))
-    //   .filter(s => s && s.length > 0);
+    const saleId = modelSale.map(row => row.get('OAORNO'));
+    const cleanSaleId = saleId
+      .map(s => (typeof s === 'string' ? s.trim() : s))
+      .filter(s => s && s.length > 0);
 
     // const notInModelOrder = await Order.find({
     //   orderId: { $nin: cleanSaleId }
