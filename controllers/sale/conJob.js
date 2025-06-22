@@ -40,48 +40,54 @@ async function erpApiCheckOrderJob(channel = 'cash') {
     //   { $set: { status: 'success' } }
     // );
 
+    let updatedCount = 0
+
     for (const id of cleanSaleId) {
       try {
         const result = await Order.updateOne(
           { orderId: id },
           { $set: { status: 'success' } }
         );
-        // Log ผลลัพธ์ถ้าต้องการ
-        // console.log(`Updated orderId: ${id}, modified: ${result.modifiedCount}`);
+        if (result.modifiedCount > 0) {
+          updatedCount++
+        }
+        // ถ้าอยาก log ดูเป็นรายตัว
+        // console.log(`orderId: ${id}, modified: ${result.modifiedCount}`);
       } catch (err) {
         console.error(`Error update orderId: ${id}`, err);
       }
     }
 
+    if (updatedCount === 0) {
+      console.log('No new order found in the M3 system');
+      return { updated: false, updatedCount: 0 };
+    } else {
+      console.log(`Updated ${updatedCount} order(s)`);
 
-    // console.log('saleId ตัวอย่าง:', saleId.slice(0, 10), 'รวมทั้งหมด:', saleId.length)
+      const io = getSocket();
+      const events = [
+        'sale_getSummarybyArea',
+        'sale_getSummarybyMonth',
+        'sale_getSummarybyRoute',
+        'sale_getSummaryItem',
+        'sale_getSummarybyGroup',
+        'sale_getRouteCheckinAll',
+        'sale_getTimelineCheckin',
+        'sale_routeTimeline'
+      ];
 
-    // console.log(notInModelOrder)
-    // if (updateResult.modifiedCount === 0) {
-    //   console.log('No new order found in the M3 system');
-    //   return { updated: false, updatedCount: 0 };
-    // }
+      events.forEach(event => {
+        io.emit(event, {
+          status: 200,
+          message: 'New Update Data',
+          updatedCount: updateResult.modifiedCount
+        });
+      });
 
+      return { updated: true, updatedCount };
+    }
     // Broadcast
-    // const io = getSocket();
-    // const events = [
-    //   'sale_getSummarybyArea',
-    //   'sale_getSummarybyMonth',
-    //   'sale_getSummarybyRoute',
-    //   'sale_getSummaryItem',
-    //   'sale_getSummarybyGroup',
-    //   'sale_getRouteCheckinAll',
-    //   'sale_getTimelineCheckin',
-    //   'sale_routeTimeline'
-    // ];
 
-    // events.forEach(event => {
-    //   io.emit(event, {
-    //     status: 200,
-    //     message: 'New Update Data',
-    //     updatedCount: updateResult.modifiedCount
-    //   });
-    // });
 
     // return {
     //   updated: true,
@@ -121,25 +127,25 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
 
     // console.log('✅ Updated Distribution Order IDs:', orderIdList);
 
-    // const io = getSocket();
-    // const events = [
-    //   'sale_getSummarybyArea',
-    //   'sale_getSummarybyMonth',
-    //   'sale_getSummarybyRoute',
-    //   'sale_getSummaryItem',
-    //   'sale_getSummarybyGroup',
-    //   'sale_getRouteCheckinAll',
-    //   'sale_getTimelineCheckin',
-    //   'sale_routeTimeline'
-    // ];
+    const io = getSocket();
+    const events = [
+      'sale_getSummarybyArea',
+      'sale_getSummarybyMonth',
+      'sale_getSummarybyRoute',
+      'sale_getSummaryItem',
+      'sale_getSummarybyGroup',
+      'sale_getRouteCheckinAll',
+      'sale_getTimelineCheckin',
+      'sale_routeTimeline'
+    ];
 
-    // events.forEach(event => {
-    //   io.emit(event, {
-    //     status: 200,
-    //     message: 'New Update Data',
-    //     updatedCount: updateResult.modifiedCount
-    //   });
-    // });
+    events.forEach(event => {
+      io.emit(event, {
+        status: 200,
+        message: 'New Update Data',
+        updatedCount: updateResult.modifiedCount
+      });
+    });
 
     return {
       updated: true,
