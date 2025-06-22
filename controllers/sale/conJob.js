@@ -33,44 +33,45 @@ async function erpApiCheckOrderJob(channel = 'cash') {
     // const notInModelOrder = await Order.find({
     //   orderId: { $nin: cleanSaleId }
     // }).select('orderId');
+    // console.log(cleanSaleId)
 
     const updateResult = await Order.updateMany(
-      { orderId: { $in: saleId } },
+      { orderId: { $in: cleanSaleId } },
       { $set: { status: 'success' } }
     );
     // console.log('saleId ตัวอย่าง:', saleId.slice(0, 10), 'รวมทั้งหมด:', saleId.length)
 
     // console.log(notInModelOrder)
-    // if (updateResult.modifiedCount === 0) {
-    //   console.log('No new order found in the M3 system');
-    //   return { updated: false, updatedCount: 0 };
-    // }
+    if (updateResult.modifiedCount === 0) {
+      console.log('No new order found in the M3 system');
+      return { updated: false, updatedCount: 0 };
+    }
 
     // Broadcast
-    // const io = getSocket();
-    // const events = [
-    //   'sale_getSummarybyArea',
-    //   'sale_getSummarybyMonth',
-    //   'sale_getSummarybyRoute',
-    //   'sale_getSummaryItem',
-    //   'sale_getSummarybyGroup',
-    //   'sale_getRouteCheckinAll',
-    //   'sale_getTimelineCheckin',
-    //   'sale_routeTimeline'
-    // ];
+    const io = getSocket();
+    const events = [
+      'sale_getSummarybyArea',
+      'sale_getSummarybyMonth',
+      'sale_getSummarybyRoute',
+      'sale_getSummaryItem',
+      'sale_getSummarybyGroup',
+      'sale_getRouteCheckinAll',
+      'sale_getTimelineCheckin',
+      'sale_routeTimeline'
+    ];
 
-    // events.forEach(event => {
-    //   io.emit(event, {
-    //     status: 200,
-    //     message: 'New Update Data',
-    //     updatedCount: updateResult.modifiedCount
-    //   });
-    // });
+    events.forEach(event => {
+      io.emit(event, {
+        status: 200,
+        message: 'New Update Data',
+        updatedCount: updateResult.modifiedCount
+      });
+    });
 
-    // return {
-    //   updated: true,
-    //   updatedCount: updateResult.modifiedCount
-    // };
+    return {
+      updated: true,
+      updatedCount: updateResult.modifiedCount
+    };
   } catch (error) {
     console.error('❌ Error in erpApiCheckOrderJob:', error);
     return { error: true, message: error.message };
@@ -80,8 +81,8 @@ async function erpApiCheckOrderJob(channel = 'cash') {
 
 async function erpApiCheckDisributionM3Job(channel = 'cash') {
   try {
-    const { Order } = getModelsByChannel(channel, null, orderModel);
-    const { Disribution } = getModelsByChannel(channel, null, disributionModel);
+    // const { Order } = getModelsByChannel(channel, null, orderModel);
+    const { Distribution } = getModelsByChannel(channel, null, disributionModel);
 
     const modelSale = await DisributionM3.findAll({
       attributes: [
@@ -92,8 +93,8 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
     });
 
     const orderIdList = modelSale.map(row => row.get('MGTRNR'));
-
-    const updateResult = await Order.updateMany(
+    // console.log(orderIdList)
+    const updateResult = await Distribution.updateMany(
       { orderId: { $in: orderIdList } },
       { $set: { status: 'success' } }
     );
