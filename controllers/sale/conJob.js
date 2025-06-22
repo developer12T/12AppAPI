@@ -68,10 +68,10 @@ async function erpApiCheckOrderJob(channel = 'cash') {
     //   });
     // });
 
-    return {
-      updated: true,
-      updatedCount: updateResult.modifiedCount
-    };
+    // return {
+    //   updated: true,
+    //   updatedCount: updateResult.modifiedCount
+    // };
   } catch (error) {
     console.error('❌ Error in erpApiCheckOrderJob:', error);
     return { error: true, message: error.message };
