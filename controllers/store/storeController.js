@@ -1125,3 +1125,71 @@ exports.getTypeStore = async (req, res) => {
   })
 }
 
+exports.insertStoreToErp = async (req, res) => {
+
+  const { area } = req.body
+  const channel = req.headers['x-channel'];
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const { User } = getModelsByChannel(channel, res, userModel)
+  const dataStore = await Store.find({ area: area })
+  const dataUser = await User.findOne({ area: area, role: 'sale' })
+  let data = []
+  for (const item of dataStore) {
+
+    const dataTran = {
+      Hcase: 0,
+      customerNo: item.storeId,
+      customerStatus: item.status,
+      customerName: item.name,
+      customerChannel: '103',
+      customerCoType: item.typeName,
+      customerAddress1: item.address,
+      customerAddress2: item.subDistrict,
+      customerAddress3: item.district,
+      customerAddress4: item.province,
+      customerPoscode: 0,
+      customerPhone: item.tel,
+      warehouse: item.area,
+      OKSDST: item.zone,
+      saleTeam: "",
+      OKCFC1: item.area,
+      OKCFC3: item.route,
+      OKCFC6: item.type,
+      salePayer: dataUser.salePayer,
+      creditLimit: 0,
+      taxno: item.taxId,
+      saleCode: dataUser.saleCode,
+      saleZone: dataUser.zone,
+      shippings: item.shippingAddress.map(u => {
+        return {
+          shippingAddress1: u.address,
+          shippingAddress2: u.district,
+          shippingAddress3: u.subDistrict,
+          shippingAddress4: u.province,
+          shippingPoscode: u.postCode,
+          shippingPhone: item.tel,
+          shippingRoute: 0,
+          OPGEOX: u.latitude,
+          OPGEOY: u.longtitude
+
+
+        }
+      })
+    }
+
+    data.push(dataTran)
+  }
+  
+  for (const i of data) {
+  const response = await axios.post(
+    `${process.env.API_URL_12ERP}/customer/insert`,
+    i
+  );
+  }
+  res.status(200).json({
+    status: 200,
+    message: 'successfully',
+    data: data
+  })
+}
+

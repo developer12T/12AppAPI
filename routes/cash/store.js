@@ -19,6 +19,7 @@ const {
   deleteStoreArray,
   getTypeStore,
   addTypeStore,
+  insertStoreToErp
   // test
 } = require('../../controllers/store/storeController')
 
@@ -47,6 +48,8 @@ router.post('/deleteStoreArray', deleteStoreArray)
 
 router.get('/getTypeStore', getTypeStore)
 router.post('/addTypeStore', addTypeStore)
+router.post('/insertStoreToErp', insertStoreToErp)
+
 // router.get('/test', test)
 
 

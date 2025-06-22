@@ -6,6 +6,7 @@
 const { period, previousPeriod } = require('../../utilities/datetime')
 
 
+
 const { Warehouse, Locate, Balance, Sale, DisributionM3 } = require('../../models/cash/master')
 const { generateOrderId } = require('../../utilities/genetateId')
 const {
@@ -28,14 +29,15 @@ const {
 } = require('../promotion/calculate')
 const stockModel = require('../../models/cash/stock')
 const disributionModel = require('../../models/cash/distribution')
-
+const sendmoneyModel = require('../../models/cash/sendmoney')
 const orderModel = require('../../models/cash/sale')
 const cartModel = require('../../models/cash/cart')
 const userModel = require('../../models/cash/user')
 const productModel = require('../../models/cash/product')
 const routeModel = require('../../models/cash/route')
 const promotionModel = require('../../models/cash/promotion')
-
+const distributionModel = require('../../models/cash/distribution')
+const refundModel = require('../../models/cash/refund')
 const storeModel = require('../../models/cash/store')
 const { getModelsByChannel } = require('../../middleware/channel')
 
@@ -2611,6 +2613,7 @@ exports.getProductLimit = async (req, res) => {
   const { Cart } = getModelsByChannel(channel, res, cartModel)
   const { User } = getModelsByChannel(channel, res, userModel)
   const { Product } = getModelsByChannel(channel, res, productModel)
+  const { Sendmoney } = getModelsByChannel(channel, res, sendmoneyModel)
   const { PromotionLimit } = getModelsByChannel(channel, res, promotionModel)
   const cart = await Cart.findOne({ type, area, storeId })
   if (!cart || cart.listProduct.length === 0) {
@@ -2648,8 +2651,8 @@ exports.summaryAllProduct = async (req, res) => {
 
   if (dataStock == 0) {
     return res.status(404).json({
-      status:404,
-      message:'Not found Stock'
+      status: 404,
+      message: 'Not found Stock'
     })
   }
 
@@ -2693,3 +2696,111 @@ exports.summaryAllProduct = async (req, res) => {
     data: sumPrice
   })
 }
+
+
+exports.summaryDaily = async (req, res) => {
+  try {
+    const { area } = req.query;
+    const channel = req.headers['x-channel'];
+    const { Order } = getModelsByChannel(channel, res, orderModel);
+    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel);
+    const { Refund } = getModelsByChannel(channel, res, refundModel);
+
+    // รับ period และคำนวณปี เดือน
+    const periodStr = period();
+    const year = Number(periodStr.substring(0, 4));
+    const month = Number(periodStr.substring(4, 6));
+
+    // หาช่วงเวลา UTC ของเดือนที่ต้องการ (แปลงจากเวลาไทย)
+    const thOffset = 7 * 60 * 60 * 1000;
+    const startOfMonthTH = new Date(year, month - 1, 1, 0, 0, 0, 0);
+    const endOfMonthTH = new Date(year, month, 0, 23, 59, 59, 999);
+    const startOfMonthUTC = new Date(startOfMonthTH.getTime() - thOffset);
+    const endOfMonthUTC = new Date(endOfMonthTH.getTime() - thOffset);
+
+    // ฟังก์ชันสำหรับแปลงวันที่เป็น dd/mm/yyyy ตามเวลาไทย
+    const getDateStrTH = dateUTC => {
+      const dateTH = new Date(new Date(dateUTC).getTime() + thOffset);
+      const day = dateTH.getDate().toString().padStart(2, '0');
+      const mon = (dateTH.getMonth() + 1).toString().padStart(2, '0');
+      const yr = dateTH.getFullYear();
+      return `${day}/${mon}/${yr}`;
+    };
+
+    // ดึงข้อมูลในช่วงเดือนนี้
+    const [dataSendmoney, dataRefund] = await Promise.all([
+      SendMoney.find({
+        area: area,
+        createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+      }),
+      Refund.find({
+        'store.area': area,
+        period: periodStr,
+        createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+        type: 'refund'
+      })
+    ]);
+
+    // รวม summary และ status ต่อวันจาก sendmoney
+    const sumByDate = dataSendmoney.reduce((acc, item) => {
+      const dateStr = getDateStrTH(item.createdAt);
+      if (!acc[dateStr]) {
+        acc[dateStr] = { summary: 0, status: item.status || '' };
+      }
+      acc[dateStr].summary += item.sendmoney || 0;
+      // acc[dateStr].status = item.status; // ถ้าอยากใช้ status อันสุดท้ายในวันนั้น
+      return acc;
+    }, {});
+
+    // ทำให้ array พร้อม map สำหรับ summary กับ status
+    const dataSendMoneyTran = Object.entries(sumByDate).map(([date, val]) => ({
+      date,
+      summary: val.summary,
+      status: val.status
+    }));
+    const sendMoneyMap = Object.fromEntries(dataSendMoneyTran.map(d => [d.date, d.summary]));
+    const statusMap = Object.fromEntries(dataSendMoneyTran.map(d => [d.date, d.status]));
+
+    // สร้างรายการ refund แบบแบน
+    const refundListFlat = dataRefund.flatMap(item =>
+      item.listProduct.map(u => ({
+        price: u.total,
+        condition: u.condition,
+        date: getDateStrTH(item.createdAt)
+      }))
+    );
+    const refundByDate = refundListFlat.reduce((acc, r) => {
+      if (!acc[r.date]) acc[r.date] = [];
+      acc[r.date].push(r);
+      return acc;
+    }, {});
+
+    // เตรียม array วันที่ครบทั้งเดือน
+    const lastDay = new Date(year, month, 0).getDate();
+    const allDateArr = Array.from({ length: lastDay }, (_, i) =>
+      `${(i + 1).toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`
+    );
+
+    // สร้างผลลัพธ์รายวัน (ใส่ 0 ถ้าไม่มีข้อมูล)
+    const fullMonthArr = allDateArr.map(date => {
+      const summary = sendMoneyMap[date] || 0;
+      const status = statusMap[date] || '';
+      const refundToday = refundByDate[date] || [];
+      const good = refundToday
+        .filter(x => x.condition === 'good')
+        .reduce((sum, x) => sum + Number(x.price), 0);
+      const damaged = refundToday
+        .filter(x => x.condition === 'damaged')
+        .reduce((sum, x) => sum + Number(x.price), 0);
+      return { date, summary, status, good, damaged };
+    });
+
+    res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: fullMonthArr
+    });
+  } catch (err) {
+    res.status(500).json({ status: 500, message: err.message });
+  }
+};

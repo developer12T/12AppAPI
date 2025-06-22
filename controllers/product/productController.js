@@ -167,14 +167,20 @@ exports.getProduct = async (req, res) => {
 
     const data = products
       .map(product => {
-        const matchedStock = stock.find(s => s._id === product.id) || {}
+        const matchedStock = stock.find(s => s._id === product.id) || {};
         return {
           ...product,
           qtyCtn: matchedStock.balanceCtn || 0,
           qtyPcs: matchedStock.balancePcs || 0
-        }
+        };
       })
-      .sort((a, b) => b.qtyPcs - a.qtyPcs) // เรียงตาม qtyCtn มาก → น้อย
+      .sort((a, b) => {
+        // สมมติ group เป็น string
+        if (a.groupCode < b.groupCode) return -1;
+        if (a.groupCode > b.groupCode) return 1;
+        return 0;
+      });
+
 
     res.status(200).json({
       status: '200',
@@ -663,8 +669,8 @@ exports.addFromERPnew = async (req, res) => {
           price: {
             sale: unit.pricePerUnitSale,
             refund: unit.pricePerUnitRefund,
-            refundDmg:unit.pricePerUnitRefundDamage,
-            change:unit.pricePerUnitChange
+            refundDmg: unit.pricePerUnitRefundDamage,
+            change: unit.pricePerUnitChange
           }
         }
       })
@@ -676,8 +682,8 @@ exports.addFromERPnew = async (req, res) => {
       name: listProduct.name,
       groupCode: listProduct.groupCode,
       group: listProduct.group,
-      groupCodeM3:listProduct.groupCodeM3,
-      groupM3:listProduct.groupM3,
+      groupCodeM3: listProduct.groupCodeM3,
+      groupM3: listProduct.groupM3,
       brandCode: listProduct.brandCode,
       brand: listProduct.brand,
       size: listProduct.size,
@@ -699,7 +705,7 @@ exports.addFromERPnew = async (req, res) => {
   res.status(200).json({
     status: 200,
     message: 'Products added successfully',
-    data:data
+    data: data
   })
 }
 
@@ -1020,7 +1026,7 @@ exports.brandByFilter = async (req, res) => {
 }
 
 exports.unitByFilter = async (req, res) => {
- const { flavour, brand, group, size } = req.body
+  const { flavour, brand, group, size } = req.body
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
 
