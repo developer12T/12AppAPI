@@ -251,7 +251,9 @@ exports.checkout = async (req, res) => {
     // console.log(qtyproductPro)
 
     const productQty = Object.values(
-      [...qtyproductPro, ...qtyproduct].reduce((acc, cur) => {
+      // [...qtyproductPro, ...qtyproduct].reduce((acc, cur) => {
+      [, ...qtyproduct].reduce((acc, cur) => {
+
         const key = `${cur.productId}-${cur.unit}`;
         acc[key] = acc[key]
           ? { ...cur, qty: acc[key].qty + cur.qty }
@@ -259,66 +261,67 @@ exports.checkout = async (req, res) => {
         return acc;
       }, {})
     );
-
     // ตัด stock เบล ver
-    // for (const item of productQty) {
-    //   const factorPcsResult = await Product.aggregate([
-    //     { $match: { id: item.productId } },
-    //     {
-    //       $project: {
-    //         id: 1,
-    //         listUnit: {
-    //           $filter: {
-    //             input: "$listUnit",
-    //             as: "unitItem",
-    //             cond: { $eq: ["$$unitItem.unit", item.unit] }
-    //           }
-    //         }
-    //       }
-    //     }
-    //   ]);
-
-    //   const factorCtnResult = await Product.aggregate([
-    //     { $match: { id: item.productId } },
-    //     {
-    //       $project: {
-    //         id: 1,
-    //         listUnit: {
-    //           $filter: {
-    //             input: "$listUnit",
-    //             as: "unitItem",
-    //             cond: { $eq: ["$$unitItem.unit", "CTN"] }
-    //           }
-    //         }
-    //       }
-    //     }
-    //   ]);
-    //   const factorCtn = factorCtnResult[0].listUnit[0].factor
-    //   const factorPcs = factorPcsResult[0].listUnit[0].factor
-    //   const factorPcsQty = item.qty * factorPcs
-    //   const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
-    //   const data = await Stock.findOneAndUpdate(
-    //     {
-    //       area: area,
-    //       period: period,
-    //       'listProduct.productId': item.productId
-    //     },
-    //     {
-    //       $inc: {
-    //         'listProduct.$[elem].stockOutPcs': +factorPcsQty,
-    //         'listProduct.$[elem].balancePcs': -factorPcsQty,
-    //         'listProduct.$[elem].stockOutCtn': +factorCtnQty,
-    //         'listProduct.$[elem].balanceCtn': -factorCtnQty
-    //       }
-    //     },
-    //     {
-    //       arrayFilters: [
-    //         { 'elem.productId': item.productId }
-    //       ],
-    //       new: true
-    //     }
-    //   );
-    // }
+    for (const item of productQty) {
+      const factorPcsResult = await Product.aggregate([
+        { $match: { id: item.productId } },
+        {
+          $project: {
+            id: 1,
+            listUnit: {
+              $filter: {
+                input: "$listUnit",
+                as: "unitItem",
+                cond: { $eq: ["$$unitItem.unit", item.unit] }
+              }
+            }
+          }
+        }
+      ]);
+      // console.log(factorPcsResult)
+      const factorCtnResult = await Product.aggregate([
+        { $match: { id: item.productId } },
+        {
+          $project: {
+            id: 1,
+            listUnit: {
+              $filter: {
+                input: "$listUnit",
+                as: "unitItem",
+                cond: { $eq: ["$$unitItem.unit", "CTN"] }
+              }
+            }
+          }
+        }
+      ]);
+      const factorCtn = factorCtnResult[0].listUnit[0].factor
+      const factorPcs = factorPcsResult[0].listUnit[0].factor
+      const factorPcsQty = item.qty * factorPcs
+      const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
+      // console.log('factorPcsQty', factorPcsQty)
+      // console.log('factorCtnQty', factorCtnQty)
+        const data = await Stock.findOneAndUpdate(
+          {
+            area: area,
+            period: period,
+            'listProduct.productId': item.productId
+          },
+          {
+            $inc: {
+              'listProduct.$[elem].stockOutPcs': +factorPcsQty,
+              // 'listProduct.$[elem].balancePcs': -factorPcsQty,
+              'listProduct.$[elem].stockOutCtn': +factorCtnQty,
+              // 'listProduct.$[elem].balanceCtn': -factorCtnQty
+            }
+          },
+          {
+            arrayFilters: [
+              { 'elem.productId': item.productId }
+            ],
+            new: true
+          }
+        );
+    }
     const calStock = {
       // storeId: refundOrder.store.storeId,
       orderId: newOrder.orderId,
@@ -343,10 +346,10 @@ exports.checkout = async (req, res) => {
       refOrderId: createdMovement._id
     });
     await newOrder.save()
-    // await PromotionShelf.findOneAndUpdate(
-    //   { proShelfId: promotionshelf.proShelfId },
-    //   { $set: { qty: 0 } }
-    // )
+    await PromotionShelf.findOneAndUpdate(
+      { proShelfId: promotionshelf.proShelfId },
+      { $set: { qty: 0 } }
+    )
     await Cart.deleteOne({ type, area, storeId })
     const currentDate = new Date()
     let query = {}
@@ -367,15 +370,6 @@ exports.checkout = async (req, res) => {
       $gte: startMonth,
       $lt: NextMonth
     }
-    const newStore = await Store.aggregate([
-      { $match: query },
-      {
-        $match: {
-          storeId: newOrder.store.storeId
-        }
-      }])
-
-    // console.log(newOrder.store.storeId)
 
     for (const item of promoDetail) {
       if (item.applicableTo.isNewStore === true) {
@@ -2849,7 +2843,7 @@ exports.summaryDaily = async (req, res) => {
 
 
 
-      return { date, sendmoney,summary, change, status, good, damaged,  };
+      return { date, sendmoney, summary, change, status, good, damaged, };
     });
 
     res.status(200).json({

@@ -710,10 +710,10 @@ exports.updateStock = async (req, res) => {
 
     // Update based on IN or OUT
     if (type === 'IN') {
-      productStock.stockInPcs += qty
+      // productStock.stockInPcs += qty
       productStock.balancePcs += qty
     } else if (type === 'OUT') {
-      productStock.stockOutPcs += qty
+      // productStock.stockOutPcs += qty
       productStock.balancePcs -= qty
     } else {
       return res.status(400).json({
