@@ -169,64 +169,64 @@ exports.checkout = async (req, res) => {
     })
 
 
-    for (const item of productQty) {
-      const factorPcsResult = await Product.aggregate([
-        { $match: { id: item.productId } },
-        {
-          $project: {
-            id: 1,
-            listUnit: {
-              $filter: {
-                input: "$listUnit",
-                as: "unitItem",
-                cond: { $eq: ["$$unitItem.unit", item.unit] }
-              }
-            }
-          }
-        }
-      ]);
+    // for (const item of productQty) {
+    //   const factorPcsResult = await Product.aggregate([
+    //     { $match: { id: item.productId } },
+    //     {
+    //       $project: {
+    //         id: 1,
+    //         listUnit: {
+    //           $filter: {
+    //             input: "$listUnit",
+    //             as: "unitItem",
+    //             cond: { $eq: ["$$unitItem.unit", item.unit] }
+    //           }
+    //         }
+    //       }
+    //     }
+    //   ]);
 
-      const factorCtnResult = await Product.aggregate([
-        { $match: { id: item.productId } },
-        {
-          $project: {
-            id: 1,
-            listUnit: {
-              $filter: {
-                input: "$listUnit",
-                as: "unitItem",
-                cond: { $eq: ["$$unitItem.unit", "CTN"] }
-              }
-            }
-          }
-        }
-      ]);
-      const factorCtn = factorCtnResult[0].listUnit[0].factor
-      const factorPcs = factorPcsResult[0].listUnit[0].factor
-      const factorPcsQty = item.qty * factorPcs
-      const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
-      const data = await Stock.findOneAndUpdate(
-        {
-          area: area,
-          period: period,
-          'listProduct.productId': item.productId
-        },
-        {
-          $inc: {
-            'listProduct.$[elem].stockOutPcs': +factorPcsQty,
+    //   const factorCtnResult = await Product.aggregate([
+    //     { $match: { id: item.productId } },
+    //     {
+    //       $project: {
+    //         id: 1,
+    //         listUnit: {
+    //           $filter: {
+    //             input: "$listUnit",
+    //             as: "unitItem",
+    //             cond: { $eq: ["$$unitItem.unit", "CTN"] }
+    //           }
+    //         }
+    //       }
+    //     }
+    //   ]);
+    //   const factorCtn = factorCtnResult[0].listUnit[0].factor
+    //   const factorPcs = factorPcsResult[0].listUnit[0].factor
+    //   const factorPcsQty = item.qty * factorPcs
+    //   const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
+    //   const data = await Stock.findOneAndUpdate(
+    //     {
+    //       area: area,
+    //       period: period,
+    //       'listProduct.productId': item.productId
+    //     },
+    //     {
+    //       $inc: {
+            // 'listProduct.$[elem].stockOutPcs': +factorPcsQty,
             // 'listProduct.$[elem].balancePcs': -factorPcsQty,
-            'listProduct.$[elem].stockOutCtn': +factorCtnQty,
+            // 'listProduct.$[elem].stockOutCtn': +factorCtnQty,
             // 'listProduct.$[elem].balanceCtn': -factorCtnQty
-          }
-        },
-        {
-          arrayFilters: [
-            { 'elem.productId': item.productId }
-          ],
-          new: true
-        }
-      );
-    }
+    //       }
+    //     },
+    //     {
+    //       arrayFilters: [
+    //         { 'elem.productId': item.productId }
+    //       ],
+    //       new: true
+    //     }
+    //   );
+    // }
 
 
 
