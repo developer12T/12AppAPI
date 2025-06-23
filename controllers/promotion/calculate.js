@@ -95,11 +95,12 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
         })
         .filter(Boolean)
 
+    // console.log(rewards)
     // const eligibleProducts = await Product.find({
     //     id: { $in: productStock.map(u => u.id) }
     // }).lean()
     const eligibleProducts = []
-
+    
     for (const item of productStock) {
         // console.log(item)
         const dataProduct = await Product.findOne({ id: item.id }).lean()
@@ -110,7 +111,7 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
         }
         eligibleProducts.push(data)
     }
-    // console.log(eligibleProducts)
+
     // const productStockTest = await Product.find({
     //     id: { $in: productStock.map(u => u.id) }
     // }).lean()
@@ -122,7 +123,7 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
 
 
 
-    // console.log(productQtyPcs)
+    // console.log(eligibleProducts)
 
     if (!eligibleProducts.length) return []
 
@@ -133,7 +134,7 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
             (!r.productBrand || p.brand === r.productBrand) &&
             (!r.productSize || p.size === r.productSize)
         )
-        // console.log("test",product)
+        console.log("test",product)
         if (!product) return null
 
         const unitData = product.listUnit.find(unit => unit.unit === r.productUnit)
@@ -295,7 +296,9 @@ async function applyPromotion(order, channel, res) {
                 break
         }
         if (promoApplied) {
-            let selectedProduct = freeProducts.length > 0 ? freeProducts[0] : null
+            // console.log(freeProducts)
+            let selectedProduct = freeProducts.length > 0 ? freeProducts[0] : {}
+            console.log(selectedProduct)
             appliedPromotions.push({
                 proId: promo.proId,
                 proCode: promo.proCode,
