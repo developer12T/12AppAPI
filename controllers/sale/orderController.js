@@ -2833,7 +2833,7 @@ exports.summaryDaily = async (req, res) => {
         .reduce((sum, x) => sum + Number(x.price), 0);
 
       // เพิ่ม sale และ change
-      const sale = saleByDate[date] || 0;
+      const summary = saleByDate[date] || 0;
       const change = changeByDate[date] || 0;
 
 
@@ -2849,7 +2849,7 @@ exports.summaryDaily = async (req, res) => {
 
 
 
-      return { date, sendmoney,sale, change, status, good, damaged,  };
+      return { date, sendmoney,summary, change, status, good, damaged,  };
     });
 
     res.status(200).json({

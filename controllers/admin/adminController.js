@@ -39,7 +39,7 @@ exports.reportCheck = async (req, res) => {
       const mm = String(today.getMonth() + 1).padStart(2, '0');
       const dd = String(today.getDate()).padStart(2, '0');
       const todayStr = `${yyyy}-${mm}-${dd}`;
-
+      console.log(todayStr)
       startStr = addHours(new Date(`${todayStr}T00:00:00.000Z`), 7)
       endStr = addHours(new Date(`${todayStr}T23:59:59.999Z`), 7)
 

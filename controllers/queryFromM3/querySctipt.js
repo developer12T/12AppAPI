@@ -685,7 +685,8 @@ SELECT
 ITNO AS id,
 NAME_BILL as name,
 GRP as GRP_CODE,
-g.GRP_DESC as \`group\`,
+-- g.GRP_DESC as \`group\`,
+gp.GRP_DESC as \`group\`,
 GREPORT AS groupCodeM3,
 gM3.GRP_DESC AS groupM3,
 Brand as BRAND_CODE,
@@ -719,7 +720,7 @@ LEFT JOIN m_unit u ON a.unit_cal = u.UNIT_CODE_BC
 LEFT JOIN ca_factor c ON a.ITNO = c.itemcode 
 LEFT JOIN m_flavour f ON a.FLAVOUR = f.FAV_CODE 
 LEFT JOIN c_brand b ON a.Brand = b.BRAND_CODE
-
+LEFT JOIN m_prd_group gp ON a.GRP = gp.GRP_CODE
 
 
 `);
