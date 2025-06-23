@@ -675,7 +675,7 @@ exports.addFromERPnew = async (req, res) => {
         }
       })
       .sort((a, b) => b.factor - a.factor)
-    // console.log(JSON.stringify(listUnit, null, 2));
+    // console.log("listProduct.weightGross", listProduct.weightGross.length);
 
     const newProduct = new Product({
       id: listProduct.id,
@@ -700,7 +700,7 @@ exports.addFromERPnew = async (req, res) => {
     })
     // console.log(newProduct)
     await newProduct.save()
-    data.push(newProduct)
+    // data.push(newProduct)
   }
   res.status(200).json({
     status: 200,
