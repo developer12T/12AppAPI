@@ -251,8 +251,8 @@ exports.checkout = async (req, res) => {
     // console.log(qtyproductPro)
 
     const productQty = Object.values(
-      // [...qtyproductPro, ...qtyproduct].reduce((acc, cur) => {
-      [, ...qtyproduct].reduce((acc, cur) => {
+      [...qtyproductPro, ...qtyproduct].reduce((acc, cur) => {
+      // [, ...qtyproduct].reduce((acc, cur) => {
 
         const key = `${cur.productId}-${cur.unit}`;
         acc[key] = acc[key]

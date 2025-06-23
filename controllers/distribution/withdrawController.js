@@ -214,9 +214,9 @@ exports.checkout = async (req, res) => {
         {
           $inc: {
             'listProduct.$[elem].stockOutPcs': +factorPcsQty,
-            'listProduct.$[elem].balancePcs': -factorPcsQty,
+            // 'listProduct.$[elem].balancePcs': -factorPcsQty,
             'listProduct.$[elem].stockOutCtn': +factorCtnQty,
-            'listProduct.$[elem].balanceCtn': -factorCtnQty
+            // 'listProduct.$[elem].balanceCtn': -factorCtnQty
           }
         },
         {

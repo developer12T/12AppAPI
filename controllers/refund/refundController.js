@@ -227,119 +227,119 @@ exports.checkout = async (req, res) => {
     // ตัด stock เบล ver
     // const productQty = qtyproductPro.concat(qtyproduct);
 
-    // for (const item of qtyproduct) {
-    //   const factorPcsResult = await Product.aggregate([
-    //     { $match: { id: item.productId } },
-    //     {
-    //       $project: {
-    //         id: 1,
-    //         listUnit: {
-    //           $filter: {
-    //             input: '$listUnit',
-    //             as: 'unitItem',
-    //             cond: { $eq: ['$$unitItem.unit', item.unit] }
-    //           }
-    //         }
-    //       }
-    //     }
-    //   ])
+    for (const item of qtyproduct) {
+      const factorPcsResult = await Product.aggregate([
+        { $match: { id: item.productId } },
+        {
+          $project: {
+            id: 1,
+            listUnit: {
+              $filter: {
+                input: '$listUnit',
+                as: 'unitItem',
+                cond: { $eq: ['$$unitItem.unit', item.unit] }
+              }
+            }
+          }
+        }
+      ])
 
-    //   const factorCtnResult = await Product.aggregate([
-    //     { $match: { id: item.productId } },
-    //     {
-    //       $project: {
-    //         id: 1,
-    //         listUnit: {
-    //           $filter: {
-    //             input: '$listUnit',
-    //             as: 'unitItem',
-    //             cond: { $eq: ['$$unitItem.unit', 'CTN'] }
-    //           }
-    //         }
-    //       }
-    //     }
-    //   ])
-    //   const factorCtn = factorCtnResult[0].listUnit[0].factor
-    //   const factorPcs = factorPcsResult[0].listUnit[0].factor
-    //   const factorPcsQty = item.qty * factorPcs
-    //   const factorCtnQty = Math.floor(factorPcsQty / factorCtn)
-    //   const data = await Stock.findOneAndUpdate(
-    //     {
-    //       area: area,
-    //       period: period,
-    //       'listProduct.productId': item.productId
-    //     },
-    //     {
-    //       $inc: {
-    //         'listProduct.$[elem].stockInPcs': +factorPcsQty,
-    //         'listProduct.$[elem].balancePcs': +factorPcsQty,
-    //         'listProduct.$[elem].stockInCtn': +factorCtnQty,
-    //         'listProduct.$[elem].balanceCtn': +factorCtnQty
-    //       }
-    //     },
-    //     {
-    //       arrayFilters: [{ 'elem.productId': item.productId }],
-    //       new: true
-    //     }
-    //   )
-    // }
+      const factorCtnResult = await Product.aggregate([
+        { $match: { id: item.productId } },
+        {
+          $project: {
+            id: 1,
+            listUnit: {
+              $filter: {
+                input: '$listUnit',
+                as: 'unitItem',
+                cond: { $eq: ['$$unitItem.unit', 'CTN'] }
+              }
+            }
+          }
+        }
+      ])
+      const factorCtn = factorCtnResult[0].listUnit[0].factor
+      const factorPcs = factorPcsResult[0].listUnit[0].factor
+      const factorPcsQty = item.qty * factorPcs
+      const factorCtnQty = Math.floor(factorPcsQty / factorCtn)
+      const data = await Stock.findOneAndUpdate(
+        {
+          area: area,
+          period: period,
+          'listProduct.productId': item.productId
+        },
+        {
+          $inc: {
+            'listProduct.$[elem].stockInPcs': +factorPcsQty,
+            // 'listProduct.$[elem].balancePcs': +factorPcsQty,
+            'listProduct.$[elem].stockInCtn': +factorCtnQty,
+            // 'listProduct.$[elem].balanceCtn': +factorCtnQty
+          }
+        },
+        {
+          arrayFilters: [{ 'elem.productId': item.productId }],
+          new: true
+        }
+      )
+    }
 
-    // for (const item of qtyproductchange) {
-    //   const factorPcsResult = await Product.aggregate([
-    //     { $match: { id: item.productId } },
-    //     {
-    //       $project: {
-    //         id: 1,
-    //         listUnit: {
-    //           $filter: {
-    //             input: '$listUnit',
-    //             as: 'unitItem',
-    //             cond: { $eq: ['$$unitItem.unit', item.unit] }
-    //           }
-    //         }
-    //       }
-    //     }
-    //   ])
+    for (const item of qtyproductchange) {
+      const factorPcsResult = await Product.aggregate([
+        { $match: { id: item.productId } },
+        {
+          $project: {
+            id: 1,
+            listUnit: {
+              $filter: {
+                input: '$listUnit',
+                as: 'unitItem',
+                cond: { $eq: ['$$unitItem.unit', item.unit] }
+              }
+            }
+          }
+        }
+      ])
 
-    //   const factorCtnResult = await Product.aggregate([
-    //     { $match: { id: item.productId } },
-    //     {
-    //       $project: {
-    //         id: 1,
-    //         listUnit: {
-    //           $filter: {
-    //             input: '$listUnit',
-    //             as: 'unitItem',
-    //             cond: { $eq: ['$$unitItem.unit', 'CTN'] }
-    //           }
-    //         }
-    //       }
-    //     }
-    //   ])
-    //   const factorCtn = factorCtnResult[0].listUnit[0].factor
-    //   const factorPcs = factorPcsResult[0].listUnit[0].factor
-    //   const factorPcsQty = item.qty * factorPcs
-    //   const factorCtnQty = Math.floor(factorPcsQty / factorCtn)
-    //   const data = await Stock.findOneAndUpdate(
-    //     {
-    //       area: area,
-    //       period: period,
-    //       'listProduct.productId': item.productId
-    //     },
-    //     {
-    //       $inc: {
-    //         'listProduct.$[elem].stockOutPcs': +factorPcsQty,
-    //         'listProduct.$[elem].balancePcs': -factorPcsQty,
-    //         'listProduct.$[elem].stockOutCtn': +factorCtnQty,
-    //         'listProduct.$[elem].balanceCtn': -factorCtnQty
-    //       }
-    //     },
-    //     {
-    //       arrayFilters: [{ 'elem.productId': item.productId }],
-    //       new: true
-    //     }
-    //   )
-    // }
+      const factorCtnResult = await Product.aggregate([
+        { $match: { id: item.productId } },
+        {
+          $project: {
+            id: 1,
+            listUnit: {
+              $filter: {
+                input: '$listUnit',
+                as: 'unitItem',
+                cond: { $eq: ['$$unitItem.unit', 'CTN'] }
+              }
+            }
+          }
+        }
+      ])
+      const factorCtn = factorCtnResult[0].listUnit[0].factor
+      const factorPcs = factorPcsResult[0].listUnit[0].factor
+      const factorPcsQty = item.qty * factorPcs
+      const factorCtnQty = Math.floor(factorPcsQty / factorCtn)
+      const data = await Stock.findOneAndUpdate(
+        {
+          area: area,
+          period: period,
+          'listProduct.productId': item.productId
+        },
+        {
+          $inc: {
+            'listProduct.$[elem].stockOutPcs': +factorPcsQty,
+            // 'listProduct.$[elem].balancePcs': -factorPcsQty,
+            'listProduct.$[elem].stockOutCtn': +factorCtnQty,
+            // 'listProduct.$[elem].balanceCtn': -factorCtnQty
+          }
+        },
+        {
+          arrayFilters: [{ 'elem.productId': item.productId }],
+          new: true
+        }
+      )
+    }
 
     const createdMovementRefund = await StockMovement.create({
       ...refundCalStock
