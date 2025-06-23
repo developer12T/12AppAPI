@@ -2831,10 +2831,10 @@ exports.summaryDaily = async (req, res) => {
       const change = changeByDate[date] || 0;
 
 
-      if (sendmoney == 0 && sale == 0) {
+      if (sendmoney == 0 && summary == 0) {
         status = 'ยังส่งเงินไม่ครบ';
       }
-      else if (sendmoney - sale == 0) {
+      else if (sendmoney - summary == 0) {
         status = 'ส่งเงินครบ';
       }
       else {
