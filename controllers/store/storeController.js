@@ -1140,71 +1140,111 @@ exports.getTypeStore = async (req, res) => {
   })
 }
 
-exports.insertStoreToErp = async (req, res) => {
+exports.insertStoreToErpOne = async (req, res) => {
 
-  const { area } = req.body
+  const { storeId,area } = req.body
   const channel = req.headers['x-channel'];
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const { User } = getModelsByChannel(channel, res, userModel)
-  const dataStore = await Store.find({ area: area })
+  const item = await Store.findOne({ storeId: storeId ,area:area})
   const dataUser = await User.findOne({ area: area, role: 'sale' })
-  let data = []
-  for (const item of dataStore) {
-
-    const dataTran = {
-      Hcase: 0,
-      customerNo: item.storeId,
-      customerStatus: item.status,
-      customerName: item.name,
-      customerChannel: '103',
-      customerCoType: item.typeName,
-      customerAddress1: item.address,
-      customerAddress2: item.subDistrict,
-      customerAddress3: item.district,
-      customerAddress4: item.province,
-      customerPoscode: 0,
-      customerPhone: item.tel,
-      warehouse: item.area,
-      OKSDST: item.zone,
-      saleTeam: "",
-      OKCFC1: item.area,
-      OKCFC3: item.route,
-      OKCFC6: item.type,
-      salePayer: dataUser.salePayer,
-      creditLimit: 0,
-      taxno: item.taxId,
-      saleCode: dataUser.saleCode,
-      saleZone: dataUser.zone,
-      shippings: item.shippingAddress.map(u => {
-        return {
-          shippingAddress1: u.address,
-          shippingAddress2: u.district,
-          shippingAddress3: u.subDistrict,
-          shippingAddress4: u.province,
-          shippingPoscode: u.postCode,
-          shippingPhone: item.tel,
-          shippingRoute: 0,
-          OPGEOX: u.latitude,
-          OPGEOY: u.longtitude
 
 
+  // console.log(item)
+  // const dataTran = {
+  //   Hcase: 0,
+  //   customerNo: item.storeId,
+  //   customerStatus: item.status,
+  //   customerName: item.name,
+  //   customerChannel: '103',
+  //   customerCoType: item.typeName,
+  //   customerAddress1: item.address,
+  //   customerAddress2: item.subDistrict,
+  //   customerAddress3: item.district,
+  //   customerAddress4: item.province,
+  //   customerPoscode: item.postCode,
+  //   customerPhone: item.tel,
+  //   warehouse: item.area,
+  //   OKSDST: item.zone,
+  //   saleTeam: "",
+  //   OKCFC1: item.area,
+  //   OKCFC3: item.route,
+  //   OKCFC6: item.type,
+  //   salePayer: dataUser.salePayer,
+  //   creditLimit: 0,
+  //   taxno: item.taxId,
+  //   saleCode: dataUser.saleCode,
+  //   saleZone: dataUser.zone,
+  //   shippings: item.shippingAddress.map(u => {
+  //     return {
+  //       shippingAddress1: u.address,
+  //       shippingAddress2: u.district,
+  //       shippingAddress3: u.subDistrict,
+  //       shippingAddress4: u.province,
+  //       shippingPoscode: u.postCode,
+  //       shippingPhone: item.tel,
+  //       shippingRoute: item.postCode,
+  //       OPGEOX: u.latitude,
+  //       OPGEOY: u.longtitude
+  //     }
+  //   })
+  // }
+
+
+  const dataTran = {
+ "Hcase" : 0, // 0 = address only, 1 = customer and address
+    "customerNo": "MBE2500197",
+    "customerStatus": "20",
+    "customerName": "ร้าน เฮียชัย",    
+    "customerChannel": "103",
+    "customerCoType": "", // OKORTP
+    "customerAddress1": "ตลาดบางซื่อบางซ่อน",
+    "customerAddress2": "บางซื่อ",
+    "customerAddress3": "บางซื่อ กรุงเทพมหานคร",
+    "customerAddress4": "",
+    "customerPoscode": "10800",
+    "customerPhone": "",
+    "warehouse": "117",
+    "OKSDST": "BE",
+    "saleTeam": "BE1",
+    "OKCFC1": "BE811",
+    "OKCFC3": "R25",
+    "OKCFC6": "021",
+    "salePayer": "V01000356",
+    "creditLimit": "000",
+    "taxno": "",
+    "saleCode": "20401",
+    "saleZone": "BE",
+    "shippings": [
+        {
+            "shippingAddress1": "ตลาดบางซื่อบางซ่อน ",
+            "shippingAddress2": "บางซื่อ  บางซื่อ",
+            "shippingAddress3": "กรุงเทพมหานคร",
+            "shippingAddress4": "",
+            "shippingPoscode": "",
+            "shippingPhone": "",
+            "shippingRoute": "10800",
+            "OPGEOX": "13.8223529", // lat
+            "OPGEOY": "100.5316155" // long
         }
-      })
-    }
-
-    data.push(dataTran)
+    ]
   }
 
-  for (const i of data) {
-    const response = await axios.post(
-      `${process.env.API_URL_12ERP}/customer/insert`,
-      i
-    );
-  }
+
+
+
+
+
+
+  const response = await axios.post(
+    `${process.env.API_URL_12ERP}/customer/insert`,
+    dataTran
+  );
+
   res.status(200).json({
     status: 200,
     message: 'successfully',
-    data: data
+    data: dataTran
   })
 }
 
