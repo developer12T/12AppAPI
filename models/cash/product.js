@@ -2,10 +2,10 @@ const mongoose = require('mongoose')
 const { dbCA } = require('../../config/db')
 
 const price = mongoose.Schema({
-    sale: { type: Number },
-    refund: { type: Number },
-    refundDmg: { type: Number },
-    change: { type: Number },
+    sale: { type: Number ,default: 0},
+    refund: { type: Number ,default: 0},
+    refundDmg: { type: Number ,default: 0},
+    change: { type: Number ,default: 0},
 })
 
 const listUnit = mongoose.Schema({
@@ -28,8 +28,8 @@ const productSchema = mongoose.Schema({
     flavourCode: { type: String, require: true },
     flavour: { type: String, require: true },
     type: { type: String, require: true },
-    weightGross: { type: Number,require: true },
-    weightNet: { type: Number ,require: true},
+    weightGross: { type: Number, require: true, default: 0 },
+    weightNet: { type: Number, require: true, default: 0 },
     statusSale: { type: String, require: true },
     statusWithdraw: { type: String, require: true },
     statusRefund: { type: String, require: true },

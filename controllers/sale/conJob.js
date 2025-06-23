@@ -4,14 +4,16 @@ const { OrderToExcelConJob } = require('../../controllers/sale/orderController')
 
 
 const { Warehouse, Locate, Balance, Sale, DisributionM3 } = require('../../models/cash/master')
+const fs = require('fs');
 
 const { sequelize, DataTypes } = require('../../config/m3db')
 const { getSocket } = require('../../socket')
 
 const disributionModel = require('../../models/cash/distribution')
-
+const cartModel = require('../../models/cash/cart')
 const orderModel = require('../../models/cash/sale')
 const { getModelsByChannel } = require('../../middleware/channel')
+const { create } = require('lodash')
 
 async function erpApiCheckOrderJob(channel = 'cash') {
   try {
@@ -158,80 +160,63 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
   }
 }
 
+async function DeleteCartDaily(channel = 'cash') {
+  try {
+    const { Cart } = getModelsByChannel(channel, null, cartModel);
+
+    const now = new Date();
+    // หา "เมื่อวาน" (เวลาไทย)
+    const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+
+    // สร้างช่วงเวลาเมื่อวาน (เวลาไทย)
+    const yyyy = yesterday.getFullYear();
+    const mm = String(yesterday.getMonth() + 1).padStart(2, '0');
+    const dd = String(yesterday.getDate()).padStart(2, '0');
+    const startStr = `${yyyy}-${mm}-${dd}T00:00:00.000+07:00`;
+    const endStr = `${yyyy}-${mm}-${dd}T23:59:59.999+07:00`;
+
+    const startUtc = new Date(startStr);
+    const endUtc = new Date(endStr);
+
+    const result = await Cart.deleteMany({
+      createdAt: { $gte: startUtc, $lte: endUtc }
+    });
+
+    console.log(`[DeleteCartDaily] Deleted cart for date ${yyyy}-${mm}-${dd} (ไทย) | count: ${result.deletedCount}`);
+
+  } catch (error) {
+    console.error('❌ Error in DeleteCartDaily:', error);
+    return { error: true, message: error.message };
+  }
+}
+
+
 
 const startCronJobErpApiCheck = () => {
-  cron.schedule('*/5 * * * *', async () => {
-    console.log('Running cron job startCronJobErpApiCheck every 5 minutes')
+  cron.schedule('*/10 * * * *', async () => {
+    console.log('Running cron job startCronJobErpApiCheck every 10 minutes')
     await erpApiCheckOrderJob()
   })
 }
 
 const startCronJobErpApiCheckDisribution = () => {
-  cron.schedule('*/5 * * * *', async () => {
-    console.log('Running cron job startCronJobErpApiCheckDisribution every 5 minutes')
+  cron.schedule('*/10 * * * *', async () => {
+    console.log('Running cron job startCronJobErpApiCheckDisribution every 10 minutes')
     await erpApiCheckDisributionM3Job()
   })
 }
 
-
-
-// const startCronJobErpApiCheck = () => {
-//   const times = [9, 12, 18, 23];
-
-//   times.forEach(hour => {
-//     cron.schedule(`0 ${hour} * * *`, async () => {
-//       console.log(`Running cron job at ${hour}:00`);
-//       await erpApiCheck();
-//     }, {
-//       timezone: 'Asia/Bangkok' 
-//     });
-//   });
-// };
-
-
-
-
-
-
-
-// const startCronJobOrderToExcel = () => {
-//   const times = [9, 12, 18, 23];
-
-//   times.forEach(hour => {
-//     cron.schedule(`0 ${hour} * * *`, async () => {
-//       console.log(`Running cron job at ${hour}:00`);
-//       await OrderToExcelConJob();
-//     }, {
-//       timezone: 'Asia/Bangkok' 
-//     });
-//   });
-// };
-
-
-// const startCronJobOrderToExcel = () => {
-//   const now = moment().tz('Asia/Bangkok');
-//   const nextMinute = now.add(1, 'minute');
-
-//   const minute = nextMinute.minute();
-//   const hour = nextMinute.hour();
-
-//   const cronExpression = `${minute} ${hour} * * *`;
-
-//   console.log(`✅ Scheduling OrderToExcelConJob at: ${nextMinute.format('YYYY-MM-DD HH:mm:ss')}`);
-//   console.log(`🕒 CRON expression: ${cronExpression}`);
-
-//   cron.schedule(cronExpression, async () => {
-//     console.log(`[${moment().tz('Asia/Bangkok').format()}] 🔁 Running OrderToExcelConJob`);
-//     await OrderToExcelConJob();
-//   }, {
-//     timezone: 'Asia/Bangkok'
-//   });
-// };
-
+const startCronJobDeleteCartDaily = () => {
+  cron.schedule('0 0 * * *', async () => {
+    console.log('Running cron job DeleteCartDaily at 01:00 every day');
+    await DeleteCartDaily();
+  });
+}
 
 
 module.exports = {
   startCronJobErpApiCheck,
   // startCronJobOrderToExcel
-  startCronJobErpApiCheckDisribution
+  startCronJobErpApiCheckDisribution,
+  startCronJobDeleteCartDaily
 };
