@@ -264,10 +264,13 @@ exports.addStore = async (req, res) => {
         })
       }
 
-      const existingStores = await Store.find(
-        {},
-        { _id: 0, __v: 0, idIndex: 0 }
-      )
+      // const existingStores = await Store.find(
+      //   {},
+      //   { _id: 0, __v: 0, idIndex: 0 },
+      //   {area : store.area}
+
+      // )
+      // console.log(store.area)
       const fieldsToCheck = [
         'name',
         'taxId',
@@ -281,42 +284,42 @@ exports.addStore = async (req, res) => {
         'longtitude'
       ]
 
-      const similarStores = existingStores
-        .map(existingStore => {
-          let totalSimilarity = 0
-          fieldsToCheck.forEach(field => {
-            const similarity = calculateSimilarity(
-              store[field]?.toString() || '',
-              existingStore[field]?.toString() || ''
-            )
-            totalSimilarity += similarity
-          })
+      // const similarStores = existingStores
+      //   .map(existingStore => {
+      //     let totalSimilarity = 0
+      //     fieldsToCheck.forEach(field => {
+      //       const similarity = calculateSimilarity(
+      //         store[field]?.toString() || '',
+      //         existingStore[field]?.toString() || ''
+      //       )
+      //       totalSimilarity += similarity
+      //     })
 
-          const averageSimilarity = totalSimilarity / fieldsToCheck.length
-          return {
-            store: existingStore,
-            similarity: averageSimilarity
-          }
-        })
-        .filter(result => result.similarity > 70)
-        .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, 3)
+      //     const averageSimilarity = totalSimilarity / fieldsToCheck.length
+      //     return {
+      //       store: existingStore,
+      //       similarity: averageSimilarity
+      //     }
+      //   })
+      //   .filter(result => result.similarity > 70)
+      //   .sort((a, b) => b.similarity - a.similarity)
+      //   .slice(0, 3)
 
-      if (similarStores.length > 0) {
-        const sanitizedStores = similarStores.map(item => ({
-          store: Object.fromEntries(
-            Object.entries(item.store._doc || item.store).filter(
-              ([key]) => key !== '_id'
-            )
-          ),
-          similarity: item.similarity.toFixed(2)
-        }))
-        return res.status(200).json({
-          status: '200',
-          message: 'similar store',
-          data: sanitizedStores
-        })
-      }
+      // if (similarStores.length > 0) {
+      //   const sanitizedStores = similarStores.map(item => ({
+      //     store: Object.fromEntries(
+      //       Object.entries(item.store._doc || item.store).filter(
+      //         ([key]) => key !== '_id'
+      //       )
+      //     ),
+      //     similarity: item.similarity.toFixed(2)
+      //   }))
+      //   return res.status(200).json({
+      //     status: '200',
+      //     message: 'similar store',
+      //     data: sanitizedStores
+      //   })
+      // }
 
       const uploadedFiles = []
       for (let i = 0; i < files.length; i++) {
@@ -325,15 +328,27 @@ exports.addStore = async (req, res) => {
           path.join(__dirname, '../../public/images/stores'),
           store.area,
           types[i]
-        )
+        );
+
+        const originalPath = uploadedFile[0].fullPath; // เช่น .../public/images/stores/xxx.jpg
+        const webpPath = originalPath.replace(/\.[a-zA-Z]+$/, '.webp'); // แปลงชื่อไฟล์นามสกุล .webp
+
+        await sharp(originalPath)
+          .rotate()
+          .resize(800)
+          .webp({ quality: 80 })
+          .toFile(webpPath);
+
+        fs.unlinkSync(originalPath);
         uploadedFiles.push({
-          name: uploadedFile[0].name,
-          path: uploadedFile[0].fullPath,
+          name: path.basename(webpPath),
+          path: webpPath,
           type: types[i]
-        })
+        });
       }
 
       const imageList = uploadedFiles
+
 
       const policyAgree = {
         status: store.policyConsent?.status || ''
@@ -1179,12 +1194,12 @@ exports.insertStoreToErp = async (req, res) => {
 
     data.push(dataTran)
   }
-  
+
   for (const i of data) {
-  const response = await axios.post(
-    `${process.env.API_URL_12ERP}/customer/insert`,
-    i
-  );
+    const response = await axios.post(
+      `${process.env.API_URL_12ERP}/customer/insert`,
+      i
+    );
   }
   res.status(200).json({
     status: 200,
