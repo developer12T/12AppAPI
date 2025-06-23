@@ -886,18 +886,14 @@ exports.getStockQty = async (req, res) => {
   let summaryStockOut = 0;
   let summaryStockBal = 0;
 
+  let summaryStockPcs = 0;
+  let summaryStockInPcs = 0;
+  let summaryStockOutPcs = 0;
+  let summaryStockBalPcs = 0;
+
   for (const stockItem of dataStockTran.listProduct) {
     const productDetail = dataProduct.find(u => u.id == stockItem.productId);
     if (!productDetail) continue;
-
-    // หา sale ของ unit 'PCS' เท่านั้น
-    const unitPCS = productDetail.listUnit.find(u => u.unit === 'PCS');
-    const sale = unitPCS ? unitPCS.price.sale : 0;
-
-    summaryStock += (stockItem.stockPcs || 0) * sale;
-    summaryStockIn += (stockItem.stockInPcs || 0) * sale;
-    summaryStockOut += (stockItem.stockOutPcs || 0) * sale;
-    summaryStockBal += (stockItem.balancePcs || 0) * sale;
 
     // === สร้าง listUnit (ตามโค้ดเดิม) ===
     let stock = stockItem.stockPcs;
@@ -905,7 +901,15 @@ exports.getStockQty = async (req, res) => {
     let stockOut = stockItem.stockOutPcs;
     let balance = stockItem.balancePcs;
 
+    summaryStockPcs += stockItem.stockPcs || 0;
+    summaryStockInPcs += stockItem.stockInPcs || 0;
+    summaryStockOutPcs += stockItem.stockOutPcs || 0;
+    summaryStockBalPcs += stockItem.balancePcs || 0;
+
+
+
     const listUnitStock = productDetail.listUnit.map(u => {
+      const sale = u.price.sale
       const factor = u.factor;
       const stockQty = Math.floor(stock / factor) || 0;
       const stockInQty = Math.floor(stockIn / factor) || 0;
@@ -916,6 +920,13 @@ exports.getStockQty = async (req, res) => {
       stockIn -= stockInQty * factor;
       stockOut -= stockOutQty * factor;
       balance -= balanceQty * factor;
+
+      summaryStock += (stockQty || 0) * sale;
+      summaryStockIn += (stockInQty || 0) * sale;
+      summaryStockOut += (stockOutQty || 0) * sale;
+      summaryStockBal += (balanceQty || 0) * sale;
+
+
 
       return {
         unit: u.unit,
@@ -941,15 +952,19 @@ exports.getStockQty = async (req, res) => {
   data.sort((a, b) => b.pcsMain - a.pcsMain);
   data.forEach(item => { delete item.pcsMain; });
 
-res.status(200).json({
-  status: 200,
-  message: 'suceesful',
-  data: data,
-  summaryStock: Number(summaryStock.toFixed(2)),
-  summaryStockIn: Number(summaryStockIn.toFixed(2)),
-  summaryStockOut: Number(summaryStockOut.toFixed(2)),
-  summaryStockBal: Number(summaryStockBal.toFixed(2))
-});
+  res.status(200).json({
+    status: 200,
+    message: 'suceesful',
+    data: data,
+    summaryStock: Number(summaryStock.toFixed(2)),
+    summaryStockIn: Number(summaryStockIn.toFixed(2)),
+    summaryStockOut: Number(summaryStockOut.toFixed(2)),
+    summaryStockBal: Number(summaryStockBal.toFixed(2)),
+    summaryStockPcs: summaryStockPcs,
+    summaryStockInPcs: summaryStockInPcs,
+    summaryStockOutPcs: summaryStockOutPcs,
+    summaryStockBalPcs: summaryStockBalPcs,
+  });
 
 }
 

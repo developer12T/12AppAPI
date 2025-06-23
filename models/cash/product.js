@@ -11,7 +11,7 @@ const price = mongoose.Schema({
 const listUnit = mongoose.Schema({
     unit: { type: String },
     name: { type: String },
-    factor: { type: String },
+    factor: { type: Number },
     price: price,
 })
 
@@ -28,8 +28,8 @@ const productSchema = mongoose.Schema({
     flavourCode: { type: String, require: true },
     flavour: { type: String, require: true },
     type: { type: String, require: true },
-    weightGross: { type: String, require: true },
-    weightNet: { type: String, require: true },
+    weightGross: { type: Number,require: true },
+    weightNet: { type: Number ,require: true},
     statusSale: { type: String, require: true },
     statusWithdraw: { type: String, require: true },
     statusRefund: { type: String, require: true },
