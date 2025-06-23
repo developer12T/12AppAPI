@@ -166,17 +166,19 @@ exports.addSendMoneyImage = async (req, res) => {
 exports.getSendMoney = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
-    const { area } = req.body
+    const { area, date } = req.body
 
     const { Order } = getModelsByChannel(channel, res, orderModel)
     const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
 
-    // วันไทย (UTC+7)
-    const now = new Date()
-    const thaiNow = new Date(now.getTime() + 7 * 60 * 60 * 1000)
-    const year = thaiNow.getFullYear()
-    const month = thaiNow.getMonth() + 1
-    const day = thaiNow.getDate()
+    const dateISO = `${date.substring(0, 4)}-${date.substring(4, 6)}-${date.substring(6, 8)}T00:00:00Z`;
+    const dateObj = new Date(dateISO);
+
+    // +7 ชั่วโมงเป็นเวลาไทย
+    const thaiNow = new Date(dateObj.getTime() + 7 * 60 * 60 * 1000);
+    const year = thaiNow.getFullYear();
+    const month = thaiNow.getMonth() + 1;
+    const day = thaiNow.getDate();
 
     // Step 1: คำนวณยอดที่ควรส่งวันนี้ (เหมือน getSummarybyChoice type = day)
     const orders = await Order.aggregate([
@@ -254,15 +256,29 @@ exports.getSendMoney = async (req, res) => {
 
     const alreadySent =
       alreadySentDocs.length > 0 ? alreadySentDocs[0].totalSent : 0
+    // console.log(totalToSend, alreadySent)
 
+    let status = ''
+    if (totalToSend == 0 && alreadySent == 0) {
+      status = 'ยังส่งเงินไม่ครบ'
+    }
+    else if (totalToSend - alreadySent == 0) {
+      status = 'ส่งเงินครบ';
+    }
+    else {
+      status = 'ยังส่งเงินไม่ครบ';
+    }
     const remaining = parseFloat((totalToSend - alreadySent).toFixed(2))
+
+
+
 
     res.status(200).json({
       message: 'success',
       totalToSend,
       alreadySent,
       sendmoney: remaining,
-      status: remaining <= 0 ? 'ส่งเงินครบ' : 'ยังส่งเงินไม่ครบ'
+      status: status
     })
   } catch (err) {
     console.error('[getSendMoney Error]', err)
