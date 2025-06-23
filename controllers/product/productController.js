@@ -645,7 +645,7 @@ exports.addFromERPnew = async (req, res) => {
 
     const existingProduct = await Product.findOne({ id: productId })
     if (existingProduct) {
-      console.log(`Product ID ${productId} already exists. Skipping.`)
+      // console.log(`Product ID ${productId} already exists. Skipping.`)
       continue
     }
     const itemConvertResponse = await axios.post(
