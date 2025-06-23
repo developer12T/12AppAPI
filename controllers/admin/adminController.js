@@ -34,22 +34,19 @@ exports.reportCheck = async (req, res) => {
     let startStr, endStr;
 
     if (!start || !end) {
+      // ถ้าไม่ส่ง start/end: ให้ใช้วันนี้ของไทย (00:00-23:59 เวลาไทย)
       const today = new Date();
       const yyyy = today.getFullYear();
       const mm = String(today.getMonth() + 1).padStart(2, '0');
       const dd = String(today.getDate()).padStart(2, '0');
       const todayStr = `${yyyy}-${mm}-${dd}`;
-      console.log(todayStr)
-      startStr = addHours(new Date(`${todayStr}T00:00:00.000Z`), 7)
-      endStr = addHours(new Date(`${todayStr}T23:59:59.999Z`), 7)
-
-      console.log(startStr)
-      console.log(endStr)
+      startStr = new Date(`${todayStr}T00:00:00.000+07:00`);
+      endStr = new Date(`${todayStr}T23:59:59.999+07:00`);
     } else {
-      startStr = addHours(new Date(`${start}T00:00:00.000Z`), 7)
-      endStr = addHours(new Date(`${end}T23:59:59.999Z`), 7)
+      // ถ้าระบุ start/end: ให้ใช้ช่วงวันตามที่ส่งมา (ตามเวลาไทย)
+      startStr = new Date(`${start}T00:00:00.000+07:00`);
+      endStr = new Date(`${end}T23:59:59.999+07:00`);
     }
-
 
     const user = await User.find({ role: 'sale' }).select('area')
     const areaId = [...new Set(user.flatMap(u => u.area))]
@@ -197,19 +194,18 @@ exports.reportCheckExcel = async (req, res) => {
     let startStr, endStr;
 
     if (!start || !end) {
+      // ถ้าไม่ส่ง start/end: ให้ใช้วันนี้ของไทย (00:00-23:59 เวลาไทย)
       const today = new Date();
       const yyyy = today.getFullYear();
       const mm = String(today.getMonth() + 1).padStart(2, '0');
       const dd = String(today.getDate()).padStart(2, '0');
       const todayStr = `${yyyy}-${mm}-${dd}`;
-
-      startStr = addHours(new Date(`${todayStr}T00:00:00.000Z`), 7)
-      endStr = addHours(new Date(`${todayStr}T23:59:59.999Z`), 7)
-      start = todayStr
-      end = todayStr
+      startStr = new Date(`${todayStr}T00:00:00.000+07:00`);
+      endStr = new Date(`${todayStr}T23:59:59.999+07:00`);
     } else {
-      startStr = addHours(new Date(`${start}T00:00:00.000Z`), 7)
-      endStr = addHours(new Date(`${end}T23:59:59.999Z`), 7)
+      // ถ้าระบุ start/end: ให้ใช้ช่วงวันตามที่ส่งมา (ตามเวลาไทย)
+      startStr = new Date(`${start}T00:00:00.000+07:00`);
+      endStr = new Date(`${end}T23:59:59.999+07:00`);
     }
 
 
@@ -322,9 +318,9 @@ exports.reportCheckExcel = async (req, res) => {
 
 
     // res.status(200).json({
-      // status: 200,
-      // message: 'Create Excel file',
-      // data: result
+    // status: 200,
+    // message: 'Create Excel file',
+    // data: result
     // })
 
   } catch (err) {
