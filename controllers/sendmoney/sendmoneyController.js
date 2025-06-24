@@ -26,7 +26,7 @@ exports.addSendMoney = async (req, res) => {
       $addFields: {
         thaiDate: {
           $dateAdd: {
-            startDate: '$createdAt',
+            startDate: '$dateAt',
             unit: 'hour',
             amount: 7
           }
@@ -45,11 +45,15 @@ exports.addSendMoney = async (req, res) => {
       }
     }
   ])
-  let sendmoneyData = {}
+
+  // let sendmoneyData = {}
+
+  // console.log(existData)
+
   if (existData.length == 0) {
     sendmoneyData = await SendMoney.create({
       area: area,
-      date: dateObj,
+      dateAt: dateObj,
       sendmoney: sendmoney
     })
   } else {
@@ -57,22 +61,14 @@ exports.addSendMoney = async (req, res) => {
       { _id: existData[0]._id },
       {
         $inc: {
-          sendmoney: - sendmoney
+          sendmoney: + sendmoney
         }
       }
     )
   }
-
-  // const sendmoneyData = await SendMoney.create({
-  //   area: area,
-  //   date: dateObj,
-  //   sendmoney: sendmoney
-  // })
-
   res.status(200).json({
     status: 200,
     message: 'success',
-    data: dateObj
   })
 }
 
@@ -227,7 +223,7 @@ exports.getSendMoney = async (req, res) => {
         $addFields: {
           thaiDate: {
             $dateAdd: {
-              startDate: '$createdAt',
+              startDate: '$dateAt',
               unit: 'hour',
               amount: 7
             }
@@ -244,9 +240,6 @@ exports.getSendMoney = async (req, res) => {
               { $eq: [{ $year: '$thaiDate' }, year] }
             ]
           },
-          // day,
-          // month,
-          // year
         },
       },
       {
@@ -275,12 +268,46 @@ exports.getSendMoney = async (req, res) => {
 
 
 
+    const SentDocsForUpdate = await SendMoney.aggregate([
+      {
+        $addFields: {
+          thaiDate: {
+            $dateAdd: {
+              startDate: '$dateAt',
+              unit: 'hour',
+              amount: 7
+            }
+          }
+        }
+      },
+      {
+        $match: {
+          area: area,
+          $expr: {
+            $and: [
+              { $eq: [{ $dayOfMonth: '$thaiDate' }, day] },
+              { $eq: [{ $month: '$thaiDate' }, month] },
+              { $eq: [{ $year: '$thaiDate' }, year] }
+            ]
+          },
+        },
+      },
+    ]);
+
+
+    for (const doc of SentDocsForUpdate) {
+      console.log(doc._id)
+      await SendMoney.updateOne(
+        { _id: doc._id },
+        { $set: { different: remaining } }
+      );
+    }
 
     res.status(200).json({
       message: 'success',
-      totalToSend,
-      alreadySent,
-      sendmoney: remaining,
+      summary: totalToSend,
+      sendmoney: alreadySent,
+      different: remaining,
       status: status
     })
   } catch (err) {

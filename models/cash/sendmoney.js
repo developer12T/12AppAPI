@@ -10,10 +10,12 @@ const sendMoneySchema = mongoose.Schema({
   area: { type: String, require: true },
   preiod: { type: String, require: true },
   sendmoney: { type: Number, require: true },
+  different: { type: Number, require: true },
   imageList: [imageSchema],
   status: { type: String },
   createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
+  updatedAt: { type: Date, default: Date.now },
+  dateAt: { type: Date }
 })
 
 module.exports = conn => {

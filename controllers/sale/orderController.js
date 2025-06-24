@@ -252,7 +252,7 @@ exports.checkout = async (req, res) => {
 
     const productQty = Object.values(
       [...qtyproductPro, ...qtyproduct].reduce((acc, cur) => {
-      // [, ...qtyproduct].reduce((acc, cur) => {
+        // [, ...qtyproduct].reduce((acc, cur) => {
 
         const key = `${cur.productId}-${cur.unit}`;
         acc[key] = acc[key]
@@ -300,27 +300,27 @@ exports.checkout = async (req, res) => {
       const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
       // console.log('factorPcsQty', factorPcsQty)
       // console.log('factorCtnQty', factorCtnQty)
-        const data = await Stock.findOneAndUpdate(
-          {
-            area: area,
-            period: period,
-            'listProduct.productId': item.productId
-          },
-          {
-            $inc: {
-              'listProduct.$[elem].stockOutPcs': +factorPcsQty,
-              // 'listProduct.$[elem].balancePcs': -factorPcsQty,
-              'listProduct.$[elem].stockOutCtn': +factorCtnQty,
-              // 'listProduct.$[elem].balanceCtn': -factorCtnQty
-            }
-          },
-          {
-            arrayFilters: [
-              { 'elem.productId': item.productId }
-            ],
-            new: true
+      const data = await Stock.findOneAndUpdate(
+        {
+          area: area,
+          period: period,
+          'listProduct.productId': item.productId
+        },
+        {
+          $inc: {
+            'listProduct.$[elem].stockOutPcs': +factorPcsQty,
+            // 'listProduct.$[elem].balancePcs': -factorPcsQty,
+            'listProduct.$[elem].stockOutCtn': +factorCtnQty,
+            // 'listProduct.$[elem].balanceCtn': -factorCtnQty
           }
-        );
+        },
+        {
+          arrayFilters: [
+            { 'elem.productId': item.productId }
+          ],
+          new: true
+        }
+      );
     }
     const calStock = {
       // storeId: refundOrder.store.storeId,
@@ -2720,13 +2720,24 @@ exports.summaryDaily = async (req, res) => {
       const yr = dateTH.getFullYear();
       return `${day}/${mon}/${yr}`;
     };
-
-    // ดึงข้อมูลในช่วงเดือนนี้
     const [dataSendmoney, dataRefund, dataOrderSale, dataOrderChange] = await Promise.all([
-      SendMoney.find({
-        area: area,
-        createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
-      }),
+      // SendMoney.find({
+      //   area: area,
+      //   dateAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+      // }),
+      SendMoney.aggregate([
+        {
+          $match: {
+            area: area,
+            dateAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC }
+          }
+        },
+        {
+          $addFields: {
+            createdAt: "$dateAt"  
+          }
+        }
+      ]),
       Refund.find({
         'store.area': area,
         period: periodStr,
@@ -2764,6 +2775,7 @@ exports.summaryDaily = async (req, res) => {
       summary: val.summary,
       status: val.status
     }));
+    console.log(dataSendMoneyTran)
     const sendMoneyMap = Object.fromEntries(dataSendMoneyTran.map(d => [d.date, d.summary]));
     const statusMap = Object.fromEntries(dataSendMoneyTran.map(d => [d.date, d.status]));
 
