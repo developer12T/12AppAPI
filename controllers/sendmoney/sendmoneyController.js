@@ -57,7 +57,7 @@ exports.addSendMoney = async (req, res) => {
       { _id: existData[0]._id },
       {
         $inc: {
-          sendmoney: +sendmoney
+          sendmoney: - sendmoney
         }
       }
     )
