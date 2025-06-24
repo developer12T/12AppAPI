@@ -1142,104 +1142,80 @@ exports.getTypeStore = async (req, res) => {
 
 exports.insertStoreToErpOne = async (req, res) => {
 
-  const { storeId,area } = req.body
+  const { storeId, area } = req.body
   const channel = req.headers['x-channel'];
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const { User } = getModelsByChannel(channel, res, userModel)
-  const item = await Store.findOne({ storeId: storeId ,area:area})
+  const item = await Store.findOne({ storeId: storeId, area: area })
   const dataUser = await User.findOne({ area: area, role: 'sale' })
 
 
   // console.log(item)
-  // const dataTran = {
-  //   Hcase: 0,
-  //   customerNo: item.storeId,
-  //   customerStatus: item.status,
-  //   customerName: item.name,
-  //   customerChannel: '103',
-  //   customerCoType: item.typeName,
-  //   customerAddress1: item.address,
-  //   customerAddress2: item.subDistrict,
-  //   customerAddress3: item.district,
-  //   customerAddress4: item.province,
-  //   customerPoscode: item.postCode,
-  //   customerPhone: item.tel,
-  //   warehouse: item.area,
-  //   OKSDST: item.zone,
-  //   saleTeam: "",
-  //   OKCFC1: item.area,
-  //   OKCFC3: item.route,
-  //   OKCFC6: item.type,
-  //   salePayer: dataUser.salePayer,
-  //   creditLimit: 0,
-  //   taxno: item.taxId,
-  //   saleCode: dataUser.saleCode,
-  //   saleZone: dataUser.zone,
-  //   shippings: item.shippingAddress.map(u => {
-  //     return {
-  //       shippingAddress1: u.address,
-  //       shippingAddress2: u.district,
-  //       shippingAddress3: u.subDistrict,
-  //       shippingAddress4: u.province,
-  //       shippingPoscode: u.postCode,
-  //       shippingPhone: item.tel,
-  //       shippingRoute: item.postCode,
-  //       OPGEOX: u.latitude,
-  //       OPGEOY: u.longtitude
-  //     }
-  //   })
-  // }
-
-
   const dataTran = {
- "Hcase" : 0, // 0 = address only, 1 = customer and address
-    "customerNo": "MBE2500197",
-    "customerStatus": "20",
-    "customerName": "ร้าน เฮียชัย",    
-    "customerChannel": "103",
-    "customerCoType": "", // OKORTP
-    "customerAddress1": "ตลาดบางซื่อบางซ่อน",
-    "customerAddress2": "บางซื่อ",
-    "customerAddress3": "บางซื่อ กรุงเทพมหานคร",
-    "customerAddress4": "",
-    "customerPoscode": "10800",
-    "customerPhone": "",
-    "warehouse": "117",
-    "OKSDST": "BE",
-    "saleTeam": "BE1",
-    "OKCFC1": "BE811",
-    "OKCFC3": "R25",
-    "OKCFC6": "021",
-    "salePayer": "V01000356",
-    "creditLimit": "000",
-    "taxno": "",
-    "saleCode": "20401",
-    "saleZone": "BE",
-    "shippings": [
-        {
-            "shippingAddress1": "ตลาดบางซื่อบางซ่อน ",
-            "shippingAddress2": "บางซื่อ  บางซื่อ",
-            "shippingAddress3": "กรุงเทพมหานคร",
-            "shippingAddress4": "",
-            "shippingPoscode": "",
-            "shippingPhone": "",
-            "shippingRoute": "10800",
-            "OPGEOX": "13.8223529", // lat
-            "OPGEOY": "100.5316155" // long
-        }
-    ]
+    Hcase: 1,
+    customerNo: item.storeId,
+    customerStatus: item.status,
+    customerName: item.name,
+    customerChannel: '103',
+    customerCoType: item.type,
+    customerAddress1: item.address,
+    customerAddress2: item.subDistrict,
+    customerAddress3: item.district,
+    customerAddress4: item.province,
+    customerPoscode: item.postCode,
+    customerPhone: item.tel,
+    warehouse: dataUser.warehouse,
+    OKSDST: item.zone,
+    saleTeam: dataUser.area.slice(0, 3),
+    OKCFC1: item.area,
+    OKCFC3: item.route,
+    OKCFC6: item.type,
+    salePayer: dataUser.salePayer,
+    creditLimit: "000",
+    taxno: item.taxId,
+    saleCode: dataUser.saleCode,
+    saleZone: dataUser.zone,
+    shippings: item.shippingAddress.map(u => {
+      return {
+        shippingAddress1: u.address,
+        shippingAddress2: u.district,
+        shippingAddress3: u.subDistrict,
+        shippingAddress4: u.province,
+        shippingPoscode: u.postCode,
+        shippingPhone: item.tel,
+        shippingRoute: item.postCode,
+        OPGEOX: u.latitude,
+        OPGEOY: u.longtitude
+      }
+    })
   }
 
+  try {
+    const response = await axios.post(
+      `${process.env.API_URL_12ERP}/customer/insert`,
+      dataTran
+    );
 
+    // ถ้ามาถึงตรงนี้ แปลว่า status = 2xx เท่านั้น!
+    return res.status(200).json({
+      message: 'Success',
+      data: response.data
+    });
 
+  } catch (error) {
+    // ถ้ามี error (status != 2xx) จะเข้าตรงนี้เสมอ
+    if (error.response && error.response.status === 400) {
+      return res.status(400).json({
+        message: error.response.data?.message || 'Already Exists'
+      });
+    } else {
+      return res.status(500).json({
+        message: 'Internal Server Error',
+        error: error.message
+      });
+    }
+  }
 
-
-
-
-  const response = await axios.post(
-    `${process.env.API_URL_12ERP}/customer/insert`,
-    dataTran
-  );
 
   res.status(200).json({
     status: 200,

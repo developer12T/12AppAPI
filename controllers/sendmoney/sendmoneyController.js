@@ -243,8 +243,11 @@ exports.getSendMoney = async (req, res) => {
               { $eq: [{ $month: '$thaiDate' }, month] },
               { $eq: [{ $year: '$thaiDate' }, year] }
             ]
-          }
-        }
+          },
+          // day,
+          // month,
+          // year
+        },
       },
       {
         $group: {
