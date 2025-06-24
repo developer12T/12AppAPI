@@ -108,57 +108,7 @@ exports.reportCheck = async (req, res) => {
         distribution: foundDistribution ? 1 : 0,
         refund: foundRefund ? 1 : 0,
       }
-    })
-
-    const workbook = new ExcelJS.Workbook()
-    const worksheet = workbook.addWorksheet('StatusByArea')
-
-    worksheet.addRow(['เขต', 'โหลดโปรแกรม', 'เพิ่มร้านค้าใหม่', 'เข้าเยี่ยม', 'ขาย', 'เบิก', 'คืน'])
-
-    result.forEach(row => {
-      const excelRow = worksheet.addRow([
-        row.area,
-        '',
-        row.store,
-        row.Route,
-        row.order,
-        row.distribution,
-        row.refund
-      ])
-      for (let i = 3; i <= 7; i++) {
-        if (excelRow.getCell(i).value === 1) {
-          excelRow.getCell(i).fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFC6EFCE' }
-          }
-        } else if (excelRow.getCell(i).value === 0) {
-          excelRow.getCell(i).fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFFFC7CE' } // แดงอ่อน
-          }
-        }
-      }
-    })
-
-    // ปรับความกว้างคอลัมน์ให้ดูดี
-    worksheet.columns.forEach(col => {
-      col.width = 18
-    })
-
-    worksheet.eachRow((row, rowNumber) => {
-      row.eachCell((cell, colNumber) => {
-        cell.border = {
-          top: { style: 'thin', color: { argb: 'FF000000' } },
-          left: { style: 'thin', color: { argb: 'FF000000' } },
-          bottom: { style: 'thin', color: { argb: 'FF000000' } },
-          right: { style: 'thin', color: { argb: 'FF000000' } }
-        }
-      })
-    })
-
-    await workbook.xlsx.writeFile('area_status.xlsx')
+    }).sort((a, b) => a.area.localeCompare(b.area))
 
     res.status(200).json({
       status: 200,

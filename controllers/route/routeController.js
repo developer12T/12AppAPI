@@ -311,7 +311,7 @@ exports.addFromERPnew = async (req, res) => {
           for (const list of storeList.storeInfo || []) {
             const store = await Store.findOne({ storeId: list })
             if (!store) {
-              console.warn(`Store with storeId ${list} not found`)
+              // console.warn(`Store with storeId ${list} not found`)
               continue
             }
 
@@ -352,7 +352,7 @@ exports.addFromERPnew = async (req, res) => {
                 listOrder: []
               })
             } else {
-              console.warn(`Store with storeId ${storeId} not found`)
+              // console.warn(`Store with storeId ${storeId} not found`)
             }
           }
 
