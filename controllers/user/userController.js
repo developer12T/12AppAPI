@@ -267,18 +267,18 @@ exports.updateUserOne = async (req, res) => {
   const { User } = getModelsByChannel(channel, res, userModel)
   // const user = await User.findOne({saleCode:req.body.saleCode})
 
-    if (!req.body.saleCode && !req.body.username) {
-      return res.status(400).json({
-        status: 400,
-        message: 'saleCode or username is required!'
-      })
-    }
+  if (!req.body.saleCode && !req.body.username) {
+    return res.status(400).json({
+      status: 400,
+      message: 'saleCode or username is required!'
+    })
+  }
 
   const saltRounds = 10;
 
   const hashedPassword = await bcrypt.hash(req.body.password, saltRounds);
   const user = await User.updateOne(
-    { saleCode: req.body.saleCode,username:req.body.username },
+    { saleCode: req.body.saleCode, username: req.body.username },
     {
       $set: {
         salePayer: req.body.salePayer,
@@ -724,3 +724,47 @@ exports.checkUserLogin = async (req, res) => {
     data: dataUser
   });
 };
+
+exports.getTeam = async (req, res) => {
+
+  const { zone } = req.query
+  const channel = req.headers['x-channel'];
+  const { User } = getModelsByChannel(channel, res, userModel);
+
+  const dataUser = await User.aggregate([
+    { $match: { zone: zone } },
+    {
+      $group: {
+        _id: {
+          $concat: [
+            { $substr: ['$area', 0, 2] },    // 2 ตัวแรก
+            { $substr: ['$area', 3, 1] }     // ตัวที่ 4 (index เริ่ม 0)
+          ]
+        }
+      }
+    },
+    { $match: { _id: { $ne: '' } } },
+    {
+      $project: {
+        _id: 0,
+        saleTeam: '$_id'
+      }
+    }
+  ]);
+
+
+  if (dataUser.length == 0) {
+
+    return res.status(404).json({
+      status: 404,
+      message: 'Not found team'
+    })
+  }
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: dataUser
+  })
+
+}

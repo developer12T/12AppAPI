@@ -1166,7 +1166,7 @@ exports.insertStoreToErpOne = async (req, res) => {
     customerPhone: item.tel,
     warehouse: dataUser.warehouse,
     OKSDST: item.zone,
-    saleTeam: dataUser.area.slice(0, 3),
+    saleTeam: dataUser.area.slice(0, 2) + dataUser.area[3],
     OKCFC1: item.area,
     OKCFC3: item.route,
     OKCFC6: item.type,
@@ -1217,10 +1217,10 @@ exports.insertStoreToErpOne = async (req, res) => {
   }
 
 
-  res.status(200).json({
-    status: 200,
-    message: 'successfully',
-    data: dataTran
-  })
+  // res.status(200).json({
+  //   status: 200,
+  //   message: 'successfully',
+  //   data: dataTran
+  // })
 }
 
