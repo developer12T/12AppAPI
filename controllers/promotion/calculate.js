@@ -27,22 +27,15 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
         // ...(r.productQty: ? { balancePcs: r.productQty: } : {}),
     }))
 
-    const test = await Stock.aggregate([
+    // 1. ดึง stock + รายละเอียด product ออกมาครบจบใน aggregate แล้ว
+    const stockList = await Stock.aggregate([
         {
             $match: {
                 area: order.store.area,
                 period: period()
             }
         },
-        {
-            $project: {
-                _id: 0,
-                listProduct: 1
-            }
-        },
-        {
-            $unwind: '$listProduct'
-        },
+        { $unwind: '$listProduct' },
         {
             $lookup: {
                 from: 'products',
@@ -51,9 +44,7 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
                 as: 'productDetail'
             }
         },
-        {
-            $unwind: '$productDetail'   // <-- เอา array ออก เหลือเป็น object เดียว
-        },
+        { $unwind: '$productDetail' },
         {
             $replaceRoot: {
                 newRoot: {
@@ -61,69 +52,60 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
                 }
             }
         }
-    ])
-    // console.log(test)
+    ]);
+
+    // 2. Filter เฉพาะที่ match กับ rewardFilters
     function matchFilter(obj, filter) {
-        // เช็คทุก key ใน filter ว่าตรงกับ obj มั้ย
-        return Object.keys(filter).every(key => obj[key] === filter[key])
+        return Object.keys(filter).every(key => obj[key] === filter[key]);
     }
 
-    // รวม filter หลายเงื่อนไขแบบ OR
-    const filtered = test.filter(item =>
+    const filteredStock = stockList.filter(item =>
         rewardFilters.some(filter => matchFilter(item, filter))
-    )
+    );
 
-    // console.log(filtered)
+    // 3. แปลง reward ให้เป็นโครงสร้างที่ต้องใช้
+    const rewardQty = rewards.map(item => ({
+        unit: item.productUnit,
+        qty: item.productQty
+    }));
 
-    const Allproduct = await Product.find({ $or: rewardFilters }).lean()
+    // 4. สร้าง productStock พร้อม unitList ที่ตรงกับ reward
+    const productStock = filteredStock.map(item => ({
+        id: item.productId,
+        unitList: item.listUnit, // จาก productDetail
+        balancePcs: item.balancePcs
+    }));
 
-    const productId = Allproduct.map(item => ({ id: item.id }))
+    // 5. ตรวจสอบว่า stock พอสำหรับ reward มั้ย
+    const checkList = productStock.map(stock => {
+        const rewardPcs = rewardQty.reduce((sum, reward) => {
+            const u = stock.unitList.find(u => u.unit === reward.unit);
+            const factor = u ? u.factor : 1;
+            return sum + (reward.qty * factor);
+        }, 0);
+        return {
+            id: stock.id,
+            totalRewardPcs: rewardPcs,
+            totalStockPcs: stock.balancePcs,
+            enough: stock.balancePcs >= rewardPcs
+        };
+    });
 
-    const dataStock = await Stock.findOne({
-        area: order.store.area,
-        period: period()
-    })
+    const enoughList = checkList.filter(item => item.enough);
 
-    const productStock = dataStock.listProduct
-        .flatMap(item => {
-            const inStock = productId.find(u => u.id == item.productId)
-            if (!inStock) return undefined // หรือ return []
+    // 6. ดึงรายละเอียดสินค้าแบบรวดเดียว (Promise.all)
+    const eligibleProducts = await Promise.all(
+        enoughList.map(async item => {
+            const dataProduct = await Product.findOne({ id: item.id }).lean();
             return {
-                id: inStock.id,
-                balancePcs: item.balancePcs
-            }
+                ...dataProduct,
+                balancePcs: item.totalStockPcs
+            };
         })
-        .filter(Boolean)
+    );
 
-    // console.log(rewards)
-    // const eligibleProducts = await Product.find({
-    //     id: { $in: productStock.map(u => u.id) }
-    // }).lean()
-    const eligibleProducts = []
-    
-    for (const item of productStock) {
-        // console.log(item)
-        const dataProduct = await Product.findOne({ id: item.id }).lean()
+    // console.log(eligibleProducts);
 
-        const data = {
-            ...dataProduct,
-            balancePcs: item.balancePcs
-        }
-        eligibleProducts.push(data)
-    }
-
-    // const productStockTest = await Product.find({
-    //     id: { $in: productStock.map(u => u.id) }
-    // }).lean()
-    // for (const item of rewards) {
-    //     const unitData = eligibleProducts.
-
-    // }
-
-
-
-
-    // console.log(eligibleProducts)
 
     if (!eligibleProducts.length) return []
 
@@ -134,7 +116,7 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
             (!r.productBrand || p.brand === r.productBrand) &&
             (!r.productSize || p.size === r.productSize)
         )
-        console.log("test",product)
+        // console.log("test",product)
         if (!product) return null
 
         const unitData = product.listUnit.find(unit => unit.unit === r.productUnit)
@@ -298,7 +280,7 @@ async function applyPromotion(order, channel, res) {
         if (promoApplied) {
             // console.log(freeProducts)
             let selectedProduct = freeProducts.length > 0 ? freeProducts[0] : {}
-            console.log(selectedProduct)
+            // console.log(selectedProduct)
             appliedPromotions.push({
                 proId: promo.proId,
                 proCode: promo.proCode,

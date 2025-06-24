@@ -165,21 +165,17 @@ async function DeleteCartDaily(channel = 'cash') {
     const { Cart } = getModelsByChannel(channel, null, cartModel);
 
     const now = new Date();
-    // หา "เมื่อวาน" (เวลาไทย)
-    const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    // หาค่า 'วันนี้' 00:00 (เวลาไทย)
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const todayStartStr = `${yyyy}-${mm}-${dd}T00:00:00.000+07:00`;
+    const todayStartUtc = new Date(todayStartStr);
 
-    // สร้างช่วงเวลาเมื่อวาน (เวลาไทย)
-    const yyyy = yesterday.getFullYear();
-    const mm = String(yesterday.getMonth() + 1).padStart(2, '0');
-    const dd = String(yesterday.getDate()).padStart(2, '0');
-    const startStr = `${yyyy}-${mm}-${dd}T00:00:00.000+07:00`;
-    const endStr = `${yyyy}-${mm}-${dd}T23:59:59.999+07:00`;
-
-    const startUtc = new Date(startStr);
-    const endUtc = new Date(endStr);
+    // console.log(todayStartUtc); // debug
 
     const result = await Cart.deleteMany({
-      createdAt: { $gte: startUtc, $lte: endUtc }
+      createdAt: { $lt: todayStartUtc }
     });
 
     console.log(`[DeleteCartDaily] Deleted cart for date ${yyyy}-${mm}-${dd} (ไทย) | count: ${result.deletedCount}`);
@@ -207,11 +203,20 @@ const startCronJobErpApiCheckDisribution = () => {
 }
 
 const startCronJobDeleteCartDaily = () => {
-  cron.schedule('0 0 * * *', async () => {
-    console.log('Running cron job DeleteCartDaily at 01:00 every day');
+cron.schedule(
+  '0 0 * * *',
+  async () => {
+    console.log('Running cron job DeleteCartDaily at 00:00 (Asia/Bangkok)');
     await DeleteCartDaily();
-  });
+  },
+  {
+    timezone: 'Asia/Bangkok'
+  }
+);
 }
+
+
+
 
 
 module.exports = {
