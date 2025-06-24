@@ -2734,7 +2734,7 @@ exports.summaryDaily = async (req, res) => {
         },
         {
           $addFields: {
-            createdAt: "$dateAt"  
+            createdAt: "$dateAt"
           }
         }
       ]),
@@ -2844,7 +2844,7 @@ exports.summaryDaily = async (req, res) => {
 
 
       if (sendmoney == 0 && summary == 0) {
-        status = 'ยังส่งเงินไม่ครบ';
+        status = 'วันนี้ไม่มียอดต้องส่ง';
       }
       else if (sendmoney - summary == 0) {
         status = 'ส่งเงินครบ';
@@ -2858,10 +2858,33 @@ exports.summaryDaily = async (req, res) => {
       return { date, sendmoney, summary, change, status, good, damaged, };
     });
 
+
+    const sumSendMoney = fullMonthArr.reduce((sum, item) => {
+      return sum + (item.sendmoney || 0)
+    }, 0);
+
+    const sumSummary = fullMonthArr.reduce((sum, item) => {
+      return sum + (item.summary || 0)
+    }, 0);
+    const sumChange = fullMonthArr.reduce((sum, item) => {
+      return sum + (item.change || 0)
+    }, 0);
+    const sumGood = fullMonthArr.reduce((sum, item) => {
+      return sum + (item.good || 0)
+    }, 0);
+    const sumDamaged = fullMonthArr.reduce((sum, item) => {
+      return sum + (item.damaged || 0)
+    }, 0);
+
     res.status(200).json({
       status: 200,
       message: 'success',
-      data: fullMonthArr
+      data: fullMonthArr,
+      sumSendMoney: sumSendMoney,
+      sumSummary: sumSummary,
+      sumChange: sumChange,
+      sumGood: sumGood,
+      sumDamaged:sumDamaged
     });
   } catch (err) {
     res.status(500).json({ status: 500, message: err.message });
