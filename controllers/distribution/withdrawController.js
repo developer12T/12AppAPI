@@ -313,7 +313,7 @@ exports.getOrder = async (req, res) => {
         $lt: endDate
       }
     }
-    console.log(query)
+    // console.log(query)
     const order = await Distribution.aggregate([
       {
         $addFields: {
