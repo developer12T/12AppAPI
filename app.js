@@ -3,12 +3,11 @@ const bodyParser = require('body-parser')
 const morgan = require('morgan')
 const cors = require('cors')
 const routeIndex = require('./routes/index')
-const startCronJob = require('./controllers/sale/conJob')
 const app = express()
 const { startCronJobErpApiCheck,startCronJobErpApiCheckDisribution,startCronJobDeleteCartDaily } = require('../12AppAPI/controllers/sale/conJob');
 
 // startCronJobErpApiCheck()    
-// startCronJobErpApiCheckDisribution()
+startCronJobErpApiCheckDisribution()
 // startCronJobDeleteCartDaily()
 // startCronJobOrderToExcel()
 
