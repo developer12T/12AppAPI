@@ -51,23 +51,23 @@ async function erpApiCheckOrderJob(channel = 'cash') {
     }
 
     // 5. Broadcast event
-    const io = getSocket();
-    const events = [
-      'sale_getSummarybyArea',
-      'sale_getSummarybyMonth',
-      'sale_getSummarybyRoute',
-      'sale_getSummaryItem',
-      'sale_getSummarybyGroup',
-      'sale_getRouteCheckinAll',
-      'sale_getTimelineCheckin',
-      'sale_routeTimeline'
-    ];
-    events.forEach(event => {
-      io.emit(event, {
-        status: 200,
-        message: 'New Update Data'
-      });
-    });
+    // const io = getSocket();
+    // const events = [
+    //   'sale_getSummarybyArea',
+    //   'sale_getSummarybyMonth',
+    //   'sale_getSummarybyRoute',
+    //   'sale_getSummaryItem',
+    //   'sale_getSummarybyGroup',
+    //   'sale_getRouteCheckinAll',
+    //   'sale_getTimelineCheckin',
+    //   'sale_routeTimeline'
+    // ];
+    // events.forEach(event => {
+    //   io.emit(event, {
+    //     status: 200,
+    //     message: 'New Update Data'
+    //   });
+    // });
 
     console.log(`Total updated Order: ${updatedCount}`);
     return updatedCount;
@@ -119,23 +119,23 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
     }
 
     // 5. Broadcast event
-    const io = getSocket();
-    const events = [
-      'sale_getSummarybyArea',
-      'sale_getSummarybyMonth',
-      'sale_getSummarybyRoute',
-      'sale_getSummaryItem',
-      'sale_getSummarybyGroup',
-      'sale_getRouteCheckinAll',
-      'sale_getTimelineCheckin',
-      'sale_routeTimeline'
-    ];
-    events.forEach(event => {
-      io.emit(event, {
-        status: 200,
-        message: 'New Update Data'
-      });
-    });
+    // const io = getSocket();
+    // const events = [
+    //   'sale_getSummarybyArea',
+    //   'sale_getSummarybyMonth',
+    //   'sale_getSummarybyRoute',
+    //   'sale_getSummaryItem',
+    //   'sale_getSummarybyGroup',
+    //   'sale_getRouteCheckinAll',
+    //   'sale_getTimelineCheckin',
+    //   'sale_routeTimeline'
+    // ];
+    // events.forEach(event => {
+    //   io.emit(event, {
+    //     status: 200,
+    //     message: 'New Update Data'
+    //   });
+    // });
 
     console.log(`Total updated Distribution: ${updatedCount}`);
     return updatedCount;
