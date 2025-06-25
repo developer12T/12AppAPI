@@ -9,8 +9,8 @@ const { API_PORT } = process.env
 const PORT = process.env.PORT || API_PORT
 
 const server = http.createServer(app)
-// const { initSocket } = require("./socket.js");
-// const io = initSocket(server);
+const { initSocket } = require("./socket.js");
+const io = initSocket(server);
 
 
 const checkConnections = async () => {
@@ -29,4 +29,4 @@ const checkConnections = async () => {
     }
 }
 checkConnections()
-// module.exports = io
+module.exports = io
