@@ -74,7 +74,7 @@ exports.getStore = async (req, res) => {
     let query = {}
 
     if (area) {
-      query.area = { $regex: `^${area}`, $options: 'i' } 
+      query.area = { $regex: `^${area}`, $options: 'i' }
     }
 
     if (type === 'new') {
@@ -1153,6 +1153,19 @@ exports.insertStoreToErpOne = async (req, res) => {
   const item = await Store.findOne({ storeId: storeId, area: area })
   const dataUser = await User.findOne({ area: area, role: 'sale' })
 
+  if (!item) {
+    return res.status(404).json({
+      json: 404,
+      message: 'Not found Store'
+    })
+  }
+
+  if (!item.postCode) {
+    return res.status(404).json({
+      json: 404,
+      message: 'Not found postCode'
+    })
+  }
 
   // console.log(item)
   const dataTran = {

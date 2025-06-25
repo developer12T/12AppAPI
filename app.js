@@ -6,9 +6,9 @@ const routeIndex = require('./routes/index')
 const app = express()
 const { startCronJobErpApiCheck,startCronJobErpApiCheckDisribution,startCronJobDeleteCartDaily } = require('../12AppAPI/controllers/sale/conJob');
 
-// startCronJobErpApiCheck()    
+startCronJobErpApiCheck()    
 startCronJobErpApiCheckDisribution()
-// startCronJobDeleteCartDaily()
+startCronJobDeleteCartDaily()
 // startCronJobOrderToExcel()
 
 app.use(bodyParser.json({ limit: '50mb' }))

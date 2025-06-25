@@ -27,67 +27,35 @@ async function erpApiCheckOrderJob(channel = 'cash') {
       group: ['OAORNO']
     });
 
-    const saleId = modelSale.map(row => row.get('OAORNO'));
-    const cleanSaleId = saleId
-      .map(s => (typeof s === 'string' ? s.trim() : s))
-      .filter(s => s && s.length > 0);
+    const saleIds = modelSale.map(row => row.get('OAORNO').toString());
 
-    // const notInModelOrder = await Order.find({
-    //   orderId: { $nin: cleanSaleId }
-    // }).select('orderId');
-    // console.log(cleanSaleId)
-    // const dataOrder = await Order.find()
-    // const updateResult = await Order.updateMany(
-    //   { orderId: { $in: cleanSaleId } },
-    //   { $set: { status: 'success' } }
-    // );
+    const inMongo = await Order.find({ status: 'pending' }).select('orderId');
+    const orderIdsInMongo = inMongo.map(item => item.orderId.toString());
 
-    let updatedCount = 0
+    // อัปเดตเฉพาะ orderId ที่ตรงกันระหว่างสองชุด
+    const matchedIds = orderIdsInMongo.filter(id => saleIds.includes(id));
 
-    for (const id of cleanSaleId) {
+    let updatedCount = 0;
+
+    for (const id of matchedIds) {
       try {
         const result = await Order.updateOne(
           { orderId: id },
-          { $set: { status: 'success' } }
+          { $set: { status: 'success',statusTH:'สำเร็จ' , updatedAt: new Date() } }
         );
         if (result.modifiedCount > 0) {
-          updatedCount++
+          updatedCount++;
         }
-        // ถ้าอยาก log ดูเป็นรายตัว
         // console.log(`orderId: ${id}, modified: ${result.modifiedCount}`);
       } catch (err) {
         console.error(`Error update orderId: ${id}`, err);
       }
     }
 
-    if (updatedCount === 0) {
-      console.log('No new order found in the M3 system');
-      return { updated: false, updatedCount: 0 };
-    } else {
-      console.log(`Updated ${updatedCount} order(s)`);
+    console.log(`Total updated Order: ${updatedCount}`);
+    return updatedCount;
 
-      // const io = getSocket();
-      // const events = [
-      //   'sale_getSummarybyArea',
-      //   'sale_getSummarybyMonth',
-      //   'sale_getSummarybyRoute',
-      //   'sale_getSummaryItem',
-      //   'sale_getSummarybyGroup',
-      //   'sale_getRouteCheckinAll',
-      //   'sale_getTimelineCheckin',
-      //   'sale_routeTimeline'
-      // ];
 
-      // events.forEach(event => {
-      //   io.emit(event, {
-      //     status: 200,
-      //     message: 'New Update Data',
-      //     updatedCount: updateResult.modifiedCount
-      //   });
-      // });
-
-      return { updated: true, updatedCount };
-    }
     // Broadcast
 
 
@@ -121,36 +89,32 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
 
     // แนะนำ: map orderId ให้เป็น string ทั้งหมด
     const orderIdsInMongo = inMongo.map(item => item.orderId.toString());
-    console.log(orderIdList.length)
+    // console.log(orderIdList.length)
     // filter orderId ที่ตรงกันเท่านั้น
     const orderidUpdate = orderIdsInMongo.filter(orderId => orderIdList.includes(orderId));
 
-    console.log("orderidUpdate =", orderidUpdate);
+    // console.log("orderidUpdate =", orderidUpdate);
 
-    if (!orderidUpdate.length) {
-      console.log('No new order Distribution found in the M3 system');
-      return { updated: false, updatedCount: 0 };
-    } else {
-      let updatedCount = 0;
-      for (const orderId of orderidUpdate) {
-        const result = await Distribution.updateOne(
-          { orderId: orderId },
-          { $set: { status: 'success', updatedAt: new Date() } }
-        );
-        updatedCount += result.modifiedCount;
-      }
-      return {
-        updated: updatedCount > 0,
-        updatedCount
-      };
-    }
+if (!orderidUpdate.length) {
+  console.log('No new order Distribution found in the M3 system');
+  return { updated: false, updatedCount: 0 };
+} else {
+  let updatedCount = 0;
+  for (const orderId of orderidUpdate) {
+    const result = await Distribution.updateOne(
+      { orderId: orderId },
+      { $set: { 
+        status: 'success',
+        statusTH: 'สำเร็จ',
+        updatedAt: new Date()
+      }}
+    );
+    updatedCount += result.modifiedCount;
+  }
+  console.log(`Total updated Distribution: ${updatedCount}`);
+  return  updatedCount
+}
 
-
-
-    return {
-      updated: true,
-      // updatedCount: updateResult.modifiedCount
-    };
 
   } catch (error) {
     console.error('❌ Error in erpApiCheckDisributionM3Job:', error);
@@ -188,14 +152,14 @@ async function DeleteCartDaily(channel = 'cash') {
 
 
 const startCronJobErpApiCheck = () => {
-  cron.schedule('*/1 * * * *', async () => {
+  cron.schedule('*/10 * * * *', async () => {
     console.log('Running cron job startCronJobErpApiCheck every 10 minutes')
     await erpApiCheckOrderJob()
   })
 }
 
 const startCronJobErpApiCheckDisribution = () => {
-  cron.schedule('*/1 * * * *', async () => {
+  cron.schedule('*/10 * * * *', async () => {
     console.log('Running cron job startCronJobErpApiCheckDisribution every 10 minutes')
     await erpApiCheckDisributionM3Job()
   })
