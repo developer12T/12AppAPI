@@ -8,8 +8,8 @@ const app = express()
 const { startCronJobErpApiCheck,startCronJobErpApiCheckDisribution,startCronJobDeleteCartDaily } = require('../12AppAPI/controllers/sale/conJob');
 
 // startCronJobErpApiCheck()    
-startCronJobErpApiCheckDisribution()
-startCronJobDeleteCartDaily()
+// startCronJobErpApiCheckDisribution()
+// startCronJobDeleteCartDaily()
 // startCronJobOrderToExcel()
 
 app.use(bodyParser.json({ limit: '50mb' }))
