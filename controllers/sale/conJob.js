@@ -104,10 +104,10 @@ async function erpApiCheckOrderJob(channel = 'cash') {
 
 async function erpApiCheckDisributionM3Job(channel = 'cash') {
   try {
-    // const { Order } = getModelsByChannel(channel, null, orderModel);
     const { Distribution } = getModelsByChannel(channel, null, disributionModel);
 
-    const modelSale = await DisributionM3.findAll({
+    // *** ตรวจสอบชื่อ model ให้ถูกต้อง ***
+    const modelSale = await DistributionM3.findAll({
       attributes: [
         'MGTRNR',
         [sequelize.fn('COUNT', sequelize.col('MGTRNR')), 'count']
@@ -115,52 +115,27 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
       group: ['MGTRNR']
     });
 
-    const orderIdList = modelSale.map(row => row.get('MGTRNR'));
+    const orderIdList = modelSale.map(row => row.get('MGTRNR').toString());
 
-    const inMongo = await Distribution.find({ status: 'pending' }).select('orderId')
+    const inMongo = await Distribution.find({ status: 'pending' }).select('orderId');
 
-    const orderInMongo = inMongo.map(item => {
-      return {
-        orderId: item.orderId
-      }
-    })
+    // แนะนำ: map orderId ให้เป็น string ทั้งหมด
+    const orderIdsInMongo = inMongo.map(item => item.orderId.toString());
 
-    const orderidUpdate = orderInMongo
-      .map(item => orderIdList.find(i => i == item.orderId))
-      .filter(Boolean);
+    // filter orderId ที่ตรงกันเท่านั้น
+    const orderidUpdate = orderIdsInMongo.filter(orderId => orderIdList.includes(orderId));
 
+    console.log("orderidUpdate =", orderidUpdate);
+
+    if (!orderidUpdate.length) {
+      console.log('No new order Distribution found in the M3 system');
+      return { updated: false, updatedCount: 0 };
+    }
 
     const updateResult = await Distribution.updateMany(
       { orderId: { $in: orderidUpdate } },
       { $set: { status: 'success', updatedAt: new Date() } }
     );
-
-    if (updateResult.modifiedCount === 0) {
-      console.log('No new order Distribution found in the M3 system');
-      return { updated: false, updatedCount: 0 };
-    }
-
-    // console.log('✅ Updated Distribution Order IDs:', orderIdList);
-
-    // const io = getSocket();
-    // const events = [
-    //   'sale_getSummarybyArea',
-    //   'sale_getSummarybyMonth',
-    //   'sale_getSummarybyRoute',
-    //   'sale_getSummaryItem',
-    //   'sale_getSummarybyGroup',
-    //   'sale_getRouteCheckinAll',
-    //   'sale_getTimelineCheckin',
-    //   'sale_routeTimeline'
-    // ];
-
-    // events.forEach(event => {
-    //   io.emit(event, {
-    //     status: 200,
-    //     message: 'New Update Data',
-    //     updatedCount: updateResult.modifiedCount
-    //   });
-    // });
 
     return {
       updated: true,
@@ -172,6 +147,7 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
     return { error: true, message: error.message };
   }
 }
+
 
 async function DeleteCartDaily(channel = 'cash') {
   try {
