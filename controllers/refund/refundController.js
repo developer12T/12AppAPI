@@ -395,22 +395,38 @@ exports.getRefund = async (req, res) => {
 
     const { startDate, endDate } = rangeDate(period)
 
+
+    let areaQuery = {}
+    if (area.length == 2) {
+      areaQuery.zone = area.slice(0, 2)
+    }
+    else if (area.length == 5) {
+      areaQuery['store.area'] = area;
+    }
+
     let query = {
       type,
-      'store.area': area,
-      createdAt: { $gte: startDate, $lt: endDate }
+      ...areaQuery,
+      // 'store.area': area,
+      // createdAt: { $gte: startDate, $lt: endDate }
+      period: period
     }
 
     if (store) {
       query['store.storeId'] = store
     }
 
-    const refunds = await Refund.find(query)
-      .select(
-        'orderId store.createdAt store.storeId store.name store.address total status'
-      )
-      .lean()
+    const refunds = await Refund.aggregate([
+      {
+        $addFields: {
+          zone: { $substrBytes: ["$store.area", 0, 2] }
+        }
+      },
 
+      { $match: query }
+    ])
+
+    // console.log(refunds)
     if (!refunds || refunds.length === 0) {
       return res.status(404).json({
         status: 404,
@@ -434,6 +450,7 @@ exports.getRefund = async (req, res) => {
 
         return {
           orderId: refund.orderId,
+          area: refund.store.area,
           storeId: refund.store?.storeId || '',
           storeName: refund.store?.name || '',
           storeAddress: refund.store?.address || '',
@@ -498,18 +515,18 @@ exports.getDetail = async (req, res) => {
 
     const listProductChange = order
       ? order.listProduct.map(product => ({
-          id: product.id,
-          name: product.name,
-          group: product.group,
-          brand: product.brand,
-          size: product.size,
-          flavour: product.flavour,
-          qty: product.qty,
-          unit: product.unit,
-          unitName: product.unitName,
-          price: product.price,
-          netTotal: product.netTotal
-        }))
+        id: product.id,
+        name: product.name,
+        group: product.group,
+        brand: product.brand,
+        size: product.size,
+        flavour: product.flavour,
+        qty: product.qty,
+        unit: product.unit,
+        unitName: product.unitName,
+        price: product.price,
+        netTotal: product.netTotal
+      }))
       : []
 
     const totalChange = order ? order.total : 0
