@@ -116,10 +116,23 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
     });
 
     const orderIdList = modelSale.map(row => row.get('MGTRNR'));
-    // console.log(orderIdList)
+
+    const inMongo = await Distribution.find({ status: 'pending' }).select('orderId')
+
+    const orderInMongo = inMongo.map(item => {
+      return {
+        orderId: item.orderId
+      }
+    })
+
+    const orderidUpdate = orderInMongo
+      .map(item => orderIdList.find(i => i == item.orderId))
+      .filter(Boolean);
+
+
     const updateResult = await Distribution.updateMany(
-      { orderId: { $in: orderIdList } },
-      { $set: { status: 'success' } }
+      { orderId: { $in: orderidUpdate } },
+      { $set: { status: 'success', updatedAt: new Date() } }
     );
 
     if (updateResult.modifiedCount === 0) {
@@ -189,30 +202,30 @@ async function DeleteCartDaily(channel = 'cash') {
 
 
 const startCronJobErpApiCheck = () => {
-  cron.schedule('*/10 * * * *', async () => {
+  cron.schedule('*/1 * * * *', async () => {
     console.log('Running cron job startCronJobErpApiCheck every 10 minutes')
     await erpApiCheckOrderJob()
   })
 }
 
 const startCronJobErpApiCheckDisribution = () => {
-  cron.schedule('*/10 * * * *', async () => {
+  cron.schedule('*/1 * * * *', async () => {
     console.log('Running cron job startCronJobErpApiCheckDisribution every 10 minutes')
     await erpApiCheckDisributionM3Job()
   })
 }
 
 const startCronJobDeleteCartDaily = () => {
-cron.schedule(
-  '0 0 * * *',
-  async () => {
-    console.log('Running cron job DeleteCartDaily at 00:00 (Asia/Bangkok)');
-    await DeleteCartDaily();
-  },
-  {
-    timezone: 'Asia/Bangkok'
-  }
-);
+  cron.schedule(
+    '0 0 * * *',
+    async () => {
+      console.log('Running cron job DeleteCartDaily at 00:00 (Asia/Bangkok)');
+      await DeleteCartDaily();
+    },
+    {
+      timezone: 'Asia/Bangkok'
+    }
+  );
 }
 
 
