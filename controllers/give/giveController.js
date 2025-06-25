@@ -232,7 +232,7 @@ exports.checkout = async (req, res) => {
             latitude,
             longitude,
             status: 'pending',
-            statusTH:'รอนำเข้า',
+            statusTH: 'รอนำเข้า',
             listProduct: summary.listProduct,
             totalVat: summary.totalVat,
             totalExVat: summary.totalExVat,
@@ -249,12 +249,12 @@ exports.checkout = async (req, res) => {
         if (!newOrder.store.area) {
 
             return res.status(400).json({
-                status:400,
-                message:'Not found store'
+                status: 400,
+                message: 'Not found store'
             })
         }
 
-        
+
         const calStock = {
             // storeId: refundOrder.store.storeId,
             orderId: newOrder.orderId,
@@ -263,7 +263,7 @@ exports.checkout = async (req, res) => {
             period: period,
             warehouse: newOrder.sale.warehouse,
             status: 'pending',
-            statusTH:'รอนำเข้า',
+            statusTH: 'รอนำเข้า',
             action: "Give",
             type: "Give",
             product: newOrder.listProduct.map(u => {
@@ -392,20 +392,37 @@ exports.getOrder = async (req, res) => {
 
         const { startDate, endDate } = rangeDate(period)
 
+
+        let areaQuery = {}
+        if (area.length == 2) {
+            areaQuery.zone = area.slice(0, 2)
+        }
+        else if (area.length == 5) {
+            areaQuery['store.area'] = area;
+        }
+
         let query = {
             type,
-            'store.area': area,
-            createdAt: { $gte: startDate, $lt: endDate }
+            ...areaQuery,
+            // 'store.area': area,
+            // createdAt: { $gte: startDate, $lt: endDate }
+            period: period
         }
 
         if (store) {
             query['store.storeId'] = store
         }
 
-        const order = await Giveaway.find(query)
-            .select('orderId giveInfo.name store.createdAt store.storeId store.name store.address total status')
-            .lean()
+        const order = await Giveaway.aggregate([
+            {
+                $addFields: {
+                    zone: { $substrBytes: ["$store.area", 0, 2] }
+                }
+            },
 
+            { $match: query }
+        ])
+            console.log(order)
         if (!order || order.length === 0) {
             return res.status(404).json({
                 status: 404,
@@ -416,6 +433,7 @@ exports.getOrder = async (req, res) => {
 
         response = order.map((o) => ({
             orderId: o.orderId,
+            area:o.store.area,
             giveName: o.giveInfo?.name || '',
             storeId: o.store?.storeId || '',
             storeName: o.store?.name || '',

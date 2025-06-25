@@ -439,8 +439,6 @@ exports.getOrder = async (req, res) => {
 
     const { startDate, endDate } = rangeDate(period)
 
-
-
     let areaQuery = {}
     if (area.length == 2) {
       areaQuery.zone = area.slice(0, 2)
@@ -453,7 +451,8 @@ exports.getOrder = async (req, res) => {
       type,
       ...areaQuery,
       // 'store.area': area,
-      createdAt: { $gte: startDate, $lt: endDate }
+      // createdAt: { $gte: startDate, $lt: endDate }
+      period:period
     }
 
     if (store) {
