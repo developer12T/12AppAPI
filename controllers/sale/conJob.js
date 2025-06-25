@@ -121,7 +121,7 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
 
     // แนะนำ: map orderId ให้เป็น string ทั้งหมด
     const orderIdsInMongo = inMongo.map(item => item.orderId.toString());
-
+    console.log(orderIdList.length)
     // filter orderId ที่ตรงกันเท่านั้น
     const orderidUpdate = orderIdsInMongo.filter(orderId => orderIdList.includes(orderId));
 
