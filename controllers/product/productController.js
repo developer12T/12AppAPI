@@ -8,6 +8,7 @@ const stockModel = require('../../models/cash/stock')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { productQuery } = require('../../controllers/queryFromM3/querySctipt')
 const { group } = require('console')
+const { flatMap } = require('lodash')
 
 exports.getProductAll = async (req, res) => {
   try {
@@ -163,7 +164,18 @@ exports.getProduct = async (req, res) => {
       return modifiedProduct
     })
 
-    // console.log('stock', stock)
+    function parseGram(sizeStr) {
+      // support "800 G", "1 KG", "850-P G", "420-N G", "850-S G", "350-P G"
+      let match = sizeStr.match(/^([\d.]+)(?:-[A-Z])?\s*(KG|G|g|kg)?/i);
+      if (!match) return 0;
+      let value = parseFloat(match[1]);
+      let unit = (match[2] || "G").toUpperCase();
+      if (unit === "KG") return value * 1000;
+      return value;
+    }
+
+
+
 
     const data = products
       .map(product => {
@@ -175,10 +187,11 @@ exports.getProduct = async (req, res) => {
         };
       })
       .sort((a, b) => {
-        // สมมติ group เป็น string
+        // เรียง groupCode จากน้อยไปมาก
         if (a.groupCode < b.groupCode) return -1;
         if (a.groupCode > b.groupCode) return 1;
-        return 0;
+        // ถ้า groupCode เท่ากันให้ sort อย่างอื่นต่อ
+        return parseGram(a.size) - parseGram(b.size);
       });
 
 
