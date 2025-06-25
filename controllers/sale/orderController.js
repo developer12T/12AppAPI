@@ -1917,144 +1917,144 @@ exports.getSummarybyGroup = async (req, res) => {
   }
 }
 
-exports.erpApiCheckOrder = async (req, res) => {
-  try {
-    const channel = 'cash';
-    const { Order } = getModelsByChannel(channel, res, orderModel);
+// exports.erpApiCheckOrder = async (req, res) => {
+//   try {
+//     const channel = 'cash';
+//     const { Order } = getModelsByChannel(channel, res, orderModel);
 
-    // 1. ดึง OAORNO ทั้งหมดจาก Sale
-    const modelSale = await Sale.findAll({
-      attributes: [
-        'OAORNO',
-        [sequelize.fn('COUNT', sequelize.col('OAORNO')), 'count']
-      ],
-      group: ['OAORNO']
-    });
+//     // 1. ดึง OAORNO ทั้งหมดจาก Sale
+//     const modelSale = await Sale.findAll({
+//       attributes: [
+//         'OAORNO',
+//         [sequelize.fn('COUNT', sequelize.col('OAORNO')), 'count']
+//       ],
+//       group: ['OAORNO']
+//     });
 
-    const saleId = modelSale.map(row => row.get('OAORNO'));
+//     const saleId = modelSale.map(row => row.get('OAORNO'));
 
-    // 2. หาว่ามี order ไหนไม่อยู่ใน sale (optional ใช้ต่อได้ถ้าต้อง log/เก็บ)
-    const notInModelOrder = await Order.find({
-      orderId: { $nin: saleId }
-    }).select('orderId');
+//     // 2. หาว่ามี order ไหนไม่อยู่ใน sale (optional ใช้ต่อได้ถ้าต้อง log/เก็บ)
+//     const notInModelOrder = await Order.find({
+//       orderId: { $nin: saleId }
+//     }).select('orderId');
 
-    // 3. อัปเดตสถานะ success ให้ order ที่อยู่ใน saleId
-    const updateResult = await Order.updateMany(
-      { orderId: { $in: saleId } },
-      { $set: { status: 'success' } }
-    );
+//     // 3. อัปเดตสถานะ success ให้ order ที่อยู่ใน saleId
+//     const updateResult = await Order.updateMany(
+//       { orderId: { $in: saleId } },
+//       { $set: { status: 'success' } }
+//     );
 
-    if (updateResult.modifiedCount === 0) {
-      console.log('No new order found in the M3 system');
-      return res.status(200).json({
-        message: 'No new order found in the M3 system'
-      });
-    }
+//     if (updateResult.modifiedCount === 0) {
+//       console.log('No new order found in the M3 system');
+//       return res.status(200).json({
+//         message: 'No new order found in the M3 system'
+//       });
+//     }
 
-    // console.log('✅ Updated orderIds:', saleId);
+//     // console.log('✅ Updated orderIds:', saleId);
 
-    // // 4. Broadcast ไปยังทุก event ที่ต้องการ
-    // const io = getSocket();
-    // const events = [
-    //   'sale_getSummarybyArea',
-    //   'sale_getSummarybyMonth',
-    //   'sale_getSummarybyRoute',
-    //   'sale_getSummaryItem',
-    //   'sale_getSummarybyGroup',
-    //   'sale_getRouteCheckinAll',
-    //   'sale_getTimelineCheckin',
-    //   'sale_routeTimeline'
-    // ];
+//     // // 4. Broadcast ไปยังทุก event ที่ต้องการ
+//     // const io = getSocket();
+//     // const events = [
+//     //   'sale_getSummarybyArea',
+//     //   'sale_getSummarybyMonth',
+//     //   'sale_getSummarybyRoute',
+//     //   'sale_getSummaryItem',
+//     //   'sale_getSummarybyGroup',
+//     //   'sale_getRouteCheckinAll',
+//     //   'sale_getTimelineCheckin',
+//     //   'sale_routeTimeline'
+//     // ];
 
-    // events.forEach(event => {
-    //   io.emit(event, {
-    //     status: 200,
-    //     message: 'New Update Data',
-    //     updatedCount: updateResult.modifiedCount
-    //   });
-    // });
+//     // events.forEach(event => {
+//     //   io.emit(event, {
+//     //     status: 200,
+//     //     message: 'New Update Data',
+//     //     updatedCount: updateResult.modifiedCount
+//     //   });
+//     // });
 
-    // 5. ตอบกลับสำเร็จ
-    res.status(200).json({
-      status: 200,
-      message: 'Update status success',
-      updatedCount: updateResult.modifiedCount
-    });
+//     // 5. ตอบกลับสำเร็จ
+//     res.status(200).json({
+//       status: 200,
+//       message: 'Update status success',
+//       updatedCount: updateResult.modifiedCount
+//     });
 
-  } catch (error) {
-    console.error(error);
-    // res.status(500).json({ message: 'Internal server error.' });
-  }
-};
+//   } catch (error) {
+//     console.error(error);
+//     // res.status(500).json({ message: 'Internal server error.' });
+//   }
+// };
 
-exports.erpApiCheckDisributionM3 = async (req, res) => {
-  try {
-    const channel = 'cash';
-    const { Order } = getModelsByChannel(channel, res, orderModel);
-    const { Disribution } = getModelsByChannel(channel, res, disributionModel);
+// exports.erpApiCheckDisributionM3 = async (req, res) => {
+//   try {
+//     const channel = 'cash';
+//     const { Order } = getModelsByChannel(channel, res, orderModel);
+//     const { Disribution } = getModelsByChannel(channel, res, disributionModel);
 
-    // 1. ดึง orderId จาก DisributionM3
-    const modelSale = await DisributionM3.findAll({
-      attributes: [
-        'MGTRNR',
-        [sequelize.fn('COUNT', sequelize.col('MGTRNR')), 'count']
-      ],
-      group: ['MGTRNR']
-    });
+//     // 1. ดึง orderId จาก DisributionM3
+//     const modelSale = await DisributionM3.findAll({
+//       attributes: [
+//         'MGTRNR',
+//         [sequelize.fn('COUNT', sequelize.col('MGTRNR')), 'count']
+//       ],
+//       group: ['MGTRNR']
+//     });
 
-    const orderIdList = modelSale.map(row => row.get('MGTRNR'));
+//     const orderIdList = modelSale.map(row => row.get('MGTRNR'));
 
-    // 2. อัปเดต status: 'success' สำหรับ orderId ที่เจอ
-    const updateResult = await Order.updateMany(
-      { orderId: { $in: orderIdList } },
-      { $set: { status: 'success' } }
-    );
+//     // 2. อัปเดต status: 'success' สำหรับ orderId ที่เจอ
+//     const updateResult = await Order.updateMany(
+//       { orderId: { $in: orderIdList } },
+//       { $set: { status: 'success' } }
+//     );
 
-    // 3. ถ้าไม่มีอะไรอัปเดตเลย → return
+//     // 3. ถ้าไม่มีอะไรอัปเดตเลย → return
 
-    if (updateResult.modifiedCount === 0) {
-      console.log('No new order Distribution found in the M3 system');
-      return res.status(200).json({
-        message: 'No new order Distribution found in the M3 system'
-      });
-    }
+//     if (updateResult.modifiedCount === 0) {
+//       console.log('No new order Distribution found in the M3 system');
+//       return res.status(200).json({
+//         message: 'No new order Distribution found in the M3 system'
+//       });
+//     }
 
 
 
-    console.log('✅ Updated Distribution Order IDs:', orderIdList);
+//     console.log('✅ Updated Distribution Order IDs:', orderIdList);
 
-    // 4. Broadcast ให้ client อัปเดต
-    // const io = getSocket();
-    // const events = [
-    //   'sale_getSummarybyArea',
-    //   'sale_getSummarybyMonth',
-    //   'sale_getSummarybyRoute',
-    //   'sale_getSummaryItem',
-    //   'sale_getSummarybyGroup',
-    //   'sale_getRouteCheckinAll',
-    //   'sale_getTimelineCheckin',
-    //   'sale_routeTimeline'
-    // ];
+//     // 4. Broadcast ให้ client อัปเดต
+//     // const io = getSocket();
+//     // const events = [
+//     //   'sale_getSummarybyArea',
+//     //   'sale_getSummarybyMonth',
+//     //   'sale_getSummarybyRoute',
+//     //   'sale_getSummaryItem',
+//     //   'sale_getSummarybyGroup',
+//     //   'sale_getRouteCheckinAll',
+//     //   'sale_getTimelineCheckin',
+//     //   'sale_routeTimeline'
+//     // ];
 
-    // events.forEach(event => {
-    //   io.emit(event, {
-    //     status: 200,
-    //     message: 'New Update Data',
-    //     updatedCount: updateResult.modifiedCount
-    //   });
-    // });
+//     // events.forEach(event => {
+//     //   io.emit(event, {
+//     //     status: 200,
+//     //     message: 'New Update Data',
+//     //     updatedCount: updateResult.modifiedCount
+//     //   });
+//     // });
 
-    // 5. ตอบกลับ
-    res.status(200).json({
-      status: 200,
-      message: 'Update status success',
-      updatedCount: updateResult.modifiedCount
-    });
-  } catch (error) {
-    console.error('❌ Error in erpApiCheckDisributionM3:', error);
-    // res.status(500).json({ status: 500, message: 'Internal server error' });
-  }
-};
+//     // 5. ตอบกลับ
+//     res.status(200).json({
+//       status: 200,
+//       message: 'Update status success',
+//       updatedCount: updateResult.modifiedCount
+//     });
+//   } catch (error) {
+//     console.error('❌ Error in erpApiCheckDisributionM3:', error);
+//     // res.status(500).json({ status: 500, message: 'Internal server error' });
+//   }
+// };
 
 
 

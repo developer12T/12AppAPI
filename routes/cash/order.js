@@ -1,7 +1,10 @@
 const express = require('express')
 const { getOrder, getDetail, updateStatus, checkout, addSlip, OrderToExcel, getAllOrder, getSummaryItem, getSummarybyRoute, 
     getSummarybyMonth, getSummarybyArea,getSummarybyGroup,erpApiCheck,getSummarybyChoice,getSaleSummaryByStore,getGroup,
-    getSummaryProduct, getProductLimit, erpApiCheckOrder, erpApiCheckDisributionM3,summaryAllProduct,
+    getSummaryProduct, getProductLimit, 
+    // erpApiCheckOrder, 
+    // erpApiCheckDisributionM3,
+    summaryAllProduct,
     summaryDaily
 
  } = require('../../controllers/sale/orderController')
