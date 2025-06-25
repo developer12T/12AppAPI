@@ -107,7 +107,7 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
     const { Distribution } = getModelsByChannel(channel, null, disributionModel);
 
     // *** ตรวจสอบชื่อ model ให้ถูกต้อง ***
-    const modelSale = await DistributionM3.findAll({
+    const modelSale = await DisributionM3.findAll({
       attributes: [
         'MGTRNR',
         [sequelize.fn('COUNT', sequelize.col('MGTRNR')), 'count']
