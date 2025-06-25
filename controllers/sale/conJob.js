@@ -19,6 +19,7 @@ async function erpApiCheckOrderJob(channel = 'cash') {
   try {
     const { Order } = getModelsByChannel(channel, null, orderModel);
 
+    // 1. Get sale order numbers (OAORNO) ที่มีใน Sale
     const modelSale = await Sale.findAll({
       attributes: [
         'OAORNO',
@@ -26,55 +27,62 @@ async function erpApiCheckOrderJob(channel = 'cash') {
       ],
       group: ['OAORNO']
     });
-
     const saleIds = modelSale.map(row => row.get('OAORNO').toString());
 
+    // 2. Get pending orderIds ใน MongoDB
     const inMongo = await Order.find({ status: 'pending' }).select('orderId');
     const orderIdsInMongo = inMongo.map(item => item.orderId.toString());
 
-    // อัปเดตเฉพาะ orderId ที่ตรงกันระหว่างสองชุด
+    // 3. filter ให้เหลือเฉพาะที่อยู่ทั้งสองฝั่ง
     const matchedIds = orderIdsInMongo.filter(id => saleIds.includes(id));
 
+    // 4. อัปเดตทุกตัวที่ match (วนทีละตัว)
     let updatedCount = 0;
-
-    for (const id of matchedIds) {
+    for (const orderId of matchedIds) {
       try {
         const result = await Order.updateOne(
-          { orderId: id },
-          { $set: { status: 'success',statusTH:'สำเร็จ' , updatedAt: new Date() } }
+          { orderId },
+          { $set: { status: 'success', statusTH: 'สำเร็จ', updatedAt: new Date() } }
         );
-        if (result.modifiedCount > 0) {
-          updatedCount++;
-        }
-        // console.log(`orderId: ${id}, modified: ${result.modifiedCount}`);
+        if (result.modifiedCount > 0) updatedCount++;
       } catch (err) {
-        console.error(`Error update orderId: ${id}`, err);
+        console.error(`Error update orderId: ${orderId}`, err);
       }
     }
+
+    // 5. Broadcast event
+    const io = getSocket();
+    const events = [
+      'sale_getSummarybyArea',
+      'sale_getSummarybyMonth',
+      'sale_getSummarybyRoute',
+      'sale_getSummaryItem',
+      'sale_getSummarybyGroup',
+      'sale_getRouteCheckinAll',
+      'sale_getTimelineCheckin',
+      'sale_routeTimeline'
+    ];
+    events.forEach(event => {
+      io.emit(event, {
+        status: 200,
+        message: 'New Update Data'
+      });
+    });
 
     console.log(`Total updated Order: ${updatedCount}`);
     return updatedCount;
 
-
-    // Broadcast
-
-
-    // return {
-    //   updated: true,
-    //   updatedCount: updateResult.modifiedCount
-    // };
   } catch (error) {
     console.error('❌ Error in erpApiCheckOrderJob:', error);
     return { error: true, message: error.message };
   }
 }
 
-
 async function erpApiCheckDisributionM3Job(channel = 'cash') {
   try {
     const { Distribution } = getModelsByChannel(channel, null, disributionModel);
 
-    // *** ตรวจสอบชื่อ model ให้ถูกต้อง ***
+    // 1. Get order numbers (MGTRNR) ที่มีใน DisributionM3
     const modelSale = await DisributionM3.findAll({
       attributes: [
         'MGTRNR',
@@ -82,39 +90,55 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
       ],
       group: ['MGTRNR']
     });
+    const distributionIds = modelSale.map(row => row.get('MGTRNR').toString());
 
-    const orderIdList = modelSale.map(row => row.get('MGTRNR').toString());
-
+    // 2. Get pending orderIds ใน MongoDB
     const inMongo = await Distribution.find({ status: 'pending' }).select('orderId');
-
-    // แนะนำ: map orderId ให้เป็น string ทั้งหมด
     const orderIdsInMongo = inMongo.map(item => item.orderId.toString());
-    // console.log(orderIdList.length)
-    // filter orderId ที่ตรงกันเท่านั้น
-    const orderidUpdate = orderIdsInMongo.filter(orderId => orderIdList.includes(orderId));
 
-    // console.log("orderidUpdate =", orderidUpdate);
+    // 3. filter ให้เหลือเฉพาะที่อยู่ทั้งสองฝั่ง
+    const matchedIds = orderIdsInMongo.filter(id => distributionIds.includes(id));
 
-if (!orderidUpdate.length) {
-  console.log('No new order Distribution found in the M3 system');
-  return { updated: false, updatedCount: 0 };
-} else {
-  let updatedCount = 0;
-  for (const orderId of orderidUpdate) {
-    const result = await Distribution.updateOne(
-      { orderId: orderId },
-      { $set: { 
-        status: 'success',
-        statusTH: 'สำเร็จ',
-        updatedAt: new Date()
-      }}
-    );
-    updatedCount += result.modifiedCount;
-  }
-  console.log(`Total updated Distribution: ${updatedCount}`);
-  return  updatedCount
-}
+    if (!matchedIds.length) {
+      console.log('No new order Distribution found in the M3 system');
+      return { updated: false, updatedCount: 0 };
+    }
 
+    // 4. อัปเดตทุกตัวที่ match (วนทีละตัว)
+    let updatedCount = 0;
+    for (const orderId of matchedIds) {
+      try {
+        const result = await Distribution.updateOne(
+          { orderId },
+          { $set: { status: 'success', statusTH: 'สำเร็จ', updatedAt: new Date() } }
+        );
+        if (result.modifiedCount > 0) updatedCount++;
+      } catch (err) {
+        console.error(`Error update orderId: ${orderId}`, err);
+      }
+    }
+
+    // 5. Broadcast event
+    const io = getSocket();
+    const events = [
+      'sale_getSummarybyArea',
+      'sale_getSummarybyMonth',
+      'sale_getSummarybyRoute',
+      'sale_getSummaryItem',
+      'sale_getSummarybyGroup',
+      'sale_getRouteCheckinAll',
+      'sale_getTimelineCheckin',
+      'sale_routeTimeline'
+    ];
+    events.forEach(event => {
+      io.emit(event, {
+        status: 200,
+        message: 'New Update Data'
+      });
+    });
+
+    console.log(`Total updated Distribution: ${updatedCount}`);
+    return updatedCount;
 
   } catch (error) {
     console.error('❌ Error in erpApiCheckDisributionM3Job:', error);
@@ -152,14 +176,14 @@ async function DeleteCartDaily(channel = 'cash') {
 
 
 const startCronJobErpApiCheck = () => {
-  cron.schedule('*/10 * * * *', async () => {
+  cron.schedule('*/1 * * * *', async () => {
     console.log('Running cron job startCronJobErpApiCheck every 10 minutes')
     await erpApiCheckOrderJob()
   })
 }
 
 const startCronJobErpApiCheckDisribution = () => {
-  cron.schedule('*/10 * * * *', async () => {
+  cron.schedule('*/1 * * * *', async () => {
     console.log('Running cron job startCronJobErpApiCheckDisribution every 10 minutes')
     await erpApiCheckDisributionM3Job()
   })
