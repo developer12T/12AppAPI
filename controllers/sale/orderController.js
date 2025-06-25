@@ -439,9 +439,20 @@ exports.getOrder = async (req, res) => {
 
     const { startDate, endDate } = rangeDate(period)
 
+
+
+    let areaQuery = {}
+    if (area.length == 2) {
+      areaQuery.zone = area.slice(0, 2)
+    }
+    else if (area.length == 5) {
+      areaQuery['store.area'] = area;
+    }
+
     let query = {
       type,
-      'store.area': area,
+      ...areaQuery,
+      // 'store.area': area,
       createdAt: { $gte: startDate, $lt: endDate }
     }
 
@@ -449,11 +460,23 @@ exports.getOrder = async (req, res) => {
       query['store.storeId'] = store
     }
 
-    const order = await Order.find(query)
-      .select(
-        'orderId store.createdAt store.storeId store.name store.address total status statusTH createdAt'
-      )
-      .lean()
+    const order = await Order.aggregate([
+      {
+        $addFields: {
+          zone: { $substrBytes: ["$store.area", 0, 2] }
+        }
+      },
+      { $match: query }
+    ])
+
+    // console.log(order)
+
+
+    // const order = await Order.find(query)
+    //   .select(
+    //     'orderId store.createdAt store.storeId store.name store.address total status statusTH createdAt'
+    //   )
+    //   .lean()
     // console.log("order",order)
     if (!order || order.length === 0) {
       return res.status(404).json({
@@ -465,6 +488,7 @@ exports.getOrder = async (req, res) => {
 
     response = order.map(o => ({
       orderId: o.orderId,
+      area: o.store.area,
       storeId: o.store?.storeId || '',
       storeName: o.store?.name || '',
       storeAddress: o.store?.address || '',
@@ -2884,7 +2908,7 @@ exports.summaryDaily = async (req, res) => {
       sumSummary: sumSummary,
       sumChange: sumChange,
       sumGood: sumGood,
-      sumDamaged:sumDamaged
+      sumDamaged: sumDamaged
     });
   } catch (err) {
     res.status(500).json({ status: 500, message: err.message });
