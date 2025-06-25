@@ -74,7 +74,7 @@ exports.getStore = async (req, res) => {
     let query = {}
 
     if (area) {
-      query.area = { $regex: `^${area}`, $options: 'i' } // ตรงกับคำที่ลงท้ายด้วย area
+      query.area = { $regex: `^${area}`, $options: 'i' } 
     }
 
     if (type === 'new') {
@@ -83,17 +83,21 @@ exports.getStore = async (req, res) => {
         $lt: NextMonth
       }
     } else if (type === 'all') {
-      query.createdAt = {
-        $not: {
-          $gte: startMonth,
-          $lt: NextMonth
-        }
-      }
+      // query.createdAt = {
+      //   $not: {
+      //     $gte: startMonth,
+      //     $lt: NextMonth
+      //   }
+      // }
+      delete query.createdAt;
     }
 
     if (route) {
       query.route = route
     }
+
+    // console.log(query)
+
     const data = await Store.aggregate([
       { $match: query },
       {

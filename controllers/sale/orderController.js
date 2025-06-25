@@ -431,28 +431,28 @@ exports.getOrder = async (req, res) => {
 
     let response = []
 
-    if (!type || !area || !period) {
+    if (!type || !period) {
       return res
         .status(400)
-        .json({ status: 400, message: 'type, area, period are required!' })
+        .json({ status: 400, message: 'type,  period are required!' })
     }
 
     const { startDate, endDate } = rangeDate(period)
-
     let areaQuery = {}
-    if (area.length == 2) {
-      areaQuery.zone = area.slice(0, 2)
+    if (area) {
+      if (area.length == 2) {
+        areaQuery.zone = area.slice(0, 2)
+      }
+      else if (area.length == 5) {
+        areaQuery['store.area'] = area;
+      }
     }
-    else if (area.length == 5) {
-      areaQuery['store.area'] = area;
-    }
-
     let query = {
       type,
       ...areaQuery,
       // 'store.area': area,
       // createdAt: { $gte: startDate, $lt: endDate }
-      period:period
+      period: period
     }
 
     if (store) {

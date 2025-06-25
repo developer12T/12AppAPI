@@ -386,21 +386,22 @@ exports.getOrder = async (req, res) => {
         const channel = req.headers['x-channel'];
         const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel);
 
-        if (!type || !area || !period) {
-            return res.status(400).json({ status: 400, message: 'type, area, period are required!' })
+        if (!type || !period) {
+            return res.status(400).json({ status: 400, message: 'type,  period are required!' })
         }
 
         const { startDate, endDate } = rangeDate(period)
 
 
         let areaQuery = {}
-        if (area.length == 2) {
-            areaQuery.zone = area.slice(0, 2)
+        if (area) {
+            if (area.length == 2) {
+                areaQuery.zone = area.slice(0, 2)
+            }
+            else if (area.length == 5) {
+                areaQuery['store.area'] = area;
+            }
         }
-        else if (area.length == 5) {
-            areaQuery['store.area'] = area;
-        }
-
         let query = {
             type,
             ...areaQuery,
@@ -422,7 +423,7 @@ exports.getOrder = async (req, res) => {
 
             { $match: query }
         ])
-            console.log(order)
+        // console.log(order)
         if (!order || order.length === 0) {
             return res.status(404).json({
                 status: 404,
@@ -433,7 +434,7 @@ exports.getOrder = async (req, res) => {
 
         response = order.map((o) => ({
             orderId: o.orderId,
-            area:o.store.area,
+            area: o.store.area,
             giveName: o.giveInfo?.name || '',
             storeId: o.store?.storeId || '',
             storeName: o.store?.name || '',
