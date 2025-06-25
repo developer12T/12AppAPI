@@ -1951,28 +1951,28 @@ exports.erpApiCheckOrder = async (req, res) => {
       });
     }
 
-    console.log('✅ Updated orderIds:', saleId);
+    // console.log('✅ Updated orderIds:', saleId);
 
-    // 4. Broadcast ไปยังทุก event ที่ต้องการ
-    const io = getSocket();
-    const events = [
-      'sale_getSummarybyArea',
-      'sale_getSummarybyMonth',
-      'sale_getSummarybyRoute',
-      'sale_getSummaryItem',
-      'sale_getSummarybyGroup',
-      'sale_getRouteCheckinAll',
-      'sale_getTimelineCheckin',
-      'sale_routeTimeline'
-    ];
+    // // 4. Broadcast ไปยังทุก event ที่ต้องการ
+    // const io = getSocket();
+    // const events = [
+    //   'sale_getSummarybyArea',
+    //   'sale_getSummarybyMonth',
+    //   'sale_getSummarybyRoute',
+    //   'sale_getSummaryItem',
+    //   'sale_getSummarybyGroup',
+    //   'sale_getRouteCheckinAll',
+    //   'sale_getTimelineCheckin',
+    //   'sale_routeTimeline'
+    // ];
 
-    events.forEach(event => {
-      io.emit(event, {
-        status: 200,
-        message: 'New Update Data',
-        updatedCount: updateResult.modifiedCount
-      });
-    });
+    // events.forEach(event => {
+    //   io.emit(event, {
+    //     status: 200,
+    //     message: 'New Update Data',
+    //     updatedCount: updateResult.modifiedCount
+    //   });
+    // });
 
     // 5. ตอบกลับสำเร็จ
     res.status(200).json({
@@ -2024,25 +2024,25 @@ exports.erpApiCheckDisributionM3 = async (req, res) => {
     console.log('✅ Updated Distribution Order IDs:', orderIdList);
 
     // 4. Broadcast ให้ client อัปเดต
-    const io = getSocket();
-    const events = [
-      'sale_getSummarybyArea',
-      'sale_getSummarybyMonth',
-      'sale_getSummarybyRoute',
-      'sale_getSummaryItem',
-      'sale_getSummarybyGroup',
-      'sale_getRouteCheckinAll',
-      'sale_getTimelineCheckin',
-      'sale_routeTimeline'
-    ];
+    // const io = getSocket();
+    // const events = [
+    //   'sale_getSummarybyArea',
+    //   'sale_getSummarybyMonth',
+    //   'sale_getSummarybyRoute',
+    //   'sale_getSummaryItem',
+    //   'sale_getSummarybyGroup',
+    //   'sale_getRouteCheckinAll',
+    //   'sale_getTimelineCheckin',
+    //   'sale_routeTimeline'
+    // ];
 
-    events.forEach(event => {
-      io.emit(event, {
-        status: 200,
-        message: 'New Update Data',
-        updatedCount: updateResult.modifiedCount
-      });
-    });
+    // events.forEach(event => {
+    //   io.emit(event, {
+    //     status: 200,
+    //     message: 'New Update Data',
+    //     updatedCount: updateResult.modifiedCount
+    //   });
+    // });
 
     // 5. ตอบกลับ
     res.status(200).json({

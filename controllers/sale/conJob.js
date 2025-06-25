@@ -66,25 +66,25 @@ async function erpApiCheckOrderJob(channel = 'cash') {
     } else {
       console.log(`Updated ${updatedCount} order(s)`);
 
-      const io = getSocket();
-      const events = [
-        'sale_getSummarybyArea',
-        'sale_getSummarybyMonth',
-        'sale_getSummarybyRoute',
-        'sale_getSummaryItem',
-        'sale_getSummarybyGroup',
-        'sale_getRouteCheckinAll',
-        'sale_getTimelineCheckin',
-        'sale_routeTimeline'
-      ];
+      // const io = getSocket();
+      // const events = [
+      //   'sale_getSummarybyArea',
+      //   'sale_getSummarybyMonth',
+      //   'sale_getSummarybyRoute',
+      //   'sale_getSummaryItem',
+      //   'sale_getSummarybyGroup',
+      //   'sale_getRouteCheckinAll',
+      //   'sale_getTimelineCheckin',
+      //   'sale_routeTimeline'
+      // ];
 
-      events.forEach(event => {
-        io.emit(event, {
-          status: 200,
-          message: 'New Update Data',
-          updatedCount: updateResult.modifiedCount
-        });
-      });
+      // events.forEach(event => {
+      //   io.emit(event, {
+      //     status: 200,
+      //     message: 'New Update Data',
+      //     updatedCount: updateResult.modifiedCount
+      //   });
+      // });
 
       return { updated: true, updatedCount };
     }
@@ -142,25 +142,25 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
 
     // console.log('✅ Updated Distribution Order IDs:', orderIdList);
 
-    const io = getSocket();
-    const events = [
-      'sale_getSummarybyArea',
-      'sale_getSummarybyMonth',
-      'sale_getSummarybyRoute',
-      'sale_getSummaryItem',
-      'sale_getSummarybyGroup',
-      'sale_getRouteCheckinAll',
-      'sale_getTimelineCheckin',
-      'sale_routeTimeline'
-    ];
+    // const io = getSocket();
+    // const events = [
+    //   'sale_getSummarybyArea',
+    //   'sale_getSummarybyMonth',
+    //   'sale_getSummarybyRoute',
+    //   'sale_getSummaryItem',
+    //   'sale_getSummarybyGroup',
+    //   'sale_getRouteCheckinAll',
+    //   'sale_getTimelineCheckin',
+    //   'sale_routeTimeline'
+    // ];
 
-    events.forEach(event => {
-      io.emit(event, {
-        status: 200,
-        message: 'New Update Data',
-        updatedCount: updateResult.modifiedCount
-      });
-    });
+    // events.forEach(event => {
+    //   io.emit(event, {
+    //     status: 200,
+    //     message: 'New Update Data',
+    //     updatedCount: updateResult.modifiedCount
+    //   });
+    // });
 
     return {
       updated: true,
