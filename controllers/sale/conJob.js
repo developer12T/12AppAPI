@@ -130,16 +130,18 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
     if (!orderidUpdate.length) {
       console.log('No new order Distribution found in the M3 system');
       return { updated: false, updatedCount: 0 };
+    } else {
+      const updateResult = await Distribution.updateMany(
+        { orderId: { $in: orderidUpdate } },
+        { $set: { status: 'success', updatedAt: new Date() } }
+      );
     }
 
-    const updateResult = await Distribution.updateMany(
-      { orderId: { $in: orderidUpdate } },
-      { $set: { status: 'success', updatedAt: new Date() } }
-    );
+
 
     return {
       updated: true,
-      updatedCount: updateResult.modifiedCount
+      // updatedCount: updateResult.modifiedCount
     };
 
   } catch (error) {
