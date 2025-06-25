@@ -71,7 +71,7 @@ exports.getCart = async (req, res) => {
       summary.listPromotion = cart.listPromotion
       summary.listQuota = quota.appliedPromotions
       await cart.save()
-      // console.log(JSON.stringify(summary.listPromotion, null, 2));
+
     }
 
     if (type === 'withdraw') {

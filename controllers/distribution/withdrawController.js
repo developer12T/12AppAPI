@@ -213,10 +213,10 @@ exports.checkout = async (req, res) => {
     //     },
     //     {
     //       $inc: {
-            // 'listProduct.$[elem].stockOutPcs': +factorPcsQty,
-            // 'listProduct.$[elem].balancePcs': -factorPcsQty,
-            // 'listProduct.$[elem].stockOutCtn': +factorCtnQty,
-            // 'listProduct.$[elem].balanceCtn': -factorCtnQty
+    // 'listProduct.$[elem].stockOutPcs': +factorPcsQty,
+    // 'listProduct.$[elem].balancePcs': -factorPcsQty,
+    // 'listProduct.$[elem].stockOutCtn': +factorCtnQty,
+    // 'listProduct.$[elem].balanceCtn': -factorCtnQty
     //       }
     //     },
     //     {
@@ -246,7 +246,7 @@ exports.checkout = async (req, res) => {
       period: period,
       warehouse: newOrder.fromWarehouse,
       status: 'pending',
-      statusTH:'รอนำเข้า',
+      statusTH: 'รอนำเข้า',
       action: "Withdraw",
       type: "Withdraw",
       product: productQty
@@ -285,7 +285,6 @@ exports.getOrder = async (req, res) => {
 
     const { Distribution } = getModelsByChannel(channel, res, distributionModel);
 
-
     let response = []
     if (!type || !area || !period) {
       return res
@@ -298,19 +297,34 @@ exports.getOrder = async (req, res) => {
     // console.log('endDate', endDate)
 
     const status = type === 'history' ? { $ne: 'pending' } : 'pending'
+    let areaQuery = {}
+    if (area.length == 2) {
+      areaQuery.zone = area.slice(0,2)
+    }
+    else if (area.length == 5) {
+      areaQuery.area = area
+    }
 
     let query = {
-      area,
+      ...areaQuery,
       status,
       createdAt: {
         $gte: startDate,
         $lt: endDate
       }
     }
-
-    const order = await Distribution.find(query)
+    console.log(query)
+    const order = await Distribution.aggregate([
+      {
+        $addFields: {
+          zone: { $substrBytes: ["$area", 0, 2] }
+        }
+      },
+      { $match: query }
+    ])
+    // const order = await Distribution.find(query)
     // const order2 = await Distribution.find();
-
+    // console.log(order)
     if (order.length == 0) {
       return res
         .status(404)
@@ -637,7 +651,7 @@ exports.insertWithdrawToErp = async (req, res) => {
 
   const response = await axios.post(
     `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
-     data 
+    data
   );
 
   res.status(200).json({
@@ -696,7 +710,7 @@ exports.insertOneWithdrawToErp = async (req, res) => {
 
   const response = await axios.post(
     `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
-     data 
+    data
   );
 
   res.status(200).json({
