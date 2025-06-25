@@ -125,16 +125,24 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
     // filter orderId ที่ตรงกันเท่านั้น
     const orderidUpdate = orderIdsInMongo.filter(orderId => orderIdList.includes(orderId));
 
-    console.log("orderidUpdate =", orderidUpdate);
+    // console.log("orderidUpdate =", orderidUpdate);
 
     if (!orderidUpdate.length) {
       console.log('No new order Distribution found in the M3 system');
       return { updated: false, updatedCount: 0 };
     } else {
-      // const updateResult = await Distribution.updateMany(
-      //   { orderId: { $in: orderidUpdate } },
-      //   { $set: { status: 'success', updatedAt: new Date() } }
-      // );
+      let updatedCount = 0;
+      for (const orderId of orderidUpdate) {
+        const result = await Distribution.updateOne(
+          { orderId: orderId },
+          { $set: { status: 'success', updatedAt: new Date() } }
+        );
+        updatedCount += result.modifiedCount;
+      }
+      return {
+        updated: updatedCount > 0,
+        updatedCount
+      };
     }
 
 
