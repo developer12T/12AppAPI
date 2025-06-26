@@ -288,42 +288,42 @@ exports.addStore = async (req, res) => {
         'longtitude'
       ]
 
-      // const similarStores = existingStores
-      //   .map(existingStore => {
-      //     let totalSimilarity = 0
-      //     fieldsToCheck.forEach(field => {
-      //       const similarity = calculateSimilarity(
-      //         store[field]?.toString() || '',
-      //         existingStore[field]?.toString() || ''
-      //       )
-      //       totalSimilarity += similarity
-      //     })
+      const similarStores = existingStores
+        .map(existingStore => {
+          let totalSimilarity = 0
+          fieldsToCheck.forEach(field => {
+            const similarity = calculateSimilarity(
+              store[field]?.toString() || '',
+              existingStore[field]?.toString() || ''
+            )
+            totalSimilarity += similarity
+          })
 
-      //     const averageSimilarity = totalSimilarity / fieldsToCheck.length
-      //     return {
-      //       store: existingStore,
-      //       similarity: averageSimilarity
-      //     }
-      //   })
-      //   .filter(result => result.similarity > 70)
-      //   .sort((a, b) => b.similarity - a.similarity)
-      //   .slice(0, 3)
+          const averageSimilarity = totalSimilarity / fieldsToCheck.length
+          return {
+            store: existingStore,
+            similarity: averageSimilarity
+          }
+        })
+        .filter(result => result.similarity > 70)
+        .sort((a, b) => b.similarity - a.similarity)
+        .slice(0, 3)
 
-      // if (similarStores.length > 0) {
-      //   const sanitizedStores = similarStores.map(item => ({
-      //     store: Object.fromEntries(
-      //       Object.entries(item.store._doc || item.store).filter(
-      //         ([key]) => key !== '_id'
-      //       )
-      //     ),
-      //     similarity: item.similarity.toFixed(2)
-      //   }))
-      //   return res.status(200).json({
-      //     status: '200',
-      //     message: 'similar store',
-      //     data: sanitizedStores
-      //   })
-      // }
+      if (similarStores.length > 0) {
+        const sanitizedStores = similarStores.map(item => ({
+          store: Object.fromEntries(
+            Object.entries(item.store._doc || item.store).filter(
+              ([key]) => key !== '_id'
+            )
+          ),
+          similarity: item.similarity.toFixed(2)
+        }))
+        return res.status(200).json({
+          status: '200',
+          message: 'similar store',
+          data: sanitizedStores
+        })
+      }
 
       const uploadedFiles = []
       for (let i = 0; i < files.length; i++) {

@@ -11,7 +11,7 @@ const productModel = require('../../models/cash/product')
 const distributionModel = require('../../models/cash/distribution')
 const userModel = require('../../models/cash/user')
 const stockModel = require('../../models/cash/stock')
-
+const { withdrawQuery } = require('../../controllers/queryFromM3/querySctipt')
 const { getModelsByChannel } = require('../../middleware/channel')
 
 
@@ -718,5 +718,20 @@ exports.insertOneWithdrawToErp = async (req, res) => {
     status: 200,
     message: 'successfully',
     data
+  })
+}
+
+
+
+exports.addFromERPWithdraw = async (req,res) => {
+  const channel = req.headers['x-channel'];
+  const result = withdrawQuery(channel)
+
+
+
+    res.status(200).json({
+    status: 200,
+    message: 'successfully',
+    data:result
   })
 }

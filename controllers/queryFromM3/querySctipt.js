@@ -123,7 +123,7 @@ exports.userQueryManeger = async function (channel, area) {
   }
   await sql.close();
 
-  
+
   return result.recordset
 
 
@@ -798,8 +798,8 @@ LEFT JOIN m_prd_group gp ON a.GRP = gp.GRP_CODE
         name: row.name?.trim() || '',
         groupCode: row.GRP_CODE?.trim() || '',
         group: row.group?.trim() || '',
-        groupCodeM3 : row.groupCodeM3?.trim() || '',
-        groupM3 : row.groupM3?.trim() || '',
+        groupCodeM3: row.groupCodeM3?.trim() || '',
+        groupM3: row.groupM3?.trim() || '',
         brandCode: row.BRAND_CODE?.trim() || '',
         brand: row.brand?.trim() || '',
         size: row.size?.trim() || '',
@@ -960,4 +960,26 @@ exports.groupStoreType = async function () {
   await sql.close();
   return result.recordset
 
+}
+
+
+exports.withdrawQuery = async function (channel) {
+
+const config = {
+  host: process.env.MY_SQL_SERVER,
+  user: process.env.MY_SQL_USER,
+  password: process.env.MY_SQL_PASSWORD,
+  database: process.env.MY_SQL_DATABASE,
+};
+
+const connection = await mysql.createConnection(config);
+
+let rows = [];
+if (channel === 'cash') {
+  [rows] = await connection.execute(`
+    SELECT * FROM pc_withdraws_destination
+  `);
+  await connection.end(); // ปิด connection ที่ถูกต้อง
+  return rows; // คืนค่า rows ตรง ๆ (array ของ row)
+}
 }

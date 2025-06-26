@@ -61,10 +61,10 @@ exports.reportCheck = async (req, res) => {
       createdAt: { $gte: startStr, $lte: endStr }
     }).lean()
 
-    const withdraws = await Withdraw.find({
-      area: { $in: areaId },
-      createdAt: { $gte: startStr, $lte: endStr }
-    }).lean()
+    // const withdraws = await Withdraw.find({
+    //   area: { $in: areaId },
+    //   createdAt: { $gte: startStr, $lte: endStr }
+    // }).lean()
 
     const distributions = await Distribution.find({
       area: { $in: areaId },
@@ -172,10 +172,10 @@ exports.reportCheckExcel = async (req, res) => {
       createdAt: { $gte: startStr, $lte: endStr }
     }).lean()
 
-    const withdraws = await Withdraw.find({
-      area: { $in: areaId },
-      createdAt: { $gte: startStr, $lte: endStr }
-    }).lean()
+    // const withdraws = await Withdraw.find({
+    //   area: { $in: areaId },
+    //   createdAt: { $gte: startStr, $lte: endStr }
+    // }).lean()
 
     const distributions = await Distribution.find({
       area: { $in: areaId },
