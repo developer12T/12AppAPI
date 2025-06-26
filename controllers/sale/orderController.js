@@ -2961,6 +2961,16 @@ exports.saleReport = async (req, res) => {
 
 
   const data = dataOrder.map(item => {
+    let paymentMethodTH = ''
+    if (item.paymentMethod === 'cash') {
+      paymentMethodTH = 'เงินสด'
+    } 
+    else if (item.paymentMethod === 'qr') {
+      paymentMethodTH = 'QR Payment'
+    }
+    else {
+      paymentMethodTH = item.paymentMethod
+    }
     return {
       type: item.type,
       orderId: item.orderId,
@@ -2970,7 +2980,7 @@ exports.saleReport = async (req, res) => {
       storeName: item.store.name,
       storeTaxId: item.store.taxId,
       total: item.total,
-      paymentMethod: item.paymentMethod
+      paymentMethod: paymentMethodTH
     }
   })
 
