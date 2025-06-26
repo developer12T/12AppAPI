@@ -5,6 +5,7 @@
 // } = require('../../models/cash/stock')
 // const { User } = require('../../models/cash/user')
 // const { Product } = require('../../models/cash/product')
+const { generateOrderId } = require('../../utilities/genetateId')
 const path = require('path')
 const errorEndpoint = require('../../middleware/errorEndpoint')
 const currentFilePath = path.basename(__filename)
@@ -20,9 +21,12 @@ const distributionModel = require('../../models/cash/distribution')
 const productModel = require('../../models/cash/product')
 const stockModel = require('../../models/cash/stock')
 const orderModel = require('../../models/cash/sale')
+const cartModel = require('../../models/cash/cart')
 const refundModel = require('../../models/cash/refund')
 const { getModelsByChannel } = require('../../middleware/channel')
-
+const {
+  summaryOrder,
+} = require('../../utilities/summary')
 const fetchArea = async warehouse => {
   try {
     const WarehouseData = await Warehouse.findAll({
@@ -864,9 +868,37 @@ exports.getStockQty = async (req, res) => {
   const { Stock } = getModelsByChannel(channel, res, stockModel);
   const { Product } = getModelsByChannel(channel, res, productModel);
 
-  const dataStock = await Stock.find({ area: area, period: period }).select(
-    'listProduct -_id'
-  );
+  let areaQuery = {}
+  if (area) {
+    if (area.length == 2) {
+      areaQuery.zone = area.slice(0, 2)
+    }
+    else if (area.length == 5) {
+      areaQuery.area = area
+    }
+  }
+
+  // const dataStock = await Stock.find({ area: area, period: period }).select(
+  //   'listProduct -_id'
+  // );
+
+  const matchQuery = { ...areaQuery, period };
+  const dataStock = await Stock.aggregate([
+    {
+      $addFields: {
+        zone: { $substrBytes: ["$area", 0, 2] }
+      }
+    },
+    { $match: matchQuery },
+    {
+      $project: {
+        listProduct: 1,
+        _id: 0
+      }
+    }
+  ])
+
+
   if (dataStock.length === 0) {
     return res.status(404).json({
       status: 404,
@@ -874,11 +906,51 @@ exports.getStockQty = async (req, res) => {
     });
   }
 
-  const dataStockTran = dataStock[0];
-  const productId = dataStockTran.listProduct.map(item => item.productId);
-  const dataProduct = await Product.find({ id: { $in: productId } }).select(
+  const dataStockTran = dataStock;
+  const productIdList = dataStockTran.flatMap(item =>
+    item.listProduct.map(u => u.productId)
+  );
+
+  const uniqueProductId = [...new Set(productIdList)];
+
+  // console.log(uniqueProductId)
+  const allProducts = dataStockTran.flatMap(item => item.listProduct);
+
+  // 2. รวมยอดแต่ละ field ตาม productId
+  const sumById = {}; // { productId: { ...sum } }
+  for (const u of allProducts) {
+    const id = u.productId;
+    if (!sumById[id]) {
+      // clone อันแรก (หรือสร้าง object เปล่า)
+      sumById[id] = {
+        id: id,
+        stockPcs: u.stockPcs || 0,
+        stockInPcs: u.stockInPcs || 0,
+        stockOutPcs: u.stockOutPcs || 0,
+        balancePcs: u.balancePcs || 0,
+        stockCtn: u.stockCtn || 0,
+        stockInCtn: u.stockInCtn || 0,
+        stockOutCtn: u.stockOutCtn || 0,
+        balanceCtn: u.balanceCtn || 0
+      };
+    } else {
+      sumById[id].stockPcs += u.stockPcs || 0;
+      sumById[id].stockInPcs += u.stockInPcs || 0;
+      sumById[id].stockOutPcs += u.stockOutPcs || 0;
+      sumById[id].balancePcs += u.balancePcs || 0;
+      sumById[id].stockCtn += u.stockCtn || 0;
+      sumById[id].stockInCtn += u.stockInCtn || 0;
+      sumById[id].stockOutCtn += u.stockOutCtn || 0;
+      sumById[id].balanceCtn += u.balanceCtn || 0;
+    }
+  }
+
+  const productSum = Object.values(sumById);
+
+  const dataProduct = await Product.find({ id: { $in: uniqueProductId } }).select(
     'id name listUnit'
   );
+
 
   let data = [];
   let summaryStock = 0;
@@ -891,16 +963,15 @@ exports.getStockQty = async (req, res) => {
   let summaryStockOutPcs = 0;
   let summaryStockBalPcs = 0;
 
-  for (const stockItem of dataStockTran.listProduct) {
-    const productDetail = dataProduct.find(u => u.id == stockItem.productId);
+  for (const stockItem of productSum) {
+    const productDetail = dataProduct.find(u => u.id == stockItem.id);
     if (!productDetail) continue;
 
-    // === สร้าง listUnit (ตามโค้ดเดิม) ===
+    const pcsMain = stockItem.stockPcs
     let stock = stockItem.stockPcs;
     let stockIn = stockItem.stockInPcs;
     let stockOut = stockItem.stockOutPcs;
     let balance = stockItem.balancePcs;
-
     summaryStockPcs += stockItem.stockPcs || 0;
     summaryStockInPcs += stockItem.stockInPcs || 0;
     summaryStockOutPcs += stockItem.stockOutPcs || 0;
@@ -927,7 +998,6 @@ exports.getStockQty = async (req, res) => {
       summaryStockBal += (balanceQty || 0) * sale;
 
 
-
       return {
         unit: u.unit,
         unitName: u.name,
@@ -939,9 +1009,9 @@ exports.getStockQty = async (req, res) => {
     });
 
     const finalProductStock = {
-      productId: stockItem.productId,
+      productId: stockItem.id,
       productName: productDetail.name,
-      pcsMain: stockItem.stockPcs,
+      pcsMain: pcsMain,
       listUnit: listUnitStock
     };
 
@@ -1323,92 +1393,87 @@ exports.getStockQtyDetail = async (req, res) => {
 
 
 exports.checkout = async (req, res) => {
-    try {
-        const { type, area, period, storeId, giveId, note, latitude, longitude, shipping } = req.body
-        const channel = req.headers['x-channel'];
-        const { Cart } = getModelsByChannel(channel, res, cartModel);
-        const { User } = getModelsByChannel(channel, res, userModel);
-        const { Product } = getModelsByChannel(channel, res, productModel)
+  try {
+    const { type, area, period, storeId, giveId, note, latitude, longitude, shipping } = req.body
+    const channel = req.headers['x-channel'];
+    const { Cart } = getModelsByChannel(channel, res, cartModel);
+    const { User } = getModelsByChannel(channel, res, userModel);
+    const { Product } = getModelsByChannel(channel, res, productModel)
 
-        const { Givetype } = getModelsByChannel(channel, res, giveawaysModel);
-        const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel);
-        const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(channel, res, stockModel);
+    const { Stock, StockMovementLog, StockMovement, AdjustStock } = getModelsByChannel(channel, res, stockModel);
 
 
 
-        if (!type || !area || !storeId || !giveId || !shipping) {
-            return res.status(400).json({ status: 400, message: 'Missing required fields!' })
-        }
-
-        const cart = await Cart.findOne({ type, area, storeId })
-        if (!cart || cart.listProduct.length === 0) {
-            return res.status(404).json({ status: 404, message: 'Cart is empty!' })
-        }
-
-        const sale = await User.findOne({ area }).select('firstName surName warehouse tel saleCode salePayer')
-        if (!sale) {
-            return res.status(404).json({ status: 404, message: 'Sale user not found!' })
-        }
-
-        const give = await Givetype.findOne({ giveId }).select('-_id giveId name type remark dept')
-        if (!give) {
-            return res.status(404).json({ status: 404, message: 'Give type not found!' })
-        }
-
-        const orderId = await generateGiveawaysId(area, sale.warehouse, channel, res)
-
-        const summary = await summaryGive(cart, channel, res)
-
-
-
-        const newOrder = new Giveaway({
-            type,
-            orderId,
-            giveInfo: give,
-            sale: {
-                saleCode: sale.saleCode,
-                salePayer: sale.salePayer,
-                name: `${sale.firstName} ${sale.surName}`,
-                tel: sale.tel || '',
-                warehouse: sale.warehouse
-            },
-            store: {
-                storeId: summary.store.storeId,
-                name: summary.store.name,
-                type: summary.store.type,
-                address: summary.store.address,
-                taxId: summary.store.taxId,
-                tel: summary.store.tel,
-                area: summary.store.area,
-                zone: summary.store.zone
-            },
-            note,
-            latitude,
-            longitude,
-            status: 'pending',
-            statusTH: 'รอนำเข้า',
-            listProduct: summary.listProduct,
-            totalVat: summary.totalVat,
-            totalExVat: summary.totalExVat,
-            total: summary.total,
-            shipping: {
-                shippingId: "",
-                address: ""
-            },
-            createdBy: sale.username,
-            period: period,
-        })
-
-
-
-
-
-        
-    
-    } catch (error) {
-        console.error(error)
-        res.status(500).json({ status: '500', message: error.message })
+    if (!type || !area || !storeId) {
+      return res.status(400).json({ status: 400, message: 'Missing required fields!' })
     }
+
+    const cart = await Cart.findOne({ type, area, storeId })
+    if (!cart || cart.listProduct.length === 0) {
+      return res.status(404).json({ status: 404, message: 'Cart is empty!' })
+    }
+
+    const sale = await User.findOne({ area }).select('firstName surName warehouse tel saleCode salePayer')
+    if (!sale) {
+      return res.status(404).json({ status: 404, message: 'Sale user not found!' })
+    }
+
+    const orderId = await generateOrderId(area, sale.warehouse, channel, res)
+    const summary = await summaryOrder(cart, channel, res)
+
+    // new AdjustStock
+
+    const newOrder = ({
+      type,
+      orderId,
+      sale: {
+        saleCode: sale.saleCode,
+        salePayer: sale.salePayer,
+        name: `${sale.firstName} ${sale.surName}`,
+        tel: sale.tel || '',
+        warehouse: sale.warehouse
+      },
+      store: {
+        storeId: summary.store.storeId,
+        name: summary.store.name,
+        type: summary.store.type,
+        address: summary.store.address,
+        taxId: summary.store.taxId,
+        tel: summary.store.tel,
+        area: summary.store.area,
+        zone: summary.store.zone
+      },
+      note,
+      latitude,
+      longitude,
+      status: 'pending',
+      statusTH: 'รอนำเข้า',
+      listProduct: summary.listProduct,
+      totalVat: summary.totalVat,
+      totalExVat: summary.totalExVat,
+      total: summary.total,
+      shipping: {
+        shippingId: "",
+        address: ""
+      },
+      createdBy: sale.username,
+      period: period,
+    })
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'Sucessful',
+      newOrder
+    })
+
+
+
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
 }
 
 
@@ -1422,28 +1487,28 @@ exports.checkout = async (req, res) => {
 
 exports.addIncidentStock = async (req, res) => {
 
-    const { orderId, area, saleCode,
-      period, note, listImage, listProduct
-     } = req.body;
-    const channel = req.headers['x-channel'];
-    const { Stock, IncidentStock } = getModelsByChannel(channel, res, stockModel)
+  const { orderId, area, saleCode,
+    period, note, listImage, listProduct
+  } = req.body;
+  const channel = req.headers['x-channel'];
+  const { Stock, IncidentStock } = getModelsByChannel(channel, res, stockModel)
 
-    const data = {
-      orderId:orderId,
-      area:area,
-      saleCode:saleCode,
-      period:period,
-      note:note,
-      listImage:listImage,
-      listProduct:listProduct
-    }
+  const data = {
+    orderId: orderId,
+    area: area,
+    saleCode: saleCode,
+    period: period,
+    note: note,
+    listImage: listImage,
+    listProduct: listProduct
+  }
 
-    await IncidentStock.create(data)
+  await IncidentStock.create(data)
 
-  
+
   res.status(200).json({
-    status:200,
-    message:'successfully'
+    status: 200,
+    message: 'successfully'
   })
 
 

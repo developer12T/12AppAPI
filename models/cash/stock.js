@@ -133,7 +133,7 @@ const incidentStockImageSchema = mongoose.Schema({
 
 
 const adjustStockSchema = new mongoose.Schema({
-  orderRef: { type: String, required: true },
+  orederId: { type: String, required: true },
   stockId :{ type: String, required: true },
   area: { type: String, required: true },
   saleCode: { type: String, required: true },

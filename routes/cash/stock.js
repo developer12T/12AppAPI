@@ -16,7 +16,8 @@ const {
   getStockQty,
   getWeightProduct,
   getStockQtyDetail,
-  addIncidentStock
+  addIncidentStock,
+  checkout
 } = require('../../controllers/stock/stockController')
 
 const router = express.Router()
@@ -40,5 +41,5 @@ router.post('/getWeightProduct', getWeightProduct)
 // router.get('/movement', available)
 router.post('/getStockQtyDetail', getStockQtyDetail)
 router.post('/addIncidentStock', addIncidentStock)
-
+router.post('/checkout', checkout)
 module.exports = router
