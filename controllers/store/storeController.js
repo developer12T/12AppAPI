@@ -268,12 +268,12 @@ exports.addStore = async (req, res) => {
         })
       }
 
-      // const existingStores = await Store.find(
-      //   {},
-      //   { _id: 0, __v: 0, idIndex: 0 },
-      //   {area : store.area}
+      const existingStores = await Store.find(
+        {},
+        { _id: 0, __v: 0, idIndex: 0 },
+        {area : store.area}
 
-      // )
+      )
       // console.log(store.area)
       const fieldsToCheck = [
         'name',
