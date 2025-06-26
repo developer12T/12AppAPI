@@ -152,20 +152,32 @@ async function DeleteCartDaily(channel = 'cash') {
     const { Cart } = getModelsByChannel(channel, null, cartModel);
 
     const now = new Date();
-    // หาค่า 'วันนี้' 00:00 (เวลาไทย)
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    const todayStartStr = `${yyyy}-${mm}-${dd}T00:00:00.000+07:00`;
-    const todayStartUtc = new Date(todayStartStr);
+    const tzOffsetMs = 7 * 60 * 60 * 1000; // เวลาไทย +7
 
-    // console.log(todayStartUtc); // debug
+    const bangkokNow = new Date(now.getTime() + tzOffsetMs);
+    const yyyy = bangkokNow.getFullYear();
+    const mm = bangkokNow.getMonth();
+    const dd = bangkokNow.getDate();
+
+    const thaiStart = new Date(Date.UTC(yyyy, mm, dd, 0, 0, 0) - tzOffsetMs);
+    const thaiEnd = new Date(Date.UTC(yyyy, mm, dd + 1, 0, 0, 0) - tzOffsetMs);
+
+    // debug
+    // console.log('thaiStart:', thaiStart.toISOString());
+    // console.log('thaiEnd:', thaiEnd.toISOString());
 
     const result = await Cart.deleteMany({
-      createdAt: { $lt: todayStartUtc }
+      createdAt: { $lt: thaiStart }
     });
 
-    console.log(`[DeleteCartDaily] Deleted cart for date ${yyyy}-${mm}-${dd} (ไทย) | count: ${result.deletedCount}`);
+    // const data = await Cart.find({
+    //   createdAt: { $lt: thaiStart }
+    // })
+
+    // console.log(data)
+
+
+
 
   } catch (error) {
     console.error('❌ Error in DeleteCartDaily:', error);

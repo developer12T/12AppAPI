@@ -27,25 +27,23 @@ exports.reportCheck = async (req, res) => {
     const { Refund } = getModelsByChannel(channel, res, refundModel)
     const { Withdraw, Distribution } = getModelsByChannel(channel, res, DistributionModel)
 
-    function addHours(date, hours) {
-      return new Date(date.getTime() + hours * 60 * 60 * 1000)
-    }
-
-    let startStr, endStr;
-
+    let startDate, endDate;
     if (!start || !end) {
-      // ถ้าไม่ส่ง start/end: ให้ใช้วันนี้ของไทย (00:00-23:59 เวลาไทย)
-      const today = new Date();
-      const yyyy = today.getFullYear();
-      const mm = String(today.getMonth() + 1).padStart(2, '0');
-      const dd = String(today.getDate()).padStart(2, '0');
+      // วันนี้ของไทย (00:00-23:59 ไทย)
+      const now = new Date();
+      const tzOffsetMs = 7 * 60 * 60 * 1000;
+      const bangkokNow = new Date(now.getTime() + tzOffsetMs);
+
+      const yyyy = bangkokNow.getFullYear();
+      const mm = String(bangkokNow.getMonth() + 1).padStart(2, '0');
+      const dd = String(bangkokNow.getDate()).padStart(2, '0');
       const todayStr = `${yyyy}-${mm}-${dd}`;
-      startStr = new Date(`${todayStr}T00:00:00.000+07:00`);
-      endStr = new Date(`${todayStr}T23:59:59.999+07:00`);
+      startDate = toBangkokStartUtc(todayStr);
+      endDate = toBangkokEndUtc(todayStr);
     } else {
-      // ถ้าระบุ start/end: ให้ใช้ช่วงวันตามที่ส่งมา (ตามเวลาไทย)
-      startStr = new Date(`${start}T00:00:00.000+07:00`);
-      endStr = new Date(`${end}T23:59:59.999+07:00`);
+      // กรณีส่ง start/end มาเป็น yyyy-mm-dd
+      startDate = toBangkokStartUtc(start);
+      endDate = toBangkokEndUtc(end);
     }
 
     const user = await User.find({ role: 'sale' }).select('area')
@@ -137,25 +135,23 @@ exports.reportCheckExcel = async (req, res) => {
     const { Refund } = getModelsByChannel(channel, res, refundModel)
     const { Withdraw, Distribution } = getModelsByChannel(channel, res, DistributionModel)
 
-    function addHours(date, hours) {
-      return new Date(date.getTime() + hours * 60 * 60 * 1000)
-    }
-
-    let startStr, endStr;
-
+    let startDate, endDate;
     if (!start || !end) {
-      // ถ้าไม่ส่ง start/end: ให้ใช้วันนี้ของไทย (00:00-23:59 เวลาไทย)
-      const today = new Date();
-      const yyyy = today.getFullYear();
-      const mm = String(today.getMonth() + 1).padStart(2, '0');
-      const dd = String(today.getDate()).padStart(2, '0');
+      // วันนี้ของไทย (00:00-23:59 ไทย)
+      const now = new Date();
+      const tzOffsetMs = 7 * 60 * 60 * 1000;
+      const bangkokNow = new Date(now.getTime() + tzOffsetMs);
+
+      const yyyy = bangkokNow.getFullYear();
+      const mm = String(bangkokNow.getMonth() + 1).padStart(2, '0');
+      const dd = String(bangkokNow.getDate()).padStart(2, '0');
       const todayStr = `${yyyy}-${mm}-${dd}`;
-      startStr = new Date(`${todayStr}T00:00:00.000+07:00`);
-      endStr = new Date(`${todayStr}T23:59:59.999+07:00`);
+      startDate = toBangkokStartUtc(todayStr);
+      endDate = toBangkokEndUtc(todayStr);
     } else {
-      // ถ้าระบุ start/end: ให้ใช้ช่วงวันตามที่ส่งมา (ตามเวลาไทย)
-      startStr = new Date(`${start}T00:00:00.000+07:00`);
-      endStr = new Date(`${end}T23:59:59.999+07:00`);
+      // กรณีส่ง start/end มาเป็น yyyy-mm-dd
+      startDate = toBangkokStartUtc(start);
+      endDate = toBangkokEndUtc(end);
     }
 
 
