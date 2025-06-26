@@ -678,7 +678,7 @@ exports.insertOneWithdrawToErp = async (req, res) => {
     const uniqueCount = new Set(MGNUGL).size;
 
     const dataTran = {
-      Hcase: 0,
+      Hcase: 1,
       orderNo: item.orderId,
       statusLow: '22',
       statusHigh: '22',
@@ -692,7 +692,7 @@ exports.insertOneWithdrawToErp = async (req, res) => {
       MGNUGL: uniqueCount,
       MGDEPT: '',
       remark: '',
-      item: item.listProduct.map(u => {
+      items: item.listProduct.map(u => {
         return {
           itemCode: u.id,
           itemStatus: '22',

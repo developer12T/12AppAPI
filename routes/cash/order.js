@@ -5,7 +5,8 @@ const { getOrder, getDetail, updateStatus, checkout, addSlip, OrderToExcel, getA
     // erpApiCheckOrder, 
     // erpApiCheckDisributionM3,
     summaryAllProduct,
-    summaryDaily
+    summaryDaily,
+    saleReport
 
  } = require('../../controllers/sale/orderController')
 
@@ -35,5 +36,5 @@ router.get('/getSummaryProduct', getSummaryProduct)
 router.get('/getProductLimit', getProductLimit)
 router.get('/summaryAllProduct', summaryAllProduct)
 router.get('/summaryDaily', summaryDaily)
-
+router.get('/saleReport', saleReport)
 module.exports = router
