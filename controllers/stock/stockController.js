@@ -1322,10 +1322,129 @@ exports.getStockQtyDetail = async (req, res) => {
 };
 
 
-exports.addStockOrder = async (req, res) => {
+exports.checkout = async (req, res) => {
+    try {
+        const { type, area, period, storeId, giveId, note, latitude, longitude, shipping } = req.body
+        const channel = req.headers['x-channel'];
+        const { Cart } = getModelsByChannel(channel, res, cartModel);
+        const { User } = getModelsByChannel(channel, res, userModel);
+        const { Product } = getModelsByChannel(channel, res, productModel)
+
+        const { Givetype } = getModelsByChannel(channel, res, giveawaysModel);
+        const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel);
+        const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(channel, res, stockModel);
 
 
 
+        if (!type || !area || !storeId || !giveId || !shipping) {
+            return res.status(400).json({ status: 400, message: 'Missing required fields!' })
+        }
+
+        const cart = await Cart.findOne({ type, area, storeId })
+        if (!cart || cart.listProduct.length === 0) {
+            return res.status(404).json({ status: 404, message: 'Cart is empty!' })
+        }
+
+        const sale = await User.findOne({ area }).select('firstName surName warehouse tel saleCode salePayer')
+        if (!sale) {
+            return res.status(404).json({ status: 404, message: 'Sale user not found!' })
+        }
+
+        const give = await Givetype.findOne({ giveId }).select('-_id giveId name type remark dept')
+        if (!give) {
+            return res.status(404).json({ status: 404, message: 'Give type not found!' })
+        }
+
+        const orderId = await generateGiveawaysId(area, sale.warehouse, channel, res)
+
+        const summary = await summaryGive(cart, channel, res)
+
+
+
+        const newOrder = new Giveaway({
+            type,
+            orderId,
+            giveInfo: give,
+            sale: {
+                saleCode: sale.saleCode,
+                salePayer: sale.salePayer,
+                name: `${sale.firstName} ${sale.surName}`,
+                tel: sale.tel || '',
+                warehouse: sale.warehouse
+            },
+            store: {
+                storeId: summary.store.storeId,
+                name: summary.store.name,
+                type: summary.store.type,
+                address: summary.store.address,
+                taxId: summary.store.taxId,
+                tel: summary.store.tel,
+                area: summary.store.area,
+                zone: summary.store.zone
+            },
+            note,
+            latitude,
+            longitude,
+            status: 'pending',
+            statusTH: 'รอนำเข้า',
+            listProduct: summary.listProduct,
+            totalVat: summary.totalVat,
+            totalExVat: summary.totalExVat,
+            total: summary.total,
+            shipping: {
+                shippingId: "",
+                address: ""
+            },
+            createdBy: sale.username,
+            period: period,
+        })
+
+
+
+
+
+        
+    
+    } catch (error) {
+        console.error(error)
+        res.status(500).json({ status: '500', message: error.message })
+    }
+}
+
+
+
+
+
+
+
+
+
+
+exports.addIncidentStock = async (req, res) => {
+
+    const { orderId, area, saleCode,
+      period, note, listImage, listProduct
+     } = req.body;
+    const channel = req.headers['x-channel'];
+    const { Stock, IncidentStock } = getModelsByChannel(channel, res, stockModel)
+
+    const data = {
+      orderId:orderId,
+      area:area,
+      saleCode:saleCode,
+      period:period,
+      note:note,
+      listImage:listImage,
+      listProduct:listProduct
+    }
+
+    await IncidentStock.create(data)
 
   
+  res.status(200).json({
+    status:200,
+    message:'successfully'
+  })
+
+
 }

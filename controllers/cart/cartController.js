@@ -122,10 +122,10 @@ exports.addProduct = async (req, res) => {
       })
     }
 
-    if ((type === 'sale' || type === 'refund' || type === 'give') && !storeId) {
+    if ((type === 'sale' || type === 'refund' || type === 'give' || type === 'adjuststock') && !storeId) {
       return res.status(400).json({
         status: 400,
-        message: 'storeId is required for sale or refund or give!'
+        message: 'storeId is required for sale or refund or give or adjuststock!'
       })
     }
 

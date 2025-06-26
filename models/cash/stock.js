@@ -101,12 +101,63 @@ const stockMovementLogSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 })
 
+const listincidentStockProductSchema = new mongoose.Schema({
+  id: { type: String, require: true },
+  name: { type: String, require: true },
+  lot: { type: String, require: true },
+  groupCode: { type: String, require: true },
+  group: { type: String, require: true },
+  brandCode: { type: String, require: true },
+  brand: { type: String, require: true },
+  size: { type: String, require: true },
+  flavourCode: { type: String, require: true },
+  flavour: { type: String, require: true },
+  qty: { type: Number, require: true },
+  unit: { type: String, require: true },
+  unitName: { type: String, require: true },
+  qtyPcs: { type: Number, require: true },
+  price: { type: Number, require: true },
+  subtotal: { type: Number, require: true },
+  discount: { type: Number, require: true, default: 0 },
+  netTotal: { type: Number, require: true }
+})
+
+
+
+const incidentStockImageSchema = mongoose.Schema({
+  name: { type: String },
+  path: { type: String },
+  type: { type: String },
+})
+
+
+
+const adjustStockSchema = new mongoose.Schema({
+  orderRef: { type: String, required: true },
+  stockId :{ type: String, required: true },
+  area: { type: String, required: true },
+  saleCode: { type: String, required: true },
+  period: { type: String, required: true },
+  note: { type: String, default: '' },
+  listImage: [incidentStockImageSchema],
+  listProduct: [listincidentStockProductSchema],
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+},{
+  timestamps : true
+})
+
+
+
+
+
 module.exports = (conn) => {
   return {
     // Stock: conn.model('Stock', stockSchema),
     Stock: conn.model('stockTest', stockSchema, 'stockTest'),
     StockMovementLog: conn.model('stockMovementLog', stockMovementLogSchema, 'stockmovementlogs'),
-    StockMovement: conn.model('StockMovement', stockMovementSchema)
+    StockMovement: conn.model('StockMovement', stockMovementSchema),
+    AdjustStock: conn.model('adjustStock', adjustStockSchema,'adjustStocks')
   };
 };
 

@@ -104,7 +104,7 @@ exports.userQueryManeger = async function (channel, area) {
     ${hash} AS password,
     '' AS tel,
      CASE
-    WHEN Col_o_JobTitle IN ('Developer', 'IT Support', 'Sale_Manager') THEN 'All'
+    WHEN Col_o_JobTitle IN ('Developer', 'IT Support', 'Sale_Manager') THEN ''
     ELSE Col_o_Address
   END AS zone ,
     '' AS area,
