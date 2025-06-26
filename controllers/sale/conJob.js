@@ -188,14 +188,14 @@ async function DeleteCartDaily(channel = 'cash') {
 
 
 const startCronJobErpApiCheck = () => {
-  cron.schedule('*/1 * * * *', async () => {
+  cron.schedule('*/10 * * * *', async () => {
     console.log('Running cron job startCronJobErpApiCheck every 10 minutes')
     await erpApiCheckOrderJob()
   })
 }
 
 const startCronJobErpApiCheckDisribution = () => {
-  cron.schedule('*/1 * * * *', async () => {
+  cron.schedule('*/10 * * * *', async () => {
     console.log('Running cron job startCronJobErpApiCheckDisribution every 10 minutes')
     await erpApiCheckDisributionM3Job()
   })
