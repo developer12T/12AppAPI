@@ -1678,7 +1678,7 @@ exports.getSummarybyArea = async (req, res) => {
       groupStage
     ])
 
-    console.log("modelRouteValue", modelRouteValue)
+    // console.log("modelRouteValue", modelRouteValue)
 
     const haveArea = [...new Set(modelRouteValue.map(i => i.area))]
     otherModelRoute = await Route.aggregate([
@@ -2916,82 +2916,94 @@ exports.summaryDaily = async (req, res) => {
 
 
 exports.saleReport = async (req, res) => {
-  const { area, type, date } = req.query;
+  const { area, type, date, role } = req.query;
   const channel = req.headers['x-channel'];
   const { Order } = getModelsByChannel(channel, res, orderModel);
-  let filterCreatedAt = {}
-  let filterArea = {}
-  let filterType = {}
-  if (area) {
-    filterArea = { 'store.area': area }
-  }
-  if (type) {
-    filterType = { type: type }
-  }
-  if (date) {
-    const year = Number(date.substring(0, 4));
-    const month = Number(date.substring(4, 6)) - 1;
-    const day = Number(date.substring(6, 8));
-    const bangkokStart = new Date(year, month, day, 0, 0, 0, 0);
-    startDate = new Date(bangkokStart.getTime() - 7 * 60 * 60 * 1000);
-    const bangkokEnd = new Date(year, month, day + 1, 0, 0, 0, 0);
-    endDate = new Date(bangkokEnd.getTime() - 7 * 60 * 60 * 1000);
-    filterCreatedAt = {
-      createdAt: {
-        $gte: startDate,
-        $lt: endDate
+
+  if (role == 'sale' || role == '' || !role) {
+    let filterCreatedAt = {}
+    let filterArea = {}
+    let filterType = {}
+    if (area) {
+      filterArea = { 'store.area': area }
+    }
+    if (type) {
+      filterType = { type: type }
+    }
+    if (date) {
+      const year = Number(date.substring(0, 4));
+      const month = Number(date.substring(4, 6)) - 1;
+      const day = Number(date.substring(6, 8));
+      const bangkokStart = new Date(year, month, day, 0, 0, 0, 0);
+      startDate = new Date(bangkokStart.getTime() - 7 * 60 * 60 * 1000);
+      const bangkokEnd = new Date(year, month, day + 1, 0, 0, 0, 0);
+      endDate = new Date(bangkokEnd.getTime() - 7 * 60 * 60 * 1000);
+      filterCreatedAt = {
+        createdAt: {
+          $gte: startDate,
+          $lt: endDate
+        }
       }
     }
+    const dataOrder = await Order.find({
+      ...filterArea,
+      ...filterCreatedAt,
+      ...filterType
+    });
 
-
-  }
-  const dataOrder = await Order.find({
-    ...filterArea,
-    ...filterCreatedAt,
-    ...filterType
-  });
-
-  if (dataOrder.length === 0) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found Order'
+    if (dataOrder.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found Order'
+      })
+    }
+    const data = dataOrder.map(item => {
+      let paymentMethodTH = ''
+      if (item.paymentMethod === 'cash') {
+        paymentMethodTH = 'เงินสด'
+      }
+      else if (item.paymentMethod === 'qr') {
+        paymentMethodTH = 'QR Payment'
+      }
+      else {
+        paymentMethodTH = item.paymentMethod
+      }
+      return {
+        type: item.type,
+        orderId: item.orderId,
+        saleCode: item.sale.saleCode,
+        saleName: item.sale.name,
+        storeId: item.store.storeId,
+        storeName: item.store.name,
+        storeTaxId: item.store.taxId,
+        total: item.total,
+        paymentMethod: paymentMethodTH
+      }
+    })
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: data
     })
   }
 
+  else if (role == 'supervisor') {
 
-
-  const data = dataOrder.map(item => {
-    let paymentMethodTH = ''
-    if (item.paymentMethod === 'cash') {
-      paymentMethodTH = 'เงินสด'
-    } 
-    else if (item.paymentMethod === 'qr') {
-      paymentMethodTH = 'QR Payment'
+    let areaQuery = {}
+    if (area) {
+      if (area.length == 2) {
+        areaQuery.zone = area.slice(0, 2)
+      }
+      else if (area.length == 5) {
+        areaQuery['store.area'] = area;
+      }
     }
-    else {
-      paymentMethodTH = item.paymentMethod
-    }
-    return {
-      type: item.type,
-      orderId: item.orderId,
-      saleCode: item.sale.saleCode,
-      saleName: item.sale.name,
-      storeId: item.store.storeId,
-      storeName: item.store.name,
-      storeTaxId: item.store.taxId,
-      total: item.total,
-      paymentMethod: paymentMethodTH
-    }
-  })
+
+    
 
 
 
 
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: data
-  })
 
-
+  }
 }

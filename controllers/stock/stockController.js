@@ -1506,6 +1506,10 @@ exports.stockToExcel = async (req, res) => {
   const startOfMonthUTC = new Date(startOfMonthTH.getTime() - thOffset);
   const endOfMonthUTC = new Date(endOfMonthTH.getTime() - thOffset);
 
+  function to2(num) {
+    return Math.round((Number(num) || 0) * 100) / 100;
+  }
+
   const [dataRefund, dataOrderSale, dataOrderChange, dataWithdraw, dataStock, dataGive] = await Promise.all([
     Refund.find({
       'store.area': area,
@@ -1570,6 +1574,13 @@ exports.stockToExcel = async (req, res) => {
   const StockQty = allListProduct.filter(item => uniqueProductId.includes(item.productId));
 
   let sumStockIn = 0
+  // let sumStockWithdraw = 0
+  // let sumStockGood = 0
+  // let sumStockDamaged = 0
+  // let sumStockCredit = 0
+  // let sumStockCredit = 0
+  // let sumStockCredit = 0
+
   const stockIn = [...dataRefund, ...dataWithdraw].flatMap(item =>
     (item.listProduct || []).map(i => {
       const product = productDetail.find(u => u.id === i.id);
@@ -1597,7 +1608,7 @@ exports.stockToExcel = async (req, res) => {
         damaged: qtyPcsDamaged,
         credit: 0,
         sumStock: sumStock?.stockPcs || 0,
-        summary: summary
+        summary: to2(summary)
       };
     })
   );
@@ -1655,16 +1666,16 @@ exports.stockToExcel = async (req, res) => {
         productId: i.id,
         name: product ? product.name : "",
         sale: qtyPcsSale,
-        summarySale: summarySale,
+        summarySale: to2(summarySale),
         promotion: qtyPcsPromotion,
-        summaryPromotion: summaryPromotion,
+        summaryPromotion: to2(summaryPromotion),
         change: qtyPcsChange,
-        summaryChange: summaryChange,
+        summaryChange: to2(summaryChange),
         give: qtyPcsGive,
-        summaryGive: summaryGive,
-        exchange : 0 ,
-        summaryQtySalePromotionChange: (qtyPcsSale || 0) + (qtyPcsPromotion || 0) + (qtyPcsChange || 0),
-        summarySalePromotionChange: (summarySale || 0) + (summaryPromotion || 0) + (summaryChange || 0),
+        summaryGive: to2(summaryGive),
+        exchange: 0,
+        summaryQtySalePromotionChange: to2((qtyPcsSale || 0) + (qtyPcsPromotion || 0) + (qtyPcsChange || 0)),
+        summarySalePromotionChange: to2((summarySale || 0) + (summaryPromotion || 0) + (summaryChange || 0)),
       };
     })
   );
@@ -1704,7 +1715,7 @@ exports.stockToExcel = async (req, res) => {
       productName: product?.name || '',
       balanceGood: item.balancePcs || 0,
       balanceDamaged: 0,
-      summary: (item.balancePcs || 0) * (factorPcs?.price?.sale || 0)
+      summary: Number(((item.balancePcs || 0) * (factorPcs?.price?.sale || 0)).toFixed(2))
     }
   });
 
@@ -1742,7 +1753,7 @@ exports.stockToExcel = async (req, res) => {
 
     const balanceThai = balance.map(item => ({
       'รหัส': item.productId,
-      'ชื่อสินค้า': item.name,
+      'ชื่อสินค้า': item.productName,
       'จำนวนคงเหลือดี': item.balanceGood,
       'จำนวนคงเหลือเสีย': item.balanceDamaged,
       'มูลค่าคงเหลือ': item.summary,
