@@ -16,6 +16,8 @@ const sendMoneySchema = mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
   dateAt: { type: Date }
+}, {
+  timestamps: true
 })
 
 module.exports = conn => {

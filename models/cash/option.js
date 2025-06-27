@@ -13,6 +13,8 @@ const optionSchema = mongoose.Schema({
     list: [list],
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
+}, {
+  timestamps: true
 })
 
 // const Option = dbCA.model('Option', optionSchema)

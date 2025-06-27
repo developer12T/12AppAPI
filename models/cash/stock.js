@@ -58,6 +58,8 @@ const stockSchema = new mongoose.Schema({
   listProduct: { type: [listProductSchema], default: [] },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
+}, {
+  timestamps: true
 })
 
 
@@ -85,6 +87,8 @@ const stockMovementSchema = new mongoose.Schema({
   product: { type: [listProductMovementSchema], default: [] },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
+}, {
+  timestamps: true
 })
 
 const stockMovementLogSchema = new mongoose.Schema({
@@ -99,6 +103,8 @@ const stockMovementLogSchema = new mongoose.Schema({
   action: { type: String, required: true },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
+}, {
+  timestamps: true
 })
 
 const listincidentStockProductSchema = new mongoose.Schema({

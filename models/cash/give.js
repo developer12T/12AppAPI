@@ -32,6 +32,8 @@ const giveTypeSchema = new mongoose.Schema({
     status: { type: String, enum: ['active', 'inactive'], default: 'active' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
+}, {
+  timestamps: true
 })
 
 const giveInfoSchema = new mongoose.Schema({
@@ -108,6 +110,8 @@ const giveawaysSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
     period: { type: String, require: true },
+}, {
+  timestamps: true
 })
 
 // const Giveaway = dbCA.model('Giveaway', giveawaysSchema)

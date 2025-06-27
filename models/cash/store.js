@@ -73,6 +73,8 @@ const storeSchema = mongoose.Schema({
           return new Date(now.getTime() + 7 * 60 * 60 * 1000);
         }
       }
+}, {
+  timestamps: true
 })
 
 const typeStoreSchema = mongoose.Schema({
@@ -81,6 +83,8 @@ const typeStoreSchema = mongoose.Schema({
     status: { type: String, default:'1' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
+}, {
+  timestamps: true
 })
 
 // const Store = dbCA.model('Store', storeSchema)
@@ -95,6 +99,8 @@ const runningNumberSchema = mongoose.Schema({
     last: { type: String, require: true },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
+}, {
+  timestamps: true
 })
 
 const storeBeautySchema = new mongoose.Schema({
@@ -104,6 +110,8 @@ const storeBeautySchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
     usedPro: { type: [String] }
+}, {
+  timestamps: true
 });
 
 

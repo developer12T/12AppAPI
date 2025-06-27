@@ -1,6 +1,7 @@
 const mongoose = require('mongoose')
 const { dbCA } = require('../../config/db')
 const { sequelize, DataTypes } = require('../../config/m3db')
+const { timestamp } = require('../../utilities/datetime')
 
 
 const listWarehouse = mongoose.Schema({
@@ -47,7 +48,7 @@ const listProductReceive = new mongoose.Schema({
 })
 
 const receiveSchema = mongoose.Schema({
-    type: { type: String, require: true, default: 'receive'},
+    type: { type: String, require: true, default: 'receive' },
     orderId: { type: String, require: true },
     orderType: { type: String, require: true },
     orderTypeName: { type: String, require: true },
@@ -69,11 +70,13 @@ const receiveSchema = mongoose.Schema({
     status: { type: String, require: true, enum: ['pending', 'completed', 'canceled', 'rejected'], default: 'pending' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
+}, {
+  timestamps: true
 })
 
 const listProductDistribution = new mongoose.Schema({
     id: { type: String, require: true },
-    lot:{ type: String, require: true },
+    lot: { type: String, require: true },
     name: { type: String, require: true },
     group: { type: String, require: true },
     brand: { type: String, require: true },
@@ -90,7 +93,7 @@ const listProductDistribution = new mongoose.Schema({
 })
 
 const distributionSchema = mongoose.Schema({
-    type: { type: String, require: true, default: 'withdraw'},
+    type: { type: String, require: true, default: 'withdraw' },
     orderId: { type: String, require: true },
     orderType: { type: String, require: true }, //T04, T05
     orderTypeName: { type: String, require: true }, //รับเอง, ส่งสินค้า
@@ -117,20 +120,22 @@ const distributionSchema = mongoose.Schema({
     statusTH: { type: String, require: true, enum: ['รอนำเข้า', 'สำเร็จ', 'ยกเลิก', 'ถูกปฏิเสธ'], default: 'รอนำเข้า' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
-    period:{ type: String, require: true },
+    period: { type: String, require: true },
+}, {
+    timestamps: true
 })
 
 
 
 const withdrawSchema = mongoose.Schema({
-  Des_No: { type: String, required: true },
-  Des_Name: { type: String, required: true },
-  Des_Date: { type: String, required: true },
-  Des_Area: { type: String, required: true },
-  ZType: { type: String, required: true },  
-  WH: { type: String, required: true },
-  ROUTE: { type: String, required: true },
-  WH1: { type: String, required: true },
+    Des_No: { type: String, required: true },
+    Des_Name: { type: String, required: true },
+    Des_Date: { type: String, required: true },
+    Des_Area: { type: String, required: true },
+    ZType: { type: String, required: true },
+    WH: { type: String, required: true },
+    ROUTE: { type: String, required: true },
+    WH1: { type: String, required: true },
 });
 
 
@@ -147,10 +152,10 @@ const withdrawSchema = mongoose.Schema({
 
 module.exports = (conn) => {
     return {
-      Withdraw: conn.model('Withdraw', withdrawSchema, 'withdraw'),
-      Place: conn.model('Place', placeSchema),
-      Distribution: conn.model('Distribution', distributionSchema),
-      Receive: conn.model('Receive', receiveSchema),
+        Withdraw: conn.model('Withdraw', withdrawSchema, 'withdraw'),
+        Place: conn.model('Place', placeSchema),
+        Distribution: conn.model('Distribution', distributionSchema),
+        Receive: conn.model('Receive', receiveSchema),
 
     };
-  };
+};

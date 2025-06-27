@@ -38,6 +38,8 @@ const productSchema = mongoose.Schema({
     listUnit: [listUnit],
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
+}, {
+  timestamps: true
 })
 
 // const Product = dbCA.model('Product', productSchema)

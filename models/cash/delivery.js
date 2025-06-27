@@ -8,6 +8,8 @@ const deliverySchema = new mongoose.Schema({
   displayDays: { type: Number},
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
+}, {
+  timestamps: true
 });
 
 module.exports = (conn) => {

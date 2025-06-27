@@ -85,6 +85,8 @@ const cartSchema = mongoose.Schema({
   cartHashPromotion: { type: String, default: '' },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
+}, {
+  timestamps: true
 })
 
 // const Cart = dbCA.model('Cart', cartSchema)

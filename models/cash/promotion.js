@@ -69,6 +69,8 @@ const promotionSchema = new mongoose.Schema({
     status: { type: String, enum: ['active', 'inactive'], default: 'active' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
+}, {
+  timestamps: true
 })
 
 
@@ -163,6 +165,8 @@ const quotaSchema = new mongoose.Schema({
     status: { type: String, enum: ['active', 'inactive'], default: 'active' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
+}, {
+  timestamps: true
 })
 
 const promotionShelfSchema = new mongoose.Schema({
@@ -173,6 +177,8 @@ const promotionShelfSchema = new mongoose.Schema({
     price: { type: Number },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
+}, {
+  timestamps: true
 })
 
 
