@@ -2988,20 +2988,34 @@ exports.saleReport = async (req, res) => {
   }
 
   else if (role == 'supervisor') {
-
+    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel);
     let areaQuery = {}
     if (area) {
       if (area.length == 2) {
         areaQuery.zone = area.slice(0, 2)
       }
       else if (area.length == 5) {
-        areaQuery['store.area'] = area;
+        areaQuery.area = area;
       }
     }
-
     
+    const sendMoneyData = await SendMoney.aggregate([
+      {$addFields:{
+        zone: { $substrBytes: ["$area", 0, 2] }
+      }},
+      {$match:{
+        ...areaQuery
+      }}
+    ])
 
 
+
+
+
+    res.status(200).json({
+      status:200,
+      sendMoneyData
+    })
 
 
 
