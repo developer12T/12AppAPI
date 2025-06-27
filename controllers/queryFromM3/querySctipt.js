@@ -95,13 +95,13 @@ exports.userQueryManeger = async function (channel, area) {
   let result = ''
   if (channel == 'cash') {
     result = await sql.query`
-    SELECT 
+ SELECT 
      '' AS saleCode,
      '' AS salePayer,
     Col_LoginName AS username,
     LEFT(Col_Name, CHARINDEX(' ', Col_Name + ' ') - 1) AS firstName,
     SUBSTRING(Col_Name, CHARINDEX(' ', Col_Name + ' ') + 1, LEN(Col_Name)) AS surName,
-    ${hash} AS password,
+    '$2b$10$DqTAeJ.dZ67XVLky203dn.77idSGjHqbOJ7ztOTeEpr1VeycWngua' AS password,
     '' AS tel,
      CASE
     WHEN Col_o_JobTitle IN ('Developer', 'IT Support', 'Sale_Manager') THEN ''
@@ -109,11 +109,18 @@ exports.userQueryManeger = async function (channel, area) {
   END AS zone ,
     '' AS area,
     '' AS warehouse,
-    Col_o_JobTitle AS role,
+    case 
+    when Col_o_JobTitle = 'Supervisor' THEN 'supervisor'
+    when Col_o_JobTitle like 'DC%' THEN 'dc'
+    when Col_o_JobTitle = 'Area_Manager' then 'area_manager'
+    when Col_o_JobTitle = 'Sale_Manager' then 'sale_manager'
+    ELSE 'admin'
+    END AS role,
+--     Col_o_JobTitle AS role,
     '1' AS status
     FROM [192.168.0.3].[AntDB].[dbo].[hs_User] AS hr
-    WHERE 
-      Col_o_JobTitle in ('Developer','IT Support','Sale_Manager','Supervisor','Area_Manager','IT')
+--     WHERE 
+--       Col_o_JobTitle in ('Developer','IT Support','Sale_Manager','Supervisor','Area_Manager','IT')
     `;
   }
 

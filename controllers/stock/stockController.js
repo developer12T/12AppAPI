@@ -5,7 +5,8 @@
 // } = require('../../models/cash/stock')
 // const { User } = require('../../models/cash/user')
 // const { Product } = require('../../models/cash/product')
-const { generateOrderId } = require('../../utilities/genetateId')
+const xlsx = require('xlsx')
+const { generateStockId } = require('../../utilities/genetateId')
 const path = require('path')
 const errorEndpoint = require('../../middleware/errorEndpoint')
 const currentFilePath = path.basename(__filename)
@@ -13,17 +14,19 @@ const { getStockAvailable } = require('./available')
 const { getStockMovement } = require('../../utilities/movement')
 const { Warehouse, Locate, Balance } = require('../../models/cash/master')
 const { Op } = require('sequelize')
-const XLSX = require('xlsx')
+const fs = require('fs')
 // const { Refund } = require('../../models/cash/refund')
 const { stockQuery } = require('../../controllers/queryFromM3/querySctipt')
 const userModel = require('../../models/cash/user')
 const distributionModel = require('../../models/cash/distribution')
 const productModel = require('../../models/cash/product')
 const stockModel = require('../../models/cash/stock')
+const giveModel = require('../../models/cash/give')
 const orderModel = require('../../models/cash/sale')
 const cartModel = require('../../models/cash/cart')
 const refundModel = require('../../models/cash/refund')
 const { getModelsByChannel } = require('../../middleware/channel')
+const os = require('os')
 const {
   summaryOrder,
 } = require('../../utilities/summary')
@@ -868,6 +871,8 @@ exports.getStockQty = async (req, res) => {
   const { Stock } = getModelsByChannel(channel, res, stockModel);
   const { Product } = getModelsByChannel(channel, res, productModel);
 
+
+
   let areaQuery = {}
   if (area) {
     if (area.length == 2) {
@@ -877,10 +882,6 @@ exports.getStockQty = async (req, res) => {
       areaQuery.area = area
     }
   }
-
-  // const dataStock = await Stock.find({ area: area, period: period }).select(
-  //   'listProduct -_id'
-  // );
 
   const matchQuery = { ...areaQuery, period };
   const dataStock = await Stock.aggregate([
@@ -1022,6 +1023,9 @@ exports.getStockQty = async (req, res) => {
   data.sort((a, b) => b.pcsMain - a.pcsMain);
   data.forEach(item => { delete item.pcsMain; });
 
+
+
+
   res.status(200).json({
     status: 200,
     message: 'suceesful',
@@ -1035,6 +1039,8 @@ exports.getStockQty = async (req, res) => {
     summaryStockOutPcs: summaryStockOutPcs,
     summaryStockBalPcs: summaryStockBalPcs,
   });
+
+
 
 }
 
@@ -1418,7 +1424,7 @@ exports.checkout = async (req, res) => {
       return res.status(404).json({ status: 404, message: 'Sale user not found!' })
     }
 
-    const orderId = await generateOrderId(area, sale.warehouse, channel, res)
+    const orderId = await generateStockId(area, sale.warehouse, channel, res)
     const summary = await summaryOrder(cart, channel, res)
 
     // new AdjustStock
@@ -1426,38 +1432,14 @@ exports.checkout = async (req, res) => {
     const newOrder = ({
       type,
       orderId,
-      sale: {
-        saleCode: sale.saleCode,
-        salePayer: sale.salePayer,
-        name: `${sale.firstName} ${sale.surName}`,
-        tel: sale.tel || '',
-        warehouse: sale.warehouse
-      },
-      store: {
-        storeId: summary.store.storeId,
-        name: summary.store.name,
-        type: summary.store.type,
-        address: summary.store.address,
-        taxId: summary.store.taxId,
-        tel: summary.store.tel,
-        area: summary.store.area,
-        zone: summary.store.zone
-      },
-      note,
-      latitude,
-      longitude,
-      status: 'pending',
-      statusTH: 'รอนำเข้า',
-      listProduct: summary.listProduct,
-      totalVat: summary.totalVat,
-      totalExVat: summary.totalExVat,
-      total: summary.total,
-      shipping: {
-        shippingId: "",
-        address: ""
-      },
-      createdBy: sale.username,
+      area: summary.store.area,
+      saleCode: sale.saleCode,
       period: period,
+      note,
+      // status: 'pending',
+      // statusTH: 'รอนำเข้า',
+      listProduct: summary.listProduct,
+
     })
 
 
@@ -1475,15 +1457,6 @@ exports.checkout = async (req, res) => {
     res.status(500).json({ status: '500', message: error.message })
   }
 }
-
-
-
-
-
-
-
-
-
 
 exports.addIncidentStock = async (req, res) => {
 
@@ -1513,3 +1486,262 @@ exports.addIncidentStock = async (req, res) => {
 
 
 }
+
+exports.stockToExcel = async (req, res) => {
+  const { area, period, excel } = req.body;
+  const channel = req.headers['x-channel'];
+  const { Stock } = getModelsByChannel(channel, res, stockModel);
+  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+  const { Order } = getModelsByChannel(channel, res, orderModel);
+  const { Product } = getModelsByChannel(channel, res, productModel);
+  const { Refund } = getModelsByChannel(channel, res, refundModel);
+  const { Giveaway } = getModelsByChannel(channel, res, giveModel);
+  const periodStr = period;
+  const year = Number(periodStr.substring(0, 4));
+  const month = Number(periodStr.substring(4, 6));
+
+  const startOfMonthTH = new Date(year, month - 1, 1, 0, 0, 0, 0);
+  const endOfMonthTH = new Date(year, month, 0, 23, 59, 59, 999);
+  const thOffset = 7 * 60 * 60 * 1000;
+  const startOfMonthUTC = new Date(startOfMonthTH.getTime() - thOffset);
+  const endOfMonthUTC = new Date(endOfMonthTH.getTime() - thOffset);
+
+  const [dataRefund, dataOrderSale, dataOrderChange, dataWithdraw, dataStock, dataGive] = await Promise.all([
+    Refund.find({
+      'store.area': area,
+      period: periodStr,
+      createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+      type: 'refund'
+    }),
+    Order.find({
+      'store.area': area,
+      period: periodStr,
+      createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+      type: 'sale'
+    }),
+    Order.find({
+      'store.area': area,
+      period: periodStr,
+      createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+      type: 'change'
+    }),
+    Distribution.find({
+      area: area,
+      period: periodStr,
+      createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+      type: 'withdraw'
+    }),
+    Stock.find({
+      area: area,
+      period: periodStr,
+    }).select("listProduct"),
+    Giveaway.find({
+      'store.area': area,
+      period: periodStr,
+    }).select("listProduct")
+  ]);
+
+  const markSource = (arr, source) =>
+    arr.map(item => ({ ...item, _source: source }));
+
+  const dataOrderPromotion = dataOrderSale.flatMap(item =>
+    (item.listPromotions || []).map(u => ({
+      _id: u._id,
+      listProduct: u.listProduct || []
+    }))
+  );
+
+  // รวม productId ที่ใช้จริง
+  const productId = [
+    ...dataOrderSale.flatMap(item => (item.listProduct || []).map(i => i.id)),
+    ...dataRefund.flatMap(item => (item.listProduct || []).map(i => i.id)),
+    ...dataOrderChange.flatMap(item => (item.listProduct || []).map(i => i.id)),
+    ...dataWithdraw.flatMap(item => (item.listProduct || []).map(i => i.id)),
+    ...dataGive.flatMap(item => (item.listProduct || []).map(i => i.id)),
+    ...dataOrderPromotion.flatMap(item => (item.listProduct || []).map(i => i.id)),
+  ];
+  const uniqueProductId = [...new Set(productId)];
+
+  // โหลดรายละเอียดสินค้า
+  const productDetail = await Product.find({ id: { $in: uniqueProductId } });
+
+  // รวม stock ทั้งหมด
+  const allListProduct = dataStock.flatMap(stock => stock.listProduct || []);
+  const StockQty = allListProduct.filter(item => uniqueProductId.includes(item.productId));
+
+  let sumStockIn = 0
+  const stockIn = [...dataRefund, ...dataWithdraw].flatMap(item =>
+    (item.listProduct || []).map(i => {
+      const product = productDetail.find(u => u.id === i.id);
+      const factorPcs = product?.listUnit?.find(u => u.unit === i.unit);
+      const qtyPcs = i.qty * (factorPcs?.factor || 1);
+      const sumStock = StockQty.find(u => u.productId === i.id);
+      let qtyPcsGood = 0;
+      let qtyPcsDamaged = 0;
+      let qtyWithdraw = 0;
+      let summary = i.total || 0;
+      if (i.condition === 'good') {
+        qtyPcsGood = qtyPcs;
+      } else if (i.condition === 'damaged') {
+        qtyPcsDamaged = qtyPcs;
+      } else {
+        qtyWithdraw = qtyPcs;
+      }
+      sumStockIn += qtyPcs
+      return {
+        productId: i.id,
+        name: product ? product.name : "",
+        stock: qtyPcs,
+        withdraw: qtyWithdraw,
+        good: qtyPcsGood,
+        damaged: qtyPcsDamaged,
+        credit: 0,
+        sumStock: sumStock?.stockPcs || 0,
+        summary: summary
+      };
+    })
+  );
+
+  // ฟังก์ชันสำหรับเข้าถึง listProduct
+  const getListProduct = (item) => {
+    if (Array.isArray(item.listProduct)) return item.listProduct;
+    if (item._doc && Array.isArray(item._doc.listProduct)) return item._doc.listProduct;
+    return [];
+  };
+
+  const dataOrderSaleMark = markSource(dataOrderSale, "orderSale");
+  const dataOrderChangeMark = markSource(dataOrderChange, "orderChange");
+  const dataGiveMark = markSource(dataGive, "give");
+  const dataPromotionMark = markSource(dataOrderPromotion, "promotion");
+
+  let sumStockOut = 0;
+  const stockOut = [
+    ...dataOrderSaleMark,
+    ...dataOrderChangeMark,
+    ...dataGiveMark,
+    ...dataPromotionMark
+  ].flatMap(item =>
+    getListProduct(item).map(i => {
+      const product = productDetail.find(u => u.id === i.id);
+      const factorPcs = product?.listUnit?.find(u => u.unit === i.unit);
+      const qtyPcs = i.qty * (factorPcs?.factor || 1);
+      const sumStock = StockQty.find(u => u.productId === i.id);
+      sumStockOut += qtyPcs
+      let qtyPcsSale = 0;
+      let summarySale = 0;
+      let qtyPcsPromotion = 0;
+      let summaryPromotion = 0;
+      let qtyPcsChange = 0;
+      let summaryChange = 0;
+      let qtyPcsGive = 0;
+      let summaryGive = 0;
+
+      if (item._source === 'orderSale') {
+        qtyPcsSale = qtyPcs;
+        summarySale = i.subtotal ?? 0;
+      } else if (item._source === 'promotion') {
+        qtyPcsPromotion = qtyPcs;
+        summaryPromotion = i.qty * (factorPcs?.price?.sale || 0);
+      } else if (item._source === 'orderChange') {
+        qtyPcsChange = qtyPcs;
+        summaryChange = i.total ?? 0;
+      } else if (item._source === 'give') {
+        qtyPcsGive = qtyPcs;
+        summaryGive = i.total ?? 0;
+      }
+
+      return {
+        productId: i.id,
+        name: product ? product.name : "",
+        sale: qtyPcsSale,
+        summarySale: summarySale,
+        promotion: qtyPcsPromotion,
+        summaryPromotion: summaryPromotion,
+        change: qtyPcsChange,
+        summaryChange: summaryChange,
+        give: qtyPcsGive,
+        summaryGive: summaryGive,
+        summaryQtySalePromotionChange: (qtyPcsSale || 0) + (qtyPcsPromotion || 0) + (qtyPcsChange || 0),
+        summarySalePromotionChange: (summarySale || 0) + (summaryPromotion || 0) + (summaryChange || 0),
+      };
+    })
+  );
+
+  // รวมยอดตาม productId
+  const stockOutFinal = Object.values(
+    stockOut.reduce((acc, cur) => {
+      if (!acc[cur.productId]) {
+        acc[cur.productId] = { ...cur };
+      } else {
+        acc[cur.productId].sale += cur.sale;
+        acc[cur.productId].summarySale += cur.summarySale;
+        acc[cur.productId].promotion += cur.promotion;
+        acc[cur.productId].summaryPromotion += cur.summaryPromotion;
+        acc[cur.productId].change += cur.change;
+        acc[cur.productId].summaryChange += cur.summaryChange;
+        acc[cur.productId].give += cur.give;
+        acc[cur.productId].summaryGive += cur.summaryGive;
+        acc[cur.productId].summaryQtySalePromotionChange =
+          (acc[cur.productId].summaryQtySalePromotionChange || 0) + (cur.summaryQtySalePromotionChange || 0);
+        acc[cur.productId].summarySalePromotionChange =
+          (acc[cur.productId].summarySalePromotionChange || 0) + (cur.summarySalePromotionChange || 0);
+      }
+      return acc;
+    }, {})
+  );
+
+  // balance
+  let sumBalance = 0;
+  const balance = allListProduct.map(item => {
+    const product = productDetail.find(u => u.id === item.productId) || null;
+    const factorPcs = product?.listUnit?.find(u => u.unit === 'PCS');
+    sumBalance += item.balancePcs || 0
+    return {
+      productId: item.productId,
+      productName: product?.name || '',
+      balanceGood: item.balancePcs || 0,
+      balanceDamaged: 0,
+      summary: (item.balancePcs || 0) * (factorPcs?.price?.sale || 0)
+    }
+  });
+
+  // ส่งออก excel หรือ json
+  if (excel === true) {
+    const wb = xlsx.utils.book_new();
+    const wsStockIn = xlsx.utils.json_to_sheet(stockIn);
+    xlsx.utils.book_append_sheet(wb, wsStockIn, 'stockIn');
+
+    const wsStockOut = xlsx.utils.json_to_sheet(stockOutFinal);
+    xlsx.utils.book_append_sheet(wb, wsStockOut, 'stockOut');
+
+    const wsBalance = xlsx.utils.json_to_sheet(balance);
+    xlsx.utils.book_append_sheet(wb, wsBalance, 'balance');
+
+    const tempPath = path.join(os.tmpdir(), `Stock.xlsx`);
+    xlsx.writeFile(wb, tempPath);
+
+    res.download(tempPath, 'Stock.xlsx', err => {
+      if (err) {
+        console.error('❌ Download error:', err)
+        if (!res.headersSent) {
+          res.status(500).send('Download failed')
+        }
+      }
+      fs.unlink(tempPath, () => { });
+    });
+  } else {
+    res.status(200).json({
+      status: 200,
+      message: 'successfully',
+      data: {
+        stockIn,
+        sumStockIn,
+        stockOut: stockOutFinal,
+        sumStockOut,
+        balance,
+        sumBalance
+      }
+    });
+  }
+};
+

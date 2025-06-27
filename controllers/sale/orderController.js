@@ -2798,7 +2798,7 @@ exports.summaryDaily = async (req, res) => {
       summary: val.summary,
       status: val.status
     }));
-    console.log(dataSendMoneyTran)
+    // console.log(dataSendMoneyTran)
     const sendMoneyMap = Object.fromEntries(dataSendMoneyTran.map(d => [d.date, d.summary]));
     const statusMap = Object.fromEntries(dataSendMoneyTran.map(d => [d.date, d.status]));
 
