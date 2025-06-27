@@ -1563,7 +1563,7 @@ exports.stockToExcel = async (req, res) => {
   const uniqueProductId = [...new Set(productId)];
 
   // โหลดรายละเอียดสินค้า
-  const productDetail = await Product.find({ id: { $in: uniqueProductId } });
+  const productDetail = await Product.find();
 
   // รวม stock ทั้งหมด
   const allListProduct = dataStock.flatMap(stock => stock.listProduct || []);
@@ -1661,6 +1661,7 @@ exports.stockToExcel = async (req, res) => {
         summaryChange: summaryChange,
         give: qtyPcsGive,
         summaryGive: summaryGive,
+        exchange : 0 ,
         summaryQtySalePromotionChange: (qtyPcsSale || 0) + (qtyPcsPromotion || 0) + (qtyPcsChange || 0),
         summarySalePromotionChange: (summarySale || 0) + (summaryPromotion || 0) + (summaryChange || 0),
       };
@@ -1681,6 +1682,7 @@ exports.stockToExcel = async (req, res) => {
         acc[cur.productId].summaryChange += cur.summaryChange;
         acc[cur.productId].give += cur.give;
         acc[cur.productId].summaryGive += cur.summaryGive;
+        acc[cur.productId].exchange += cur.exchange;
         acc[cur.productId].summaryQtySalePromotionChange =
           (acc[cur.productId].summaryQtySalePromotionChange || 0) + (cur.summaryQtySalePromotionChange || 0);
         acc[cur.productId].summarySalePromotionChange =
@@ -1694,7 +1696,7 @@ exports.stockToExcel = async (req, res) => {
   let sumBalance = 0;
   const balance = allListProduct.map(item => {
     const product = productDetail.find(u => u.id === item.productId) || null;
-    const factorPcs = product?.listUnit?.find(u => u.unit === 'PCS');
+    const factorPcs = product?.listUnit?.find(u => u.unit === 'PCS' || u.unit === 'BOT');
     sumBalance += item.balancePcs || 0
     return {
       productId: item.productId,
@@ -1707,14 +1709,57 @@ exports.stockToExcel = async (req, res) => {
 
   // ส่งออก excel หรือ json
   if (excel === true) {
+
+    const stockInThai = stockIn.map(item => ({
+      'รหัส': item.productId,
+      'ชื่อสินค้า': item.name,
+      'ยอดยกมา': item.stock,
+      'เบิกระหว่างทริป': item.withdraw,
+      'รับคืนดี': item.good,
+      'รับคืนเสีย': item.damaged,
+      'รับโอนจากเครดิต': item.credit,
+      'รวมจำนวนรับเข้า': item.sumStock,
+      'รวมมูลค่ารับเข้า': item.summary
+    }));
+
+    const stockOutThai = stockOut.map(item => ({
+      'รหัส': item.productId,
+      'ชื่อสินค้า': item.name,
+      'จำนวนขาย': item.sale,
+      'มูลค่าขาย': item.summarySale,
+      'จำนวนแถม': item.promotion,
+      'มูลค่าแถม': item.summaryPromotion,
+      'จำนวนที่เปลี่ยนให้ร้านค้า': item.change,
+      'มูลค่าเปลี่ยนให้ร้านค้า': item.summaryChange,
+      'จำนวนแจกสินค้า': item.give,
+      'มูลค่าแจกสินค้า': item.summaryGive,
+      'แลกซอง': item.exchange,
+      'รวมจำนวนขาย+แถม+เปลี่ยน': item.summaryQtySalePromotionChange,
+      'รวมมูลค่าขาย+แถม+เปลี่ยน': item.summarySalePromotionChange,
+    }));
+
+
+    const balanceThai = balance.map(item => ({
+      'รหัส': item.productId,
+      'ชื่อสินค้า': item.name,
+      'จำนวนคงเหลือดี': item.balanceGood,
+      'จำนวนคงเหลือเสีย': item.balanceDamaged,
+      'มูลค่าคงเหลือ': item.summary,
+
+    }));
+
+
+
+
+
     const wb = xlsx.utils.book_new();
-    const wsStockIn = xlsx.utils.json_to_sheet(stockIn);
+    const wsStockIn = xlsx.utils.json_to_sheet(stockInThai);
     xlsx.utils.book_append_sheet(wb, wsStockIn, 'stockIn');
 
-    const wsStockOut = xlsx.utils.json_to_sheet(stockOutFinal);
+    const wsStockOut = xlsx.utils.json_to_sheet(stockOutThai);
     xlsx.utils.book_append_sheet(wb, wsStockOut, 'stockOut');
 
-    const wsBalance = xlsx.utils.json_to_sheet(balance);
+    const wsBalance = xlsx.utils.json_to_sheet(balanceThai);
     xlsx.utils.book_append_sheet(wb, wsBalance, 'balance');
 
     const tempPath = path.join(os.tmpdir(), `Stock.xlsx`);
