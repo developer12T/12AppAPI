@@ -1643,8 +1643,9 @@ exports.stockToExcel = async (req, res) => {
         qtyPcsPromotion = qtyPcs;
         summaryPromotion = i.qty * (factorPcs?.price?.sale || 0);
       } else if (item._source === 'orderChange') {
+        console.log(i)
         qtyPcsChange = qtyPcs;
-        summaryChange = i.total ?? 0;
+        summaryChange = i.netTotal ?? 0;
       } else if (item._source === 'give') {
         qtyPcsGive = qtyPcs;
         summaryGive = i.total ?? 0;
