@@ -1574,12 +1574,12 @@ exports.stockToExcel = async (req, res) => {
   const StockQty = allListProduct.filter(item => uniqueProductId.includes(item.productId));
 
   let sumStockIn = 0
-  // let sumStockWithdraw = 0
-  // let sumStockGood = 0
-  // let sumStockDamaged = 0
-  // let sumStockCredit = 0
-  // let sumStockCredit = 0
-  // let sumStockCredit = 0
+  let sumStockInWithdraw = 0
+  let sumStockInGood = 0
+  let sumStockInDamaged = 0
+  let sumStockInCredit = 0
+  let sumStockInsumStock = 0
+  let sumStockInsummary = 0
 
   const stockIn = [...dataRefund, ...dataWithdraw].flatMap(item =>
     (item.listProduct || []).map(i => {
@@ -1599,6 +1599,13 @@ exports.stockToExcel = async (req, res) => {
         qtyWithdraw = qtyPcs;
       }
       sumStockIn += qtyPcs
+      sumStockInWithdraw += qtyWithdraw
+      sumStockInGood += qtyPcsGood
+      sumStockInDamaged += qtyPcsDamaged
+      sumStockInCredit += 0
+      sumStockInsumStock += sumStock?.stockPcs || 0
+      sumStockInsummary += to2(summary)
+
       return {
         productId: i.id,
         name: product ? product.name : "",
@@ -1625,7 +1632,17 @@ exports.stockToExcel = async (req, res) => {
   const dataGiveMark = markSource(dataGive, "give");
   const dataPromotionMark = markSource(dataOrderPromotion, "promotion");
 
-  let sumStockOut = 0;
+  let sumStockOutSale = 0
+  let sumStockOutSummarySale = 0
+  let sumStockOutPromotion = 0
+  let sumStockOutSummaryPromotion = 0
+  let sumStockOutChange = 0
+  let sumStockOutSummaryChange = 0
+  let sumStockOutGive = 0
+  let sumStockOutSummaryGive = 0
+  let sumStockOutexchange = 0
+  let sumStockOutSummaryQtySalePromotionChange = 0
+  let sumStockOutSummarySalePromotionChange = 0
   const stockOut = [
     ...dataOrderSaleMark,
     ...dataOrderChangeMark,
@@ -1636,8 +1653,7 @@ exports.stockToExcel = async (req, res) => {
       const product = productDetail.find(u => u.id === i.id);
       const factorPcs = product?.listUnit?.find(u => u.unit === i.unit);
       const qtyPcs = i.qty * (factorPcs?.factor || 1);
-      const sumStock = StockQty.find(u => u.productId === i.id);
-      sumStockOut += qtyPcs
+
       let qtyPcsSale = 0;
       let summarySale = 0;
       let qtyPcsPromotion = 0;
@@ -1661,6 +1677,18 @@ exports.stockToExcel = async (req, res) => {
         qtyPcsGive = qtyPcs;
         summaryGive = i.total ?? 0;
       }
+
+      sumStockOutSale += qtyPcsSale
+      sumStockOutSummarySale += to2(summarySale)
+      sumStockOutPromotion += qtyPcsPromotion
+      sumStockOutSummaryPromotion += to2(summaryPromotion)
+      sumStockOutChange += qtyPcsChange
+      sumStockOutSummaryChange += to2(summaryChange)
+      sumStockOutGive += qtyPcsGive
+      sumStockOutSummaryGive += to2(summaryGive)
+      sumStockOutexchange = 0
+      sumStockOutSummaryQtySalePromotionChange += to2((qtyPcsSale || 0) + (qtyPcsPromotion || 0) + (qtyPcsChange || 0))
+      sumStockOutSummarySalePromotionChange += to2((summarySale || 0) + (summaryPromotion || 0) + (summaryChange || 0))
 
       return {
         productId: i.id,
@@ -1705,24 +1733,45 @@ exports.stockToExcel = async (req, res) => {
   );
 
   // balance
-  let sumBalance = 0;
+  let sumBalanceGood = 0;
+  let sumBalanceDamaged = 0;
+  let sumBalancesummary = 0;
+
   const balance = allListProduct.map(item => {
     const product = productDetail.find(u => u.id === item.productId) || null;
     const factorPcs = product?.listUnit?.find(u => u.unit === 'PCS' || u.unit === 'BOT');
-    sumBalance += item.balancePcs || 0
+    sumBalanceGood += item.balancePcs || 0
+    sumBalanceDamaged += 0
+    sumBalancesummary += to2((item.balancePcs || 0) * (factorPcs?.price?.sale || 0))
+
     return {
       productId: item.productId,
       productName: product?.name || '',
       balanceGood: item.balancePcs || 0,
       balanceDamaged: 0,
-      summary: Number(((item.balancePcs || 0) * (factorPcs?.price?.sale || 0)).toFixed(2))
+      summary: to2((item.balancePcs || 0) * (factorPcs?.price?.sale || 0))
     }
   });
 
   // ส่งออก excel หรือ json
   if (excel === true) {
 
-    const stockInThai = stockIn.map(item => ({
+    const stockInWithSum = [
+      ...stockIn,
+      {
+        productId: '', name: 'รวมทั้งหมด',
+        stock: sumStockIn,
+        withdraw: sumStockInWithdraw,
+        good: sumStockInGood,
+        damaged: sumStockInDamaged,
+        credit: sumStockInCredit,
+        sumStock: sumStockInsumStock,
+        summary: sumStockInsummary
+      }
+    ];
+
+
+    const stockInThai = stockInWithSum.map(item => ({
       'รหัส': item.productId,
       'ชื่อสินค้า': item.name,
       'ยอดยกมา': item.stock,
@@ -1734,7 +1783,25 @@ exports.stockToExcel = async (req, res) => {
       'รวมมูลค่ารับเข้า': item.summary
     }));
 
-    const stockOutThai = stockOut.map(item => ({
+    const stockOutWithSum = [
+      ...stockOut,
+      {
+        productId: '', name: 'รวมทั้งหมด',
+        sale: sumStockOutSale,
+        summarySale: sumStockOutSummarySale,
+        promotion: sumStockOutPromotion,
+        summaryPromotion: sumStockOutSummaryPromotion,
+        change: sumStockOutChange,
+        summaryChange: sumStockOutSummaryChange,
+        give: sumStockOutGive,
+        summaryGive: sumStockOutSummaryGive,
+        exchange: sumStockOutexchange,
+        summaryQtySalePromotionChange: sumStockOutSummaryQtySalePromotionChange,
+        summarySalePromotionChange: sumStockOutSummarySalePromotionChange
+      }
+    ];
+
+    const stockOutThai = stockOutWithSum.map(item => ({
       'รหัส': item.productId,
       'ชื่อสินค้า': item.name,
       'จำนวนขาย': item.sale,
@@ -1750,8 +1817,17 @@ exports.stockToExcel = async (req, res) => {
       'รวมมูลค่าขาย+แถม+เปลี่ยน': item.summarySalePromotionChange,
     }));
 
+    const balanceWithSum = [
+      ...balance,
+      {
+        productId: '', productName: 'รวมทั้งหมด',
+        balanceGood: sumBalanceGood,
+        balanceDamaged: sumBalanceDamaged,
+        summary: sumBalancesummary,
+      }
+    ];
 
-    const balanceThai = balance.map(item => ({
+    const balanceThai = balanceWithSum.map(item => ({
       'รหัส': item.productId,
       'ชื่อสินค้า': item.productName,
       'จำนวนคงเหลือดี': item.balanceGood,
@@ -1759,10 +1835,6 @@ exports.stockToExcel = async (req, res) => {
       'มูลค่าคงเหลือ': item.summary,
 
     }));
-
-
-
-
 
     const wb = xlsx.utils.book_new();
     const wsStockIn = xlsx.utils.json_to_sheet(stockInThai);
@@ -1793,10 +1865,27 @@ exports.stockToExcel = async (req, res) => {
       data: {
         stockIn,
         sumStockIn,
+        sumStockInGood,
+        sumStockInDamaged,
+        sumStockInCredit,
+        sumStockInsumStock,
+        sumStockInsummary,
         stockOut: stockOutFinal,
-        sumStockOut,
+        sumStockOutSale,
+        sumStockOutSummarySale,
+        sumStockOutPromotion,
+        sumStockOutSummaryPromotion,
+        sumStockOutChange,
+        sumStockOutSummaryChange,
+        sumStockOutGive,
+        sumStockOutSummaryGive,
+        sumStockOutexchange,
+        sumStockOutSummaryQtySalePromotionChange,
+        sumStockOutSummarySalePromotionChange,
         balance,
-        sumBalance
+        sumBalanceGood,
+        sumBalanceDamaged,
+        sumBalanceSummary: to2(sumBalancesummary)
       }
     });
   }
