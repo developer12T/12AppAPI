@@ -336,9 +336,14 @@ exports.getOrder = async (req, res) => {
     }
 
     const { startDate, endDate } = rangeDate(period)
+    let statusQuery = {}
+    if (type === 'pending') {
+      statusQuery.status = { $in: ['pending','approved','rejected'] };
+    } else if (type === 'history') {
+      statusQuery.status = { $in: ['approved','rejected','success'] };
+    }
 
-
-    const status = type === 'history' ? { $ne: 'pending' } : 'pending'
+    // const status = type === 'history' ? { $ne: 'pending' } : 'pending'
     let areaQuery = {}
     if (area) {
       if (area.length == 2) {
@@ -350,7 +355,7 @@ exports.getOrder = async (req, res) => {
     }
     let query = {
       ...areaQuery,
-      status,
+      ...statusQuery,
       period: period
     }
     // console.log(query)
@@ -711,8 +716,8 @@ exports.insertOneWithdrawToErp = async (req, res) => {
 
   let data = []
   for (const item of distributionData) {
-    const sendDate = new Date(item.sendDate); // สร้าง Date object
-    const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, ''); // "20250222"
+    const sendDate = new Date(item.sendDate);
+    const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '');
     const MGNUGL = item.listProduct.map(i => i.id);
     const uniqueCount = new Set(MGNUGL).size;
 
@@ -811,10 +816,52 @@ exports.approveWithdraw = async (req, res) => {
     });
   }
 
+  const distributionTran = await Distribution.find({ orderId: orderId, type: 'withdraw' })
+  console.log(distributionTran)
+  const sendDate = new Date(distributionTran.sendDate);
+  
+  const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '');
+  const MGNUGL = distributionTran.listProduct.map(i => i.id);
+  const uniqueCount = new Set(MGNUGL).size;
+
+  const dataTran = {
+    Hcase: 1,
+    orderNo: distributionTran.orderId,
+    statusLow: '22',
+    statusHigh: '22',
+    orderType: distributionTran.orderType,
+    tranferDate: formattedDate,
+    warehouse: distributionTran.fromWarehouse,
+    towarehouse: distributionTran.toWarehouse,
+    routeCode: distributionTran.shippingRoute,
+    addressCode: distributionTran.shippingId,
+    location: '',
+    MGNUGL: uniqueCount,
+    MGDEPT: '',
+    remark: '',
+    items: distributionTran.listProduct.map(u => {
+      return {
+        itemCode: u.id,
+        itemStatus: '22',
+        MRWHLO: distributionTran.fromWarehouse,
+        itemQty: u.qty,
+        itemUnit: u.unit,
+        toLocation: '',
+        itemLot: '',
+        location: '',
+        itemLocation: ''
+      }
+    })
+  }
+
+  // console.log(dataTran)
+
+
+
   res.status(200).json({
     status: 200,
     message: 'successfully',
-    data: distributionData
+    data: dataTran
   })
 
 }
