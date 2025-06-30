@@ -1140,7 +1140,7 @@ exports.getTypeStore = async (req, res) => {
   res.status(200).json({
     status: 200,
     message: 'successfully',
-    deletedStore: storeType
+    data: storeType
   })
 }
 

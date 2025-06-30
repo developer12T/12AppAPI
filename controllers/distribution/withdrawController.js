@@ -738,13 +738,23 @@ exports.addFromERPWithdraw = async (req, res) => {
 }
 
 exports.approveWithdraw = async (req, res) => {
-  const { orderId } = req.query
+  const { orderId, status } = req.body
+
+  let statusStr = ''
+  let statusThStr = ''
+  if (status === true) {
+    statusStr = 'approved'
+    statusThStr = 'อนุมัติ'
+  } else {
+    statusStr = 'rejected'
+    statusThStr = 'ไม่อนุมัติ'
+  }
 
   const channel = req.headers['x-channel'];
   const { Distribution } = getModelsByChannel(channel, res, distributionModel);
   const distributionData = await Distribution.findOneAndUpdate(
     { orderId: orderId, type: 'withdraw' },
-    { $set: { statusTH: 'completed', status: 'สำเร็จ' } },
+    { $set: { statusTH: statusThStr, status: statusStr } },
     { new: true }
   );
 

@@ -28,5 +28,5 @@ router.post('/updateStockWithdraw', updateStockWithdraw)
 router.post('/insertWithdrawToErp', insertWithdrawToErp)
 router.post('/insertOneWithdrawToErp', insertOneWithdrawToErp)
 router.post('/addFromERPWithdraw', addFromERPWithdraw)
-router.get('/approveWithdraw', approveWithdraw)
+router.post('/approveWithdraw', approveWithdraw)
 module.exports = router
