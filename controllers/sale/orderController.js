@@ -4,9 +4,9 @@
 // const { Product } = require('../../models/cash/product')
 // const { Route } = require('../../models/cash/route')
 const { period, previousPeriod } = require('../../utilities/datetime')
-
-
-
+const axios = require('axios')
+const dayjs = require('dayjs');
+const { getSeries, updateRunningNumber } = require('../../middleware/order')
 const { Warehouse, Locate, Balance, Sale, DisributionM3 } = require('../../models/cash/master')
 const { generateOrderId } = require('../../utilities/genetateId')
 const {
@@ -47,7 +47,10 @@ const os = require('os')
 const fs = require('fs')
 const { group } = require('console')
 
+
+
 exports.checkout = async (req, res) => {
+  const transaction = await sequelize.transaction();
   try {
     const {
       type,
@@ -145,7 +148,50 @@ exports.checkout = async (req, res) => {
       }
     })
     if (listProduct.includes(null)) return
+
+
     const orderId = await generateOrderId(area, sale.warehouse, channel, res)
+
+    // console.log(response)
+    // let orderId = ''
+    // if (type === 'sale') {
+
+    //   const series = await getSeries('A31')
+    //   if (series == null) {
+    //     const error = new Error('Order Type is incorrect or not found')
+    //     error.statusCode = 422
+    //     throw error
+    //   }
+
+    //   const runningJson = {
+    //     coNo: '410',
+    //     series: series.OOOT05,
+    //     seriesType: '01'
+    //   }
+    //   const response = await axios.post(
+    //     `${process.env.API_URL_12ERP}/master/runningNumber/`,
+    //     {
+    //       coNo: runningJson.coNo,
+    //       series: runningJson.series,
+    //       seriesType: runningJson.seriesType
+    //     }
+    //   );
+    //   orderId = parseInt(response.data.lastNo) + 1
+
+    //   await updateRunningNumber(
+    //     {
+    //       coNo: runningJson.coNo,
+    //       series: runningJson.series,
+    //       seriesType: runningJson.seriesType,
+    //       lastNo: orderId
+    //     },
+    //     transaction
+    //   )
+
+    // } else if (type === 'change') {
+    //   orderId = await generateOrderId(area, sale.warehouse, channel, res)
+    // }
+
     const promotionshelf = await PromotionShelf.find({ storeId: storeId, period: period, qty: 1 }) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf.map(item => item.price).reduce((sum, price) => sum + price, 0)
@@ -394,9 +440,6 @@ exports.checkout = async (req, res) => {
       }
     }
 
-
-
-
     const checkIn = await checkInRoute(
       {
         storeId: storeId,
@@ -409,13 +452,14 @@ exports.checkout = async (req, res) => {
       channel,
       res
     )
-
+    await transaction.commit()
     res.status(200).json({
       status: 200,
       message: 'Checkout successful!',
       data: newOrder
     })
   } catch (error) {
+    await transaction.rollback()
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
   }
@@ -670,7 +714,7 @@ exports.addSlip = async (req, res) => {
 exports.OrderToExcel = async (req, res) => {
   const { channel, date } = req.query
 
-  console.log(channel, date)
+  // console.log(channel, date)
 
   if (!date || date === 'null') {
     const today = new Date()
@@ -679,18 +723,15 @@ exports.OrderToExcel = async (req, res) => {
     const day = String(today.getDate()).padStart(2, '0')
 
     date = `${year}${month}${day}`
-    console.log('📅 date:', date)
+    // console.log('📅 date:', date)
   }
 
   const start = new Date(
-    `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00+07:00`
-  )
+    `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00`
+  );
   const end = new Date(
-    `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(
-      6,
-      8
-    )}T23:59:59.999+07:00`
-  )
+    `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T23:59:59.999`
+  );
 
   // const channel = 'cash';
   const { Order } = getModelsByChannel(channel, res, orderModel)
@@ -729,10 +770,7 @@ exports.OrderToExcel = async (req, res) => {
   // console.log(modelOrder)
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    const date = new Date()
-    const RLDT = `${date.getFullYear()}${(date.getMonth() + 1)
-      .toString()
-      .padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`
+    const RLDT = dayjs().tz('Asia/Bangkok').format('YYYYMMDD');
 
     const listProduct = order.listProduct.map(product => {
       return {
@@ -870,21 +908,15 @@ exports.OrderToExcelConJob = async (req, res) => {
     const month = String(today.getMonth() + 1).padStart(2, '0') // เดือนเริ่มที่ 0
     const day = String(today.getDate()).padStart(2, '0')
 
-    date = `${year}${month}${day}`
-    console.log('📅 date:', date)
+    const date = `${year}${month}${day}`
+    // console.log('📅 date:', date)
 
     const start = new Date(
-      `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(
-        6,
-        8
-      )}T00:00:00+07:00`
-    )
+      `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00`
+    );
     const end = new Date(
-      `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(
-        6,
-        8
-      )}T23:59:59.999+07:00`
-    )
+      `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T23:59:59.999`
+    );
 
     // const channel = req.headers['x-channel'];
     const { Order } = getModelsByChannel(ch, res, orderModel)
@@ -923,10 +955,9 @@ exports.OrderToExcelConJob = async (req, res) => {
     // console.log(modelOrder)
     const tranFromOrder = modelOrder.flatMap(order => {
       let counterOrder = 0
-      const date = new Date()
-      const RLDT = `${date.getFullYear()}${(date.getMonth() + 1)
-        .toString()
-        .padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`
+
+      const RLDT = dayjs().tz('Asia/Bangkok').format('YYYYMMDD');
+
 
       const listProduct = order.listProduct.map(product => {
         return {
@@ -1170,7 +1201,6 @@ exports.getSummaryItem = async (req, res) => {
     const periodYear = period.slice(0, 4)
     const month = period.slice(4, 6)
 
-    // สร้างช่วงเวลาของเดือนนั้นใน timezone Bangkok
     const start = new Date(
       new Date(`${periodYear}-${month}-01T00:00:00`).toLocaleString('en-US', {
         timeZone: 'Asia/Bangkok'
@@ -1183,7 +1213,7 @@ exports.getSummaryItem = async (req, res) => {
       {
         $match: {
           'store.area': area,
-          period : period,
+          period: period,
           type: { $in: ['sale', 'change'] }
         }
       },
@@ -1517,8 +1547,6 @@ exports.getSummarybyMonth = async (req, res) => {
       }
     )
 
-    console.log()
-
     const modelOrder = await Order.aggregate(pipeline)
     const modelOrderValue = modelOrder.map(item => {
       return {
@@ -1817,7 +1845,7 @@ exports.getSummarybyGroup = async (req, res) => {
       {
         $match: {
           'store.zone': zone, // กรองตาม zone
-          period:period
+          period: period
         }
       },
       { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: false } },
@@ -2998,14 +3026,18 @@ exports.saleReport = async (req, res) => {
         areaQuery.area = area;
       }
     }
-    
+
     const sendMoneyData = await SendMoney.aggregate([
-      {$addFields:{
-        zone: { $substrBytes: ["$area", 0, 2] }
-      }},
-      {$match:{
-        ...areaQuery
-      }}
+      {
+        $addFields: {
+          zone: { $substrBytes: ["$area", 0, 2] }
+        }
+      },
+      {
+        $match: {
+          ...areaQuery
+        }
+      }
     ])
 
 
@@ -3013,7 +3045,7 @@ exports.saleReport = async (req, res) => {
 
 
     res.status(200).json({
-      status:200,
+      status: 200,
       sendMoneyData
     })
 
