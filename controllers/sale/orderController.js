@@ -1064,18 +1064,18 @@ exports.getAllOrder = async (req, res) => {
       const month = period.slice(4, 6)
 
       // สร้างช่วงเวลาของเดือนนั้นใน timezone Bangkok
-      const start = new Date(
-        new Date(`${periodYear}-${month}-01T00:00:00`).toLocaleString('en-US', {
-          timeZone: 'Asia/Bangkok'
-        })
-      )
+      // const start = new Date(
+      //   new Date(`${periodYear}-${month}-01T00:00:00`).toLocaleString('en-US', {
+      //     timeZone: 'Asia/Bangkok'
+      //   })
+      // )
 
-      const end = new Date(new Date(start).setMonth(start.getMonth() + 1))
+      // const end = new Date(new Date(start).setMonth(start.getMonth() + 1))
 
       const modelOrder = await Order.aggregate([
         {
           $match: {
-            createdAt: { $gte: start, $lt: end },
+            period: period,
             type: { $in: ['sale', 'change'] }
           }
         },
@@ -1183,7 +1183,7 @@ exports.getSummaryItem = async (req, res) => {
       {
         $match: {
           'store.area': area,
-          createdAt: { $gte: start, $lt: end },
+          period : period,
           type: { $in: ['sale', 'change'] }
         }
       },
@@ -1817,7 +1817,7 @@ exports.getSummarybyGroup = async (req, res) => {
       {
         $match: {
           'store.zone': zone, // กรองตาม zone
-          createdAt: { $gte: start, $lt: end }
+          period:period
         }
       },
       { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: false } },

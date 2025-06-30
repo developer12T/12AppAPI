@@ -294,8 +294,7 @@ exports.getOrder = async (req, res) => {
     }
 
     const { startDate, endDate } = rangeDate(period)
-    // console.log('startDate', startDate)
-    // console.log('endDate', endDate)
+
 
     const status = type === 'history' ? { $ne: 'pending' } : 'pending'
     let areaQuery = {}
