@@ -309,10 +309,7 @@ exports.getOrder = async (req, res) => {
     let query = {
       ...areaQuery,
       status,
-      createdAt: {
-        $gte: startDate,
-        $lt: endDate
-      }
+      period: period
     }
     // console.log(query)
     const order = await Distribution.aggregate([
