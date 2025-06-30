@@ -1545,10 +1545,11 @@ exports.getZoneInRoute = async (req, res) => {
     }
   ]
 
-  if (zone) {
+  if (zone && zone.length) {
+    const zoneArray = typeof zone === 'string' ? zone.split(',') : zone;
     pipeline.push({
-      $match: { area2: zone }
-    })
+      $match: { area2: { $in: zoneArray } }
+    });
   }
 
   pipeline.push(
