@@ -140,7 +140,7 @@ exports.userQueryManeger = async function (channel, area) {
 exports.userQueryFilter = async function (channel, area) {
 
   const array = area.map(code => `'${code}'`).join(',');
-  console.log(`(${array})`)
+  // console.log(`(${array})`)
   const config = {
     user: process.env.MS_SQL_USER,
     password: process.env.MS_SQL_PASSWORD,
@@ -984,9 +984,13 @@ const connection = await mysql.createConnection(config);
 let rows = [];
 if (channel === 'cash') {
   [rows] = await connection.execute(`
-    SELECT * FROM pc_withdraws_destination
+    SELECT * FROM vancash.pc_withdraws_destination
   `);
-  await connection.end(); // ปิด connection ที่ถูกต้อง
-  return rows; // คืนค่า rows ตรง ๆ (array ของ row)
+  await connection.end(); 
+
+
+    // console.log(rows)
+
+  return rows; 
 }
 }

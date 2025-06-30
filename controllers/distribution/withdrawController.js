@@ -16,6 +16,7 @@ const stockModel = require('../../models/cash/stock')
 const { withdrawQuery } = require('../../controllers/queryFromM3/querySctipt')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { query } = require('mssql')
+const { exists } = require('fs')
 
 
 
@@ -763,9 +764,17 @@ exports.insertOneWithdrawToErp = async (req, res) => {
 
 exports.addFromERPWithdraw = async (req, res) => {
   const channel = req.headers['x-channel'];
-  const result = withdrawQuery(channel)
+  const { Withdraw } = getModelsByChannel(channel, res, distributionModel);
+  const result = await withdrawQuery(channel)
 
-
+  for (const item of result) {
+    const existWithdraw = await Withdraw.findOne({ Des_No: item.Des_No });
+    if (existWithdraw) {
+      await Withdraw.findOneAndUpdate({ Des_No: item.Des_No }, item, { new: true });
+    } else {
+      await Withdraw.create(item);
+    }
+  }
 
   res.status(200).json({
     status: 200,
