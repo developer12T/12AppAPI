@@ -6,7 +6,8 @@ const { checkout,
     updateStockWithdraw,
     insertWithdrawToErp,
     insertOneWithdrawToErp,
-    addFromERPWithdraw 
+    addFromERPWithdraw,
+    approveWithdraw 
 } = require('../../controllers/distribution/withdrawController')
 const { getPlace, addPlace, getType, addAllPlace } = require('../../controllers/distribution/placeController')
 
@@ -27,5 +28,5 @@ router.post('/updateStockWithdraw', updateStockWithdraw)
 router.post('/insertWithdrawToErp', insertWithdrawToErp)
 router.post('/insertOneWithdrawToErp', insertOneWithdrawToErp)
 router.post('/addFromERPWithdraw', addFromERPWithdraw)
-
+router.get('/approveWithdraw', approveWithdraw)
 module.exports = router

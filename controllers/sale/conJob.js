@@ -42,7 +42,7 @@ async function erpApiCheckOrderJob(channel = 'cash') {
       try {
         const result = await Order.updateOne(
           { orderId },
-          { $set: { status: 'success', statusTH: 'สำเร็จ', updatedAt: new Date() } }
+          { $set: { status: 'completed', statusTH: 'สำเร็จ', updatedAt: new Date() } }
         );
         if (result.modifiedCount > 0) updatedCount++;
       } catch (err) {
@@ -110,7 +110,7 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
       try {
         const result = await Distribution.updateOne(
           { orderId },
-          { $set: { status: 'success', statusTH: 'สำเร็จ', updatedAt: new Date() } }
+          { $set: { status: 'completed', statusTH: 'สำเร็จ', updatedAt: new Date() } }
         );
         if (result.modifiedCount > 0) updatedCount++;
       } catch (err) {

@@ -13,6 +13,7 @@ const userModel = require('../../models/cash/user')
 const stockModel = require('../../models/cash/stock')
 const { withdrawQuery } = require('../../controllers/queryFromM3/querySctipt')
 const { getModelsByChannel } = require('../../middleware/channel')
+const { query } = require('mssql')
 
 
 
@@ -723,15 +724,41 @@ exports.insertOneWithdrawToErp = async (req, res) => {
 
 
 
-exports.addFromERPWithdraw = async (req,res) => {
+exports.addFromERPWithdraw = async (req, res) => {
   const channel = req.headers['x-channel'];
   const result = withdrawQuery(channel)
 
 
 
-    res.status(200).json({
+  res.status(200).json({
     status: 200,
     message: 'successfully',
-    data:result
+    data: result
   })
+}
+
+exports.approveWithdraw = async (req, res) => {
+  const { orderId } = req.query
+
+  const channel = req.headers['x-channel'];
+  const { Distribution } = getModelsByChannel(channel, res, distributionModel);
+  const distributionData = await Distribution.findOneAndUpdate(
+    { orderId: orderId, type: 'withdraw' },
+    { $set: { statusTH: 'completed', status: 'สำเร็จ' } },
+    { new: true }
+  );
+
+  if (!distributionData) {
+    return res.status(404).json({
+      status: 404,
+      message: 'Not found withdraw'
+    });
+  }
+
+  res.status(200).json({
+    status: 200,
+    message: 'successfully',
+    data: distributionData
+  })
+
 }
