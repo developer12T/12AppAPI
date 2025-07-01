@@ -7,7 +7,7 @@ const { getOrder, getDetail, updateStatus, checkout, addSlip, OrderToExcel, getA
     summaryAllProduct,
     summaryDaily,
     saleReport,
-    getSummary12SKU
+    getSummary18SKU
 
  } = require('../../controllers/sale/orderController')
 
@@ -38,5 +38,5 @@ router.get('/getProductLimit', getProductLimit)
 router.get('/summaryAllProduct', summaryAllProduct)
 router.get('/summaryDaily', summaryDaily)
 router.get('/saleReport', saleReport)
-router.get('/getSummary12SKU', getSummary12SKU)
+router.get('/getSummary18SKU', getSummary18SKU)
 module.exports = router

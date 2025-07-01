@@ -3056,7 +3056,7 @@ exports.saleReport = async (req, res) => {
 }
 
 
-exports.getSummary12SKU = async (req, res) => {
+exports.getSummary18SKU = async (req, res) => {
   const { zone, area, team } = req.query
   const channel = req.headers['x-channel'];
   const { Order } = getModelsByChannel(channel, res, orderModel);
