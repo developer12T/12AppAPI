@@ -1408,7 +1408,9 @@ exports.checkout = async (req, res) => {
 
     const { Stock, StockMovementLog, StockMovement, AdjustStock } = getModelsByChannel(channel, res, stockModel);
 
-
+    if (type != 'adjuststock') {
+      return res.status(400).json({ status: 400, message: 'Type is not vaild' })
+    }
 
     if (!type || !area || !storeId) {
       return res.status(400).json({ status: 400, message: 'Missing required fields!' })
@@ -1436,8 +1438,9 @@ exports.checkout = async (req, res) => {
       saleCode: sale.saleCode,
       period: period,
       note,
-      // status: 'pending',
-      // statusTH: 'รอนำเข้า',
+      status: 'pending',
+      statusTH: 'รอนำเข้า',
+      listImage: [],
       listProduct: summary.listProduct,
 
     })
@@ -1458,7 +1461,7 @@ exports.checkout = async (req, res) => {
   }
 }
 
-exports.addIncidentStock = async (req, res) => {
+exports.addAdjustStock = async (req, res) => {
 
   const { orderId, area, saleCode,
     period, note, listImage, listProduct

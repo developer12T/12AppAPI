@@ -2363,7 +2363,7 @@ exports.getSummaryProduct = async (req, res) => {
         store: '$order.store.storeId',
         area: '$order.store.area',
         productId: '$order.listProduct.id',
-        group: '$order.listProduct.groupCode',
+        group: '$order.listProduct.group',
         size: '$order.listProduct.size',
         unit: '$order.listProduct.unit',
         qty: '$order.listProduct.qty'
@@ -2386,7 +2386,7 @@ exports.getSummaryProduct = async (req, res) => {
       $project: {
         _id: 0,
         productId: '$id',
-        group: '$listUnit.groupCode',
+        group: '$listUnit.group',
         size: '$listUnit.size',
         unit: '$listUnit.unit',
         factor: '$listUnit.factor'
@@ -2439,7 +2439,7 @@ exports.getSummaryProduct = async (req, res) => {
     {
       $addFields: {
         groupSize: {
-          $concat: ['$groupCode', ' ', '$size']
+          $concat: ['$group', ' ', '$size']
         }
       }
     },
