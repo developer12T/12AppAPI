@@ -1430,7 +1430,7 @@ exports.getRouteEffective = async (req, res) => {
 }
 
 exports.getRouteEffectiveAll = async (req, res) => {
-  const { zone, area, period, day } = req.query
+  const { zone, area,team, period, day } = req.query
 
   const query = {}
   if (area) query.area = area
@@ -1458,6 +1458,31 @@ exports.getRouteEffectiveAll = async (req, res) => {
       message: 'Not found route'
     })
   }
+ if (team) {
+    routes = routes.map(item => {
+      const teamStr = item.area.substring(0, 2) + item.area.charAt(3)
+      return {
+        id: item.id,
+        period: item.period,
+        area: item.area,
+        team: teamStr,
+        day: item.day,
+        listStore: item.listStore,
+        storeAll: item.storeAll,
+        storePending: item.storePending,
+        storeSell: item.storeSell,
+        storeNotSell: item.storeNotSell,
+        storeCheckInNotSell: item.storeCheckInNotSell,
+        storeTotal: item.storeTotal,
+        percentComplete: item.percentComplete,
+        complete: item.complete,
+        percentVisit: item.percentVisit,
+        percentEffective: item.percentEffective
+      }
+    })
+  }
+
+
 
   let totalVisit = 0
   let totalEffective = 0
