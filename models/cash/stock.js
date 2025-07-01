@@ -140,7 +140,7 @@ const incidentStockImageSchema = mongoose.Schema({
 
 const adjustStockSchema = new mongoose.Schema({
   type: { type: String, require: true, enum: ['adjuststock'] },
-  orederId: { type: String, required: true },
+  orderId: { type: String, required: true },
   // stockId :{ type: String, required: true },
   area: { type: String, required: true },
   saleCode: { type: String, required: true },
@@ -164,7 +164,7 @@ module.exports = (conn) => {
     Stock: conn.model('stockTest', stockSchema, 'stockTest'),
     StockMovementLog: conn.model('stockMovementLog', stockMovementLogSchema, 'stockmovementlogs'),
     StockMovement: conn.model('StockMovement', stockMovementSchema),
-    AdjustStock: conn.model('adjustStock', adjustStockSchema,'adjustStocks')
+    AdjustStock: conn.model('adjustStock', adjustStockSchema,'adjuststocks')
   };
 };
 

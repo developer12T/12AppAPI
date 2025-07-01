@@ -1429,7 +1429,7 @@ exports.checkout = async (req, res) => {
     const orderId = await generateStockId(area, sale.warehouse, channel, res)
     const summary = await summaryOrder(cart, channel, res)
 
-    // new AdjustStock
+    // new AdjustStocka
 
     const newOrder = ({
       type,
@@ -1440,11 +1440,14 @@ exports.checkout = async (req, res) => {
       note,
       status: 'pending',
       statusTH: 'รอนำเข้า',
+      action:'',
       listImage: [],
       listProduct: summary.listProduct,
 
     })
 
+    await AdjustStock.create(newOrder)
+    await Cart.deleteOne({ type, area, storeId })
 
     res.status(200).json({
       status: 200,

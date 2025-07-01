@@ -107,6 +107,7 @@ exports.addProduct = async (req, res) => {
       qty,
       unit,
       condition,
+      action,
       expire
       // lot
     } = req.body
@@ -247,6 +248,7 @@ exports.addProduct = async (req, res) => {
           qty,
           unit,
           price,
+          action,
           condition
         })
       }

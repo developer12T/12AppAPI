@@ -1261,7 +1261,7 @@ exports.getRouteProvince = async (req, res) => {
 }
 
 exports.getRouteEffective = async (req, res) => {
-  const { area, period } = req.body
+  const { area, team, period } = req.body
 
   const channel = req.headers['x-channel']
 
@@ -1270,7 +1270,14 @@ exports.getRouteEffective = async (req, res) => {
   const { Order } = getModelsByChannel(channel, res, orderModel)
   const { Product } = getModelsByChannel(channel, res, productModel)
 
-  const routes = await Route.find({ area: area, period: period }).populate(
+  let query = {}
+  if ( area ) {
+    query = { area: area }
+  } else {
+    query = {}
+  }
+
+  let routes = await Route.find({ ...query, period: period }).populate(
     'listStore.storeInfo',
     'storeId name address typeName taxId tel'
   )
@@ -1283,13 +1290,40 @@ exports.getRouteEffective = async (req, res) => {
     })
   }
 
+  if (team) {
+    routes = routes.map(item => {
+      const teamStr = item.area.substring(0, 2) + item.area.charAt(3)
+      return {
+        id: item.id,
+        period: item.period,
+        area: item.area,
+        team: teamStr,
+        day: item.day,
+        listStore: item.listStore,
+        storeAll: item.storeAll,
+        storePending: item.storePending,
+        storeSell: item.storeSell,
+        storeNotSell: item.storeNotSell,
+        storeCheckInNotSell: item.storeCheckInNotSell,
+        storeTotal: item.storeTotal,
+        percentComplete: item.percentComplete,
+        complete: item.complete,
+        percentVisit: item.percentVisit,
+        percentEffective: item.percentEffective
+      }
+    })
+    // console.log(routes)
+    routes = routes.filter(item => item.team === team)
+    // console.log(routes)
+  }
+  // console.log(routes)
   const orderIdList = routes.flatMap(u =>
     (u.listStore || []).flatMap(i =>
       (i.listOrder || []).map(order => order.orderId)
     )
   )
   const orderDetail = await Order.find({ orderId: { $in: orderIdList } })
-
+  // console.log(orderDetail)
   const productId = orderDetail.flatMap(u => u.listProduct.map(i => i.id))
 
   const productFactor = await Product.aggregate([
