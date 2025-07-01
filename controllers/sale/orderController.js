@@ -45,7 +45,8 @@ const xlsx = require('xlsx')
 const path = require('path')
 const os = require('os')
 const fs = require('fs')
-const { group } = require('console')
+const { group } = require('console');
+const { query } = require('mssql');
 
 
 
@@ -3052,4 +3053,107 @@ exports.saleReport = async (req, res) => {
 
 
   }
+}
+
+
+exports.getSummary12SKU = async (req, res) => {
+  const { zone, area, team } = req.query
+  const channel = req.headers['x-channel'];
+  const { Order } = getModelsByChannel(channel, res, orderModel);
+  const { Product } = getModelsByChannel(channel, res, productModel);
+
+  const matchStage = {};
+  if (zone) matchStage['store.zone'] = zone;
+  if (area) matchStage['store.area'] = area;
+  if (team) matchStage['team'] = team;
+  // console.log(team)
+  const dataOrder = await Order.aggregate([
+    {
+      $addFields: {
+        team: {
+          $concat: [
+            { $substr: ['$store.area', 0, 2] },    // 2 ตัวแรก
+            { $substr: ['$store.area', 3, 1] }     // ตัวที่ 4 (index เริ่ม 0)
+          ]
+        }
+      }
+    },
+    { $match: matchStage },
+    { $match: { team: { $ne: '' } } },
+    { $unwind: '$listProduct' },
+    { $replaceRoot: { newRoot: '$listProduct' } },
+  ]);
+
+  const productlist = dataOrder.map(item => item.id); // หรือ flatMap ถ้าเป็น array
+  const productId = [...new Set(productlist)];
+  const productData = await Product.find({ id: { $in: productId } });
+
+
+  const emptyGroup = await Product.aggregate([
+    {
+      $group: {
+        _id: {
+          groupCode: '$groupCode',
+          group: '$group',
+          groupCodeM3: '$groupCodeM3'
+        }
+      }
+    },
+    { $replaceRoot: { newRoot: '$_id' } },
+    {
+      $addFields: {
+        summaryQty: 0,
+        summary: 0
+      }
+    },
+  ]
+  )
+
+  data = []
+  for (const item of dataOrder) {
+    const productDetail = productData.find(i => item.id === i.id)
+    const unit = productDetail.listUnit.find(u => item.unit === u.unit)
+    const factorPcs = unit.factor
+    dataTran = {
+      groupCode: productDetail.groupCode,
+      groupCodeM3: productDetail.groupCodeM3,
+      group: productDetail.group,
+      summaryQty: item.qty * factorPcs,
+      summary: item.netTotal
+    }
+    data.push(dataTran)
+  }
+
+
+  const mergedGroup = emptyGroup.map(group => {
+    const groupItems = data.filter(
+      item =>
+        item.groupCode === group.groupCode &&
+        item.group === group.group &&
+        item.groupCodeM3 === group.groupCodeM3
+    );
+    const summaryQtySum = groupItems.reduce((sum, i) => sum + i.summaryQty, 0);
+    const summarySum = groupItems.reduce((sum, i) => sum + i.summary, 0);
+
+    return {
+      ...group,
+      summaryQty: summaryQtySum,
+      summary: summarySum
+    };
+  });
+
+  const sortedMergedGroup = mergedGroup.sort(
+    (a, b) => a.groupCode.localeCompare(b.groupCode, undefined, { numeric: true })
+  );
+
+
+
+
+
+  res.status(200).json({
+    status: 200,
+    // data: data,
+    data: sortedMergedGroup
+  })
+
 }
