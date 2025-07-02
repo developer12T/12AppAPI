@@ -601,8 +601,8 @@ exports.getDetail = async (req, res) => {
 }
 
 exports.updateStatus = async (req, res) => {
-  const session = await require('mongoose').startSession();
-  session.startTransaction();
+  // const session = await require('mongoose').startSession();
+  // session.startTransaction();
   try {
     const { orderId, status } = req.body;
 
@@ -613,21 +613,22 @@ exports.updateStatus = async (req, res) => {
     const { Stock } = getModelsByChannel(channel, res, stockModel);
 
     if (!orderId || !status) {
-      await session.abortTransaction();
-      session.endSession();
+      // await session.abortTransaction();
+      // session.endSession();
       return res.status(400).json({ status: 400, message: 'orderId, status are required!' });
     }
 
-    const order = await Order.findOne({ orderId }).session(session);
+    const order = await Order.findOne({ orderId })
+    // .session(session);
     if (!order) {
-      await session.abortTransaction();
-      session.endSession();
+      // await session.abortTransaction();
+      // session.endSession();
       return res.status(404).json({ status: 404, message: 'Order not found!' });
     }
 
     if (order.status !== 'pending' && status !== 'canceled') {
-      await session.abortTransaction();
-      session.endSession();
+      // await session.abortTransaction();
+      // session.endSession();
       return res.status(400).json({
         status: 400,
         message: 'Cannot update status, order is not in pending state!'
@@ -639,10 +640,11 @@ exports.updateStatus = async (req, res) => {
     if (status === 'canceled' && !orderId.endsWith('CC')) {
       newOrderId = `${orderId}CC`;
 
-      const isDuplicate = await Order.findOne({ orderId: newOrderId }).session(session);
+      const isDuplicate = await Order.findOne({ orderId: newOrderId })
+      // .session(session);
       if (isDuplicate) {
         let counter = 1;
-        while (await Order.findOne({ orderId: `${orderId}CC${counter}` }).session(session)) {
+        while (await Order.findOne({ orderId: `${orderId}CC${counter}` })) {
           counter++;
         }
         newOrderId = `${orderId}CC${counter}`;
@@ -665,7 +667,8 @@ exports.updateStatus = async (req, res) => {
               }
             }
           }
-        ]).session(session);
+        ])
+        // .session(session);
 
         const factorCtnResult = await Product.aggregate([
           { $match: { id: u.id } },
@@ -681,7 +684,7 @@ exports.updateStatus = async (req, res) => {
               }
             }
           }
-        ]).session(session) || [];
+        ])|| [];
 
         const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0;
         const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 1;
@@ -706,7 +709,7 @@ exports.updateStatus = async (req, res) => {
               { 'elem.productId': u.id }
             ],
             new: true,
-            session
+            // session
           }
         );
       }
@@ -714,7 +717,7 @@ exports.updateStatus = async (req, res) => {
 
     if (order.listPromotions.length > 0) {
       for (const item of order.listPromotions) {
-        const promotionDetail = await Promotion.findOne({ proId: item.proId }).session(session) || {};
+        const promotionDetail = await Promotion.findOne({ proId: item.proId }) || {};
         const storeIdToRemove = order.store.storeId;
         if (promotionDetail.applicableTo?.isNewStore === true) {
           promotionDetail.applicableTo.completeStoreNew = promotionDetail.applicableTo.completeStoreNew?.filter(
@@ -725,7 +728,7 @@ exports.updateStatus = async (req, res) => {
             storeId => storeId !== storeIdToRemove
           ) || [];
         }
-        await promotionDetail.save({ session }).catch(() => { }); // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => { }); // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
 
           const factorPcsResult = await Product.aggregate([
@@ -742,7 +745,8 @@ exports.updateStatus = async (req, res) => {
                 }
               }
             }
-          ]).session(session);
+          ])
+          // .session(session);
 
           const factorCtnResult = await Product.aggregate([
             { $match: { id: u.id } },
@@ -758,7 +762,7 @@ exports.updateStatus = async (req, res) => {
                 }
               }
             }
-          ]).session(session) || [];
+          ]) || [];
 
           const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0;
           const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 1;
@@ -783,7 +787,7 @@ exports.updateStatus = async (req, res) => {
                 { 'elem.productId': u.id }
               ],
               new: true,
-              session
+              // session
             }
           );
         }
@@ -793,11 +797,11 @@ exports.updateStatus = async (req, res) => {
     const updatedOrder = await Order.findOneAndUpdate(
       { orderId },
       { $set: { status, orderId: newOrderId } },
-      { new: true, session }
+      { new: true,  }
     );
 
-    await session.commitTransaction();
-    session.endSession();
+    // await session.commitTransaction();
+    // session.endSession();
 
     const io = getSocket()
     io.emit('order/updateStatus', {});
@@ -808,8 +812,8 @@ exports.updateStatus = async (req, res) => {
       data: updatedOrder
     });
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
+    // await session.abortTransaction();
+    // session.endSession();
     console.error('Error updating order:', error);
     res.status(500).json({ status: 500, message: 'Server error' });
   }

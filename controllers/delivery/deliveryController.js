@@ -3,8 +3,8 @@ const { getModelsByChannel } = require('../../middleware/channel')
 const { getSocket } = require('../../socket')
 
 exports.addDelivery = async (req, res) => {
-    const session = await require('mongoose').startSession();
-    session.startTransaction();
+    // const session = await require('mongoose').startSession();
+    // session.startTransaction();
     try {
         const { stratMonth } = req.body;
 
@@ -12,10 +12,11 @@ exports.addDelivery = async (req, res) => {
         const { Delivery } = getModelsByChannel(channel, res, deliveryModel);
 
         const deliveryDateStart = new Date(`${stratMonth}-01`);
-        const deliveryExit = await Delivery.findOne({ deliveryDateStart: deliveryDateStart }).session(session);
+        const deliveryExit = await Delivery.findOne({ deliveryDateStart: deliveryDateStart })
+        // .session(session);
         if (deliveryExit) {
-            await session.abortTransaction();
-            session.endSession();
+            // await session.abortTransaction();
+            // session.endSession();
             return res.status(400).json({
                 Message: "Already have in database"
             });
@@ -33,10 +34,10 @@ exports.addDelivery = async (req, res) => {
             deliveryDateEnd,
             preparationDays,
             displayDays
-        }], { session });
+        }]);
 
-        await session.commitTransaction();
-        session.endSession();
+        // await session.commitTransaction();
+        // session.endSession();
 
         const io = getSocket()
         io.emit('delivery/addDelivery', {});
@@ -47,8 +48,8 @@ exports.addDelivery = async (req, res) => {
         });
 
     } catch (error) {
-        await session.abortTransaction().catch(() => { });
-        session.endSession();
+        // await session.abortTransaction().catch(() => { });
+        // session.endSession();
         res.status(500).json({ status: 500, message: error.message });
     }
 };

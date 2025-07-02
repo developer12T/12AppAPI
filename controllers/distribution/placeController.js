@@ -46,8 +46,8 @@ exports.getPlace = async (req, res) => {
 }
 
 exports.addPlace = async (req, res) => {
-    const session = await require('mongoose').startSession();
-    session.startTransaction();
+    // const session = await require('mongoose').startSession();
+    // session.startTransaction();
     try {
         const { area, listAddress } = req.body;
 
@@ -55,29 +55,30 @@ exports.addPlace = async (req, res) => {
         const { Place } = getModelsByChannel(channel, res, distributionModel);
 
         if (!area || !listAddress) {
-            await session.abortTransaction();
-            session.endSession();
+            // await session.abortTransaction();
+            // session.endSession();
             return res.status(400).json({ status: 400, message: 'area and listAddress are required!' });
         }
 
-        let place = await Place.findOne({ area: area }).session(session);
+        let place = await Place.findOne({ area: area })
+        // .session(session);
         if (!place) {
             place = await Place.create([{
                 area,
                 listAddress
-            }], { session });
+            }]);
             place = place[0]; // create แบบ array
         } else {
             const existingIds = new Set(place.listAddress.map(addr => addr.id));
             const newAddresses = listAddress.filter(addr => !existingIds.has(addr.id));
             if (newAddresses.length > 0) {
                 place.listAddress.push(...newAddresses);
-                await place.save({ session });
+                await place.save();
             }
         }
 
-        await session.commitTransaction();
-        session.endSession();
+        // await session.commitTransaction();
+        // session.endSession();
 
         const io = getSocket()
         io.emit('distribution/place/add', {});
@@ -89,8 +90,8 @@ exports.addPlace = async (req, res) => {
         });
 
     } catch (error) {
-        await session.abortTransaction().catch(() => { });
-        session.endSession();
+        // await session.abortTransaction().catch(() => { });
+        // session.endSession();
         console.error(error);
         res.status(500).json({ status: '500', message: error.message });
     }
@@ -141,15 +142,16 @@ exports.getType = async (req, res) => {
 }
 
 exports.addAllPlace = async (req, res) => {
-    const session = await require('mongoose').startSession();
-    session.startTransaction();
+    // const session = await require('mongoose').startSession();
+    // session.startTransaction();
     try {
         const channel = req.headers['x-channel'];
         const { User } = getModelsByChannel(channel, res, userModel);
         const { Place, Withdraw } = getModelsByChannel(channel, res, distributionModel);
 
 
-        const users = await User.find({ role: 'sale' }).session(session)
+        const users = await User.find({ role: 'sale' })
+        // .session(session)
 
         areaList = users.map(user => user.area)
 
@@ -159,11 +161,11 @@ exports.addAllPlace = async (req, res) => {
         // console.log("areaList",areaList)
         for (const user of areaList) {
 
-            const withdrawT04 = await Withdraw.findOne({ Des_Area: user, ZType: "T04" }).session(session) || {};
+            const withdrawT04 = await Withdraw.findOne({ Des_Area: user, ZType: "T04" })|| {};
 
-            const withdrawT05 = await Withdraw.findOne({ Des_Area: user, ZType: "T05" }).session(session) || {};
+            const withdrawT05 = await Withdraw.findOne({ Des_Area: user, ZType: "T05" })|| {};
 
-            const checkPlace = await Place.findOne({ area: user }).session(session)
+            const checkPlace = await Place.findOne({ area: user })
 
             if (!checkPlace) {
                 const t04 = {
@@ -220,13 +222,13 @@ exports.addAllPlace = async (req, res) => {
                 data.push(combineData)
                 areaAdded.push(combineData.area)
                 placeDoc = new Place(combineData)
-                await placeDoc.save({ session })
+                await placeDoc.save()
             }
 
         }
 
-        await session.commitTransaction();
-        session.endSession();
+        // await session.commitTransaction();
+        // session.endSession();
 
         const io = getSocket()
         io.emit('distribution/place/addAllPlace', {});
@@ -240,8 +242,8 @@ exports.addAllPlace = async (req, res) => {
 
 
     } catch (error) {
-        await session.abortTransaction().catch(() => { });
-        session.endSession();
+        // await session.abortTransaction().catch(() => { });
+        // session.endSession();
         console.error(error);
         res.status(500).json({ status: '500', message: error.message });
     }

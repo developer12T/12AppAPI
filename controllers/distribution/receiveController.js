@@ -11,8 +11,8 @@ const { getModelsByChannel } = require('../../middleware/channel')
 
 
 exports.addReceive = async (req, res) => {
-  const session = await require('mongoose').startSession();
-  session.startTransaction();
+  // const session = await require('mongoose').startSession();
+  // session.startTransaction();
   try {
     const today = moment().format('YYYYMMDD');
     const response = await axios.post(`${process.env.API_URL_12ERP}/receive/getReceiveAll`, { transdate: today });
@@ -24,8 +24,8 @@ exports.addReceive = async (req, res) => {
     const { Product } = getModelsByChannel(channel, res, productModel);
 
     if (!Array.isArray(receiveData) || receiveData.length === 0) {
-      await session.abortTransaction();
-      session.endSession();
+      // await session.abortTransaction();
+      // session.endSession();
       return res.status(400).json({ status: 400, message: 'No receive data found' });
     }
 
@@ -34,8 +34,10 @@ exports.addReceive = async (req, res) => {
     for (const receive of receiveData) {
       const { orderId, orderType, area, fromWarehouse, toWarehouse, shippingId, shippingRoute, shippingName, sendAddress, sendDate, remark, listProduct } = receive;
 
-      const user = await User.findOne({ area }).session(session);
-      const place = await Place.findOne({ area }).session(session);
+      const user = await User.findOne({ area })
+      // .session(session);
+      const place = await Place.findOne({ area })
+      // .session(session);
       const orderTypeName = place?.listAddress?.find(addr => addr.type === orderType)?.typeNameTH || '';
       const saleCode = user?.saleCode || '';
 
@@ -112,7 +114,7 @@ exports.addReceive = async (req, res) => {
         totalWeightGross,
         totalWeightNet,
         status: 'pending'
-      }], { session });
+      }]);
 
       createdOrderIds.push(orderId);
     }
@@ -129,8 +131,8 @@ exports.addReceive = async (req, res) => {
       }
     }
 
-    await session.commitTransaction();
-    session.endSession();
+    // await session.commitTransaction();
+    // session.endSession();
 
 
     const io = getSocket()
@@ -141,8 +143,8 @@ exports.addReceive = async (req, res) => {
       message: 'Receive data saved and status updated successfully!'
     });
   } catch (error) {
-    await session.abortTransaction().catch(() => { });
-    session.endSession();
+    // await session.abortTransaction().catch(() => { });
+    // session.endSession();
     console.error('Error adding receive:', error);
     res.status(500).json({ status: 500, message: 'Error adding receive', error: error.message });
   }

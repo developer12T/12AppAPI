@@ -152,8 +152,8 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
 
 async function DeleteCartDaily(channel = 'cash') {
   // เปิด session สำหรับ transaction
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  // const session = await mongoose.startSession();
+  // session.startTransaction();
 
   try {
     const { Cart } = getModelsByChannel(channel, null, cartModel);
@@ -161,7 +161,8 @@ async function DeleteCartDaily(channel = 'cash') {
     const { Product } = getModelsByChannel(channel, null, productModel);
 
     // ดึงข้อมูล cart ทั้งหมด (เช่นเดิม)
-    const data = await Cart.find({}).session(session);
+    const data = await Cart.find({})
+    // .session(session);
 
     // ดึงข้อมูล listProduct และ listPromotion
     const listProduct = data.flatMap(sub =>
@@ -198,7 +199,8 @@ async function DeleteCartDaily(channel = 'cash') {
             }
           }
         }
-      ]).session(session);
+      ])
+      // .session(session);
 
       const factorCtnResult = await Product.aggregate([
         { $match: { id: item.id } },
@@ -214,7 +216,8 @@ async function DeleteCartDaily(channel = 'cash') {
             }
           }
         }
-      ]).session(session);
+      ])
+      // .session(session);
 
       // ตรวจสอบว่ามีข้อมูล unit
       if (!factorCtnResult.length || !factorCtnResult[0].listUnit.length ||
@@ -244,24 +247,24 @@ async function DeleteCartDaily(channel = 'cash') {
         {
           arrayFilters: [{ 'elem.productId': item.id }],
           new: true,
-          session // สำคัญ!
+          // session // สำคัญ!
         }
       );
     }
 
     // ลบ Cart ทั้งหมด (ตามเงื่อนไขที่คุณต้องการ)
-    await Cart.deleteMany({}, { session });
+    await Cart.deleteMany({});
 
     // ถ้าทุกอย่างสำเร็จ, commit transaction
-    await session.commitTransaction();
-    session.endSession();
+    // await session.commitTransaction();
+    // session.endSession();
 
     return { success: true };
 
   } catch (error) {
     // ถ้าเกิด error, rollback ทุกอย่าง
-    await session.abortTransaction();
-    session.endSession();
+    // await session.abortTransaction();
+    // session.endSession();
     console.error('❌ Error in DeleteCartDaily:', error);
     return { error: true, message: error.message };
   }
