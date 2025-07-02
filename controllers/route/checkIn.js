@@ -3,18 +3,19 @@
 
 const { getModelsByChannel } = require('../../middleware/channel')
 
-const  routeModel  = require('../../models/cash/route')
-const  storeModel  = require('../../models/cash/store')
+const routeModel = require('../../models/cash/route')
+const storeModel = require('../../models/cash/store');
+const { period } = require('../../utilities/datetime');
 
-async function checkInRoute(data,channel,res) {
+async function checkInRoute(data, channel, res) {
     try {
         if (!data) {
             throw new Error('Data check-in is required')
         }
 
-        const { Store } = getModelsByChannel(channel,res,storeModel); 
+        const { Store } = getModelsByChannel(channel, res, storeModel);
 
-        const { Route } = getModelsByChannel(channel,res,routeModel); 
+        const { Route } = getModelsByChannel(channel, res, routeModel);
 
 
         const store = await Store.findOne({ storeId: data.storeId })
@@ -22,9 +23,42 @@ async function checkInRoute(data,channel,res) {
             return { status: 404, message: 'Store not found' }
         }
 
-        let route = await Route.findOne({ id: data.routeId, "listStore.storeInfo": store._id })
+        let route = await Route.findOne({ id: data.routeId, "listStore.storeInfo": store._id.toString(), "listStore.status": "0" })
         // let route = await Route.findOne({ id: data.routeId, "listStore.storeInfo": store._id })
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
 
+        const endOfDay = new Date();
+        endOfDay.setHours(23, 59, 59, 999);
+
+        let allRoute = await Route.aggregate([
+            {
+                $match: {
+                    period: data.period
+                }
+            },
+            { $unwind: '$listStore' },
+            {
+                $project: {
+                    listStore: 1
+                }
+            },
+            {
+                $replaceRoot: { newRoot: "$listStore" }
+            },
+            {
+                $match: {
+                    status: { $nin: ['0'] },
+                    storeInfo: store._id.toString(),
+                    date: { $gte: startOfDay, $lte: endOfDay }
+                }
+            }
+
+        ])
+
+        if (allRoute.length > 0) {
+            return { status: 409, message: 'Duplicate route or listStore found' };
+        }
 
         if (!route) {
             return { status: 404, message: 'Route not found or listStore not matched' }
@@ -61,11 +95,11 @@ async function checkInRoute(data,channel,res) {
             updateData["listStore.$.listOrder"] = [...listOrder, newOrder]
         }
 
-        route = await Route.findOneAndUpdate(
-            { id: data.routeId, "listStore.storeInfo": store._id },
-            { $set: updateData },
-            { new: true }
-        )
+        // route = await Route.findOneAndUpdate(
+        //     { id: data.routeId, "listStore.storeInfo": store._id },
+        //     { $set: updateData },
+        //     { new: true }
+        // )
 
         if (!route) {
             return { status: 404, message: 'Route update failed' }

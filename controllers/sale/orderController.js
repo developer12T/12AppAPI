@@ -51,7 +51,7 @@ const { query } = require('mssql');
 
 
 exports.checkout = async (req, res) => {
-  const transaction = await sequelize.transaction();
+  // const transaction = await sequelize.transaction();
   try {
     const {
       type,
@@ -249,6 +249,28 @@ exports.checkout = async (req, res) => {
       channel,
       res
     )
+
+    const checkIn = await checkInRoute(
+      {
+        storeId: storeId,
+        routeId: routeId,
+        orderId: orderId,
+        note: note,
+        latitude: latitude,
+        longitude: longitude,
+        period: period
+      },
+      channel,
+      res
+    )
+
+    if (checkIn.status === 409) {
+      return res.status(409).json({
+        status:409,
+        message:'Duplicate route or listStore found on this day'
+      })
+    }
+
     // const promotion = await applyPromotion(summary, channel, res)
 
     // newOrder.listPromotions.forEach(item => {
@@ -262,17 +284,17 @@ exports.checkout = async (req, res) => {
     //   }
     // });
 
-    for (const item of newOrder.listQuota) {
-      await Quota.findOneAndUpdate(
-        { quotaId: item.quotaId },
-        {
-          $inc: {
-            quota: -item.quota,
-            quotaUse: + item.quota
-          }
-        }
-      )
-    }
+    // for (const item of newOrder.listQuota) {
+    //   await Quota.findOneAndUpdate(
+    //     { quotaId: item.quotaId },
+    //     {
+    //       $inc: {
+    //         quota: -item.quota,
+    //         quotaUse: + item.quota
+    //       }
+    //     }
+    //   )
+    // }
 
     const qtyproduct = newOrder.listProduct.map(u => {
       return {
@@ -347,27 +369,27 @@ exports.checkout = async (req, res) => {
       const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
       // console.log('factorPcsQty', factorPcsQty)
       // console.log('factorCtnQty', factorCtnQty)
-      const data = await Stock.findOneAndUpdate(
-        {
-          area: area,
-          period: period,
-          'listProduct.productId': item.productId
-        },
-        {
-          $inc: {
-            'listProduct.$[elem].stockOutPcs': +factorPcsQty,
-            // 'listProduct.$[elem].balancePcs': -factorPcsQty,
-            'listProduct.$[elem].stockOutCtn': +factorCtnQty,
-            // 'listProduct.$[elem].balanceCtn': -factorCtnQty
-          }
-        },
-        {
-          arrayFilters: [
-            { 'elem.productId': item.productId }
-          ],
-          new: true
-        }
-      );
+      // const data = await Stock.findOneAndUpdate(
+      //   {
+      //     area: area,
+      //     period: period,
+      //     'listProduct.productId': item.productId
+      //   },
+      //   {
+      //     $inc: {
+      //       'listProduct.$[elem].stockOutPcs': +factorPcsQty,
+      //       // 'listProduct.$[elem].balancePcs': -factorPcsQty,
+      //       'listProduct.$[elem].stockOutCtn': +factorCtnQty,
+      //       // 'listProduct.$[elem].balanceCtn': -factorCtnQty
+      //     }
+      //   },
+      //   {
+      //     arrayFilters: [
+      //       { 'elem.productId': item.productId }
+      //     ],
+      //     new: true
+      //   }
+      // );
     }
     const calStock = {
       // storeId: refundOrder.store.storeId,
@@ -384,20 +406,20 @@ exports.checkout = async (req, res) => {
     }
 
 
-    const createdMovement = await StockMovement.create({
-      ...calStock
-    });
+    // const createdMovement = await StockMovement.create({
+    //   ...calStock
+    // });
 
-    await StockMovementLog.create({
-      ...calStock,
-      refOrderId: createdMovement._id
-    });
-    await newOrder.save()
-    await PromotionShelf.findOneAndUpdate(
-      { proShelfId: promotionshelf.proShelfId },
-      { $set: { qty: 0 } }
-    )
-    await Cart.deleteOne({ type, area, storeId })
+    // await StockMovementLog.create({
+    //   ...calStock,
+    //   refOrderId: createdMovement._id
+    // });
+    // await newOrder.save()
+    // await PromotionShelf.findOneAndUpdate(
+    //   { proShelfId: promotionshelf.proShelfId },
+    //   { $set: { qty: 0 } }
+    // )
+    // await Cart.deleteOne({ type, area, storeId })
     const currentDate = new Date()
     let query = {}
     const promoIds = newOrder.listPromotions.map(u => u.proId);
@@ -441,26 +463,16 @@ exports.checkout = async (req, res) => {
       }
     }
 
-    const checkIn = await checkInRoute(
-      {
-        storeId: storeId,
-        routeId: routeId,
-        orderId: orderId,
-        note: note,
-        latitude: latitude,
-        longitude: longitude
-      },
-      channel,
-      res
-    )
-    await transaction.commit()
+
+
+    // await transaction.commit()
     res.status(200).json({
       status: 200,
       message: 'Checkout successful!',
       data: newOrder
     })
   } catch (error) {
-    await transaction.rollback()
+    // await transaction.rollback()
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
   }
