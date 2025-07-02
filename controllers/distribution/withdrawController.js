@@ -817,7 +817,6 @@ exports.approveWithdraw = async (req, res) => {
   }
 
   const distributionTran = await Distribution.find({ orderId: orderId, type: 'withdraw' })
-  console.log(distributionTran)
   const sendDate = new Date(distributionTran.sendDate);
   
   const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '');

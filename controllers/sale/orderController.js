@@ -589,61 +589,217 @@ exports.getDetail = async (req, res) => {
 }
 
 exports.updateStatus = async (req, res) => {
+  const session = await require('mongoose').startSession();
+  session.startTransaction();
   try {
-    const { orderId, status } = req.body
+    const { orderId, status } = req.body;
 
-    const channel = req.headers['x-channel']
-
-    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const channel = req.headers['x-channel'];
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel);
+    const { Product } = getModelsByChannel(channel, res, productModel);
+    const { Order } = getModelsByChannel(channel, res, orderModel);
+    const { Stock } = getModelsByChannel(channel, res, stockModel);
 
     if (!orderId || !status) {
-      return res
-        .status(400)
-        .json({ status: 400, message: 'orderId, status are required!' })
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ status: 400, message: 'orderId, status are required!' });
     }
 
-    const order = await Order.findOne({ orderId })
+    const order = await Order.findOne({ orderId }).session(session);
     if (!order) {
-      return res.status(404).json({ status: 404, message: 'Order not found!' })
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ status: 404, message: 'Order not found!' });
     }
 
     if (order.status !== 'pending' && status !== 'canceled') {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({
         status: 400,
         message: 'Cannot update status, order is not in pending state!'
-      })
+      });
     }
 
-    let newOrderId = orderId
+    let newOrderId = orderId;
 
     if (status === 'canceled' && !orderId.endsWith('CC')) {
-      newOrderId = `${orderId}CC`
+      newOrderId = `${orderId}CC`;
 
-      const isDuplicate = await Order.findOne({ orderId: newOrderId })
+      const isDuplicate = await Order.findOne({ orderId: newOrderId }).session(session);
       if (isDuplicate) {
-        let counter = 1
-        while (await Order.findOne({ orderId: `${orderId}CC${counter}` })) {
-          counter++
+        let counter = 1;
+        while (await Order.findOne({ orderId: `${orderId}CC${counter}` }).session(session)) {
+          counter++;
         }
-        newOrderId = `${orderId}CC${counter}`
+        newOrderId = `${orderId}CC${counter}`;
+      }
+    }
+
+    if (order.listProduct.length > 0) {
+      for (const u of order.listProduct) {
+        const factorPcsResult = await Product.aggregate([
+          { $match: { id: u.id } },
+          {
+            $project: {
+              id: 1,
+              listUnit: {
+                $filter: {
+                  input: "$listUnit",
+                  as: "unitItem",
+                  cond: { $eq: ["$$unitItem.unit", u.unit] }
+                }
+              }
+            }
+          }
+        ]).session(session);
+
+        const factorCtnResult = await Product.aggregate([
+          { $match: { id: u.id } },
+          {
+            $project: {
+              id: 1,
+              listUnit: {
+                $filter: {
+                  input: "$listUnit",
+                  as: "unitItem",
+                  cond: { $eq: ["$$unitItem.unit", "CTN"] }
+                }
+              }
+            }
+          }
+        ]).session(session) || [];
+
+        const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0;
+        const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 1;
+        const factorPcsQty = u.qty * factorPcs;
+        const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
+        await Stock.findOneAndUpdate(
+          {
+            area: order.store.area,
+            period: order.period,
+            'listProduct.productId': u.id
+          },
+          {
+            $inc: {
+              'listProduct.$[elem].stockOutPcs': -factorPcsQty,
+              'listProduct.$[elem].balancePcs': +factorPcsQty,
+              'listProduct.$[elem].stockOutCtn': -factorCtnQty,
+              'listProduct.$[elem].balanceCtn': +factorCtnQty
+            }
+          },
+          {
+            arrayFilters: [
+              { 'elem.productId': u.id }
+            ],
+            new: true,
+            session
+          }
+        );
+      }
+    }
+
+    if (order.listPromotions.length > 0) {
+      for (const item of order.listPromotions) {
+        const promotionDetail = await Promotion.findOne({ proId: item.proId }).session(session) || {};
+        const storeIdToRemove = order.store.storeId;
+        if (promotionDetail.applicableTo?.isNewStore === true) {
+          promotionDetail.applicableTo.completeStoreNew = promotionDetail.applicableTo.completeStoreNew?.filter(
+            storeId => storeId !== storeIdToRemove
+          ) || [];
+        } else if (promotionDetail.applicableTo?.isbeauty === true) {
+          promotionDetail.applicableTo.completeStoreBeauty = promotionDetail.applicableTo.completeStoreBeauty?.filter(
+            storeId => storeId !== storeIdToRemove
+          ) || [];
+        }
+        await promotionDetail.save({ session }).catch(() => { }); // ถ้าเป็น doc ใหม่ต้อง .save()
+        for (const u of item.listProduct) {
+
+          const factorPcsResult = await Product.aggregate([
+            { $match: { id: u.id } },
+            {
+              $project: {
+                id: 1,
+                listUnit: {
+                  $filter: {
+                    input: "$listUnit",
+                    as: "unitItem",
+                    cond: { $eq: ["$$unitItem.unit", u.unit] }
+                  }
+                }
+              }
+            }
+          ]).session(session);
+
+          const factorCtnResult = await Product.aggregate([
+            { $match: { id: u.id } },
+            {
+              $project: {
+                id: 1,
+                listUnit: {
+                  $filter: {
+                    input: "$listUnit",
+                    as: "unitItem",
+                    cond: { $eq: ["$$unitItem.unit", "CTN"] }
+                  }
+                }
+              }
+            }
+          ]).session(session) || [];
+
+          const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0;
+          const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 1;
+          const factorPcsQty = u.qty * factorPcs;
+          const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
+          await Stock.findOneAndUpdate(
+            {
+              area: order.store.area,
+              period: order.period,
+              'listProduct.productId': u.id
+            },
+            {
+              $inc: {
+                'listProduct.$[elem].stockOutPcs': -factorPcsQty,
+                'listProduct.$[elem].balancePcs': +factorPcsQty,
+                'listProduct.$[elem].stockOutCtn': -factorCtnQty,
+                'listProduct.$[elem].balanceCtn': +factorCtnQty
+              }
+            },
+            {
+              arrayFilters: [
+                { 'elem.productId': u.id }
+              ],
+              new: true,
+              session
+            }
+          );
+        }
       }
     }
 
     const updatedOrder = await Order.findOneAndUpdate(
       { orderId },
       { $set: { status, orderId: newOrderId } },
-      { new: true }
-    )
+      { new: true, session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
 
     res.status(200).json({
       status: 200,
-      message: 'Updated status successfully!'
-    })
+      message: 'Updated status successfully!',
+      data: updatedOrder
+    });
   } catch (error) {
-    console.error('Error updating order:', error)
-    res.status(500).json({ status: 500, message: 'Server error' })
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Error updating order:', error);
+    res.status(500).json({ status: 500, message: 'Server error' });
   }
-}
+};
+
 
 exports.addSlip = async (req, res) => {
   try {
