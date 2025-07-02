@@ -480,3 +480,43 @@ exports.getDetail = async (req, res) => {
         res.status(500).json({ status: '500', message: error.message })
     }
 }
+
+exports.getGiveaways = async (req, res) => {
+
+    const channel = req.headers['x-channel'];
+    const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel);
+
+    let data = await Giveaway.find()
+
+    data = data.map(item => {
+        return {
+            type: item.type,
+            orderId: item.orderId,
+            giveInfo: item.giveInfo,
+            sale: item.sale,
+            store: item.store,
+            shipping: item.shipping,
+            note: item.note,
+            latitude: item.latitude,
+            longitude: item.longitude,
+            status: item.status,
+            statusTH: item.statusTH,
+            listProduct: item.listProduct,
+            totalVat: item.totalVat,
+            totalExVat: item.totalExVat,
+            total: item.total,
+            period: item.period,
+            listImage: item.listImage,
+            createdAt: item.createdAt,
+            updatedAt: item.updatedAt
+        }
+    })
+
+
+
+    res.status(200).json({
+        status: 200,
+        message: 'successful!',
+        data: data
+    })
+}
