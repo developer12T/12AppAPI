@@ -787,6 +787,9 @@ exports.updateStatus = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
+    const io = getSocket()
+    io.emit('order/updateStatus', {});
+
     res.status(200).json({
       status: 200,
       message: 'Updated status successfully!',
