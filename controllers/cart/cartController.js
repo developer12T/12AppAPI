@@ -19,7 +19,7 @@ const { getSocket } = require('../../socket')
 
 
 exports.getCart = async (req, res) => {
-  const session = await require('mongoose').startSession();
+  // const session = await require('mongoose').startSession();
   try {
     const channel = req.headers['x-channel'];
     const { Cart } = getModelsByChannel(channel, res, cartModel);
@@ -42,7 +42,8 @@ exports.getCart = async (req, res) => {
     const cartQuery = type === 'withdraw' ? { type, area } : { type, area, storeId };
 
     // ใช้ session ใน findOne เฉพาะกรณีที่ต้อง update ข้อมูล (กัน dirty read ใน replica set)
-    let cart = await Cart.findOne(cartQuery).session(session);
+    let cart = await Cart.findOne(cartQuery)
+    // .session(session);
 
     if (!cart) {
       return res.status(404).json({ status: 404, message: 'Cart not found!' });
@@ -52,7 +53,7 @@ exports.getCart = async (req, res) => {
 
     if (type === 'sale') {
       // เปิด transaction
-      session.startTransaction();
+      // session.startTransaction();
 
       summary = await summaryOrder(cart, channel, res);
 
@@ -76,9 +77,9 @@ exports.getCart = async (req, res) => {
       cart.cartHashPromotion = newCartHashPromotion;
       summary.listPromotion = cart.listPromotion;
       summary.listQuota = quota.appliedPromotions;
-      await cart.save({ session });
+      await cart.save();
 
-      await session.commitTransaction();
+      // await session.commitTransaction();
     }
 
     if (type === 'withdraw') {
@@ -93,7 +94,7 @@ exports.getCart = async (req, res) => {
       summary = await summaryGive(cart, channel, res);
     }
 
-    session.endSession();
+    // session.endSession();
 
     const io = getSocket()
     io.emit('cart/get', {});
@@ -104,8 +105,8 @@ exports.getCart = async (req, res) => {
       data: [summary]
     });
   } catch (error) {
-    await session.abortTransaction().catch(() => { });
-    session.endSession();
+    // await session.abortTransaction().catch(() => { });
+    // session.endSession();
     console.error(error);
     res.status(500).json({ status: '500', message: error.message });
   }
@@ -283,16 +284,16 @@ exports.addProduct = async (req, res) => {
 
 
 exports.adjustProduct = async (req, res) => {
-  const session = await require('mongoose').startSession();
-  session.startTransaction();
+  // const session = await require('mongoose').startSession();
+  // session.startTransaction();
   try {
     const { type, area, storeId, id, unit, qty, condition, expire } = req.body;
     const channel = req.headers['x-channel'];
     const { Cart } = getModelsByChannel(channel, res, cartModel);
 
     if (!type || !area || !id || !unit || qty === undefined) {
-      await session.abortTransaction();
-      session.endSession();
+      // await session.abortTransaction();
+      // session.endSession();
       return res.status(400).json({
         status: 400,
         message: 'type, area, id, unit, and qty are required!'
@@ -300,8 +301,8 @@ exports.adjustProduct = async (req, res) => {
     }
 
     if ((type === 'sale' || type === 'refund' || type === 'give') && !storeId) {
-      await session.abortTransaction();
-      session.endSession();
+      // await session.abortTransaction();
+      // session.endSession();
       return res.status(400).json({
         status: 400,
         message: 'storeId is required for sale, refund, or give!'
@@ -310,10 +311,11 @@ exports.adjustProduct = async (req, res) => {
 
     const cartQuery = type === 'withdraw' ? { type, area } : { type, area, storeId };
 
-    let cart = await Cart.findOne(cartQuery).session(session);
+    let cart = await Cart.findOne(cartQuery)
+    // .session(session);
     if (!cart) {
-      await session.abortTransaction();
-      session.endSession();
+      // await session.abortTransaction();
+      // session.endSession();
       return res.status(404).json({ status: 404, message: 'Cart not found!' });
     }
 
@@ -329,8 +331,8 @@ exports.adjustProduct = async (req, res) => {
       );
 
       if (existingRefundIndex === -1) {
-        await session.abortTransaction();
-        session.endSession();
+        // await session.abortTransaction();
+        // session.endSession();
         return res
           .status(404)
           .json({ status: 404, message: 'Refund product not found in cart!' });
@@ -348,8 +350,8 @@ exports.adjustProduct = async (req, res) => {
       );
 
       if (existingProductIndex === -1) {
-        await session.abortTransaction();
-        session.endSession();
+        // await session.abortTransaction();
+        // session.endSession();
         return res
           .status(404)
           .json({ status: 404, message: 'Product not found in cart!' });
@@ -380,9 +382,9 @@ exports.adjustProduct = async (req, res) => {
     }
 
     if (cart.listProduct.length === 0 && cart.listRefund.length === 0) {
-      await Cart.deleteOne(cartQuery, { session });
-      await session.commitTransaction();
-      session.endSession();
+      await Cart.deleteOne(cartQuery);
+      // await session.commitTransaction();
+      // session.endSession();
       return res.status(200).json({
         status: 200,
         message: 'Cart deleted successfully!',
@@ -390,9 +392,9 @@ exports.adjustProduct = async (req, res) => {
       });
     }
 
-    await cart.save({ session });
-    await session.commitTransaction();
-    session.endSession();
+    await cart.save();
+    // await session.commitTransaction();
+    // session.endSession();
 
     const io = getSocket()
     io.emit('cart/adjust', {});
@@ -403,23 +405,23 @@ exports.adjustProduct = async (req, res) => {
       data: cart
     });
   } catch (error) {
-    await session.abortTransaction().catch(() => { });
-    session.endSession();
+    // await session.abortTransaction().catch(() => { });
+    // session.endSession();
     console.error(error);
     res.status(500).json({ status: 500, message: error.message });
   }
 };
 
 exports.deleteProduct = async (req, res) => {
-  const session = await require('mongoose').startSession();
-  session.startTransaction();
+  // const session = await require('mongoose').startSession();
+  // session.startTransaction();
   try {
     const { type, area, storeId, id, unit, condition, expire } = req.body;
     const channel = req.headers['x-channel'];
 
     if (!type || !area || !id || !unit) {
-      await session.abortTransaction();
-      session.endSession();
+      // await session.abortTransaction();
+      // session.endSession();
       return res.status(400).json({
         status: 400,
         message: 'type, area, id, and unit are required!'
@@ -427,8 +429,8 @@ exports.deleteProduct = async (req, res) => {
     }
 
     if ((type === 'sale' || type === 'refund' || type === 'give') && !storeId) {
-      await session.abortTransaction();
-      session.endSession();
+      // await session.abortTransaction();
+      // session.endSession();
       return res.status(400).json({
         status: 400,
         message: 'storeId is required for sale or refund or give!'
@@ -438,10 +440,11 @@ exports.deleteProduct = async (req, res) => {
     const cartQuery = type === 'withdraw' ? { type, area } : { type, area, storeId };
     const { Cart } = getModelsByChannel(channel, res, cartModel);
 
-    let cart = await Cart.findOne(cartQuery).session(session);
+    let cart = await Cart.findOne(cartQuery)
+    // .session(session);
     if (!cart) {
-      await session.abortTransaction();
-      session.endSession();
+      // await session.abortTransaction();
+      // session.endSession();
       return res.status(404).json({ status: 404, message: 'Cart not found!' });
     }
 
@@ -456,8 +459,8 @@ exports.deleteProduct = async (req, res) => {
           p.expireDate === expire
       );
       if (refundIndex === -1) {
-        await session.abortTransaction();
-        session.endSession();
+        // await session.abortTransaction();
+        // session.endSession();
         return res
           .status(404)
           .json({ status: 404, message: 'Product not found in refund list!' });
@@ -472,8 +475,8 @@ exports.deleteProduct = async (req, res) => {
         p => p.id === id && p.unit === unit
       );
       if (productIndex === -1) {
-        await session.abortTransaction();
-        session.endSession();
+        // await session.abortTransaction();
+        // session.endSession();
         return res
           .status(404)
           .json({ status: 404, message: 'Product not found in cart!' });
@@ -488,8 +491,8 @@ exports.deleteProduct = async (req, res) => {
         p => p.id === id && p.unit === unit
       );
       if (productIndex === -1) {
-        await session.abortTransaction();
-        session.endSession();
+        // await session.abortTransaction();
+        // session.endSession();
         return res
           .status(404)
           .json({ status: 404, message: 'Product not found in cart!' });
@@ -502,9 +505,9 @@ exports.deleteProduct = async (req, res) => {
     }
 
     if (cart.listProduct.length === 0 && cart.listRefund.length === 0) {
-      await Cart.deleteOne(cartQuery, { session });
-      await session.commitTransaction();
-      session.endSession();
+      await Cart.deleteOne(cartQuery);
+      // await session.commitTransaction();
+      // session.endSession();
       return res.status(200).json({
         status: 200,
         message: 'Cart deleted successfully!'
@@ -512,11 +515,11 @@ exports.deleteProduct = async (req, res) => {
     }
 
     if (updated) {
-      await cart.save({ session });
+      await cart.save();
     }
 
-    await session.commitTransaction();
-    session.endSession();
+    // await session.commitTransaction();
+    // session.endSession();
 
     const io = getSocket()
     io.emit('cart/delete', {});
@@ -527,35 +530,36 @@ exports.deleteProduct = async (req, res) => {
       data: cart
     });
   } catch (error) {
-    await session.abortTransaction().catch(() => { });
-    session.endSession();
+    // await session.abortTransaction().catch(() => { });
+    // session.endSession();
     console.error(error);
     res.status(500).json({ status: 500, message: error.message });
   }
 };
 
 exports.updateCartPromotion = async (req, res) => { // ยังไม่เป็นว่าเคยใช้
-  const session = await require('mongoose').startSession();
-  session.startTransaction();
+  // const session = await require('mongoose').startSession();
+  // session.startTransaction();
   try {
     const { type, area, storeId, proId, productId, qty } = req.body;
     const channel = req.headers['x-channel'];
 
     const { Cart } = getModelsByChannel(channel, res, cartModel);
 
-    let cart = await Cart.findOne({ type, area, storeId }).session(session);
+    let cart = await Cart.findOne({ type, area, storeId })
+    // .session(session);
 
     if (!cart) {
-      await session.abortTransaction();
-      session.endSession();
+      // await session.abortTransaction();
+      // session.endSession();
       return res.status(404).json({ status: 404, message: 'Cart not found!' });
     }
 
     let promotion = cart.listPromotion.find(promo => promo.proId === proId);
 
     if (!promotion) {
-      await session.abortTransaction();
-      session.endSession();
+      // await session.abortTransaction();
+      // session.endSession();
       return res.status(404).json({ status: 404, message: 'Promotion not found!' });
     }
 
@@ -564,8 +568,8 @@ exports.updateCartPromotion = async (req, res) => { // ยังไม่เป�
     const product = await Product.findOne({ id: productId }).lean();
 
     if (!product) {
-      await session.abortTransaction();
-      session.endSession();
+      // await session.abortTransaction();
+      // session.endSession();
       return res.status(404).json({ status: 404, message: 'Product not found!' });
     }
 
@@ -574,8 +578,8 @@ exports.updateCartPromotion = async (req, res) => { // ยังไม่เป�
     );
 
     if (!matchingUnit) {
-      await session.abortTransaction();
-      session.endSession();
+      // await session.abortTransaction();
+      // session.endSession();
       return res.status(400).json({
         status: 400,
         message: `Unit '${promotion.unit}' not found for this product!`
@@ -591,10 +595,10 @@ exports.updateCartPromotion = async (req, res) => { // ยังไม่เป�
     promotion.unit = matchingUnit.unit;
     promotion.qty = promotion.qty; // ดูเหมือนจะไม่เปลี่ยนค่า แต่ถ้าต้องการให้รับจาก req.body ให้เปลี่ยนเป็น qty
 
-    await cart.save({ session });
+    await cart.save();
 
-    await session.commitTransaction();
-    session.endSession();
+    // await session.commitTransaction();
+    // session.endSession();
 
     const io = getSocket()
     io.emit('cart/ssssssssss', {});
@@ -605,16 +609,16 @@ exports.updateCartPromotion = async (req, res) => { // ยังไม่เป�
       data: cart.listPromotion
     });
   } catch (error) {
-    await session.abortTransaction().catch(() => { });
-    session.endSession();
+    // await session.abortTransaction().catch(() => { });
+    // session.endSession();
     console.error(error);
     res.status(500).json({ status: '500', message: error.message });
   }
 };
 
 exports.updateStock = async (req, res) => {
-  const session = await require('mongoose').startSession();
-  session.startTransaction();
+  // const session = await require('mongoose').startSession();
+  // session.startTransaction();
   try {
     const { area, productId, period, unit, type } = req.body;
     let { qty } = req.body;
@@ -626,11 +630,12 @@ exports.updateStock = async (req, res) => {
     const stockDoc = await Stock.findOne({
       area: area,
       period: period
-    }).session(session);
+    })
+    // .session(session);
 
     if (!stockDoc) {
-      await session.abortTransaction();
-      session.endSession();
+      // await session.abortTransaction();
+      // session.endSession();
       return res.status(404).json({
         status: 404,
         message: 'Stock document not found for this area and period'
@@ -642,19 +647,20 @@ exports.updateStock = async (req, res) => {
     );
 
     if (!productStock) {
-      await session.abortTransaction();
-      session.endSession();
+      // await session.abortTransaction();
+      // session.endSession();
       return res.status(404).json({
         status: 404,
         message: 'Product not found in stock'
       });
     }
 
-    const modelProduct = await Product.findOne({ id: productId }).session(session);
+    const modelProduct = await Product.findOne({ id: productId })
+    // .session(session);
 
     if (!modelProduct) {
-      await session.abortTransaction();
-      session.endSession();
+      // await session.abortTransaction();
+      // session.endSession();
       return res.status(404).json({
         status: 404,
         message: 'Product not found'
@@ -665,8 +671,8 @@ exports.updateStock = async (req, res) => {
     if (unit !== 'PCS') {
       const unitData = modelProduct.listUnit.find(u => u.unit === unit);
       if (!unitData) {
-        await session.abortTransaction();
-        session.endSession();
+        // await session.abortTransaction();
+        // session.endSession();
         return res.status(400).json({
           status: 400,
           message: 'Invalid unit for this product'
@@ -683,8 +689,8 @@ exports.updateStock = async (req, res) => {
       // productStock.stockOutPcs += qty;
       productStock.balancePcs -= qty;
     } else {
-      await session.abortTransaction();
-      session.endSession();
+      // await session.abortTransaction();
+      // session.endSession();
       return res.status(400).json({
         status: 400,
         message: 'Invalid type. Must be IN or OUT'
@@ -702,10 +708,10 @@ exports.updateStock = async (req, res) => {
     }
 
     // Save updated document
-    await stockDoc.save({ session });
+    await stockDoc.save();
 
-    await session.commitTransaction();
-    session.endSession();
+    // await session.commitTransaction();
+    // session.endSession();
 
     const io = getSocket()
     io.emit('cart/updateStock', {});
@@ -716,8 +722,8 @@ exports.updateStock = async (req, res) => {
       data: productStock
     });
   } catch (error) {
-    await session.abortTransaction().catch(() => { });
-    session.endSession();
+    // await session.abortTransaction().catch(() => { });
+    // session.endSession();
     console.error('[updateStock Error]', error);
     res.status(500).json({ status: 500, message: error.message });
   }
