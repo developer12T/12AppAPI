@@ -62,7 +62,7 @@ exports.getStore = async (req, res) => {
     const currentDate = new Date()
     const startMonth = new Date(
       currentDate.getFullYear(),
-      currentDate.getMonth(),
+      currentDate.getMonth() - 3,
       1
     )
     const NextMonth = new Date(
@@ -70,7 +70,8 @@ exports.getStore = async (req, res) => {
       currentDate.getMonth() + 1,
       1
     )
-
+    console.log(startMonth)
+    console.log(NextMonth)
     let query = {}
 
     if (area) {

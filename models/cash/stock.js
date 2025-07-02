@@ -164,7 +164,7 @@ module.exports = (conn) => {
     Stock: conn.model('stockTest', stockSchema, 'stockTest'),
     StockMovementLog: conn.model('stockMovementLog', stockMovementLogSchema, 'stockmovementlogs'),
     StockMovement: conn.model('StockMovement', stockMovementSchema),
-    AdjustStock: conn.model('adjustStock', adjustStockSchema,'adjuststocks')
+    AdjustStock: conn.model('adjuststocks', adjustStockSchema,'adjuststocks')
   };
 };
 
