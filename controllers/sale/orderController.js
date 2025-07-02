@@ -3250,6 +3250,11 @@ exports.getSummary18SKU = async (req, res) => {
 
   const emptyGroup = await Product.aggregate([
     {
+      $match: {
+        group: { $nin: ['สินค้าช่วยระบาย'] }  // หรือ { $ne: '' } 
+      }
+    },
+    {
       $group: {
         _id: {
           groupCode: '$groupCode',
@@ -3267,6 +3272,7 @@ exports.getSummary18SKU = async (req, res) => {
     },
   ]
   )
+  // console.log(emptyGroup)
 
   data = []
   for (const item of dataOrder) {
@@ -3301,9 +3307,11 @@ exports.getSummary18SKU = async (req, res) => {
     };
   });
 
-  const sortedMergedGroup = mergedGroup.sort(
-    (a, b) => a.groupCode.localeCompare(b.groupCode, undefined, { numeric: true })
-  );
+  const sortedMergedGroup = mergedGroup.sort((a, b) => {
+    if (!a.groupCodeM3) return 1;   
+    if (!b.groupCodeM3) return -1;  
+    return a.groupCodeM3.localeCompare(b.groupCodeM3, undefined, { numeric: true });
+  });
 
 
 
