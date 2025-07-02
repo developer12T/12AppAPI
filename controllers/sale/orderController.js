@@ -3296,8 +3296,8 @@ exports.getSummary18SKU = async (req, res) => {
 
     return {
       ...group,
-      summaryQty: summaryQtySum,
-      summary: summarySum
+      summaryQty: Number(summaryQtySum.toFixed(2)),
+      summary: Number(summarySum.toFixed(2))
     };
   });
 
