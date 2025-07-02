@@ -2749,9 +2749,9 @@ exports.getSummaryProduct = async (req, res) => {
       [`TRAGET ${item.groupSize}`]: 0,
       [`SELL ${item.groupSize}`]: productDetail?.qty || 0,
       [`PERCENT ${item.groupSize}`]: 0,
-      [`TRAGET STORE ${item.groupSize}`]: 0,
+      [`TRAGET_STORE ${item.groupSize}`]: 0,
       [`STORE ${item.groupSize}`]: storeCount?.count || 0,
-      [`PERCENT STORE ${item.groupSize}`]: Number(percentStore)
+      [`PERCENT_STORE ${item.groupSize}`]: Number(percentStore)
     }
   })
 
