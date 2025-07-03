@@ -23,8 +23,8 @@ async function checkInRoute(data, channel, res) {
             return { status: 404, message: 'Store not found' }
         }
 
-        let route = await Route.findOne({ id: data.routeId, "listStore.storeInfo": store._id.toString(), "listStore.status": "0" })
-        // let route = await Route.findOne({ id: data.routeId, "listStore.storeInfo": store._id })
+        // let route = await Route.findOne({ id: data.routeId, "listStore.storeInfo": store._id.toString(), "listStore.status": "0" })
+        let route = await Route.findOne({ id: data.routeId, "listStore.storeInfo": store._id })
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
 

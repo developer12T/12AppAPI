@@ -1,5 +1,5 @@
 const { getModelsByChannel } = require('../../middleware/channel')
-
+const campaignModel = require('../../models/cash/campaign')
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
 const cpUpload = upload.fields([
