@@ -11,10 +11,11 @@ const DistributionModel = require('../../models/cash/distribution')
 const promotionModel = require('../../models/cash/promotion')
 
 const { getModelsByChannel } = require('../../middleware/channel')
+const { Item } = require('../../models/cash/master')
 
 exports.reportCheck = async (req, res) => {
   try {
-    const { start, end } = req.query
+    const { start, end, zone, team, area } = req.query
 
     // console.log(start, end)
 
@@ -45,7 +46,21 @@ exports.reportCheck = async (req, res) => {
       endStr = new Date(`${end}T23:59:59.999Z`)
     }
     const user = await User.find({ role: 'sale' }).select('area')
-    const areaId = [...new Set(user.flatMap(u => u.area))]
+    let areaId = [...new Set(user.flatMap(u => u.area))]
+
+    if (zone) {
+      const zones = typeof zone === 'string' ? zone.split(',') : zone
+      areaId = areaId.filter(a => zones.includes(a.slice(0, 2)))
+    }
+
+    if (team) {
+      areaId = areaId.filter(a => `${a.slice(0, 2)}${a.charAt(3)}` === team)
+    }
+
+    if (area) {
+      const areaArr = typeof area === 'string' ? area.split(',') : area
+      areaId = areaId.filter(a => areaArr.includes(a))
+    }
 
     const stores = await Store.find({
       area: { $in: areaId },
@@ -131,7 +146,7 @@ exports.reportCheck = async (req, res) => {
 
 exports.reportCheckExcel = async (req, res) => {
   try {
-    let { start, end, channel } = req.query
+    let { start, end, channel, zone, team, area } = req.query
 
     // console.log(start, end)
 
@@ -163,7 +178,21 @@ exports.reportCheckExcel = async (req, res) => {
     }
 
     const user = await User.find({ role: 'sale' }).select('area')
-    const areaId = [...new Set(user.flatMap(u => u.area))]
+    let areaId = [...new Set(user.flatMap(u => u.area))]
+
+    if (zone) {
+      const zones = typeof zone === 'string' ? zone.split(',') : zone
+      areaId = areaId.filter(a => zones.includes(a.slice(0, 2)))
+    }
+
+    if (team) {
+      areaId = areaId.filter(a => `${a.slice(0, 2)}${a.charAt(3)}` === team)
+    }
+
+    if (area) {
+      const areaArr = typeof area === 'string' ? area.split(',') : area
+      areaId = areaId.filter(a => areaArr.includes(a))
+    }
 
     const stores = await Store.find({
       area: { $in: areaId },

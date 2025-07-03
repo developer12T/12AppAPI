@@ -650,17 +650,17 @@ exports.addFromERPnew = async (req, res) => {
   //     message: 'Invalid response data from external API'
   //   })
   // }
-  // console.log(result)
+  console.log(result)
   data = []
 
   for (const listProduct of result) {
     const productId = listProduct.id
 
-    const existingProduct = await Product.findOne({ id: productId })
-    if (existingProduct) {
-      // console.log(`Product ID ${productId} already exists. Skipping.`)
-      continue
-    }
+    // const existingProduct = await Product.findOne({ id: productId })
+    // if (existingProduct) {
+    //   // console.log(`Product ID ${productId} already exists. Skipping.`)
+    //   continue
+    // }
     const itemConvertResponse = await axios.post(
       'http://192.168.2.97:8383/M3API/ItemManage/Item/getItemConvertItemcode',
       { itcode: productId }
@@ -713,7 +713,7 @@ exports.addFromERPnew = async (req, res) => {
     })
     // console.log(newProduct)
     await newProduct.save()
-    // data.push(newProduct)
+    data.push(newProduct)
   }
   res.status(200).json({
     status: 200,

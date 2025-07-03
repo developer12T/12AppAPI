@@ -95,11 +95,11 @@ async function checkInRoute(data, channel, res) {
             updateData["listStore.$.listOrder"] = [...listOrder, newOrder]
         }
 
-        // route = await Route.findOneAndUpdate(
-        //     { id: data.routeId, "listStore.storeInfo": store._id },
-        //     { $set: updateData },
-        //     { new: true }
-        // )
+        route = await Route.findOneAndUpdate(
+            { id: data.routeId, "listStore.storeInfo": store._id },
+            { $set: updateData },
+            { new: true }
+        )
 
         if (!route) {
             return { status: 404, message: 'Route update failed' }
