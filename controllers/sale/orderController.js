@@ -250,19 +250,7 @@ exports.checkout = async (req, res) => {
       res
     )
 
-    const checkIn = await checkInRoute(
-      {
-        storeId: storeId,
-        routeId: routeId,
-        orderId: orderId,
-        note: note,
-        latitude: latitude,
-        longitude: longitude,
-        period: period
-      },
-      channel,
-      res
-    )
+
 
     if (checkIn.status === 409) {
       return res.status(409).json({
@@ -463,7 +451,19 @@ exports.checkout = async (req, res) => {
       }
     }
 
-
+    const checkIn = await checkInRoute(
+      {
+        storeId: storeId,
+        routeId: routeId,
+        orderId: orderId,
+        note: note,
+        latitude: latitude,
+        longitude: longitude,
+        period: period
+      },
+      channel,
+      res
+    )
 
     // await transaction.commit()
     res.status(200).json({
