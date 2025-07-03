@@ -10,7 +10,6 @@ const refundModel = require('../../models/cash/refund')
 const DistributionModel = require('../../models/cash/distribution')
 const promotionModel = require('../../models/cash/promotion')
 
-
 const { getModelsByChannel } = require('../../middleware/channel')
 
 exports.reportCheck = async (req, res) => {
@@ -25,21 +24,25 @@ exports.reportCheck = async (req, res) => {
     const { Route } = getModelsByChannel(channel, res, routeModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
     const { Refund } = getModelsByChannel(channel, res, refundModel)
-    const { Withdraw, Distribution } = getModelsByChannel(channel, res, DistributionModel)
+    const { Withdraw, Distribution } = getModelsByChannel(
+      channel,
+      res,
+      DistributionModel
+    )
 
-    let startStr, endStr;
+    let startStr, endStr
 
     if (!start || !end) {
-      const today = new Date();
-      const yyyy = today.getUTCFullYear();
-      const mm = String(today.getUTCMonth() + 1).padStart(2, '0');
-      const dd = String(today.getUTCDate()).padStart(2, '0');
-      const todayStr = `${yyyy}-${mm}-${dd}`;
-      startStr = new Date(`${todayStr}T00:00:00.000Z`);
-      endStr = new Date(`${todayStr}T23:59:59.999Z`);
+      const today = new Date()
+      const yyyy = today.getUTCFullYear()
+      const mm = String(today.getUTCMonth() + 1).padStart(2, '0')
+      const dd = String(today.getUTCDate()).padStart(2, '0')
+      const todayStr = `${yyyy}-${mm}-${dd}`
+      startStr = new Date(`${todayStr}T00:00:00.000Z`)
+      endStr = new Date(`${todayStr}T23:59:59.999Z`)
     } else {
-      startStr = new Date(`${start}T00:00:00.000Z`);
-      endStr = new Date(`${end}T23:59:59.999Z`);
+      startStr = new Date(`${start}T00:00:00.000Z`)
+      endStr = new Date(`${end}T23:59:59.999Z`)
     }
     const user = await User.find({ role: 'sale' }).select('area')
     const areaId = [...new Set(user.flatMap(u => u.area))]
@@ -71,7 +74,7 @@ exports.reportCheck = async (req, res) => {
         }
       },
       {
-        $unwind: "$listStore"
+        $unwind: '$listStore'
       },
       {
         $match: {
@@ -85,36 +88,46 @@ exports.reportCheck = async (req, res) => {
       createdAt: { $gte: startStr, $lte: endStr }
     }).lean()
 
-    const result = areaId.map(areaName => {
-      const foundStore = stores.some(s => s.area === areaName)
-      const foundOrder = orders.some(o => o.store.area === areaName)
-      // const foundWithdraw = withdraws.some(w => w.area === areaName)
-      const foundDistribution = distributions.some(d => d.area === areaName)
-      const foundRoute = route.some(z => z.area === areaName)
-      const foundRefund = refund.some(x => x.store.area === areaName)
-      return {
-        area: areaName,
-        store: foundStore ? 1 : 0,
-        Route: foundRoute ? 1 : 0,
-        order: foundOrder ? 1 : 0,
-        // withdraw: foundWithdraw ? 1 : 0, // ถ้าอยากใส่คอมเมนต์กลับมาได้เลย
-        distribution: foundDistribution ? 1 : 0,
-        refund: foundRefund ? 1 : 0,
-      }
-    }).sort((a, b) => a.area.localeCompare(b.area))
+    const result = areaId
+      .map(areaName => {
+        const foundStore = stores.some(s => s.area === areaName)
+        const foundOrder = orders.some(o => o.store.area === areaName)
+        // const foundWithdraw = withdraws.some(w => w.area === areaName)
+        const foundDistribution = distributions.some(d => d.area === areaName)
+        const foundRoute = route.some(z => z.area === areaName)
+        const foundRefund = refund.some(x => x.store.area === areaName)
+
+        const countStore = stores.filter(s => s.area === areaName).length
+        const countOrder = orders.filter(o => o.store.area === areaName).length
+        // const countWithdraw = withdraws.filter(w => w.area === areaName).length;
+        const countDistribution = distributions.filter(
+          d => d.area === areaName
+        ).length
+        const countRoute = route.filter(r => r.area === areaName).length
+        const countRefund = refund.filter(x => x.store.area === areaName).length
+
+        return {
+          area: areaName,
+          store: countStore,
+          Route: countRoute,
+          order: countOrder,
+          // withdraw: foundWithdraw ? 1 : 0, // ถ้าอยากใส่คอมเมนต์กลับมาได้เลย
+          distribution: countDistribution,
+          refund: countRefund
+        }
+      })
+      .sort((a, b) => a.area.localeCompare(b.area))
 
     res.status(200).json({
       status: 200,
       message: 'success',
       data: result
     })
-
   } catch (err) {
     console.error(err)
     res.status(500).json({ status: 500, message: 'Internal server error' })
   }
 }
-
 
 exports.reportCheckExcel = async (req, res) => {
   try {
@@ -128,23 +141,26 @@ exports.reportCheckExcel = async (req, res) => {
     const { Route } = getModelsByChannel(channel, res, routeModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
     const { Refund } = getModelsByChannel(channel, res, refundModel)
-    const { Withdraw, Distribution } = getModelsByChannel(channel, res, DistributionModel)
+    const { Withdraw, Distribution } = getModelsByChannel(
+      channel,
+      res,
+      DistributionModel
+    )
 
-    let startStr, endStr;
+    let startStr, endStr
 
     if (!start || !end) {
-      const today = new Date();
-      const yyyy = today.getUTCFullYear();
-      const mm = String(today.getUTCMonth() + 1).padStart(2, '0');
-      const dd = String(today.getUTCDate()).padStart(2, '0');
-      const todayStr = `${yyyy}-${mm}-${dd}`;
-      startStr = new Date(`${todayStr}T00:00:00.000Z`);
-      endStr = new Date(`${todayStr}T23:59:59.999Z`);
+      const today = new Date()
+      const yyyy = today.getUTCFullYear()
+      const mm = String(today.getUTCMonth() + 1).padStart(2, '0')
+      const dd = String(today.getUTCDate()).padStart(2, '0')
+      const todayStr = `${yyyy}-${mm}-${dd}`
+      startStr = new Date(`${todayStr}T00:00:00.000Z`)
+      endStr = new Date(`${todayStr}T23:59:59.999Z`)
     } else {
-      startStr = new Date(`${start}T00:00:00.000Z`);
-      endStr = new Date(`${end}T23:59:59.999Z`);
+      startStr = new Date(`${start}T00:00:00.000Z`)
+      endStr = new Date(`${end}T23:59:59.999Z`)
     }
-
 
     const user = await User.find({ role: 'sale' }).select('area')
     const areaId = [...new Set(user.flatMap(u => u.area))]
@@ -176,7 +192,7 @@ exports.reportCheckExcel = async (req, res) => {
         }
       },
       {
-        $unwind: "$listStore"
+        $unwind: '$listStore'
       },
       {
         $match: {
@@ -190,44 +206,76 @@ exports.reportCheckExcel = async (req, res) => {
       createdAt: { $gte: startStr, $lte: endStr }
     }).lean()
 
-    const result = areaId.map(areaName => {
-      const foundStore = stores.some(s => s.area === areaName)
-      const foundOrder = orders.some(o => o.store.area === areaName)
-      // const foundWithdraw = withdraws.some(w => w.area === areaName)
-      const foundDistribution = distributions.some(d => d.area === areaName)
-      const foundRoute = route.some(z => z.area === areaName)
-      const foundRefund = refund.some(x => x.store.area === areaName)
-      return {
-        area: areaName,
-        store: foundStore ? 1 : 0,
-        Route: foundRoute ? 1 : 0,
-        order: foundOrder ? 1 : 0,
-        // withdraw: foundWithdraw ? 1 : 0, // ถ้าอยากใส่คอมเมนต์กลับมาได้เลย
-        distribution: foundDistribution ? 1 : 0,
-        refund: foundRefund ? 1 : 0,
-      }
-    })
+    const result = areaId
+      .map(areaName => {
+        const foundStore = stores.some(s => s.area === areaName)
+        const foundOrder = orders.some(o => o.store.area === areaName)
+        // const foundWithdraw = withdraws.some(w => w.area === areaName)
+        const foundDistribution = distributions.some(d => d.area === areaName)
+        const foundRoute = route.some(z => z.area === areaName)
+        const foundRefund = refund.some(x => x.store.area === areaName)
+
+        const countStore = stores.filter(s => s.area === areaName).length
+        const countOrder = orders.filter(o => o.store.area === areaName).length
+        // const countWithdraw = withdraws.filter(w => w.area === areaName).length;
+        const countDistribution = distributions.filter(
+          d => d.area === areaName
+        ).length
+        const countRoute = route.filter(r => r.area === areaName).length
+        const countRefund = refund.filter(x => x.store.area === areaName).length
+
+        return {
+          area: areaName,
+          store: countStore,
+          Route: countOrder,
+          order: countDistribution,
+          // withdraw: foundWithdraw ? 1 : 0, // ถ้าอยากใส่คอมเมนต์กลับมาได้เลย
+          distribution: countRoute,
+          refund: countRefund
+        }
+      })
+      .sort((a, b) => a.area.localeCompare(b.area))
 
     const workbook = new ExcelJS.Workbook()
     const worksheet = workbook.addWorksheet(`${start} To ${end}`)
-    worksheet.addRow(['เขต', 'โหลดโปรแกรม', 'เพิ่มร้านค้าใหม่', 'เข้าเยี่ยม', 'ขาย', 'เบิก', 'คืน'])
+    worksheet.addRow([
+      'เขต',
+      'โหลดโปรแกรม',
+      'เพิ่มร้านค้าใหม่',
+      'เข้าเยี่ยม',
+      'ขาย',
+      'เบิก',
+      'คืน'
+    ])
     result.forEach(row => {
       const excelRow = worksheet.addRow([
-        row.area, '', row.store, row.Route, row.order, row.distribution, row.refund
+        row.area,
+        '',
+        row.store,
+        row.Route,
+        row.order,
+        row.distribution,
+        row.refund
       ])
       for (let i = 3; i <= 7; i++) {
         if (excelRow.getCell(i).value === 1) {
           excelRow.getCell(i).fill = {
-            type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC6EFCE' }
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFC6EFCE' }
           }
         } else if (excelRow.getCell(i).value === 0) {
           excelRow.getCell(i).fill = {
-            type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC7CE' }
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFFFC7CE' }
           }
         }
       }
     })
-    worksheet.columns.forEach(col => { col.width = 18 })
+    worksheet.columns.forEach(col => {
+      col.width = 18
+    })
     worksheet.eachRow(row => {
       row.eachCell(cell => {
         cell.border = {
@@ -250,32 +298,28 @@ exports.reportCheckExcel = async (req, res) => {
           res.status(500).send('Download failed')
         }
       }
-      fs.unlink(tempPath, () => { }) // ลบ temp file ทิ้ง
+      fs.unlink(tempPath, () => {}) // ลบ temp file ทิ้ง
     })
-
 
     // res.status(200).json({
     // status: 200,
     // message: 'Create Excel file',
     // data: result
     // })
-
   } catch (err) {
     console.error(err)
     res.status(500).json({ status: 500, message: 'Internal server error' })
   }
-
 }
 
-
 exports.createPowerPoint = async (req, res) => {
-  const file = req.file;
+  const file = req.file
   if (!file) {
-    return res.status(400).json({ status: 400, message: 'No file uploaded' });
+    return res.status(400).json({ status: 400, message: 'No file uploaded' })
   }
   res.status(200).json({
     status: 200,
     message: 'Create powerPoint file',
-    file: file,
-  });
+    file: file
+  })
 }

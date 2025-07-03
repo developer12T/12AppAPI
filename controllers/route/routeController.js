@@ -1271,7 +1271,7 @@ exports.getRouteEffective = async (req, res) => {
   const { Product } = getModelsByChannel(channel, res, productModel)
 
   let query = {}
-  if ( area ) {
+  if (area) {
     query = { area: area }
   } else {
     query = {}
@@ -1430,7 +1430,7 @@ exports.getRouteEffective = async (req, res) => {
 }
 
 exports.getRouteEffectiveAll = async (req, res) => {
-  const { zone, area,team, period, day } = req.query
+  const { zone, area, team, period, day } = req.query
 
   const query = {}
   if (area) query.area = area
@@ -1458,7 +1458,7 @@ exports.getRouteEffectiveAll = async (req, res) => {
       message: 'Not found route'
     })
   }
- if (team) {
+  if (team) {
     routes = routes.map(item => {
       const teamStr = item.area.substring(0, 2) + item.area.charAt(3)
       return {
@@ -1481,8 +1481,6 @@ exports.getRouteEffectiveAll = async (req, res) => {
       }
     })
   }
-
-
 
   let totalVisit = 0
   let totalEffective = 0
@@ -1589,7 +1587,7 @@ exports.getAreaInRoute = async (req, res) => {
 }
 
 exports.getZoneInRoute = async (req, res) => {
-  const { zone, period } = req.query
+  const { zone, period, team } = req.query
   const channel = req.headers['x-channel']
   const { Route } = getModelsByChannel(channel, res, routeModel)
 
@@ -1599,16 +1597,28 @@ exports.getZoneInRoute = async (req, res) => {
     },
     {
       $addFields: {
-        area2: { $substrCP: ['$area', 0, 2] }
+        area2: { $substrCP: ['$area', 0, 2] },
+        team3: {
+          $concat: [
+            { $substrCP: ['$area', 0, 2] }, // "BE"
+            { $substrCP: ['$area', 3, 1] } // "1" → from "212" (character at index 3)
+          ]
+        }
       }
     }
   ]
 
   if (zone && zone.length) {
-    const zoneArray = typeof zone === 'string' ? zone.split(',') : zone;
+    const zoneArray = typeof zone === 'string' ? zone.split(',') : zone
     pipeline.push({
       $match: { area2: { $in: zoneArray } }
-    });
+    })
+  }
+
+  if (team && team.length) {
+    pipeline.push({
+      $match: { team3: team }
+    })
   }
 
   pipeline.push(
