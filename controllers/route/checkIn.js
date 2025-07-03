@@ -31,34 +31,34 @@ async function checkInRoute(data, channel, res) {
         const endOfDay = new Date();
         endOfDay.setHours(23, 59, 59, 999);
 
-        let allRoute = await Route.aggregate([
-            {
-                $match: {
-                    period: data.period
-                }
-            },
-            { $unwind: '$listStore' },
-            {
-                $project: {
-                    listStore: 1
-                }
-            },
-            {
-                $replaceRoot: { newRoot: "$listStore" }
-            },
-            {
-                $match: {
-                    status: { $nin: ['0'] },
-                    storeInfo: store._id.toString(),
-                    date: { $gte: startOfDay, $lte: endOfDay }
-                }
-            }
+        // let allRoute = await Route.aggregate([
+        //     {
+        //         $match: {
+        //             period: data.period
+        //         }
+        //     },
+        //     { $unwind: '$listStore' },
+        //     {
+        //         $project: {
+        //             listStore: 1
+        //         }
+        //     },
+        //     {
+        //         $replaceRoot: { newRoot: "$listStore" }
+        //     },
+        //     {
+        //         $match: {
+        //             status: { $nin: ['0'] },
+        //             storeInfo: store._id.toString(),
+        //             date: { $gte: startOfDay, $lte: endOfDay }
+        //         }
+        //     }
 
-        ])
+        // ])
 
-        if (allRoute.length > 0) {
-            return { status: 409, message: 'Duplicate route or listStore found' };
-        }
+        // if (allRoute.length > 0) {
+        //     return { status: 409, message: 'Duplicate route or listStore found' };
+        // }
 
         if (!route) {
             return { status: 404, message: 'Route not found or listStore not matched' }
