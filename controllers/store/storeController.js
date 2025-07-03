@@ -49,9 +49,6 @@ const { v4: uuidv4 } = require('uuid')
 uuidv4() // ⇨ '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed'
 const { productQuery } = require('../../controllers/queryFromM3/querySctipt')
 
-
-
-
 exports.getStore = async (req, res) => {
   try {
     const { area, type, route } = req.query
@@ -90,7 +87,7 @@ exports.getStore = async (req, res) => {
       //     $lt: NextMonth
       //   }
       // }
-      delete query.createdAt;
+      delete query.createdAt
     }
 
     if (route) {
@@ -128,6 +125,9 @@ exports.getStore = async (req, res) => {
           __v: 0,
           beauty: 0
         }
+      },
+      {
+        $sort: { createdAt: -1 }
       }
     ])
 
@@ -272,8 +272,7 @@ exports.addStore = async (req, res) => {
       const existingStores = await Store.find(
         {},
         { _id: 0, __v: 0, idIndex: 0 },
-        {area : store.area}
-
+        { area: store.area }
       )
       // console.log(store.area)
       const fieldsToCheck = [
@@ -333,27 +332,26 @@ exports.addStore = async (req, res) => {
           path.join(__dirname, '../../public/images/stores'),
           store.area,
           types[i]
-        );
+        )
 
-        const originalPath = uploadedFile[0].fullPath; // เช่น .../public/images/stores/xxx.jpg
-        const webpPath = originalPath.replace(/\.[a-zA-Z]+$/, '.webp'); // แปลงชื่อไฟล์นามสกุล .webp
+        const originalPath = uploadedFile[0].fullPath // เช่น .../public/images/stores/xxx.jpg
+        const webpPath = originalPath.replace(/\.[a-zA-Z]+$/, '.webp') // แปลงชื่อไฟล์นามสกุล .webp
 
         await sharp(originalPath)
           .rotate()
           .resize(800)
           .webp({ quality: 80 })
-          .toFile(webpPath);
+          .toFile(webpPath)
 
-        fs.unlinkSync(originalPath);
+        fs.unlinkSync(originalPath)
         uploadedFiles.push({
           name: path.basename(webpPath),
           path: webpPath,
           type: types[i]
-        });
+        })
       }
 
       const imageList = uploadedFiles
-
 
       const policyAgree = {
         status: store.policyConsent?.status || ''
@@ -690,7 +688,7 @@ exports.updateStoreStatus = async (req, res) => {
         maxStoreId: { $max: '$storeId' }
       }
     }
-  ]);
+  ])
   const oldId = maxRunningAll.flatMap(u => u.maxStoreId)
   const newId = oldId[0].replace(/\d+$/, n =>
     String(+n + 1).padStart(n.length, '0')
@@ -1146,9 +1144,8 @@ exports.getTypeStore = async (req, res) => {
 }
 
 exports.insertStoreToErpOne = async (req, res) => {
-
   const { storeId, area } = req.body
-  const channel = req.headers['x-channel'];
+  const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const { User } = getModelsByChannel(channel, res, userModel)
   const item = await Store.findOne({ storeId: storeId, area: area })
@@ -1189,7 +1186,7 @@ exports.insertStoreToErpOne = async (req, res) => {
     OKCFC3: item.route,
     OKCFC6: item.type,
     salePayer: dataUser.salePayer,
-    creditLimit: "000",
+    creditLimit: '000',
     taxno: item.taxId,
     saleCode: dataUser.saleCode,
     saleZone: dataUser.zone,
@@ -1212,28 +1209,26 @@ exports.insertStoreToErpOne = async (req, res) => {
     const response = await axios.post(
       `${process.env.API_URL_12ERP}/customer/insert`,
       dataTran
-    );
+    )
 
     // ถ้ามาถึงตรงนี้ แปลว่า status = 2xx เท่านั้น!
     return res.status(200).json({
       message: 'Success',
       data: response.data
-    });
-
+    })
   } catch (error) {
     // ถ้ามี error (status != 2xx) จะเข้าตรงนี้เสมอ
     if (error.response && error.response.status === 400) {
       return res.status(400).json({
         message: error.response.data?.message || 'Already Exists'
-      });
+      })
     } else {
       return res.status(500).json({
         message: 'Internal Server Error',
         error: error.message
-      });
+      })
     }
   }
-
 
   // res.status(200).json({
   //   status: 200,
@@ -1241,4 +1236,3 @@ exports.insertStoreToErpOne = async (req, res) => {
   //   data: dataTran
   // })
 }
-
