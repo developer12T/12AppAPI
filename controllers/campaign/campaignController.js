@@ -122,7 +122,7 @@ exports.addCampaign = [
         newCampaignId = await generateCampaignId(Campaign);
       }
 
-      const savedPaths = await saveFiles(req,newCampaignId);
+      const savedPaths = await saveFiles(req, newCampaignId);
 
       const newCampaign = new Campaign({
         id: newCampaignId,
@@ -130,8 +130,8 @@ exports.addCampaign = [
         des: addCampaignDetail.des,
         aticle: addCampaignDetail.aticle,
         link: addCampaignDetail.link,
-        imagePath: savedPaths.imagePath || '',
-        filePath: savedPaths.filePath || '',
+        image: savedPaths.imagePath || '',
+        file: savedPaths.filePath || '',
         createdAt: new Date()
       });
 
@@ -151,6 +151,17 @@ exports.addCampaign = [
 
 
 
-exports.getCampaign = async (req,res) => {
-  
+exports.getCampaign = async (req, res) => {
+
+  const channel = req.headers['x-channel'];
+  const { Campaign } = getModelsByChannel(channel, res, campaignModel);
+  const data = await Campaign.find()
+
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'Campaign added successfully',
+    data: data
+  });
 }
