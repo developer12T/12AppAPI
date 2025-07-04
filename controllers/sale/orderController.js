@@ -266,8 +266,8 @@ exports.checkout = async (req, res) => {
 
     if (checkIn.status === 409) {
       return res.status(409).json({
-        status:409,
-        message:'Duplicate route or listStore found on this day'
+        status: 409,
+        message: 'Duplicate route or listStore found on this day'
       })
     }
 
@@ -684,7 +684,7 @@ exports.updateStatus = async (req, res) => {
               }
             }
           }
-        ])|| [];
+        ]) || [];
 
         const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0;
         const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 1;
@@ -797,7 +797,7 @@ exports.updateStatus = async (req, res) => {
     const updatedOrder = await Order.findOneAndUpdate(
       { orderId },
       { $set: { status, orderId: newOrderId } },
-      { new: true,  }
+      { new: true, }
     );
 
     // await session.commitTransaction();
@@ -946,7 +946,17 @@ exports.OrderToExcel = async (req, res) => {
   // console.log(modelOrder)
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    const RLDT = dayjs().tz('Asia/Bangkok').format('YYYYMMDD');
+    // const RLDT = dayjs().tz('Asia/Bangkok').format('YYYYMMDD');
+    const d = new Date();
+    d.setHours(d.getHours() + 7); // บวก 7 ชั่วโมง = เวลาไทย (UTC+7)
+
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+
+    const RLDT = `${yyyy}${mm}${dd}`;
+
+
 
     const listProduct = order.listProduct.map(product => {
       return {
@@ -3330,8 +3340,8 @@ exports.getSummary18SKU = async (req, res) => {
   });
 
   const sortedMergedGroup = mergedGroup.sort((a, b) => {
-    if (!a.groupCodeM3) return 1;   
-    if (!b.groupCodeM3) return -1;  
+    if (!a.groupCodeM3) return 1;
+    if (!b.groupCodeM3) return -1;
     return a.groupCodeM3.localeCompare(b.groupCodeM3, undefined, { numeric: true });
   });
 
