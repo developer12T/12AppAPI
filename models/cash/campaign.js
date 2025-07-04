@@ -4,7 +4,7 @@ const campaignSchema = mongoose.Schema({
   id: { type: String, require: true },
   title: { type: String, require: true },
   des: { type: String, require: true },
-  aticle: { type: String, require: true },
+  article: { type: String, require: true },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
   link: { type: String, require: true },

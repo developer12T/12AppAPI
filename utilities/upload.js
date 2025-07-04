@@ -74,7 +74,46 @@ const uploadFilesCheckin = async (
   return uploadedFiles
 }
 
-module.exports = { uploadFiles, uploadFilesCheckin }
+
+
+async function moveFile(file, destFolder) {
+  const destPath = path.join(destFolder, file.originalname);
+  
+  return new Promise((resolve, reject) => {
+    fs.rename(file.path, destPath, (err) => {
+      if (err) return reject(err);
+      resolve(destPath);
+    });
+  });
+}
+
+const saveFiles = async (req) => {
+  const campaignFolder = path.join(__dirname, '../../public/campaign');
+
+  if (!fs.existsSync(campaignFolder)) {
+    fs.mkdirSync(campaignFolder, { recursive: true });
+  }
+
+  const results = {};
+
+  const imageFile = req.files['image'] ? req.files['image'][0] : null;
+  const fileFile = req.files['file'] ? req.files['file'][0] : null;
+
+  if (imageFile) {
+    results.imagePath = await moveFile(imageFile, campaignFolder);
+  }
+  if (fileFile) {
+    results.filePath = await moveFile(fileFile, campaignFolder);
+  }
+
+  return results;
+};
+
+
+
+
+
+module.exports = { uploadFiles, uploadFilesCheckin,saveFiles }
 
 // const uploadFiles = async (files, basePath, subFolder = '', name = '') => {
 //     if (!files || !Array.isArray(files) || files.length === 0) {
