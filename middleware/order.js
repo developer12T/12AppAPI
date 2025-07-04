@@ -1,9 +1,9 @@
 
-const { OOTYPE,NumberSeries } = require('../models/cash/master')
+const { OOTYPE, NumberSeries } = require('../models/cash/master')
 
 
 
-exports.updateRunningNumber = async (data,transaction) => {
+exports.updateRunningNumber = async (data, transaction) => {
   try {
     const { coNo, lastNo, seriesType, series } = data;
     const update = await NumberSeries.update(
@@ -37,3 +37,8 @@ exports.getSeries = async (orderType) => {
     throw errorEndpoint(currentFilePath, "getSeries", error);
   }
 };
+
+
+module.exports.to2 = function(num) {
+  return Math.round((Number(num) || 0) * 100) / 100;
+}

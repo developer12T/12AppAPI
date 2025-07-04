@@ -53,13 +53,12 @@ async function saveFiles(req, folderName = '') {
       : `${baseName}-${String(index).padStart(3, '0')}${ext}`;
 
     const destPath = path.join(uploadDir, newFileName);
-
     return new Promise((resolve, reject) => {
       fs.rename(file.path, destPath, err => {
         if (err) reject(err);
         else resolve(destPath);
       });
-    });
+    })
   }
 
   if (imageFile) results.imagePath = await moveFile(imageFile);
@@ -123,6 +122,8 @@ exports.addCampaign = [
       }
 
       const savedPaths = await saveFiles(req, newCampaignId);
+      nameImage = savedPaths.imagePath.match(/CAM[-\w\d]*\.[\w\d]+/)?.[0] || ''
+      nameFile = savedPaths.filePath.match(/CAM[-\w\d]*\.[\w\d]+/)?.[0] || ''
 
       const newCampaign = new Campaign({
         id: newCampaignId,
@@ -130,8 +131,8 @@ exports.addCampaign = [
         des: addCampaignDetail.des,
         aticle: addCampaignDetail.aticle,
         link: addCampaignDetail.link,
-        image: savedPaths.imagePath || '',
-        file: savedPaths.filePath || '',
+        image: `https://apps.onetwotrading.co.th/campaign/${nameImage}`,
+        file: `https://apps.onetwotrading.co.th/campaign/${nameFile}`,
         createdAt: new Date()
       });
 

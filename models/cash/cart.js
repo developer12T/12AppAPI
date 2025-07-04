@@ -43,32 +43,34 @@ const listCartProduct = mongoose.Schema({
   qty: { type: Number, require: true, default: 0 },
   unit: { type: String, require: true, default: '' },
   price: { type: Number, require: true, default: 0 },
-  condition: { type: String, default: '' },
+  condition: { type: String,  },
+  action: { type: String,  },
+
 })
 
 const listQuotaSchema = new mongoose.Schema({
-    quotaId: { type: String, required: true },
-    detail: { type: String, required: true },
-    proCode: { type: String, required: true },
-    quota: { type: Number },
-    listProduct: [
-        {
-            id: { type: String },
-            name: { type: String },
-            lot: { type: String },
-            groupCode: { type: String },
-            group: { type: String },
-            brandCode: { type: String },
-            brand: { type: String },
-            size: { type: String },
-            flavourCode: { type: String },
-            flavour: { type: String },
-            qty: { type: Number },
-            unit: { type: String },
-            unitName: { type: String },
-            qtyPcs: { type: Number }
-        }
-    ]
+  quotaId: { type: String, required: true },
+  detail: { type: String, required: true },
+  proCode: { type: String, required: true },
+  quota: { type: Number },
+  listProduct: [
+    {
+      id: { type: String },
+      name: { type: String },
+      lot: { type: String },
+      groupCode: { type: String },
+      group: { type: String },
+      brandCode: { type: String },
+      brand: { type: String },
+      size: { type: String },
+      flavourCode: { type: String },
+      flavour: { type: String },
+      qty: { type: Number },
+      unit: { type: String },
+      unitName: { type: String },
+      qtyPcs: { type: Number }
+    }
+  ]
 })
 
 const cartSchema = mongoose.Schema({

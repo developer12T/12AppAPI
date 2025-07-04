@@ -3,6 +3,7 @@ const { Cart } = require('../../models/cash/cart')
 const { Product } = require('../../models/cash/product')
 const { Stock } = require('../../models/cash/stock')
 const { applyPromotion, applyQuota } = require('../promotion/calculate')
+const { to2 } = require('../../middleware/order')
 const {
   summaryOrder,
   summaryWithdraw,
@@ -254,7 +255,9 @@ exports.addProduct = async (req, res) => {
         0
       )
       cart.total = totalProduct - totalRefund
-    } else {
+      cart.total = to2(cart.total)
+    }
+    else if (type === 'adjuststock') {
       const existingProduct = cart.listProduct.find(
         p => p.id === id && p.unit === unit
       )
@@ -267,12 +270,32 @@ exports.addProduct = async (req, res) => {
           qty,
           unit,
           price,
-          action,
+          action
+        })
+      }
+      
+      cart.total = cart.listProduct.reduce((sum, p) => sum + p.qty * p.price, 0)
+      cart.total = to2(cart.total)
+    }
+    else {
+      const existingProduct = cart.listProduct.find(
+        p => p.id === id && p.unit === unit
+      )
+      if (existingProduct && existingProduct.unit === unit) {
+        existingProduct.qty += qty
+      } else {
+        cart.listProduct.push({
+          id,
+          name: product.name,
+          qty,
+          unit,
+          price,
           condition
         })
       }
 
       cart.total = cart.listProduct.reduce((sum, p) => sum + p.qty * p.price, 0)
+      cart.total = to2(cart.total)
     }
     cart.createdAt = new Date()
 

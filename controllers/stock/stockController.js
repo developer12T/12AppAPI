@@ -28,6 +28,9 @@ const refundModel = require('../../models/cash/refund')
 const { getModelsByChannel } = require('../../middleware/channel')
 const os = require('os')
 const { summaryOrder } = require('../../utilities/summary')
+const { to2 } = require('../../middleware/order')
+
+
 const fetchArea = async warehouse => {
   try {
     const WarehouseData = await Warehouse.findAll({
@@ -654,60 +657,60 @@ exports.availableStock = async (req, res, next) => {
     const data = products.map(product => {
       const lot = modelStock.find(u => u.productId == product.id)
 
-      // console.log("lot",lot)
+      console.log("lot", lot)
       const tranFromProduct = product
         ? {
-            // ...product,
-            _id: product._id,
-            id: product.id,
-            name: product.name,
-            group: product.group,
-            groupCode: product.groupCode,
-            brandCode: product.brandCode,
-            brand: product.brand,
-            size: product.size,
-            flavourCode: product.flavourCode,
-            flavour: product.flavour,
-            type: product.type,
-            weightGross: product.weightGross,
-            weightNet: product.weightNet,
-            statusSale: product.statusSale,
-            statusWithdraw: product.statusWithdraw,
-            statusRefund: product.statusRefund,
-            image: product.image,
+          // ...product,
+          _id: product._id,
+          id: product.id,
+          name: product.name,
+          group: product.group,
+          groupCode: product.groupCode,
+          brandCode: product.brandCode,
+          brand: product.brand,
+          size: product.size,
+          flavourCode: product.flavourCode,
+          flavour: product.flavour,
+          type: product.type,
+          weightGross: product.weightGross,
+          weightNet: product.weightNet,
+          statusSale: product.statusSale,
+          statusWithdraw: product.statusWithdraw,
+          statusRefund: product.statusRefund,
+          image: product.image,
 
-            listUnit: product.listUnit.map(unit => {
-              // console.log("lot",lot)
-              // const totalQtyPcsToCtn = Math.floor(
-              //   lot.available.reduce((sum, item) => {
-              //     return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor
-              //   }, 0)
-              // )
-              if (unit.unit == 'CTN') {
-                qty = lot.available.reduce((total, u) => total + u.qtyCtn, 0)
-              } else if (unit.unit == 'PCS') {
-                qty = lot.available.reduce((total, u) => total + u.qtyPcs, 0)
-              } else {
-                qty = 0
+          listUnit: product.listUnit.map(unit => {
+            // console.log("lot",lot)
+            // const totalQtyPcsToCtn = Math.floor(
+            //   lot.available.reduce((sum, item) => {
+            //     return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor
+            //   }, 0)
+            // )
+            if (unit.unit == 'CTN') {
+              qty = lot.available.reduce((total, u) => total + u.qtyCtn, 0)
+            } else if (unit.unit == 'PCS') {
+              qty = lot.available.reduce((total, u) => total + u.qtyPcs, 0)
+            } else {
+              qty = 0
+            }
+
+            return {
+              unit: unit.unit,
+              name: unit.name,
+              factor: unit.factor,
+              // qty: totalQtyPcsToCtn,
+
+              qty: qty,
+              price: {
+                sale: unit.price.sale,
+                Refund: unit.price.refund
               }
-
-              return {
-                unit: unit.unit,
-                name: unit.name,
-                factor: unit.factor,
-                // qty: totalQtyPcsToCtn,
-
-                qty: qty,
-                price: {
-                  sale: unit.price.sale,
-                  Refund: unit.price.refund
-                }
-              }
-            }),
-            created: product.created,
-            updated: product.updated,
-            __v: product.__v
-          }
+            }
+          }),
+          created: product.created,
+          updated: product.updated,
+          __v: product.__v
+        }
         : null
 
       // console.log(lot)
@@ -735,7 +738,7 @@ exports.availableStock = async (req, res, next) => {
       }
     })
 
-    function parseSize (sizeStr) {
+    function parseSize(sizeStr) {
       if (!sizeStr) return 0
 
       const units = {
@@ -788,17 +791,20 @@ exports.availableStock = async (req, res, next) => {
 }
 
 exports.addStockFromERP = async (req, res) => {
-  const { period } = req.body
-  const channel = req.headers['x-channel']
-  const data = await stockQuery(channel, period)
-  const cleanPeriod = period.replace('-', '') // "202506"
-  const { User } = getModelsByChannel(channel, res, userModel)
-  const { Stock } = getModelsByChannel(channel, res, stockModel)
-  const { Product } = getModelsByChannel(channel, res, productModel)
+  const { period } = req.body;
+  const channel = req.headers['x-channel'];
+  const data = await stockQuery(channel, period);
+  const cleanPeriod = period.replace('-', ''); // "202506"
+  const { User } = getModelsByChannel(channel, res, userModel);
+  const { Stock } = getModelsByChannel(channel, res, stockModel);
+  const { Product } = getModelsByChannel(channel, res, productModel);
+
   const users = await User.find({ role: 'sale' })
     .select('area saleCode warehouse')
-    .lean()
-  const productId = data.flatMap(item => item.ITEM_CODE)
+    .lean();
+
+  const productId = data.flatMap(item => item.ITEM_CODE);
+
   const factorCtn = await Product.aggregate([
     {
       $match: {
@@ -822,12 +828,22 @@ exports.addStockFromERP = async (req, res) => {
         }
       }
     }
-  ])
+  ]);
 
-  const result = []
+  const result = [];
 
   for (const item of users) {
-    const datastock = data.filter(i => i.WH == item.warehouse)
+    const datastock = data.filter(i => i.WH == item.warehouse);
+
+    const existingStock = await Stock.findOne({
+      area: item.area,
+      period: cleanPeriod,
+      warehouse: item.warehouse
+    });
+
+    if (existingStock) {
+      continue;
+    }
 
     const record = {
       area: item.area,
@@ -835,9 +851,9 @@ exports.addStockFromERP = async (req, res) => {
       period: cleanPeriod,
       warehouse: item.warehouse,
       listProduct: datastock.map(stock => {
-        const ctn = factorCtn.find(i => i.id === stock.ITEM_CODE) || {}
-        const factor = Number(ctn?.listUnit?.factor)
-        const qtyCtn = factor > 0 ? Math.floor(stock.ITEM_QTY / factor) : 0
+        const ctn = factorCtn.find(i => i.id === stock.ITEM_CODE) || {};
+        const factor = Number(ctn?.listUnit?.factor);
+        const qtyCtn = factor > 0 ? Math.floor(stock.ITEM_QTY / factor) : 0;
         return {
           productId: stock.ITEM_CODE,
           stockPcs: stock.ITEM_QTY,
@@ -848,22 +864,23 @@ exports.addStockFromERP = async (req, res) => {
           stockInCtn: 0,
           stockOutCtn: 0,
           balanceCtn: qtyCtn
-        }
+        };
       })
-    }
+    };
 
-    result.push(record)
+    result.push(record);
 
-    const stockDoc = new Stock(record)
-    await stockDoc.save()
+    const stockDoc = new Stock(record);
+    await stockDoc.save();
   }
 
   res.status(200).json({
     status: 200,
     message: 'addStockFromERP',
     data: result
-  })
-}
+  });
+};
+
 
 exports.getStockQty = async (req, res) => {
   const { area, period } = req.body
@@ -1552,9 +1569,9 @@ exports.stockToExcel = async (req, res) => {
   const startOfMonthUTC = new Date(startOfMonthTH.getTime() - thOffset)
   const endOfMonthUTC = new Date(endOfMonthTH.getTime() - thOffset)
 
-  function to2 (num) {
-    return Math.round((Number(num) || 0) * 100) / 100
-  }
+  // function to2 (num) {
+  //   return Math.round((Number(num) || 0) * 100) / 100
+  // }
 
   const [
     dataRefund,
@@ -1928,7 +1945,7 @@ exports.stockToExcel = async (req, res) => {
           res.status(500).send('Download failed')
         }
       }
-      fs.unlink(tempPath, () => {})
+      fs.unlink(tempPath, () => { })
     })
   } else {
     res.status(200).json({
