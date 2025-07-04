@@ -5,6 +5,7 @@ const { getModelsByChannel } = require('../../middleware/channel')
 
 const routeModel = require('../../models/cash/route')
 const storeModel = require('../../models/cash/store');
+const orderModel = require('../../models/cash/sale');
 const { period } = require('../../utilities/datetime');
 
 async function checkInRoute(data, channel, res) {
@@ -16,6 +17,8 @@ async function checkInRoute(data, channel, res) {
         const { Store } = getModelsByChannel(channel, res, storeModel);
 
         const { Route } = getModelsByChannel(channel, res, routeModel);
+
+        const { Order } = getModelsByChannel(channel, res, orderModel);
 
 
         const store = await Store.findOne({ storeId: data.storeId })
@@ -100,6 +103,12 @@ async function checkInRoute(data, channel, res) {
             { $set: updateData },
             { new: true }
         )
+        order = await Order.findOneAndUpdate(
+            { orderId: data.orderId },
+            { $set: { route: 'in' } },
+            { new: true }
+        );
+
 
         if (!route) {
             return { status: 404, message: 'Route update failed' }
