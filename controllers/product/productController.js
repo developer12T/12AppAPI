@@ -650,17 +650,17 @@ exports.addFromERPnew = async (req, res) => {
   //     message: 'Invalid response data from external API'
   //   })
   // }
-  console.log(result)
+  // console.log(result)
   data = []
 
   for (const listProduct of result) {
     const productId = listProduct.id
 
-    // const existingProduct = await Product.findOne({ id: productId })
-    // if (existingProduct) {
-    //   // console.log(`Product ID ${productId} already exists. Skipping.`)
-    //   continue
-    // }
+    const existingProduct = await Product.findOne({ id: productId })
+    if (existingProduct) {
+      // console.log(`Product ID ${productId} already exists. Skipping.`)
+      continue
+    }
     const itemConvertResponse = await axios.post(
       'http://192.168.2.97:8383/M3API/ItemManage/Item/getItemConvertItemcode',
       { itcode: productId }
@@ -1088,5 +1088,32 @@ exports.unitByFilter = async (req, res) => {
     data: dataProduct
   })
 }
+
+exports.addProductimage = async (req, res) => {
+
+  const channel = req.headers['x-channel']
+  const { Product } = getModelsByChannel(channel, res, productModel)
+
+  const productIds = await Product.find().select('id -_id');
+
+  // อัปเดตแต่ละ product ทีละรายการ (ถ้าต้องการใช้ id เองใน URL)
+  for (const product of productIds) {
+    const id = product.id;
+    await Product.updateMany(
+      { id: id },
+      { $set: { image: `https://apps.onetwotrading.co.th/images/products/${id}.webp` } }
+    );
+  }
+
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    // data: productId
+  })
+
+}
+
 
 

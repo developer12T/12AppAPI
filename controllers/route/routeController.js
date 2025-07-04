@@ -1682,3 +1682,13 @@ exports.getRouteByArea = async (req, res) => {
     data: data
   })
 }
+
+exports.deleteAndAddOne = async (req, res) => {
+
+
+    res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    // data: data
+  })
+}

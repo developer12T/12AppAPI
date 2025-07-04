@@ -946,15 +946,19 @@ exports.OrderToExcel = async (req, res) => {
   // console.log(modelOrder)
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    // const RLDT = dayjs().tz('Asia/Bangkok').format('YYYYMMDD');
-    const d = new Date();
-    d.setHours(d.getHours() + 7); // บวก 7 ชั่วโมง = เวลาไทย (UTC+7)
+    function formatDateToThaiYYYYMMDD(date) {
+      const d = new Date(date);
+      d.setHours(d.getHours() + 7); // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
 
-    const RLDT = `${yyyy}${mm}${dd}`;
+      return `${yyyy}${mm}${dd}`;
+    }
+
+    // ใช้งาน
+    const RLDT = formatDateToThaiYYYYMMDD(order.createdAt);
 
 
 
