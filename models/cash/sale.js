@@ -134,6 +134,7 @@ const orderSchema = new mongoose.Schema({
     total: { type: Number, require: true },
     paymentMethod: { type: String, default: 'cash' },
     paymentStatus: { type: String, default: 'unpaid' },
+    route : { type: String, default: 'out' },
     listImage: [orderImageSchema],
     reference: { type: String, require: true, default: '' },
     createdBy: { type: String, require: true },
