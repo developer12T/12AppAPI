@@ -125,7 +125,8 @@ const listincidentStockProductSchema = new mongoose.Schema({
   price: { type: Number, require: true },
   subtotal: { type: Number, require: true },
   discount: { type: Number, require: true, default: 0 },
-  netTotal: { type: Number, require: true }
+  netTotal: { type: Number, require: true },
+  action: { type: String,  },
 })
 
 

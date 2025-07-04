@@ -1473,13 +1473,13 @@ exports.checkout = async (req, res) => {
       return res.status(400).json({ status: 400, message: 'Type is not vaild' })
     }
 
-    if (!type || !area || !storeId) {
+    if (!type || !area ) {
       return res
         .status(400)
         .json({ status: 400, message: 'Missing required fields!' })
     }
 
-    const cart = await Cart.findOne({ type, area, storeId })
+    const cart = await Cart.findOne({ type, area})
     if (!cart || cart.listProduct.length === 0) {
       return res.status(404).json({ status: 404, message: 'Cart is empty!' })
     }
@@ -1494,31 +1494,32 @@ exports.checkout = async (req, res) => {
     }
 
     const orderId = await generateStockId(area, sale.warehouse, channel, res)
-    const summary = await summaryOrder(cart, channel, res)
-
-    // new AdjustStocka
+    console.log(cart)
+    // new AdjustStock
 
     const newOrder = {
       type,
       orderId,
-      area: summary.store.area,
+      area: area,
       saleCode: sale.saleCode,
       period: period,
       note,
       status: 'pending',
       statusTH: 'รอนำเข้า',
+      // listProduct:listProduct,
       action: '',
       listImage: [],
-      listProduct: summary.listProduct
+      // listProduct: summary.listProduct
     }
 
-    await AdjustStock.create(newOrder)
-    await Cart.deleteOne({ type, area, storeId })
+    // await AdjustStock.create(newOrder)
+    // await Cart.deleteOne({ type, area, storeId })
 
     res.status(200).json({
       status: 200,
       message: 'Sucessful',
       newOrder
+      // cart
     })
   } catch (error) {
     console.error(error)

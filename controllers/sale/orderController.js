@@ -153,44 +153,8 @@ exports.checkout = async (req, res) => {
 
     const orderId = await generateOrderId(area, sale.warehouse, channel, res)
 
-    // console.log(response)
-    // let orderId = ''
-    // if (type === 'sale') {
+    // if () {
 
-    //   const series = await getSeries('A31')
-    //   if (series == null) {
-    //     const error = new Error('Order Type is incorrect or not found')
-    //     error.statusCode = 422
-    //     throw error
-    //   }
-
-    //   const runningJson = {
-    //     coNo: '410',
-    //     series: series.OOOT05,
-    //     seriesType: '01'
-    //   }
-    //   const response = await axios.post(
-    //     `${process.env.API_URL_12ERP}/master/runningNumber/`,
-    //     {
-    //       coNo: runningJson.coNo,
-    //       series: runningJson.series,
-    //       seriesType: runningJson.seriesType
-    //     }
-    //   );
-    //   orderId = parseInt(response.data.lastNo) + 1
-
-    //   await updateRunningNumber(
-    //     {
-    //       coNo: runningJson.coNo,
-    //       series: runningJson.series,
-    //       seriesType: runningJson.seriesType,
-    //       lastNo: orderId
-    //     },
-    //     transaction
-    //   )
-
-    // } else if (type === 'change') {
-    //   orderId = await generateOrderId(area, sale.warehouse, channel, res)
     // }
 
     const promotionshelf = await PromotionShelf.find({ storeId: storeId, period: period, qty: 1 }) || {}
@@ -271,30 +235,30 @@ exports.checkout = async (req, res) => {
       })
     }
 
-    // const promotion = await applyPromotion(summary, channel, res)
+    const promotion = await applyPromotion(summary, channel, res)
 
-    // newOrder.listPromotions.forEach(item => {
-    //   const promo = promotion.appliedPromotions.find(u => u.proId === item.proId);
+    newOrder.listPromotions.forEach(item => {
+      const promo = promotion.appliedPromotions.find(u => u.proId === item.proId);
 
-    //   if (!promo) return; 
+      if (!promo) return; 
 
-    //   if (promo.proQty - item.proQty < 0) {
+      if (promo.proQty - item.proQty < 0) {
 
-    //     item.proQty = promo.proQty;
-    //   }
-    // });
+        item.proQty = promo.proQty;
+      }
+    });
 
-    // for (const item of newOrder.listQuota) {
-    //   await Quota.findOneAndUpdate(
-    //     { quotaId: item.quotaId },
-    //     {
-    //       $inc: {
-    //         quota: -item.quota,
-    //         quotaUse: + item.quota
-    //       }
-    //     }
-    //   )
-    // }
+    for (const item of newOrder.listQuota) {
+      await Quota.findOneAndUpdate(
+        { quotaId: item.quotaId },
+        {
+          $inc: {
+            quota: -item.quota,
+            quotaUse: + item.quota
+          }
+        }
+      )
+    }
 
     const qtyproduct = newOrder.listProduct.map(u => {
       return {
@@ -369,27 +333,27 @@ exports.checkout = async (req, res) => {
       const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
       // console.log('factorPcsQty', factorPcsQty)
       // console.log('factorCtnQty', factorCtnQty)
-      // const data = await Stock.findOneAndUpdate(
-      //   {
-      //     area: area,
-      //     period: period,
-      //     'listProduct.productId': item.productId
-      //   },
-      //   {
-      //     $inc: {
-      //       'listProduct.$[elem].stockOutPcs': +factorPcsQty,
-      //       // 'listProduct.$[elem].balancePcs': -factorPcsQty,
-      //       'listProduct.$[elem].stockOutCtn': +factorCtnQty,
-      //       // 'listProduct.$[elem].balanceCtn': -factorCtnQty
-      //     }
-      //   },
-      //   {
-      //     arrayFilters: [
-      //       { 'elem.productId': item.productId }
-      //     ],
-      //     new: true
-      //   }
-      // );
+      const data = await Stock.findOneAndUpdate(
+        {
+          area: area,
+          period: period,
+          'listProduct.productId': item.productId
+        },
+        {
+          $inc: {
+            'listProduct.$[elem].stockOutPcs': +factorPcsQty,
+            // 'listProduct.$[elem].balancePcs': -factorPcsQty,
+            'listProduct.$[elem].stockOutCtn': +factorCtnQty,
+            // 'listProduct.$[elem].balanceCtn': -factorCtnQty
+          }
+        },
+        {
+          arrayFilters: [
+            { 'elem.productId': item.productId }
+          ],
+          new: true
+        }
+      );
     }
     const calStock = {
       // storeId: refundOrder.store.storeId,
@@ -406,19 +370,19 @@ exports.checkout = async (req, res) => {
     }
 
 
-    // const createdMovement = await StockMovement.create({
-    //   ...calStock
-    // });
+    const createdMovement = await StockMovement.create({
+      ...calStock
+    });
 
-    // await StockMovementLog.create({
-    //   ...calStock,
-    //   refOrderId: createdMovement._id
-    // });
+    await StockMovementLog.create({
+      ...calStock,
+      refOrderId: createdMovement._id
+    });
     await newOrder.save()
-    // await PromotionShelf.findOneAndUpdate(
-    //   { proShelfId: promotionshelf.proShelfId },
-    //   { $set: { qty: 0 } }
-    // )
+    await PromotionShelf.findOneAndUpdate(
+      { proShelfId: promotionshelf.proShelfId },
+      { $set: { qty: 0 } }
+    )
     await Cart.deleteOne({ type, area, storeId })
     const currentDate = new Date()
     let query = {}
