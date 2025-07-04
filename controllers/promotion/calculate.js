@@ -92,7 +92,7 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
     });
 
     const enoughList = checkList.filter(item => item.enough);
-
+    // console.log(enoughList)
     // 6. ดึงรายละเอียดสินค้าแบบรวดเดียว (Promise.all)
     const eligibleProducts = await Promise.all(
         enoughList.map(async item => {
@@ -103,8 +103,6 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
             };
         })
     );
-
-    // console.log(eligibleProducts);
 
 
     if (!eligibleProducts.length) return []

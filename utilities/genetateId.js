@@ -11,7 +11,41 @@ const distributionModel = require('../models/cash/distribution')
 const giveawayModel = require('../models/cash/give')
 const stockModel = require('../models/cash/stock')
 const promotionModel = require('../models/cash/promotion')
+const campaignModel = require('../models/cash/campaign')
 const { getModelsByChannel } = require('../middleware/channel')
+
+
+async function generateCampaignId(channel, res) {
+
+    const { Campaign } = getModelsByChannel(channel, res, campaignModel);
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const dateStr = `${yyyy}${mm}${dd}`;
+
+    // หารหัสล่าสุดที่ขึ้นต้นด้วย CAM-YYYYMMDD-
+    const regex = new RegExp(`^CAM-${dateStr}-(\\d{3})$`);
+
+    const latest = await Campaign.findOne({ id: { $regex: regex } })
+        .sort({ id: -1 })
+        .lean();
+
+    let nextNumber = 1;
+
+    if (latest) {
+        // ดึงเลขลำดับสุดท้าย
+        const match = latest.id.match(/(\d{3})$/);
+        if (match) {
+            nextNumber = parseInt(match[1], 10) + 1;
+        }
+    }
+
+    const nextNumberStr = String(nextNumber).padStart(3, '0');
+    const newId = `CAM-${dateStr}-${nextNumberStr}`;
+    return newId;
+}
+
 
 
 const generateStockId = async (area, warehouse, channel, res) => {
@@ -173,5 +207,6 @@ module.exports = {
     generateGiveawaysId,
     generateGivetypeId,
     generatePromotionId,
-    generateStockId
+    generateStockId,
+    generateCampaignId
 }
