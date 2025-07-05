@@ -126,7 +126,7 @@ const listincidentStockProductSchema = new mongoose.Schema({
   subtotal: { type: Number, require: true },
   discount: { type: Number, require: true, default: 0 },
   netTotal: { type: Number, require: true },
-  action: { type: String,  },
+  action: { type: String, },
 })
 
 
@@ -146,13 +146,15 @@ const adjustStockSchema = new mongoose.Schema({
   area: { type: String, required: true },
   saleCode: { type: String, required: true },
   period: { type: String, required: true },
+  status: { type: String, require: true, enum: ['pending', 'completed', 'canceled', 'rejected'], default: 'pending' },
+  statusTH: { type: String, require: true, enum: ['รอนำเข้า', 'สำเร็จ', 'ยกเลิก', 'ถูกปฏิเสธ'], default: 'รอนำเข้า' },
   note: { type: String, default: '' },
   listImage: [incidentStockImageSchema],
   listProduct: [listincidentStockProductSchema],
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
-},{
-  timestamps : true
+}, {
+  timestamps: true
 })
 
 
@@ -165,7 +167,7 @@ module.exports = (conn) => {
     Stock: conn.model('stockTest', stockSchema, 'stockTest'),
     StockMovementLog: conn.model('stockMovementLog', stockMovementLogSchema, 'stockmovementlogs'),
     StockMovement: conn.model('StockMovement', stockMovementSchema),
-    AdjustStock: conn.model('adjuststocks', adjustStockSchema,'adjuststocks')
+    AdjustStock: conn.model('adjuststocks', adjustStockSchema, 'adjuststocks')
   };
 };
 

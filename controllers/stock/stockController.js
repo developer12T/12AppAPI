@@ -5,6 +5,7 @@
 // } = require('../../models/cash/stock')
 // const { User } = require('../../models/cash/user')
 // const { Product } = require('../../models/cash/product')
+const { rangeDate } = require('../../utilities/datetime')
 const xlsx = require('xlsx')
 const { generateStockId } = require('../../utilities/genetateId')
 const path = require('path')
@@ -1454,12 +1455,8 @@ exports.checkout = async (req, res) => {
       type,
       area,
       period,
-      storeId,
-      giveId,
       note,
-      latitude,
-      longitude,
-      shipping
+
     } = req.body
     const channel = req.headers['x-channel']
     const { Cart } = getModelsByChannel(channel, res, cartModel)
@@ -1469,17 +1466,19 @@ exports.checkout = async (req, res) => {
     const { Stock, StockMovementLog, StockMovement, AdjustStock } =
       getModelsByChannel(channel, res, stockModel)
 
+    const { startDate, endDate } = rangeDate(period)
+
     if (type != 'adjuststock') {
       return res.status(400).json({ status: 400, message: 'Type is not vaild' })
     }
 
-    if (!type || !area ) {
+    if (!type || !area) {
       return res
         .status(400)
         .json({ status: 400, message: 'Missing required fields!' })
     }
 
-    const cart = await Cart.findOne({ type, area})
+    const cart = await Cart.findOne({ type, area, createdAt: { $gte: startDate, $lt: endDate } })
     if (!cart || cart.listProduct.length === 0) {
       return res.status(404).json({ status: 404, message: 'Cart is empty!' })
     }
@@ -1494,8 +1493,10 @@ exports.checkout = async (req, res) => {
     }
 
     const orderId = await generateStockId(area, sale.warehouse, channel, res)
-    console.log(cart)
-    // new AdjustStock
+    // console.log(cart)
+    const productId = cart.listProduct.flatMap(item => item.id)
+    const productDetail = await Product.find({ id: { $in: productId } })
+
 
     const newOrder = {
       type,
@@ -1506,14 +1507,25 @@ exports.checkout = async (req, res) => {
       note,
       status: 'pending',
       statusTH: 'รอนำเข้า',
-      // listProduct:listProduct,
-      action: '',
+      listProduct: cart.listProduct.map(item => {
+        const product = productDetail.find(i => i.id === item.id)
+        const factorPcs = product.listUnit.find(i => i.unit === item.unit).factor
+        const qtyPcs = item.qty * factorPcs
+        return {
+          id: item.id,
+          name: item.name,
+          qty: item.qty,
+          qtyPcs: qtyPcs,
+          unit: item.unit,
+          price: item.price,
+          action: item.action
+        }
+      }),
       listImage: [],
       // listProduct: summary.listProduct
     }
-
-    // await AdjustStock.create(newOrder)
-    // await Cart.deleteOne({ type, area, storeId })
+    await AdjustStock.create(newOrder)
+    await Cart.deleteOne({ type, area, createdAt: { $gte: startDate, $lt: endDate } })
 
     res.status(200).json({
       status: 200,
@@ -1527,27 +1539,125 @@ exports.checkout = async (req, res) => {
   }
 }
 
-exports.addAdjustStock = async (req, res) => {
-  const { orderId, area, saleCode, period, note, listImage, listProduct } =
-    req.body
+exports.approveAdjustStock = async (req, res) => {
+  const { orderId, status } = req.body
   const channel = req.headers['x-channel']
-  const { Stock, IncidentStock } = getModelsByChannel(channel, res, stockModel)
-
-  const data = {
-    orderId: orderId,
-    area: area,
-    saleCode: saleCode,
-    period: period,
-    note: note,
-    listImage: listImage,
-    listProduct: listProduct
+  let statusStr = ''
+  let statusThStr = ''
+  if (status === true) {
+    statusStr = 'approved'
+    statusThStr = 'อนุมัติ'
+  } else {
+    statusStr = 'rejected'
+    statusThStr = 'ไม่อนุมัติ'
   }
 
-  await IncidentStock.create(data)
+  const { Product } = getModelsByChannel(channel, res, productModel)
+  const { Stock, StockMovementLog, StockMovement, AdjustStock } =
+    getModelsByChannel(channel, res, stockModel)
+
+  const DataAdjustStock = await AdjustStock.findOne({ orderId: orderId })
+
+  for (const item of DataAdjustStock.listProduct) {
+    const factorPcsResult = await Product.aggregate([
+      { $match: { id: item.id } },
+      {
+        $project: {
+          id: 1,
+          listUnit: {
+            $filter: {
+              input: "$listUnit",
+              as: "unitItem",
+              cond: { $eq: ["$$unitItem.unit", item.unit] }
+            }
+          }
+        }
+      }
+    ]);
+    // console.log(factorPcsResult)
+    const factorCtnResult = await Product.aggregate([
+      { $match: { id: item.id } },
+      {
+        $project: {
+          id: 1,
+          listUnit: {
+            $filter: {
+              input: "$listUnit",
+              as: "unitItem",
+              cond: { $eq: ["$$unitItem.unit", "CTN"] }
+            }
+          }
+        }
+      }
+    ]);
+    // console.log(item.action)
+    const factorCtn = factorCtnResult[0].listUnit[0].factor
+    const factorPcs = factorPcsResult[0].listUnit[0].factor
+    const factorPcsQty = item.qty * factorPcs
+    const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
+
+
+    if (item.action === 'reduce') {
+      const data = await Stock.findOneAndUpdate(
+        {
+          area: DataAdjustStock.area,
+          period: DataAdjustStock.period,
+          'listProduct.productId': item.id
+        },
+        {
+          $inc: {
+            'listProduct.$[elem].stockPcs': -factorPcsQty,
+            'listProduct.$[elem].balancePcs': -factorPcsQty,
+            'listProduct.$[elem].stockCtn': -factorCtnQty,
+            'listProduct.$[elem].balanceCtn': -factorCtnQty
+          }
+        },
+        {
+          arrayFilters: [
+            { 'elem.productId': item.id }
+          ],
+          new: true
+        }
+      );
+    }
+
+    else if (item.action === 'add') {
+      const data = await Stock.findOneAndUpdate(
+        {
+          area: DataAdjustStock.area,
+          period: DataAdjustStock.period,
+          'listProduct.productId': item.id
+        },
+        {
+          $inc: {
+            'listProduct.$[elem].stockPcs': +factorPcsQty,
+            'listProduct.$[elem].balancePcs': +factorPcsQty,
+            'listProduct.$[elem].stockCtn': +factorCtnQty,
+            'listProduct.$[elem].balanceCtn': +factorCtnQty
+          }
+        },
+        {
+          arrayFilters: [
+            { 'elem.productId': item.id }
+          ],
+          new: true
+        }
+      );
+
+    }
+  }
+
+  await AdjustStock.findOneAndUpdate(
+    { orderId: orderId, type: 'adjuststock' },
+    { $set: { statusTH: statusThStr, status: statusStr } },
+    { new: true }
+  );
+
 
   res.status(200).json({
     status: 200,
-    message: 'successfully'
+    message: 'successfully',
+    // data: DataAdjustStock
   })
 }
 
