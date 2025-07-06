@@ -8,7 +8,8 @@ const {
   summaryOrder,
   summaryWithdraw,
   summaryRefund,
-  summaryGive
+  summaryGive,
+  summaryAjustStock
 } = require('../../utilities/summary')
 const { forEach } = require('lodash')
 const { error } = require('console')
@@ -41,7 +42,9 @@ exports.getCart = async (req, res) => {
     }
 
     const cartQuery =
-      type === 'withdraw' ? { type, area } : { type, area, storeId }
+      type === 'withdraw' || type === 'adjuststock'
+        ? { type, area }
+        : { type, area, storeId }
 
     // ใช้ session ใน findOne เฉพาะกรณีที่ต้อง update ข้อมูล (กัน dirty read ใน replica set)
     let cart = await Cart.findOne(cartQuery)
@@ -86,6 +89,10 @@ exports.getCart = async (req, res) => {
 
     if (type === 'withdraw') {
       summary = await summaryWithdraw(cart, channel, res)
+    }
+
+    if (type === 'adjuststock') {
+      summary = await summaryAjustStock(cart, channel, res)
     }
 
     if (type === 'refund') {
@@ -256,8 +263,7 @@ exports.addProduct = async (req, res) => {
       )
       cart.total = totalProduct - totalRefund
       cart.total = to2(cart.total)
-    }
-    else if (type === 'adjuststock') {
+    } else if (type === 'adjuststock') {
       const existingProduct = cart.listProduct.find(
         p => p.id === id && p.unit === unit
       )
@@ -273,11 +279,10 @@ exports.addProduct = async (req, res) => {
           action
         })
       }
-      
+
       cart.total = cart.listProduct.reduce((sum, p) => sum + p.qty * p.price, 0)
       cart.total = to2(cart.total)
-    }
-    else {
+    } else {
       const existingProduct = cart.listProduct.find(
         p => p.id === id && p.unit === unit
       )
