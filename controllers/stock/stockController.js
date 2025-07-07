@@ -26,11 +26,11 @@ const giveModel = require('../../models/cash/give')
 const orderModel = require('../../models/cash/sale')
 const cartModel = require('../../models/cash/cart')
 const refundModel = require('../../models/cash/refund')
+const adjustStockModel = require('../../models/cash/stock')
 const { getModelsByChannel } = require('../../middleware/channel')
 const os = require('os')
 const { summaryOrder } = require('../../utilities/summary')
 const { to2 } = require('../../middleware/order')
-
 
 const fetchArea = async warehouse => {
   try {
@@ -76,6 +76,161 @@ const fetchArea = async warehouse => {
   } catch (error) {
     // Enhanced error handling
     throw errorEndpoint(currentFilePath, 'fetchArea', error)
+  }
+}
+
+exports.getAdjustStockDetail = async (req, res) => {
+  try {
+    const { orderId } = req.params
+    const channel = req.headers['x-channel']
+    const { AdjustStock } = getModelsByChannel(channel, res, adjustStockModel)
+
+    if (!orderId) {
+      return res
+        .status(400)
+        .json({ status: 400, message: 'orderId is required!' })
+    }
+
+    const order = await AdjustStock.find({ orderId })
+
+    if (order.length === 0) {
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Distribution order not found!' })
+    }
+
+    const data = order.map(u => {
+      return {
+        type: u.type,
+        orderId: u.orderId,
+        type: u.type,
+        area: u.area,
+        saleCode: u.saleCode,
+        period: u.period,
+        status: u.status,
+        statusTH: u.statusTH,
+        note: u.note,
+        listProduct: u.listProduct.map(p => {
+          return {
+            id: p.id,
+            name: p.name,
+            qty: p.qty,
+            unit: p.unit,
+            price: p.price,
+            qtyPcs: p.qtyPcs,
+            discount: p.discount,
+            price: p.price,
+            action: p.action
+          }
+        })
+      }
+    })
+
+    res.status(200).json({
+      status: 200,
+      message: 'successful!',
+      data: data
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.getAdjustStock = async (req, res) => {
+  try {
+    const { type, zone, team, area, period } = req.query
+    const channel = req.headers['x-channel']
+    const { AdjustStock } = getModelsByChannel(channel, res, adjustStockModel)
+    let response = []
+    if (!type || !period) {
+      return res
+        .status(400)
+        .json({ status: 400, message: 'type,  period are required!' })
+    }
+    let areaQuery = {}
+
+    if (zone) {
+      areaQuery.zone = { $regex: `^${zone}`, $options: 'i' }
+    }
+
+    if (area) {
+      areaQuery.area = { $regex: `^${area}`, $options: 'i' }
+    }
+
+    let query = {
+      type,
+      ...areaQuery,
+      // 'store.area': area,
+      // createdAt: { $gte: startDate, $lt: endDate }
+      period: period
+    }
+
+    const pipeline = [
+      {
+        $addFields: {
+          zone: { $substrBytes: ['$area', 0, 2] },
+          team3: {
+            $concat: [
+              { $substrCP: ['$area', 0, 2] },
+              { $substrCP: ['$area', 3, 1] }
+            ]
+          }
+        }
+      },
+      { $match: query }
+    ]
+
+    if (team) {
+      pipeline.push({
+        $match: {
+          team3: { $regex: `^${team}`, $options: 'i' }
+        }
+      })
+    }
+
+    pipeline.push(
+      {
+        $project: {
+          _id: 0,
+          __v: 0,
+          beauty: 0
+        }
+      },
+      {
+        $sort: { createdAt: -1 }
+      }
+    )
+
+    const adjustStock = await AdjustStock.aggregate(pipeline)
+
+    if (!adjustStock || adjustStock.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'No orders found!',
+        data: []
+      })
+    }
+
+    response = adjustStock.map(o => ({
+      orderId: o.orderId,
+      area: o.area,
+      saleCode: o.saleCode,
+      period: o.period,
+      statusTH: o.statusTH,
+      status: o.status,
+      createdAt: o.createdAt,
+      updatedAt: o.updatedAt
+    }))
+
+    res.status(200).json({
+      status: 200,
+      message: 'Successful!',
+      data: response
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
   }
 }
 
@@ -658,60 +813,60 @@ exports.availableStock = async (req, res, next) => {
     const data = products.map(product => {
       const lot = modelStock.find(u => u.productId == product.id)
 
-      console.log("lot", lot)
+      console.log('lot', lot)
       const tranFromProduct = product
         ? {
-          // ...product,
-          _id: product._id,
-          id: product.id,
-          name: product.name,
-          group: product.group,
-          groupCode: product.groupCode,
-          brandCode: product.brandCode,
-          brand: product.brand,
-          size: product.size,
-          flavourCode: product.flavourCode,
-          flavour: product.flavour,
-          type: product.type,
-          weightGross: product.weightGross,
-          weightNet: product.weightNet,
-          statusSale: product.statusSale,
-          statusWithdraw: product.statusWithdraw,
-          statusRefund: product.statusRefund,
-          image: product.image,
+            // ...product,
+            _id: product._id,
+            id: product.id,
+            name: product.name,
+            group: product.group,
+            groupCode: product.groupCode,
+            brandCode: product.brandCode,
+            brand: product.brand,
+            size: product.size,
+            flavourCode: product.flavourCode,
+            flavour: product.flavour,
+            type: product.type,
+            weightGross: product.weightGross,
+            weightNet: product.weightNet,
+            statusSale: product.statusSale,
+            statusWithdraw: product.statusWithdraw,
+            statusRefund: product.statusRefund,
+            image: product.image,
 
-          listUnit: product.listUnit.map(unit => {
-            // console.log("lot",lot)
-            // const totalQtyPcsToCtn = Math.floor(
-            //   lot.available.reduce((sum, item) => {
-            //     return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor
-            //   }, 0)
-            // )
-            if (unit.unit == 'CTN') {
-              qty = lot.available.reduce((total, u) => total + u.qtyCtn, 0)
-            } else if (unit.unit == 'PCS') {
-              qty = lot.available.reduce((total, u) => total + u.qtyPcs, 0)
-            } else {
-              qty = 0
-            }
-
-            return {
-              unit: unit.unit,
-              name: unit.name,
-              factor: unit.factor,
-              // qty: totalQtyPcsToCtn,
-
-              qty: qty,
-              price: {
-                sale: unit.price.sale,
-                Refund: unit.price.refund
+            listUnit: product.listUnit.map(unit => {
+              // console.log("lot",lot)
+              // const totalQtyPcsToCtn = Math.floor(
+              //   lot.available.reduce((sum, item) => {
+              //     return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor
+              //   }, 0)
+              // )
+              if (unit.unit == 'CTN') {
+                qty = lot.available.reduce((total, u) => total + u.qtyCtn, 0)
+              } else if (unit.unit == 'PCS') {
+                qty = lot.available.reduce((total, u) => total + u.qtyPcs, 0)
+              } else {
+                qty = 0
               }
-            }
-          }),
-          created: product.created,
-          updated: product.updated,
-          __v: product.__v
-        }
+
+              return {
+                unit: unit.unit,
+                name: unit.name,
+                factor: unit.factor,
+                // qty: totalQtyPcsToCtn,
+
+                qty: qty,
+                price: {
+                  sale: unit.price.sale,
+                  Refund: unit.price.refund
+                }
+              }
+            }),
+            created: product.created,
+            updated: product.updated,
+            __v: product.__v
+          }
         : null
 
       // console.log(lot)
@@ -739,7 +894,7 @@ exports.availableStock = async (req, res, next) => {
       }
     })
 
-    function parseSize(sizeStr) {
+    function parseSize (sizeStr) {
       if (!sizeStr) return 0
 
       const units = {
@@ -792,19 +947,19 @@ exports.availableStock = async (req, res, next) => {
 }
 
 exports.addStockFromERP = async (req, res) => {
-  const { period } = req.body;
-  const channel = req.headers['x-channel'];
-  const data = await stockQuery(channel, period);
-  const cleanPeriod = period.replace('-', ''); // "202506"
-  const { User } = getModelsByChannel(channel, res, userModel);
-  const { Stock } = getModelsByChannel(channel, res, stockModel);
-  const { Product } = getModelsByChannel(channel, res, productModel);
+  const { period } = req.body
+  const channel = req.headers['x-channel']
+  const data = await stockQuery(channel, period)
+  const cleanPeriod = period.replace('-', '') // "202506"
+  const { User } = getModelsByChannel(channel, res, userModel)
+  const { Stock } = getModelsByChannel(channel, res, stockModel)
+  const { Product } = getModelsByChannel(channel, res, productModel)
 
   const users = await User.find({ role: 'sale' })
     .select('area saleCode warehouse')
-    .lean();
+    .lean()
 
-  const productId = data.flatMap(item => item.ITEM_CODE);
+  const productId = data.flatMap(item => item.ITEM_CODE)
 
   const factorCtn = await Product.aggregate([
     {
@@ -829,21 +984,21 @@ exports.addStockFromERP = async (req, res) => {
         }
       }
     }
-  ]);
+  ])
 
-  const result = [];
+  const result = []
 
   for (const item of users) {
-    const datastock = data.filter(i => i.WH == item.warehouse);
+    const datastock = data.filter(i => i.WH == item.warehouse)
 
     const existingStock = await Stock.findOne({
       area: item.area,
       period: cleanPeriod,
       warehouse: item.warehouse
-    });
+    })
 
     if (existingStock) {
-      continue;
+      continue
     }
 
     const record = {
@@ -852,9 +1007,9 @@ exports.addStockFromERP = async (req, res) => {
       period: cleanPeriod,
       warehouse: item.warehouse,
       listProduct: datastock.map(stock => {
-        const ctn = factorCtn.find(i => i.id === stock.ITEM_CODE) || {};
-        const factor = Number(ctn?.listUnit?.factor);
-        const qtyCtn = factor > 0 ? Math.floor(stock.ITEM_QTY / factor) : 0;
+        const ctn = factorCtn.find(i => i.id === stock.ITEM_CODE) || {}
+        const factor = Number(ctn?.listUnit?.factor)
+        const qtyCtn = factor > 0 ? Math.floor(stock.ITEM_QTY / factor) : 0
         return {
           productId: stock.ITEM_CODE,
           stockPcs: stock.ITEM_QTY,
@@ -865,23 +1020,22 @@ exports.addStockFromERP = async (req, res) => {
           stockInCtn: 0,
           stockOutCtn: 0,
           balanceCtn: qtyCtn
-        };
+        }
       })
-    };
+    }
 
-    result.push(record);
+    result.push(record)
 
-    const stockDoc = new Stock(record);
-    await stockDoc.save();
+    const stockDoc = new Stock(record)
+    await stockDoc.save()
   }
 
   res.status(200).json({
     status: 200,
     message: 'addStockFromERP',
     data: result
-  });
-};
-
+  })
+}
 
 exports.getStockQty = async (req, res) => {
   const { area, period } = req.body
@@ -1451,13 +1605,7 @@ exports.getStockQtyDetail = async (req, res) => {
 
 exports.checkout = async (req, res) => {
   try {
-    const {
-      type,
-      area,
-      period,
-      note,
-
-    } = req.body
+    const { type, area, period, note } = req.body
     const channel = req.headers['x-channel']
     const { Cart } = getModelsByChannel(channel, res, cartModel)
     const { User } = getModelsByChannel(channel, res, userModel)
@@ -1478,7 +1626,11 @@ exports.checkout = async (req, res) => {
         .json({ status: 400, message: 'Missing required fields!' })
     }
 
-    const cart = await Cart.findOne({ type, area, createdAt: { $gte: startDate, $lt: endDate } })
+    const cart = await Cart.findOne({
+      type,
+      area,
+      createdAt: { $gte: startDate, $lt: endDate }
+    })
     if (!cart || cart.listProduct.length === 0) {
       return res.status(404).json({ status: 404, message: 'Cart is empty!' })
     }
@@ -1497,7 +1649,6 @@ exports.checkout = async (req, res) => {
     const productId = cart.listProduct.flatMap(item => item.id)
     const productDetail = await Product.find({ id: { $in: productId } })
 
-
     const newOrder = {
       type,
       orderId,
@@ -1509,7 +1660,9 @@ exports.checkout = async (req, res) => {
       statusTH: 'รอนำเข้า',
       listProduct: cart.listProduct.map(item => {
         const product = productDetail.find(i => i.id === item.id)
-        const factorPcs = product.listUnit.find(i => i.unit === item.unit).factor
+        const factorPcs = product.listUnit.find(
+          i => i.unit === item.unit
+        ).factor
         const qtyPcs = item.qty * factorPcs
         return {
           id: item.id,
@@ -1521,11 +1674,15 @@ exports.checkout = async (req, res) => {
           action: item.action
         }
       }),
-      listImage: [],
+      listImage: []
       // listProduct: summary.listProduct
     }
     await AdjustStock.create(newOrder)
-    await Cart.deleteOne({ type, area, createdAt: { $gte: startDate, $lt: endDate } })
+    await Cart.deleteOne({
+      type,
+      area,
+      createdAt: { $gte: startDate, $lt: endDate }
+    })
 
     res.status(200).json({
       status: 200,
@@ -1566,14 +1723,14 @@ exports.approveAdjustStock = async (req, res) => {
           id: 1,
           listUnit: {
             $filter: {
-              input: "$listUnit",
-              as: "unitItem",
-              cond: { $eq: ["$$unitItem.unit", item.unit] }
+              input: '$listUnit',
+              as: 'unitItem',
+              cond: { $eq: ['$$unitItem.unit', item.unit] }
             }
           }
         }
       }
-    ]);
+    ])
     // console.log(factorPcsResult)
     const factorCtnResult = await Product.aggregate([
       { $match: { id: item.id } },
@@ -1582,20 +1739,19 @@ exports.approveAdjustStock = async (req, res) => {
           id: 1,
           listUnit: {
             $filter: {
-              input: "$listUnit",
-              as: "unitItem",
-              cond: { $eq: ["$$unitItem.unit", "CTN"] }
+              input: '$listUnit',
+              as: 'unitItem',
+              cond: { $eq: ['$$unitItem.unit', 'CTN'] }
             }
           }
         }
       }
-    ]);
+    ])
     // console.log(item.action)
     const factorCtn = factorCtnResult[0].listUnit[0].factor
     const factorPcs = factorPcsResult[0].listUnit[0].factor
     const factorPcsQty = item.qty * factorPcs
-    const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
-
+    const factorCtnQty = Math.floor(factorPcsQty / factorCtn)
 
     if (item.action === 'reduce') {
       const data = await Stock.findOneAndUpdate(
@@ -1613,15 +1769,11 @@ exports.approveAdjustStock = async (req, res) => {
           }
         },
         {
-          arrayFilters: [
-            { 'elem.productId': item.id }
-          ],
+          arrayFilters: [{ 'elem.productId': item.id }],
           new: true
         }
-      );
-    }
-
-    else if (item.action === 'add') {
+      )
+    } else if (item.action === 'add') {
       const data = await Stock.findOneAndUpdate(
         {
           area: DataAdjustStock.area,
@@ -1637,13 +1789,10 @@ exports.approveAdjustStock = async (req, res) => {
           }
         },
         {
-          arrayFilters: [
-            { 'elem.productId': item.id }
-          ],
+          arrayFilters: [{ 'elem.productId': item.id }],
           new: true
         }
-      );
-
+      )
     }
   }
 
@@ -1651,12 +1800,11 @@ exports.approveAdjustStock = async (req, res) => {
     { orderId: orderId, type: 'adjuststock' },
     { $set: { statusTH: statusThStr, status: statusStr } },
     { new: true }
-  );
-
+  )
 
   res.status(200).json({
     status: 200,
-    message: 'successfully',
+    message: 'successfully'
     // data: DataAdjustStock
   })
 }
@@ -2056,7 +2204,7 @@ exports.stockToExcel = async (req, res) => {
           res.status(500).send('Download failed')
         }
       }
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
   } else {
     res.status(200).json({
