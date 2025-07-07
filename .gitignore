@@ -1,4 +1,5 @@
-
+/public/
 /public/images/stores
+/public/images/sendmoney
 /node_modules
 .env

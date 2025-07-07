@@ -10,7 +10,9 @@ const giveawaysProduct = new mongoose.Schema({
     productUnit: [{ type: String }],
     productQty: { type: Number, default: 0 },
     productAmount: { type: Number, default: 0 },
-    limitType: { type: String, enum: ['limited', 'unlimited'], default: 'limited' }
+    limitType: { type: String, enum: ['limited', 'unlimited'], default: 'limited' },
+    lot: [{ type: String }],
+
 })
 
 const giveTypeSchema = new mongoose.Schema({
@@ -28,8 +30,10 @@ const giveTypeSchema = new mongoose.Schema({
     },
     conditions: [giveawaysProduct],
     status: { type: String, enum: ['active', 'inactive'], default: 'active' },
-    createdAt: { type: Date },
+    createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
+}, {
+  timestamps: true
 })
 
 const giveInfoSchema = new mongoose.Schema({
@@ -66,6 +70,7 @@ const giveShipingSchema = new mongoose.Schema({
 const listGiveProductSchema = new mongoose.Schema({
     id: { type: String, require: true },
     name: { type: String, require: true },
+    lot: { type: String, require: true },
     group: { type: String, require: true },
     brand: { type: String, require: true },
     size: { type: String, require: true },
@@ -95,6 +100,7 @@ const giveawaysSchema = new mongoose.Schema({
     latitude: { type: String, require: true },
     longitude: { type: String, require: true },
     status: { type: String, require: true, enum: ['pending', 'completed', 'canceled', 'rejected'], default: 'pending' },
+    statusTH: { type: String, require: true, enum: ['รอนำเข้า', 'สำเร็จ', 'ยกเลิก', 'ถูกปฏิเสธ'], default: 'รอนำเข้า' },
     listProduct: [listGiveProductSchema],
     totalVat: { type: Number, default: 0 },
     totalExVat: { type: Number, default: 0 },
@@ -102,9 +108,19 @@ const giveawaysSchema = new mongoose.Schema({
     listImage: [giveImageSchema],
     createdBy: { type: String, require: true },
     createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
+    updatedAt: { type: Date, default: Date.now },
+    period: { type: String, require: true },
+}, {
+  timestamps: true
 })
 
-const Giveaway = dbCA.model('Giveaway', giveawaysSchema)
-const Givetype = dbCA.model('Givetype', giveTypeSchema)
-module.exports = { Giveaway, Givetype }
+// const Giveaway = dbCA.model('Giveaway', giveawaysSchema)
+// const Givetype = dbCA.model('Givetype', giveTypeSchema)
+// module.exports = { Giveaway, Givetype }
+
+module.exports = (conn) => {
+    return {
+        Giveaway: conn.model('Giveaway', giveawaysSchema),
+        Givetype: conn.model('Givetype', giveTypeSchema),
+    };
+};

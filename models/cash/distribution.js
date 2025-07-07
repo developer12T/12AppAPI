@@ -1,5 +1,8 @@
 const mongoose = require('mongoose')
 const { dbCA } = require('../../config/db')
+const { sequelize, DataTypes } = require('../../config/m3db')
+const { timestamp } = require('../../utilities/datetime')
+
 
 const listWarehouse = mongoose.Schema({
     normal: { type: String, require: true },
@@ -45,7 +48,7 @@ const listProductReceive = new mongoose.Schema({
 })
 
 const receiveSchema = mongoose.Schema({
-    type: { type: String, require: true, default: 'receive'},
+    type: { type: String, require: true, default: 'receive' },
     orderId: { type: String, require: true },
     orderType: { type: String, require: true },
     orderTypeName: { type: String, require: true },
@@ -67,10 +70,13 @@ const receiveSchema = mongoose.Schema({
     status: { type: String, require: true, enum: ['pending', 'completed', 'canceled', 'rejected'], default: 'pending' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
+}, {
+  timestamps: true
 })
 
 const listProductDistribution = new mongoose.Schema({
     id: { type: String, require: true },
+    lot: { type: String, require: true },
     name: { type: String, require: true },
     group: { type: String, require: true },
     brand: { type: String, require: true },
@@ -82,11 +88,12 @@ const listProductDistribution = new mongoose.Schema({
     price: { type: Number, require: true },
     total: { type: Number, require: true },
     weightGross: { type: Number, require: true },
-    weightNet: { type: Number, require: true }
+    weightNet: { type: Number, require: true },
+    receiveQty: { type: Number, require: true, default: 0 }
 })
 
 const distributionSchema = mongoose.Schema({
-    type: { type: String, require: true, default: 'withdraw'},
+    type: { type: String, require: true, default: 'withdraw' },
     orderId: { type: String, require: true },
     orderType: { type: String, require: true }, //T04, T05
     orderTypeName: { type: String, require: true }, //รับเอง, ส่งสินค้า
@@ -105,12 +112,50 @@ const distributionSchema = mongoose.Schema({
     totalQty: { type: Number, require: true, default: 0 },
     totalWeightGross: { type: Number, require: true, default: 0 },
     totalWeightNet: { type: Number, require: true, default: 0 },
+    receivetotal: { type: Number, require: true, default: 0 },
+    receivetotalQty: { type: Number, require: true, default: 0 },
+    receivetotalWeightGross: { type: Number, require: true, default: 0 },
+    receivetotalWeightNet: { type: Number, require: true, default: 0 },
     status: { type: String, require: true, enum: ['pending', 'completed', 'canceled', 'rejected'], default: 'pending' },
+    statusTH: { type: String, require: true, enum: ['รอนำเข้า', 'สำเร็จ', 'ยกเลิก', 'ถูกปฏิเสธ'], default: 'รอนำเข้า' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
+    period: { type: String, require: true },
+}, {
+    timestamps: true
 })
 
-const Place = dbCA.model('Place', placeSchema)
-const Distribution = dbCA.model('Distribution', distributionSchema)
-const Receive = dbCA.model('Receive', receiveSchema)
-module.exports = { Place, Distribution, Receive }
+
+
+const withdrawSchema = mongoose.Schema({
+    Des_No: { type: String, required: true },
+    Des_Name: { type: String, required: true },
+    Des_Date: { type: String, required: true },
+    Des_Area: { type: String, required: true },
+    ZType: { type: String, required: true },
+    WH: { type: String, required: true },
+    ROUTE: { type: String, required: true },
+    WH1: { type: String, required: true },
+});
+
+
+
+
+
+// const Withdraw = dbCA.model('Withdraw', withdrawSchema, 'withdraw');
+// const Place = dbCA.model('Place', placeSchema)
+// const Distribution = dbCA.model('Distribution', distributionSchema)
+// const Receive = dbCA.model('Receive', receiveSchema)
+
+
+// module.exports = { Place, Distribution, Receive ,Withdraw }
+
+module.exports = (conn) => {
+    return {
+        Withdraw: conn.model('Withdraw', withdrawSchema, 'withdraw'),
+        Place: conn.model('Place', placeSchema),
+        Distribution: conn.model('Distribution', distributionSchema),
+        Receive: conn.model('Receive', receiveSchema),
+
+    };
+};

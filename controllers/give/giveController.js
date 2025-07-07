@@ -1,10 +1,18 @@
-const { Givetype, Giveaways } = require('../../models/cash/give')
-const { Cart } = require('../../models/cash/cart')
-const { User } = require('../../models/cash/user')
+// const { Givetype, Giveaways } = require('../../models/cash/give')
+// const { Cart } = require('../../models/cash/cart')
+// const { User } = require('../../models/cash/user')
 const { generateGiveawaysId, generateGivetypeId } = require('../../utilities/genetateId')
 const { getProductGive, getStoreGive } = require('./giveProduct')
 const { summaryGive } = require('../../utilities/summary')
 const { rangeDate } = require('../../utilities/datetime')
+const { period, previousPeriod } = require('../../utilities/datetime')
+const productModel = require('../../models/cash/product')
+
+const stockModel = require('../../models/cash/stock')
+const giveawaysModel = require('../../models/cash/give');
+const cartModel = require('../../models/cash/cart')
+const userModel = require('../../models/cash/user')
+const { getModelsByChannel } = require('../../middleware/channel')
 
 exports.addGiveType = async (req, res) => {
     try {
@@ -13,11 +21,14 @@ exports.addGiveType = async (req, res) => {
             dept, applicableTo, conditions, status
         } = req.body
 
+        const channel = req.headers['x-channel'];
+        const { Givetype } = getModelsByChannel(channel, res, giveawaysModel);
+
         if (!name || !type || !remark || !dept) {
             return res.status(400).json({ status: 400, message: 'Missing required fields!' })
         }
 
-        const giveId = await generateGivetypeId()
+        const giveId = await generateGivetypeId(channel, res)
 
         const newPromotion = new Givetype({
             giveId, name, description, type, remark,
@@ -41,6 +52,9 @@ exports.addGiveType = async (req, res) => {
 
 exports.getGiveType = async (req, res) => {
     try {
+        const channel = req.headers['x-channel'];
+        const { Givetype } = getModelsByChannel(channel, res, giveawaysModel);
+
         const givetypes = await Givetype.find({}).select('-_id giveId name').lean()
 
         if (!givetypes || givetypes.length === 0) {
@@ -66,6 +80,7 @@ exports.getGiveType = async (req, res) => {
 exports.getGiveProductFilter = async (req, res) => {
     try {
         const { area, giveId, group, brand, size, flavour } = req.body
+        const channel = req.headers['x-channel'];
 
         if (!giveId || !area) {
             return res.status(400).json({
@@ -74,7 +89,7 @@ exports.getGiveProductFilter = async (req, res) => {
             })
         }
 
-        const products = await getProductGive(giveId, area)
+        const products = await getProductGive(giveId, area, channel, res)
 
         if (!products.length) {
             return res.status(404).json({
@@ -140,7 +155,8 @@ exports.getGiveProductFilter = async (req, res) => {
 exports.getGiveStoreFilter = async (req, res) => {
     try {
         const { area, giveId } = req.query
-        const store = await getStoreGive(giveId, area)
+        const channel = req.headers['x-channel'];
+        const store = await getStoreGive(giveId, area, channel, res)
         res.status(200).json({
             status: 200,
             message: 'Successfully fetched give store filters!',
@@ -154,7 +170,17 @@ exports.getGiveStoreFilter = async (req, res) => {
 
 exports.checkout = async (req, res) => {
     try {
-        const { type, area, storeId, giveId, note, latitude, longitude, shipping } = req.body
+        const { type, area, period, storeId, giveId, note, latitude, longitude, shipping } = req.body
+        const channel = req.headers['x-channel'];
+        const { Cart } = getModelsByChannel(channel, res, cartModel);
+        const { User } = getModelsByChannel(channel, res, userModel);
+        const { Product } = getModelsByChannel(channel, res, productModel)
+
+        const { Givetype } = getModelsByChannel(channel, res, giveawaysModel);
+        const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel);
+        const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(channel, res, stockModel);
+
+
 
         if (!type || !area || !storeId || !giveId || !shipping) {
             return res.status(400).json({ status: 400, message: 'Missing required fields!' })
@@ -175,11 +201,13 @@ exports.checkout = async (req, res) => {
             return res.status(404).json({ status: 404, message: 'Give type not found!' })
         }
 
-        const orderId = await generateGiveawaysId(area, sale.warehouse)
+        const orderId = await generateGiveawaysId(area, sale.warehouse, channel, res)
 
-        const summary = await summaryGive(cart)
+        const summary = await summaryGive(cart, channel, res)
 
-        const newOrder = new Giveaways({
+
+
+        const newOrder = new Giveaway({
             type,
             orderId,
             giveInfo: give,
@@ -204,22 +232,136 @@ exports.checkout = async (req, res) => {
             latitude,
             longitude,
             status: 'pending',
+            statusTH: 'รอนำเข้า',
             listProduct: summary.listProduct,
             totalVat: summary.totalVat,
             totalExVat: summary.totalExVat,
             total: summary.total,
-            // shipping: {
-            //     shippingId: shippingData.shippingId,
-            //     address: shippingData.address,
-            //     dateRequest: shipping.dateRequest,
-            //     note: shipping.note
-            // },
             shipping: {
                 shippingId: "",
                 address: ""
             },
-            createdBy: sale.username
+            createdBy: sale.username,
+            period: period,
         })
+
+
+        if (!newOrder.store.area) {
+
+            return res.status(400).json({
+                status: 400,
+                message: 'Not found store'
+            })
+        }
+
+
+        const calStock = {
+            // storeId: refundOrder.store.storeId,
+            orderId: newOrder.orderId,
+            area: newOrder.store.area,
+            saleCode: newOrder.sale.saleCode,
+            period: period,
+            warehouse: newOrder.sale.warehouse,
+            status: 'pending',
+            statusTH: 'รอนำเข้า',
+            action: "Give",
+            type: "Give",
+            product: newOrder.listProduct.map(u => {
+                return {
+                    productId: u.id,
+                    unit: u.unit,
+                    qty: u.qty,
+                    statusMovement: 'OUT'
+                }
+            })
+        }
+
+
+
+        const productQty = newOrder.listProduct.map(u => {
+            return {
+                productId: u.id,
+                unit: u.unit,
+                qty: u.qty
+            }
+        })
+
+        for (const item of productQty) {
+            const factorPcsResult = await Product.aggregate([
+                { $match: { id: item.productId } },
+                {
+                    $project: {
+                        id: 1,
+                        listUnit: {
+                            $filter: {
+                                input: "$listUnit",
+                                as: "unitItem",
+                                cond: { $eq: ["$$unitItem.unit", item.unit] }
+                            }
+                        }
+                    }
+                }
+            ]);
+
+            const factorCtnResult = await Product.aggregate([
+                { $match: { id: item.productId } },
+                {
+                    $project: {
+                        id: 1,
+                        listUnit: {
+                            $filter: {
+                                input: "$listUnit",
+                                as: "unitItem",
+                                cond: { $eq: ["$$unitItem.unit", "CTN"] }
+                            }
+                        }
+                    }
+                }
+            ]);
+            const factorCtn = factorCtnResult[0].listUnit[0].factor
+            const factorPcs = factorPcsResult[0].listUnit[0].factor
+            const factorPcsQty = item.qty * factorPcs
+            const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
+            const data = await Stock.findOneAndUpdate(
+                {
+                    area: area,
+                    period: period,
+                    'listProduct.productId': item.productId
+                },
+                {
+                    $inc: {
+                        'listProduct.$[elem].stockOutPcs': +factorPcsQty,
+                        // 'listProduct.$[elem].balancePcs': -factorPcsQty,
+                        'listProduct.$[elem].stockOutCtn': +factorCtnQty,
+                        // 'listProduct.$[elem].balanceCtn': -factorCtnQty
+                    }
+                },
+                {
+                    arrayFilters: [
+                        { 'elem.productId': item.productId }
+                    ],
+                    new: true
+                }
+            );
+        }
+
+        // console.log(newOrder)
+
+
+
+
+
+
+        const createdMovement = await StockMovement.create({
+            ...calStock
+        });
+
+        await StockMovementLog.create({
+            ...calStock,
+            refOrderId: createdMovement._id
+        });
+
+
 
         await newOrder.save()
         await Cart.deleteOne({ type, area, storeId })
@@ -227,7 +369,8 @@ exports.checkout = async (req, res) => {
         res.status(200).json({
             status: 200,
             message: 'Checkout successful!',
-            data: { orderId, total: summary.total }
+            data: newOrder
+            // data: { orderId, total: summary.total }
         })
     } catch (error) {
         console.error(error)
@@ -240,26 +383,47 @@ exports.getOrder = async (req, res) => {
         const { type, area, store, period } = req.query
         let response = []
 
-        if (!type || !area || !period) {
-            return res.status(400).json({ status: 400, message: 'type, area, period are required!' })
+        const channel = req.headers['x-channel'];
+        const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel);
+
+        if (!type || !period) {
+            return res.status(400).json({ status: 400, message: 'type,  period are required!' })
         }
 
         const { startDate, endDate } = rangeDate(period)
 
+
+        let areaQuery = {}
+        if (area) {
+            if (area.length == 2) {
+                areaQuery.zone = area.slice(0, 2)
+            }
+            else if (area.length == 5) {
+                areaQuery['store.area'] = area;
+            }
+        }
         let query = {
             type,
-            'store.area': area,
-            createdAt: { $gte: startDate, $lt: endDate }
+            ...areaQuery,
+            // 'store.area': area,
+            // createdAt: { $gte: startDate, $lt: endDate }
+            period: period
         }
 
         if (store) {
             query['store.storeId'] = store
         }
 
-        const order = await Giveaways.find(query)
-            .select('orderId giveInfo.name store.createdAt store.storeId store.name store.address total status')
-            .lean()
+        const order = await Giveaway.aggregate([
+            {
+                $addFields: {
+                    zone: { $substrBytes: ["$store.area", 0, 2] }
+                }
+            },
 
+            { $match: query }
+        ])
+        // console.log(order)
         if (!order || order.length === 0) {
             return res.status(404).json({
                 status: 404,
@@ -270,6 +434,7 @@ exports.getOrder = async (req, res) => {
 
         response = order.map((o) => ({
             orderId: o.orderId,
+            area: o.store.area,
             giveName: o.giveInfo?.name || '',
             storeId: o.store?.storeId || '',
             storeName: o.store?.name || '',
@@ -298,7 +463,11 @@ exports.getDetail = async (req, res) => {
             return res.status(400).json({ status: 400, message: 'orderId is required!' })
         }
 
-        const order = await Giveaways.findOne({ orderId })
+        const channel = req.headers['x-channel'];
+        const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel);
+
+
+        const order = await Giveaway.findOne({ orderId })
 
         res.status(200).json({
             status: 200,
@@ -310,4 +479,44 @@ exports.getDetail = async (req, res) => {
         console.error(error)
         res.status(500).json({ status: '500', message: error.message })
     }
+}
+
+exports.getGiveaways = async (req, res) => {
+
+    const channel = req.headers['x-channel'];
+    const { Givetype } = getModelsByChannel(channel, res, giveawaysModel);
+
+    let data = await Givetype.find()
+
+    // data = data.map(item => {
+    //     return {
+    //         type: item.type,
+    //         orderId: item.orderId,
+    //         giveInfo: item.giveInfo,
+    //         sale: item.sale,
+    //         store: item.store,
+    //         shipping: item.shipping,
+    //         note: item.note,
+    //         latitude: item.latitude,
+    //         longitude: item.longitude,
+    //         status: item.status,
+    //         statusTH: item.statusTH,
+    //         listProduct: item.listProduct,
+    //         totalVat: item.totalVat,
+    //         totalExVat: item.totalExVat,
+    //         total: item.total,
+    //         period: item.period,
+    //         listImage: item.listImage,
+    //         createdAt: item.createdAt,
+    //         updatedAt: item.updatedAt
+    //     }
+    // })
+
+
+
+    res.status(200).json({
+        status: 200,
+        message: 'successful!',
+        data: data
+    })
 }

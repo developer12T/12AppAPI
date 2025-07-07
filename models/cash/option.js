@@ -11,9 +11,18 @@ const optionSchema = mongoose.Schema({
     type: { type: String, require: true },
     description: { type: String, require: true },
     list: [list],
-    created: { type: Date, default: Date.now },
-    updated: { type: Date, default: Date.now },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+}, {
+  timestamps: true
 })
 
-const Option = dbCA.model('Option', optionSchema)
-module.exports = { Option }
+// const Option = dbCA.model('Option', optionSchema)
+// module.exports = { Option }
+
+
+module.exports = (conn) => {
+    return {
+        Option: conn.model('Option', optionSchema),
+    };
+  };
