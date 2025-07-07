@@ -51,7 +51,7 @@ const { productQuery } = require('../../controllers/queryFromM3/querySctipt')
 
 exports.getStore = async (req, res) => {
   try {
-    const { area, type, route } = req.query
+    const { area, type, route, zone, team } = req.query
     const channel = req.headers['x-channel'] // 'credit' or 'cash'
 
     const { Store } = getModelsByChannel(channel, res, storeModel)
@@ -70,6 +70,10 @@ exports.getStore = async (req, res) => {
     console.log(startMonth)
     console.log(NextMonth)
     let query = {}
+
+    if (zone) {
+      query.zone = { $regex: `^${zone}`, $options: 'i' }
+    }
 
     if (area) {
       query.area = { $regex: `^${area}`, $options: 'i' }
@@ -96,7 +100,7 @@ exports.getStore = async (req, res) => {
 
     // console.log(query)
 
-    const data = await Store.aggregate([
+    const pipeline = [
       { $match: query },
       {
         $lookup: {
@@ -116,9 +120,26 @@ exports.getStore = async (req, res) => {
                 $concatArrays: ['$$value', '$$this.type']
               }
             }
+          },
+          team3: {
+            $concat: [
+              { $substrCP: ['$area', 0, 2] },
+              { $substrCP: ['$area', 3, 1] }
+            ]
           }
         }
-      },
+      }
+    ]
+
+    if (team) {
+      pipeline.push({
+        $match: {
+          team3: { $regex: `^${team}`, $options: 'i' }
+        }
+      })
+    }
+
+    pipeline.push(
       {
         $project: {
           _id: 0,
@@ -129,7 +150,9 @@ exports.getStore = async (req, res) => {
       {
         $sort: { createdAt: -1 }
       }
-    ])
+    )
+
+    const data = await Store.aggregate(pipeline)
 
     // console.log(data)
 
