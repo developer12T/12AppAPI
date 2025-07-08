@@ -18,23 +18,23 @@ const { getModelsByChannel } = require('../../middleware/channel')
 const { query } = require('mssql')
 const { exists } = require('fs')
 
-
-
-
 exports.checkout = async (req, res) => {
-  const transaction = await sequelize.transaction();
+  const transaction = await sequelize.transaction()
   try {
-    const { type, area, shippingId, withdrawType, sendDate, note, period } = req.body
+    const { type, area, shippingId, withdrawType, sendDate, note, period } =
+      req.body
 
-    const channel = req.headers['x-channel'];
-    const { Cart } = getModelsByChannel(channel, res, cartModel);
-    const { User } = getModelsByChannel(channel, res, userModel);
-    const { Place } = getModelsByChannel(channel, res, distributionModel);
+    const channel = req.headers['x-channel']
+    const { Cart } = getModelsByChannel(channel, res, cartModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { Place } = getModelsByChannel(channel, res, distributionModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Distribution } = getModelsByChannel(channel, res, distributionModel)
-    const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(channel, res, stockModel);
-
-
+    const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
+      channel,
+      res,
+      stockModel
+    )
 
     if (!type || !area || !shippingId || !withdrawType || !sendDate || !note) {
       return res
@@ -74,12 +74,10 @@ exports.checkout = async (req, res) => {
         : shipping.warehouse?.clearance
 
     if (!fromWarehouse) {
-      return res
-        .status(400)
-        .json({
-          status: 400,
-          message: 'Invalid withdrawType or missing warehouse data!'
-        })
+      return res.status(400).json({
+        status: 400,
+        message: 'Invalid withdrawType or missing warehouse data!'
+      })
     }
 
     // console.log("cart",cart)
@@ -134,8 +132,12 @@ exports.checkout = async (req, res) => {
 
     if (listProduct.includes(null)) return
     // if (listProduct.some(p => p === null)) return res.status(400).json({ status: 400, message: 'Invalid product in cart!' })
-    const orderId = await generateDistributionId(area, sale.warehouse, channel, res)
-
+    const orderId = await generateDistributionId(
+      area,
+      sale.warehouse,
+      channel,
+      res
+    )
 
     // const series = await getSeries(shipping.type)
     // if (series == null) {
@@ -143,7 +145,6 @@ exports.checkout = async (req, res) => {
     //   error.statusCode = 422
     //   throw error
     // }
-
 
     // const runningJson = {
     //   coNo: '410',
@@ -170,11 +171,6 @@ exports.checkout = async (req, res) => {
     //   transaction
     // )
 
-
-
-
-
-
     const newOrder = new Distribution({
       orderId,
       orderType: shipping.type,
@@ -197,9 +193,6 @@ exports.checkout = async (req, res) => {
       period: period
     })
 
-
-
-
     const productQty = newOrder.listProduct.map(u => {
       return {
         productId: u.id,
@@ -209,7 +202,6 @@ exports.checkout = async (req, res) => {
         statusMovement: 'OUT'
       }
     })
-
 
     // for (const item of productQty) {
     //   const factorPcsResult = await Product.aggregate([
@@ -270,16 +262,6 @@ exports.checkout = async (req, res) => {
     //   );
     // }
 
-
-
-
-
-
-
-
-
-
-
     const calStock = {
       // storeId: refundOrder.store.storeId,
       orderId: newOrder.orderId,
@@ -289,20 +271,19 @@ exports.checkout = async (req, res) => {
       warehouse: newOrder.fromWarehouse,
       status: 'pending',
       statusTH: 'รอนำเข้า',
-      action: "Withdraw",
-      type: "Withdraw",
+      action: 'Withdraw',
+      type: 'Withdraw',
       product: productQty
     }
 
     const createdMovement = await StockMovement.create({
       ...calStock
-    });
+    })
 
     await StockMovementLog.create({
       ...calStock,
       refOrderId: createdMovement._id
-    });
-
+    })
 
     await newOrder.save()
     await Cart.deleteOne({ type, area })
@@ -323,10 +304,10 @@ exports.checkout = async (req, res) => {
 
 exports.getOrder = async (req, res) => {
   try {
-    const { type, area, period } = req.query
-    const channel = req.headers['x-channel'];
+    const { type, area, period, zone, team, year, month } = req.query
+    const channel = req.headers['x-channel']
 
-    const { Distribution } = getModelsByChannel(channel, res, distributionModel);
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
     let response = []
     if (!type || !period) {
@@ -338,38 +319,67 @@ exports.getOrder = async (req, res) => {
     const { startDate, endDate } = rangeDate(period)
     let statusQuery = {}
     if (type === 'pending') {
-      statusQuery.status = { $in: ['pending','approved','rejected'] };
+      statusQuery.status = { $in: ['pending', 'approved', 'rejected'] }
     } else if (type === 'history') {
-      statusQuery.status = { $in: ['approved','rejected','success'] };
+      statusQuery.status = { $in: ['approved', 'rejected', 'success'] }
     }
 
     // const status = type === 'history' ? { $ne: 'pending' } : 'pending'
     let areaQuery = {}
+
     if (area) {
-      if (area.length == 2) {
-        areaQuery.zone = area.slice(0, 2)
-      }
-      else if (area.length == 5) {
-        areaQuery.area = area
-      }
+      areaQuery.area = area
+    } else if (zone) {
+      areaQuery.area = { $regex: `^${zone}`, $options: 'i' }
     }
+
     let query = {
       ...areaQuery,
       ...statusQuery,
       period: period
     }
-    // console.log(query)
-    const order = await Distribution.aggregate([
+
+    const pipeline = [
       {
         $addFields: {
-          zone: { $substrBytes: ["$area", 0, 2] }
+          team3: {
+            $concat: [
+              { $substrCP: ['$area', 0, 2] },
+              { $substrCP: ['$area', 3, 1] }
+            ]
+          },
+          statusASC: {
+            $cond: [
+              { $eq: ['$status', 'pending'] },
+              0,
+              {
+                $cond: [
+                  { $eq: ['$status', 'approved'] },
+                  1,
+                  2 // else: rejected (or other status)
+                ]
+              }
+            ]
+          }
         }
       },
       { $match: query }
-    ])
-    // const order = await Distribution.find(query)
-    // const order2 = await Distribution.find();
-    // console.log(order)
+    ]
+
+    if (team) {
+      pipeline.push({
+        $match: {
+          team3: { $regex: `^${team}`, $options: 'i' }
+        }
+      })
+    }
+
+    pipeline.push({
+      $sort: { statusASC: 1, createdAt: -1 }
+    })
+
+    const order = await Distribution.aggregate(pipeline)
+
     if (order.length == 0) {
       return res
         .status(404)
@@ -402,9 +412,9 @@ exports.getDetail = async (req, res) => {
   try {
     const { orderId } = req.params
 
-    const channel = req.headers['x-channel'];
+    const channel = req.headers['x-channel']
 
-    const { Distribution } = getModelsByChannel(channel, res, distributionModel);
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
     if (!orderId) {
       return res
         .status(400)
@@ -452,7 +462,7 @@ exports.getDetail = async (req, res) => {
             weightNet: p.weightNet,
             receiveQty: p.receiveQty,
             _id: p._id
-          };
+          }
         }),
         total: u.total,
         totalQty: u.totalQty,
@@ -463,9 +473,8 @@ exports.getDetail = async (req, res) => {
         receivetotalWeightGross: u.receivetotalWeightGross,
         receivetotalWeightNet: u.receivetotalWeightNet,
         status: u.status
-      };
-    });
-
+      }
+    })
 
     res.status(200).json({
       status: 200,
@@ -482,9 +491,9 @@ exports.updateStatus = async (req, res) => {
   try {
     const { orderId, status } = req.body
 
-    const channel = req.headers['x-channel'];
+    const channel = req.headers['x-channel']
 
-    const { Distribution } = getModelsByChannel(channel, res, distributionModel);
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
     if (!orderId || !status) {
       return res
@@ -498,12 +507,10 @@ exports.updateStatus = async (req, res) => {
     }
 
     if (order.status !== 'pending' && status !== 'canceled') {
-      return res
-        .status(400)
-        .json({
-          status: 400,
-          message: 'Cannot update status, distribution is not in pending state!'
-        })
+      return res.status(400).json({
+        status: 400,
+        message: 'Cannot update status, distribution is not in pending state!'
+      })
     }
 
     let newOrderId = orderId
@@ -540,61 +547,63 @@ exports.updateStatus = async (req, res) => {
 }
 
 exports.updateStockWithdraw = async (req, res) => {
-
   const { orderId, status } = req.body
-  const channel = req.headers['x-channel'];
-  const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(channel, res, stockModel);
+  const channel = req.headers['x-channel']
+  const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
+    channel,
+    res,
+    stockModel
+  )
 
-  const stockmovements = await StockMovement.findOne({ orderId: orderId, status: status })
+  const stockmovements = await StockMovement.findOne({
+    orderId: orderId,
+    status: status
+  })
 
   const productId = stockmovements.product.flatMap(u => u.productId)
 
   const stock = await Stock.aggregate([
     { $match: { area: stockmovements.area, period: stockmovements.period } },
     { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
-    { $match: { "listProduct.productId": { $in: productId } } },
+    { $match: { 'listProduct.productId': { $in: productId } } },
     // { $match : { "listProduct.available.lot": u.lot } },
     {
       $project: {
         _id: 0,
-        productId: "$listProduct.productId",
-        sumQtyPcs: "$listProduct.sumQtyPcs",
-        sumQtyCtn: "$listProduct.sumQtyCtn",
-        sumQtyPcsStockIn: "$listProduct.sumQtyPcsStockIn",
-        sumQtyCtnStockIn: "$listProduct.sumQtyCtnStockIn",
-        sumQtyPcsStockOut: "$listProduct.sumQtyPcsStockOut",
-        sumQtyCtnStockOut: "$listProduct.sumQtyCtnStockOut",
-        available: "$listProduct.available"
+        productId: '$listProduct.productId',
+        sumQtyPcs: '$listProduct.sumQtyPcs',
+        sumQtyCtn: '$listProduct.sumQtyCtn',
+        sumQtyPcsStockIn: '$listProduct.sumQtyPcsStockIn',
+        sumQtyCtnStockIn: '$listProduct.sumQtyCtnStockIn',
+        sumQtyPcsStockOut: '$listProduct.sumQtyPcsStockOut',
+        sumQtyCtnStockOut: '$listProduct.sumQtyCtnStockOut',
+        available: '$listProduct.available'
       }
     }
-  ]);
-
+  ])
 
   let listProductWithDraw = []
   let updateLot = []
-
 
   for (const stockDetail of stock) {
     for (const lot of stockDetail.available) {
       const calDetails = calStock.product.filter(
         u => u.productId === stockDetail.productId && u.lot === lot.lot
-      );
+      )
 
-
-      let pcsQty = 0;
-      let ctnQty = 0;
+      let pcsQty = 0
+      let ctnQty = 0
 
       for (const cal of calDetails) {
         if (cal.unit === 'PCS' || cal.unit === 'BOT') {
-          pcsQty += cal.qty || 0;
+          pcsQty += cal.qty || 0
         }
         if (cal.unit === 'CTN') {
-          ctnQty += cal.qty || 0;
+          ctnQty += cal.qty || 0
         }
       }
       checkQtyPcs = lot.qtyPcs + pcsQty
       checkQtyCtn = lot.qtyCtn + ctnQty
-
 
       updateLot.push({
         productId: stockDetail.productId,
@@ -609,17 +618,31 @@ exports.updateStockWithdraw = async (req, res) => {
       })
     }
 
-    const relatedLots = updateLot.filter((u) => u.productId === stockDetail.productId);
+    const relatedLots = updateLot.filter(
+      u => u.productId === stockDetail.productId
+    )
     listProductWithDraw.push({
       productId: stockDetail.productId,
       sumQtyPcs: relatedLots.reduce((total, item) => total + item.qtyPcs, 0),
       sumQtyCtn: relatedLots.reduce((total, item) => total + item.qtyCtn, 0),
-      sumQtyPcsStockIn: relatedLots.reduce((total, item) => total + item.qtyPcsStockIn, 0),
-      sumQtyCtnStockIn: relatedLots.reduce((total, item) => total + item.qtyCtnStockIn, 0),
-      sumQtyPcsStockOut: relatedLots.reduce((total, item) => total + item.qtyPcsStockOut, 0),
-      sumQtyCtnStockOut: relatedLots.reduce((total, item) => total + item.qtyCtnStockOut, 0),
-      available: relatedLots.map(({ id, ...rest }) => rest),
-    });
+      sumQtyPcsStockIn: relatedLots.reduce(
+        (total, item) => total + item.qtyPcsStockIn,
+        0
+      ),
+      sumQtyCtnStockIn: relatedLots.reduce(
+        (total, item) => total + item.qtyCtnStockIn,
+        0
+      ),
+      sumQtyPcsStockOut: relatedLots.reduce(
+        (total, item) => total + item.qtyPcsStockOut,
+        0
+      ),
+      sumQtyCtnStockOut: relatedLots.reduce(
+        (total, item) => total + item.qtyCtnStockOut,
+        0
+      ),
+      available: relatedLots.map(({ id, ...rest }) => rest)
+    })
   }
   // console.log("listProductWithDraw:\n", JSON.stringify(listProductWithDraw, null, 2));
   for (const updated of listProductWithDraw) {
@@ -627,40 +650,38 @@ exports.updateStockWithdraw = async (req, res) => {
       { area: area, period: period },
       {
         $set: {
-          "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
-          "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
-          "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
-          "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
-          "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
-          "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
-          "listProduct.$[product].available": updated.available
+          'listProduct.$[product].sumQtyPcs': updated.sumQtyPcs,
+          'listProduct.$[product].sumQtyCtn': updated.sumQtyCtn,
+          'listProduct.$[product].sumQtyPcsStockIn': updated.sumQtyPcsStockIn,
+          'listProduct.$[product].sumQtyCtnStockIn': updated.sumQtyCtnStockIn,
+          'listProduct.$[product].sumQtyPcsStockOut': updated.sumQtyPcsStockOut,
+          'listProduct.$[product].sumQtyCtnStockOut': updated.sumQtyCtnStockOut,
+          'listProduct.$[product].available': updated.available
         }
       },
-      { arrayFilters: [{ "product.productId": updated.productId }], new: true }
+      { arrayFilters: [{ 'product.productId': updated.productId }], new: true }
     )
   }
 
-
   res.status(200).json({
     status: 200,
-    message: "successfully",
+    message: 'successfully',
     stock
   })
 }
 
 exports.insertWithdrawToErp = async (req, res) => {
-
   const { area, period } = req.body
-  const channel = req.headers['x-channel'];
-  const { Distribution } = getModelsByChannel(channel, res, distributionModel);
+  const channel = req.headers['x-channel']
+  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
   const distributionData = await Distribution.find({ area: area })
 
   let data = []
   for (const item of distributionData) {
-    const sendDate = new Date(item.sendDate); // สร้าง Date object
-    const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, ''); // "20250222"
-    const MGNUGL = item.listProduct.map(i => i.id);
-    const uniqueCount = new Set(MGNUGL).size;
+    const sendDate = new Date(item.sendDate) // สร้าง Date object
+    const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '') // "20250222"
+    const MGNUGL = item.listProduct.map(i => i.id)
+    const uniqueCount = new Set(MGNUGL).size
 
     const dataTran = {
       Hcase: 0,
@@ -697,7 +718,7 @@ exports.insertWithdrawToErp = async (req, res) => {
   const response = await axios.post(
     `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
     data
-  );
+  )
 
   res.status(200).json({
     status: 200,
@@ -706,20 +727,18 @@ exports.insertWithdrawToErp = async (req, res) => {
   })
 }
 
-
 exports.insertOneWithdrawToErp = async (req, res) => {
-
   const { orderId } = req.body
-  const channel = req.headers['x-channel'];
-  const { Distribution } = getModelsByChannel(channel, res, distributionModel);
+  const channel = req.headers['x-channel']
+  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
   const distributionData = await Distribution.find({ orderId: orderId })
 
   let data = []
   for (const item of distributionData) {
-    const sendDate = new Date(item.sendDate);
-    const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '');
-    const MGNUGL = item.listProduct.map(i => i.id);
-    const uniqueCount = new Set(MGNUGL).size;
+    const sendDate = new Date(item.sendDate)
+    const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '')
+    const MGNUGL = item.listProduct.map(i => i.id)
+    const uniqueCount = new Set(MGNUGL).size
 
     const dataTran = {
       Hcase: 1,
@@ -756,7 +775,7 @@ exports.insertOneWithdrawToErp = async (req, res) => {
   const response = await axios.post(
     `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
     data
-  );
+  )
 
   res.status(200).json({
     status: 200,
@@ -765,19 +784,19 @@ exports.insertOneWithdrawToErp = async (req, res) => {
   })
 }
 
-
-
 exports.addFromERPWithdraw = async (req, res) => {
-  const channel = req.headers['x-channel'];
-  const { Withdraw } = getModelsByChannel(channel, res, distributionModel);
+  const channel = req.headers['x-channel']
+  const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
   const result = await withdrawQuery(channel)
 
   for (const item of result) {
-    const existWithdraw = await Withdraw.findOne({ Des_No: item.Des_No });
+    const existWithdraw = await Withdraw.findOne({ Des_No: item.Des_No })
     if (existWithdraw) {
-      await Withdraw.findOneAndUpdate({ Des_No: item.Des_No }, item, { new: true });
+      await Withdraw.findOneAndUpdate({ Des_No: item.Des_No }, item, {
+        new: true
+      })
     } else {
-      await Withdraw.create(item);
+      await Withdraw.create(item)
     }
   }
 
@@ -801,28 +820,31 @@ exports.approveWithdraw = async (req, res) => {
     statusThStr = 'ไม่อนุมัติ'
   }
 
-  const channel = req.headers['x-channel'];
-  const { Distribution } = getModelsByChannel(channel, res, distributionModel);
+  const channel = req.headers['x-channel']
+  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
   const distributionData = await Distribution.findOneAndUpdate(
     { orderId: orderId, type: 'withdraw' },
     { $set: { statusTH: statusThStr, status: statusStr } },
     { new: true }
-  );
+  )
 
   if (!distributionData) {
     return res.status(404).json({
       status: 404,
       message: 'Not found withdraw'
-    });
+    })
   }
 
-  const distributionTran = await Distribution.findOne({ orderId: orderId, type: 'withdraw' })
+  const distributionTran = await Distribution.findOne({
+    orderId: orderId,
+    type: 'withdraw'
+  })
   // console.log(distributionTran);
-  const sendDate = new Date(distributionTran.sendDate);
-  
-  const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '');
-  const MGNUGL = distributionTran.listProduct.map(i => i.id);
-  const uniqueCount = new Set(MGNUGL).size;
+  const sendDate = new Date(distributionTran.sendDate)
+
+  const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '')
+  const MGNUGL = distributionTran.listProduct.map(i => i.id)
+  const uniqueCount = new Set(MGNUGL).size
 
   const dataTran = {
     Hcase: 1,
@@ -858,5 +880,4 @@ exports.approveWithdraw = async (req, res) => {
     message: 'successfully',
     data: dataTran
   })
-
 }

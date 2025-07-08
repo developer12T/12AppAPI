@@ -232,12 +232,10 @@ exports.getStore = async (req, res) => {
       }
     } // ถ้า type=all ไม่ต้อง filter createdAt เลย
 
-    if (zone) {
-      query.zone = { $regex: `^${zone}`, $options: 'i' }
-    }
-
     if (area) {
-      query.area = { $regex: `^${area}`, $options: 'i' }
+      query.area = area
+    } else if (zone) {
+      query.area = { $regex: `^${zone}`, $options: 'i' }
     }
 
     if (route) {
