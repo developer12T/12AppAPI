@@ -50,7 +50,16 @@ exports.getProductSwitch = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
     const { Product } = getModelsByChannel(channel, res, productModel)
-    const products = await Product.find().lean()
+    const products = await Product.aggregate([
+      {
+        $addFields: {
+          statusSaleOrder: { $cond: [{ $eq: ['$statusSale', 'Y'] }, 0, 1] }
+        }
+      },
+      { $sort: { statusSaleOrder: 1, groupCode: 1 } },
+      { $project: { statusSaleOrder: 0 } } // Remove the helper field from the result
+    ])
+
     res.status(200).json({
       status: '200',
       message: 'Products fetched successfully!',
@@ -120,7 +129,7 @@ exports.getProduct = async (req, res) => {
           balanceCtn: { $sum: '$listProduct.balanceCtn' },
           balancePcs: { $sum: '$listProduct.balancePcs' }
         }
-      },
+      }
     ])
 
     if (!products.length) {
@@ -164,36 +173,32 @@ exports.getProduct = async (req, res) => {
       return modifiedProduct
     })
 
-    function parseGram(sizeStr) {
+    function parseGram (sizeStr) {
       // support "800 G", "1 KG", "850-P G", "420-N G", "850-S G", "350-P G"
-      let match = sizeStr.match(/^([\d.]+)(?:-[A-Z])?\s*(KG|G|g|kg)?/i);
-      if (!match) return 0;
-      let value = parseFloat(match[1]);
-      let unit = (match[2] || "G").toUpperCase();
-      if (unit === "KG") return value * 1000;
-      return value;
+      let match = sizeStr.match(/^([\d.]+)(?:-[A-Z])?\s*(KG|G|g|kg)?/i)
+      if (!match) return 0
+      let value = parseFloat(match[1])
+      let unit = (match[2] || 'G').toUpperCase()
+      if (unit === 'KG') return value * 1000
+      return value
     }
-
-
-
 
     const data = products
       .map(product => {
-        const matchedStock = stock.find(s => s._id === product.id) || {};
+        const matchedStock = stock.find(s => s._id === product.id) || {}
         return {
           ...product,
           qtyCtn: matchedStock.balanceCtn || 0,
           qtyPcs: matchedStock.balancePcs || 0
-        };
+        }
       })
       .sort((a, b) => {
         // เรียง groupCode จากน้อยไปมาก
-        if (a.groupCode < b.groupCode) return -1;
-        if (a.groupCode > b.groupCode) return 1;
+        if (a.groupCode < b.groupCode) return -1
+        if (a.groupCode > b.groupCode) return 1
         // ถ้า groupCode เท่ากันให้ sort อย่างอื่นต่อ
-        return parseGram(a.size) - parseGram(b.size);
-      });
-
+        return parseGram(a.size) - parseGram(b.size)
+      })
 
     res.status(200).json({
       status: '200',
@@ -837,13 +842,13 @@ exports.groupByFilter = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
 
-  let query = {};
-  if (size) query.size = size;
-  if (brand) query.brand = brand;
-  if (flavour) query.flavour = flavour;
+  let query = {}
+  if (size) query.size = size
+  if (brand) query.brand = brand
+  if (flavour) query.flavour = flavour
 
-  let queryUnit = {};
-  if (unit) queryUnit['listUnit.name'] = unit;
+  let queryUnit = {}
+  if (unit) queryUnit['listUnit.name'] = unit
 
   const dataProduct = await Product.aggregate([
     { $match: query },
@@ -869,7 +874,6 @@ exports.groupByFilter = async (req, res) => {
   ])
 
   if (dataProduct.length === 0) {
-
     return res.status(404).json({
       status: 404,
       message: 'Not found group'
@@ -883,19 +887,18 @@ exports.groupByFilter = async (req, res) => {
   })
 }
 
-
 exports.flavourByFilter = async (req, res) => {
   const { size, brand, group, unit } = req.body
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
 
-  let query = {};
-  if (size) query.size = size;
-  if (brand) query.brand = brand;
-  if (group) query.group = group;
+  let query = {}
+  if (size) query.size = size
+  if (brand) query.brand = brand
+  if (group) query.group = group
 
-  let queryUnit = {};
-  if (unit) queryUnit['listUnit.name'] = unit;
+  let queryUnit = {}
+  if (unit) queryUnit['listUnit.name'] = unit
 
   const dataProduct = await Product.aggregate([
     { $match: query },
@@ -921,7 +924,6 @@ exports.flavourByFilter = async (req, res) => {
   ])
 
   if (dataProduct.length === 0) {
-
     return res.status(404).json({
       status: 404,
       message: 'Not found flavour'
@@ -935,19 +937,18 @@ exports.flavourByFilter = async (req, res) => {
   })
 }
 
-
 exports.sizeByFilter = async (req, res) => {
   const { flavour, brand, group, unit } = req.body
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
 
-  let query = {};
-  if (flavour) query.flavour = flavour;
-  if (brand) query.brand = brand;
-  if (group) query.group = group;
+  let query = {}
+  if (flavour) query.flavour = flavour
+  if (brand) query.brand = brand
+  if (group) query.group = group
 
-  let queryUnit = {};
-  if (unit) queryUnit['listUnit.name'] = unit;
+  let queryUnit = {}
+  if (unit) queryUnit['listUnit.name'] = unit
 
   const dataProduct = await Product.aggregate([
     { $match: query },
@@ -973,7 +974,6 @@ exports.sizeByFilter = async (req, res) => {
   ])
 
   if (dataProduct.length === 0) {
-
     return res.status(404).json({
       status: 404,
       message: 'Not found size'
@@ -992,13 +992,13 @@ exports.brandByFilter = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
 
-  let query = {};
-  if (flavour) query.flavour = flavour;
-  if (size) query.size = size;
-  if (group) query.group = group;
+  let query = {}
+  if (flavour) query.flavour = flavour
+  if (size) query.size = size
+  if (group) query.group = group
 
-  let queryUnit = {};
-  if (unit) queryUnit['listUnit.name'] = unit;
+  let queryUnit = {}
+  if (unit) queryUnit['listUnit.name'] = unit
 
   const dataProduct = await Product.aggregate([
     { $match: query },
@@ -1024,7 +1024,6 @@ exports.brandByFilter = async (req, res) => {
   ])
 
   if (dataProduct.length === 0) {
-
     return res.status(404).json({
       status: 404,
       message: 'Not found brand'
@@ -1043,10 +1042,10 @@ exports.unitByFilter = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
 
-  let query = {};
-  if (flavour) query.flavour = flavour;
-  if (brand) query.brand = brand;
-  if (group) query.group = group;
+  let query = {}
+  if (flavour) query.flavour = flavour
+  if (brand) query.brand = brand
+  if (group) query.group = group
   if (size) query.size = size
   // let queryUnit = {};
   // if (unit) queryUnit['listUnit.name'] = unit;
@@ -1075,7 +1074,6 @@ exports.unitByFilter = async (req, res) => {
   ])
 
   if (dataProduct.length === 0) {
-
     return res.status(404).json({
       status: 404,
       message: 'Not found unit'
@@ -1090,30 +1088,27 @@ exports.unitByFilter = async (req, res) => {
 }
 
 exports.addProductimage = async (req, res) => {
-
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
 
-  const productIds = await Product.find().select('id -_id');
+  const productIds = await Product.find().select('id -_id')
 
   // อัปเดตแต่ละ product ทีละรายการ (ถ้าต้องการใช้ id เองใน URL)
   for (const product of productIds) {
-    const id = product.id;
+    const id = product.id
     await Product.updateMany(
       { id: id },
-      { $set: { image: `https://apps.onetwotrading.co.th/images/products/${id}.webp` } }
-    );
+      {
+        $set: {
+          image: `https://apps.onetwotrading.co.th/images/products/${id}.webp`
+        }
+      }
+    )
   }
-
-
 
   res.status(200).json({
     status: 200,
-    message: 'sucess',
+    message: 'sucess'
     // data: productId
   })
-
 }
-
-
-
