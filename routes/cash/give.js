@@ -1,7 +1,15 @@
 const express = require('express')
-const { addGiveType, getGiveType, getGiveProductFilter, getGiveStoreFilter, getOrder, getDetail, checkout,
-    getGiveaways
- } = require('../../controllers/give/giveController')
+const {
+  addGiveType,
+  getGiveType,
+  getGiveProductFilter,
+  getGiveStoreFilter,
+  getOrder,
+  getDetail,
+  checkout,
+  getGiveaways,
+  getGiveawaysDetail
+} = require('../../controllers/give/giveController')
 
 const router = express.Router()
 
@@ -13,4 +21,5 @@ router.get('/all', getOrder)
 router.get('/detail/:orderId', getDetail)
 router.post('/checkout', checkout)
 router.get('/getGiveaways', getGiveaways)
+router.get('/getGiveaways/:giveId', getGiveawaysDetail)
 module.exports = router
