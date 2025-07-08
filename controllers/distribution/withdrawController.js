@@ -816,7 +816,8 @@ exports.approveWithdraw = async (req, res) => {
     });
   }
 
-  const distributionTran = await Distribution.find({ orderId: orderId, type: 'withdraw' })
+  const distributionTran = await Distribution.findOne({ orderId: orderId, type: 'withdraw' })
+  // console.log(distributionTran);
   const sendDate = new Date(distributionTran.sendDate);
   
   const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '');
@@ -852,11 +853,6 @@ exports.approveWithdraw = async (req, res) => {
       }
     })
   }
-
-  // console.log(dataTran)
-
-
-
   res.status(200).json({
     status: 200,
     message: 'successfully',
