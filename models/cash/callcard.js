@@ -13,7 +13,7 @@ const CallCardSchema = new mongoose.Schema(
     payer: { type: String, default: '' },
     stockKeeper: { type: String, default: '' },
     stockKeeperPhone: { type: String, default: '' },
-    flowAcrion: [{ type: String, default: '' }],
+    flowAction: [{ type: String, default: '' }],
 
     detailStore: {
       floor: { type: String, default: '' },

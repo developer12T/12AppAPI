@@ -647,7 +647,7 @@ exports.updateStockWithdraw = async (req, res) => {
   // console.log("listProductWithDraw:\n", JSON.stringify(listProductWithDraw, null, 2));
   for (const updated of listProductWithDraw) {
     await Stock.findOneAndUpdate(
-      { area: area, period: period },
+      { area: area, period: stockmovements.period },
       {
         $set: {
           'listProduct.$[product].sumQtyPcs': updated.sumQtyPcs,
