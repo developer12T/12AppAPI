@@ -86,7 +86,7 @@ exports.addCallCard = async (req, res) => {
 
     res.status(200).json({
       status: 200,
-      message: 'test',
+      message: 'Sucessful',
       data: data
     })
   } catch (error) {
@@ -127,4 +127,71 @@ exports.delCallCard = async (req, res) => {
     console.error(error);
     res.status(500).json({ status: 500, message: error.message || 'Server error' });
   }
+}
+
+
+
+exports.addFlowAction = async (req, res) => {
+  try {
+    const { area, period, storeId, flowAction } = req.body;
+    const channel = req.headers['x-channel'];
+    const { CallCard } = getModelsByChannel(channel, res, callCardModel);
+    const data = await CallCard.findOneAndUpdate(
+      { area: area, period: period, storeId: storeId },
+      { $set: { flowAction: flowAction } },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      status: 200,
+      message: 'Sucessful',
+      data: {
+        storeId: storeId,
+        area: area,
+        period: period,
+        flowAction: flowAction
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ status: 500, message: error.message || 'Server error' });
+  }
+}
+
+exports.getFlowAction = async (req, res) => {
+  try {
+
+    const { area, period, storeId, flowAction } = req.body;
+    const channel = req.headers['x-channel'];
+    const { CallCard } = getModelsByChannel(channel, res, callCardModel);
+
+
+
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ status: 500, message: error.message || 'Server error' });
+  }
+
+}
+
+exports.delFlowAction = async (req, res) => {
+  try {
+
+    const { area, period, storeId, flowAction } = req.body;
+    const channel = req.headers['x-channel'];
+    const { CallCard } = getModelsByChannel(channel, res, callCardModel);
+
+    const data = await CallCard.findOneAndUpdate(
+      { area: area, period: period, storeId: storeId },
+      { $set: { flowAction: flowAction } },
+      { new: true }
+    );
+
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ status: 500, message: error.message || 'Server error' });
+  }
+
 }

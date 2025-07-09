@@ -24,7 +24,7 @@ const {
 } = require('../../controllers/store/storeController')
 
 
-const { addCallCard, getCallCard, delCallCard } = require('../../controllers/store/callCardController')
+const { addCallCard, getCallCard, delCallCard, addFlowAction } = require('../../controllers/store/callCardController')
 
 
 
@@ -57,7 +57,7 @@ router.post('/insertStoreToErpOne', insertStoreToErpOne)
 router.post('/addCallCard', addCallCard)
 router.get('/getCallCard', getCallCard)
 router.delete('/delCallCard', delCallCard)
-
+router.post('/addFlowAction', addFlowAction)
 
 
 

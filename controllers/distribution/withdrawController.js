@@ -807,77 +807,143 @@ exports.addFromERPWithdraw = async (req, res) => {
   })
 }
 
+
 exports.approveWithdraw = async (req, res) => {
-  const { orderId, status } = req.body
+  try {
+    const { orderId, status } = req.body;
+    let statusStr = status === true ? 'approved' : 'rejected';
+    let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ';
 
-  let statusStr = ''
-  let statusThStr = ''
-  if (status === true) {
-    statusStr = 'approved'
-    statusThStr = 'อนุมัติ'
-  } else {
-    statusStr = 'rejected'
-    statusThStr = 'ไม่อนุมัติ'
-  }
+    const channel = req.headers['x-channel'];
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel);
+    const { Product } = getModelsByChannel(channel, res, productModel);
+    const { Stock } = getModelsByChannel(channel, res, stockModel);
 
-  const channel = req.headers['x-channel']
-  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
-  const distributionData = await Distribution.findOneAndUpdate(
-    { orderId: orderId, type: 'withdraw' },
-    { $set: { statusTH: statusThStr, status: statusStr } },
-    { new: true }
-  )
+    // 1. UPDATE Distribution status
+    const distributionData = await Distribution.findOneAndUpdate(
+      { orderId: orderId, type: 'withdraw' },
+      { $set: { statusTH: statusThStr, status: statusStr } },
+      { new: true }
+    );
 
-  if (!distributionData) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found withdraw'
-    })
-  }
+    if (!distributionData) {
+      return res.status(404).json({ status: 404, message: 'Not found withdraw' });
+    }
 
-  const distributionTran = await Distribution.findOne({
-    orderId: orderId,
-    type: 'withdraw'
-  })
-  // console.log(distributionTran);
-  const sendDate = new Date(distributionTran.sendDate)
+    if (statusStr === 'approved') {
 
-  const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '')
-  const MGNUGL = distributionTran.listProduct.map(i => i.id)
-  const uniqueCount = new Set(MGNUGL).size
+      const distributionTran = await Distribution.findOne(
+        { orderId: orderId, type: 'withdraw' }
+      );
 
-  const dataTran = {
-    Hcase: 1,
-    orderNo: distributionTran.orderId,
-    statusLow: '22',
-    statusHigh: '22',
-    orderType: distributionTran.orderType,
-    tranferDate: formattedDate,
-    warehouse: distributionTran.fromWarehouse,
-    towarehouse: distributionTran.toWarehouse,
-    routeCode: distributionTran.shippingRoute,
-    addressCode: distributionTran.shippingId,
-    location: '',
-    MGNUGL: uniqueCount,
-    MGDEPT: '',
-    remark: '',
-    items: distributionTran.listProduct.map(u => {
-      return {
-        itemCode: u.id,
-        itemStatus: '22',
-        MRWHLO: distributionTran.fromWarehouse,
-        itemQty: u.qty,
-        itemUnit: u.unit,
-        toLocation: '',
-        itemLot: '',
+      const sendDate = new Date(distributionTran.sendDate);
+      const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '');
+      const MGNUGL = distributionTran.listProduct.map(i => i.id);
+      const uniqueCount = new Set(MGNUGL).size;
+      let data = [];
+      const dataTran = {
+        Hcase: 1,
+        orderNo: distributionTran.orderId,
+        statusLow: '22',
+        statusHigh: '22',
+        orderType: distributionTran.orderType,
+        tranferDate: formattedDate,
+        warehouse: distributionTran.fromWarehouse,
+        towarehouse: distributionTran.toWarehouse,
+        routeCode: distributionTran.shippingRoute,
+        addressCode: distributionTran.shippingId,
         location: '',
-        itemLocation: ''
+        MGNUGL: uniqueCount,
+        MGDEPT: '',
+        remark: '',
+        items: distributionTran.listProduct.map(u => ({
+          itemCode: u.id,
+          itemStatus: '22',
+          MRWHLO: distributionTran.fromWarehouse,
+          itemQty: u.qty,
+          itemUnit: u.unit,
+          toLocation: '',
+          itemLot: '',
+          location: '',
+          itemLocation: ''
+        }))
+      };
+      data.push(dataTran);
+
+      // 2. ส่งไป External API (ถ้า fail -> return error)
+      let response;
+      try {
+        response = await axios.post(
+          `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
+          data
+        );
+      } catch (err) {
+        return res.status(500).json({ status: 500, message: 'External API failed', error: err.message });
       }
-    })
+
+      // 3. UPDATE Stock ตามรายการ
+      for (const item of dataTran.items) {
+        const factorPcsResult = await Product.aggregate([
+          { $match: { id: item.itemCode } },
+          {
+            $project: {
+              id: 1,
+              listUnit: {
+                $filter: {
+                  input: '$listUnit',
+                  as: 'unitItem',
+                  cond: { $eq: ['$$unitItem.unit', item.itemUnit] }
+                }
+              }
+            }
+          }
+        ]);
+        const factorCtnResult = await Product.aggregate([
+          { $match: { id: item.itemCode } },
+          {
+            $project: {
+              id: 1,
+              listUnit: {
+                $filter: {
+                  input: '$listUnit',
+                  as: 'unitItem',
+                  cond: { $eq: ['$$unitItem.unit', 'CTN'] }
+                }
+              }
+            }
+          }
+        ]);
+        const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0;
+        const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 0;
+        const factorPcsQty = item.itemQty * factorPcs;
+        const factorCtnQty = factorCtn ? Math.floor(factorPcsQty / factorCtn) : 0;
+        await Stock.findOneAndUpdate(
+          {
+            area: distributionTran.area,
+            period: distributionTran.period,
+            'listProduct.productId': item.itemCode
+          },
+          {
+            $inc: {
+              'listProduct.$[elem].stockInPcs': +factorPcsQty,
+              'listProduct.$[elem].stockInCtn': +factorCtnQty
+            }
+          },
+          {
+            arrayFilters: [{ 'elem.productId': item.itemCode }],
+            new: true
+          }
+        );
+      }
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'successfully',
+      data: dataTran
+    });
+
+  } catch (error) {
+    res.status(500).json({ status: 500, message: error.message });
   }
-  res.status(200).json({
-    status: 200,
-    message: 'successfully',
-    data: dataTran
-  })
-}
+};
