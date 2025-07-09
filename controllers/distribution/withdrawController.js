@@ -841,7 +841,7 @@ exports.approveWithdraw = async (req, res) => {
       const MGNUGL = distributionTran.listProduct.map(i => i.id);
       const uniqueCount = new Set(MGNUGL).size;
       let data = [];
-      const dataTran = {
+      dataTran = {
         Hcase: 1,
         orderNo: distributionTran.orderId,
         statusLow: '22',
