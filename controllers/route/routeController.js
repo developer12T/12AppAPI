@@ -417,7 +417,7 @@ exports.checkIn = async (req, res) => {
           const files = req.files
           const uploadedFile = await uploadFilesCheckin(
             files,
-            path.join(__dirname, '../stores/checkin'),
+            path.join(__dirname, '../../public/images/stores/checkin'),
             store.area,
             storeId
           )

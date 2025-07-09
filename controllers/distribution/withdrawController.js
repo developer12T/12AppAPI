@@ -60,18 +60,21 @@ exports.checkout = async (req, res) => {
       { area, 'listAddress.shippingId': shippingId },
       { 'listAddress.$': 1 }
     )
-
+    
     if (!shippingData || !shippingData.listAddress.length) {
       return res
         .status(404)
         .json({ status: 404, message: 'Shipping address not found!' })
     }
     const shipping = shippingData.listAddress[0]
+    // console.log(shipping)
+    let fromWarehouse;
+    if (withdrawType === 'normal') {
+      fromWarehouse = shipping.warehouse?.normal;
+    } else {
+      fromWarehouse = shipping.warehouse?.clearance;
+    }
 
-    const fromWarehouse =
-      withdrawType === 'normal'
-        ? shipping.warehouse?.normal
-        : shipping.warehouse?.clearance
 
     if (!fromWarehouse) {
       return res.status(400).json({

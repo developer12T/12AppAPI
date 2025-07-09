@@ -44,6 +44,11 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
         },
         { $unwind: '$productDetail' },
         {
+            $match: {
+                'productDetail.statusSale': 'Y'
+            }
+        },
+        {
             $replaceRoot: {
                 newRoot: {
                     $mergeObjects: ['$listProduct', '$productDetail']
@@ -215,7 +220,7 @@ async function applyPromotion(order, channel, res) {
 
         let matchedProducts = order.listProduct.filter((product) =>
             promo.conditions.some((condition) =>
-                (condition.productId.length === 0 || condition.productId.includes(product.id))  ||//&&
+                (condition.productId.length === 0 || condition.productId.includes(product.id)) ||//&&
                 (condition.productGroup.length === 0 || condition.productGroup.includes(product.group)) || //&&
                 (condition.productBrand.length === 0 || condition.productBrand.includes(product.brand)) || //&&
                 (condition.productFlavour.length === 0 || condition.productFlavour.includes(product.flavour)) || //&&
