@@ -95,7 +95,7 @@ exports.userQueryManeger = async function (channel, area) {
   let result = ''
   if (channel == 'cash') {
     result = await sql.query`
- SELECT 
+SELECT 
      '' AS saleCode,
      '' AS salePayer,
     Col_LoginName AS username,
@@ -119,6 +119,8 @@ exports.userQueryManeger = async function (channel, area) {
 --     Col_o_JobTitle AS role,
     '1' AS status
     FROM [192.168.0.3].[AntDB].[dbo].[hs_User] AS hr
+    WHERE Col_o_JobTitle NOT IN ('cash', 'credit', 'Credit Top', 'PC', 'EV', 'Food Service','DC')
+
 --     WHERE 
 --       Col_o_JobTitle in ('Developer','IT Support','Sale_Manager','Supervisor','Area_Manager','IT')
     `;
@@ -972,25 +974,25 @@ exports.groupStoreType = async function () {
 
 exports.withdrawQuery = async function (channel) {
 
-const config = {
-  host: process.env.MY_SQL_SERVER,
-  user: process.env.MY_SQL_USER,
-  password: process.env.MY_SQL_PASSWORD,
-  database: process.env.MY_SQL_DATABASE,
-};
+  const config = {
+    host: process.env.MY_SQL_SERVER,
+    user: process.env.MY_SQL_USER,
+    password: process.env.MY_SQL_PASSWORD,
+    database: process.env.MY_SQL_DATABASE,
+  };
 
-const connection = await mysql.createConnection(config);
+  const connection = await mysql.createConnection(config);
 
-let rows = [];
-if (channel === 'cash') {
-  [rows] = await connection.execute(`
+  let rows = [];
+  if (channel === 'cash') {
+    [rows] = await connection.execute(`
     SELECT * FROM vancash.pc_withdraws_destination
   `);
-  await connection.end(); 
+    await connection.end();
 
 
     // console.log(rows)
 
-  return rows; 
-}
+    return rows;
+  }
 }

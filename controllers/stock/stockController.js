@@ -816,57 +816,57 @@ exports.availableStock = async (req, res, next) => {
       console.log('lot', lot)
       const tranFromProduct = product
         ? {
-            // ...product,
-            _id: product._id,
-            id: product.id,
-            name: product.name,
-            group: product.group,
-            groupCode: product.groupCode,
-            brandCode: product.brandCode,
-            brand: product.brand,
-            size: product.size,
-            flavourCode: product.flavourCode,
-            flavour: product.flavour,
-            type: product.type,
-            weightGross: product.weightGross,
-            weightNet: product.weightNet,
-            statusSale: product.statusSale,
-            statusWithdraw: product.statusWithdraw,
-            statusRefund: product.statusRefund,
-            image: product.image,
+          // ...product,
+          _id: product._id,
+          id: product.id,
+          name: product.name,
+          group: product.group,
+          groupCode: product.groupCode,
+          brandCode: product.brandCode,
+          brand: product.brand,
+          size: product.size,
+          flavourCode: product.flavourCode,
+          flavour: product.flavour,
+          type: product.type,
+          weightGross: product.weightGross,
+          weightNet: product.weightNet,
+          statusSale: product.statusSale,
+          statusWithdraw: product.statusWithdraw,
+          statusRefund: product.statusRefund,
+          image: product.image,
 
-            listUnit: product.listUnit.map(unit => {
-              // console.log("lot",lot)
-              // const totalQtyPcsToCtn = Math.floor(
-              //   lot.available.reduce((sum, item) => {
-              //     return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor
-              //   }, 0)
-              // )
-              if (unit.unit == 'CTN') {
-                qty = lot.available.reduce((total, u) => total + u.qtyCtn, 0)
-              } else if (unit.unit == 'PCS') {
-                qty = lot.available.reduce((total, u) => total + u.qtyPcs, 0)
-              } else {
-                qty = 0
+          listUnit: product.listUnit.map(unit => {
+            // console.log("lot",lot)
+            // const totalQtyPcsToCtn = Math.floor(
+            //   lot.available.reduce((sum, item) => {
+            //     return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor
+            //   }, 0)
+            // )
+            if (unit.unit == 'CTN') {
+              qty = lot.available.reduce((total, u) => total + u.qtyCtn, 0)
+            } else if (unit.unit == 'PCS') {
+              qty = lot.available.reduce((total, u) => total + u.qtyPcs, 0)
+            } else {
+              qty = 0
+            }
+
+            return {
+              unit: unit.unit,
+              name: unit.name,
+              factor: unit.factor,
+              // qty: totalQtyPcsToCtn,
+
+              qty: qty,
+              price: {
+                sale: unit.price.sale,
+                Refund: unit.price.refund
               }
-
-              return {
-                unit: unit.unit,
-                name: unit.name,
-                factor: unit.factor,
-                // qty: totalQtyPcsToCtn,
-
-                qty: qty,
-                price: {
-                  sale: unit.price.sale,
-                  Refund: unit.price.refund
-                }
-              }
-            }),
-            created: product.created,
-            updated: product.updated,
-            __v: product.__v
-          }
+            }
+          }),
+          created: product.created,
+          updated: product.updated,
+          __v: product.__v
+        }
         : null
 
       // console.log(lot)
@@ -894,7 +894,7 @@ exports.availableStock = async (req, res, next) => {
       }
     })
 
-    function parseSize (sizeStr) {
+    function parseSize(sizeStr) {
       if (!sizeStr) return 0
 
       const units = {
@@ -1714,88 +1714,89 @@ exports.approveAdjustStock = async (req, res) => {
     getModelsByChannel(channel, res, stockModel)
 
   const DataAdjustStock = await AdjustStock.findOne({ orderId: orderId })
+  if (statusStr === 'approved') {
 
-  for (const item of DataAdjustStock.listProduct) {
-    const factorPcsResult = await Product.aggregate([
-      { $match: { id: item.id } },
-      {
-        $project: {
-          id: 1,
-          listUnit: {
-            $filter: {
-              input: '$listUnit',
-              as: 'unitItem',
-              cond: { $eq: ['$$unitItem.unit', item.unit] }
+    for (const item of DataAdjustStock.listProduct) {
+      const factorPcsResult = await Product.aggregate([
+        { $match: { id: item.id } },
+        {
+          $project: {
+            id: 1,
+            listUnit: {
+              $filter: {
+                input: '$listUnit',
+                as: 'unitItem',
+                cond: { $eq: ['$$unitItem.unit', item.unit] }
+              }
             }
           }
         }
-      }
-    ])
-    // console.log(factorPcsResult)
-    const factorCtnResult = await Product.aggregate([
-      { $match: { id: item.id } },
-      {
-        $project: {
-          id: 1,
-          listUnit: {
-            $filter: {
-              input: '$listUnit',
-              as: 'unitItem',
-              cond: { $eq: ['$$unitItem.unit', 'CTN'] }
+      ])
+      // console.log(factorPcsResult)
+      const factorCtnResult = await Product.aggregate([
+        { $match: { id: item.id } },
+        {
+          $project: {
+            id: 1,
+            listUnit: {
+              $filter: {
+                input: '$listUnit',
+                as: 'unitItem',
+                cond: { $eq: ['$$unitItem.unit', 'CTN'] }
+              }
             }
           }
         }
-      }
-    ])
-    // console.log(item.action)
-    const factorCtn = factorCtnResult[0].listUnit[0].factor
-    const factorPcs = factorPcsResult[0].listUnit[0].factor
-    const factorPcsQty = item.qty * factorPcs
-    const factorCtnQty = Math.floor(factorPcsQty / factorCtn)
+      ])
+      // console.log(item.action)
+      const factorCtn = factorCtnResult[0].listUnit[0].factor
+      const factorPcs = factorPcsResult[0].listUnit[0].factor
+      const factorPcsQty = item.qty * factorPcs
+      const factorCtnQty = Math.floor(factorPcsQty / factorCtn)
 
-    if (item.action === 'reduce') {
-      const data = await Stock.findOneAndUpdate(
-        {
-          area: DataAdjustStock.area,
-          period: DataAdjustStock.period,
-          'listProduct.productId': item.id
-        },
-        {
-          $inc: {
-            'listProduct.$[elem].stockPcs': -factorPcsQty,
-            'listProduct.$[elem].balancePcs': -factorPcsQty,
-            'listProduct.$[elem].stockCtn': -factorCtnQty,
-            'listProduct.$[elem].balanceCtn': -factorCtnQty
+      if (item.action === 'reduce') {
+        const data = await Stock.findOneAndUpdate(
+          {
+            area: DataAdjustStock.area,
+            period: DataAdjustStock.period,
+            'listProduct.productId': item.id
+          },
+          {
+            $inc: {
+              'listProduct.$[elem].stockPcs': -factorPcsQty,
+              'listProduct.$[elem].balancePcs': -factorPcsQty,
+              'listProduct.$[elem].stockCtn': -factorCtnQty,
+              'listProduct.$[elem].balanceCtn': -factorCtnQty
+            }
+          },
+          {
+            arrayFilters: [{ 'elem.productId': item.id }],
+            new: true
           }
-        },
-        {
-          arrayFilters: [{ 'elem.productId': item.id }],
-          new: true
-        }
-      )
-    } else if (item.action === 'add') {
-      const data = await Stock.findOneAndUpdate(
-        {
-          area: DataAdjustStock.area,
-          period: DataAdjustStock.period,
-          'listProduct.productId': item.id
-        },
-        {
-          $inc: {
-            'listProduct.$[elem].stockPcs': +factorPcsQty,
-            'listProduct.$[elem].balancePcs': +factorPcsQty,
-            'listProduct.$[elem].stockCtn': +factorCtnQty,
-            'listProduct.$[elem].balanceCtn': +factorCtnQty
+        )
+      } else if (item.action === 'add') {
+        const data = await Stock.findOneAndUpdate(
+          {
+            area: DataAdjustStock.area,
+            period: DataAdjustStock.period,
+            'listProduct.productId': item.id
+          },
+          {
+            $inc: {
+              'listProduct.$[elem].stockPcs': +factorPcsQty,
+              'listProduct.$[elem].balancePcs': +factorPcsQty,
+              'listProduct.$[elem].stockCtn': +factorCtnQty,
+              'listProduct.$[elem].balanceCtn': +factorCtnQty
+            }
+          },
+          {
+            arrayFilters: [{ 'elem.productId': item.id }],
+            new: true
           }
-        },
-        {
-          arrayFilters: [{ 'elem.productId': item.id }],
-          new: true
-        }
-      )
+        )
+      }
     }
   }
-
   await AdjustStock.findOneAndUpdate(
     { orderId: orderId, type: 'adjuststock' },
     { $set: { statusTH: statusThStr, status: statusStr } },
@@ -2204,7 +2205,7 @@ exports.stockToExcel = async (req, res) => {
           res.status(500).send('Download failed')
         }
       }
-      fs.unlink(tempPath, () => {})
+      fs.unlink(tempPath, () => { })
     })
   } else {
     res.status(200).json({
