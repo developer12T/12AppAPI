@@ -43,11 +43,11 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
             }
         },
         { $unwind: '$productDetail' },
-        {
-            $match: {
-                'productDetail.statusSale': 'Y'
-            }
-        },
+        // {
+        //     $match: {
+        //         'productDetail.statusSale': 'Y'
+        //     }
+        // },
         {
             $replaceRoot: {
                 newRoot: {
