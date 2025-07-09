@@ -619,7 +619,7 @@ exports.updateStatus = async (req, res) => {
 
     if (status === 'canceled' && !orderId.endsWith('CC')) {
       newOrderId = `${orderId}CC`
-
+      statusTH = 'ยกเลิก'
       const isDuplicate = await Order.findOne({ orderId: newOrderId })
       // .session(session);
       if (isDuplicate) {
@@ -776,7 +776,7 @@ exports.updateStatus = async (req, res) => {
 
     const updatedOrder = await Order.findOneAndUpdate(
       { orderId },
-      { $set: { status, orderId: newOrderId } },
+      { $set: { status, orderId: newOrderId, statusTH } },
       { new: true }
     )
 

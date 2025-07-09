@@ -12,8 +12,6 @@ const stock = require('../../models/cash/stock')
 
 
 
-
-
 async function rewardProduct(rewards, order, multiplier, channel, res) {
     if (!rewards || rewards.length === 0) return []
     const { Product } = getModelsByChannel(channel, res, productModel);
@@ -217,11 +215,11 @@ async function applyPromotion(order, channel, res) {
 
         let matchedProducts = order.listProduct.filter((product) =>
             promo.conditions.some((condition) =>
-                (condition.productId.length === 0 || condition.productId.includes(product.id)) &&
-                (condition.productGroup.length === 0 || condition.productGroup.includes(product.group)) &&
-                (condition.productBrand.length === 0 || condition.productBrand.includes(product.brand)) &&
-                (condition.productFlavour.length === 0 || condition.productFlavour.includes(product.flavour)) &&
-                (condition.productSize.length === 0 || condition.productSize.includes(product.size)) &&
+                (condition.productId.length === 0 || condition.productId.includes(product.id))  ||//&&
+                (condition.productGroup.length === 0 || condition.productGroup.includes(product.group)) || //&&
+                (condition.productBrand.length === 0 || condition.productBrand.includes(product.brand)) || //&&
+                (condition.productFlavour.length === 0 || condition.productFlavour.includes(product.flavour)) || //&&
+                (condition.productSize.length === 0 || condition.productSize.includes(product.size)) || //&&
                 (condition.productUnit.length === 0 || condition.productUnit.includes(product.unit))
             )
         )
