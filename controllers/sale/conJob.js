@@ -185,6 +185,7 @@ async function DeleteCartDaily(channel = 'cash') {
 
     for (const item of [...listProduct, ...listPromotion]) {
       // ดึง factor สำหรับแต่ละ unit
+      // console.log("item ",item)
       const factorPcsResult = await Product.aggregate([
         { $match: { id: item.id } },
         {
@@ -222,7 +223,8 @@ async function DeleteCartDaily(channel = 'cash') {
       // ตรวจสอบว่ามีข้อมูล unit
       if (!factorCtnResult.length || !factorCtnResult[0].listUnit.length ||
           !factorPcsResult.length || !factorPcsResult[0].listUnit.length) {
-        throw new Error(`unit factor not found for product ${item.id}`);
+        // throw new Error(`unit factor not found for product ${item.id}`);
+        // console.log(item.id,"item.unit :",item.unit, item.area )
       }
 
       const factorCtn = factorCtnResult[0].listUnit[0].factor;
@@ -231,29 +233,31 @@ async function DeleteCartDaily(channel = 'cash') {
       const factorPcsQty = item.qty * factorPcs;
       const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
 
+      // console.log("factorPcsQty",factorPcsQty,"factorCtnQty",factorCtnQty)
+
       // อัปเดต Stock
-      await Stock.findOneAndUpdate(
-        {
-          area: item.area,
-          period: period(),
-          'listProduct.productId': item.id
-        },
-        {
-          $inc: {
-            'listProduct.$[elem].balancePcs': +factorPcsQty,
-            'listProduct.$[elem].balanceCtn': +factorCtnQty
-          }
-        },
-        {
-          arrayFilters: [{ 'elem.productId': item.id }],
-          new: true,
+      // await Stock.findOneAndUpdate(
+      //   {
+      //     area: item.area,
+      //     period: period(),
+      //     'listProduct.productId': item.id
+      //   },
+      //   {
+      //     $inc: {
+      //       'listProduct.$[elem].balancePcs': +factorPcsQty,
+      //       'listProduct.$[elem].balanceCtn': +factorCtnQty
+      //     }
+      //   },
+      //   {
+      //     arrayFilters: [{ 'elem.productId': item.id }],
+      //     new: true,
           // session // สำคัญ!
-        }
-      );
+        // }
+      // );
     }
 
     // ลบ Cart ทั้งหมด (ตามเงื่อนไขที่คุณต้องการ)
-    await Cart.deleteMany({});
+    // await Cart.deleteMany({});
 
     // ถ้าทุกอย่างสำเร็จ, commit transaction
     // await session.commitTransaction();
@@ -287,10 +291,10 @@ const startCronJobErpApiCheckDisribution = () => {
 }
 
 const startCronJobDeleteCartDaily = () => {
-  cron.schedule(
-    '0 0 * * *',
-    async () => {
-  // cron.schedule('*/1 * * * *', async () => {
+  // cron.schedule(
+  //   '0 0 * * *',
+  //   async () => {
+  cron.schedule('*/1 * * * *', async () => {
     console.log('Running cron job DeleteCartDaily at 00:00 (Asia/Bangkok)');
     await DeleteCartDaily();
   },

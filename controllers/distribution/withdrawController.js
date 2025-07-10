@@ -60,7 +60,7 @@ exports.checkout = async (req, res) => {
       { area, 'listAddress.shippingId': shippingId },
       { 'listAddress.$': 1 }
     )
-    
+
     if (!shippingData || !shippingData.listAddress.length) {
       return res
         .status(404)
@@ -881,63 +881,85 @@ exports.approveWithdraw = async (req, res) => {
           data
         );
       } catch (err) {
-        return res.status(500).json({ status: 500, message: 'External API failed', error: err.message });
+        if (err.response) {
+          console.log('API error response:', err.response.data);
+          console.log('Status:', err.response.status);
+          return res.status(500).json({
+            status: 500,
+            message: 'External API failed',
+            error: err.response.data    // <-- error ที่มาจากปลายทางจริง
+          });
+        } else if (err.request) {
+          console.log('No response from API:', err.message);
+          return res.status(500).json({
+            status: 500,
+            message: 'External API unreachable',
+            error: err.message
+          });
+        } else {
+          console.log('Other error:', err.message);
+          return res.status(500).json({
+            status: 500,
+            message: 'External API error',
+            error: err.message
+          });
+        }
       }
 
       // 3. UPDATE Stock ตามรายการ
-      for (const item of dataTran.items) {
-        const factorPcsResult = await Product.aggregate([
-          { $match: { id: item.itemCode } },
-          {
-            $project: {
-              id: 1,
-              listUnit: {
-                $filter: {
-                  input: '$listUnit',
-                  as: 'unitItem',
-                  cond: { $eq: ['$$unitItem.unit', item.itemUnit] }
-                }
-              }
-            }
-          }
-        ]);
-        const factorCtnResult = await Product.aggregate([
-          { $match: { id: item.itemCode } },
-          {
-            $project: {
-              id: 1,
-              listUnit: {
-                $filter: {
-                  input: '$listUnit',
-                  as: 'unitItem',
-                  cond: { $eq: ['$$unitItem.unit', 'CTN'] }
-                }
-              }
-            }
-          }
-        ]);
-        const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0;
-        const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 0;
-        const factorPcsQty = item.itemQty * factorPcs;
-        const factorCtnQty = factorCtn ? Math.floor(factorPcsQty / factorCtn) : 0;
-        await Stock.findOneAndUpdate(
-          {
-            area: distributionTran.area,
-            period: distributionTran.period,
-            'listProduct.productId': item.itemCode
-          },
-          {
-            $inc: {
-              'listProduct.$[elem].stockInPcs': +factorPcsQty,
-              'listProduct.$[elem].stockInCtn': +factorCtnQty
-            }
-          },
-          {
-            arrayFilters: [{ 'elem.productId': item.itemCode }],
-            new: true
-          }
-        );
-      }
+    //   for (const item of dataTran.items) {
+    //     const factorPcsResult = await Product.aggregate([
+    //       { $match: { id: item.itemCode } },
+    //       {
+    //         $project: {
+    //           id: 1,
+    //           listUnit: {
+    //             $filter: {
+    //               input: '$listUnit',
+    //               as: 'unitItem',
+    //               cond: { $eq: ['$$unitItem.unit', item.itemUnit] }
+    //             }
+    //           }
+    //         }
+    //       }
+    //     ]);
+    //     const factorCtnResult = await Product.aggregate([
+    //       { $match: { id: item.itemCode } },
+    //       {
+    //         $project: {
+    //           id: 1,
+    //           listUnit: {
+    //             $filter: {
+    //               input: '$listUnit',
+    //               as: 'unitItem',
+    //               cond: { $eq: ['$$unitItem.unit', 'CTN'] }
+    //             }
+    //           }
+    //         }
+    //       }
+    //     ]);
+    //     const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0;
+    //     const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 0;
+    //     const factorPcsQty = item.itemQty * factorPcs;
+    //     const factorCtnQty = factorCtn ? Math.floor(factorPcsQty / factorCtn) : 0;
+    //     await Stock.findOneAndUpdate(
+    //       {
+    //         area: distributionTran.area,
+    //         period: distributionTran.period,
+    //         'listProduct.productId': item.itemCode
+    //       },
+    //       {
+    //         $inc: {
+    //           'listProduct.$[elem].stockInPcs': +factorPcsQty,
+    //           'listProduct.$[elem].stockInCtn': +factorCtnQty
+    //         }
+    //       },
+    //       {
+    //         arrayFilters: [{ 'elem.productId': item.itemCode }],
+    //         new: true
+    //       }
+    //     );
+    //   }
     }
 
     res.status(200).json({
