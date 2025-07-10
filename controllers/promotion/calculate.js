@@ -43,11 +43,11 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
             }
         },
         { $unwind: '$productDetail' },
-        {
-            $match: {
-                'productDetail.statusSale': 'Y'
-            }
-        },
+        // {
+        //     $match: {
+        //         'productDetail.statusSale': 'Y'
+        //     }
+        // },
         {
             $replaceRoot: {
                 newRoot: {
@@ -57,7 +57,7 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
         }
     ]);
 
-    console.log(stockList)
+    // console.log(stockList)
 
     // 2. Filter เฉพาะที่ match กับ rewardFilters
     function matchFilter(obj, filter) {
@@ -222,11 +222,11 @@ async function applyPromotion(order, channel, res) {
 
         let matchedProducts = order.listProduct.filter((product) =>
             promo.conditions.some((condition) =>
-                (condition.productId.length === 0 || condition.productId.includes(product.id)) ||//&&
-                (condition.productGroup.length === 0 || condition.productGroup.includes(product.group)) || //&&
-                (condition.productBrand.length === 0 || condition.productBrand.includes(product.brand)) || //&&
-                (condition.productFlavour.length === 0 || condition.productFlavour.includes(product.flavour)) || //&&
-                (condition.productSize.length === 0 || condition.productSize.includes(product.size)) || //&&
+                (condition.productId.length === 0 || condition.productId.includes(product.id)) &&
+                (condition.productGroup.length === 0 || condition.productGroup.includes(product.group)) &&
+                (condition.productBrand.length === 0 || condition.productBrand.includes(product.brand)) &&
+                (condition.productFlavour.length === 0 || condition.productFlavour.includes(product.flavour)) &&
+                (condition.productSize.length === 0 || condition.productSize.includes(product.size)) &&
                 (condition.productUnit.length === 0 || condition.productUnit.includes(product.unit))
             )
         )
