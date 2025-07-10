@@ -43,11 +43,11 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
             }
         },
         { $unwind: '$productDetail' },
-        // {
-        //     $match: {
-        //         'productDetail.statusSale': 'Y'
-        //     }
-        // },
+        {
+            $match: {
+                'productDetail.statusSale': 'Y'
+            }
+        },
         {
             $replaceRoot: {
                 newRoot: {
@@ -56,6 +56,8 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
             }
         }
     ]);
+
+    console.log(stockList)
 
     // 2. Filter เฉพาะที่ match กับ rewardFilters
     function matchFilter(obj, filter) {
