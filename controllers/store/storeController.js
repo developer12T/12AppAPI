@@ -48,6 +48,7 @@ const { v4: uuidv4 } = require('uuid')
 
 uuidv4() // ⇨ '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed'
 const { productQuery } = require('../../controllers/queryFromM3/querySctipt')
+const store = require('../../models/cash/store')
 
 // exports.getStore = async (req, res) => {
 //   try {
@@ -192,7 +193,7 @@ const { productQuery } = require('../../controllers/queryFromM3/querySctipt')
 
 exports.getStore = async (req, res) => {
   try {
-    const { area, type, route, zone, team, year, month } = req.query
+    const { area, type, route, zone, team, year, month, showMap } = req.query
     const channel = req.headers['x-channel'] // 'credit' or 'cash'
 
     const { Store } = getModelsByChannel(channel, res, storeModel)
@@ -294,7 +295,18 @@ exports.getStore = async (req, res) => {
       }
     )
 
-    const data = await Store.aggregate(pipeline)
+    let data = await Store.aggregate(pipeline)
+
+    if (showMap === 'true') {
+      data = data.map(item => ({
+        storeId: item.storeId,
+        name: item.name,
+        zone: item.zone,
+        address: item.address,
+        latitude: item.latitude ? parseFloat(item.latitude) : null,
+        longitude: item.longtitude ? parseFloat(item.longtitude) : null
+      }))
+    }
 
     if (data.length === 0) {
       return res.status(404).json({
