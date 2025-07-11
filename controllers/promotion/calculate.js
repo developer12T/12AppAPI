@@ -43,11 +43,11 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
             }
         },
         { $unwind: '$productDetail' },
-        // {
-        //     $match: {
-        //         'productDetail.statusSale': 'Y'
-        //     }
-        // },
+        {
+            $match: {
+                'productDetail.statusSale': 'Y'
+            }
+        },
         {
             $replaceRoot: {
                 newRoot: {
@@ -400,6 +400,7 @@ async function getRewardProduct(proId, channel, res) {
         if (reward.productFlavour) condition.flavour = reward.productFlavour
         if (reward.productBrand) condition.brand = reward.productBrand
         if (reward.productSize) condition.size = reward.productSize
+        condition.statusSale = "Y"  // <== ใส่แบบนี้ถูกต้อง
         productQuery.$or.push(condition)
     })
 

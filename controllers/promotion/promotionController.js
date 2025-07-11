@@ -141,7 +141,7 @@ exports.getPromotionProduct = async (req, res) => {
     }
 
     const cart = await Cart.findOne({ type, storeId }).lean()
-    console.log(cart)
+    // console.log(cart)
     if (!cart || !cart.listPromotion.length) {
       return res
         .status(404)
