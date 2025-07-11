@@ -212,7 +212,7 @@ exports.getStore = async (req, res) => {
     )
 
     let query = {}
-
+    query.status = '20'
     // Priority: ใช้ month/year filter ก่อน type
     if (month && year) {
       // หมายเหตุ: month ใน JS index เริ่มที่ 0 (มกราคม=0), แต่ใน req.query month=7 (กรกฎาคม)

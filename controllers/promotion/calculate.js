@@ -126,7 +126,7 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
         const factor = parseInt(unitData?.factor, 10) || 1
         const productQty = r.limitType === 'limited' ? r.productQty : r.productQty * multiplier
         const productQtyPcs = productQty * factor
-        // console.log(productQtyPcs)
+        // console.log(r.productUnit)
 
         return {
             productId: product.id,
