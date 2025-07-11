@@ -846,13 +846,19 @@ exports.updateStoreStatus = async (req, res) => {
       message: 'Not found store'
     })
   }
-  console.log(store._id)
+  const storeZone = store.area.substring(0, 2);
+  console.log(storeZone)
   const maxRunningAll = await Store.aggregate([
     {
+      $addFields: {
+        zoneNew: { $substr: ['$area', 0, 2] }
+      }
+    },
+    {
       $match: {
-        zone: store.zone,
+        zoneNew: storeZone,
         storeId: {
-          $regex: /^V.{0,9}$/,
+          $regex: /^[VI].{0,9}$/,
           $options: 'i'
         }
       }
@@ -865,6 +871,7 @@ exports.updateStoreStatus = async (req, res) => {
     }
   ])
   const oldId = maxRunningAll.flatMap(u => u.maxStoreId)
+  // console.log(maxRunningAll)
   const newId = oldId[0].replace(/\d+$/, n =>
     String(+n + 1).padStart(n.length, '0')
   )

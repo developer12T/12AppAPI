@@ -163,10 +163,11 @@ async function DeleteCartDaily(channel = 'cash') {
     // ดึงข้อมูล cart ทั้งหมด (เช่นเดิม)
     const data = await Cart.find({})
     // .session(session);
-
+    // console.log(data)
     // ดึงข้อมูล listProduct และ listPromotion
     const listProduct = data.flatMap(sub =>
       sub.listProduct.map(item => ({
+        storeId: sub.storeId,
         area: sub.area,
         id: item.id,
         unit: item.unit,
@@ -176,6 +177,7 @@ async function DeleteCartDaily(channel = 'cash') {
 
     const listPromotion = data.flatMap(sub =>
       sub.listPromotion.flatMap(item => item.listProduct.map(y => ({
+        storeId: sub.storeId,
         area: sub.area,
         id: y.id,
         unit: y.unit,
@@ -185,7 +187,7 @@ async function DeleteCartDaily(channel = 'cash') {
 
     for (const item of [...listProduct, ...listPromotion]) {
       // ดึง factor สำหรับแต่ละ unit
-      // console.log("item ",item)
+      console.log("item ",item.storeId,item.area)
       const factorPcsResult = await Product.aggregate([
         { $match: { id: item.id } },
         {
