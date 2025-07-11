@@ -349,7 +349,7 @@ exports.checkout = async (req, res) => {
           }
         }
       ])
-      const factorCtn = factorCtnResult[0].listUnit[0].factor
+      const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor || 0;
       const factorPcs = factorPcsResult[0].listUnit[0].factor
       const factorPcsQty = item.qty * factorPcs
       const factorCtnQty = Math.floor(factorPcsQty / factorCtn)
