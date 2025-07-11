@@ -849,7 +849,7 @@ exports.updateStoreStatus = async (req, res) => {
     })
   }
   const storeZone = store.area.substring(0, 2);
-  console.log(storeZone)
+  // console.log(storeZone)
   const maxRunningAll = await Store.aggregate([
     {
       $addFields: {

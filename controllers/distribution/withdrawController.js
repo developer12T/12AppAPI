@@ -822,22 +822,21 @@ exports.approveWithdraw = async (req, res) => {
     const { Product } = getModelsByChannel(channel, res, productModel);
     const { Stock } = getModelsByChannel(channel, res, stockModel);
 
-    // 1. UPDATE Distribution status
-    const distributionData = await Distribution.findOneAndUpdate(
-      { orderId: orderId, type: 'withdraw' },
-      { $set: { statusTH: statusThStr, status: statusStr } },
-      { new: true }
-    );
-
-    if (!distributionData) {
-      return res.status(404).json({ status: 404, message: 'Not found withdraw' });
-    }
-
     if (statusStr === 'approved') {
 
       const distributionTran = await Distribution.findOne(
         { orderId: orderId, type: 'withdraw' }
       );
+
+      const distributionData = await Distribution.findOneAndUpdate(
+        { orderId: orderId, type: 'withdraw' },
+        { $set: { statusTH: statusThStr, status: statusStr } },
+        { new: true }
+      );
+
+      if (!distributionData) {
+        return res.status(404).json({ status: 404, message: 'Not found withdraw' });
+      }
 
       const sendDate = new Date(distributionTran.sendDate);
       const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '');
@@ -907,59 +906,59 @@ exports.approveWithdraw = async (req, res) => {
       }
 
       // 3. UPDATE Stock ตามรายการ
-    //   for (const item of dataTran.items) {
-    //     const factorPcsResult = await Product.aggregate([
-    //       { $match: { id: item.itemCode } },
-    //       {
-    //         $project: {
-    //           id: 1,
-    //           listUnit: {
-    //             $filter: {
-    //               input: '$listUnit',
-    //               as: 'unitItem',
-    //               cond: { $eq: ['$$unitItem.unit', item.itemUnit] }
-    //             }
-    //           }
-    //         }
-    //       }
-    //     ]);
-    //     const factorCtnResult = await Product.aggregate([
-    //       { $match: { id: item.itemCode } },
-    //       {
-    //         $project: {
-    //           id: 1,
-    //           listUnit: {
-    //             $filter: {
-    //               input: '$listUnit',
-    //               as: 'unitItem',
-    //               cond: { $eq: ['$$unitItem.unit', 'CTN'] }
-    //             }
-    //           }
-    //         }
-    //       }
-    //     ]);
-    //     const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0;
-    //     const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 0;
-    //     const factorPcsQty = item.itemQty * factorPcs;
-    //     const factorCtnQty = factorCtn ? Math.floor(factorPcsQty / factorCtn) : 0;
-    //     await Stock.findOneAndUpdate(
-    //       {
-    //         area: distributionTran.area,
-    //         period: distributionTran.period,
-    //         'listProduct.productId': item.itemCode
-    //       },
-    //       {
-    //         $inc: {
-    //           'listProduct.$[elem].stockInPcs': +factorPcsQty,
-    //           'listProduct.$[elem].stockInCtn': +factorCtnQty
-    //         }
-    //       },
-    //       {
-    //         arrayFilters: [{ 'elem.productId': item.itemCode }],
-    //         new: true
-    //       }
-    //     );
-    //   }
+      for (const item of dataTran.items) {
+        const factorPcsResult = await Product.aggregate([
+          { $match: { id: item.itemCode } },
+          {
+            $project: {
+              id: 1,
+              listUnit: {
+                $filter: {
+                  input: '$listUnit',
+                  as: 'unitItem',
+                  cond: { $eq: ['$$unitItem.unit', item.itemUnit] }
+                }
+              }
+            }
+          }
+        ]);
+        const factorCtnResult = await Product.aggregate([
+          { $match: { id: item.itemCode } },
+          {
+            $project: {
+              id: 1,
+              listUnit: {
+                $filter: {
+                  input: '$listUnit',
+                  as: 'unitItem',
+                  cond: { $eq: ['$$unitItem.unit', 'CTN'] }
+                }
+              }
+            }
+          }
+        ]);
+        const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0;
+        const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 0;
+        const factorPcsQty = item.itemQty * factorPcs;
+        const factorCtnQty = factorCtn ? Math.floor(factorPcsQty / factorCtn) : 0;
+        await Stock.findOneAndUpdate(
+          {
+            area: distributionTran.area,
+            period: distributionTran.period,
+            'listProduct.productId': item.itemCode
+          },
+          {
+            $inc: {
+              'listProduct.$[elem].stockInPcs': +factorPcsQty,
+              'listProduct.$[elem].stockInCtn': +factorCtnQty
+            }
+          },
+          {
+            arrayFilters: [{ 'elem.productId': item.itemCode }],
+            new: true
+          }
+        );
+      }
     }
 
     res.status(200).json({
@@ -969,6 +968,11 @@ exports.approveWithdraw = async (req, res) => {
     });
 
   } catch (error) {
-    res.status(500).json({ status: 500, message: error.message });
+    console.error('[❌ approveWithdraw ERROR]', error); // แสดงใน console
+    res.status(500).json({
+      status: 500,
+      message: error.message,
+      stack: error.stack // เพิ่มเพื่อ debug ลึกขึ้น (optional)
+    });
   }
 };

@@ -195,3 +195,108 @@ exports.delFlowAction = async (req, res) => {
   }
 
 }
+
+
+exports.updateDetailStore = async (req, res) => {
+  try {
+    const { area, period, storeId, ...rest } = req.body;
+    const channel = req.headers['x-channel'];
+    const { CallCard } = getModelsByChannel(channel, res, callCardModel);
+
+    // หาเอกสารเดิม
+    const existing = await CallCard.findOne({ area, period, storeId });
+    if (!existing) {
+      return res.status(404).json({
+        status: 404,
+        message: 'ไม่พบข้อมูล CallCard'
+      });
+    }
+
+    // สร้าง object สำหรับ detailStore ที่ต้องอัปเดต
+    const updatedFields = {};
+    const allowedFields = [
+      'floor',
+      'marketStall',
+      'warehouse',
+      'owner',
+      'rented',
+      'takeover',
+      'remainingContractTerm'
+    ];
+
+    for (const field of allowedFields) {
+      if (rest[field] !== undefined && rest[field] !== '') {
+        updatedFields[`detailStore.${field}`] = rest[field];
+      }
+    }
+
+    const updated = await CallCard.findOneAndUpdate(
+      { area, period, storeId },
+      { $set: updatedFields },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      status: 200,
+      message: 'Successful',
+      data: updated
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      status: 500,
+      message: error.message || 'Server error'
+    });
+  }
+};
+
+exports.updateDailyvisit = async (req, res) => {
+  try {
+    const { area, period, storeId, ...rest } = req.body;
+    const channel = req.headers['x-channel'];
+    const { CallCard } = getModelsByChannel(channel, res, callCardModel);
+
+    // หาเอกสารเดิม
+    const existing = await CallCard.findOne({ area, period, storeId });
+    if (!existing) {
+      return res.status(404).json({
+        status: 404,
+        message: 'ไม่พบข้อมูล CallCard'
+      });
+    }
+
+    // สร้าง object สำหรับ detailStore ที่ต้องอัปเดต
+    const updatedFields = {};
+    const allowedFields = [
+      'monday',
+      'tuseday',
+      'wednesday',
+      'thuresday',
+      'friday',
+    ];
+
+    for (const field of allowedFields) {
+      if (rest[field] !== undefined && rest[field] !== '') {
+        updatedFields[`dayilyVisit.${field}`] = rest[field];
+      }
+    }
+
+    const updated = await CallCard.findOneAndUpdate(
+      { area, period, storeId },
+      { $set: updatedFields },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      status: 200,
+      message: 'Successful',
+      data: updated
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      status: 500,
+      message: error.message || 'Server error'
+    });
+  }
+};
