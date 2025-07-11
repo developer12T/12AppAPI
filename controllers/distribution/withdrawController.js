@@ -950,7 +950,9 @@ exports.approveWithdraw = async (req, res) => {
           {
             $inc: {
               'listProduct.$[elem].stockInPcs': +factorPcsQty,
-              'listProduct.$[elem].stockInCtn': +factorCtnQty
+              'listProduct.$[elem].stockInCtn': +factorCtnQty,
+              'listProduct.$[elem].balancePcs': +factorPcsQty,
+              'listProduct.$[elem].balanceCtn': +factorCtnQty
             }
           },
           {
