@@ -873,37 +873,37 @@ exports.approveWithdraw = async (req, res) => {
       data.push(dataTran);
 
       // 2. ส่งไป External API (ถ้า fail -> return error)
-      let response;
-      try {
-        response = await axios.post(
-          `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
-          data
-        );
-      } catch (err) {
-        if (err.response) {
-          console.log('API error response:', err.response.data);
-          console.log('Status:', err.response.status);
-          return res.status(500).json({
-            status: 500,
-            message: 'External API failed',
-            error: err.response.data    // <-- error ที่มาจากปลายทางจริง
-          });
-        } else if (err.request) {
-          console.log('No response from API:', err.message);
-          return res.status(500).json({
-            status: 500,
-            message: 'External API unreachable',
-            error: err.message
-          });
-        } else {
-          console.log('Other error:', err.message);
-          return res.status(500).json({
-            status: 500,
-            message: 'External API error',
-            error: err.message
-          });
-        }
-      }
+      // let response;
+      // try {
+      //   response = await axios.post(
+      //     `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
+      //     data
+      //   );
+      // } catch (err) {
+      //   if (err.response) {
+      //     console.log('API error response:', err.response.data);
+      //     console.log('Status:', err.response.status);
+      //     return res.status(500).json({
+      //       status: 500,
+      //       message: 'External API failed',
+      //       error: err.response.data    // <-- error ที่มาจากปลายทางจริง
+      //     });
+      //   } else if (err.request) {
+      //     console.log('No response from API:', err.message);
+      //     return res.status(500).json({
+      //       status: 500,
+      //       message: 'External API unreachable',
+      //       error: err.message
+      //     });
+      //   } else {
+      //     console.log('Other error:', err.message);
+      //     return res.status(500).json({
+      //       status: 500,
+      //       message: 'External API error',
+      //       error: err.message
+      //     });
+      //   }
+      // }
 
       // 3. UPDATE Stock ตามรายการ
       for (const item of dataTran.items) {
