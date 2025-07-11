@@ -173,7 +173,7 @@ exports.getProduct = async (req, res) => {
       return modifiedProduct
     })
 
-    function parseGram (sizeStr) {
+    function parseGram(sizeStr) {
       // support "800 G", "1 KG", "850-P G", "420-N G", "850-S G", "350-P G"
       let match = sizeStr.match(/^([\d.]+)(?:-[A-Z])?\s*(KG|G|g|kg)?/i)
       if (!match) return 0
@@ -246,12 +246,20 @@ exports.getFilters = async (req, res) => {
       })
     }
 
-    let matchCondition = {}
-    if (group && !isEmptyArray(group)) matchCondition.group = { $in: group }
-    if (brand && !isEmptyArray(brand)) matchCondition.brand = { $in: brand }
-    if (size && !isEmptyArray(size)) matchCondition.size = { $in: size }
-    if (flavour && !isEmptyArray(flavour))
-      matchCondition.flavour = { $in: flavour }
+    let matchCondition = {};
+
+    if (Array.isArray(group) && group.length > 0) {
+      matchCondition.group = { $in: group };
+    }
+    if (Array.isArray(brand) && brand.length > 0) {
+      matchCondition.brand = { $in: brand };
+    }
+    if (Array.isArray(size) && size.length > 0) {
+      matchCondition.size = { $in: size };
+    }
+    if (Array.isArray(flavour) && flavour.length > 0) {
+      matchCondition.flavour = { $in: flavour };
+    }
 
     const attributes = await Product.aggregate([
       { $match: matchCondition },
@@ -264,7 +272,7 @@ exports.getFilters = async (req, res) => {
         }
       },
       { $project: { _id: 0, brand: 1, size: 1, flavour: 1 } }
-    ])
+    ]);
 
     // ✅ กรอง null ออกจากผลลัพธ์สุดท้ายด้วย
     const clean = arr => (arr || []).filter(item => item !== null)
