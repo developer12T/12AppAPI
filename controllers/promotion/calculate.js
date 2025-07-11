@@ -256,6 +256,7 @@ async function applyPromotion(order, channel, res) {
                 }
                 return multiplier
             }, 1)
+            // console.log(multiplier)
         }
         // console.log(promo.rewards)
         switch (promo.proType) {

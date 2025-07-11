@@ -177,8 +177,8 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-          .map(item => item.price)
-          .reduce((sum, price) => sum + price, 0)
+        .map(item => item.price)
+        .reduce((sum, price) => sum + price, 0)
       : 0
     const total = subtotal - discountProduct
     const newOrder = new Order({
@@ -352,7 +352,9 @@ exports.checkout = async (req, res) => {
       const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor || 0;
       const factorPcs = factorPcsResult[0].listUnit[0].factor
       const factorPcsQty = item.qty * factorPcs
-      const factorCtnQty = Math.floor(factorPcsQty / factorCtn)
+      const factorCtnQty = factorCtn > 0
+        ? Math.floor(factorPcsQty / factorCtn)
+        : 0;
       // console.log('factorPcsQty', factorPcsQty)
       // console.log('factorCtnQty', factorCtnQty)
       const data = await Stock.findOneAndUpdate(
@@ -710,7 +712,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           const factorPcsResult = await Product.aggregate([
             { $match: { id: u.id } },
@@ -925,7 +927,7 @@ exports.OrderToExcel = async (req, res) => {
   // console.log(modelOrder)
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD (date) {
+    function formatDateToThaiYYYYMMDD(date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1058,7 +1060,7 @@ exports.OrderToExcel = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => {})
+    fs.unlink(tempPath, () => { })
   })
 
   // res.status(200).json({

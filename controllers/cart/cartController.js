@@ -729,7 +729,6 @@ exports.updateStock = async (req, res) => {
       }
       qty = parseInt(unitData.factor) * qty
     }
-
     // Update based on IN or OUT
     if (type === 'IN') {
       // productStock.stockInPcs += qty;
@@ -756,6 +755,7 @@ exports.updateStock = async (req, res) => {
       productStock.balanceCtn = Math.floor(productStock.balancePcs / factor)
     }
 
+    // console.log(productStock)
     // Save updated document
     await stockDoc.save()
 
