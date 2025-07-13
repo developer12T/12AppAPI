@@ -56,7 +56,7 @@ const { query } = require('mssql')
 
 exports.checkout = async (req, res) => {
   // const transaction = await sequelize.transaction();
-  // try {
+  try {
   const {
     type,
     area,
@@ -452,11 +452,11 @@ exports.checkout = async (req, res) => {
     message: 'Checkout successful!',
     data: newOrder
   })
-  // } catch (error) {
-  //   // await transaction.rollback()
-  //   console.error(error)
-  //   res.status(500).json({ status: '500', message: error.message })
-  // }
+  } catch (error) {
+    // await transaction.rollback()
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
 }
 
 exports.getOrder = async (req, res) => {
