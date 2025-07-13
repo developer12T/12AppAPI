@@ -120,6 +120,7 @@ exports.checkout = async (req, res) => {
         res
       )
     }
+    // console.log(summary)
     const productIds = cart.listProduct.map(p => p.id)
     const products = await Product.find({ id: { $in: productIds } }).select(
       'id name groupCode group brandCode brand size flavourCode flavour listUnit'

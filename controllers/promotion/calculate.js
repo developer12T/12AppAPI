@@ -177,7 +177,7 @@ async function applyPromotion(order, channel, res) {
             }
         }])
     const newStore = dataStore[0]
-
+    // console.log(order.store.storeId)
     const beautyStore = await TypeStore.findOne({
         storeId: order.store.storeId,
         type: { $in: ["beauty"] }
