@@ -700,7 +700,8 @@ exports.updateStatus = async (req, res) => {
     if (order.listPromotions.length > 0) {
       for (const item of order.listPromotions) {
         const promotionDetail =
-          (await Promotion.findOne({ proId: item.proId })) || {}
+          (await Promotion.findOne({ proId: item.proId })) ||
+          new Promotion({ proId: item.proId });
         const storeIdToRemove = order.store.storeId
         if (promotionDetail.applicableTo?.isNewStore === true) {
           promotionDetail.applicableTo.completeStoreNew =
