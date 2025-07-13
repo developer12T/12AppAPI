@@ -50,146 +50,30 @@ uuidv4() // ⇨ '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed'
 const { productQuery } = require('../../controllers/queryFromM3/querySctipt')
 const store = require('../../models/cash/store')
 
-// exports.getStore = async (req, res) => {
-//   try {
-//     const { area, type, route, zone, team, year, month } = req.query
-//     const channel = req.headers['x-channel'] // 'credit' or 'cash'
+exports.getDetailStore = async (req, res) => {
+  try {
+    const { storeId } = req.params
+    const channel = req.headers['x-channel'] // 'credit' or 'cash'
 
-//     const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
-//     const currentDate = new Date()
-//     const startMonth = new Date(
-//       currentDate.getFullYear(),
-//       currentDate.getMonth() - 3,
-//       1
-//     )
-//     const NextMonth = new Date(
-//       currentDate.getFullYear(),
-//       currentDate.getMonth() + 1,
-//       1
-//     )
-//     // console.log(startMonth)
-//     // console.log(NextMonth)
-//     let query = {}
+    // ตัวอย่างดึงข้อมูลจาก MongoDB
+    const storeData = await Store.findOne({ storeId }).lean()
 
-//     if (month && year) {
-//       // หมายเหตุ: month ใน JS index เริ่มที่ 0 (มกราคม=0), แต่ใน req.query month=7 (กรกฎาคม)
-//       const m = parseInt(month) - 1 // ปรับ index ให้เป็น 0-based
-//       const y = parseInt(year)
-//       console.log(year, month)
-//       const startDate  = new Date(y, m, 1)
-//       const endDate = new Date(y, m + 1, 1)
-//       endDate.setMilliseconds(endDate.getMilliseconds() - 1)
-//       console.log(startDate)
-//       console.log(endDate)
-//       query.createdAt = {
-//         $gte: startDate,
-//         $lt: endDate
-//       }
-//     }
+    if (!storeData) {
+      return res.status(404).json({ status: 404, message: 'Store not found' })
+    }
 
-//     if (zone) {
-//       query.zone = { $regex: `^${zone}`, $options: 'i' }
-//     }
-
-//     if (area) {
-//       query.area = { $regex: `^${area}`, $options: 'i' }
-//     }
-
-//     if (type === 'new') {
-//       query.createdAt = {
-//         $gte: startMonth,
-//         $lt: NextMonth
-//       }
-//     } else if (type === 'all') {
-//       // query.createdAt = {
-//       //   $not: {
-//       //     $gte: startMonth,
-//       //     $lt: NextMonth
-//       //   }
-//       // }
-//       // delete query.createdAt
-//     }
-
-//     if (route) {
-//       query.route = route
-//     }
-
-//     // console.log(query)
-
-//     const pipeline = [
-//       { $match: query },
-//       {
-//         $lookup: {
-//           from: 'typestores',
-//           localField: 'storeId',
-//           foreignField: 'storeId',
-//           as: 'beauty'
-//         }
-//       },
-//       {
-//         $addFields: {
-//           storetype: {
-//             $reduce: {
-//               input: '$beauty',
-//               initialValue: [],
-//               in: {
-//                 $concatArrays: ['$$value', '$$this.type']
-//               }
-//             }
-//           },
-//           team3: {
-//             $concat: [
-//               { $substrCP: ['$area', 0, 2] },
-//               { $substrCP: ['$area', 3, 1] }
-//             ]
-//           }
-//         }
-//       }
-//     ]
-
-//     if (team) {
-//       pipeline.push({
-//         $match: {
-//           team3: { $regex: `^${team}`, $options: 'i' }
-//         }
-//       })
-//     }
-
-//     pipeline.push(
-//       {
-//         $project: {
-//           _id: 0,
-//           __v: 0,
-//           beauty: 0
-//         }
-//       },
-//       {
-//         $sort: { createdAt: -1 }
-//       }
-//     )
-
-//     const data = await Store.aggregate(pipeline)
-
-//     // console.log(data)
-
-//     if (data.length === 0) {
-//       return res.status(404).json({
-//         status: 404,
-//         message: 'Not Found Store'
-//       })
-//     }
-
-//     res.status(200).json({
-//       status: '200',
-//       message: 'Success',
-//       data: data
-//     })
-//   } catch (error) {
-//     console.error(error)
-//     res.status(500).json({ status: '500', message: error.message })
-//   }
-// }
+    // ส่งข้อมูลกลับ
+    res.status(200).json({
+      status: 200,
+      data: storeData
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
 
 exports.getStore = async (req, res) => {
   try {
@@ -212,7 +96,7 @@ exports.getStore = async (req, res) => {
     )
 
     let query = {}
-    
+
     // Priority: ใช้ month/year filter ก่อน type
     if (month && year) {
       // หมายเหตุ: month ใน JS index เริ่มที่ 0 (มกราคม=0), แต่ใน req.query month=7 (กรกฎาคม)
@@ -848,7 +732,7 @@ exports.updateStoreStatus = async (req, res) => {
       message: 'Not found store'
     })
   }
-  const storeZone = store.area.substring(0, 2);
+  const storeZone = store.area.substring(0, 2)
   // console.log(storeZone)
   const maxRunningAll = await Store.aggregate([
     {

@@ -19,6 +19,7 @@ const {
   deleteStoreArray,
   getTypeStore,
   addTypeStore,
+  getDetailStore,
   insertStoreToErpOne
   // test
 } = require('../../controllers/store/storeController')
@@ -34,6 +35,7 @@ const { addCallCard, getCallCard, delCallCard, addFlowAction, addDetailStore,
 const router = express.Router()
 
 router.get('/getStore', getStore)
+router.get('/:storeId', getDetailStore)
 router.post('/addStore', addStore)
 router.post('/updateImage', updateImage)
 router.post('/addFromERP', addFromERP)
