@@ -119,6 +119,7 @@ exports.checkout = async (req, res) => {
       channel,
       res
     )
+    // res.json(summary); // return ตรงนี้เลย
   }
   // console.log(summary)
   const productIds = cart.listProduct.map(p => p.id)
@@ -403,7 +404,7 @@ exports.checkout = async (req, res) => {
     { proShelfId: promotionshelf.proShelfId },
     { $set: { qty: 0 } }
   )
-  await Cart.deleteOne({ type, area, storeId })
+  // await Cart.deleteOne({ type, area, storeId })
   const currentDate = new Date()
   let query = {}
   const promoIds = newOrder.listPromotions.map(u => u.proId)
