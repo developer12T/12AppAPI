@@ -404,7 +404,7 @@ exports.checkout = async (req, res) => {
     { proShelfId: promotionshelf.proShelfId },
     { $set: { qty: 0 } }
   )
-  // await Cart.deleteOne({ type, area, storeId })
+  await Cart.deleteOne({ type, area, storeId })
   const currentDate = new Date()
   let query = {}
   const promoIds = newOrder.listPromotions.map(u => u.proId)
