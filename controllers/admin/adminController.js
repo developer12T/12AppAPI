@@ -9,7 +9,7 @@ const routeModel = require('../../models/cash/route')
 const refundModel = require('../../models/cash/refund')
 const DistributionModel = require('../../models/cash/distribution')
 const promotionModel = require('../../models/cash/promotion')
-
+const sendMoneyModel = require('../../models/cash/sendmoney')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { Item } = require('../../models/cash/master')
 
@@ -25,6 +25,7 @@ exports.reportCheck = async (req, res) => {
     const { Route } = getModelsByChannel(channel, res, routeModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
     const { Refund } = getModelsByChannel(channel, res, refundModel)
+    const { SendMoney } = getModelsByChannel(channel, res, sendMoneyModel)
     const { Withdraw, Distribution } = getModelsByChannel(
       channel,
       res,
@@ -72,6 +73,11 @@ exports.reportCheck = async (req, res) => {
       createdAt: { $gte: startStr, $lte: endStr }
     }).lean()
 
+    const sendMoneys = await SendMoney.find({
+      area: { $in: areaId },
+      createdAt: { $gte: startStr, $lte: endStr }
+    }).lean()
+
     // const withdraws = await Withdraw.find({
     //   area: { $in: areaId },
     //   createdAt: { $gte: startStr, $lte: endStr }
@@ -115,6 +121,7 @@ exports.reportCheck = async (req, res) => {
         const countStore = stores.filter(s => s.area === areaName).length
         const countOrder = orders.filter(o => o.store.area === areaName).length
         // const countWithdraw = withdraws.filter(w => w.area === areaName).length;
+        const countSendmoney = sendMoneys.filter(s => s.area === areaName).length
         const countDistribution = distributions.filter(
           d => d.area === areaName
         ).length
@@ -128,7 +135,8 @@ exports.reportCheck = async (req, res) => {
           order: countOrder,
           // withdraw: foundWithdraw ? 1 : 0, // ถ้าอยากใส่คอมเมนต์กลับมาได้เลย
           distribution: countDistribution,
-          refund: countRefund
+          refund: countRefund,
+          sendMoney: countSendmoney
         }
       })
       .sort((a, b) => a.area.localeCompare(b.area))
@@ -156,6 +164,7 @@ exports.reportCheckExcel = async (req, res) => {
     const { Route } = getModelsByChannel(channel, res, routeModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
     const { Refund } = getModelsByChannel(channel, res, refundModel)
+    const { SendMoney } = getModelsByChannel(channel, res, sendMoneyModel)
     const { Withdraw, Distribution } = getModelsByChannel(
       channel,
       res,
@@ -208,6 +217,12 @@ exports.reportCheckExcel = async (req, res) => {
     //   area: { $in: areaId },
     //   createdAt: { $gte: startStr, $lte: endStr }
     // }).lean()
+    const sendMoneys = await SendMoney.find({
+      area: { $in: areaId },
+      createdAt: { $gte: startStr, $lte: endStr }
+    }).lean()
+
+
 
     const distributions = await Distribution.find({
       area: { $in: areaId },
@@ -243,7 +258,7 @@ exports.reportCheckExcel = async (req, res) => {
         const foundDistribution = distributions.some(d => d.area === areaName)
         const foundRoute = route.some(z => z.area === areaName)
         const foundRefund = refund.some(x => x.store.area === areaName)
-
+        const countSendmoney = sendMoneys.filter(s => s.area === areaName).length
         const countStore = stores.filter(s => s.area === areaName).length
         const countOrder = orders.filter(o => o.store.area === areaName).length
         // const countWithdraw = withdraws.filter(w => w.area === areaName).length;
@@ -260,7 +275,9 @@ exports.reportCheckExcel = async (req, res) => {
           order: countDistribution,
           // withdraw: foundWithdraw ? 1 : 0, // ถ้าอยากใส่คอมเมนต์กลับมาได้เลย
           distribution: countRoute,
-          refund: countRefund
+          refund: countRefund,
+          sendMoney: countSendmoney
+
         }
       })
       .sort((a, b) => a.area.localeCompare(b.area))
@@ -274,7 +291,8 @@ exports.reportCheckExcel = async (req, res) => {
       'เข้าเยี่ยม',
       'ขาย',
       'เบิก',
-      'คืน'
+      'คืน',
+      'ส่งเงิน'
     ])
     result.forEach(row => {
       const excelRow = worksheet.addRow([
@@ -284,7 +302,8 @@ exports.reportCheckExcel = async (req, res) => {
         row.Route,
         row.order,
         row.distribution,
-        row.refund
+        row.refund,
+        row.sendMoney
       ])
       for (let i = 3; i <= 7; i++) {
         if (excelRow.getCell(i).value === 1) {
@@ -327,7 +346,7 @@ exports.reportCheckExcel = async (req, res) => {
           res.status(500).send('Download failed')
         }
       }
-      fs.unlink(tempPath, () => {}) // ลบ temp file ทิ้ง
+      fs.unlink(tempPath, () => { }) // ลบ temp file ทิ้ง
     })
 
     // res.status(200).json({
