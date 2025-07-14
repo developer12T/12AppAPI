@@ -6,8 +6,6 @@ const modelProduct = require('../../models/cash/product')
 const modelSendMoney = require('../../models/cash/sendmoney')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { rangeDate } = require('../../utilities/datetime')
-const { json } = require('body-parser')
-const { default: lookup } = require('socket.io-client')
 exports.getCallCard = async (req, res) => {
   try {
     const { area, period, storeId } = req.query
@@ -25,7 +23,7 @@ exports.getCallCard = async (req, res) => {
 
     res.status(200).json({
       status: 200,
-      message: 'test',
+      message: 'sucess',
       data: data
     })
 
@@ -67,10 +65,24 @@ exports.addCallCard = async (req, res) => {
     });
 
     if (existingCallCard) {
-      return res.status(409).json({
-        status: 409,
-        message: 'CallCard for this store and period already exists.'
-      });
+      const updateFields = {};
+
+      if (commercialRegistration !== '') updateFields.commercialRegistration = commercialRegistration;
+      if (creditlimit !== '') updateFields.creditlimit = creditlimit;
+      if (creditTerm !== '') updateFields.creditTerm = creditTerm;
+      if (purchaser !== '') updateFields.purchaser = purchaser;
+      if (payer !== '') updateFields.payer = payer;
+      if (stockKeeper !== '') updateFields.stockKeeper = stockKeeper;
+      if (stockKeeperPhone !== '') updateFields.stockKeeperPhone = stockKeeperPhone;
+      if (note !== '') updateFields.note = note;
+
+      if (existingCallCard) {
+        const data = await CallCard.findOneAndUpdate(
+          { area: area, period: period, storeId: storeId },
+          { $set: updateFields },
+          { new: true }
+        );
+      }
     }
 
     data = {
@@ -143,6 +155,18 @@ exports.addFlowAction = async (req, res) => {
     const { area, period, storeId, flowAction } = req.body;
     const channel = req.headers['x-channel'];
     const { CallCard } = getModelsByChannel(channel, res, callCardModel);
+
+    const existCallCard = await CallCard.findOne(
+      { area: area, period: period, storeId: storeId }
+    )
+
+    if (!existCallCard) {
+      return res.status(200).json({
+        status: 200,
+        message: 'Not found callcard'
+      })
+    }
+
     const data = await CallCard.findOneAndUpdate(
       { area: area, period: period, storeId: storeId },
       { $set: { flowAction: flowAction } },
@@ -151,7 +175,7 @@ exports.addFlowAction = async (req, res) => {
 
     return res.status(200).json({
       status: 200,
-      message: 'Sucessful',
+      message: 'sucess',
       data: {
         storeId: storeId,
         area: area,
@@ -210,12 +234,11 @@ exports.updateDetailStore = async (req, res) => {
     const channel = req.headers['x-channel'];
     const { CallCard } = getModelsByChannel(channel, res, callCardModel);
 
-    // หาเอกสารเดิม
     const existing = await CallCard.findOne({ area, period, storeId });
     if (!existing) {
       return res.status(404).json({
         status: 404,
-        message: 'ไม่พบข้อมูล CallCard'
+        message: 'Not found callcard'
       });
     }
 
@@ -268,7 +291,7 @@ exports.updateDailyvisit = async (req, res) => {
     if (!existing) {
       return res.status(404).json({
         status: 404,
-        message: 'ไม่พบข้อมูล CallCard'
+        message: 'Not found callcard'
       });
     }
 
@@ -456,11 +479,14 @@ exports.addVisit = async (req, res) => {
 
   const CallCardData = await CallCard.findOneAndUpdate(
     { area: area, period: period, storeId: storeId },
-    { $set: { visit: data,
-      summaryOrder:summaryOrder,
-      summaryCN:summaryCN,
-      summarySendmoney:summarySendmoney
-     } },
+    {
+      $set: {
+        visit: data,
+        summaryOrder: summaryOrder,
+        summaryCN: summaryCN,
+        summarySendmoney: summarySendmoney
+      }
+    },
     { new: true }
   );
 
