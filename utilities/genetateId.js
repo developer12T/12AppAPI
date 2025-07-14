@@ -84,8 +84,8 @@ const generateOrderId = async (area, warehouse, channel, res) => {
         createdAt: {
             $gte: new Date(`${new Date().getFullYear()}-${currentMonth}-01`),
             $lt: new Date(`${new Date().getFullYear()}-${parseInt(currentMonth) + 1}-01`)
-        },
-        status: { $ne: 'canceled' }
+        }
+        // ,status: { $ne: 'canceled' }
     }).sort({ orderId: -1 }).select('orderId');
 
     let runningNumber = latestOrder ? parseInt(latestOrder.orderId.slice(-4)) + 1 : 1
@@ -104,8 +104,8 @@ const generateRefundId = async (area, warehouse, channel, res) => {
         createdAt: {
             $gte: new Date(`${new Date().getFullYear()}-${currentMonth}-01`),
             $lt: new Date(`${new Date().getFullYear()}-${parseInt(currentMonth) + 1}-01`)
-        },
-        status: { $ne: 'canceled' }
+        }
+        // ,status: { $ne: 'canceled' }
     }).sort({ orderId: -1 }).select('orderId');
 
     let runningNumber = latestOrder ? parseInt(latestOrder.orderId.slice(-4)) + 1 : 1
@@ -126,8 +126,8 @@ const generateDistributionId = async (area, warehouse, channel, res) => {
         createdAt: {
             $gte: new Date(`${new Date().getFullYear()}-${currentMonth}-01`),
             $lt: new Date(`${new Date().getFullYear()}-${parseInt(currentMonth) + 1}-01`)
-        },
-        status: { $ne: 'canceled' }
+        }
+        // ,status: { $ne: 'canceled' }
     })
         .sort({ orderId: -1 })
         .select('orderId');
@@ -151,8 +151,8 @@ const generateGiveawaysId = async (area, warehouse, channel, res) => {
         createdAt: {
             $gte: new Date(`${new Date().getFullYear()}-${currentMonth}-01`),
             $lt: new Date(`${new Date().getFullYear()}-${parseInt(currentMonth) + 1}-01`)
-        },
-        status: { $ne: 'canceled' }
+        }
+        // ,status: { $ne: 'canceled' }
     }).sort({ orderId: -1 }).select('orderId');
 
     let runningNumber = latestOrder ? parseInt(latestOrder.orderId.slice(-2)) + 1 : 1

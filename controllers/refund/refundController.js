@@ -668,30 +668,20 @@ exports.updateStatus = async (req, res) => {
       })
     }
 
-    let newOrderId = orderId
-
-    if (status === 'canceled' && !orderId.endsWith('CC')) {
-      newOrderId = `${orderId}CC`
-
-      const isDuplicate = await Refund.findOne({ orderId: newOrderId })
-      if (isDuplicate) {
-        let counter = 1
-        while (await Refund.findOne({ orderId: `${orderId}CC${counter}` })) {
-          counter++
-        }
-        newOrderId = `${orderId}CC${counter}`
-      }
+    if (status === 'canceled' ) {
+      statusTH = 'ยกเลิก'
     }
+
 
     const updatedRefund = await Refund.findOneAndUpdate(
       { orderId },
-      { $set: { status, orderId: newOrderId } },
+      { $set: { status,statusTH  } },
       { new: true }
     )
 
     const updatedOrder = await Order.findOneAndUpdate(
       { orderId: refundOrder.reference, type: 'change' },
-      { $set: { status } },
+      { $set: { status,statusTH } },
       { new: true }
     )
 
