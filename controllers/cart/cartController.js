@@ -265,7 +265,7 @@ exports.addProduct = async (req, res) => {
       cart.total = to2(cart.total)
     } else if (type === 'adjuststock') {
       const existingProduct = cart.listProduct.find(
-        p => p.id === id && p.unit === unit
+        p => p.id === id && p.unit === unit && p.action === action
       )
       if (existingProduct && existingProduct.unit === unit) {
         existingProduct.qty += qty

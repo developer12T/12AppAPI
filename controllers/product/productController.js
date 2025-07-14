@@ -226,12 +226,14 @@ exports.getFilters = async (req, res) => {
         isEmptyArray(size) &&
         isEmptyArray(flavour))
 
-    // ✅ กรอง group ที่ไม่ใช่ null ตอนดึงทั้งหมด
     const allGroups = await Product.aggregate([
       { $match: { group: { $ne: null } } },
       { $group: { _id: '$group' } },
-      { $project: { _id: 0, group: '$_id' } }
-    ])
+      { $project: { _id: 0, group: '$_id' } },
+      { $sort: { group: 1 } }
+    ]);
+
+
 
     if (isEmptyRequest) {
       return res.status(200).json({
