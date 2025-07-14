@@ -100,7 +100,7 @@ exports.getStore = async (req, res) => {
     // Priority: ใช้ month/year filter ก่อน type
     if (month && year) {
       // หมายเหตุ: month ใน JS index เริ่มที่ 0 (มกราคม=0), แต่ใน req.query month=7 (กรกฎาคม)
-      query.status = '20'
+      // query.status = '20'
       const m = parseInt(month) - 1 // ปรับ index ให้เป็น 0-based
       const y = parseInt(year)
       const startDate = new Date(y, m, 1)
@@ -112,7 +112,7 @@ exports.getStore = async (req, res) => {
       }
     } else if (type === 'new') {
       // 3 เดือนล่าสุด
-      query.status = { $in: ['20', '10'] }
+      // query.status = { $in: ['20', '10'] }
       query.createdAt = {
         $gte: startMonth,
         $lt: nextMonth
