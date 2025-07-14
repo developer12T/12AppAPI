@@ -26,7 +26,7 @@ const {
 
 
 const { addCallCard, getCallCard, delCallCard, addFlowAction, addDetailStore,
-  updateDetailStore, updateDailyvisit
+  updateDetailStore, updateDailyvisit, updateGooglemap, addVisit
  } = require('../../controllers/store/callCardController')
 
 
@@ -64,7 +64,7 @@ router.delete('/delCallCard', delCallCard)
 router.post('/addFlowAction', addFlowAction)
 router.post('/updateDetailStore', updateDetailStore)
 router.post('/updateDailyvisit', updateDailyvisit)
-
-
+router.post('/updateGooglemap', updateGooglemap)
+router.post('/addVisit', addVisit)
 
 module.exports = router

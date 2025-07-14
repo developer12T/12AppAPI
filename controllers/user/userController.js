@@ -406,12 +406,13 @@ exports.addUserManeger = async (req, res) => {
           )
 
           if (hasChanged) {
+            // console.log(m3.username)
             await User.updateOne(
-              { saleCode: m3.saleCode },
+              { username: m3.username },
               {
                 $set: {
                   salePayer: m3.salePayer,
-                  username: m3.username,
+                  // username: m3.username,
                   firstName: m3.firstName,
                   surName: m3.surName,
                   password: m3.password,

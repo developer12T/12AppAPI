@@ -1,7 +1,9 @@
 const callCardModel = require('../../models/cash/callcard')
 const storeModel = require('../../models/cash/store')
+const saleModel = require('../../models/cash/sale')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { rangeDate } = require('../../utilities/datetime')
+const { json } = require('body-parser')
 exports.getCallCard = async (req, res) => {
   try {
     const { area, period, storeId } = req.query
@@ -32,7 +34,7 @@ exports.getCallCard = async (req, res) => {
 exports.addCallCard = async (req, res) => {
   try {
     const { area, period, storeId, commercialRegistration, creditlimit, creditTerm,
-      purchaser, payer, stockKeeper, stockKeeperPhone
+      purchaser, payer, stockKeeper, stockKeeperPhone,note
     } = req.body
     const channel = req.headers['x-channel']
     const { CallCard } = getModelsByChannel(channel, res, callCardModel)
@@ -78,7 +80,8 @@ exports.addCallCard = async (req, res) => {
       purchaser: purchaser,
       payer: payer,
       stockKeeper: stockKeeper,
-      stockKeeperPhone: stockKeeperPhone
+      stockKeeperPhone: stockKeeperPhone,
+      note:note,
     }
 
     await CallCard.create(data)
@@ -300,3 +303,52 @@ exports.updateDailyvisit = async (req, res) => {
     });
   }
 };
+
+
+exports.updateGooglemap = async (req, res) => {
+  try {
+    const { area, period, storeId, googlemap } = req.body;
+    const channel = req.headers['x-channel'];
+    const { CallCard } = getModelsByChannel(channel, res, callCardModel);
+    const data = await CallCard.findOneAndUpdate(
+      { area: area, period: period, storeId: storeId },
+      { $set: { googlemap: googlemap } },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      status: 200,
+      message: 'Sucessful',
+      data: {
+        storeId: storeId,
+        area: area,
+        period: period,
+        googlemap: googlemap
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ status: 500, message: error.message || 'Server error' });
+  }
+}
+
+
+
+exports.addVisit = async (req,res) => {
+    const { area, period, storeId, googlemap } = req.body;
+    const channel = req.headers['x-channel'];
+    const { CallCard } = getModelsByChannel(channel, res, callCardModel);
+    const { Order } = getModelsByChannel(channel, res, saleModel);
+
+    const modelOrder = await Order.find({ 'store.storeId':storeId,
+      'store.area':area,period:period
+     })
+
+
+    res.status(200).json({
+      status:200,
+      message:'Sucess',
+      data:modelOrder
+    })
+
+}
