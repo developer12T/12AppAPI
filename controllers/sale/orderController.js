@@ -3052,7 +3052,7 @@ exports.summaryDaily = async (req, res) => {
       const summary = to2(summaryRaw)
       const changeRaw = changeByDate[date] || 0
       const change = to2(changeRaw)
-      const diffRaw = summary - sendmoney
+      const diffRaw =  sendmoney - summary 
       const diff = to2(diffRaw)
       if (sendmoney > 0) {
         status = 'ส่งเงินแล้ว'
