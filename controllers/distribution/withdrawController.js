@@ -17,6 +17,8 @@ const { withdrawQuery } = require('../../controllers/queryFromM3/querySctipt')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { query } = require('mssql')
 const { exists } = require('fs')
+const { formatDateTimeToThai } = require('../../middleware/order')
+
 
 exports.checkout = async (req, res) => {
   const transaction = await sequelize.transaction()
@@ -397,7 +399,7 @@ exports.getOrder = async (req, res) => {
       sendDate: o.sendDate,
       total: o.totalQty || 0,
       status: o.status,
-      created: o.created
+      createdAt: formatDateTimeToThai(o.createdAt)
     }))
 
     res.status(200).json({

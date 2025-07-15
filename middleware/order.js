@@ -39,6 +39,20 @@ exports.getSeries = async (orderType) => {
 };
 
 
+module.exports.formatDateTimeToThai = function(date) {
+  const thDate = new Date(new Date(date).getTime() + 7 * 60 * 60 * 1000);
+  const day = String(thDate.getDate()).padStart(2, '0');
+  const month = String(thDate.getMonth() + 1).padStart(2, '0');
+  const year = thDate.getFullYear();
+  const hour = String(thDate.getHours()).padStart(2, '0');
+  const minute = String(thDate.getMinutes()).padStart(2, '0');
+  const second = String(thDate.getSeconds()).padStart(2, '0');
+  return `${day}/${month}/${year} ${hour}:${minute}:${second}`;
+}
+
+
 module.exports.to2 = function(num) {
   return Math.round((Number(num) || 0) * 100) / 100;
 }
+
+
