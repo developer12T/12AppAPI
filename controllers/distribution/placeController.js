@@ -29,7 +29,7 @@ exports.getPlace = async (req, res) => {
             return res.status(404).json({ status: 404, message: 'Place not found!' })
         }
 
-        // console.log(place.listAddress)
+        console.log(place.listAddress)
         if (type) {
             place.listAddress = place.listAddress.filter(address => address.type === type)
         }
@@ -159,73 +159,69 @@ exports.addAllPlace = async (req, res) => {
         let data = []
 
         areaAdded = []
-        // console.log("areaList",areaList)
+        // console.log("areaList", areaList)
         for (const user of areaList) {
-
-            const withdrawT04 = await Withdraw.findOne({ Des_Area: user, ZType: "T04" })|| {};
-
-            const withdrawT05 = await Withdraw.findOne({ Des_Area: user, ZType: "T05" })|| {};
-
-            const checkPlace = await Place.findOne({ area: user })
+            const withdrawT04 = await Withdraw.find({ Des_Area: user, ZType: "T04" }) || [];
+            const withdrawT05 = await Withdraw.find({ Des_Area: user, ZType: "T05" }) || [];
+            const checkPlace = await Place.findOne({ area: user });
 
             if (!checkPlace) {
-                const t04 = {
-                    type: "T04",
-                    typeNameTH: withdrawT04.Des_Name,
-                    typeNameEN: "pickup",
-                    shippingId: withdrawT04.Des_Area,
-                    route: withdrawT04.ROUTE,
-                    name: "",
-                    address: "",
-                    district: "",
-                    subDistrict: "",
-                    province: "",
-                    postcode: "",
-                    tel: '',
-                    warehouse: {
-                        normal: withdrawT04.WH,
-                        clearance: withdrawT04.WH1
-                    }
+                const listAddress = [];
 
-                };
-                //   data.push(t04)
+                // วน T04
+                for (const i of withdrawT04) {
+                    listAddress.push({
+                        type: "T04",
+                        typeNameTH: i.Des_Name,
+                        typeNameEN: "pickup",
+                        shippingId: i.Des_Area,
+                        route: i.ROUTE,
+                        name: "",
+                        address: "",
+                        district: "",
+                        subDistrict: "",
+                        province: "",
+                        postcode: "",
+                        tel: '',
+                        warehouse: {
+                            normal: i.WH,
+                            clearance: i.WH1
+                        }
+                    });
+                }
 
-                const t05 = {
-                    type: "T05",
-                    typeNameTH: "ส่งสินค้า",
-                    typeNameEN: "delivery",
-                    shippingId: withdrawT05.Des_No,
-                    route: withdrawT05.Des_Area,
-                    name: withdrawT05.Des_Name,
-                    address: "",
-                    district: "",
-                    subDistrict: "",
-                    province: "",
-                    postcode: "",
-                    tel: "",
-                    warehouse: {
-                        normal: withdrawT04.WH,
-                        clearance: withdrawT04.WH1
-                    }
+                // วน T05
+                for (const i of withdrawT05) {
+                    listAddress.push({
+                        type: "T05",
+                        typeNameTH: "ส่งสินค้า",
+                        typeNameEN: "delivery",
+                        shippingId: i.Des_No,
+                        route: i.Des_Area,
+                        name: i.Des_Name,
+                        address: "",
+                        district: "",
+                        subDistrict: "",
+                        province: "",
+                        postcode: "",
+                        tel: "",
+                        warehouse: {
+                            normal: i.WH,
+                            clearance: i.WH1
+                        }
+                    });
+                }
 
-                };
-
-
+                // รวมข้อมูล
                 const combineData = {
                     area: user,
-                    listAddress: [
-                        ...[t04],
-                        ...[t05]
-                    ]
-
-
-                }
-                data.push(combineData)
-                areaAdded.push(combineData.area)
-                placeDoc = new Place(combineData)
-                await placeDoc.save()
+                    listAddress
+                };
+                data.push(combineData);
+                areaAdded.push(combineData.area);
+                const placeDoc = new Place(combineData);
+                await placeDoc.save();
             }
-
         }
 
         // await session.commitTransaction();

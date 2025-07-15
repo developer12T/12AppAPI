@@ -3,7 +3,7 @@ const { Cart } = require('../../models/cash/cart')
 const { Product } = require('../../models/cash/product')
 const { Stock } = require('../../models/cash/stock')
 const { applyPromotion, applyQuota } = require('../promotion/calculate')
-const { to2 } = require('../../middleware/order')
+const { to2, getQty } = require('../../middleware/order')
 const {
   summaryOrder,
   summaryWithdraw,
@@ -11,7 +11,7 @@ const {
   summaryGive,
   summaryAjustStock
 } = require('../../utilities/summary')
-const { forEach } = require('lodash')
+const { forEach, chain } = require('lodash')
 const { error } = require('console')
 const cartModel = require('../../models/cash/cart')
 const productModel = require('../../models/cash/product')
@@ -332,7 +332,8 @@ exports.adjustProduct = async (req, res) => {
     const { type, area, storeId, id, unit, qty, condition, expire } = req.body
     const channel = req.headers['x-channel']
     const { Cart } = getModelsByChannel(channel, res, cartModel)
-
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
+    // console.log(await Cart.find() )
     if (!type || !area || !id || !unit || qty === undefined) {
       // await session.abortTransaction();
       // session.endSession();
@@ -353,8 +354,10 @@ exports.adjustProduct = async (req, res) => {
 
     const cartQuery =
       type === 'withdraw' ? { type, area } : { type, area, storeId }
+    // console.log(cartQuery)
 
     let cart = await Cart.findOne(cartQuery)
+    // console.log(cart)
     // .session(session);
     if (!cart) {
       // await session.abortTransaction();
@@ -363,6 +366,15 @@ exports.adjustProduct = async (req, res) => {
     }
 
     let updated = false
+
+    const stockBody = {
+      area: cart.area,
+      period: period(),
+      productId: id,
+      unit: unit
+    }
+    const productQty = await getQty(stockBody, channel)
+
 
     if (type === 'refund' && condition !== undefined && expire !== undefined) {
       const existingRefundIndex = cart.listRefund.findIndex(
@@ -384,13 +396,22 @@ exports.adjustProduct = async (req, res) => {
       if (qty === 0) {
         cart.listRefund.splice(existingRefundIndex, 1)
       } else {
-        cart.listRefund[existingRefundIndex].qty = qty
+        let qtyNew = 0
+        if (qty > productQty.qty) {
+          qtyNew = productQty.qty
+        } else {
+          qtyNew = qty
+        }
+
+        cart.listProduct[existingProductIndex].qty = qtyNew
       }
       updated = true
     } else {
       const existingProductIndex = cart.listProduct.findIndex(
         p => p.id === id && p.unit === unit
       )
+
+      // console.log(existingProductIndex)
 
       if (existingProductIndex === -1) {
         // await session.abortTransaction();
@@ -403,7 +424,15 @@ exports.adjustProduct = async (req, res) => {
       if (qty === 0) {
         cart.listProduct.splice(existingProductIndex, 1)
       } else {
-        cart.listProduct[existingProductIndex].qty = qty
+        // console.log(cart.listProduct[existingProductIndex])
+        let qtyNew = 0
+        if (qty > productQty.qty) {
+          qtyNew = productQty.qty
+        } else {
+          qtyNew = qty
+        }
+
+        cart.listProduct[existingProductIndex].qty = qtyNew
       }
       updated = true
     }
@@ -425,7 +454,7 @@ exports.adjustProduct = async (req, res) => {
     }
 
     if (cart.listProduct.length === 0 && cart.listRefund.length === 0) {
-      await Cart.deleteOne(cartQuery)
+      // await Cart.deleteOne(cartQuery)
       // await session.commitTransaction();
       // session.endSession();
       return res.status(200).json({
@@ -435,7 +464,7 @@ exports.adjustProduct = async (req, res) => {
       })
     }
 
-    await cart.save()
+    // await cart.save()
     // await session.commitTransaction();
     // session.endSession();
 
