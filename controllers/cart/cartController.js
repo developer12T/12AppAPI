@@ -454,7 +454,7 @@ exports.adjustProduct = async (req, res) => {
     }
 
     if (cart.listProduct.length === 0 && cart.listRefund.length === 0) {
-      // await Cart.deleteOne(cartQuery)
+      await Cart.deleteOne(cartQuery)
       // await session.commitTransaction();
       // session.endSession();
       return res.status(200).json({
