@@ -199,7 +199,7 @@ exports.getSendMoney = async (req, res) => {
       {
         $match: {
           'store.area': area,
-          status: 'pending',
+          status: { $nin: ['canceled'] },
           day,
           month,
           year
