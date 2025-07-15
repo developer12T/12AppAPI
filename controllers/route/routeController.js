@@ -556,7 +556,7 @@ exports.changeRoute = async (req, res) => {
     const channel = req.headers['x-channel']
 
     const { Store } = getModelsByChannel(channel, res, storeModel)
-
+    const { RouteChangeLog } = getModelsByChannel(channel, res, routeModel)
     if (
       !area ||
       !period ||
