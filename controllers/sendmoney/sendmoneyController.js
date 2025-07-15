@@ -255,14 +255,11 @@ exports.getSendMoney = async (req, res) => {
     // console.log(totalToSend, alreadySent)
 
     let status = ''
-    if (totalToSend == 0 && alreadySent == 0) {
-      status = 'ยังส่งเงินไม่ครบ'
-    }
-    else if (totalToSend - alreadySent == 0) {
-      status = 'ส่งเงินครบ';
+    if (alreadySent > 0) {
+      status = 'ส่งเงินแล้ว'
     }
     else {
-      status = 'ยังส่งเงินไม่ครบ';
+      status = 'ยังไม่ส่งเงิน';
     }
     const remaining = parseFloat((totalToSend - alreadySent).toFixed(2))
 
@@ -296,7 +293,6 @@ exports.getSendMoney = async (req, res) => {
 
 
     for (const doc of SentDocsForUpdate) {
-      console.log(doc._id)
       await SendMoney.updateOne(
         { _id: doc._id },
         { $set: { different: remaining } }
