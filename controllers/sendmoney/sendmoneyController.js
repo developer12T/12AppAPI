@@ -64,7 +64,9 @@ exports.addSendMoney = async (req, res) => {
       {
         $inc: {
           sendmoney: + sendmoney
-        }
+        },
+        salePayer: salePayer,
+        saleCode: saleCode
       }
     )
   }

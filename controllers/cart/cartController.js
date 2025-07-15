@@ -394,8 +394,10 @@ exports.adjustProduct = async (req, res) => {
       }
 
       if (qty === 0) {
+        // console.log(cart.listRefund)
         cart.listRefund.splice(existingRefundIndex, 1)
       } else {
+        // console.log(cart.listProduct[existingRefundIndex])
         let qtyNew = 0
         if (qty > productQty.qty) {
           qtyNew = productQty.qty
@@ -403,7 +405,7 @@ exports.adjustProduct = async (req, res) => {
           qtyNew = qty
         }
 
-        cart.listProduct[existingRefundIndex].qty = qtyNew
+        cart.listRefund[existingRefundIndex].qty = qtyNew
       }
       updated = true
     } else {
