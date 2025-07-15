@@ -516,7 +516,7 @@ exports.updateStatus = async (req, res) => {
       })
     }
 
-    if (status === 'canceled' ) {
+    if (status === 'canceled') {
       statusTH = 'ยกเลิก'
     }
 
@@ -928,25 +928,61 @@ exports.approveWithdraw = async (req, res) => {
         const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 0;
         const factorPcsQty = item.itemQty * factorPcs;
         const factorCtnQty = factorCtn ? Math.floor(factorPcsQty / factorCtn) : 0;
-        await Stock.findOneAndUpdate(
+
+        const existsProduct = await Stock.aggregate([
           {
-            area: distributionTran.area,
-            period: distributionTran.period,
-            'listProduct.productId': item.itemCode
-          },
-          {
-            $inc: {
-              'listProduct.$[elem].stockInPcs': +factorPcsQty,
-              'listProduct.$[elem].stockInCtn': +factorCtnQty,
-              'listProduct.$[elem].balancePcs': +factorPcsQty,
-              'listProduct.$[elem].balanceCtn': +factorCtnQty
+            $match: {
+              area: distributionTran.area,
+              period: distributionTran.period,
+              'listProduct.productId': item.itemCode
             }
-          },
-          {
-            arrayFilters: [{ 'elem.productId': item.itemCode }],
-            new: true
           }
-        );
+        ]);
+
+        if (existsProduct.length > 0) {
+          await Stock.findOneAndUpdate(
+            {
+              area: distributionTran.area,
+              period: distributionTran.period,
+              'listProduct.productId': item.itemCode
+            },
+            {
+              $inc: {
+                'listProduct.$[elem].stockInPcs': +factorPcsQty,
+                'listProduct.$[elem].stockInCtn': +factorCtnQty,
+                'listProduct.$[elem].balancePcs': +factorPcsQty,
+                'listProduct.$[elem].balanceCtn': +factorCtnQty
+              }
+            },
+            {
+              arrayFilters: [{ 'elem.productId': item.itemCode }],
+              new: true
+            }
+          );
+        } else {
+
+          const newProduct = {
+            productId: item.itemCode,
+            stockPcs: 0,
+            stockInPcs: factorPcsQty,
+            stockOutPcs: 0,
+            balancePcs: factorPcsQty,
+            stockCtn: 0,
+            stockInCtn: factorCtnQty,
+            stockOutCtn: 0,
+            balanceCtn: factorCtnQty
+          };
+
+          await Stock.findOneAndUpdate(
+            { area: distributionTran.area, period: distributionTran.period },
+            { $push: { listProduct: newProduct } },
+            { upsert: true, new: true }
+          );
+
+
+        }
+
+
       }
     }
 
