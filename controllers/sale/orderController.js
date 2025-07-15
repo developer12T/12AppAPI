@@ -2929,7 +2929,7 @@ exports.summaryDaily = async (req, res) => {
           {
             $match: {
               area: area,
-              dateAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC }
+              dateAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
             }
           },
           {
@@ -2942,19 +2942,22 @@ exports.summaryDaily = async (req, res) => {
           'store.area': area,
           period: periodStr,
           createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
-          type: 'refund'
+          type: 'refund',
+          status: { $nin: ['canceled'] }
         }),
         Order.find({
           'store.area': area,
           period: periodStr,
           createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
-          type: 'sale'
+          type: 'sale',
+          status: { $nin: ['canceled'] }
         }),
         Order.find({
           'store.area': area,
           period: periodStr,
           createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
-          type: 'change'
+          type: 'change',
+          status: { $nin: ['canceled'] }
         })
       ])
 
@@ -3052,7 +3055,7 @@ exports.summaryDaily = async (req, res) => {
       const summary = to2(summaryRaw)
       const changeRaw = changeByDate[date] || 0
       const change = to2(changeRaw)
-      const diffRaw =  sendmoney - summary 
+      const diffRaw = sendmoney - summary
       const diff = to2(diffRaw)
       if (sendmoney > 0) {
         status = 'ส่งเงินแล้ว'

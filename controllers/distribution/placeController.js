@@ -29,6 +29,7 @@ exports.getPlace = async (req, res) => {
             return res.status(404).json({ status: 404, message: 'Place not found!' })
         }
 
+        // console.log(place.listAddress)
         if (type) {
             place.listAddress = place.listAddress.filter(address => address.type === type)
         }
