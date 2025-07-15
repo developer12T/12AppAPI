@@ -13,7 +13,7 @@ const upload = multer({ storage: multer.memoryStorage() }).array(
 exports.addSendMoney = async (req, res) => {
   const channel = req.headers['x-channel']
   const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
-  const { area, date, sendmoney } = req.body
+  const { area, date, sendmoney, salePayer, saleCode } = req.body
 
   const year = parseInt(date.slice(0, 4), 10)
   const month = parseInt(date.slice(4, 6), 10)
@@ -54,7 +54,9 @@ exports.addSendMoney = async (req, res) => {
     sendmoneyData = await SendMoney.create({
       area: area,
       dateAt: dateObj,
-      sendmoney: sendmoney
+      sendmoney: sendmoney,
+      salePayer: salePayer,
+      saleCode: saleCode
     })
   } else {
     sendmoneyData = await SendMoney.findOneAndUpdate(
@@ -373,8 +375,8 @@ exports.getSendMoneyForAcc = async (req, res) => {
       }
     },
     {
-      $group:{
-        _id:'$area',
+      $group: {
+        _id: '$area',
         value: { $sum: '$sendmoney' },
         COUNT: { $sum: 1 }
       }

@@ -464,7 +464,7 @@ exports.adjustProduct = async (req, res) => {
       })
     }
 
-    // await cart.save()
+    await cart.save()
     // await session.commitTransaction();
     // session.endSession();
 
