@@ -117,7 +117,9 @@ exports.getStore = async (req, res) => {
         $gte: startMonth,
         $lt: nextMonth
       }
-    } // ถ้า type=all ไม่ต้อง filter createdAt เลย
+    }  else {    
+      query.status = { $nin: ['10'] }
+    }// ถ้า type=all ไม่ต้อง filter createdAt เลย
 
     if (area) {
       query.area = area
