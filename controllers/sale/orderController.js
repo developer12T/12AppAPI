@@ -3,6 +3,7 @@
 // const { User } = require('../../models/cash/user')
 // const { Product } = require('../../models/cash/product')
 // const { Route } = require('../../models/cash/route')
+const { to2 } = require('../../middleware/order')
 const { period, previousPeriod } = require('../../utilities/datetime')
 const axios = require('axios')
 const dayjs = require('dayjs')
@@ -57,402 +58,402 @@ const { query } = require('mssql')
 exports.checkout = async (req, res) => {
   // const transaction = await sequelize.transaction();
   try {
-  const {
-    type,
-    area,
-    storeId,
-    routeId,
-    period,
-    note,
-    latitude,
-    longitude,
-    shipping,
-    payment,
-    changePromotionStatus,
-    listPromotion = []
-  } = req.body
+    const {
+      type,
+      area,
+      storeId,
+      routeId,
+      period,
+      note,
+      latitude,
+      longitude,
+      shipping,
+      payment,
+      changePromotionStatus,
+      listPromotion = []
+    } = req.body
 
-  const channel = req.headers['x-channel']
+    const channel = req.headers['x-channel']
 
-  const { Cart } = getModelsByChannel(channel, res, cartModel)
-  const { User } = getModelsByChannel(channel, res, userModel)
-  const { Product } = getModelsByChannel(channel, res, productModel)
-  const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-  const { Promotion, PromotionShelf, Quota } = getModelsByChannel(
-    channel,
-    res,
-    promotionModel
-  )
-  const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
-    channel,
-    res,
-    stockModel
-  )
+    const { Cart } = getModelsByChannel(channel, res, cartModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Promotion, PromotionShelf, Quota } = getModelsByChannel(
+      channel,
+      res,
+      promotionModel
+    )
+    const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
+      channel,
+      res,
+      stockModel
+    )
 
-  if (!type || !area || !storeId || !shipping || !payment) {
-    return res
-      .status(400)
-      .json({ status: 400, message: 'Missing required fields!' })
-  }
+    if (!type || !area || !storeId || !shipping || !payment) {
+      return res
+        .status(400)
+        .json({ status: 400, message: 'Missing required fields!' })
+    }
 
-  const cart = await Cart.findOne({ type, area, storeId })
-  if (!cart || cart.listProduct.length === 0) {
-    return res.status(404).json({ status: 404, message: 'Cart is empty!' })
-  }
-  const sale = await User.findOne({ area }).select(
-    'firstName surName warehouse tel saleCode salePayer'
-  )
-  if (!sale) {
-    return res
-      .status(404)
-      .json({ status: 404, message: 'Sale user not found!' })
-  }
+    const cart = await Cart.findOne({ type, area, storeId })
+    if (!cart || cart.listProduct.length === 0) {
+      return res.status(404).json({ status: 404, message: 'Cart is empty!' })
+    }
+    const sale = await User.findOne({ area }).select(
+      'firstName surName warehouse tel saleCode salePayer'
+    )
+    if (!sale) {
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Sale user not found!' })
+    }
 
-  let summary = ''
-  if (changePromotionStatus == 0) {
-    summary = await summaryOrder(cart, channel, res)
-  } else if (changePromotionStatus == 1) {
-    summary = await summaryOrderProStatusOne(
-      cart,
-      listPromotion,
+    let summary = ''
+    if (changePromotionStatus == 0) {
+      summary = await summaryOrder(cart, channel, res)
+    } else if (changePromotionStatus == 1) {
+      summary = await summaryOrderProStatusOne(
+        cart,
+        listPromotion,
+        channel,
+        res
+      )
+      // res.json(summary); // return ตรงนี้เลย
+    }
+    // console.log(summary)
+    const productIds = cart.listProduct.map(p => p.id)
+    const products = await Product.find({ id: { $in: productIds } }).select(
+      'id name groupCode group brandCode brand size flavourCode flavour listUnit'
+    )
+
+    let subtotal = 0
+    let listProduct = cart.listProduct.map(item => {
+      const product = products.find(p => p.id === item.id)
+      if (!product) return null
+
+      const unitData = product.listUnit.find(u => u.unit === item.unit)
+      if (!unitData) {
+        return res.status(400).json({
+          status: 400,
+          message: `Invalid unit for product ${item.id}`
+        })
+      }
+
+      const totalPrice = item.qty * unitData.price.sale
+      subtotal += totalPrice
+
+      return {
+        id: product.id,
+        // lot: item.lot,
+        name: product.name,
+        group: product.group,
+        groupCode: product.groupCode,
+        brandCode: product.brandCode,
+        brand: product.brand,
+        size: product.size,
+        flavourCode: product.flavourCode,
+        flavour: product.flavour,
+        qty: item.qty,
+        unit: item.unit,
+        unitName: unitData.name,
+        price: unitData.price.sale,
+        subtotal: parseFloat(totalPrice.toFixed(2)),
+        discount: 0,
+        netTotal: parseFloat(totalPrice.toFixed(2))
+      }
+    })
+    if (listProduct.includes(null)) return
+
+    const orderId = await generateOrderId(area, sale.warehouse, channel, res)
+
+    // if () {
+
+    // }
+
+    const promotionshelf =
+      (await PromotionShelf.find({
+        storeId: storeId,
+        period: period,
+        qty: 1
+      })) || {}
+    const discountProduct = promotionshelf?.length
+      ? promotionshelf
+        .map(item => item.price)
+        .reduce((sum, price) => sum + price, 0)
+      : 0
+    const total = subtotal - discountProduct
+    const newOrder = new Order({
+      orderId,
+      type,
+      status: 'pending',
+      statusTH: 'รอนำเข้า',
+      sale: {
+        saleCode: sale.saleCode,
+        salePayer: sale.salePayer,
+        name: `${sale.firstName} ${sale.surName}`,
+        tel: sale.tel || '',
+        warehouse: sale.warehouse
+      },
+      store: {
+        storeId: summary.store.storeId,
+        name: summary.store.name,
+        type: summary.store.type,
+        address: summary.store.address,
+        taxId: summary.store.taxId,
+        tel: summary.store.tel,
+        area: summary.store.area,
+        zone: summary.store.zone,
+        isBeauty: summary.store.isBeauty
+      },
+      note,
+      latitude,
+      longitude,
+      listProduct,
+      listPromotions: summary.listPromotion,
+      listQuota: summary.listQuota,
+      subtotal,
+      discount: 0,
+      discountProductId: promotionshelf.map(item => ({
+        proShelfId: item.proShelfId
+      })),
+      discountProduct: discountProduct,
+      vat: parseFloat((total - total / 1.07).toFixed(2)),
+      totalExVat: parseFloat((total / 1.07).toFixed(2)),
+      total: total,
+      shipping: {
+        shippingId: '',
+        address: ''
+      },
+      paymentMethod: 'cash',
+      paymentStatus: 'paid',
+      createdBy: sale.username,
+      period: period
+    })
+    applyPromotionUsage(
+      newOrder.store.storeId,
+      newOrder.listPromotions,
       channel,
       res
     )
-    // res.json(summary); // return ตรงนี้เลย
-  }
-  // console.log(summary)
-  const productIds = cart.listProduct.map(p => p.id)
-  const products = await Product.find({ id: { $in: productIds } }).select(
-    'id name groupCode group brandCode brand size flavourCode flavour listUnit'
-  )
 
-  let subtotal = 0
-  let listProduct = cart.listProduct.map(item => {
-    const product = products.find(p => p.id === item.id)
-    if (!product) return null
+    const checkIn = await checkInRoute(
+      {
+        storeId: storeId,
+        routeId: routeId,
+        orderId: orderId,
+        note: note,
+        latitude: latitude,
+        longitude: longitude,
+        period: period
+      },
+      channel,
+      res
+    )
 
-    const unitData = product.listUnit.find(u => u.unit === item.unit)
-    if (!unitData) {
-      return res.status(400).json({
-        status: 400,
-        message: `Invalid unit for product ${item.id}`
+    if (checkIn.status === 409) {
+      return res.status(409).json({
+        status: 409,
+        message: 'Duplicate route or listStore found on this day'
       })
     }
 
-    const totalPrice = item.qty * unitData.price.sale
-    subtotal += totalPrice
+    const promotion = await applyPromotion(summary, channel, res)
 
-    return {
-      id: product.id,
-      // lot: item.lot,
-      name: product.name,
-      group: product.group,
-      groupCode: product.groupCode,
-      brandCode: product.brandCode,
-      brand: product.brand,
-      size: product.size,
-      flavourCode: product.flavourCode,
-      flavour: product.flavour,
-      qty: item.qty,
-      unit: item.unit,
-      unitName: unitData.name,
-      price: unitData.price.sale,
-      subtotal: parseFloat(totalPrice.toFixed(2)),
-      discount: 0,
-      netTotal: parseFloat(totalPrice.toFixed(2))
-    }
-  })
-  if (listProduct.includes(null)) return
+    newOrder.listPromotions.forEach(item => {
+      const promo = promotion.appliedPromotions.find(
+        u => u.proId === item.proId
+      )
 
-  const orderId = await generateOrderId(area, sale.warehouse, channel, res)
+      if (!promo) return
 
-  // if () {
-
-  // }
-
-  const promotionshelf =
-    (await PromotionShelf.find({
-      storeId: storeId,
-      period: period,
-      qty: 1
-    })) || {}
-  const discountProduct = promotionshelf?.length
-    ? promotionshelf
-      .map(item => item.price)
-      .reduce((sum, price) => sum + price, 0)
-    : 0
-  const total = subtotal - discountProduct
-  const newOrder = new Order({
-    orderId,
-    type,
-    status: 'pending',
-    statusTH: 'รอนำเข้า',
-    sale: {
-      saleCode: sale.saleCode,
-      salePayer: sale.salePayer,
-      name: `${sale.firstName} ${sale.surName}`,
-      tel: sale.tel || '',
-      warehouse: sale.warehouse
-    },
-    store: {
-      storeId: summary.store.storeId,
-      name: summary.store.name,
-      type: summary.store.type,
-      address: summary.store.address,
-      taxId: summary.store.taxId,
-      tel: summary.store.tel,
-      area: summary.store.area,
-      zone: summary.store.zone,
-      isBeauty: summary.store.isBeauty
-    },
-    note,
-    latitude,
-    longitude,
-    listProduct,
-    listPromotions: summary.listPromotion,
-    listQuota: summary.listQuota,
-    subtotal,
-    discount: 0,
-    discountProductId: promotionshelf.map(item => ({
-      proShelfId: item.proShelfId
-    })),
-    discountProduct: discountProduct,
-    vat: parseFloat((total - total / 1.07).toFixed(2)),
-    totalExVat: parseFloat((total / 1.07).toFixed(2)),
-    total: total,
-    shipping: {
-      shippingId: '',
-      address: ''
-    },
-    paymentMethod: 'cash',
-    paymentStatus: 'paid',
-    createdBy: sale.username,
-    period: period
-  })
-  applyPromotionUsage(
-    newOrder.store.storeId,
-    newOrder.listPromotions,
-    channel,
-    res
-  )
-
-  const checkIn = await checkInRoute(
-    {
-      storeId: storeId,
-      routeId: routeId,
-      orderId: orderId,
-      note: note,
-      latitude: latitude,
-      longitude: longitude,
-      period: period
-    },
-    channel,
-    res
-  )
-
-  if (checkIn.status === 409) {
-    return res.status(409).json({
-      status: 409,
-      message: 'Duplicate route or listStore found on this day'
-    })
-  }
-
-  const promotion = await applyPromotion(summary, channel, res)
-
-  newOrder.listPromotions.forEach(item => {
-    const promo = promotion.appliedPromotions.find(
-      u => u.proId === item.proId
-    )
-
-    if (!promo) return
-
-    if (promo.proQty - item.proQty < 0) {
-      item.proQty = promo.proQty
-    }
-  })
-
-  for (const item of newOrder.listQuota) {
-    await Quota.findOneAndUpdate(
-      { quotaId: item.quotaId },
-      {
-        $inc: {
-          quota: -item.quota,
-          quotaUse: +item.quota
-        }
+      if (promo.proQty - item.proQty < 0) {
+        item.proQty = promo.proQty
       }
-    )
-  }
+    })
 
-  const qtyproduct = newOrder.listProduct
-    .filter(u => u?.id && u?.unit && u?.qty > 0)
-    .map(u => ({
-      productId: u.id,
-      unit: u.unit,
-      qty: u.qty,
-      statusMovement: 'OUT'
-    }));
-  const qtyproductPro = newOrder.listPromotions.flatMap(u => {
-    const promoDetail = u.listProduct
-      .filter(item => item?.id && item?.unit && item?.qty > 0)
-      .map(item => ({
-        productId: item.id,
-        unit: item.unit,
-        qty: item.qty,
+    for (const item of newOrder.listQuota) {
+      await Quota.findOneAndUpdate(
+        { quotaId: item.quotaId },
+        {
+          $inc: {
+            quota: -item.quota,
+            quotaUse: +item.quota
+          }
+        }
+      )
+    }
+
+    const qtyproduct = newOrder.listProduct
+      .filter(u => u?.id && u?.unit && u?.qty > 0)
+      .map(u => ({
+        productId: u.id,
+        unit: u.unit,
+        qty: u.qty,
         statusMovement: 'OUT'
       }));
-    return promoDetail;
-  });
+    const qtyproductPro = newOrder.listPromotions.flatMap(u => {
+      const promoDetail = u.listProduct
+        .filter(item => item?.id && item?.unit && item?.qty > 0)
+        .map(item => ({
+          productId: item.id,
+          unit: item.unit,
+          qty: item.qty,
+          statusMovement: 'OUT'
+        }));
+      return promoDetail;
+    });
 
 
-  const productQty = Object.values(
-    [...qtyproductPro, ...qtyproduct].reduce((acc, cur) => {
-      // [, ...qtyproduct].reduce((acc, cur) => {
+    const productQty = Object.values(
+      [...qtyproductPro, ...qtyproduct].reduce((acc, cur) => {
+        // [, ...qtyproduct].reduce((acc, cur) => {
 
-      const key = `${cur.productId}-${cur.unit}`
-      acc[key] = acc[key]
-        ? { ...cur, qty: acc[key].qty + cur.qty }
-        : { ...cur }
-      return acc
-    }, {})
-  )
-  // ตัด stock เบล ver
-  for (const item of productQty) {
-    const factorPcsResult = await Product.aggregate([
-      { $match: { id: item.productId } },
-      {
-        $project: {
-          id: 1,
-          listUnit: {
-            $filter: {
-              input: '$listUnit',
-              as: 'unitItem',
-              cond: { $eq: ['$$unitItem.unit', item.unit] }
-            }
-          }
-        }
-      }
-    ])
-    // console.log(factorPcsResult)
-    const factorCtnResult = await Product.aggregate([
-      { $match: { id: item.productId } },
-      {
-        $project: {
-          id: 1,
-          listUnit: {
-            $filter: {
-              input: '$listUnit',
-              as: 'unitItem',
-              cond: { $eq: ['$$unitItem.unit', 'CTN'] }
-            }
-          }
-        }
-      }
-    ])
-    const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor || 0;
-    const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor || 0;
-    const factorPcsQty = item.qty * factorPcs
-    const factorCtnQty = factorCtn > 0
-      ? Math.floor(factorPcsQty / factorCtn)
-      : 0;
-    // console.log('factorPcsQty', factorPcsQty)
-    // console.log('factorCtnQty', factorCtnQty)
-    const data = await Stock.findOneAndUpdate(
-      {
-        area: area,
-        period: period,
-        'listProduct.productId': item.productId
-      },
-      {
-        $inc: {
-          'listProduct.$[elem].stockOutPcs': +factorPcsQty,
-          // 'listProduct.$[elem].balancePcs': -factorPcsQty,
-          'listProduct.$[elem].stockOutCtn': +factorCtnQty
-          // 'listProduct.$[elem].balanceCtn': -factorCtnQty
-        }
-      },
-      {
-        arrayFilters: [{ 'elem.productId': item.productId }],
-        new: true
-      }
+        const key = `${cur.productId}-${cur.unit}`
+        acc[key] = acc[key]
+          ? { ...cur, qty: acc[key].qty + cur.qty }
+          : { ...cur }
+        return acc
+      }, {})
     )
-  }
-  const calStock = {
-    // storeId: refundOrder.store.storeId,
-    orderId: newOrder.orderId,
-    area: newOrder.store.area,
-    saleCode: sale.saleCode,
-    period: period,
-    warehouse: newOrder.sale.warehouse,
-    status: 'pending',
-    statusTH: 'รอนำเข้า',
-    action: 'Sale',
-    type: 'Sale',
-    product: [...productQty]
-  }
-
-  const createdMovement = await StockMovement.create({
-    ...calStock
-  })
-
-  await StockMovementLog.create({
-    ...calStock,
-    refOrderId: createdMovement._id
-  })
-  await newOrder.save()
-  await PromotionShelf.findOneAndUpdate(
-    { proShelfId: promotionshelf.proShelfId },
-    { $set: { qty: 0 } }
-  )
-  await Cart.deleteOne({ type, area, storeId })
-  const currentDate = new Date()
-  let query = {}
-  const promoIds = newOrder.listPromotions.map(u => u.proId)
-  const promoDetail = await Promotion.find({ proId: { $in: promoIds } })
-  const startMonth = new Date(
-    currentDate.getFullYear(),
-    currentDate.getMonth(),
-    1
-  )
-  const NextMonth = new Date(
-    currentDate.getFullYear(),
-    currentDate.getMonth() + 1,
-    1
-  )
-
-  query.createdAt = {
-    $gte: startMonth,
-    $lt: NextMonth
-  }
-
-  for (const item of promoDetail) {
-    if (item.applicableTo.isNewStore === true) {
-      await Promotion.findOneAndUpdate(
-        { proId: item.proId },
+    // ตัด stock เบล ver
+    for (const item of productQty) {
+      const factorPcsResult = await Product.aggregate([
+        { $match: { id: item.productId } },
         {
-          $addToSet: {
-            'applicableTo.completeStoreNew': newOrder.store.storeId
+          $project: {
+            id: 1,
+            listUnit: {
+              $filter: {
+                input: '$listUnit',
+                as: 'unitItem',
+                cond: { $eq: ['$$unitItem.unit', item.unit] }
+              }
+            }
           }
         }
-      )
-    } else if (item.applicableTo.isbeauty === true) {
-      await Promotion.findOneAndUpdate(
-        { proId: item.proId },
+      ])
+      // console.log(factorPcsResult)
+      const factorCtnResult = await Product.aggregate([
+        { $match: { id: item.productId } },
         {
-          $addToSet: {
-            'applicableTo.completeStoreBeauty': newOrder.store.storeId
+          $project: {
+            id: 1,
+            listUnit: {
+              $filter: {
+                input: '$listUnit',
+                as: 'unitItem',
+                cond: { $eq: ['$$unitItem.unit', 'CTN'] }
+              }
+            }
           }
+        }
+      ])
+      const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor || 0;
+      const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor || 0;
+      const factorPcsQty = item.qty * factorPcs
+      const factorCtnQty = factorCtn > 0
+        ? Math.floor(factorPcsQty / factorCtn)
+        : 0;
+      // console.log('factorPcsQty', factorPcsQty)
+      // console.log('factorCtnQty', factorCtnQty)
+      const data = await Stock.findOneAndUpdate(
+        {
+          area: area,
+          period: period,
+          'listProduct.productId': item.productId
+        },
+        {
+          $inc: {
+            'listProduct.$[elem].stockOutPcs': +factorPcsQty,
+            // 'listProduct.$[elem].balancePcs': -factorPcsQty,
+            'listProduct.$[elem].stockOutCtn': +factorCtnQty
+            // 'listProduct.$[elem].balanceCtn': -factorCtnQty
+          }
+        },
+        {
+          arrayFilters: [{ 'elem.productId': item.productId }],
+          new: true
         }
       )
     }
-  }
+    const calStock = {
+      // storeId: refundOrder.store.storeId,
+      orderId: newOrder.orderId,
+      area: newOrder.store.area,
+      saleCode: sale.saleCode,
+      period: period,
+      warehouse: newOrder.sale.warehouse,
+      status: 'pending',
+      statusTH: 'รอนำเข้า',
+      action: 'Sale',
+      type: 'Sale',
+      product: [...productQty]
+    }
 
-  // await transaction.commit()
-  res.status(200).json({
-    status: 200,
-    message: 'Checkout successful!',
-    data: newOrder
-  })
+    const createdMovement = await StockMovement.create({
+      ...calStock
+    })
+
+    await StockMovementLog.create({
+      ...calStock,
+      refOrderId: createdMovement._id
+    })
+    await newOrder.save()
+    await PromotionShelf.findOneAndUpdate(
+      { proShelfId: promotionshelf.proShelfId },
+      { $set: { qty: 0 } }
+    )
+    await Cart.deleteOne({ type, area, storeId })
+    const currentDate = new Date()
+    let query = {}
+    const promoIds = newOrder.listPromotions.map(u => u.proId)
+    const promoDetail = await Promotion.find({ proId: { $in: promoIds } })
+    const startMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      1
+    )
+    const NextMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() + 1,
+      1
+    )
+
+    query.createdAt = {
+      $gte: startMonth,
+      $lt: NextMonth
+    }
+
+    for (const item of promoDetail) {
+      if (item.applicableTo.isNewStore === true) {
+        await Promotion.findOneAndUpdate(
+          { proId: item.proId },
+          {
+            $addToSet: {
+              'applicableTo.completeStoreNew': newOrder.store.storeId
+            }
+          }
+        )
+      } else if (item.applicableTo.isbeauty === true) {
+        await Promotion.findOneAndUpdate(
+          { proId: item.proId },
+          {
+            $addToSet: {
+              'applicableTo.completeStoreBeauty': newOrder.store.storeId
+            }
+          }
+        )
+      }
+    }
+
+    // await transaction.commit()
+    res.status(200).json({
+      status: 200,
+      message: 'Checkout successful!',
+      data: newOrder
+    })
   } catch (error) {
     // await transaction.rollback()
     console.error(error)
@@ -618,7 +619,7 @@ exports.updateStatus = async (req, res) => {
     }
 
 
-    if (status === 'canceled' ) {
+    if (status === 'canceled') {
       statusTH = 'ยกเลิก'
     }
 
@@ -768,7 +769,7 @@ exports.updateStatus = async (req, res) => {
 
     const updatedOrder = await Order.findOneAndUpdate(
       { orderId },
-      { $set: { status,  statusTH } },
+      { $set: { status, statusTH } },
       { new: true }
     )
 
@@ -3033,29 +3034,33 @@ exports.summaryDaily = async (req, res) => {
 
     // สร้างผลลัพธ์รายวัน (ใส่ 0 ถ้าไม่มีข้อมูล)
     const fullMonthArr = allDateArr.map(date => {
-      const sendmoney = sendMoneyMap[date] || 0
+      const sendmoneyRaw = sendMoneyMap[date] || 0
+      const sendmoney = to2(sendmoneyRaw)
       let status = ''
-      const refundToday = refundByDate[date] || []
-      const good = refundToday
+      const refundTodayRaw = refundByDate[date] || []
+      const refundToday = refundTodayRaw
+      const goodRaw = refundToday
         .filter(x => x.condition === 'good')
         .reduce((sum, x) => sum + Number(x.price), 0)
-      const damaged = refundToday
+      const good = to2(goodRaw)
+      const damagedRaw = refundToday
         .filter(x => x.condition === 'damaged')
         .reduce((sum, x) => sum + Number(x.price), 0)
-
+      const damaged = to2(damagedRaw)
       // เพิ่ม sale และ change
-      const summary = saleByDate[date] || 0
-      const change = changeByDate[date] || 0
-
-      if (sendmoney == 0 && summary == 0) {
-        status = 'วันนี้ไม่มียอดต้องส่ง'
-      } else if (sendmoney - summary == 0) {
-        status = 'ส่งเงินครบ'
+      const summaryRaw = saleByDate[date] || 0
+      const summary = to2(summaryRaw)
+      const changeRaw = changeByDate[date] || 0
+      const change = to2(changeRaw)
+      const diffRaw = summary - sendmoney
+      const diff = to2(diffRaw)
+      if (sendmoney > 0) {
+        status = 'ส่งเงินแล้ว'
       } else {
-        status = 'ยังส่งเงินไม่ครบ'
+        status = 'ยังไม่ส่งเงิน'
       }
 
-      return { date, sendmoney, summary, change, status, good, damaged }
+      return { date, sendmoney, summary, diff, change, status, good, damaged }
     })
 
     const sumSendMoney = fullMonthArr.reduce((sum, item) => {
@@ -3075,15 +3080,16 @@ exports.summaryDaily = async (req, res) => {
       return sum + (item.damaged || 0)
     }, 0)
 
+    // console.log(fullMonthArr)
     res.status(200).json({
       status: 200,
       message: 'success',
       data: fullMonthArr,
-      sumSendMoney: sumSendMoney,
-      sumSummary: sumSummary,
-      sumChange: sumChange,
-      sumGood: sumGood,
-      sumDamaged: sumDamaged
+      sumSendMoney: to2(sumSendMoney),
+      sumSummary: to2(sumSummary),
+      sumChange: to2(sumChange),
+      sumGood: to2(sumGood),
+      sumDamaged: to2(sumDamaged)
     })
   } catch (err) {
     res.status(500).json({ status: 500, message: err.message })
