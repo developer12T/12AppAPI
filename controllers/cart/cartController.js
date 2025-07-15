@@ -403,7 +403,7 @@ exports.adjustProduct = async (req, res) => {
           qtyNew = qty
         }
 
-        cart.listProduct[existingProductIndex].qty = qtyNew
+        cart.listProduct[existingRefundIndex].qty = qtyNew
       }
       updated = true
     } else {

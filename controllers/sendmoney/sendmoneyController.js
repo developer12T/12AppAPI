@@ -350,3 +350,44 @@ exports.getAllSendMoney = async (req, res) => {
   })
 
 }
+
+exports.getSendMoneyForAcc = async (req, res) => {
+  const { date } = req.query
+  const channel = req.headers['x-channel']
+  const { area, zone } = req.query
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+  const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+
+
+
+  const start = new Date(date + 'T00:00:00.000Z');
+  const end = new Date(date + 'T23:59:59.999Z');
+
+  const data = await SendMoney.aggregate([
+    {
+      $match: {
+        dateAt: {
+          $gte: start,
+          $lte: end
+        }
+      }
+    },
+    {
+      $group:{
+        _id:'$area',
+        value: { $sum: '$sendmoney' },
+        COUNT: { $sum: 1 }
+      }
+    }
+  ]);
+
+
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'success',
+    data: data
+  })
+
+}
