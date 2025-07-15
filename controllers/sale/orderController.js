@@ -3070,6 +3070,11 @@ exports.summaryDaily = async (req, res) => {
     const sumSummary = fullMonthArr.reduce((sum, item) => {
       return sum + (item.summary || 0)
     }, 0)
+
+    const sumSummaryDif = fullMonthArr.reduce((sum, item) => {
+      return sum + (item.diff || 0)
+    }, 0)
+
     const sumChange = fullMonthArr.reduce((sum, item) => {
       return sum + (item.change || 0)
     }, 0)
@@ -3087,6 +3092,7 @@ exports.summaryDaily = async (req, res) => {
       data: fullMonthArr,
       sumSendMoney: to2(sumSendMoney),
       sumSummary: to2(sumSummary),
+      sumSummaryDif: to2(sumSummaryDif),
       sumChange: to2(sumChange),
       sumGood: to2(sumGood),
       sumDamaged: to2(sumDamaged)
