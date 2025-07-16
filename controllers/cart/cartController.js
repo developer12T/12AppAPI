@@ -493,17 +493,18 @@ exports.adjustProduct = async (req, res) => {
 
     if (type != 'withdraw') {
       if (stockType === 'IN') {
-        // console.log(productQtyStock.qty, qtyProduct.qty)
-        // if (productQtyStock.qty > qtyProduct.qty && productQtyStock ) {
+        qtyFinal = qtyProductMain.qty - qtyProduct.qty
 
-          qtyFinal = productQtyStock.qty - qtyProductMain.qty
+        // console.log(productQtyStock.qty, qtyProduct.qty)
+        if (qtyFinal != 0) {
+
           qtyProductStock = {
             id: id,
             qty: qtyFinal,
             unit: unit
           }
           await cart.save()
-          // console.log(qtyProductStock)
+          console.log(qtyProductMain.qty, qtyProduct.qty)
           const updateResult = await updateStockMongo(qtyProductStock, area, period, 'adjust', channel, stockType, res);
           if (updateResult) return;
           res.status(200).json({
@@ -511,14 +512,13 @@ exports.adjustProduct = async (req, res) => {
             message: 'Cart updated successfully!',
             data: cart
           })
-        // }
+        }
 
 
-        // res.status(409).json({
-        //   status: 409,
-        //   message: 'Cart is more than stock',
-      
-        // })
+        return res.status(200).json({
+          status: 200,
+          message: 'No changes made'
+        });
 
 
       } else if (stockType === 'OUT') {
