@@ -388,8 +388,8 @@ exports.adjustProduct = async (req, res) => {
       productId: id,
       unit: unit
     }
-    const productQty = await getQty(stockBody, channel)
-    // console.log(productQty)
+    const productQtyStock = await getQty(stockBody, channel)
+    // console.log(productQtyStock)
     let maxStock = false
     if (type === 'refund' && condition !== undefined && expire !== undefined) {
       const existingRefundIndex = cart.listRefund.findIndex(
@@ -414,8 +414,8 @@ exports.adjustProduct = async (req, res) => {
       } else {
         // console.log(cart.listProduct[existingRefundIndex])
         let qtyNew = 0
-        if (qty > productQty.qty && stockType === 'OUT') {
-          qtyNew = productQty.qty
+        if (qty > productQtyStock.qty && stockType === 'OUT') {
+          qtyNew = productQtyStock.qty
           maxStock = true
         } else {
           qtyNew = qty
@@ -444,8 +444,8 @@ exports.adjustProduct = async (req, res) => {
       } else {
         // console.log(cart.listProduct[existingProductIndex])
         let qtyNew = 0
-        if (qty > productQty.qty && stockType === 'OUT') {
-          qtyNew = productQty.qty
+        if (qty > productQtyStock.qty && stockType === 'OUT') {
+          qtyNew = productQtyStock.qty
           maxStock = true
         } else {
           qtyNew = qty
@@ -493,21 +493,32 @@ exports.adjustProduct = async (req, res) => {
 
     if (type != 'withdraw') {
       if (stockType === 'IN') {
+        console.log(productQtyStock.qty, qtyProduct.qty)
+        if (productQtyStock.qty > qtyProduct.qty) {
 
-        if (qtyProduct.qty > qtyProductMain.qty) {
-
-          qtyFinal = qtyProductMain.qty - qtyProduct.qty
+          qtyFinal = productQtyStock.qty - qtyProductMain.qty
           qtyProductStock = {
             id: id,
             qty: qtyFinal,
             unit: unit
           }
-          console.log(qtyProductMain.qty, qtyProduct.qty)
+          await cart.save()
+          // console.log(qtyProductStock)
           const updateResult = await updateStockMongo(qtyProductStock, area, period, 'adjust', channel, stockType, res);
           if (updateResult) return;
-
+          res.status(200).json({
+            status: 200,
+            message: 'Cart updated successfully!',
+            data: cart
+          })
         }
 
+
+        res.status(200).json({
+          status: 200,
+          message: 'Cart updated successfully!',
+          data: cart
+        })
 
 
       } else if (stockType === 'OUT') {
@@ -526,6 +537,13 @@ exports.adjustProduct = async (req, res) => {
         }
         const updateResult = await updateStockMongo(qtyProductStock, area, period, 'adjust', channel, stockType, res);
         if (updateResult) return;
+
+        res.status(200).json({
+          status: 200,
+          message: 'Cart updated successfully!',
+          data: cart
+        })
+
       }
     }
 
@@ -539,19 +557,22 @@ exports.adjustProduct = async (req, res) => {
         data: null
       })
     }
+    if (stockType === 'OUT') {
+      await cart.save()
+      return res.status(200).json({
+        status: 200,
+        message: 'Cart deleted successfully!',
+        data: null
+      })
+    }
 
-    await cart.save()
     // await session.commitTransaction();
     // session.endSession();
 
     const io = getSocket()
     io.emit('cart/adjust', {})
 
-    res.status(200).json({
-      status: 200,
-      message: 'Cart updated successfully!',
-      data: cart
-    })
+
   } catch (err) {
     // ส่ง error message กลับ client
     res.status(500).json({ success: false, message: err.message });
