@@ -20,6 +20,7 @@ const productModel = require('../../models/cash/product')
 const userModel = require('../../models/cash/user')
 const stockModel = require('../../models/cash/stock')
 const { getModelsByChannel } = require('../../middleware/channel')
+const { to2, getQty, updateStockMongo, getPeriodFromDate } = require('../../middleware/order')
 
 exports.checkout = async (req, res) => {
   try {
@@ -387,7 +388,7 @@ exports.getRefund = async (req, res) => {
 
     let response = []
 
-    if (!type  || !period) {
+    if (!type || !period) {
       return res
         .status(400)
         .json({ status: 400, message: 'type,  period are required!' })
@@ -668,20 +669,48 @@ exports.updateStatus = async (req, res) => {
       })
     }
 
-    if (status === 'canceled' ) {
+    const productQty = refundOrder.listProduct.map(u => {
+      return {
+        id: u.id,
+        // lot: u.lot,
+        unit: u.unit,
+        qty: u.qty,
+        // statusMovement: 'OUT'
+      }
+    })
+
+    if (status === 'canceled') {
       statusTH = 'ยกเลิก'
+      for (const item of productQty) {
+        updateStockMongo(item, refundOrder.store.area, refundOrder.period, 'rufundCanceled', channel)
+      }
+    } else if (status === 'rejected') {
+      statusTH = 'ถูกปฏิเสธ'
+      for (const item of productQty) {
+        updateStockMongo(item, refundOrder.store.area, refundOrder.period, 'rufundCanceled', channel)
+      }
+    } else if (status === 'completed') {
+      statusTH = 'สำเร็จ'
+      for (const item of productQty) {
+        updateStockMongo(item, refundOrder.store.area, refundOrder.period, 'refund', channel)
+      }
     }
+
+
+
+
+    // console.log(productQty)
 
 
     const updatedRefund = await Refund.findOneAndUpdate(
       { orderId },
-      { $set: { status,statusTH  } },
+      { $set: { status, statusTH } },
       { new: true }
     )
 
     const updatedOrder = await Order.findOneAndUpdate(
       { orderId: refundOrder.reference, type: 'change' },
-      { $set: { status,statusTH } },
+      { $set: { status, statusTH } },
       { new: true }
     )
 
