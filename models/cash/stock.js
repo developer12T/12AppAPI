@@ -65,7 +65,7 @@ const stockSchema = new mongoose.Schema({
 
 const listProductMovementSchema = new mongoose.Schema(
   {
-    productId: { type: String, required: true },
+    id: { type: String, required: true },
     unit: { type: String, default: '' },
     // lot: { type: String, default: '' },
     qty: { type: Number, default: 0 },

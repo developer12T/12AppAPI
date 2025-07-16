@@ -5,6 +5,7 @@ const routeModel = require('../../models/cash/route')
 const sendmoneyModel = require('../../models/cash/sendmoney')
 const path = require('path')
 const multer = require('multer')
+const { replace } = require('lodash')
 const upload = multer({ storage: multer.memoryStorage() }).array(
   'sendmoneyImage',
   1
@@ -377,13 +378,64 @@ exports.getSendMoneyForAcc = async (req, res) => {
       }
     },
     {
+      $lookup: {
+        from: 'users',
+        localField: 'saleCode',
+        foreignField: 'saleCode',
+        as: 'user'
+      }
+    },
+    {
+      $unwind: {
+        path: '$user',
+        preserveNullAndEmptyArrays: true
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        area: '$area',
+        sale: '$user.firstName',
+        STATUS: 'รอตรวจสอบ',
+        TRANSFER_DATE: `${date}`,
+        VALUES: '$sendmoney',
+        ZONE: { $substrBytes: ['$area', 0, 2] }
+      }
+    },
+    {
       $group: {
-        _id: '$area',
-        value: { $sum: '$sendmoney' },
+        _id: { area: '$area', sale: '$sale', STATUS: '$STATUS', TRANSFER_DATE: '$TRANSFER_DATE', ZONE:'$ZONE' },
+        VALUES: { $sum: '$VALUES' },
         COUNT: { $sum: 1 }
+      }
+    },
+    {
+      $project: {
+        _id: 0,                           // ไม่เอา _id
+        AREA: '$_id.area',
+        ZONE: '$_id.ZONE',
+        sale: '$_id.sale',
+        STATUS: '$_id.STATUS',
+        TRANSFER_DATE: '$_id.TRANSFER_DATE',
+        VALUES: 1,                         // เอา field value, COUNT ตามเดิม
+        COUNT: 1
       }
     }
   ]);
+
+  const dataFinal = data.map(item => {
+
+    return {
+      AREA:item.AREA,
+      COUNT:item.COUNT,
+      SALE:item.SALE,
+      STATUS:item.STATUS,
+      TRANSFER_DATE:item.TRANSFER_DATE,
+      VALUES:item.VALUES,
+      ZONE:item.ZONE
+    }
+  })
+
 
 
 
@@ -391,7 +443,7 @@ exports.getSendMoneyForAcc = async (req, res) => {
   res.status(200).json({
     status: 200,
     message: 'success',
-    data: data
+    data: dataFinal
   })
 
 }

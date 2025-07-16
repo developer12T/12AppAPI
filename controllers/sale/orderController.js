@@ -3,7 +3,6 @@
 // const { User } = require('../../models/cash/user')
 // const { Product } = require('../../models/cash/product')
 // const { Route } = require('../../models/cash/route')
-const { to2 } = require('../../middleware/order')
 const { period, previousPeriod } = require('../../utilities/datetime')
 const axios = require('axios')
 const dayjs = require('dayjs')
@@ -28,6 +27,7 @@ const { checkInRoute } = require('../route/checkIn')
 const multer = require('multer')
 const upload = multer({ storage: multer.memoryStorage() }).single('image')
 const _ = require('lodash')
+const { to2, updateStockMongo } = require('../../middleware/order')
 const { DateTime } = require('luxon')
 const { getSocket } = require('../../socket')
 const {
@@ -288,7 +288,7 @@ exports.checkout = async (req, res) => {
     const qtyproduct = newOrder.listProduct
       .filter(u => u?.id && u?.unit && u?.qty > 0)
       .map(u => ({
-        productId: u.id,
+        id: u.id,
         unit: u.unit,
         qty: u.qty,
         statusMovement: 'OUT'
@@ -297,7 +297,7 @@ exports.checkout = async (req, res) => {
       const promoDetail = u.listProduct
         .filter(item => item?.id && item?.unit && item?.qty > 0)
         .map(item => ({
-          productId: item.id,
+          id: item.id,
           unit: item.unit,
           qty: item.qty,
           statusMovement: 'OUT'
@@ -319,64 +319,65 @@ exports.checkout = async (req, res) => {
     )
     // ตัด stock เบล ver
     for (const item of productQty) {
-      const factorPcsResult = await Product.aggregate([
-        { $match: { id: item.productId } },
-        {
-          $project: {
-            id: 1,
-            listUnit: {
-              $filter: {
-                input: '$listUnit',
-                as: 'unitItem',
-                cond: { $eq: ['$$unitItem.unit', item.unit] }
-              }
-            }
-          }
-        }
-      ])
-      // console.log(factorPcsResult)
-      const factorCtnResult = await Product.aggregate([
-        { $match: { id: item.productId } },
-        {
-          $project: {
-            id: 1,
-            listUnit: {
-              $filter: {
-                input: '$listUnit',
-                as: 'unitItem',
-                cond: { $eq: ['$$unitItem.unit', 'CTN'] }
-              }
-            }
-          }
-        }
-      ])
-      const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor || 0;
-      const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor || 0;
-      const factorPcsQty = item.qty * factorPcs
-      const factorCtnQty = factorCtn > 0
-        ? Math.floor(factorPcsQty / factorCtn)
-        : 0;
-      // console.log('factorPcsQty', factorPcsQty)
-      // console.log('factorCtnQty', factorCtnQty)
-      const data = await Stock.findOneAndUpdate(
-        {
-          area: area,
-          period: period,
-          'listProduct.productId': item.productId
-        },
-        {
-          $inc: {
-            'listProduct.$[elem].stockOutPcs': +factorPcsQty,
-            // 'listProduct.$[elem].balancePcs': -factorPcsQty,
-            'listProduct.$[elem].stockOutCtn': +factorCtnQty
-            // 'listProduct.$[elem].balanceCtn': -factorCtnQty
-          }
-        },
-        {
-          arrayFilters: [{ 'elem.productId': item.productId }],
-          new: true
-        }
-      )
+      updateStockMongo(item, area, period, 'sale', channel)
+      // const factorPcsResult = await Product.aggregate([
+      //   { $match: { id: item.productId } },
+      //   {
+      //     $project: {
+      //       id: 1,
+      //       listUnit: {
+      //         $filter: {
+      //           input: '$listUnit',
+      //           as: 'unitItem',
+      //           cond: { $eq: ['$$unitItem.unit', item.unit] }
+      //         }
+      //       }
+      //     }
+      //   }
+      // ])
+      // // console.log(factorPcsResult)
+      // const factorCtnResult = await Product.aggregate([
+      //   { $match: { id: item.productId } },
+      //   {
+      //     $project: {
+      //       id: 1,
+      //       listUnit: {
+      //         $filter: {
+      //           input: '$listUnit',
+      //           as: 'unitItem',
+      //           cond: { $eq: ['$$unitItem.unit', 'CTN'] }
+      //         }
+      //       }
+      //     }
+      //   }
+      // ])
+      // const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor || 0;
+      // const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor || 0;
+      // const factorPcsQty = item.qty * factorPcs
+      // const factorCtnQty = factorCtn > 0
+      //   ? Math.floor(factorPcsQty / factorCtn)
+      //   : 0;
+      // // console.log('factorPcsQty', factorPcsQty)
+      // // console.log('factorCtnQty', factorCtnQty)
+      // const data = await Stock.findOneAndUpdate(
+      //   {
+      //     area: area,
+      //     period: period,
+      //     'listProduct.productId': item.productId
+      //   },
+      //   {
+      //     $inc: {
+      //       'listProduct.$[elem].stockOutPcs': +factorPcsQty,
+      //       // 'listProduct.$[elem].balancePcs': -factorPcsQty,
+      //       'listProduct.$[elem].stockOutCtn': +factorCtnQty
+      //       // 'listProduct.$[elem].balanceCtn': -factorCtnQty
+      //     }
+      //   },
+      //   {
+      //     arrayFilters: [{ 'elem.productId': item.productId }],
+      //     new: true
+      //   }
+      // )
     }
     const calStock = {
       // storeId: refundOrder.store.storeId,
@@ -625,64 +626,65 @@ exports.updateStatus = async (req, res) => {
 
     if (order.listProduct.length > 0) {
       for (const u of order.listProduct) {
-        const factorPcsResult = await Product.aggregate([
-          { $match: { id: u.id } },
-          {
-            $project: {
-              id: 1,
-              listUnit: {
-                $filter: {
-                  input: '$listUnit',
-                  as: 'unitItem',
-                  cond: { $eq: ['$$unitItem.unit', u.unit] }
-                }
-              }
-            }
-          }
-        ])
-        // .session(session);
+        updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
+        // const factorPcsResult = await Product.aggregate([
+        //   { $match: { id: u.id } },
+        //   {
+        //     $project: {
+        //       id: 1,
+        //       listUnit: {
+        //         $filter: {
+        //           input: '$listUnit',
+        //           as: 'unitItem',
+        //           cond: { $eq: ['$$unitItem.unit', u.unit] }
+        //         }
+        //       }
+        //     }
+        //   }
+        // ])
+        // // .session(session);
 
-        const factorCtnResult =
-          (await Product.aggregate([
-            { $match: { id: u.id } },
-            {
-              $project: {
-                id: 1,
-                listUnit: {
-                  $filter: {
-                    input: '$listUnit',
-                    as: 'unitItem',
-                    cond: { $eq: ['$$unitItem.unit', 'CTN'] }
-                  }
-                }
-              }
-            }
-          ])) || []
+        // const factorCtnResult =
+        //   (await Product.aggregate([
+        //     { $match: { id: u.id } },
+        //     {
+        //       $project: {
+        //         id: 1,
+        //         listUnit: {
+        //           $filter: {
+        //             input: '$listUnit',
+        //             as: 'unitItem',
+        //             cond: { $eq: ['$$unitItem.unit', 'CTN'] }
+        //           }
+        //         }
+        //       }
+        //     }
+        //   ])) || []
 
-        const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0
-        const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 1
-        const factorPcsQty = u.qty * factorPcs
-        const factorCtnQty = Math.floor(factorPcsQty / factorCtn)
-        await Stock.findOneAndUpdate(
-          {
-            area: order.store.area,
-            period: order.period,
-            'listProduct.productId': u.id
-          },
-          {
-            $inc: {
-              'listProduct.$[elem].stockOutPcs': -factorPcsQty,
-              'listProduct.$[elem].balancePcs': +factorPcsQty,
-              'listProduct.$[elem].stockOutCtn': -factorCtnQty,
-              'listProduct.$[elem].balanceCtn': +factorCtnQty
-            }
-          },
-          {
-            arrayFilters: [{ 'elem.productId': u.id }],
-            new: true
-            // session
-          }
-        )
+        // const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0
+        // const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 1
+        // const factorPcsQty = u.qty * factorPcs
+        // const factorCtnQty = Math.floor(factorPcsQty / factorCtn)
+        // await Stock.findOneAndUpdate(
+        //   {
+        //     area: order.store.area,
+        //     period: order.period,
+        //     'listProduct.productId': u.id
+        //   },
+        //   {
+        //     $inc: {
+        //       'listProduct.$[elem].stockOutPcs': -factorPcsQty,
+        //       'listProduct.$[elem].balancePcs': +factorPcsQty,
+        //       'listProduct.$[elem].stockOutCtn': -factorCtnQty,
+        //       'listProduct.$[elem].balanceCtn': +factorCtnQty
+        //     }
+        //   },
+        //   {
+        //     arrayFilters: [{ 'elem.productId': u.id }],
+        //     new: true
+        //     // session
+        //   }
+        // )
       }
     }
 
@@ -705,64 +707,66 @@ exports.updateStatus = async (req, res) => {
         }
         await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
-          const factorPcsResult = await Product.aggregate([
-            { $match: { id: u.id } },
-            {
-              $project: {
-                id: 1,
-                listUnit: {
-                  $filter: {
-                    input: '$listUnit',
-                    as: 'unitItem',
-                    cond: { $eq: ['$$unitItem.unit', u.unit] }
-                  }
-                }
-              }
-            }
-          ])
-          // .session(session);
 
-          const factorCtnResult =
-            (await Product.aggregate([
-              { $match: { id: u.id } },
-              {
-                $project: {
-                  id: 1,
-                  listUnit: {
-                    $filter: {
-                      input: '$listUnit',
-                      as: 'unitItem',
-                      cond: { $eq: ['$$unitItem.unit', 'CTN'] }
-                    }
-                  }
-                }
-              }
-            ])) || []
+          updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
+          // const factorPcsResult = await Product.aggregate([
+          //   { $match: { id: u.id } },
+          //   {
+          //     $project: {
+          //       id: 1,
+          //       listUnit: {
+          //         $filter: {
+          //           input: '$listUnit',
+          //           as: 'unitItem',
+          //           cond: { $eq: ['$$unitItem.unit', u.unit] }
+          //         }
+          //       }
+          //     }
+          //   }
+          // ])
+          // // .session(session);
 
-          const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0
-          const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 1
-          const factorPcsQty = u.qty * factorPcs
-          const factorCtnQty = Math.floor(factorPcsQty / factorCtn)
-          await Stock.findOneAndUpdate(
-            {
-              area: order.store.area,
-              period: order.period,
-              'listProduct.productId': u.id
-            },
-            {
-              $inc: {
-                'listProduct.$[elem].stockOutPcs': -factorPcsQty,
-                'listProduct.$[elem].balancePcs': +factorPcsQty,
-                'listProduct.$[elem].stockOutCtn': -factorCtnQty,
-                'listProduct.$[elem].balanceCtn': +factorCtnQty
-              }
-            },
-            {
-              arrayFilters: [{ 'elem.productId': u.id }],
-              new: true
-              // session
-            }
-          )
+          // const factorCtnResult =
+          //   (await Product.aggregate([
+          //     { $match: { id: u.id } },
+          //     {
+          //       $project: {
+          //         id: 1,
+          //         listUnit: {
+          //           $filter: {
+          //             input: '$listUnit',
+          //             as: 'unitItem',
+          //             cond: { $eq: ['$$unitItem.unit', 'CTN'] }
+          //           }
+          //         }
+          //       }
+          //     }
+          //   ])) || []
+
+          // const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0
+          // const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 1
+          // const factorPcsQty = u.qty * factorPcs
+          // const factorCtnQty = Math.floor(factorPcsQty / factorCtn)
+          // await Stock.findOneAndUpdate(
+          //   {
+          //     area: order.store.area,
+          //     period: order.period,
+          //     'listProduct.productId': u.id
+          //   },
+          //   {
+          //     $inc: {
+          //       'listProduct.$[elem].stockOutPcs': -factorPcsQty,
+          //       'listProduct.$[elem].balancePcs': +factorPcsQty,
+          //       'listProduct.$[elem].stockOutCtn': -factorCtnQty,
+          //       'listProduct.$[elem].balanceCtn': +factorCtnQty
+          //     }
+          //   },
+          //   {
+          //     arrayFilters: [{ 'elem.productId': u.id }],
+          //     new: true
+          //     // session
+          //   }
+          // )
         }
       }
     }

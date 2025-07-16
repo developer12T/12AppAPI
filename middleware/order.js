@@ -58,7 +58,7 @@ module.exports.to2 = function (num) {
   return Math.round((Number(num) || 0) * 100) / 100;
 }
 
-module.exports.getQty = async function (data,channel) {
+module.exports.getQty = async function (data, channel) {
   try {
     const { area, productId, unit, period } = data
     // const channel = req.headers['x-channel']
@@ -133,9 +133,235 @@ module.exports.getQty = async function (data,channel) {
     // })
   }
 
+}
 
 
+async function checkProductInStock(Stock, area, period, id) {
+  const stock = await Stock.findOne({
+    area: area,
+    period: period,
+    'listProduct.productId': id
+  });
+  return !!stock;
+}
+
+
+
+
+module.exports.updateStockMongo = async function (data, area, period, type, channel) {
+
+  const { id, unit, qty } = data
+
+  const { Stock } = getModelsByChannel(channel, '', stockModel)
+  const { Product } = getModelsByChannel(channel, '', productModel)
+  if (!id || !unit || !qty || !area || !period) {
+    throw new Error('Missing product data (id/unit/qty/area/period)');
+  }
+  const factorPcsResult = await Product.aggregate([
+    { $match: { id: id } },
+    {
+      $project: {
+        id: 1,
+        listUnit: {
+          $filter: {
+            input: '$listUnit',
+            as: 'unitItem',
+            cond: { $eq: ['$$unitItem.unit', unit] }
+          }
+        }
+      }
+    }
+  ])
+  // console.log(factorPcsResult)
+  const factorCtnResult = await Product.aggregate([
+    { $match: { id: id } },
+    {
+      $project: {
+        id: 1,
+        listUnit: {
+          $filter: {
+            input: '$listUnit',
+            as: 'unitItem',
+            cond: { $eq: ['$$unitItem.unit', 'CTN'] }
+          }
+        }
+      }
+    }
+  ])
+  const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor || 0;
+  const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor || 0;
+  const factorPcsQty = qty * factorPcs
+  const factorCtnQty = factorCtn > 0
+    ? Math.floor(factorPcsQty / factorCtn)
+    : 0;
+
+  if (factorPcs === 0) throw new Error('Cannot find product unit factor for PCS')
+  // ปรับให้ throw ถ้า type ไม่ถูกต้อง
+  if (!['sale', 'withdraw', 'give', 'deleteCart', 'orderCanceled'].includes(type))
+    throw new Error('Invalid stock update type: ' + type)
+
+
+  // console.log('factorPcsQty', factorPcsQty)
+  // console.log('factorCtnQty', factorCtnQty)
+  if (type === 'sale') {
+    const found = await checkProductInStock(Stock, area, period, id);
+    if (!found) throw new Error(`Product id:${id} not found in stock for area:${area} period:${period}`);
+    try {
+      await Stock.findOneAndUpdate(
+        {
+          area: area,
+          period: period,
+          'listProduct.productId': id
+        },
+        {
+          $inc: {
+            'listProduct.$[elem].stockOutPcs': +factorPcsQty,
+            // 'listProduct.$[elem].balancePcs': -factorPcsQty,
+            'listProduct.$[elem].sWtockOutCtn': +factorCtnQty
+            // 'listProduct.$[elem].balanceCtn': -factorCtnQty
+          }
+        },
+        {
+          arrayFilters: [{ 'elem.productId': id }],
+          new: true
+        }
+      )
+    } catch (err) {
+      throw new Error('Error updating stock for sale: ' + err.message)
+    }
+
+  } else if (type === 'withdraw') {
+    // console.log(factorPcsQty)
+    try {
+      const existsProduct = await Stock.aggregate([
+        {
+          $match: {
+            area: area,
+            period: period,
+            'listProduct.productId': id
+          }
+        }
+      ]);
+
+      if (existsProduct.length > 0) {
+        await Stock.findOneAndUpdate(
+          {
+            area: area,
+            period: period,
+            'listProduct.productId': id
+          },
+          {
+            $inc: {
+              'listProduct.$[elem].stockInPcs': +factorPcsQty,
+              'listProduct.$[elem].stockInCtn': +factorCtnQty,
+              'listProduct.$[elem].balancePcs': +factorPcsQty,
+              'listProduct.$[elem].balanceCtn': +factorCtnQty
+            }
+          },
+          {
+            arrayFilters: [{ 'elem.productId': id }],
+            new: true
+          }
+        );
+      } else {
+
+        const newProduct = {
+          productId: id,
+          stockPcs: 0,
+          stockInPcs: factorPcsQty,
+          stockOutPcs: 0,
+          balancePcs: factorPcsQty,
+          stockCtn: 0,
+          stockInCtn: factorCtnQty,
+          stockOutCtn: 0,
+          balanceCtn: factorCtnQty
+        };
+
+        await Stock.findOneAndUpdate(
+          { area: area, period: period },
+          { $push: { listProduct: newProduct } },
+          { upsert: true, new: true }
+        );
+      }
+    } catch (err) {
+      throw new Error('Error updating stock for sale: ' + err.message)
+    }
+  } else if (type === 'give') {
+    const found = await checkProductInStock(Stock, area, period, id);
+    if (!found) throw new Error(`Product id:${id} not found in stock for area:${area} period:${period}`);
+    try {
+      await Stock.findOneAndUpdate(
+        {
+          area: area,
+          period: period,
+          'listProduct.productId': id
+        },
+        {
+          $inc: {
+            'listProduct.$[elem].stockOutPcs': +factorPcsQty,
+            // 'listProduct.$[elem].balancePcs': -factorPcsQty,
+            'listProduct.$[elem].stockOutCtn': +factorCtnQty
+            // 'listProduct.$[elem].balanceCtn': -factorCtnQty
+          }
+        },
+        {
+          arrayFilters: [{ 'elem.productId': id }],
+          new: true
+        }
+      )
+    } catch (err) {
+      throw new Error('Error updating stock for sale: ' + err.message)
+    }
+  } else if (type === 'deleteCart') {
+    const found = await checkProductInStock(Stock, area, period, id);
+    if (!found) throw new Error(`Product id:${id} not found in stock for area:${area} period:${period}`);
+    try {
+      await Stock.findOneAndUpdate(
+        {
+          area: area,
+          period: period,
+          'listProduct.productId': id
+        },
+        {
+          $inc: {
+            'listProduct.$[elem].balancePcs': +factorPcsQty,
+            'listProduct.$[elem].balanceCtn': +factorCtnQty
+          }
+        },
+        {
+          arrayFilters: [{ 'elem.productId': id }],
+          new: true,
+        }
+      )
+    } catch (err) {
+      throw new Error('Error updating stock for sale: ' + err.message)
+    }
+  } else if (type === 'orderCanceled') {
+    try {
+      await Stock.findOneAndUpdate(
+        {
+          area: area,
+          period: period,
+          'listProduct.productId': id
+        },
+        {
+          $inc: {
+            'listProduct.$[elem].stockOutPcs': -factorPcsQty,
+            'listProduct.$[elem].balancePcs': +factorPcsQty,
+            'listProduct.$[elem].stockOutCtn': -factorCtnQty,
+            'listProduct.$[elem].balanceCtn': +factorCtnQty
+          }
+        },
+        {
+          arrayFilters: [{ 'elem.productId': id }],
+          new: true
+          // session
+        }
+      )
+    } catch (err) {
+      throw new Error('Error updating stock for sale: ' + err.message)
+    }
+  }
 
 
 }
-

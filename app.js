@@ -8,7 +8,7 @@ const { startCronJobErpApiCheck,startCronJobErpApiCheckDisribution,startCronJobD
 
 startCronJobErpApiCheck()    
 startCronJobErpApiCheckDisribution()
-// startCronJobDeleteCartDaily()
+startCronJobDeleteCartDaily()
 // startCronJobOrderToExcel()
 
 app.use(bodyParser.json({ limit: '50mb' }))
