@@ -134,8 +134,7 @@ exports.addProduct = async (req, res) => {
       unit,
       condition,
       action,
-      expire,
-      period
+      expire
     } = req.body
 
     const channel = req.headers['x-channel']
@@ -304,18 +303,14 @@ exports.addProduct = async (req, res) => {
     }
     cart.createdAt = new Date()
 
-    // const qtyProduct =  cart.listProduct.map( item => {
-    //   return {
-    //     id : item.id,
-    //     unit : item.unit,
-    //     qty : item.qty
-    //   }
-    // })
+    const qtyProduct = {
+      id: id,
+      qty: qty,
+      unit: unit
+    }
+    const period = getPeriodFromDate(cart.createdAt)
+    updateStockMongo(qtyProduct, area, period, 'addproduct', channel)
 
-    // if (type === 'sale') {
-
-    //   // console.log(cart)
-    // }
 
 
 
@@ -346,7 +341,7 @@ exports.adjustProduct = async (req, res) => {
   // const session = await require('mongoose').startSession();
   // session.startTransaction();
   try {
-    const { type, area, storeId, id, unit, qty, condition, expire } = req.body
+    const { type, area, storeId, id, unit, qty, condition, expire, stockType } = req.body
     const channel = req.headers['x-channel']
     const { Cart } = getModelsByChannel(channel, res, cartModel)
     const { Stock } = getModelsByChannel(channel, res, stockModel)
@@ -381,12 +376,12 @@ exports.adjustProduct = async (req, res) => {
       // session.endSession();
       return res.status(404).json({ status: 404, message: 'Cart not found!' })
     }
-
+    const period = getPeriodFromDate(cart.createdAt)
     let updated = false
 
     const stockBody = {
       area: cart.area,
-      period: period(),
+      period: period,
       productId: id,
       unit: unit
     }
@@ -472,8 +467,18 @@ exports.adjustProduct = async (req, res) => {
       }
     }
 
+    // const period = getPeriodFromDate(cart.createdAt)
+    const qtyProduct = {
+      id: id,
+      qty: qty,
+      unit: unit
+    }
+    updateStockMongo(qtyProduct, area, period, 'adjust', channel,stockType)
+
+
+
     if (cart.listProduct.length === 0 && cart.listRefund.length === 0) {
-      // await Cart.deleteOne(cartQuery)
+      await Cart.deleteOne(cartQuery)
       // await session.commitTransaction();
       // session.endSession();
       return res.status(200).json({
@@ -483,7 +488,7 @@ exports.adjustProduct = async (req, res) => {
       })
     }
 
-    // await cart.save()
+    await cart.save()
     // await session.commitTransaction();
     // session.endSession();
 
@@ -600,7 +605,7 @@ exports.deleteProduct = async (req, res) => {
 
 
     const period = getPeriodFromDate(cart.createdAt)
-    // updateStockMongo(product, area, period, 'deleteCart', channel)
+    updateStockMongo(product, area, period, 'deleteCart', channel)
 
 
     if (cart.listProduct.length === 0 && cart.listRefund.length === 0) {
@@ -787,10 +792,10 @@ exports.updateStock = async (req, res) => {
     }
     // Update based on IN or OUT
     if (type === 'IN') {
-      // productStock.stockInPcs += qty;
+      productStock.stockInPcs += qty;
       productStock.balancePcs += qty
     } else if (type === 'OUT') {
-      // productStock.stockOutPcs += qty;
+      productStock.stockOutPcs += qty;
       productStock.balancePcs -= qty
     } else {
       // await session.abortTransaction();
