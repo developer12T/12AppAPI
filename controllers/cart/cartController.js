@@ -600,7 +600,7 @@ exports.deleteProduct = async (req, res) => {
 
 
     const period = getPeriodFromDate(cart.createdAt)
-    updateStockMongo(product, area, period, 'deleteCart', channel)
+    // updateStockMongo(product, area, period, 'deleteCart', channel)
 
 
     if (cart.listProduct.length === 0 && cart.listRefund.length === 0) {
