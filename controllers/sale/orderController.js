@@ -319,7 +319,9 @@ exports.checkout = async (req, res) => {
     )
     // ตัด stock เบล ver
     for (const item of productQty) {
-      await updateStockMongo(item, area, period, 'sale', channel)
+      // await updateStockMongo(item, area, period, 'sale', channel)
+      const updateResult = await updateStockMongo(item, area, period, 'sale', channel, res);
+      if (updateResult) return;
       // const factorPcsResult = await Product.aggregate([
       //   { $match: { id: item.productId } },
       //   {
@@ -626,7 +628,9 @@ exports.updateStatus = async (req, res) => {
 
     if (order.listProduct.length > 0) {
       for (const u of order.listProduct) {
-        await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
+        // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
+        const updateResult = await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel, res);
+        if (updateResult) return;
         // const factorPcsResult = await Product.aggregate([
         //   { $match: { id: u.id } },
         //   {
@@ -708,7 +712,9 @@ exports.updateStatus = async (req, res) => {
         await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
 
-          await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
+          // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
+          const updateResult = await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel, res);
+          if (updateResult) return;
           // const factorPcsResult = await Product.aggregate([
           //   { $match: { id: u.id } },
           //   {

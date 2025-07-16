@@ -157,14 +157,22 @@ async function checkProductInStock(Stock, area, period, id) {
 
 
 
-module.exports.updateStockMongo = async function (data, area, period, type, channel, stockType = '') {
+module.exports.updateStockMongo = async function (data, area, period, type, channel, stockType = '', res = null) {
 
   const { id, unit, qty, condition } = data
 
   const { Stock } = getModelsByChannel(channel, '', stockModel)
   const { Product } = getModelsByChannel(channel, '', productModel)
-  if (!id || !unit || !qty || !area || !period) {
+  if (!id || !unit || !area || !period) {
+    // console.log(id, unit, qty)
     throw new Error('Missing product data (id/unit/qty/area/period)');
+  }
+  if (qty === undefined || qty === 0) {
+    if (res) {
+      res.status(409 ).json({ status: 409 , message: 'Stock not enough' });
+      return true; // <--- เพิ่ม return ค่า
+    }
+    throw new Error('Stock not enough');
   }
   const factorPcsResult = await Product.aggregate([
     { $match: { id: id } },
@@ -507,7 +515,9 @@ module.exports.updateStockMongo = async function (data, area, period, type, chan
         }
       )
     } catch (err) {
+
       throw new Error('Error updating stock for sale: ' + err.message)
+
     }
   }
 

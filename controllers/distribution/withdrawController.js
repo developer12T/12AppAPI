@@ -913,7 +913,9 @@ exports.approveWithdraw = async (req, res) => {
       for (const item of qtyproduct) {
         // for (const item of dataTran.items) {
         // console.log(item)
-        await updateStockMongo(item, distributionTran.area, distributionTran.period, 'withdraw', channel)
+        // await updateStockMongo(item, distributionTran.area, distributionTran.period, 'withdraw', channel)
+        const updateResult = await updateStockMongo(item, distributionTran.area, distributionTran.period, 'withdraw', channel, res);
+        if (updateResult) return;
         // const factorPcsResult = await Product.aggregate([
         //   { $match: { id: item.itemCode } },
         //   {

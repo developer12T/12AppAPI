@@ -190,8 +190,10 @@ async function DeleteCartDaily(channel = 'cash') {
 
     for (const item of [...listProduct, ...listPromotion]) {
       // console.log(item)
-      
-      await updateStockMongo(item, item.area, period(), 'deleteCart', channel)
+
+      // await updateStockMongo(item, item.area, period(), 'deleteCart', channel)
+      const updateResult = await updateStockMongo(item, item.area, period(), 'deleteCart', channel, res);
+      if (updateResult) return;
       // ดึง factor สำหรับแต่ละ unit
       // console.log("item ",item.storeId,item.area)
       // const factorPcsResult = await Product.aggregate([
@@ -259,8 +261,8 @@ async function DeleteCartDaily(channel = 'cash') {
       //   {
       //     arrayFilters: [{ 'elem.productId': item.id }],
       //     new: true,
-          // session // สำคัญ!
-        // }
+      // session // สำคัญ!
+      // }
       // );
     }
 
@@ -302,10 +304,10 @@ const startCronJobDeleteCartDaily = () => {
   cron.schedule(
     '0 0 * * *',
     async () => {
-  // cron.schedule('*/1 * * * *', async () => {
-    console.log('Running cron job DeleteCartDaily at 00:00 (Asia/Bangkok)');
-    await DeleteCartDaily();
-  },
+      // cron.schedule('*/1 * * * *', async () => {
+      console.log('Running cron job DeleteCartDaily at 00:00 (Asia/Bangkok)');
+      await DeleteCartDaily();
+    },
     {
       timezone: 'Asia/Bangkok'
     }
