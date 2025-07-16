@@ -414,7 +414,7 @@ exports.adjustProduct = async (req, res) => {
       } else {
         // console.log(cart.listProduct[existingRefundIndex])
         let qtyNew = 0
-        if (qty > productQty.qty) {
+        if (qty > productQty.qty && stockType === 'OUT') {
           qtyNew = productQty.qty
           maxStock = true
         } else {
@@ -444,7 +444,7 @@ exports.adjustProduct = async (req, res) => {
       } else {
         // console.log(cart.listProduct[existingProductIndex])
         let qtyNew = 0
-        if (qty > productQty.qty) {
+        if (qty > productQty.qty && stockType === 'OUT') {
           qtyNew = productQty.qty
           maxStock = true
         } else {
@@ -471,11 +471,12 @@ exports.adjustProduct = async (req, res) => {
       }
     }
     let cartMain = await Cart.findOne(cartQuery)
-
+    // console.log(cart)
+    const foundProductMain = cartMain.listProduct.find(item => item.id === id);
     const qtyProductMain = {
-      id: cartMain.listProduct[0].id,
-      qty: cartMain.listProduct[0].qty,
-      unit: cartMain.listProduct[0].unit
+      id: foundProductMain.id,
+      qty: foundProductMain.qty,
+      unit: foundProductMain.unit
     }
     const foundProduct = cart.listProduct.find(item => item.id === id);
 
@@ -487,16 +488,27 @@ exports.adjustProduct = async (req, res) => {
       };
     }
 
+    // console.log(qtyProductMain,qtyProduct)
+
+
     if (type != 'withdraw') {
       if (stockType === 'IN') {
-        qtyFinal = qtyProductMain.qty - qtyProduct.qty
-        qtyProductStock = {
-          id: id,
-          qty: qtyFinal,
-          unit: unit
+
+        if (qtyProduct.qty > qtyProductMain.qty) {
+
+          qtyFinal = qtyProductMain.qty - qtyProduct.qty
+          qtyProductStock = {
+            id: id,
+            qty: qtyFinal,
+            unit: unit
+          }
+          console.log(qtyProductMain.qty, qtyProduct.qty)
+          const updateResult = await updateStockMongo(qtyProductStock, area, period, 'adjust', channel, stockType, res);
+          if (updateResult) return;
+
         }
-        const updateResult = await updateStockMongo(qtyProductStock, area, period, 'adjust', channel, stockType, res);
-        if (updateResult) return;
+
+
 
       } else if (stockType === 'OUT') {
         if (maxStock === true) {
@@ -506,7 +518,7 @@ exports.adjustProduct = async (req, res) => {
           qtyFinal = Math.abs(qtyFinal);
           // console.log(qtyProductMain.qty, qtyProduct.qty)
         }
-        console.log(qtyFinal)
+        // console.log(qtyFinal)
         qtyProductStock = {
           id: id,
           qty: qtyFinal,
@@ -645,7 +657,7 @@ exports.deleteProduct = async (req, res) => {
     const period = getPeriodFromDate(cart.createdAt)
     if (type != 'withdraw') {
       // await updateStockMongo(product, area, period, 'deleteCart', channel)
-      const updateResult = await updateStockMongo(product, area, period, 'deleteCart', channel,  res);
+      const updateResult = await updateStockMongo(product, area, period, 'deleteCart', channel, res);
       if (updateResult) return;
     }
 

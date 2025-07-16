@@ -169,11 +169,20 @@ module.exports.updateStockMongo = async function (data, area, period, type, chan
   }
   if (qty === undefined || qty === 0) {
     if (res) {
-      res.status(409 ).json({ status: 409 , message: 'Stock not enough' });
+      res.status(409).json({ status: 409, message: 'Stock not enough' });
       return true; // <--- เพิ่ม return ค่า
     }
     throw new Error('Stock not enough');
   }
+
+  if ( qty < 0) {
+    if (res) {
+      res.status(409).json({ status: 409, message: 'Stock not enough' });
+      return true; // <--- เพิ่ม return ค่า
+    }
+    throw new Error('qty must > 0');
+  }
+
   const factorPcsResult = await Product.aggregate([
     { $match: { id: id } },
     {
