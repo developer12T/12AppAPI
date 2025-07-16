@@ -176,7 +176,7 @@ exports.checkout = async (req, res) => {
     const qtyproduct = refundOrder.listProduct
       .filter(u => u.condition === 'good')
       .map(u => ({
-        productId: u.id,
+        id: u.id,
         unit: u.unit,
         qty: u.qty,
         condition: u.condition,
@@ -186,7 +186,7 @@ exports.checkout = async (req, res) => {
     const qtyproductchange = changeOrder.listProduct.map(u => {
       //   const promoDetail = u.listProduct.map(item => {
       return {
-        productId: u.id,
+        id: u.id,
         unit: u.unit,
         qty: u.qty,
         statusMovement: 'OUT'

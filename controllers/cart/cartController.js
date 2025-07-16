@@ -3,7 +3,7 @@ const { Cart } = require('../../models/cash/cart')
 const { Product } = require('../../models/cash/product')
 const { Stock } = require('../../models/cash/stock')
 const { applyPromotion, applyQuota } = require('../promotion/calculate')
-const { to2, getQty } = require('../../middleware/order')
+const { to2, getQty, updateStockMongo } = require('../../middleware/order')
 const {
   summaryOrder,
   summaryWithdraw,
@@ -304,6 +304,23 @@ exports.addProduct = async (req, res) => {
     }
     cart.createdAt = new Date()
 
+    // const qtyProduct =  cart.listProduct.map( item => {
+    //   return {
+    //     id : item.id,
+    //     unit : item.unit,
+    //     qty : item.qty
+    //   }
+    // })
+
+    // if (type === 'sale') {
+
+    //   // console.log(cart)
+    // }
+
+
+
+
+
     await cart.save() //{ session }
 
     // await session.commitTransaction();
@@ -456,7 +473,7 @@ exports.adjustProduct = async (req, res) => {
     }
 
     if (cart.listProduct.length === 0 && cart.listRefund.length === 0) {
-      await Cart.deleteOne(cartQuery)
+      // await Cart.deleteOne(cartQuery)
       // await session.commitTransaction();
       // session.endSession();
       return res.status(200).json({
@@ -466,7 +483,7 @@ exports.adjustProduct = async (req, res) => {
       })
     }
 
-    await cart.save()
+    // await cart.save()
     // await session.commitTransaction();
     // session.endSession();
 
@@ -524,7 +541,7 @@ exports.deleteProduct = async (req, res) => {
     }
 
     let updated = false
-
+    // console.log(type,condition)
     if ((type === 'refund' && condition) || expire) {
       const refundIndex = cart.listRefund.findIndex(
         p =>
