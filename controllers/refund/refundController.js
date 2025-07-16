@@ -682,17 +682,17 @@ exports.updateStatus = async (req, res) => {
     if (status === 'canceled') {
       statusTH = 'ยกเลิก'
       for (const item of productQty) {
-        updateStockMongo(item, refundOrder.store.area, refundOrder.period, 'rufundCanceled', channel)
+        await updateStockMongo(item, refundOrder.store.area, refundOrder.period, 'rufundCanceled', channel)
       }
     } else if (status === 'rejected') {
       statusTH = 'ถูกปฏิเสธ'
       for (const item of productQty) {
-        updateStockMongo(item, refundOrder.store.area, refundOrder.period, 'rufundCanceled', channel)
+        await updateStockMongo(item, refundOrder.store.area, refundOrder.period, 'rufundCanceled', channel)
       }
     } else if (status === 'completed') {
       statusTH = 'สำเร็จ'
       for (const item of productQty) {
-        updateStockMongo(item, refundOrder.store.area, refundOrder.period, 'refund', channel)
+        await updateStockMongo(item, refundOrder.store.area, refundOrder.period, 'refund', channel)
       }
     }
 

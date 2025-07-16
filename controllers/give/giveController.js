@@ -333,7 +333,7 @@ exports.checkout = async (req, res) => {
 
     for (const item of productQty) {
 
-      updateStockMongo(item, area, period, 'give', channel)
+      await updateStockMongo(item, area, period, 'give', channel)
       // const factorPcsResult = await Product.aggregate([
       //   { $match: { id: item.productId } },
       //   {

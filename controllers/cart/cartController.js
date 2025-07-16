@@ -309,7 +309,7 @@ exports.addProduct = async (req, res) => {
       unit: unit
     }
     const period = getPeriodFromDate(cart.createdAt)
-    updateStockMongo(qtyProduct, area, period, 'addproduct', channel)
+    await updateStockMongo(qtyProduct, area, period, 'addproduct', channel)
 
 
 
@@ -466,19 +466,48 @@ exports.adjustProduct = async (req, res) => {
         )
       }
     }
+    let cartMain = await Cart.findOne(cartQuery)
 
-    // const period = getPeriodFromDate(cart.createdAt)
-    const qtyProduct = {
-      id: id,
-      qty: qty,
-      unit: unit
+    const qtyProductMain = {
+      id: cartMain.listProduct[0].id,
+      qty: cartMain.listProduct[0].qty,
+      unit: cartMain.listProduct[0].unit
     }
-    updateStockMongo(qtyProduct, area, period, 'adjust', channel,stockType)
+
+    const qtyProduct = {
+      id: cart.listProduct[0].id,
+      qty: cart.listProduct[0].qty,
+      unit: cart.listProduct[0].unit
+    }
+
+    if (stockType === 'IN') {
+      qtyFinal = qtyProductMain.qty - qtyProduct.qty
+      qtyProductStock = {
+        id: id,
+        qty: qtyFinal,
+        unit: unit
+      }
+      await updateStockMongo(qtyProductStock, area, period, 'adjust', channel, stockType)
+    } else if (stockType === 'OUT') {
+      qtyFinal = qtyProductMain.qty - qtyProduct.qty
+      qtyFinal = Math.abs(qtyFinal);
+      // console.log(qtyFinal)
+      qtyProductStock = {
+        id: id,
+        qty: qtyFinal,
+        unit: unit
+      }
+      await updateStockMongo(qtyProductStock, area, period, 'adjust', channel, stockType)
+    }
+
+
+
+
 
 
 
     if (cart.listProduct.length === 0 && cart.listRefund.length === 0) {
-      await Cart.deleteOne(cartQuery)
+      // await Cart.deleteOne(cartQuery)
       // await session.commitTransaction();
       // session.endSession();
       return res.status(200).json({
@@ -500,11 +529,9 @@ exports.adjustProduct = async (req, res) => {
       message: 'Cart updated successfully!',
       data: cart
     })
-  } catch (error) {
-    // await session.abortTransaction().catch(() => { });
-    // session.endSession();
-    console.error(error)
-    res.status(500).json({ status: 500, message: error.message })
+  } catch (err) {
+    // ส่ง error message กลับ client
+    res.status(500).json({ success: false, message: err.message });
   }
 }
 
@@ -605,7 +632,7 @@ exports.deleteProduct = async (req, res) => {
 
 
     const period = getPeriodFromDate(cart.createdAt)
-    updateStockMongo(product, area, period, 'deleteCart', channel)
+    await updateStockMongo(product, area, period, 'deleteCart', channel)
 
 
     if (cart.listProduct.length === 0 && cart.listRefund.length === 0) {
