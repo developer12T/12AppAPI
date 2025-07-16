@@ -36,6 +36,7 @@ SELECT
     DA.WH AS warehouse,
     'sale' AS role,
     '1' AS status,
+    '6W' AS typeTruck
     'https://apps.onetwotrading.co.th/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
 FROM 
   [DATA_OMS].[dbo].[DATA_Area] AS DA

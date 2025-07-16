@@ -23,7 +23,7 @@ const userSchema = mongoose.Schema({
   qrCodeImage: { type: String, require: true },
   period: { type: String, require: true },
   image: { imageSchema },
-  typeTruck: { type: String , default: '6W' },
+  typeTruck: { type: String  },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 }, {
