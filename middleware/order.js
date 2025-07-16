@@ -135,6 +135,15 @@ module.exports.getQty = async function (data, channel) {
 
 }
 
+module.exports.getPeriodFromDate = function (createdAt) {
+  // รับได้ทั้ง string และ Date object
+  const d = createdAt instanceof Date ? createdAt : new Date(createdAt);
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  return `${year}${month}`;
+};
+
+
 
 async function checkProductInStock(Stock, area, period, id) {
   const stock = await Stock.findOne({

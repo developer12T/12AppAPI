@@ -3,7 +3,7 @@ const { Cart } = require('../../models/cash/cart')
 const { Product } = require('../../models/cash/product')
 const { Stock } = require('../../models/cash/stock')
 const { applyPromotion, applyQuota } = require('../promotion/calculate')
-const { to2, getQty, updateStockMongo } = require('../../middleware/order')
+const { to2, getQty, updateStockMongo, getPeriodFromDate } = require('../../middleware/order')
 const {
   summaryOrder,
   summaryWithdraw,
@@ -574,7 +574,7 @@ exports.deleteProduct = async (req, res) => {
           .json({ status: 404, message: 'Product not found in cart!' })
       }
 
-      const product = cart.listProduct[productIndex]
+      product = cart.listProduct[productIndex]
       cart.listProduct.splice(productIndex, 1)
       cart.total += product.qty * product.price
       updated = true
@@ -590,11 +590,18 @@ exports.deleteProduct = async (req, res) => {
           .json({ status: 404, message: 'Product not found in cart!' })
       }
 
-      const product = cart.listProduct[productIndex]
+      product = cart.listProduct[productIndex]
       cart.listProduct.splice(productIndex, 1)
       cart.total -= product.qty * product.price
       updated = true
+
+      // console.log(product)
     }
+
+
+    const period = getPeriodFromDate(cart.createdAt)
+    updateStockMongo(product, area, period, 'deleteCart', channel)
+
 
     if (cart.listProduct.length === 0 && cart.listRefund.length === 0) {
       await Cart.deleteOne(cartQuery)
@@ -605,6 +612,7 @@ exports.deleteProduct = async (req, res) => {
         message: 'Cart deleted successfully!'
       })
     }
+
 
     if (updated) {
       await cart.save()
