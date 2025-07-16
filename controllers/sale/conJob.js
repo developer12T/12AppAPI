@@ -162,6 +162,8 @@ async function DeleteCartDaily(channel = 'cash') {
     const { Product } = getModelsByChannel(channel, null, productModel);
 
     // ดึงข้อมูล cart ทั้งหมด (เช่นเดิม)
+    await Cart.deleteMany({ type: 'withdraw' });
+
     const data = await Cart.find({})
     // .session(session);
     // console.log(data)
@@ -188,6 +190,7 @@ async function DeleteCartDaily(channel = 'cash') {
 
     for (const item of [...listProduct, ...listPromotion]) {
       // console.log(item)
+      
       await updateStockMongo(item, item.area, period(), 'deleteCart', channel)
       // ดึง factor สำหรับแต่ละ unit
       // console.log("item ",item.storeId,item.area)

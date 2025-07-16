@@ -309,8 +309,9 @@ exports.addProduct = async (req, res) => {
       unit: unit
     }
     const period = getPeriodFromDate(cart.createdAt)
-    await updateStockMongo(qtyProduct, area, period, 'addproduct', channel)
-
+    if (type != 'withdraw') {
+      await updateStockMongo(qtyProduct, area, period, 'addproduct', channel)
+    }
 
 
 
@@ -480,26 +481,27 @@ exports.adjustProduct = async (req, res) => {
       unit: cart.listProduct[0].unit
     }
 
-    if (stockType === 'IN') {
-      qtyFinal = qtyProductMain.qty - qtyProduct.qty
-      qtyProductStock = {
-        id: id,
-        qty: qtyFinal,
-        unit: unit
+    if (type != 'withdraw') {
+      if (stockType === 'IN') {
+        qtyFinal = qtyProductMain.qty - qtyProduct.qty
+        qtyProductStock = {
+          id: id,
+          qty: qtyFinal,
+          unit: unit
+        }
+        await updateStockMongo(qtyProductStock, area, period, 'adjust', channel, stockType)
+      } else if (stockType === 'OUT') {
+        qtyFinal = qtyProductMain.qty - qtyProduct.qty
+        qtyFinal = Math.abs(qtyFinal);
+        // console.log(qtyFinal)
+        qtyProductStock = {
+          id: id,
+          qty: qtyFinal,
+          unit: unit
+        }
+        await updateStockMongo(qtyProductStock, area, period, 'adjust', channel, stockType)
       }
-      await updateStockMongo(qtyProductStock, area, period, 'adjust', channel, stockType)
-    } else if (stockType === 'OUT') {
-      qtyFinal = qtyProductMain.qty - qtyProduct.qty
-      qtyFinal = Math.abs(qtyFinal);
-      // console.log(qtyFinal)
-      qtyProductStock = {
-        id: id,
-        qty: qtyFinal,
-        unit: unit
-      }
-      await updateStockMongo(qtyProductStock, area, period, 'adjust', channel, stockType)
     }
-
 
 
 
@@ -632,8 +634,9 @@ exports.deleteProduct = async (req, res) => {
 
 
     const period = getPeriodFromDate(cart.createdAt)
+    if (type != 'withdraw') {
     await updateStockMongo(product, area, period, 'deleteCart', channel)
-
+    }
 
     if (cart.listProduct.length === 0 && cart.listRefund.length === 0) {
       await Cart.deleteOne(cartQuery)
