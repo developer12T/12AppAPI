@@ -229,7 +229,7 @@ module.exports.updateStockMongo = async function (
       'adjust',
       'addproduct',
       'refund',
-      'rufund',
+      'change',
       'rufundCanceled'
     ].includes(type)
   )
@@ -246,7 +246,7 @@ module.exports.updateStockMongo = async function (
   }
 
   // === Logic for each type ===
-  if (type === 'sale' || type === 'give') {
+  if (type === 'sale' || type === 'give' || type === 'change') {
     // Out: Reduce stock
     // const enough = await checkBalanceEnough(area, period, id, factorPcsQty)
     // if (!enough) {
@@ -266,7 +266,7 @@ module.exports.updateStockMongo = async function (
         {
           $inc: {
             'listProduct.$[elem].stockOutPcs': +factorPcsQty,
-            'listProduct.$[elem].stockOutCtn': +factorCtnQty,
+            'listProduct.$[elem].stockOutCtn': +factorCtnQty
             // 'listProduct.$[elem].balancePcs': -factorPcsQty,
             // 'listProduct.$[elem].balanceCtn': -factorCtnQty
           }

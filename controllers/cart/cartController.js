@@ -127,8 +127,18 @@ exports.getCart = async (req, res) => {
 }
 exports.addProduct = async (req, res) => {
   try {
-    const { type, area, storeId, id, qty, unit, condition, action, expire } =
-      req.body
+    const {
+      type,
+      area,
+      storeId,
+      id,
+      qty,
+      unit,
+      condition,
+      action,
+      expire,
+      typeref
+    } = req.body
 
     const channel = req.headers['x-channel']
     const { Product } = getModelsByChannel(channel, res, productModel)
@@ -178,6 +188,7 @@ exports.addProduct = async (req, res) => {
       type === 'withdraw' ? { type, area } : { type, area, storeId }
     const { Cart } = getModelsByChannel(channel, res, cartModel)
     let cart = await Cart.findOne(cartQuery)
+
     if (!cart) {
       cart = await Cart.create([
         {
@@ -290,18 +301,28 @@ exports.addProduct = async (req, res) => {
     // =========== NEW LOGIC เลือก stockType ให้ updateStockMongo ===========
 
     let stockType = ''
-    if (type === 'sale' || type === 'give') {
+    if (type === 'sale' || type === 'give' || typeref === 'change') {
       stockType = 'OUT' // เพิ่มใน cart คือลดของใน stock จริง
-    } else if (type === 'refund' || type === 'withdraw') {
-      stockType = 'IN' // คืนสินค้า/เบิกสินค้ากลับเข้าคลัง
     } else if (type === 'adjuststock') {
       // สมมติ action มีค่าเป็น 'IN' หรือ 'OUT'
       stockType = action || '' // กำหนดตาม action ที่รับเข้ามา
     } else {
       stockType = 'OUT' // default เป็น OUT (กรณี add ใน cart)
     }
+    if (typeref === 'change') {
+      const updateResult = await updateStockMongo(
+        qtyProduct,
+        area,
+        period,
+        'addproduct',
+        channel,
+        stockType, // ส่ง stockType เข้าไปด้วย!
+        res
+      )
+      if (updateResult) return
+    }
 
-    if (type !== 'withdraw') {
+    if (type !== 'withdraw' && type !== 'refund') {
       const updateResult = await updateStockMongo(
         qtyProduct,
         area,
@@ -338,20 +359,16 @@ exports.adjustProduct = async (req, res) => {
 
     // Validation
     if (!type || !area || !id || !unit || qty === undefined) {
-      return res
-        .status(400)
-        .json({
-          status: 400,
-          message: 'type, area, id, unit, and qty are required!'
-        })
+      return res.status(400).json({
+        status: 400,
+        message: 'type, area, id, unit, and qty are required!'
+      })
     }
     if ((type === 'sale' || type === 'refund' || type === 'give') && !storeId) {
-      return res
-        .status(400)
-        .json({
-          status: 400,
-          message: 'storeId is required for sale, refund, or give!'
-        })
+      return res.status(400).json({
+        status: 400,
+        message: 'storeId is required for sale, refund, or give!'
+      })
     }
 
     // Find Cart
