@@ -10,7 +10,7 @@ const upload = multer({ storage: multer.memoryStorage() }).array(
   1
 )
 const sql = require('mssql')
-const { routeQuery } = require('../../controllers/queryFromM3/querySctipt')
+const { routeQuery, routeQueryOne } = require('../../controllers/queryFromM3/querySctipt')
 const orderModel = require('../../models/cash/sale')
 const routeModel = require('../../models/cash/route')
 const storeModel = require('../../models/cash/store')
@@ -384,6 +384,176 @@ exports.addFromERPnew = async (req, res) => {
     res.status(500).json({ status: '500', message: error.message })
   }
 }
+
+exports.addFromERPOne = async (req, res) => {
+  try {
+    const { id } = req.body
+    const channel = req.headers['x-channel']
+
+    const result = await routeQueryOne(channel,id)
+    await Route.deleteOne({ id: id });
+    const return_arr = []
+    for (const row of result) {
+      const area = String(row.area ?? '').trim()
+      const id = String(row.id ?? '').trim()
+      const day = String(row.day ?? '').trim()
+      const period = String(row.period ?? '').trim()
+      const storeId = String(row.storeId ?? '').trim()
+
+      const storeInfo = {
+        storeInfo: storeId,
+        latitude: '',
+        longtitude: '',
+        note: '',
+        status: '0',
+        statusText: '',
+        date: '',
+        listOrder: []
+      }
+
+      let groupFound = false
+
+      for (const group of return_arr) {
+        if (group.id === id && group.area === area) {
+          group.listStore.push(storeInfo)
+          groupFound = true
+          break
+        }
+      }
+
+      if (!groupFound) {
+        return_arr.push({
+          id,
+          area,
+          period,
+          day,
+          listStore: [storeInfo]
+        })
+      }
+    }
+
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+    
+    const route = await Route.find({ period: period(), id:id })
+    const routeMap = new Map(route.map(route => [route.id, route]))
+    // console.log(route)
+    // let routeId
+    // const latestRoute = route.sort((a, b) => b.id.localeCompare(a.id))[0]
+    // if (!latestRoute) {
+    //   routeId = `${period()}${return_arr.area}R01`
+    //   console.log('route', routeId)
+    //   console.log('period', period())
+    // } else {
+    //   const prefix = latestRoute.id.slice(0, 6)
+    //   const subfix = (parseInt(latestRoute.id.slice(7)) + 1)
+    //     .toString()
+    //     .padStart(2, '0')
+    //   routeId = prefix + subfix
+    // }
+
+    for (const storeList of return_arr) {
+      try {
+        const existingRoute = routeMap.get(storeList.id)
+
+        if (existingRoute) {
+          for (const list of storeList.storeInfo || []) {
+            const store = await Store.findOne({ storeId: list })
+            if (!store) {
+              // console.warn(`Store with storeId ${list} not found`)
+              continue
+            }
+
+            const storeExists = existingRoute.listStore.some(
+              store => store.storeInfo.toString() === store._id.toString()
+            )
+            if (!storeExists) {
+              const newData = {
+                storeInfo: store._id,
+                note: '',
+                image: '',
+                latitude: '',
+                longtitude: '',
+                status: 0,
+                statusText: 'รอเยี่ยม',
+                listOrder: [],
+                date: ''
+              }
+              existingRoute.listStore.push(newData)
+            }
+          }
+          await existingRoute.save()
+        } else {
+          const listStore = []
+
+          for (const storeId of storeList.listStore || []) {
+            const idStore = storeId.storeInfo
+            const store = await Store.findOne({ storeId: idStore })
+            if (store) {
+              listStore.push({
+                storeInfo: store._id,
+                latitude: '',
+                longtitude: '',
+                status: 0,
+                statusText: 'รอเยี่ยม',
+                note: '',
+                date: '',
+                listOrder: []
+              })
+            } else {
+              // console.warn(`Store with storeId ${storeId} not found`)
+            }
+          }
+
+          const data = {
+            id: storeList.id,
+            area: storeList.area,
+            period: period(),
+            day: storeList.day,
+            listStore
+          }
+          // console.log(data)
+          await Route.create(data)
+        }
+      } catch (err) {
+        console.error(
+          `Error processing storeList with id ${storeList.id}:`,
+          err.message
+        )
+        continue
+      }
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: return_arr
+    })
+
+
+
+
+
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 exports.checkIn = async (req, res) => {
   upload(req, res, async err => {
@@ -1686,7 +1856,7 @@ exports.getRouteByArea = async (req, res) => {
 exports.deleteAndAddOne = async (req, res) => {
 
 
-    res.status(200).json({
+  res.status(200).json({
     status: 200,
     message: 'sucess',
     // data: data
