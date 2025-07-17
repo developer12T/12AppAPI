@@ -1204,6 +1204,188 @@ exports.getStockQty = async (req, res) => {
   })
 }
 
+
+exports.getStockQtyNew = async (req, res) => {
+  const { area, period } = req.body
+  const channel = req.headers['x-channel']
+  const { Stock } = getModelsByChannel(channel, res, stockModel)
+  const { Product } = getModelsByChannel(channel, res, productModel)
+  // const { Product } = getModelsByChannel(channel, res, productModel)
+
+
+
+  let areaQuery = {}
+  if (area) {
+    if (area.length == 2) {
+      areaQuery.zone = area.slice(0, 2)
+    } else if (area.length == 5) {
+      areaQuery.area = area
+    }
+  }
+
+  const matchQuery = { ...areaQuery, period }
+  const dataStock = await Stock.aggregate([
+    {
+      $addFields: {
+        zone: { $substrBytes: ['$area', 0, 2] }
+      }
+    },
+    { $match: matchQuery },
+    {
+      $project: {
+        listProduct: 1,
+        _id: 0
+      }
+    }
+  ])
+
+  if (dataStock.length === 0) {
+    return res.status(404).json({
+      status: 404,
+      message: 'Not found this area'
+    })
+  }
+
+  const dataStockTran = dataStock
+  const productIdList = dataStockTran.flatMap(item =>
+    item.listProduct.map(u => u.productId)
+  )
+
+  const uniqueProductId = [...new Set(productIdList)]
+
+  // console.log(uniqueProductId)
+  const allProducts = dataStockTran.flatMap(item => item.listProduct)
+
+  // console.log(allProducts)
+  // 2. รวมยอดแต่ละ field ตาม productId
+  const sumById = {} // { productId: { ...sum } }
+  for (const u of allProducts) {
+    const id = u.productId
+    if (!sumById[id]) {
+      // clone อันแรก (หรือสร้าง object เปล่า)
+      // console.log(id)
+      sumById[id] = {
+        id: id,
+        stockPcs: u.stockPcs || 0,
+        stockInPcs: u.stockInPcs || 0,
+        stockOutPcs: u.stockOutPcs || 0,
+        balancePcs: u.balancePcs || 0,
+        stockCtn: u.stockCtn || 0,
+        stockInCtn: u.stockInCtn || 0,
+        stockOutCtn: u.stockOutCtn || 0,
+        balanceCtn: u.balanceCtn || 0
+      }
+    } else {
+      sumById[id].stockPcs += u.stockPcs || 0
+      sumById[id].stockInPcs += u.stockInPcs || 0
+      sumById[id].stockOutPcs += u.stockOutPcs || 0
+      sumById[id].balancePcs += u.balancePcs || 0
+      sumById[id].stockCtn += u.stockCtn || 0
+      sumById[id].stockInCtn += u.stockInCtn || 0
+      sumById[id].stockOutCtn += u.stockOutCtn || 0
+      sumById[id].balanceCtn += u.balanceCtn || 0
+    }
+  }
+
+  const productSum = Object.values(sumById)
+
+  const dataProduct = await Product.find({
+    id: { $in: uniqueProductId }
+  }).select('id name listUnit')
+
+  let data = []
+  let summaryStock = 0
+  let summaryStockIn = 0
+  let summaryStockOut = 0
+  let summaryStockBal = 0
+
+  let summaryStockPcs = 0
+  let summaryStockInPcs = 0
+  let summaryStockOutPcs = 0
+  let summaryStockBalPcs = 0
+
+  for (const stockItem of productSum) {
+    const productDetail = dataProduct.find(u => u.id == stockItem.id)
+    if (!productDetail) continue
+
+    const pcsMain = stockItem.stockPcs
+    let stock = stockItem.stockPcs
+    let stockIn = stockItem.stockInPcs
+    let stockOut = stockItem.stockOutPcs
+    let balance = stockItem.balancePcs
+    summaryStockPcs += stockItem.stockPcs || 0
+    summaryStockInPcs += stockItem.stockInPcs || 0
+    summaryStockOutPcs += stockItem.stockOutPcs || 0
+    summaryStockBalPcs += stockItem.balancePcs || 0
+
+    const listUnitStock = productDetail.listUnit.map(u => {
+      const sale = u.price.sale
+      const factor = u.factor
+      const stockQty = Math.floor(stock / factor) || 0
+      const stockInQty = Math.floor(stockIn / factor) || 0
+      const stockOutQty = Math.floor(stockOut / factor) || 0
+      const balanceQty = Math.floor(balance / factor) || 0
+
+      stock -= stockQty * factor
+      stockIn -= stockInQty * factor
+      stockOut -= stockOutQty * factor
+      balance -= balanceQty * factor
+
+      summaryStock += (stockQty || 0) * sale
+      summaryStockIn += (stockInQty || 0) * sale
+      summaryStockOut += (stockOutQty || 0) * sale
+      summaryStockBal += (balanceQty || 0) * sale
+
+      return {
+        unit: u.unit,
+        unitName: u.name,
+        stock: stockQty,
+        stockIn: stockInQty,
+        stockOut: stockOutQty,
+        balance: balanceQty
+      }
+    })
+
+    const finalProductStock = {
+      productId: stockItem.id,
+      productName: productDetail.name,
+      pcsMain: pcsMain,
+      listUnit: listUnitStock
+    }
+
+    data.push(finalProductStock)
+  }
+
+  // sort และลบ pcsMain ก่อนส่งออก
+  data.sort((a, b) => b.pcsMain - a.pcsMain)
+  data.forEach(item => {
+    delete item.pcsMain
+  })
+
+  res.status(200).json({
+    status: 200,
+    message: 'suceesful',
+    data: data,
+    summaryStock: Number(summaryStock.toFixed(2)),
+    summaryStockIn: Number(summaryStockIn.toFixed(2)),
+    summaryStockOut: Number(summaryStockOut.toFixed(2)),
+    summaryStockBal: Number(summaryStockBal.toFixed(2)),
+    summaryStockPcs: summaryStockPcs,
+    summaryStockInPcs: summaryStockInPcs,
+    summaryStockOutPcs: summaryStockOutPcs,
+    summaryStockBalPcs: summaryStockBalPcs
+  })
+}
+
+
+
+
+
+
+
+
+
+
 exports.getWeightProduct = async (req, res) => {
   const { area, period } = req.body
   const channel = req.headers['x-channel']

@@ -33,9 +33,12 @@ exports.utilize = async (req, res) => {
 
   const dataStock = await Stock.findOne({ area: area, period: period })
   const productIds = dataStock.listProduct.flatMap(item => {
-    return item.productId
-  })
-  const dataProduct = await Product.find({ id: { $in: productIds } })
+    return item.productId;
+  });
+
+
+
+
   const dataTypetrucks = await Typetrucks.findOne({ type_name: typetruck })
   const datawithdraw = await Distribution.find({
     area: area,
@@ -43,21 +46,29 @@ exports.utilize = async (req, res) => {
     status: 'pending'
   })
 
+  const withdrawProductIds = datawithdraw.flatMap(item =>
+    item.listProduct.map(u => u.id)
+  );
   const withdrawProduct = datawithdraw.flatMap(item =>
     item.listProduct.map(u => ({
       id: u.id,
       qtyPcs: u.qtyPcs
     }))
-  )
+  );
+  // console.log(withdrawProductIds)
+  const allProductIds = [...productIds, ...withdrawProductIds];
+  const dataProduct = await Product.find({ id: { $in: allProductIds } })
+
+
 
   // console.log(withdrawProduct)
   let stock = 0
   let withdraw = 0
 
-  for (const item of productIds) {
-    const stockItem = dataStock.listProduct.find(u => u.productId === item)
-    const productItem = dataProduct.find(u => u.id === item)
-
+  for (const item of allProductIds) {
+    const stockItem = dataStock.listProduct.find(u => u.productId === item);
+    const productItem = dataProduct.find(u => u.id === item);
+    // console.log(item)
     // เช็คว่าหาเจอหรือไม่ (ป้องกัน error)
     if (!stockItem || !productItem) continue
 
@@ -66,14 +77,17 @@ exports.utilize = async (req, res) => {
 
     stock += dataStockPcs * productNet
 
-    const withdrawProductPcsObj = withdrawProduct.find(u => u.id === item)
 
+    const withdrawTotalQty = withdrawProduct
+      .filter(u => u.id === item)
+      .reduce((sum, u) => sum + (u.qtyPcs || 0), 0);
+    // console.log(withdrawProductPcsObj)
     // ถ้าไม่เจอ หรือไม่มี qtyPcs ให้ข้าม
-    if (!withdrawProductPcsObj || withdrawProductPcsObj.qtyPcs === undefined) {
-      continue
-    }
+    // if (!withdrawProductPcsObj || withdrawProductPcsObj.qtyPcs === undefined) {
+    //   continue;
+    // }
 
-    withdraw += withdrawProductPcsObj.qtyPcs * productNet
+    withdraw += withdrawTotalQty * productNet;
   }
 
   stock = stock / 1000
@@ -95,6 +109,17 @@ exports.utilize = async (req, res) => {
     stock: to2(stock),
     wtihdraw: to2(withdraw),
     sum: to2(sum),
+    type_name: dataTypetrucks.type_name,
+    // weight: dataTypetrucks.weight,
+    total_weight: dataTypetrucks.total_weight,
+    law_weight: dataTypetrucks.law_weight,
+    height_floor: dataTypetrucks.height_floor,
+    width_floor: dataTypetrucks.width_floor,
+    length_floor: dataTypetrucks.length_floor,
+    front_pressure: dataTypetrucks.front_pressure,
+    back_pressure: dataTypetrucks.back_pressure,
+    set_speed: dataTypetrucks.set_speed,
+    set_speed_city: dataTypetrucks.set_speed_city,
     net: to2(net),
     payload: payload
   }
