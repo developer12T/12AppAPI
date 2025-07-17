@@ -1210,8 +1210,8 @@ exports.getStockQtyNew = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Stock } = getModelsByChannel(channel, res, stockModel)
   const { Product } = getModelsByChannel(channel, res, productModel)
-  // const { Product } = getModelsByChannel(channel, res, productModel)
-
+  const { Refund } = getModelsByChannel(channel, res, refundModel)
+  const { AdjustStock } = getModelsByChannel(channel, res, adjustStockModel)
 
 
   let areaQuery = {}
@@ -1222,6 +1222,18 @@ exports.getStockQtyNew = async (req, res) => {
       areaQuery.area = area
     }
   }
+
+  let areaQueryRefund = {};
+  if (area) {
+    if (area.length === 2) {
+      areaQueryRefund['store.zone'] = area.slice(0, 2);
+    } else if (area.length === 5) {
+      areaQueryRefund['store.area'] = area;
+    }
+  }
+
+
+
 
   const matchQuery = { ...areaQuery, period }
   const dataStock = await Stock.aggregate([
@@ -1238,6 +1250,44 @@ exports.getStockQtyNew = async (req, res) => {
       }
     }
   ])
+  const matchQueryRefund = { ...areaQueryRefund, period }
+
+  const dataRefund = await Refund.aggregate([
+    // {
+    //   $addFields: {
+    //     zone: { $substrBytes: ['$area', 0, 2] }
+    //   }
+    // },
+    { $match: matchQueryRefund },
+    {
+      $project: {
+        listProduct: 1,
+        _id: 0
+      }
+    }
+  ])
+
+  const allRefundProducts = dataRefund.flatMap(doc => doc.listProduct || []);
+
+  const refundProductArray = Object.values(
+    allRefundProducts.reduce((acc, curr) => {
+      const key = `${curr.id}_${curr.unit}_${curr.condition}`;
+      if (acc[key]) {
+        acc[key] = {
+          ...curr,
+          qty: (acc[key].qty || 0) + (curr.qty || 0),
+          qtyPcs: (acc[key].qtyPcs || 0) + (curr.qtyPcs || 0)
+        };
+      } else {
+        acc[key] = { ...curr };
+      }
+      return acc;
+    }, {})
+  );
+
+
+  // console.log(refundProductArray)
+
 
   if (dataStock.length === 0) {
     return res.status(404).json({
@@ -1306,7 +1356,14 @@ exports.getStockQtyNew = async (req, res) => {
 
   for (const stockItem of productSum) {
     const productDetail = dataProduct.find(u => u.id == stockItem.id)
+    const productDetailRufund = refundProductArray.find(u => u.id == stockItem.id)
+    // console.log(productDetailRufund)
     if (!productDetail) continue
+
+    if (!productDetailRufund) continue
+    let goodqty = productDetailRufund.qtyPcs
+
+    console.log(goodqty)
 
     const pcsMain = stockItem.stockPcs
     let stock = stockItem.stockPcs
@@ -1322,9 +1379,13 @@ exports.getStockQtyNew = async (req, res) => {
       const sale = u.price.sale
       const factor = u.factor
       const stockQty = Math.floor(stock / factor) || 0
+      // const withdraw = Math.floor(stock / factor) || 0
+      // const goodQty = Math.floor(productDetailRufund.qtyPcs / factor) || 0
       const stockInQty = Math.floor(stockIn / factor) || 0
       const stockOutQty = Math.floor(stockOut / factor) || 0
       const balanceQty = Math.floor(balance / factor) || 0
+      // console.log(goodQty)
+
 
       stock -= stockQty * factor
       stockIn -= stockInQty * factor
