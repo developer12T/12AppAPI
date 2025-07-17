@@ -12,7 +12,12 @@ const promotionModel = require('../../models/cash/promotion')
 const sendMoneyModel = require('../../models/cash/sendmoney')
 const stockModel = require('../../models/cash/stock')
 const productModel = require('../../models/cash/product')
-const { to2, getQty, updateStockMongo, getPeriodFromDate } = require('../../middleware/order')
+const {
+  to2,
+  getQty,
+  updateStockMongo,
+  getPeriodFromDate
+} = require('../../middleware/order')
 
 const typeTruckModel = require('../../models/cash/typetruck')
 const { getModelsByChannel } = require('../../middleware/channel')
@@ -26,50 +31,49 @@ exports.utilize = async (req, res) => {
   const { Stock } = getModelsByChannel(channel, res, stockModel)
   const { Distribution } = getModelsByChannel(channel, res, DistributionModel)
 
-
-
-
   const dataStock = await Stock.findOne({ area: area, period: period })
   const productIds = dataStock.listProduct.flatMap(item => {
-    return item.productId;
-  });
+    return item.productId
+  })
   const dataProduct = await Product.find({ id: { $in: productIds } })
   const dataTypetrucks = await Typetrucks.findOne({ type_name: typetruck })
-  const datawithdraw = await Distribution.find({ area: area, period: period, status: 'pending' })
+  const datawithdraw = await Distribution.find({
+    area: area,
+    period: period,
+    status: 'pending'
+  })
 
   const withdrawProduct = datawithdraw.flatMap(item =>
     item.listProduct.map(u => ({
       id: u.id,
       qtyPcs: u.qtyPcs
     }))
-  );
-
+  )
 
   // console.log(withdrawProduct)
-  let stock = 0;
-  let withdraw = 0;
+  let stock = 0
+  let withdraw = 0
 
   for (const item of productIds) {
-    const stockItem = dataStock.listProduct.find(u => u.productId === item);
-    const productItem = dataProduct.find(u => u.id === item);
+    const stockItem = dataStock.listProduct.find(u => u.productId === item)
+    const productItem = dataProduct.find(u => u.id === item)
 
     // เช็คว่าหาเจอหรือไม่ (ป้องกัน error)
-    if (!stockItem || !productItem) continue;
+    if (!stockItem || !productItem) continue
 
-    const dataStockPcs = stockItem.balancePcs;
-    const productNet = productItem.weightNet;
+    const dataStockPcs = stockItem.balancePcs
+    const productNet = productItem.weightNet
 
-    stock += dataStockPcs * productNet;
+    stock += dataStockPcs * productNet
 
-
-    const withdrawProductPcsObj = withdrawProduct.find(u => u.id === item);
+    const withdrawProductPcsObj = withdrawProduct.find(u => u.id === item)
 
     // ถ้าไม่เจอ หรือไม่มี qtyPcs ให้ข้าม
     if (!withdrawProductPcsObj || withdrawProductPcsObj.qtyPcs === undefined) {
-      continue;
+      continue
     }
 
-    withdraw += withdrawProductPcsObj.qtyPcs * productNet;
+    withdraw += withdrawProductPcsObj.qtyPcs * productNet
   }
 
   stock = stock / 1000
@@ -82,12 +86,10 @@ exports.utilize = async (req, res) => {
 
   // console.log(stock)
 
-
-
   const data = {
-    freePercentage: to2((free * 100) / payload),
-    stocklPercentage: to2((stock * 100) / payload),
-    withdrawPercentage: to2((withdraw * 100) / payload),
+    freePercentage: to2((free * 100) / payload / 100),
+    stocklPercentage: to2((stock * 100) / payload / 100),
+    withdrawPercentage: to2((withdraw * 100) / payload / 100),
     sumPercentage: to2(sum / payload),
     free: to2(free),
     stock: to2(stock),
@@ -95,10 +97,7 @@ exports.utilize = async (req, res) => {
     sum: to2(sum),
     net: to2(net),
     payload: payload
-
   }
-
-
 
   res.status(200).json({
     status: '200',

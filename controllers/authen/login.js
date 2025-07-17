@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken')
 const bcrypt = require('bcrypt')
 const { getModelsByChannel } = require('../../middleware/channel')
 const userModel = require('../../models/cash/user');
+const typetruck = require('../../models/cash/typetruck');
 
 exports.login = async (req, res) => {
   try {
@@ -49,6 +50,7 @@ exports.login = async (req, res) => {
               saleCode: data.saleCode,
               salePayer: data.salePayer,
               tel: data.tel,
+              typeTruck:data.typeTruck,
               area: data.area,
               zone: data.zone,
               warehouse: data.warehouse,
