@@ -2,7 +2,7 @@ const mongoose = require('mongoose')
 
 
 
-const userSchema = mongoose.Schema({
+const typeTruckSchema = mongoose.Schema({
   type_id: { type: String, require: true },
   type_name: { type: String, require: true },
   weight: { type: Number },
@@ -27,6 +27,6 @@ const userSchema = mongoose.Schema({
 
 module.exports = conn => {
   return {
-    User: conn.model('User', userSchema)
+    Typetrucks: conn.model('typetrucks', typeTruckSchema,'typetrucks')
   }
 }
