@@ -93,6 +93,17 @@ exports.utilize = async (req, res) => {
     stock: to2(stock),
     wtihdraw: to2(withdraw),
     sum: to2(sum),
+    type_name: dataTypetrucks.type_name,
+    // weight: dataTypetrucks.weight,
+    total_weight: dataTypetrucks.total_weight,
+    law_weight: dataTypetrucks.law_weight,
+    height_floor: dataTypetrucks.height_floor,
+    width_floor: dataTypetrucks.width_floor,
+    length_floor: dataTypetrucks.length_floor,
+    front_pressure: dataTypetrucks.front_pressure,
+    back_pressure: dataTypetrucks.back_pressure,
+    set_speed: dataTypetrucks.set_speed,
+    set_speed_city : dataTypetrucks.set_speed_city,
     net: to2(net),
     payload: payload
 
