@@ -230,7 +230,8 @@ module.exports.updateStockMongo = async function (
       'addproduct',
       'refund',
       'change',
-      'rufundCanceled'
+      'rufundCanceled',
+      'promotion'
     ].includes(type)
   )
     throw new Error('Invalid stock update type: ' + type)
