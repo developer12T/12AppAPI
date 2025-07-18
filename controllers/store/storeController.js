@@ -332,62 +332,6 @@ exports.addStore = async (req, res) => {
         })
       }
 
-      const existingStores = await Store.find(
-        {},
-        { _id: 0, __v: 0, idIndex: 0 },
-        { area: store.area }
-      )
-      // console.log(store.area)
-      const fieldsToCheck = [
-        'name',
-        'taxId',
-        'tel',
-        'address',
-        // 'district',
-        // 'subDistrict',
-        // 'province',
-        // 'postCode',
-        'latitude',
-        'longtitude'
-      ]
-
-      const similarStores = existingStores
-        .map(existingStore => {
-          let totalSimilarity = 0
-          fieldsToCheck.forEach(field => {
-            const similarity = calculateSimilarity(
-              store[field]?.toString() || '',
-              existingStore[field]?.toString() || ''
-            )
-            totalSimilarity += similarity
-          })
-
-          const averageSimilarity = totalSimilarity / fieldsToCheck.length
-          return {
-            store: existingStore,
-            similarity: averageSimilarity
-          }
-        })
-        .filter(result => result.similarity > 70)
-        .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, 3)
-
-      if (similarStores.length > 0) {
-        const sanitizedStores = similarStores.map(item => ({
-          store: Object.fromEntries(
-            Object.entries(item.store._doc || item.store).filter(
-              ([key]) => key !== '_id'
-            )
-          ),
-          similarity: item.similarity.toFixed(2)
-        }))
-        return res.status(200).json({
-          status: '200',
-          message: 'similar store',
-          data: sanitizedStores
-        })
-      }
-
       const uploadedFiles = []
       for (let i = 0; i < files.length; i++) {
         const uploadedFile = await uploadFiles(
@@ -800,7 +744,9 @@ exports.updateStoreStatus = async (req, res) => {
     })
   }
   const storeZone = store.area.substring(0, 2)
-  const maxRunningAll = await RunningNumber.findOne({zone:storeZone}).select("last")
+  const maxRunningAll = await RunningNumber.findOne({ zone: storeZone }).select(
+    'last'
+  )
 
   // console.log(maxRunningAll)
 
@@ -832,6 +778,11 @@ exports.updateStoreStatus = async (req, res) => {
       },
       { new: true }
     )
+    res.status(200).json({
+      status: 200,
+      storeId: newId,
+      message: 'Update storeId successful'
+    })
   } else {
     await Store.findOneAndUpdate(
       { _id: store._id },
@@ -845,12 +796,11 @@ exports.updateStoreStatus = async (req, res) => {
       },
       { new: true }
     )
+    res.status(200).json({
+      status: 200,
+      message: 'Reject Store successful'
+    })
   }
-
-  res.status(200).json({
-    status: 200,
-    message: 'Update storeId successful'
-  })
 }
 
 exports.rejectStore = async (req, res) => {

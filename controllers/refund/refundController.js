@@ -20,7 +20,13 @@ const productModel = require('../../models/cash/product')
 const userModel = require('../../models/cash/user')
 const stockModel = require('../../models/cash/stock')
 const { getModelsByChannel } = require('../../middleware/channel')
-const { to2, getQty, updateStockMongo, getPeriodFromDate } = require('../../middleware/order')
+const {
+  to2,
+  getQty,
+  updateStockMongo,
+  getPeriodFromDate
+} = require('../../middleware/order')
+const { update } = require('lodash')
 
 exports.checkout = async (req, res) => {
   try {
@@ -396,14 +402,12 @@ exports.getRefund = async (req, res) => {
 
     const { startDate, endDate } = rangeDate(period)
 
-
     let areaQuery = {}
     if (area) {
       if (area.length == 2) {
         areaQuery.zone = area.slice(0, 2)
-      }
-      else if (area.length == 5) {
-        areaQuery['store.area'] = area;
+      } else if (area.length == 5) {
+        areaQuery['store.area'] = area
       }
     }
     let query = {
@@ -421,7 +425,7 @@ exports.getRefund = async (req, res) => {
     const refunds = await Refund.aggregate([
       {
         $addFields: {
-          zone: { $substrBytes: ["$store.area", 0, 2] }
+          zone: { $substrBytes: ['$store.area', 0, 2] }
         }
       },
 
@@ -459,7 +463,9 @@ exports.getRefund = async (req, res) => {
           totalChange: totalChange.toFixed(2),
           totalRefund: totalRefund.toFixed(2),
           total: total,
-          status: refund.status
+          status: refund.status,
+          createdAt: refund.createdAt,
+          updatedAt: refund.updatedAt
         }
       })
     )
@@ -517,18 +523,18 @@ exports.getDetail = async (req, res) => {
 
     const listProductChange = order
       ? order.listProduct.map(product => ({
-        id: product.id,
-        name: product.name,
-        group: product.group,
-        brand: product.brand,
-        size: product.size,
-        flavour: product.flavour,
-        qty: product.qty,
-        unit: product.unit,
-        unitName: product.unitName,
-        price: product.price,
-        netTotal: product.netTotal
-      }))
+          id: product.id,
+          name: product.name,
+          group: product.group,
+          brand: product.brand,
+          size: product.size,
+          flavour: product.flavour,
+          qty: product.qty,
+          unit: product.unit,
+          unitName: product.unitName,
+          price: product.price,
+          netTotal: product.netTotal
+        }))
       : []
 
     const totalChange = order ? order.total : 0
@@ -674,7 +680,7 @@ exports.updateStatus = async (req, res) => {
         id: u.id,
         // lot: u.lot,
         unit: u.unit,
-        qty: u.qty,
+        qty: u.qty
         // statusMovement: 'OUT'
       }
     })
@@ -683,30 +689,47 @@ exports.updateStatus = async (req, res) => {
       statusTH = 'ยกเลิก'
       for (const item of productQty) {
         // await updateStockMongo(item, refundOrder.store.area, refundOrder.period, 'rufundCanceled', channel)
-        const updateResult = await updateStockMongo(item, refundOrder.store.area, refundOrder.period, 'rufundCanceled', channel, res);
-        if (updateResult) return;
+        const updateResult = await updateStockMongo(
+          item,
+          refundOrder.store.area,
+          refundOrder.period,
+          'rufundCanceled',
+          channel,
+          res
+        )
+        if (updateResult) return
       }
     } else if (status === 'rejected') {
       statusTH = 'ถูกปฏิเสธ'
       for (const item of productQty) {
         // await updateStockMongo(item, refundOrder.store.area, refundOrder.period, 'rufundCanceled', channel)
-        const updateResult = await updateStockMongo(item, refundOrder.store.area, refundOrder.period, 'rufundCanceled', channel, res);
-        if (updateResult) return;
+        const updateResult = await updateStockMongo(
+          item,
+          refundOrder.store.area,
+          refundOrder.period,
+          'rufundCanceled',
+          channel,
+          res
+        )
+        if (updateResult) return
       }
     } else if (status === 'completed') {
       statusTH = 'สำเร็จ'
       for (const item of productQty) {
         // await updateStockMongo(item, refundOrder.store.area, refundOrder.period, 'refund', channel)
-        const updateResult = await updateStockMongo(item, refundOrder.store.area, refundOrder.period, 'refund', channel, res);
-        if (updateResult) return;
+        const updateResult = await updateStockMongo(
+          item,
+          refundOrder.store.area,
+          refundOrder.period,
+          'refund',
+          channel,
+          res
+        )
+        if (updateResult) return
       }
     }
 
-
-
-
     // console.log(productQty)
-
 
     const updatedRefund = await Refund.findOneAndUpdate(
       { orderId },
