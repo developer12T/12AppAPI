@@ -793,7 +793,6 @@ exports.updateStoreStatus = async (req, res) => {
   const channel = req.headers['x-channel']
   const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
   const store = await Store.findOne({ storeId: storeId })
-  const storetest = await Store.findOne({ _id: store._id })
   if (!store) {
     return res.status(404).json({
       status: 404,
@@ -801,35 +800,19 @@ exports.updateStoreStatus = async (req, res) => {
     })
   }
   const storeZone = store.area.substring(0, 2)
-  // console.log(storeZone)
-  const maxRunningAll = await Store.aggregate([
-    {
-      $addFields: {
-        zoneNew: { $substr: ['$area', 0, 2] }
-      }
-    },
-    {
-      $match: {
-        zoneNew: storeZone,
-        storeId: {
-          $regex: /^[VI].{0,9}$/,
-          $options: 'i'
-        }
-      }
-    },
-    {
-      $group: {
-        _id: '$zoneNew',
-        maxStoreId: { $max: '$storeId' }
-      }
-    }
-  ])
-  const oldId = maxRunningAll.flatMap(u => u.maxStoreId)
+  const maxRunningAll = await RunningNumber.findOne({zone:storeZone}).select("last")
+
   // console.log(maxRunningAll)
-  const newId = oldId[0].replace(/\d+$/, n =>
+
+  const oldId = maxRunningAll
+  // console.log(oldId,"oldId")
+  const newId = oldId.last.replace(/\d+$/, n =>
     String(+n + 1).padStart(n.length, '0')
   )
-  console.log("oldId",oldId)
+
+  // console.log(newId,"newId")
+
+  // console.log("oldId",oldId)
   if (status === '20') {
     await RunningNumber.findOneAndUpdate(
       { zone: store.zone },
