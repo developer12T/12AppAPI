@@ -47,7 +47,7 @@ const path = require('path')
 const { v4: uuidv4 } = require('uuid')
 
 uuidv4() // ⇨ '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed'
-const { productQuery } = require('../../controllers/queryFromM3/querySctipt')
+const { productQuery,bueatyStoreQuery } = require('../../controllers/queryFromM3/querySctipt')
 const store = require('../../models/cash/store')
 
 exports.getDetailStore = async (req, res) => {
@@ -744,9 +744,7 @@ exports.updateStoreStatus = async (req, res) => {
     })
   }
   const storeZone = store.area.substring(0, 2)
-  const maxRunningAll = await RunningNumber.findOne({ zone: storeZone }).select(
-    'last'
-  )
+  const maxRunningAll = await RunningNumber.findOne({ zone: storeZone }).select("last")
 
   // console.log(maxRunningAll)
 
@@ -939,7 +937,7 @@ exports.createRunningNumber = async (req, res) => {
   const zoneId = await Store.aggregate([
     {
       $match: {
-        zone: { $ne: null, $ne: '' }
+        zone: { $ne: null, $nin: ['', null] }
       }
     },
     {
@@ -949,10 +947,13 @@ exports.createRunningNumber = async (req, res) => {
     }
   ])
 
+  console.log(zoneId)
+
+
   const maxRunningAll = await Store.aggregate([
     {
       $match: {
-        zone: { $ne: null, $ne: '' }
+        zone: { $ne: null, $nin: ['', null] }
       }
     },
     {
@@ -1039,25 +1040,15 @@ exports.updateRunningNumber = async (req, res) => {
 
 exports.addBueatyStore = async (req, res) => {
   const channel = req.headers['x-channel']
-  let pathPhp = ''
 
-  switch (channel) {
-    case 'cash':
-      pathPhp = 'ca_api/ca_customer_beauty.php'
-      break
-    case 'credit':
-      pathPhp = 'cr_api/cr_customer_beauty.php'
-      break
-    default:
-      break
-  }
-  const response = await axios.post(
-    `http://58.181.206.159:9814/apps_api/${pathPhp}`
-  )
-
+  const bueatydata = await bueatyStoreQuery()
+  // console.log(bueatydata)
   const { TypeStore } = getModelsByChannel(channel, res, storeModel)
 
-  for (const data of response.data) {
+
+
+  
+  for (const data of bueatydata) {
     const exists = await TypeStore.findOne({ storeId: data.storeId })
     if (!exists) {
       await TypeStore.create({ ...data, type: ['beauty'] })
@@ -1305,3 +1296,30 @@ exports.insertStoreToErpOne = async (req, res) => {
   //   data: dataTran
   // })
 }
+
+
+exports.getShipping = async (req, res) => {
+
+  const { storeId } = req.body
+  // console.log(storeId)
+  const channel = req.headers['x-channel']
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+
+  const dataStore = await Store.findOne({ storeId: storeId }).select("shippingAddress")
+
+  if (!dataStore) {
+    return res.status(404).json({
+      status: 404,
+      message: 'Not found store',
+    })
+  }
+
+  return res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: dataStore.shippingAddress
+  })
+
+
+}
+

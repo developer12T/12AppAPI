@@ -779,7 +779,7 @@ exports.addFromERPWithdraw = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
   const result = await withdrawQuery(channel)
-
+  // console.log(result)
   for (const item of result) {
     const existWithdraw = await Withdraw.findOne({ Des_No: item.Des_No })
     if (existWithdraw) {

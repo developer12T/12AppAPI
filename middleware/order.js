@@ -355,6 +355,31 @@ module.exports.updateStockMongo = async function (
     } catch (err) {
       throw new Error('Error updating stock for deleteCart: ' + err.message)
     }
+} else if (type === 'promotion') {
+    // In: Increase stock (return cart to stock)
+    try {
+      await Stock.findOneAndUpdate(
+        {
+          area: area,
+          period: period,
+          'listProduct.productId': id
+        },
+        {
+          $inc: {
+            'listProduct.$[elem].stockOutPcs': +factorPcsQty,
+            'listProduct.$[elem].stockOutCtn': +factorCtnQty,
+            'listProduct.$[elem].balancePcs': -factorPcsQty,
+            'listProduct.$[elem].balanceCtn': -factorCtnQty
+          }
+        },
+        {
+          arrayFilters: [{ 'elem.productId': id }],
+          new: true
+        }
+      )
+    } catch (err) {
+      throw new Error('Error updating stock for deleteCart: ' + err.message)
+    }
   } else if (type === 'orderCanceled') {
     // In: Cancel sale (return to stock)
     try {

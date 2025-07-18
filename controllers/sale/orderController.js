@@ -306,20 +306,19 @@ exports.checkout = async (req, res) => {
       return promoDetail
     })
 
-    const productQty = Object.values(
-      [...qtyproductPro, ...qtyproduct].reduce((acc, cur) => {
-        // [, ...qtyproduct].reduce((acc, cur) => {
+    // const productQty = Object.values(
+    //   [...qtyproductPro, ...qtyproduct].reduce((acc, cur) => {
+    //     // [, ...qtyproduct].reduce((acc, cur) => {
 
-        const key = `${cur.productId}-${cur.unit}`
-        acc[key] = acc[key]
-          ? { ...cur, qty: acc[key].qty + cur.qty }
-          : { ...cur }
-        return acc
-      }, {})
-    )
+    //     const key = `${cur.productId}-${cur.unit}`
+    //     acc[key] = acc[key]
+    //       ? { ...cur, qty: acc[key].qty + cur.qty }
+    //       : { ...cur }
+    //     return acc
+    //   }, {})
+    // )
     // ตัด stock เบล ver
-    for (const item of productQty) {
-      // await updateStockMongo(item, area, period, 'sale', channel)
+    for (const item of qtyproduct) {
       const updateResult = await updateStockMongo(
         item,
         area,
@@ -329,65 +328,21 @@ exports.checkout = async (req, res) => {
         res
       )
       if (updateResult) return
-      // const factorPcsResult = await Product.aggregate([
-      //   { $match: { id: item.productId } },
-      //   {
-      //     $project: {
-      //       id: 1,
-      //       listUnit: {
-      //         $filter: {
-      //           input: '$listUnit',
-      //           as: 'unitItem',
-      //           cond: { $eq: ['$$unitItem.unit', item.unit] }
-      //         }
-      //       }
-      //     }
-      //   }
-      // ])
-      // // console.log(factorPcsResult)
-      // const factorCtnResult = await Product.aggregate([
-      //   { $match: { id: item.productId } },
-      //   {
-      //     $project: {
-      //       id: 1,
-      //       listUnit: {
-      //         $filter: {
-      //           input: '$listUnit',
-      //           as: 'unitItem',
-      //           cond: { $eq: ['$$unitItem.unit', 'CTN'] }
-      //         }
-      //       }
-      //     }
-      //   }
-      // ])
-      // const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor || 0;
-      // const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor || 0;
-      // const factorPcsQty = item.qty * factorPcs
-      // const factorCtnQty = factorCtn > 0
-      //   ? Math.floor(factorPcsQty / factorCtn)
-      //   : 0;
-      // // console.log('factorPcsQty', factorPcsQty)
-      // // console.log('factorCtnQty', factorCtnQty)
-      // const data = await Stock.findOneAndUpdate(
-      //   {
-      //     area: area,
-      //     period: period,
-      //     'listProduct.productId': item.productId
-      //   },
-      //   {
-      //     $inc: {
-      //       'listProduct.$[elem].stockOutPcs': +factorPcsQty,
-      //       // 'listProduct.$[elem].balancePcs': -factorPcsQty,
-      //       'listProduct.$[elem].stockOutCtn': +factorCtnQty
-      //       // 'listProduct.$[elem].balanceCtn': -factorCtnQty
-      //     }
-      //   },
-      //   {
-      //     arrayFilters: [{ 'elem.productId': item.productId }],
-      //     new: true
-      //   }
-      // )
     }
+
+    for (const item of qtyproductPro) {
+      const updateResult = await updateStockMongo(
+        item,
+        area,
+        period,
+        'promotion',
+        channel,
+        res
+      )
+      if (updateResult) return
+    }
+
+
     const calStock = {
       // storeId: refundOrder.store.storeId,
       orderId: newOrder.orderId,
