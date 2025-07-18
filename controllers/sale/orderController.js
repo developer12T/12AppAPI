@@ -186,6 +186,7 @@ exports.checkout = async (req, res) => {
     const total = subtotal - discountProduct
     const newOrder = new Order({
       orderId,
+      routeId,
       type,
       status: 'pending',
       statusTH: 'รอนำเข้า',
