@@ -753,7 +753,7 @@ exports.updateStoreStatus = async (req, res) => {
     },
     {
       $group: {
-        _id: '$zone',
+        _id: '$zoneNew',
         maxStoreId: { $max: '$storeId' }
       }
     }
@@ -763,7 +763,7 @@ exports.updateStoreStatus = async (req, res) => {
   const newId = oldId[0].replace(/\d+$/, n =>
     String(+n + 1).padStart(n.length, '0')
   )
-  // console.log(maxRunningAll)
+  console.log("oldId",oldId)
   if (status === '20') {
     await RunningNumber.findOneAndUpdate(
       { zone: store.zone },
