@@ -1039,24 +1039,22 @@ exports.groupStoreType = async function () {
 exports.withdrawQuery = async function (channel) {
 
   const config = {
-    host: process.env.MY_SQL_SERVER,
-    user: process.env.MY_SQL_USER,
-    password: process.env.MY_SQL_PASSWORD,
-    database: process.env.MY_SQL_DATABASE,
+    user: process.env.MS_SQL_USER,
+    password: process.env.MS_SQL_PASSWORD,
+    server: process.env.MS_SQL_SERVER,
+    database: process.env.MS_SQL_DATABASE_OMS,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
   };
+  // console.log(RouteId)
+  await sql.connect(config);
 
-  const connection = await mysql.createConnection(config);
+    result = await sql.query`
+       SELECT * FROM pc_withdraws_destination
+   `
 
-  let rows = [];
-  if (channel === 'cash') {
-    [rows] = await connection.execute(`
-    SELECT * FROM vancash.pc_withdraws_destination
-  `);
-    await connection.end();
-
-
-    // console.log(rows)
-
-    return rows;
-  }
+  await sql.close();
+  return result.recordset
 }

@@ -21,6 +21,7 @@ module.exports = {
   MS_SQL_PASSWORD: process.env.MS_SQL_PASSWORD,
   MS_SQL_SERVER: process.env.MS_SQL_SERVER,
   MS_SQL_DATABASE: process.env.MS_SQL_DATABASE,
+  MS_SQL_DATABASE_OMS: process.env.MS_SQL_DATABASE_OMS,
 
   MY_SQL_USER: process.env.MY_SQL_USER,
   MY_SQL_PASSWORD: process.env.MY_SQL_PASSWORD,

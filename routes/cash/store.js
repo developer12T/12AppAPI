@@ -21,7 +21,8 @@ const {
   addTypeStore,
   getDetailStore,
   insertStoreToErpOne,
-  checkSimilarStores
+  checkSimilarStores,
+  getShipping
   // test
 } = require('../../controllers/store/storeController')
 
@@ -46,6 +47,7 @@ router.patch('/editStore/:storeId', editStore)
 router.post('/checkIn/:storeId', checkInStore)
 router.post('/updateStoreStatus', updateStoreStatus)
 router.post('/rejectStore', rejectStore)
+router.post('/getShipping', getShipping)
 router.post('/addAndUpdateStore', addAndUpdateStore)
 router.post('/createRunningNumber', createRunningNumber)
 router.post('/updateRunningNumber', updateRunningNumber)

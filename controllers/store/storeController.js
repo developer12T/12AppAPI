@@ -800,7 +800,7 @@ exports.updateStoreStatus = async (req, res) => {
     })
   }
   const storeZone = store.area.substring(0, 2)
-  const maxRunningAll = await RunningNumber.findOne({zone:storeZone}).select("last")
+  const maxRunningAll = await RunningNumber.findOne({ zone: storeZone }).select("last")
 
   // console.log(maxRunningAll)
 
@@ -989,7 +989,7 @@ exports.createRunningNumber = async (req, res) => {
   const zoneId = await Store.aggregate([
     {
       $match: {
-        zone: { $ne: null, $ne: '' }
+        zone: { $ne: null, $nin: ['', null] }
       }
     },
     {
@@ -999,10 +999,13 @@ exports.createRunningNumber = async (req, res) => {
     }
   ])
 
+  console.log(zoneId)
+
+
   const maxRunningAll = await Store.aggregate([
     {
       $match: {
-        zone: { $ne: null, $ne: '' }
+        zone: { $ne: null, $nin: ['', null] }
       }
     },
     {
@@ -1355,3 +1358,30 @@ exports.insertStoreToErpOne = async (req, res) => {
   //   data: dataTran
   // })
 }
+
+
+exports.getShipping = async (req, res) => {
+
+  const { storeId } = req.body
+  // console.log(storeId)
+  const channel = req.headers['x-channel']
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+
+  const dataStore = await Store.findOne({ storeId: storeId }).select("shippingAddress")
+
+  if (!dataStore) {
+    return res.status(404).json({
+      status: 404,
+      message: 'Not found store',
+    })
+  }
+
+  return res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: dataStore.shippingAddress
+  })
+
+
+}
+
