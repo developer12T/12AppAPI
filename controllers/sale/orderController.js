@@ -306,17 +306,17 @@ exports.checkout = async (req, res) => {
       return promoDetail
     })
 
-    // const productQty = Object.values(
-    //   [...qtyproductPro, ...qtyproduct].reduce((acc, cur) => {
-    //     // [, ...qtyproduct].reduce((acc, cur) => {
+    const productQty = Object.values(
+      [...qtyproductPro, ...qtyproduct].reduce((acc, cur) => {
+        // [, ...qtyproduct].reduce((acc, cur) => {
 
-    //     const key = `${cur.productId}-${cur.unit}`
-    //     acc[key] = acc[key]
-    //       ? { ...cur, qty: acc[key].qty + cur.qty }
-    //       : { ...cur }
-    //     return acc
-    //   }, {})
-    // )
+        const key = `${cur.productId}-${cur.unit}`
+        acc[key] = acc[key]
+          ? { ...cur, qty: acc[key].qty + cur.qty }
+          : { ...cur }
+        return acc
+      }, {})
+    )
     // ตัด stock เบล ver
     for (const item of qtyproduct) {
       const updateResult = await updateStockMongo(
