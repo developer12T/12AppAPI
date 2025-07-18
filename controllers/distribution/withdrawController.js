@@ -20,7 +20,6 @@ const { exists } = require('fs')
 const { formatDateTimeToThai } = require('../../middleware/order')
 const { to2, updateStockMongo } = require('../../middleware/order')
 
-
 exports.checkout = async (req, res) => {
   const transaction = await sequelize.transaction()
   try {
@@ -71,13 +70,12 @@ exports.checkout = async (req, res) => {
     }
     const shipping = shippingData.listAddress[0]
     // console.log(shipping)
-    let fromWarehouse;
+    let fromWarehouse
     if (withdrawType === 'normal') {
-      fromWarehouse = shipping.warehouse?.normal;
+      fromWarehouse = shipping.warehouse?.normal
     } else {
-      fromWarehouse = shipping.warehouse?.clearance;
+      fromWarehouse = shipping.warehouse?.clearance
     }
-
 
     if (!fromWarehouse) {
       return res.status(400).json({
@@ -800,44 +798,50 @@ exports.addFromERPWithdraw = async (req, res) => {
   })
 }
 
-
 exports.approveWithdraw = async (req, res) => {
   try {
-    const { orderId, status } = req.body;
-    let statusStr = status === true ? 'approved' : 'rejected';
-    let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ';
+    const { orderId, status } = req.body
+    let statusStr = status === true ? 'approved' : 'rejected'
+    let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ'
 
-    const channel = req.headers['x-channel'];
-    const { Distribution } = getModelsByChannel(channel, res, distributionModel);
-    const { Product } = getModelsByChannel(channel, res, productModel);
-    const { Stock } = getModelsByChannel(channel, res, stockModel);
+    const channel = req.headers['x-channel']
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
 
     if (statusStr === 'approved') {
       // console.log(orderId)
-      const distributionTran = await Distribution.findOne(
-        { orderId: orderId, type: 'withdraw' }
-      );
+      const distributionTran = await Distribution.findOne({
+        orderId: orderId,
+        type: 'withdraw'
+      })
 
       const distributionData = await Distribution.findOneAndUpdate(
         { orderId: orderId, type: 'withdraw' },
         { $set: { statusTH: statusThStr, status: statusStr } },
         { new: true }
-      );
+      )
 
       if (!distributionData) {
-        return res.status(404).json({ status: 404, message: 'Not found withdraw' });
+        return res
+          .status(404)
+          .json({ status: 404, message: 'Not found withdraw' })
       }
 
       if (!distributionTran.period) {
-        return res.status(404).json({ status: 404, message: 'Not found period in doc' });
+        return res
+          .status(404)
+          .json({ status: 404, message: 'Not found period in doc' })
       }
 
-
-      const sendDate = new Date(distributionTran.sendDate);
-      const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '');
-      const MGNUGL = distributionTran.listProduct.map(i => i.id);
-      const uniqueCount = new Set(MGNUGL).size;
-      let data = [];
+      const sendDate = new Date(distributionTran.sendDate)
+      const formattedDate = sendDate
+        .toISOString()
+        .slice(0, 10)
+        .replace(/-/g, '')
+      const MGNUGL = distributionTran.listProduct.map(i => i.id)
+      const uniqueCount = new Set(MGNUGL).size
+      let data = []
       dataTran = {
         Hcase: 1,
         orderNo: distributionTran.orderId,
@@ -864,8 +868,8 @@ exports.approveWithdraw = async (req, res) => {
           location: '',
           itemLocation: ''
         }))
-      };
-      data.push(dataTran);
+      }
+      data.push(dataTran)
 
       // 2. ส่งไป External API (ถ้า fail -> return error)
       // let response;
@@ -907,15 +911,22 @@ exports.approveWithdraw = async (req, res) => {
           unit: u.itemUnit,
           qty: u.itemQty,
           statusMovement: 'OUT'
-        }));
+        }))
       // console.log(distributionTran)
       // 3. UPDATE Stock ตามรายการ
       for (const item of qtyproduct) {
         // for (const item of dataTran.items) {
         // console.log(item)
         // await updateStockMongo(item, distributionTran.area, distributionTran.period, 'withdraw', channel)
-        const updateResult = await updateStockMongo(item, distributionTran.area, distributionTran.period, 'withdraw', channel, res);
-        if (updateResult) return;
+        const updateResult = await updateStockMongo(
+          item,
+          distributionTran.area,
+          distributionTran.period,
+          'withdraw',
+          channel,
+          res
+        )
+        if (updateResult) return
         // const factorPcsResult = await Product.aggregate([
         //   { $match: { id: item.itemCode } },
         //   {
@@ -1001,10 +1012,7 @@ exports.approveWithdraw = async (req, res) => {
         //     { upsert: true, new: true }
         //   );
 
-
         // }
-
-
       }
     }
 
@@ -1012,14 +1020,13 @@ exports.approveWithdraw = async (req, res) => {
       status: 200,
       message: 'successfully',
       data: dataTran
-    });
-
+    })
   } catch (error) {
-    console.error('[❌ approveWithdraw ERROR]', error); // แสดงใน console
+    console.error('[❌ approveWithdraw ERROR]', error) // แสดงใน console
     res.status(500).json({
       status: 500,
       message: error.message,
       stack: error.stack // เพิ่มเพื่อ debug ลึกขึ้น (optional)
-    });
+    })
   }
-};
+}
