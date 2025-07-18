@@ -190,9 +190,9 @@ async function DeleteCartDaily(channel = 'cash') {
 
     for (const item of [...listProduct, ...listPromotion]) {
       // console.log(item)
-
+      // console.log(item)
       // await updateStockMongo(item, item.area, period(), 'deleteCart', channel)
-      const updateResult = await updateStockMongo(item, item.area, period(), 'deleteCart', channel, res);
+      const updateResult = await updateStockMongo(item, item.area, period(), 'deleteCart', channel);
       if (updateResult) return;
       // ดึง factor สำหรับแต่ละ unit
       // console.log("item ",item.storeId,item.area)
@@ -301,13 +301,11 @@ const startCronJobErpApiCheckDisribution = () => {
 }
 
 const startCronJobDeleteCartDaily = () => {
-  cron.schedule(
-    '0 0 * * *',
-    async () => {
-      // cron.schedule('*/1 * * * *', async () => {
-      console.log('Running cron job DeleteCartDaily at 00:00 (Asia/Bangkok)');
-      await DeleteCartDaily();
-    },
+  cron.schedule('0 0 * * *', async () => {
+    // cron.schedule('*/1 * * * *', async () => {
+    console.log('Running cron job DeleteCartDaily at 00:00 (Asia/Bangkok)');
+    await DeleteCartDaily();
+  },
     {
       timezone: 'Asia/Bangkok'
     }
