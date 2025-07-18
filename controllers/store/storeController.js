@@ -47,7 +47,7 @@ const path = require('path')
 const { v4: uuidv4 } = require('uuid')
 
 uuidv4() // ⇨ '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed'
-const { productQuery } = require('../../controllers/queryFromM3/querySctipt')
+const { productQuery,bueatyStoreQuery } = require('../../controllers/queryFromM3/querySctipt')
 const store = require('../../models/cash/store')
 
 exports.getDetailStore = async (req, res) => {
@@ -329,62 +329,6 @@ exports.addStore = async (req, res) => {
         return res.status(400).json({
           status: '400',
           message: 'Number of files and types do not match'
-        })
-      }
-
-      const existingStores = await Store.find(
-        {},
-        { _id: 0, __v: 0, idIndex: 0 },
-        { area: store.area }
-      )
-      // console.log(store.area)
-      const fieldsToCheck = [
-        'name',
-        'taxId',
-        'tel',
-        'address',
-        // 'district',
-        // 'subDistrict',
-        // 'province',
-        // 'postCode',
-        'latitude',
-        'longtitude'
-      ]
-
-      const similarStores = existingStores
-        .map(existingStore => {
-          let totalSimilarity = 0
-          fieldsToCheck.forEach(field => {
-            const similarity = calculateSimilarity(
-              store[field]?.toString() || '',
-              existingStore[field]?.toString() || ''
-            )
-            totalSimilarity += similarity
-          })
-
-          const averageSimilarity = totalSimilarity / fieldsToCheck.length
-          return {
-            store: existingStore,
-            similarity: averageSimilarity
-          }
-        })
-        .filter(result => result.similarity > 70)
-        .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, 3)
-
-      if (similarStores.length > 0) {
-        const sanitizedStores = similarStores.map(item => ({
-          store: Object.fromEntries(
-            Object.entries(item.store._doc || item.store).filter(
-              ([key]) => key !== '_id'
-            )
-          ),
-          similarity: item.similarity.toFixed(2)
-        }))
-        return res.status(200).json({
-          status: '200',
-          message: 'similar store',
-          data: sanitizedStores
         })
       }
 
@@ -832,6 +776,11 @@ exports.updateStoreStatus = async (req, res) => {
       },
       { new: true }
     )
+    res.status(200).json({
+      status: 200,
+      storeId: newId,
+      message: 'Update storeId successful'
+    })
   } else {
     await Store.findOneAndUpdate(
       { _id: store._id },
@@ -845,12 +794,11 @@ exports.updateStoreStatus = async (req, res) => {
       },
       { new: true }
     )
+    res.status(200).json({
+      status: 200,
+      message: 'Reject Store successful'
+    })
   }
-
-  res.status(200).json({
-    status: 200,
-    message: 'Update storeId successful'
-  })
 }
 
 exports.rejectStore = async (req, res) => {
@@ -1092,25 +1040,15 @@ exports.updateRunningNumber = async (req, res) => {
 
 exports.addBueatyStore = async (req, res) => {
   const channel = req.headers['x-channel']
-  let pathPhp = ''
 
-  switch (channel) {
-    case 'cash':
-      pathPhp = 'ca_api/ca_customer_beauty.php'
-      break
-    case 'credit':
-      pathPhp = 'cr_api/cr_customer_beauty.php'
-      break
-    default:
-      break
-  }
-  const response = await axios.post(
-    `http://58.181.206.159:9814/apps_api/${pathPhp}`
-  )
-
+  const bueatydata = await bueatyStoreQuery()
+  // console.log(bueatydata)
   const { TypeStore } = getModelsByChannel(channel, res, storeModel)
 
-  for (const data of response.data) {
+
+
+  
+  for (const data of bueatydata) {
     const exists = await TypeStore.findOne({ storeId: data.storeId })
     if (!exists) {
       await TypeStore.create({ ...data, type: ['beauty'] })

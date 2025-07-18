@@ -1051,8 +1051,33 @@ exports.withdrawQuery = async function (channel) {
   // console.log(RouteId)
   await sql.connect(config);
 
-    result = await sql.query`
+  result = await sql.query`
        SELECT * FROM pc_withdraws_destination
+   `
+
+  await sql.close();
+  return result.recordset
+}
+
+
+exports.bueatyStoreQuery = async function (channel) {
+
+  const config = {
+    user: process.env.MS_SQL_USER,
+    password: process.env.MS_SQL_PASSWORD,
+    server: process.env.MS_SQL_SERVER,
+    // database: process.env.MS_SQL_DATABASE_OMS,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  };
+  // console.log(RouteId)
+  await sql.connect(config);
+
+  result = await sql.query`
+          SELECT * FROM [DATA_BEAUTY].[dbo].[DATA_BEAUTY_CUSTOMER]
+          where CUS_STATUS = 'N'
    `
 
   await sql.close();

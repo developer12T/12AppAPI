@@ -53,15 +53,30 @@ exports.utilize = async (req, res) => {
     }))
   )
   // console.log(withdrawProductIds)
-  const allProductIds = [...productIds, ...withdrawProductIds]
+  const allProductIds = [...new Set([...productIds, ...withdrawProductIds])]
   const dataProduct = await Product.find({ id: { $in: allProductIds } })
 
   // console.log(withdrawProduct)
   let stock = 0
   let withdraw = 0
 
+  // const dataqty = await Stock.aggregate([
+  //   { $match: { area: 'IT211', period: '202507' } },
+  //   { $unwind: "$listProduct" },
+  //   {
+  //     $group: {
+  //       _id: null, // รวมทั้งหมด ไม่แยกกลุ่ม
+  //       sum: { $sum: "$listProduct.balancePcs" }
+  //     }
+  //   }
+  // ]);
+  // console.log(dataqty)
+
+  let qty = 0
   for (const item of allProductIds) {
     const stockItem = dataStock.listProduct.find(u => u.productId === item)
+
+
     const productItem = dataProduct.find(u => u.id === item)
     // console.log(item)
     // เช็คว่าหาเจอหรือไม่ (ป้องกัน error)
@@ -70,6 +85,7 @@ exports.utilize = async (req, res) => {
     const dataStockPcs = stockItem.balancePcs
     const productNet = productItem.weightNet
 
+    qty += dataStockPcs
     stock += dataStockPcs * productNet
 
     const withdrawTotalQty = withdrawProduct
@@ -84,6 +100,8 @@ exports.utilize = async (req, res) => {
     withdraw += withdrawTotalQty * productNet
   }
 
+  // console.log(qty)
+
   stock = stock / 1000
   withdraw = withdraw / 1000
 
@@ -92,7 +110,7 @@ exports.utilize = async (req, res) => {
   const payload = dataTypetrucks.payload
   const free = dataTypetrucks.payload - sum
 
-  // console.log(stock)
+  // console.log(free,payload)
 
   const data = {
     freePercentage: to2((free * 100) / payload / 100),
