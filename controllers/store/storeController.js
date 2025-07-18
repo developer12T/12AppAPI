@@ -117,9 +117,9 @@ exports.getStore = async (req, res) => {
         $gte: startMonth,
         $lt: nextMonth
       }
-    }  else {    
+    } else {
       query.status = { $nin: ['10'] }
-    }// ถ้า type=all ไม่ต้อง filter createdAt เลย
+    } // ถ้า type=all ไม่ต้อง filter createdAt เลย
 
     if (area) {
       query.area = area
@@ -482,6 +482,72 @@ exports.addStore = async (req, res) => {
   })
 }
 
+exports.checkSimilarStores = async (req, res) => {
+  const { storeId } = req.params
+  const channel = req.headers['x-channel']
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const store = await Store.findOne({ storeId })
+
+  const existingStores = await Store.find(
+    { storeId: { $ne: storeId } },
+    { _id: 0, __v: 0, idIndex: 0 },
+    { area: store.area }
+  )
+
+  const fieldsToCheck = [
+    'name',
+    'taxId',
+    'tel',
+    'address',
+    'district',
+    'subDistrict',
+    'province',
+    'postCode',
+    'latitude',
+    'longtitude'
+  ]
+
+  const similarStores = existingStores
+    .map(existingStore => {
+      let totalSimilarity = 0
+      fieldsToCheck.forEach(field => {
+        const similarity = calculateSimilarity(
+          store[field]?.toString() || '',
+          existingStore[field]?.toString() || ''
+        )
+        totalSimilarity += similarity
+      })
+
+      const averageSimilarity = totalSimilarity / fieldsToCheck.length
+      return {
+        store: existingStore,
+        similarity: averageSimilarity
+      }
+    })
+    .filter(result => result.similarity > 50)
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, 3)
+
+  if (similarStores.length > 0) {
+    const sanitizedStores = similarStores.map(item => ({
+      store: Object.fromEntries(
+        Object.entries(item.store._doc || item.store).filter(
+          ([key]) => key !== '_id'
+        )
+      ),
+      similarity: item.similarity.toFixed(2)
+    }))
+    return res.status(200).json({
+      status: '200',
+      message: 'similar store',
+      data: sanitizedStores
+    })
+  }
+  return res.status(204).json({
+    status: '204',
+    message: 'Do not have similar store'
+  })
+}
 exports.editStore = async (req, res) => {
   const { storeId } = req.params
   const data = req.body

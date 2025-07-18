@@ -20,7 +20,8 @@ const {
   getTypeStore,
   addTypeStore,
   getDetailStore,
-  insertStoreToErpOne
+  insertStoreToErpOne,
+  checkSimilarStores
   // test
 } = require('../../controllers/store/storeController')
 
@@ -37,6 +38,7 @@ const router = express.Router()
 router.get('/getStore', getStore)
 router.get('/:storeId', getDetailStore)
 router.post('/addStore', addStore)
+router.get('/check/:storeId', checkSimilarStores)
 router.post('/updateImage', updateImage)
 router.post('/addFromERP', addFromERP)
 router.post('/addFromERPnew', addFromERPnew)

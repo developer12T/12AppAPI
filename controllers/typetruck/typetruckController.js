@@ -33,11 +33,8 @@ exports.utilize = async (req, res) => {
 
   const dataStock = await Stock.findOne({ area: area, period: period })
   const productIds = dataStock.listProduct.flatMap(item => {
-    return item.productId;
-  });
-
-
-
+    return item.productId
+  })
 
   const dataTypetrucks = await Typetrucks.findOne({ type_name: typetruck })
   const datawithdraw = await Distribution.find({
@@ -48,26 +45,24 @@ exports.utilize = async (req, res) => {
 
   const withdrawProductIds = datawithdraw.flatMap(item =>
     item.listProduct.map(u => u.id)
-  );
+  )
   const withdrawProduct = datawithdraw.flatMap(item =>
     item.listProduct.map(u => ({
       id: u.id,
       qtyPcs: u.qtyPcs
     }))
-  );
+  )
   // console.log(withdrawProductIds)
-  const allProductIds = [...productIds, ...withdrawProductIds];
+  const allProductIds = [...productIds, ...withdrawProductIds]
   const dataProduct = await Product.find({ id: { $in: allProductIds } })
-
-
 
   // console.log(withdrawProduct)
   let stock = 0
   let withdraw = 0
 
   for (const item of allProductIds) {
-    const stockItem = dataStock.listProduct.find(u => u.productId === item);
-    const productItem = dataProduct.find(u => u.id === item);
+    const stockItem = dataStock.listProduct.find(u => u.productId === item)
+    const productItem = dataProduct.find(u => u.id === item)
     // console.log(item)
     // เช็คว่าหาเจอหรือไม่ (ป้องกัน error)
     if (!stockItem || !productItem) continue
@@ -77,17 +72,16 @@ exports.utilize = async (req, res) => {
 
     stock += dataStockPcs * productNet
 
-
     const withdrawTotalQty = withdrawProduct
       .filter(u => u.id === item)
-      .reduce((sum, u) => sum + (u.qtyPcs || 0), 0);
+      .reduce((sum, u) => sum + (u.qtyPcs || 0), 0)
     // console.log(withdrawProductPcsObj)
     // ถ้าไม่เจอ หรือไม่มี qtyPcs ให้ข้าม
     // if (!withdrawProductPcsObj || withdrawProductPcsObj.qtyPcs === undefined) {
     //   continue;
     // }
 
-    withdraw += withdrawTotalQty * productNet;
+    withdraw += withdrawTotalQty * productNet
   }
 
   stock = stock / 1000
