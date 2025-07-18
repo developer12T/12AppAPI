@@ -1214,6 +1214,8 @@ exports.getStockQtyNew = async (req, res) => {
   const { AdjustStock } = getModelsByChannel(channel, res, adjustStockModel)
   const { Distribution } = getModelsByChannel(channel, res, distributionModel)
   const { Order } = getModelsByChannel(channel, res, orderModel)
+  const { Giveaway } = getModelsByChannel(channel, res, giveModel)
+
 
 
   let areaQuery = {}
@@ -1315,11 +1317,30 @@ exports.getStockQtyNew = async (req, res) => {
     }
   ])
 
+  const dataGive = await Giveaway.aggregate([
+    {
+      $addFields: {
+        zone: { $substrBytes: ['$area', 0, 2] }
+      }
+    },
+    { $match: { type: 'change' } },
+    { $match: matchQueryRefund },
+    {
+      $project: {
+        listProduct: 1,
+        _id: 0
+      }
+    }
+  ])
+
+
+
   const allWithdrawProducts = dataWithdraw.flatMap(doc => doc.listProduct || []);
   const allRefundProducts = dataRefund.flatMap(doc => doc.listProduct || []);
   const allOrderProducts = dataOrder.flatMap(doc => doc.listProduct || []);
   const allChangeProducts = dataChange.flatMap(doc => doc.listProduct || []);
   const allAdjustProducts = dataAdjust.flatMap(doc => doc.listProduct || []);
+  const allGiveProducts = dataGive.flatMap(doc => doc.listProduct || []);
 
   const dataStock = await Stock.aggregate([
     {
@@ -1423,7 +1444,21 @@ exports.getStockQtyNew = async (req, res) => {
     }, {})
   );
 
-
+  const giveProductArray = Object.values(
+    allGiveProducts.reduce((acc, curr) => {
+      const key = `${curr.id}_${curr.unit}`;
+      if (acc[key]) {
+        acc[key] = {
+          ...curr,
+          qty: (acc[key].qty || 0) + (curr.qty || 0),
+          qtyPcs: (acc[key].qtyPcs || 0) + (curr.qtyPcs || 0)
+        };
+      } else {
+        acc[key] = { ...curr };
+      }
+      return acc;
+    }, {})
+  );
 
 
 
@@ -1461,6 +1496,11 @@ exports.getStockQtyNew = async (req, res) => {
     item.id
   )
 
+  const productIdListGive = giveProductArray.flatMap(item =>
+    item.id
+  )
+
+
   const uniqueProductId = [
     ...new Set([
       ...productIdListStock,
@@ -1468,7 +1508,8 @@ exports.getStockQtyNew = async (req, res) => {
       ...productIdListRefund,
       ...productIdListOrder,
       ...productIdListChange,
-      ...productIdListAdjust
+      ...productIdListAdjust,
+      ...productIdListGive
     ])
   ];
 
@@ -1479,16 +1520,12 @@ exports.getStockQtyNew = async (req, res) => {
 
   uniqueProductId.forEach(productId => {
     if (!haveProductIdSet.has(productId)) {
-      console.log(productId)
+      // console.log(productId)
       allProducts.push({
         productId,
         stockPcs: 0,
-        stockInPcs: 0,
-        stockOutPcs: 0,
         balancePcs: 0,
         stockCtn: 0,
-        stockInCtn: 0,
-        stockOutCtn: 0,
         balanceCtn: 0
       });
     }
@@ -1508,22 +1545,14 @@ exports.getStockQtyNew = async (req, res) => {
       sumById[id] = {
         id: id,
         stockPcs: u.stockPcs || 0,
-        stockInPcs: u.stockInPcs || 0,
-        stockOutPcs: u.stockOutPcs || 0,
         balancePcs: u.balancePcs || 0,
         stockCtn: u.stockCtn || 0,
-        stockInCtn: u.stockInCtn || 0,
-        stockOutCtn: u.stockOutCtn || 0,
         balanceCtn: u.balanceCtn || 0
       }
     } else {
       sumById[id].stockPcs += u.stockPcs || 0
-      sumById[id].stockInPcs += u.stockInPcs || 0
-      sumById[id].stockOutPcs += u.stockOutPcs || 0
       sumById[id].balancePcs += u.balancePcs || 0
       sumById[id].stockCtn += u.stockCtn || 0
-      sumById[id].stockInCtn += u.stockInCtn || 0
-      sumById[id].stockOutCtn += u.stockOutCtn || 0
       sumById[id].balanceCtn += u.balanceCtn || 0
     }
   }
@@ -1538,13 +1567,18 @@ exports.getStockQtyNew = async (req, res) => {
 
   let data = []
   let summaryStock = 0
-  let summaryStockIn = 0
-  let summaryStockOut = 0
+  let summaryWithdraw = 0
+  let summaryGood = 0
+  let summaryDamaged = 0
+  let summarySale = 0
+  let summaryChange = 0
+  let summaryAdjust = 0
+  let summaryGive = 0
   let summaryStockBal = 0
 
   let summaryStockPcs = 0
-  let summaryStockInPcs = 0
-  let summaryStockOutPcs = 0
+  // let summaryStockInPcs = 0
+  // let summaryStockOutPcs = 0
   let summaryStockBalPcs = 0
 
   for (const stockItem of productSum) {
@@ -1554,6 +1588,7 @@ exports.getStockQtyNew = async (req, res) => {
     const productDetailOrder = orderProductArray.filter(u => u.id == stockItem.id)
     const productDetailChange = changeProductArray.filter(u => u.id == stockItem.id)
     const productDetailAdjust = adjustProductArray.filter(u => u.id == stockItem.id)
+    const productDetailGive = giveProductArray.filter(u => u.id == stockItem.id)
 
     if (!productDetail) continue
     if (!productDetailRufund) continue
@@ -1561,6 +1596,7 @@ exports.getStockQtyNew = async (req, res) => {
     if (!productDetailOrder) continue
     if (!productDetailChange) continue
     if (!productDetailAdjust) continue
+    if (!productDetailGive) continue
 
     // let goodqty = productDetailRufund.qtyPcs
 
@@ -1568,12 +1604,8 @@ exports.getStockQtyNew = async (req, res) => {
 
     const pcsMain = stockItem.stockPcs
     let stock = stockItem.stockPcs
-    let stockIn = stockItem.stockInPcs
-    let stockOut = stockItem.stockOutPcs
     let balance = stockItem.balancePcs
     summaryStockPcs += stockItem.stockPcs || 0
-    summaryStockInPcs += stockItem.stockInPcs || 0
-    summaryStockOutPcs += stockItem.stockOutPcs || 0
     summaryStockBalPcs += stockItem.balancePcs || 0
 
     const listUnitStock = productDetail.listUnit.map(u => {
@@ -1583,25 +1615,33 @@ exports.getStockQtyNew = async (req, res) => {
       const saleQty = productDetailOrder.find(i => i.unit === u.unit)?.qty ?? 0
       const changeQty = productDetailChange.find(i => i.unit === u.unit)?.qty ?? 0
       const adjustQty = productDetailAdjust.find(i => i.unit === u.unit)?.qty ?? 0
+      const giveQty = productDetailGive.find(i => i.unit === u.unit)?.qty ?? 0
       // console.log(goodQty)
+
+      const goodSale = u.price.refund
+      const damagedSale = u.price.refundDmg
+      const changeSale = u.price.change
       const sale = u.price.sale
       const factor = u.factor
       const stockQty = Math.floor(stock / factor) || 0
-      const stockInQty = Math.floor(stockIn / factor) || 0
-      const stockOutQty = Math.floor(stockOut / factor) || 0
       const balanceQty = Math.floor(balance / factor) || 0
       // console.log(goodQty)
 
 
       stock -= stockQty * factor
-      stockIn -= stockInQty * factor
-      stockOut -= stockOutQty * factor
       balance -= balanceQty * factor
 
       summaryStock += (stockQty || 0) * sale
-      summaryStockIn += (stockInQty || 0) * sale
-      summaryStockOut += (stockOutQty || 0) * sale
       summaryStockBal += (balanceQty || 0) * sale
+      summaryWithdraw += (withdrawQty || 0) * sale
+      summaryGood += (goodQty || 0) * goodSale
+      summaryDamaged += (damagedQty || 0) * damagedSale
+      summarySale += (saleQty || 0) * sale
+      summaryChange += (changeQty || 0) * changeSale
+      summaryAdjust += (adjustQty || 0) * sale
+      summaryGive += (giveQty || 0) * sale
+
+
 
       return {
         unit: u.unit,
@@ -1612,9 +1652,8 @@ exports.getStockQtyNew = async (req, res) => {
         damaged: damagedQty,
         sale: saleQty,
         change: changeQty,
-        adjustQty: adjustQty,
-        // stockIn: stockInQty,
-        // stockOut: stockOutQty,
+        adjust: adjustQty,
+        give: giveQty,
         balance: balanceQty
       }
     })
@@ -1640,13 +1679,16 @@ exports.getStockQtyNew = async (req, res) => {
     message: 'suceesful',
     data: data,
     summaryStock: Number(summaryStock.toFixed(2)),
-    summaryStockIn: Number(summaryStockIn.toFixed(2)),
-    summaryStockOut: Number(summaryStockOut.toFixed(2)),
     summaryStockBal: Number(summaryStockBal.toFixed(2)),
-    summaryStockPcs: summaryStockPcs,
-    summaryStockInPcs: summaryStockInPcs,
-    summaryStockOutPcs: summaryStockOutPcs,
-    summaryStockBalPcs: summaryStockBalPcs
+    summaryWithdraw: Number(summaryWithdraw.toFixed(2)),
+    summaryGood: Number(summaryGood.toFixed(2)),
+    summaryDamaged: Number(summaryDamaged.toFixed(2)),
+    summarySale: Number(summarySale.toFixed(2)),
+    summaryChange: Number(summaryChange.toFixed(2)),
+    summaryAdjust: Number(summaryAdjust.toFixed(2)),
+    summaryGive: Number(summaryGive.toFixed(2)),
+    summaryStockPcs: Number(summaryStockPcs.toFixed(2)),
+    summaryStockBalPcs: Number(summaryStockBalPcs.toFixed(2))
   })
 }
 
