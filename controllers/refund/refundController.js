@@ -27,7 +27,7 @@ const {
   getPeriodFromDate
 } = require('../../middleware/order')
 const { update } = require('lodash')
-
+const { getSocket } = require('../../socket')
 exports.checkout = async (req, res) => {
   try {
     const {
@@ -369,6 +369,11 @@ exports.checkout = async (req, res) => {
     await refundOrder.save()
     await changeOrder.save()
     await Cart.deleteOne({ type, area, storeId })
+
+    const io = getSocket()
+    io.emit('refund/checkout', {});
+
+
     res.status(200).json({
       status: 200,
       message: 'Checkout successful!',
@@ -470,6 +475,9 @@ exports.getRefund = async (req, res) => {
       })
     )
 
+    const io = getSocket()
+    io.emit('refund/all', {});
+
     res.status(200).json({
       status: 200,
       message: 'Successful!',
@@ -523,18 +531,18 @@ exports.getDetail = async (req, res) => {
 
     const listProductChange = order
       ? order.listProduct.map(product => ({
-          id: product.id,
-          name: product.name,
-          group: product.group,
-          brand: product.brand,
-          size: product.size,
-          flavour: product.flavour,
-          qty: product.qty,
-          unit: product.unit,
-          unitName: product.unitName,
-          price: product.price,
-          netTotal: product.netTotal
-        }))
+        id: product.id,
+        name: product.name,
+        group: product.group,
+        brand: product.brand,
+        size: product.size,
+        flavour: product.flavour,
+        qty: product.qty,
+        unit: product.unit,
+        unitName: product.unitName,
+        price: product.price,
+        netTotal: product.netTotal
+      }))
       : []
 
     const totalChange = order ? order.total : 0
@@ -548,6 +556,11 @@ exports.getDetail = async (req, res) => {
       (totalRefund - totalRefundExVat).toFixed(2)
     )
     const total = parseFloat((totalChange - totalRefund).toFixed(2))
+
+
+    const io = getSocket()
+    io.emit('refund/detail', {});
+
 
     res.status(200).json({
       type: refund.type,
@@ -632,6 +645,10 @@ exports.addSlip = async (req, res) => {
       ]
 
       await order.save()
+
+
+    const io = getSocket()
+    io.emit('refund/addSlip', {});
 
       res.status(200).json({
         status: 200,
@@ -742,6 +759,10 @@ exports.updateStatus = async (req, res) => {
       { $set: { status, statusTH } },
       { new: true }
     )
+
+    const io = getSocket()
+    io.emit('refund/updateStatus', {});
+
 
     res.status(200).json({
       status: 200,
