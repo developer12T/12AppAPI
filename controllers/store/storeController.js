@@ -1,3 +1,5 @@
+const mongoose = require('mongoose');
+
 const { uploadFiles } = require('../../utilities/upload')
 const { calculateSimilarity } = require('../../utilities/utility')
 const axios = require('axios')
@@ -947,7 +949,7 @@ exports.createRunningNumber = async (req, res) => {
     }
   ])
 
-  console.log(zoneId)
+  // console.log(zoneId)
 
 
   const maxRunningAll = await Store.aggregate([
@@ -975,13 +977,13 @@ exports.createRunningNumber = async (req, res) => {
     }
   })
 
-  for (const runing of data) {
-    const exists = await RunningNumber.findOne({ zone: runing.zone })
+  // for (const runing of data) {
+  //   const exists = await RunningNumber.findOne({ zone: runing.zone })
 
-    if (!exists) {
-      await RunningNumber.create(runing)
-    }
-  }
+  //   if (!exists) {
+  //     await RunningNumber.create(runing)
+  //   }
+  // }
 
   res.status(200).json({
     status: 200,
@@ -1041,25 +1043,40 @@ exports.updateRunningNumber = async (req, res) => {
 exports.addBueatyStore = async (req, res) => {
   const channel = req.headers['x-channel']
 
-  const bueatydata = await bueatyStoreQuery()
-  // console.log(bueatydata)
-  const { TypeStore } = getModelsByChannel(channel, res, storeModel)
+  // 1. Start session
+  const session = await mongoose.startSession()
+  session.startTransaction()
+
+  try {
+    const bueatydata = await bueatyStoreQuery()
+
+    const { TypeStore } = getModelsByChannel(channel, res, storeModel)
+
+    // 2. Delete all
+    await TypeStore.deleteMany({}, { session })
+
+    // 3. Insert new
+    // (สามารถ optimize เป็น insertMany ได้ ถ้าไม่มีเงื่อนไข exists)
+await TypeStore.insertMany(bueatydata.map(x => ({ ...x, type: ['beauty'] })), { session })
 
 
+    // 4. Commit
+    await session.commitTransaction()
+    session.endSession()
 
-
-  for (const data of bueatydata) {
-    const exists = await TypeStore.findOne({ storeId: data.storeId })
-    if (!exists) {
-      await TypeStore.create({ ...data, type: ['beauty'] })
-    }
+    res.status(200).json({
+      status: 200,
+      message: bueatydata
+    })
+  } catch (error) {
+    // 5. Rollback
+    await session.abortTransaction()
+    session.endSession()
+    console.error(error)
+    res.status(500).json({ status: 500, message: error.message })
   }
-
-  res.status(200).json({
-    status: 200,
-    message: response.data
-  })
 }
+
 
 exports.getBueatyStore = async (req, res) => {
   const channel = req.headers['x-channel']

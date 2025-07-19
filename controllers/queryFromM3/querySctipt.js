@@ -277,7 +277,6 @@ exports.storeQuery = async function (channel) {
             LEFT JOIN [192.168.2.74].[M3FDBPRD].[MVXJDTA].[OCUSMA] ON customerCode = OKCUNO COLLATE Latin1_General_BIN AND OKCONO = 410
             LEFT JOIN [192.168.2.74].[M3FDBPRD].[MVXJDTA].[OCUSAD] ON OKCUNO = OPCUNO AND OPCONO = 410
             LEFT JOIN [dbo].[data_shoptype] ON OKCFC6 = type_id COLLATE Thai_CI_AS
-            WHERE store_status <> '90' 
   `;
   }
   else if (channel === 'credit') {
@@ -1076,8 +1075,13 @@ exports.bueatyStoreQuery = async function (channel) {
   await sql.connect(config);
 
   result = await sql.query`
-          SELECT * FROM [DATA_BEAUTY].[dbo].[DATA_BEAUTY_CUSTOMER]
-          where CUS_STATUS = 'N'
+SELECT 
+cus_code as storeId,
+cus_area as area
+
+ FROM [DATA_BEAUTY].[dbo].[DATA_BEAUTY_CUSTOMER]
+WHERE CUS_STATUS = 'N'
+
    `
 
   await sql.close();
