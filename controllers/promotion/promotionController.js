@@ -6,7 +6,7 @@ const { getRewardProduct } = require('./calculate')
 const promotionModel = require('../../models/cash/promotion');
 const CartModel = require('../../models/cash/cart')
 const productModel = require('../../models/cash/product')
-
+const { getSocket } = require('../../socket')
 const { getModelsByChannel } = require('../../middleware/channel')
 
 exports.addPromotion = async (req, res) => {
@@ -54,6 +54,9 @@ exports.addPromotion = async (req, res) => {
     })
 
     await newPromotion.save()
+
+    const io = getSocket()
+    io.emit('promotion/add', {});
 
     res.status(201).json({
       status: 201,
@@ -110,6 +113,9 @@ exports.updatePromotion = async (req, res) => {
       { $set: updateFields },
       { upsert: true, new: true }
     )
+
+    const io = getSocket()
+    io.emit('promotion/updatePromotion', {});
 
     res.status(201).json({
       status: 201,
@@ -199,6 +205,9 @@ exports.getPromotionProduct = async (req, res) => {
       listProduct: Object.values(groupedProducts)
     }
 
+    const io = getSocket()
+    io.emit('promotion/getPromotionProduct', {});
+
     res.status(200).json({
       status: 200,
       message: 'successfully!',
@@ -283,6 +292,9 @@ exports.updateCartPromotion = async (req, res) => {
 
     await cart.save()
 
+
+
+
     res.status(200).json({
       status: 200,
       message: 'Promotion updated successfully!',
@@ -308,7 +320,8 @@ exports.getPromotionDetail = async (req, res) => {
     })
   }
 
-
+  const io = getSocket()
+  io.emit('promotion/getPromotionDetail', {});
 
   res.status(200).json({
     status: 200,
@@ -389,6 +402,10 @@ exports.addPromotionLimit = async (req, res) => {
 
   await newPromotionLimit.save()
 
+  const io = getSocket()
+  io.emit('promotion/addPromotionLimit', {});
+
+
   res.status(201).json({
     status: 201,
     message: 'Promotion created successfully!',
@@ -444,6 +461,9 @@ exports.updatePromotionLimit = async (req, res) => {
     }
   );
 
+  const io = getSocket()
+  io.emit('promotion/updatePromotionLimit', {});
+
   return res.status(200).json({ status: 200, message: 'Updated successfully' });
 }
 
@@ -476,6 +496,9 @@ exports.addQuota = async (req, res) => {
     validFrom: validFrom,
     validTo: validTo
   })
+
+  const io = getSocket()
+  io.emit('promotion/addQuota', {});
 
   res.status(200).json({
     status: 200,
@@ -526,6 +549,9 @@ exports.updateQuota = async (req, res) => {
 
   )
 
+  const io = getSocket()
+  io.emit('promotion/updateQuota', {});
+
   res.status(200).json({
     status: 200,
     message: 'sucess',
@@ -556,7 +582,8 @@ exports.addPromotionShelf = async (req, res) => {
     price: price
   })
 
-
+  const io = getSocket()
+  io.emit('promotion/addPromotionShelf', {});
 
   res.status(200).json({
     status: 200,
