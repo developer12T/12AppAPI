@@ -27,7 +27,7 @@ const router = express.Router()
 
 router.post('/add', addStock)
 router.get('/adjuststock', getAdjustStock)
-router.get('/adjuststock/:orderId', getAdjustStockDetail)
+router.get('/getAdjustStockDetail/', getAdjustStockDetail)
 router.get('/available', available)
 // router.post('/rollbackStock', rollbackStock)
 router.post('/get', getQty)

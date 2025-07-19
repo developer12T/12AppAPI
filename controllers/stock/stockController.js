@@ -31,7 +31,7 @@ const { getModelsByChannel } = require('../../middleware/channel')
 const os = require('os')
 const { summaryOrder } = require('../../utilities/summary')
 const { to2 } = require('../../middleware/order')
-
+const { getSocket } = require('../../socket')
 const fetchArea = async warehouse => {
   try {
     const WarehouseData = await Warehouse.findAll({
@@ -81,7 +81,8 @@ const fetchArea = async warehouse => {
 
 exports.getAdjustStockDetail = async (req, res) => {
   try {
-    const { orderId } = req.params
+    const { orderId } = req.query
+
     const channel = req.headers['x-channel']
     const { AdjustStock } = getModelsByChannel(channel, res, adjustStockModel)
 
@@ -125,6 +126,9 @@ exports.getAdjustStockDetail = async (req, res) => {
         })
       }
     })
+
+    const io = getSocket()
+    io.emit('stock/getAdjustStockDetail', {});
 
     res.status(200).json({
       status: 200,
@@ -223,6 +227,9 @@ exports.getAdjustStock = async (req, res) => {
       updatedAt: o.updatedAt
     }))
 
+    const io = getSocket()
+    io.emit('stock/adjuststock', {});
+
     res.status(200).json({
       status: 200,
       message: 'Successful!',
@@ -237,7 +244,6 @@ exports.getAdjustStock = async (req, res) => {
 exports.addStock = async (req, res) => {
   try {
     const body = req.body
-
     const channel = req.headers['x-channel']
 
     const { User } = getModelsByChannel(channel, res, userModel)
@@ -250,27 +256,20 @@ exports.addStock = async (req, res) => {
         .json({ status: 400, message: 'Invalid format: expected an array' })
     }
 
+    let createdStocks = []
+
     for (const item of body) {
       const { area, period, listProduct } = item
-
       if (!area || !Array.isArray(listProduct)) continue
 
       const user = await User.findOne({ area }).select('saleCode').lean()
-
-      if (!user) {
-        return res.status(404).json({
-          status: 404,
-          message: 'Not Found This Area'
-        })
-      }
+      if (!user) continue
 
       const saleCode = user.saleCode
-
       let enrichedListProduct = []
 
       for (const productEntry of listProduct) {
         const { productId, available } = productEntry
-
         const productInfo = await Product.findOne({ id: productId }).lean()
         if (!productInfo) continue
 
@@ -292,17 +291,22 @@ exports.addStock = async (req, res) => {
           listProduct: enrichedListProduct
         })
         await stockDoc.save()
-        res.status(200).json({
-          status: 200,
-          message: stockDoc
-        })
+        createdStocks.push(stockDoc)
       }
     }
 
-    // res.status(200).json({
-    //     status: 200,
-    //     message: stockDoc,
-    // })
+    // emit socket event ถ้ามีรายการถูกเพิ่ม
+    if (createdStocks.length > 0) {
+      const io = getSocket()
+      io.emit('stock/added', { count: createdStocks.length, data: createdStocks })
+      return res.status(200).json({
+        status: 200,
+        message: 'Stock added',
+        data: createdStocks
+      })
+    } else {
+      return res.status(400).json({ status: 400, message: 'No stock was added' })
+    }
   } catch (error) {
     console.error('Error adding stock:', error)
     res.status(500).json({ status: 500, message: error.message })
@@ -538,6 +542,10 @@ exports.getStock = async (req, res, next) => {
         data: data
       })
     }
+
+    const io = getSocket()
+    io.emit('stock/', {});
+
     res.status(200).json({
       status: 200,
       message: 'successfully!',
@@ -619,6 +627,9 @@ exports.getQty = async (req, res, next) => {
       unitData
     }
 
+    const io = getSocket()
+    io.emit('stock/get', {});
+
     return res.status(200).json({
       status: 200,
       message: 'Stock Quantity fetched successfully!',
@@ -671,6 +682,10 @@ exports.addStockMovement = async (req, res, next) => {
       })
       newStockMovement.save()
 
+
+      const io = getSocket()
+      io.emit('stock/addStockMovement', {});
+
       res.status(200).json({
         status: 200,
         message: 'Stock Movement added successfully!'
@@ -709,6 +724,9 @@ exports.updateStockMovement = async (req, res, next) => {
       {}, // เงื่อนไข
       { $set: { action: action } } // สิ่งที่ต้องการอัปเดต
     )
+
+    const io = getSocket()
+    io.emit('stock/updateStockMovement', {});
 
     res.status(200).json({
       status: 200,
@@ -813,7 +831,7 @@ exports.availableStock = async (req, res, next) => {
     const data = products.map(product => {
       const lot = modelStock.find(u => u.productId == product.id)
 
-      console.log('lot', lot)
+      // console.log('lot', lot)
       const tranFromProduct = product
         ? {
           // ...product,
@@ -936,6 +954,11 @@ exports.availableStock = async (req, res, next) => {
 
     const sorted = groupList.flatMap(g => g.items)
 
+
+    const io = getSocket()
+    io.emit('stock/availableStock', {});
+
+
     res.status(200).json({
       status: 200,
       message: 'Success',
@@ -1029,6 +1052,10 @@ exports.addStockFromERP = async (req, res) => {
     const stockDoc = new Stock(record)
     await stockDoc.save()
   }
+
+  const io = getSocket()
+  io.emit('stock/addStockFromERP', {});
+
 
   res.status(200).json({
     status: 200,
@@ -1188,6 +1215,9 @@ exports.getStockQty = async (req, res) => {
   data.forEach(item => {
     delete item.pcsMain
   })
+
+  const io = getSocket()
+  io.emit('stock/getStockQty', {});
 
   res.status(200).json({
     status: 200,
@@ -1674,6 +1704,10 @@ exports.getStockQtyNew = async (req, res) => {
     delete item.pcsMain
   })
 
+  const io = getSocket()
+  io.emit('stock/getStockQtyNew', {});
+
+
   res.status(200).json({
     status: 200,
     message: 'suceesful',
@@ -1743,6 +1777,10 @@ exports.getWeightProduct = async (req, res) => {
     weightGross += gross * qty
     weightNet += net * qty
   }
+
+  const io = getSocket()
+  io.emit('stock/getWeightProduct', {});
+
 
   res.status(200).json({
     status: 200,
@@ -2061,6 +2099,12 @@ exports.getStockQtyDetail = async (req, res) => {
       changeStock,
       'sale'
     )
+
+  const io = getSocket()
+  io.emit('stock/getStockQtyDetail', {});
+
+
+
     res.status(200).json({
       status: 200,
       message: 'successfully!',
@@ -2183,6 +2227,10 @@ exports.checkout = async (req, res) => {
       createdAt: { $gte: startDate, $lt: endDate }
     })
 
+  const io = getSocket()
+  io.emit('stock/checkout', {});
+
+
     res.status(200).json({
       status: 200,
       message: 'Sucessful',
@@ -2301,6 +2349,10 @@ exports.approveAdjustStock = async (req, res) => {
     { $set: { statusTH: statusThStr, status: statusStr } },
     { new: true }
   )
+
+
+  const io = getSocket()
+  io.emit('stock/approveAdjustStock', {});
 
   res.status(200).json({
     status: 200,
