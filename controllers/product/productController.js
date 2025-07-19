@@ -4,7 +4,7 @@ const fs = require('fs')
 const path = require('path')
 const productModel = require('../../models/cash/product')
 const stockModel = require('../../models/cash/stock')
-
+const { getSocket } = require('../../socket')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { productQuery } = require('../../controllers/queryFromM3/querySctipt')
 const { group } = require('console')
@@ -35,6 +35,10 @@ exports.getProductAll = async (req, res) => {
       return modifiedProduct
     })
 
+
+    const io = getSocket()
+    io.emit('product/all', {});
+
     res.status(200).json({
       status: '200',
       message: 'Products fetched successfully!',
@@ -59,6 +63,9 @@ exports.getProductSwitch = async (req, res) => {
       { $sort: { statusSaleOrder: 1, groupCode: 1 } },
       { $project: { statusSaleOrder: 0 } } // Remove the helper field from the result
     ])
+
+    const io = getSocket()
+    io.emit('product/getProductSwitch', {});
 
     res.status(200).json({
       status: '200',
@@ -200,6 +207,9 @@ exports.getProduct = async (req, res) => {
         return parseGram(a.size) - parseGram(b.size)
       })
 
+    const io = getSocket()
+    io.emit('product/get', {});
+
     res.status(200).json({
       status: '200',
       message: 'Products fetched successfully!',
@@ -279,6 +289,10 @@ exports.getFilters = async (req, res) => {
     // ✅ กรอง null ออกจากผลลัพธ์สุดท้ายด้วย
     const clean = arr => (arr || []).filter(item => item !== null)
 
+    const io = getSocket()
+    io.emit('product/filter', {});
+
+
     res.status(200).json({
       status: '200',
       message: 'Filters fetched successfully!',
@@ -334,6 +348,9 @@ exports.searchProduct = async (req, res) => {
         .json({ status: '404', message: 'No products found!' })
     }
 
+    const io = getSocket()
+    io.emit('product/search', {});
+
     res.status(200).json({
       status: '200',
       message: 'Search results fetched successfully!',
@@ -378,6 +395,9 @@ exports.updateStatus = async (req, res) => {
         .status(404)
         .json({ status: '404', message: 'product not found!' })
     }
+
+    const io = getSocket()
+    io.emit('product/onOff', {});
 
     res.status(200).json({
       status: '200',
@@ -543,6 +563,9 @@ exports.addProduct = async (req, res) => {
       })
 
       await storeData.save()
+
+
+
       res.status(200).json({
         status: '200',
         message: 'Store added successfully'
@@ -730,6 +753,11 @@ exports.addFromERPnew = async (req, res) => {
     await newProduct.save()
     data.push(newProduct)
   }
+
+  const io = getSocket()
+  io.emit('product/addFromERPnew', {});
+
+
   res.status(200).json({
     status: 200,
     message: 'Products added successfully',
@@ -757,6 +785,8 @@ exports.groupProductId = async (req, res) => {
       }
     }
   ])
+
+
 
   res.status(200).json({
     status: 200,
@@ -786,6 +816,8 @@ exports.groupBrandId = async (req, res) => {
     }
   ])
 
+
+
   res.status(200).json({
     status: 200,
     message: 'sucess',
@@ -811,6 +843,8 @@ exports.groupSize = async (req, res) => {
       }
     }
   ])
+
+
 
   res.status(200).json({
     status: 200,
@@ -839,6 +873,8 @@ exports.groupFlavourId = async (req, res) => {
       }
     }
   ])
+
+
 
   res.status(200).json({
     status: 200,
@@ -890,6 +926,8 @@ exports.groupByFilter = async (req, res) => {
     })
   }
 
+
+
   res.status(200).json({
     status: 200,
     message: 'sucess',
@@ -940,6 +978,8 @@ exports.flavourByFilter = async (req, res) => {
     })
   }
 
+
+
   res.status(200).json({
     status: 200,
     message: 'sucess',
@@ -989,6 +1029,8 @@ exports.sizeByFilter = async (req, res) => {
       message: 'Not found size'
     })
   }
+
+
 
   res.status(200).json({
     status: 200,
@@ -1115,6 +1157,9 @@ exports.addProductimage = async (req, res) => {
       }
     )
   }
+
+  const io = getSocket()
+  io.emit('delivery/addProductimage', {});
 
   res.status(200).json({
     status: 200,
