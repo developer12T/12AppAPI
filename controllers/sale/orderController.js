@@ -67,7 +67,8 @@ exports.checkout = async (req, res) => {
       note,
       latitude,
       longitude,
-      shipping,
+      shippingId,
+      address,
       payment,
       changePromotionStatus,
       listPromotion = []
@@ -91,7 +92,7 @@ exports.checkout = async (req, res) => {
       stockModel
     )
 
-    if (!type || !area || !storeId || !shipping || !payment) {
+    if (!type || !area || !storeId || !shippingId || !address || !payment) {
       return res
         .status(400)
         .json({ status: 400, message: 'Missing required fields!' })
@@ -208,6 +209,8 @@ exports.checkout = async (req, res) => {
         zone: summary.store.zone,
         isBeauty: summary.store.isBeauty
       },
+      shippingId,
+      address,
       note,
       latitude,
       longitude,

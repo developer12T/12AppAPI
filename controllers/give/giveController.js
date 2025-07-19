@@ -204,7 +204,8 @@ exports.checkout = async (req, res) => {
       note,
       latitude,
       longitude,
-      shipping
+      shippingId,
+      address,
     } = req.body
     const channel = req.headers['x-channel']
     const { Cart } = getModelsByChannel(channel, res, cartModel)
@@ -219,7 +220,7 @@ exports.checkout = async (req, res) => {
       stockModel
     )
 
-    if (!type || !area || !storeId || !giveId || !shipping) {
+    if (!type || !area || !storeId || !giveId || !shippingId || !address) {
       return res
         .status(400)
         .json({ status: 400, message: 'Missing required fields!' })
@@ -287,10 +288,8 @@ exports.checkout = async (req, res) => {
       totalVat: summary.totalVat,
       totalExVat: summary.totalExVat,
       total: summary.total,
-      shipping: {
-        shippingId: '',
-        address: ''
-      },
+      shippingId:shippingId,
+      address:address,
       createdBy: sale.username,
       period: period
     })

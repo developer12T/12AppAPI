@@ -211,11 +211,11 @@ module.exports.updateStockMongo = async function (
   const factorPcsQty = qty * factorPcs
   const factorCtnQty = factorCtn > 0 ? Math.floor(factorPcsQty / factorCtn) : 0
 
-  console.log('factorCtn', factorCtn)
-  console.log('factorPcs', factorPcs)
-  console.log('factorPcsQty', factorPcsQty)
-  console.log('factorCtnQty', factorCtnQty)
-  console.log('id', id)
+  // console.log('factorCtn', factorCtn)
+  // console.log('factorPcs', factorPcs)
+  // console.log('factorPcsQty', factorPcsQty)
+  // console.log('factorCtnQty', factorCtnQty)
+  // console.log('id', id)
 
   if (factorPcs === 0)
     throw new Error('Cannot find product unit factor for PCS')
