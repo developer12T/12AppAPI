@@ -1159,7 +1159,7 @@ exports.addProductimage = async (req, res) => {
   }
 
   const io = getSocket()
-  io.emit('delivery/addProductimage', {});
+  io.emit('product/addProductimage', {});
 
   res.status(200).json({
     status: 200,
