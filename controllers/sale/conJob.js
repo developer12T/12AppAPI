@@ -54,7 +54,7 @@ async function erpApiCheckOrderJob(channel = 'cash') {
       }
     }
 
-    // 5. Broadcast event
+    const io = getSocket()
     io.emit('order/statusOrderUpdated', {
       updatedCount,
       updatedAt: new Date()
@@ -129,7 +129,7 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
     //     message: 'New Update Data'
     //   });
     // });
-
+    const io = getSocket()
     io.emit('order/statusWithdrawUpdated', {
       updatedCount,
       updatedAt: new Date()

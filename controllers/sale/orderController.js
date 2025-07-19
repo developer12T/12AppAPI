@@ -52,8 +52,7 @@ const xlsx = require('xlsx')
 const path = require('path')
 const os = require('os')
 const fs = require('fs')
-const { group } = require('console')
-const { query } = require('mssql')
+
 
 exports.checkout = async (req, res) => {
   // const transaction = await sequelize.transaction();
@@ -181,8 +180,8 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-          .map(item => item.price)
-          .reduce((sum, price) => sum + price, 0)
+        .map(item => item.price)
+        .reduce((sum, price) => sum + price, 0)
       : 0
     const total = subtotal - discountProduct
     const newOrder = new Order({
@@ -416,6 +415,10 @@ exports.checkout = async (req, res) => {
       }
     }
 
+    const io = getSocket()
+    io.emit('order/checkout', {});
+
+
     // await transaction.commit()
     res.status(200).json({
       status: 200,
@@ -504,6 +507,9 @@ exports.getOrder = async (req, res) => {
       createdAt: o.createdAt
     }))
 
+    const io = getSocket()
+    io.emit('order/all', {});
+
     res.status(200).json({
       status: 200,
       message: 'Successful!',
@@ -537,6 +543,9 @@ exports.getDetail = async (req, res) => {
         message: `Not found this ${orderId}`
       })
     }
+
+    const io = getSocket()
+    io.emit('order/detail', {});
 
     res.status(200).json({
       status: 200,
@@ -680,7 +689,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -832,6 +841,10 @@ exports.addSlip = async (req, res) => {
 
       await order.save()
 
+
+      const io = getSocket()
+      io.emit('order/addSlip', {});
+
       res.status(200).json({
         status: 200,
         message: 'Images uploaded successfully!',
@@ -905,7 +918,7 @@ exports.OrderToExcel = async (req, res) => {
   // console.log(modelOrder)
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD (date) {
+    function formatDateToThaiYYYYMMDD(date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1038,7 +1051,7 @@ exports.OrderToExcel = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => {})
+    fs.unlink(tempPath, () => { })
   })
 
   // res.status(200).json({
@@ -1321,6 +1334,9 @@ exports.getAllOrder = async (req, res) => {
         summary: item.summary
       }))
 
+      const io = getSocket()
+      io.emit('order/getAllOrder', {});
+
       res.status(200).json({
         status: 200,
         message: 'success',
@@ -1506,6 +1522,9 @@ exports.getSummaryItem = async (req, res) => {
       // console.log(result)
     }
 
+    const io = getSocket()
+    io.emit('order/getSummaryItem', {});
+
     res.status(200).json({
       status: 200,
       message: 'success',
@@ -1594,6 +1613,9 @@ exports.getSummarybyRoute = async (req, res) => {
         summary: item.totalAmount
       }
     })
+
+    const io = getSocket()
+    io.emit('order/getSummarybyRoute', {});
 
     res.status(200).json({
       status: 200,
@@ -1710,6 +1732,10 @@ exports.getSummarybyMonth = async (req, res) => {
     modelOrderValue.forEach(d => {
       result[d.month - 1].summary = d.summary
     })
+
+
+    const io = getSocket()
+    io.emit('order/getSummarybyMonth', {});
 
     res.status(200).json({
       status: 200,
@@ -1949,6 +1975,9 @@ exports.getSummarybyArea = async (req, res) => {
       })
     }
 
+    const io = getSocket()
+    io.emit('order/getSummarybyArea', {});
+
     res.status(200).json({
       status: 200,
       message: 'Success',
@@ -2079,6 +2108,9 @@ exports.getSummarybyGroup = async (req, res) => {
         }
       }
     }
+
+    const io = getSocket()
+    io.emit('order/getSummarybyGroup', {});
 
     res.status(200).json({
       status: 200,
@@ -2308,6 +2340,10 @@ exports.getSummarybyChoice = async (req, res) => {
     })
   }
 
+  const io = getSocket()
+  io.emit('order/getSummarybyChoice', {});
+
+
   res.status(200).json({
     status: 200,
     message: 'Successful',
@@ -2399,6 +2435,10 @@ exports.getSaleSummaryByStore = async (req, res) => {
       }
     }
   ])
+
+  const io = getSocket()
+  io.emit('order/getSaleSummaryByStore', {});
+
 
   res.status(200).json({
     status: 200,
@@ -2782,6 +2822,10 @@ exports.getSummaryProduct = async (req, res) => {
     summaryPercentStore: summaryPercentStore
   }
 
+  const io = getSocket()
+  io.emit('order/getSummaryProduct', {});
+
+
   res.status(200).json({
     status: 200,
     message: 'Success',
@@ -2870,6 +2914,10 @@ exports.summaryAllProduct = async (req, res) => {
     //   sumPrice += item.balanceCtn * getCtn.listUnit.price.sale;
     // }
   }
+
+  const io = getSocket()
+  io.emit('order/summaryAllProduct', {});
+
 
   res.status(200).json({
     status: 200,
@@ -3075,7 +3123,9 @@ exports.summaryDaily = async (req, res) => {
       return sum + (item.damaged || 0)
     }, 0)
 
-    // console.log(fullMonthArr)
+    const io = getSocket()
+    io.emit('order/summaryDaily', {});
+
     res.status(200).json({
       status: 200,
       message: 'success',
@@ -3263,7 +3313,9 @@ exports.summaryDailyByZone = async (req, res) => {
       })
     }
 
-    // ส่ง response ในรูปแบบตามต้องการ
+    const io = getSocket()
+    io.emit('order/summaryDailyByZone', {});
+
     res.status(200).json({
       status: 200,
       message: 'success',
@@ -3365,6 +3417,10 @@ exports.saleReport = async (req, res) => {
         }
       }
     ])
+
+    const io = getSocket()
+    io.emit('order/saleReport', {});
+
 
     res.status(200).json({
       status: 200,
@@ -3470,6 +3526,10 @@ exports.getSummary18SKU = async (req, res) => {
       numeric: true
     })
   })
+
+   const io = getSocket()
+    io.emit('order/getSummary18SKU', {});
+
 
   res.status(200).json({
     status: 200,
