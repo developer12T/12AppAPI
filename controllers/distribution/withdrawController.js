@@ -19,6 +19,7 @@ const { query } = require('mssql')
 const { exists } = require('fs')
 const { formatDateTimeToThai } = require('../../middleware/order')
 const { to2, updateStockMongo } = require('../../middleware/order')
+const { getSocket } = require('../../socket')
 
 exports.checkout = async (req, res) => {
   const transaction = await sequelize.transaction()
@@ -292,6 +293,10 @@ exports.checkout = async (req, res) => {
     await newOrder.save()
     await Cart.deleteOne({ type, area })
     await transaction.commit()
+
+    const io = getSocket()
+    io.emit('distribution/checkout', {});
+
     res.status(200).json({
       status: 200,
       message: 'Checkout successful!',
@@ -401,6 +406,10 @@ exports.getOrder = async (req, res) => {
       createdAt: formatDateTimeToThai(o.createdAt)
     }))
 
+    const io = getSocket()
+    io.emit('distribution/get', {});
+
+
     res.status(200).json({
       status: 200,
       message: 'Successful!',
@@ -480,6 +489,10 @@ exports.getDetail = async (req, res) => {
       }
     })
 
+
+    const io = getSocket()
+    io.emit('distribution/detail', {});
+
     res.status(200).json({
       status: 200,
       message: 'successful!',
@@ -526,6 +539,10 @@ exports.updateStatus = async (req, res) => {
       { $set: { status, statusTH } },
       { new: true }
     )
+
+
+    const io = getSocket()
+    io.emit('distribution/updateStatus', {});
 
     res.status(200).json({
       status: 200,
@@ -654,6 +671,9 @@ exports.updateStockWithdraw = async (req, res) => {
     )
   }
 
+  const io = getSocket()
+  io.emit('distribution/updateStockWithdraw', {});
+
   res.status(200).json({
     status: 200,
     message: 'successfully',
@@ -710,6 +730,10 @@ exports.insertWithdrawToErp = async (req, res) => {
     `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
     data
   )
+
+  const io = getSocket()
+  io.emit('distribution/insertWithdrawToErp', {});
+
 
   res.status(200).json({
     status: 200,
@@ -768,6 +792,9 @@ exports.insertOneWithdrawToErp = async (req, res) => {
     data
   )
 
+  const io = getSocket()
+  io.emit('distribution/insertOneWithdrawToErp', {});
+
   res.status(200).json({
     status: 200,
     message: 'successfully',
@@ -790,6 +817,10 @@ exports.addFromERPWithdraw = async (req, res) => {
       await Withdraw.create(item)
     }
   }
+
+  const io = getSocket()
+  io.emit('distribution/addFromERPWithdraw', {});
+
 
   res.status(200).json({
     status: 200,
@@ -1015,6 +1046,10 @@ exports.approveWithdraw = async (req, res) => {
         // }
       }
     }
+
+    const io = getSocket()
+    io.emit('distribution/approveWithdraw', {});
+
 
     res.status(200).json({
       status: 200,

@@ -657,7 +657,7 @@ exports.updateCartPromotion = async (req, res) => {
     // session.endSession();
 
     const io = getSocket()
-    io.emit('cart/ssssssssss', {})
+    io.emit('cart/updateStock', {})
 
     res.status(200).json({
       status: '200',

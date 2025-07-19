@@ -29,10 +29,13 @@ exports.getPlace = async (req, res) => {
             return res.status(404).json({ status: 404, message: 'Place not found!' })
         }
 
-        console.log(place.listAddress)
+        // console.log(place.listAddress)
         if (type) {
             place.listAddress = place.listAddress.filter(address => address.type === type)
         }
+
+        const io = getSocket()
+        io.emit('distribution/place/get', {});
 
         res.status(200).json({
             status: '200',
@@ -131,6 +134,10 @@ exports.getType = async (req, res) => {
                 }
             }
         }
+
+        const io = getSocket()
+        io.emit('distribution/getType', {});
+
         res.status(200).json({
             status: '200',
             message: 'Type list fetched successfully!',

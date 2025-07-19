@@ -12,7 +12,7 @@ const promotionModel = require('../../models/cash/promotion')
 const sendMoneyModel = require('../../models/cash/sendmoney')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { Item } = require('../../models/cash/master')
-
+const { getSocket } = require('../../socket')
 exports.reportCheck = async (req, res) => {
   try {
     const { start, end, zone, team, area } = req.query
@@ -140,6 +140,12 @@ exports.reportCheck = async (req, res) => {
         }
       })
       .sort((a, b) => a.area.localeCompare(b.area))
+
+
+
+    const io = getSocket()
+    io.emit('admin/reportCheck', {});
+
 
     res.status(200).json({
       status: 200,
