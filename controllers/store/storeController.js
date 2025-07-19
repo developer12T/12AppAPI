@@ -6,7 +6,7 @@ const axios = require('axios')
 const multer = require('multer')
 const userModel = require('../../models/cash/user')
 const ExcelJS = require('exceljs')
-
+const { getSocket } = require('../../socket')
 const addUpload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages'
 )
@@ -65,6 +65,10 @@ exports.getDetailStore = async (req, res) => {
     if (!storeData) {
       return res.status(404).json({ status: 404, message: 'Store not found' })
     }
+
+
+    const io = getSocket()
+    io.emit('store/', {});
 
     // ส่งข้อมูลกลับ
     res.status(200).json({
@@ -204,6 +208,9 @@ exports.getStore = async (req, res) => {
         message: 'Not Found Store'
       })
     }
+
+    const io = getSocket()
+    io.emit('store/getStore', {});
 
     res.status(200).json({
       status: '200',
@@ -416,6 +423,9 @@ exports.addStore = async (req, res) => {
       await storeData.save()
       // console.log(storeData)
 
+      const io = getSocket()
+      io.emit('store/addStore', {});
+
       res.status(200).json({
         status: '200',
         message: 'Store added successfully'
@@ -483,6 +493,11 @@ exports.checkSimilarStores = async (req, res) => {
       ),
       similarity: item.similarity.toFixed(2)
     }))
+
+    const io = getSocket()
+    io.emit('store/check', {});
+
+
     return res.status(200).json({
       status: '200',
       message: 'similar store',
@@ -529,6 +544,10 @@ exports.editStore = async (req, res) => {
     if (!store) {
       return res.status(404).json({ status: '404', message: 'Store not found' })
     }
+
+    const io = getSocket()
+    io.emit('store/editStore', {});
+
 
     res.status(200).json({
       status: '200',
@@ -676,6 +695,9 @@ exports.addFromERPnew = async (req, res) => {
       }
     }
 
+    const io = getSocket()
+    io.emit('store/addFromERPnew', {});
+
     res.status(200).json({
       status: 200,
       message: 'Sync Store Success',
@@ -718,6 +740,9 @@ exports.checkInStore = async (req, res) => {
         .status(404)
         .json({ status: '404', message: 'store not found!' })
     }
+
+    const io = getSocket()
+    io.emit('store/checkIn', {});
 
     res.status(200).json({
       status: '200',
@@ -796,6 +821,10 @@ exports.updateStoreStatus = async (req, res) => {
       },
       { new: true }
     )
+
+    const io = getSocket()
+    io.emit('store/updateStoreStatus', {});
+
     res.status(200).json({
       status: 200,
       message: 'Reject Store successful'
@@ -1057,12 +1086,17 @@ exports.addBueatyStore = async (req, res) => {
 
     // 3. Insert new
     // (สามารถ optimize เป็น insertMany ได้ ถ้าไม่มีเงื่อนไข exists)
-await TypeStore.insertMany(bueatydata.map(x => ({ ...x, type: ['beauty'] })), { session })
+    await TypeStore.insertMany(bueatydata.map(x => ({ ...x, type: ['beauty'] })), { session })
 
 
     // 4. Commit
     await session.commitTransaction()
     session.endSession()
+
+    const io = getSocket()
+    io.emit('store/addBueatyStore', {});
+
+
 
     res.status(200).json({
       status: 200,
@@ -1126,6 +1160,9 @@ exports.addStoreArray = async (req, res) => {
     }
   }
 
+  const io = getSocket()
+  io.emit('store/addStoreArray', {});
+
   res.status(200).json({
     status: 200,
     message: 'Store sync completed',
@@ -1165,6 +1202,9 @@ exports.updateStoreArray = async (req, res) => {
       }
     }
   }
+  const io = getSocket()
+  io.emit('store/updateStoreArray', {});
+
   res.status(200).json({
     status: 200,
     message: 'Store update check completed',
@@ -1182,6 +1222,10 @@ exports.deleteStoreArray = async (req, res) => {
   const deletedStoreId = storeToDelete.map(store => store.storeId)
 
   await Store.deleteMany({ storeId: { $in: storeId } })
+
+  const io = getSocket()
+  io.emit('store/deleteStoreArray', {});
+
 
   res.status(200).json({
     status: 200,
@@ -1331,6 +1375,10 @@ exports.getShipping = async (req, res) => {
     })
   }
 
+
+  const io = getSocket()
+  io.emit('store/getShipping', {});
+
   return res.status(200).json({
     status: 200,
     message: 'sucess',
@@ -1394,6 +1442,9 @@ exports.addShippingInStore = async (req, res) => {
       },
       { new: true }
     );
+
+    const io = getSocket()
+    io.emit('store/addShippingInStore', {});
 
     return res.status(200).json({
       status: 200,
@@ -1461,6 +1512,10 @@ exports.editShippingInStore = async (req, res) => {
       { new: true }
     );
 
+    const io = getSocket()
+    io.emit('store/editShippingInStore', {});
+
+
     return res.status(200).json({
       status: 200,
       message: 'success',
@@ -1500,6 +1555,9 @@ exports.deleteShippingFromStore = async (req, res) => {
       { $pull: { shippingAddress: { shippingId: shippingId } } },
       { new: true }
     );
+
+    const io = getSocket()
+    io.emit('store/deleteShippingFromStore', {});
 
     return res.status(200).json({
       status: 200,
