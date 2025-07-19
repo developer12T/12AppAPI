@@ -1,5 +1,6 @@
 const { getModelsByChannel } = require('../../middleware/channel')
 const { uploadFiles } = require('../../utilities/upload')
+const { getSocket } = require('../../socket')
 const orderModel = require('../../models/cash/sale')
 const routeModel = require('../../models/cash/route')
 const sendmoneyModel = require('../../models/cash/sendmoney')
@@ -71,6 +72,10 @@ exports.addSendMoney = async (req, res) => {
       }
     )
   }
+
+  const io = getSocket()
+  io.emit('sendmoney/addSendMoney', {});
+
   res.status(200).json({
     status: 200,
     message: 'success',
@@ -153,6 +158,10 @@ exports.addSendMoneyImage = async (req, res) => {
           { $push: { imageList: { $each: uploadedFiles } } }
         )
       }
+
+      const io = getSocket()
+      io.emit('sendmoney/addSendMoneyImage', {});
+
       res.status(200).json({
         status: '200',
         message: 'Sendmoney upload successfully'
@@ -304,6 +313,10 @@ exports.getSendMoney = async (req, res) => {
       );
     }
 
+    const io = getSocket()
+    io.emit('sendmoney/getSendMoney', {});
+
+
     res.status(200).json({
       message: 'success',
       summary: totalToSend,
@@ -347,6 +360,9 @@ exports.getAllSendMoney = async (req, res) => {
   }
 
   const sendMoneyData = await SendMoney.aggregate(pipeline);
+
+  const io = getSocket()
+  io.emit('sendmoney/getAllSendMoney', {});
 
   res.status(200).json({
     status: 200,
@@ -404,7 +420,7 @@ exports.getSendMoneyForAcc = async (req, res) => {
     },
     {
       $group: {
-        _id: { area: '$area', sale: '$sale', STATUS: '$STATUS', TRANSFER_DATE: '$TRANSFER_DATE', ZONE:'$ZONE' },
+        _id: { area: '$area', sale: '$sale', STATUS: '$STATUS', TRANSFER_DATE: '$TRANSFER_DATE', ZONE: '$ZONE' },
         VALUES: { $sum: '$VALUES' },
         COUNT: { $sum: 1 }
       }
@@ -426,18 +442,19 @@ exports.getSendMoneyForAcc = async (req, res) => {
   const dataFinal = data.map(item => {
 
     return {
-      AREA:item.AREA,
-      COUNT:item.COUNT,
-      SALE:item.SALE,
-      STATUS:item.STATUS,
-      TRANSFER_DATE:item.TRANSFER_DATE,
-      VALUES:item.VALUES,
-      ZONE:item.ZONE
+      AREA: item.AREA,
+      COUNT: item.COUNT,
+      SALE: item.SALE,
+      STATUS: item.STATUS,
+      TRANSFER_DATE: item.TRANSFER_DATE,
+      VALUES: item.VALUES,
+      ZONE: item.ZONE
     }
   })
 
 
-
+  const io = getSocket()
+  io.emit('sendmoney/getSendMoneyForAcc', {});
 
 
   res.status(200).json({
