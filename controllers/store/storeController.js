@@ -47,7 +47,7 @@ const path = require('path')
 const { v4: uuidv4 } = require('uuid')
 
 uuidv4() // ⇨ '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed'
-const { productQuery,bueatyStoreQuery } = require('../../controllers/queryFromM3/querySctipt')
+const { productQuery, bueatyStoreQuery } = require('../../controllers/queryFromM3/querySctipt')
 const store = require('../../models/cash/store')
 
 exports.getDetailStore = async (req, res) => {
@@ -1047,7 +1047,7 @@ exports.addBueatyStore = async (req, res) => {
 
 
 
-  
+
   for (const data of bueatydata) {
     const exists = await TypeStore.findOne({ storeId: data.storeId })
     if (!exists) {
@@ -1323,3 +1323,174 @@ exports.getShipping = async (req, res) => {
 
 }
 
+exports.addShippingInStore = async (req, res) => {
+  try {
+    const { storeId, defaultId, shippingId, address, district,
+      subDistrict, province, postCode, latitude, longtitude
+    } = req.body
+
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const existStore = await Store.aggregate([
+      {
+        $match: {
+          storeId: storeId
+        }
+      }
+    ])
+
+    if (existStore.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found store',
+      })
+    }
+
+    const storeWithShipping = await Store.findOne({
+      storeId: storeId,
+      'shippingAddress.shippingId': shippingId
+    });
+    if (storeWithShipping) {
+      return res.status(409).json({
+        status: 409,
+        message: 'This shippingId already exists for this store.',
+      });
+    }
+
+    const addShipping = await Store.findOneAndUpdate(
+      { storeId: storeId },
+      {
+        $push: {
+          shippingAddress: {
+            default: defaultId,
+            shippingId: shippingId,
+            address: address,
+            district: district,
+            subDistrict: subDistrict,
+            province: province,
+            postCode: postCode,
+            latitude: latitude,
+            longtitude: longtitude,
+          }
+        }
+      },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: addShipping
+    })
+
+  } catch (error) {
+    console.error('addShippingInStore error:', error)
+    return res.status(500).json({ status: 500, message: 'Internal server error' })
+  }
+}
+
+
+exports.editShippingInStore = async (req, res) => {
+  try {
+    const {
+      storeId,
+      defaultId,
+      shippingId,
+      address,
+      district,
+      subDistrict,
+      province,
+      postCode,
+      latitude,
+      longitude
+    } = req.body;
+
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const existStore = await Store.findOne({
+      storeId: storeId,
+      'shippingAddress.shippingId': shippingId
+    });
+
+    if (!existStore) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found this shippingId in this store',
+      });
+    }
+
+    let setObj = {};
+    if (defaultId !== undefined && defaultId !== "") setObj["shippingAddress.$.default"] = defaultId;
+    if (address !== undefined && address !== "") setObj["shippingAddress.$.address"] = address;
+    if (district !== undefined && district !== "") setObj["shippingAddress.$.district"] = district;
+    if (subDistrict !== undefined && subDistrict !== "") setObj["shippingAddress.$.subDistrict"] = subDistrict;
+    if (province !== undefined && province !== "") setObj["shippingAddress.$.province"] = province;
+    if (postCode !== undefined && postCode !== "") setObj["shippingAddress.$.postCode"] = postCode;
+    if (latitude !== undefined && latitude !== "") setObj["shippingAddress.$.latitude"] = latitude;
+    if (longitude !== undefined && longitude !== "") setObj["shippingAddress.$.longitude"] = longitude;
+
+    if (Object.keys(setObj).length === 0) {
+      return res.status(400).json({
+        status: 400,
+        message: 'No valid fields to update',
+      });
+    }
+
+    const updatedStore = await Store.findOneAndUpdate(
+      { storeId: storeId, 'shippingAddress.shippingId': shippingId },
+      { $set: setObj },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: updatedStore
+    });
+  } catch (error) {
+    console.error('editShippingInStore error:', error)
+    return res.status(500).json({ status: 500, message: 'Internal server error' });
+  }
+}
+
+
+
+exports.deleteShippingFromStore = async (req, res) => {
+  try {
+    const { storeId, shippingId } = req.body; // หรือ req.params, แล้วแต่ดีไซน์
+
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    // เช็กว่าร้านนี้มี shippingId นี้จริงหรือไม่
+    const existStore = await Store.findOne({
+      storeId: storeId,
+      'shippingAddress.shippingId': shippingId
+    });
+
+    if (!existStore) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found this shippingId in this store',
+      });
+    }
+
+    // ลบ shippingAddress ที่ตรงกับ shippingId นี้
+    const updatedStore = await Store.findOneAndUpdate(
+      { storeId: storeId },
+      { $pull: { shippingAddress: { shippingId: shippingId } } },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: updatedStore
+    });
+  } catch (error) {
+    console.error('deleteShippingFromStore error:', error)
+    return res.status(500).json({ status: 500, message: 'Internal server error' });
+  }
+}

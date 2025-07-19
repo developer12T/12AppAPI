@@ -20,7 +20,7 @@ const {
   checkout,
   getAdjustStockDetail,
   stockToExcel,
-  getStockQtyNew
+  getStockQtyNew,
 } = require('../../controllers/stock/stockController')
 
 const router = express.Router()

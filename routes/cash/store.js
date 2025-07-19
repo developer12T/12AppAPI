@@ -22,7 +22,10 @@ const {
   getDetailStore,
   insertStoreToErpOne,
   checkSimilarStores,
-  getShipping
+  getShipping,
+  addShippingInStore,
+  deleteShippingFromStore,
+  editShippingInStore
   // test
 } = require('../../controllers/store/storeController')
 
@@ -59,7 +62,9 @@ router.post('/deleteStoreArray', deleteStoreArray)
 router.get('/getTypeStore', getTypeStore)
 router.post('/addTypeStore', addTypeStore)
 router.post('/insertStoreToErpOne', insertStoreToErpOne)
-
+router.post('/addShippingInStore', addShippingInStore)
+router.post('/deleteShippingFromStore', deleteShippingFromStore)
+router.post('/editShippingInStore', editShippingInStore)
 // router.get('/test', test)
 
 router.post('/addCallCard', addCallCard)
