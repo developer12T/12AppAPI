@@ -6,6 +6,9 @@ const modelProduct = require('../../models/cash/product')
 const modelSendMoney = require('../../models/cash/sendmoney')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { rangeDate } = require('../../utilities/datetime')
+const { getSocket } = require('../../socket')
+
+
 exports.getCallCard = async (req, res) => {
   try {
     const { area, period, storeId } = req.query
@@ -20,6 +23,9 @@ exports.getCallCard = async (req, res) => {
     const data = await CallCard.aggregate([
       { $match: query }
     ]);
+
+    const io = getSocket()
+    io.emit('store/getCallCard', {});
 
     res.status(200).json({
       status: 200,
@@ -102,6 +108,9 @@ exports.addCallCard = async (req, res) => {
 
     await CallCard.create(data)
 
+    const io = getSocket()
+    io.emit('store/addCallCard', {});
+
 
     res.status(200).json({
       status: 200,
@@ -132,6 +141,10 @@ exports.delCallCard = async (req, res) => {
         area: area,
         period: period
       });
+
+      const io = getSocket()
+      io.emit('store/delCallCard', {});
+
       return res.status(200).json({
         status: 200,
         message: 'Delete successful'
@@ -172,6 +185,9 @@ exports.addFlowAction = async (req, res) => {
       { $set: { flowAction: flowAction } },
       { new: true }
     );
+
+    const io = getSocket()
+    io.emit('store/addFlowAction', {});
 
     return res.status(200).json({
       status: 200,
@@ -266,6 +282,10 @@ exports.updateDetailStore = async (req, res) => {
       { new: true }
     );
 
+    const io = getSocket()
+    io.emit('store/updateDetailStore', {});
+
+
     return res.status(200).json({
       status: 200,
       message: 'Successful',
@@ -317,6 +337,9 @@ exports.updateDailyvisit = async (req, res) => {
       { new: true }
     );
 
+    const io = getSocket()
+    io.emit('store/updateDailyvisit', {});
+
     return res.status(200).json({
       status: 200,
       message: 'Successful',
@@ -342,6 +365,10 @@ exports.updateGooglemap = async (req, res) => {
       { $set: { googlemap: googlemap } },
       { new: true }
     );
+
+
+    const io = getSocket()
+    io.emit('store/updateGooglemap', {});
 
     return res.status(200).json({
       status: 200,
@@ -489,6 +516,11 @@ exports.addVisit = async (req, res) => {
     },
     { new: true }
   );
+
+  const io = getSocket()
+  io.emit('store/addVisit', {});
+
+
 
   res.status(200).json({
     status: 200,
