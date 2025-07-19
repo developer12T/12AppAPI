@@ -21,5 +21,5 @@ router.get('/all', getOrder)
 router.get('/detail/:orderId', getDetail)
 router.post('/checkout', checkout)
 router.get('/getGiveaways', getGiveaways)
-router.get('/getGiveaways/:giveId', getGiveawaysDetail)
+router.get('/getGiveawaysDetail/:giveId', getGiveawaysDetail)
 module.exports = router

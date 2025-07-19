@@ -10,7 +10,7 @@ const { summaryGive } = require('../../utilities/summary')
 const { rangeDate } = require('../../utilities/datetime')
 const { period, previousPeriod } = require('../../utilities/datetime')
 const productModel = require('../../models/cash/product')
-
+const { getSocket } = require('../../socket')
 const stockModel = require('../../models/cash/stock')
 const giveawaysModel = require('../../models/cash/give')
 const cartModel = require('../../models/cash/cart')
@@ -57,6 +57,11 @@ exports.addGiveType = async (req, res) => {
     newPromotion.createdAt = new Date()
     await newPromotion.save()
 
+
+    const io = getSocket()
+    io.emit('give/addGiveType', {});
+
+
     res.status(201).json({
       status: 201,
       message: 'Give type created successfully!',
@@ -82,6 +87,9 @@ exports.getGiveType = async (req, res) => {
         data: []
       })
     }
+
+    const io = getSocket()
+    io.emit('give/getGiveType', {});
 
     res.status(200).json({
       status: 200,
@@ -166,6 +174,9 @@ exports.getGiveProductFilter = async (req, res) => {
       )
     }
 
+    const io = getSocket()
+    io.emit('give/getGiveProductFilter', {});
+
     res.status(200).json({
       status: 200,
       message: 'Successfully fetched give product filters!',
@@ -182,6 +193,12 @@ exports.getGiveStoreFilter = async (req, res) => {
     const { area, giveId } = req.query
     const channel = req.headers['x-channel']
     const store = await getStoreGive(giveId, area, channel, res)
+
+    const io = getSocket()
+    io.emit('give/getGiveStoreFilter', {});
+
+
+
     res.status(200).json({
       status: 200,
       message: 'Successfully fetched give store filters!',
@@ -288,8 +305,8 @@ exports.checkout = async (req, res) => {
       totalVat: summary.totalVat,
       totalExVat: summary.totalExVat,
       total: summary.total,
-      shippingId:shippingId,
-      address:address,
+      shippingId: shippingId,
+      address: address,
       createdBy: sale.username,
       period: period
     })
@@ -405,6 +422,9 @@ exports.checkout = async (req, res) => {
     await newOrder.save()
     await Cart.deleteOne({ type, area, storeId })
 
+    const io = getSocket()
+    io.emit('give/checkout', {});
+
     res.status(200).json({
       status: 200,
       message: 'Checkout successful!',
@@ -483,6 +503,9 @@ exports.getOrder = async (req, res) => {
       status: o.status
     }))
 
+    const io = getSocket()
+    io.emit('give/all', {});
+
     res.status(200).json({
       status: 200,
       message: 'Successful!',
@@ -508,6 +531,9 @@ exports.getDetail = async (req, res) => {
 
     const order = await Giveaway.findOne({ orderId })
 
+    const io = getSocket()
+    io.emit('give/detail', {});
+
     res.status(200).json({
       status: 200,
       message: 'successful!',
@@ -523,6 +549,10 @@ exports.getGiveaways = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Givetype } = getModelsByChannel(channel, res, giveawaysModel)
   let data = await Givetype.find()
+
+  const io = getSocket()
+  io.emit('give/getGiveaways', {});
+
   res.status(200).json({
     status: 200,
     message: 'successful!',
@@ -534,6 +564,10 @@ exports.getGiveawaysDetail = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Givetype } = getModelsByChannel(channel, res, giveawaysModel)
   let data = await Givetype.findOne({ giveId: req.params.giveId })
+
+  const io = getSocket()
+  io.emit('give/getGiveawaysDetail', {});
+
   res.status(200).json({
     status: 200,
     message: 'successful!',
