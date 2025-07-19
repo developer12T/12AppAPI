@@ -15,7 +15,7 @@ const orderModel = require('../../models/cash/sale')
 const routeModel = require('../../models/cash/route')
 const storeModel = require('../../models/cash/store')
 const productModel = require('../../models/cash/product')
-
+const { getSocket } = require('../../socket')
 const { getModelsByChannel } = require('../../middleware/channel')
 const path = require('path')
 const { group } = require('console')
@@ -101,6 +101,9 @@ exports.getRoute = async (req, res) => {
         listStore: enrichedListStore
       }
     })
+
+    const io = getSocket()
+    io.emit('route/getRoute', {});
 
     res.status(200).json({
       status: 200,
@@ -375,6 +378,10 @@ exports.addFromERPnew = async (req, res) => {
       }
     }
 
+    const io = getSocket()
+    io.emit('route/addFromERPnew', {});
+
+
     res.status(200).json({
       status: 200,
       message: 'sucess'
@@ -525,34 +532,21 @@ exports.addFromERPOne = async (req, res) => {
       }
     }
 
+    const io = getSocket()
+    io.emit('route/addFromERPOne', {});
+
+
     res.status(200).json({
       status: 200,
       message: 'sucess',
       data: return_arr
     })
 
-
-
-
-
-
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -626,6 +620,10 @@ exports.checkIn = async (req, res) => {
           message: 'Route not found or listStore not matched'
         })
       }
+
+
+      const io = getSocket()
+      io.emit('route/checkIn', {});
 
       res.status(200).json({
         status: '200',
@@ -709,6 +707,11 @@ exports.checkInVisit = async (req, res) => {
         })
       }
 
+
+
+      const io = getSocket()
+      io.emit('route/checkInVisit', {});
+
       res.status(200).json({
         status: '200',
         message: 'check in successfully'
@@ -771,6 +774,10 @@ exports.changeRoute = async (req, res) => {
 
     await newRouteChangeLog.save()
 
+
+    const io = getSocket()
+    io.emit('route/change', {});
+
     res.status(201).json({
       status: '201',
       message: 'Route change logged successfully!'
@@ -815,7 +822,7 @@ exports.createRoute = async (req, res) => {
           changedStoreMap[store.storeInfo] = log
         })
       })
-      console.log('12', JSON.stringify(changeLogs, null, 2))
+      // console.log('12', JSON.stringify(changeLogs, null, 2))
 
       const routesGroupedByToRoute = previousRoutes.reduce((grouped, route) => {
         const routeId = `${period}${currentArea}${route.id.slice(-3)}`
@@ -900,6 +907,9 @@ exports.createRoute = async (req, res) => {
       )
     }
 
+    const io = getSocket()
+    io.emit('route/createRoute', {});
+
     res.status(200).json({
       status: '200',
       message: 'Routes created successfully.',
@@ -952,6 +962,10 @@ exports.routeHistory = async (req, res) => {
         .status(404)
         .json({ status: '404', message: 'History not found.' })
     }
+
+
+    const io = getSocket()
+    io.emit('route/history', {});
 
     res.status(200).json({
       status: '200',
@@ -1061,6 +1075,10 @@ exports.getTimelineCheckin = async (req, res) => {
         message: 'Not Found'
       })
     }
+
+    const io = getSocket()
+    io.emit('route/getTimelineCheckin', {});
+
     res.status(200).json({
       status: 200,
       message: 'Success',
@@ -1158,7 +1176,9 @@ exports.getRouteCheckinAll = async (req, res) => {
 
     const data = await Route.aggregate(query)
 
-    // const data = await aggregate.exec()
+    const io = getSocket()
+    io.emit('route/getRouteCheckinAll', {});
+
 
     res.status(200).json({
       status: 200,
@@ -1231,6 +1251,10 @@ exports.routeTimeline = async (req, res) => {
           count: hourCountMap[hour] || 0
         })
       }
+
+      const io = getSocket()
+      io.emit('route/routeTimeline', {});
+
 
       res.status(200).json({
         response: data
@@ -1424,6 +1448,10 @@ exports.getRouteProvince = async (req, res) => {
     .flatMap(item => item.province)
     .filter(p => p && p.trim() !== '')
 
+
+  const io = getSocket()
+  io.emit('route/getRouteProvince', {});
+
   res.status(200).json({
     status: 200,
     message: 'successful',
@@ -1593,6 +1621,10 @@ exports.getRouteEffective = async (req, res) => {
     }
   })
 
+
+  const io = getSocket()
+  io.emit('route/getRouteEffective', {});
+
   res.status(200).json({
     status: 200,
     message: 'successful',
@@ -1698,6 +1730,10 @@ exports.getRouteEffectiveAll = async (req, res) => {
 
   const percentVisitAvg = count > 0 ? totalVisit / count : 0
   const percentEffectiveAvg = count > 0 ? totalEffective / count : 0
+
+  const io = getSocket()
+  io.emit('route/getRouteEffectiveAll', {});
+
 
   res.status(200).json({
     status: 200,
@@ -1847,6 +1883,10 @@ exports.getRouteByArea = async (req, res) => {
     })
   }
 
+  const io = getSocket()
+  io.emit('route/getRouteByArea', {});
+
+
   res.status(200).json({
     status: 200,
     message: 'sucess',
@@ -1854,118 +1894,108 @@ exports.getRouteByArea = async (req, res) => {
   })
 }
 
-exports.deleteAndAddOne = async (req, res) => {
-
-
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    // data: data
-  })
-}
-
-
 exports.CheckRouteStore = async (req, res) => {
-  try{
-  const { zone, period } = req.query
-  const channel = req.headers['x-channel']
-  const { Route } = getModelsByChannel(channel, res, routeModel)
-  const { Store } = getModelsByChannel(channel, res, storeModel)
+  try {
+    const { zone, period } = req.query
+    const channel = req.headers['x-channel']
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
 
-  if (!period) {
-    return res.status(409).json({
-      status:409,
-      message:'period is require'
-    })
-  }
-
-
-
-  const dataRoute = await Route.aggregate([
-    {
-      $addFields: {
-        zone: { $substrBytes: ["$area", 0, 2] }
-      }
-    },
-    {
-      $match: {
-        zone: zone,
-        period: period
-      }
-    },
-    {
-      $group: {
-        _id: { area: "$area", day: "$day" },
-        count: { $sum: { $size: "$listStore" } } // <<< ตรงนี้!
-      }
+    if (!period) {
+      return res.status(409).json({
+        status: 409,
+        message: 'period is require'
+      })
     }
-  ]);
 
-  if (dataRoute.length === 0) {
-    return res.status(404).json({
-      status:404,
-      message:'Not Found this zone'
+
+
+    const dataRoute = await Route.aggregate([
+      {
+        $addFields: {
+          zone: { $substrBytes: ["$area", 0, 2] }
+        }
+      },
+      {
+        $match: {
+          zone: zone,
+          period: period
+        }
+      },
+      {
+        $group: {
+          _id: { area: "$area", day: "$day" },
+          count: { $sum: { $size: "$listStore" } } // <<< ตรงนี้!
+        }
+      }
+    ]);
+
+    if (dataRoute.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not Found this zone'
+      })
+    }
+
+
+
+    function sortKeys(obj) {
+      const area = obj.area;
+      // ดึง key ทั้งหมดที่เป็น R+เลข (ยกเว้น 'R')
+      const rKeys = Object.keys(obj)
+        .filter(k => /^R\d+$/.test(k))
+        .sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1)));
+
+      // หา R ที่ไม่ใช่ Rxx (คือ 'R' อย่างเดียว)
+      const rTotal = obj.R;
+      const delTotal = obj.del;
+
+      // สร้าง object ใหม่
+      const newObj = { area };
+      for (const k of rKeys) newObj[k] = obj[k];
+      if (rTotal !== undefined) newObj['R'] = rTotal;
+      if (delTotal !== undefined) newObj['del'] = delTotal;
+
+      return newObj;
+    }
+
+
+    const allDel = await Store.find({ zone: zone, route: 'DEL' });
+    const allR = await Store.find({ zone: zone, route: { $regex: '^R' } });
+    const areaMap = {};
+
+    for (const item of dataRoute) {
+
+      const area = item._id.area;
+      const day = item._id.day;
+      const key = day.startsWith('R') ? day : `R${day}`; // ให้ day มี R นำหน้า
+
+      if (!areaMap[area]) areaMap[area] = { area };
+
+      areaMap[area][key] = item.count;
+
+
+      areaMap[area].R = allR.filter(store => store.area === area).length;
+      areaMap[area].del = allDel.filter(store => store.area === area).length;
+    }
+
+
+    const result = Object.values(areaMap).sort((a, b) => a.area.localeCompare(b.area));
+    const sortedResult = result.map(sortKeys);
+    // console.log(sortedResult);
+
+
+  const io = getSocket()
+  io.emit('route/CheckRouteStore', {});
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: sortedResult
     })
-  }
 
-
-
-  function sortKeys(obj) {
-    const area = obj.area;
-    // ดึง key ทั้งหมดที่เป็น R+เลข (ยกเว้น 'R')
-    const rKeys = Object.keys(obj)
-      .filter(k => /^R\d+$/.test(k))
-      .sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1)));
-
-    // หา R ที่ไม่ใช่ Rxx (คือ 'R' อย่างเดียว)
-    const rTotal = obj.R;
-    const delTotal = obj.del;
-
-    // สร้าง object ใหม่
-    const newObj = { area };
-    for (const k of rKeys) newObj[k] = obj[k];
-    if (rTotal !== undefined) newObj['R'] = rTotal;
-    if (delTotal !== undefined) newObj['del'] = delTotal;
-
-    return newObj;
-  }
-
-
-  const allDel = await Store.find({ zone: zone, route: 'DEL' });
-  const allR = await Store.find({ zone: zone, route: { $regex: '^R' } });
-  const areaMap = {};
-
-  for (const item of dataRoute) {
-
-    const area = item._id.area;
-    const day = item._id.day;
-    const key = day.startsWith('R') ? day : `R${day}`; // ให้ day มี R นำหน้า
-
-    if (!areaMap[area]) areaMap[area] = { area };
-
-    areaMap[area][key] = item.count;
-
-
-    areaMap[area].R = allR.filter(store => store.area === area).length;
-    areaMap[area].del = allDel.filter(store => store.area === area).length;
-  }
-
-
-  const result = Object.values(areaMap).sort((a, b) => a.area.localeCompare(b.area));
-  const sortedResult = result.map(sortKeys);
-  // console.log(sortedResult);
-
-
-
-
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: sortedResult
-  })
-
-    } catch (error) {
+  } catch (error) {
     console.error(error);
     res.status(500).json({ status: 500, message: 'Internal server error' });
   }
