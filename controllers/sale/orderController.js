@@ -258,7 +258,7 @@ exports.checkout = async (req, res) => {
     if (checkIn.status === 409) {
       return res.status(409).json({
         status: 409,
-        message: 'Duplicate route or listStore found on this day'
+        message: 'Duplicate Store on this day'
       })
     }
 
