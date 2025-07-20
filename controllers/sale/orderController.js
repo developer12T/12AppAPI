@@ -3132,7 +3132,7 @@ exports.summaryDaily = async (req, res) => {
       data: fullMonthArr,
       sumSendMoney: to2(sumSendMoney),
       sumSummary: to2(sumSummary),
-      sumSummaryDif: to2(sumSummary) - to2(sumSummaryDif),
+      sumSummaryDif: to2(sumSummary - sumSendMoney),
       sumChange: to2(sumChange),
       sumGood: to2(sumGood),
       sumDamaged: to2(sumDamaged)
