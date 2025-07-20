@@ -53,7 +53,6 @@ const path = require('path')
 const os = require('os')
 const fs = require('fs')
 
-
 exports.checkout = async (req, res) => {
   // const transaction = await sequelize.transaction();
   try {
@@ -66,8 +65,9 @@ exports.checkout = async (req, res) => {
       note,
       latitude,
       longitude,
-      shippingId,
-      address,
+      // shippingId,
+      // address,
+      shipping,
       payment,
       changePromotionStatus,
       listPromotion = []
@@ -91,7 +91,7 @@ exports.checkout = async (req, res) => {
       stockModel
     )
 
-    if (!type || !area || !storeId || !shippingId || !address || !payment) {
+    if (!type || !area || !storeId || !payment) {
       return res
         .status(400)
         .json({ status: 400, message: 'Missing required fields!' })
@@ -180,8 +180,8 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-        .map(item => item.price)
-        .reduce((sum, price) => sum + price, 0)
+          .map(item => item.price)
+          .reduce((sum, price) => sum + price, 0)
       : 0
     const total = subtotal - discountProduct
     const newOrder = new Order({
@@ -208,8 +208,8 @@ exports.checkout = async (req, res) => {
         zone: summary.store.zone,
         isBeauty: summary.store.isBeauty
       },
-      shippingId,
-      address,
+      // shipping,
+      // address,
       note,
       latitude,
       longitude,
@@ -225,10 +225,7 @@ exports.checkout = async (req, res) => {
       vat: parseFloat((total - total / 1.07).toFixed(2)),
       totalExVat: parseFloat((total / 1.07).toFixed(2)),
       total: total,
-      shipping: {
-        shippingId: '',
-        address: ''
-      },
+      shipping: shipping,
       paymentMethod: 'cash',
       paymentStatus: 'paid',
       createdBy: sale.username,
@@ -344,7 +341,6 @@ exports.checkout = async (req, res) => {
       if (updateResult) return
     }
 
-
     const calStock = {
       // storeId: refundOrder.store.storeId,
       orderId: newOrder.orderId,
@@ -382,6 +378,7 @@ exports.checkout = async (req, res) => {
       currentDate.getMonth(),
       1
     )
+    
     const NextMonth = new Date(
       currentDate.getFullYear(),
       currentDate.getMonth() + 1,
@@ -416,8 +413,7 @@ exports.checkout = async (req, res) => {
     }
 
     const io = getSocket()
-    io.emit('order/checkout', {});
-
+    io.emit('order/checkout', {})
 
     // await transaction.commit()
     res.status(200).json({
@@ -689,7 +685,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -841,9 +837,8 @@ exports.addSlip = async (req, res) => {
 
       await order.save()
 
-
       const io = getSocket()
-      io.emit('order/addSlip', {});
+      io.emit('order/addSlip', {})
 
       res.status(200).json({
         status: 200,
@@ -918,7 +913,7 @@ exports.OrderToExcel = async (req, res) => {
   // console.log(modelOrder)
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1051,7 +1046,7 @@ exports.OrderToExcel = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => { })
+    fs.unlink(tempPath, () => {})
   })
 
   // res.status(200).json({
@@ -1733,7 +1728,6 @@ exports.getSummarybyMonth = async (req, res) => {
       result[d.month - 1].summary = d.summary
     })
 
-
     // const io = getSocket()
     // io.emit('order/getSummarybyMonth', {});
 
@@ -2343,7 +2337,6 @@ exports.getSummarybyChoice = async (req, res) => {
   // const io = getSocket()
   // io.emit('order/getSummarybyChoice', {});
 
-
   res.status(200).json({
     status: 200,
     message: 'Successful',
@@ -2438,7 +2431,6 @@ exports.getSaleSummaryByStore = async (req, res) => {
 
   // const io = getSocket()
   // io.emit('order/getSaleSummaryByStore', {});
-
 
   res.status(200).json({
     status: 200,
@@ -2825,7 +2817,6 @@ exports.getSummaryProduct = async (req, res) => {
   // const io = getSocket()
   // io.emit('order/getSummaryProduct', {});
 
-
   res.status(200).json({
     status: 200,
     message: 'Success',
@@ -2917,7 +2908,6 @@ exports.summaryAllProduct = async (req, res) => {
 
   // const io = getSocket()
   // io.emit('order/summaryAllProduct', {});
-
 
   res.status(200).json({
     status: 200,
@@ -3421,7 +3411,6 @@ exports.saleReport = async (req, res) => {
     // const io = getSocket()
     // io.emit('order/saleReport', {});
 
-
     res.status(200).json({
       status: 200,
       sendMoneyData
@@ -3529,7 +3518,6 @@ exports.getSummary18SKU = async (req, res) => {
 
   //  const io = getSocket()
   //   io.emit('order/getSummary18SKU', {});
-
 
   res.status(200).json({
     status: 200,
