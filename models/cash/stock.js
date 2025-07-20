@@ -142,6 +142,7 @@ const incidentStockImageSchema = mongoose.Schema({
 const adjustStockSchema = new mongoose.Schema({
   type: { type: String, require: true, enum: ['adjuststock'] },
   orderId: { type: String, required: true },
+  withdrawId: { type: String, required: true },
   // stockId :{ type: String, required: true },
   area: { type: String, required: true },
   saleCode: { type: String, required: true },
@@ -156,9 +157,6 @@ const adjustStockSchema = new mongoose.Schema({
 }, {
   timestamps: true
 })
-
-
-
 
 
 module.exports = (conn) => {
