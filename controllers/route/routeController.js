@@ -704,6 +704,47 @@ exports.checkInVisit = async (req, res) => {
           .json({ status: '404', message: 'Store not found' })
       }
 
+
+      const period = routeId.substring(0, 6)
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+
+      let allRoute = await Route.aggregate([
+        {
+          $match: {
+            period: period
+          }
+        },
+        { $unwind: '$listStore' },
+        {
+          $project: {
+            listStore: 1
+          }
+        },
+        {
+          $replaceRoot: { newRoot: "$listStore" }
+        },
+        {
+          $match: {
+            status: { $nin: ['0'] },
+            storeInfo: store._id.toString(),
+            date: { $gte: startOfDay, $lte: endOfDay }
+          }
+        }
+
+      ])
+      // console.log(allRoute.length)
+
+      if (allRoute.length > 0) {
+        return res.status(409).json({
+          status: 409,
+          message: 'Duplicate Store on this day'
+        });
+      }
+
       let image = null
       if (req.files) {
         try {
