@@ -14,6 +14,7 @@ const userModel = require('../../models/cash/user')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { userQuery, userQueryFilter, userQueryManeger } = require('../../controllers/queryFromM3/querySctipt');
 const user = require('../../models/cash/user');
+const { getSocket } = require('../../socket')
 exports.getUser = async (req, res) => {
   try {
     const channel = req.headers['x-channel']

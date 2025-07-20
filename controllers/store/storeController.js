@@ -746,7 +746,7 @@ exports.checkInStore = async (req, res) => {
 
     res.status(200).json({
       status: '200',
-      message: 'Checked In Successfully',
+      message: 'Checked In Successfully', 
       data: {
         latitude: result.checkIn.latitude,
         longtitude: result.checkIn.latitude,
@@ -960,7 +960,7 @@ exports.createRunningNumber = async (req, res) => {
   let running = ''
   if (channel == 'cash') {
     type = '101'
-    running = 'V'
+    running = 'CV'
   } else if (channel == 'credit') {
     type = '103'
   }
@@ -1002,17 +1002,17 @@ exports.createRunningNumber = async (req, res) => {
       type: type,
       name: channel,
       start: `${running}${u._id}2500000`,
-      last: maxRunning.maxStoreId
+      last: `${running}${u._id}2500000`
     }
   })
 
-  // for (const runing of data) {
-  //   const exists = await RunningNumber.findOne({ zone: runing.zone })
+  for (const runing of data) {
+    const exists = await RunningNumber.findOne({ zone: runing.zone })
 
-  //   if (!exists) {
-  //     await RunningNumber.create(runing)
-  //   }
-  // }
+    if (!exists) {
+      await RunningNumber.create(runing)
+    }
+  }
 
   res.status(200).json({
     status: 200,
