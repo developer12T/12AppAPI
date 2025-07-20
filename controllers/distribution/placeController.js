@@ -34,8 +34,8 @@ exports.getPlace = async (req, res) => {
             place.listAddress = place.listAddress.filter(address => address.type === type)
         }
 
-        const io = getSocket()
-        io.emit('distribution/place/get', {});
+        // const io = getSocket()
+        // io.emit('distribution/place/get', {});
 
         res.status(200).json({
             status: '200',
@@ -135,8 +135,8 @@ exports.getType = async (req, res) => {
             }
         }
 
-        const io = getSocket()
-        io.emit('distribution/getType', {});
+        // const io = getSocket()
+        // io.emit('distribution/getType', {});
 
         res.status(200).json({
             status: '200',

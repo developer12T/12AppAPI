@@ -110,8 +110,8 @@ exports.getCart = async (req, res) => {
 
     // session.endSession();
 
-    const io = getSocket()
-    io.emit('cart/get', {})
+    // const io = getSocket()
+    // io.emit('cart/get', {})
 
     res.status(200).json({
       status: '200',

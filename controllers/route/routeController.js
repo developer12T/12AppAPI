@@ -102,8 +102,8 @@ exports.getRoute = async (req, res) => {
       }
     })
 
-    const io = getSocket()
-    io.emit('route/getRoute', {});
+    // const io = getSocket()
+    // io.emit('route/getRoute', {});
 
     res.status(200).json({
       status: 200,
@@ -1076,8 +1076,8 @@ exports.getTimelineCheckin = async (req, res) => {
       })
     }
 
-    const io = getSocket()
-    io.emit('route/getTimelineCheckin', {});
+    // const io = getSocket()
+    // io.emit('route/getTimelineCheckin', {});
 
     res.status(200).json({
       status: 200,
@@ -1176,8 +1176,8 @@ exports.getRouteCheckinAll = async (req, res) => {
 
     const data = await Route.aggregate(query)
 
-    const io = getSocket()
-    io.emit('route/getRouteCheckinAll', {});
+    // const io = getSocket()
+    // io.emit('route/getRouteCheckinAll', {});
 
 
     res.status(200).json({
@@ -1252,8 +1252,8 @@ exports.routeTimeline = async (req, res) => {
         })
       }
 
-      const io = getSocket()
-      io.emit('route/routeTimeline', {});
+      // const io = getSocket()
+      // io.emit('route/routeTimeline', {});
 
 
       res.status(200).json({
@@ -1449,8 +1449,8 @@ exports.getRouteProvince = async (req, res) => {
     .filter(p => p && p.trim() !== '')
 
 
-  const io = getSocket()
-  io.emit('route/getRouteProvince', {});
+  // const io = getSocket()
+  // io.emit('route/getRouteProvince', {});
 
   res.status(200).json({
     status: 200,
@@ -1622,8 +1622,8 @@ exports.getRouteEffective = async (req, res) => {
   })
 
 
-  const io = getSocket()
-  io.emit('route/getRouteEffective', {});
+  // const io = getSocket()
+  // io.emit('route/getRouteEffective', {});
 
   res.status(200).json({
     status: 200,
@@ -1731,8 +1731,8 @@ exports.getRouteEffectiveAll = async (req, res) => {
   const percentVisitAvg = count > 0 ? totalVisit / count : 0
   const percentEffectiveAvg = count > 0 ? totalEffective / count : 0
 
-  const io = getSocket()
-  io.emit('route/getRouteEffectiveAll', {});
+  // const io = getSocket()
+  // io.emit('route/getRouteEffectiveAll', {});
 
 
   res.status(200).json({
@@ -1883,8 +1883,8 @@ exports.getRouteByArea = async (req, res) => {
     })
   }
 
-  const io = getSocket()
-  io.emit('route/getRouteByArea', {});
+  // const io = getSocket()
+  // io.emit('route/getRouteByArea', {});
 
 
   res.status(200).json({
@@ -1986,8 +1986,8 @@ exports.CheckRouteStore = async (req, res) => {
     // console.log(sortedResult);
 
 
-  const io = getSocket()
-  io.emit('route/CheckRouteStore', {});
+  // const io = getSocket()
+  // io.emit('route/CheckRouteStore', {});
 
     res.status(200).json({
       status: 200,

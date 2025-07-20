@@ -2,6 +2,7 @@ const axios = require('axios')
 const { Option } = require('../../models/cash/option')
 const optionModel = require('../../models/cash/option')
 const { getModelsByChannel } = require('../../middleware/channel')
+const { getSocket } = require('../../socket')
 
 exports.getOption = async (req, res) => {
     try {
@@ -22,8 +23,8 @@ exports.getOption = async (req, res) => {
         }
         response = option.list
 
-        const io = getSocket()
-        io.emit('manage/option/get', {});
+        // const io = getSocket()
+        // io.emit('manage/option/get', {});
 
         res.status(200).json({
             status: 200,

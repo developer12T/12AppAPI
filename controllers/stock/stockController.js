@@ -127,8 +127,8 @@ exports.getAdjustStockDetail = async (req, res) => {
       }
     })
 
-    const io = getSocket()
-    io.emit('stock/getAdjustStockDetail', {});
+    // const io = getSocket()
+    // io.emit('stock/getAdjustStockDetail', {});
 
     res.status(200).json({
       status: 200,
@@ -227,8 +227,8 @@ exports.getAdjustStock = async (req, res) => {
       updatedAt: o.updatedAt
     }))
 
-    const io = getSocket()
-    io.emit('stock/adjuststock', {});
+    // const io = getSocket()
+    // io.emit('stock/adjuststock', {});
 
     res.status(200).json({
       status: 200,
@@ -543,8 +543,8 @@ exports.getStock = async (req, res, next) => {
       })
     }
 
-    const io = getSocket()
-    io.emit('stock/', {});
+    // const io = getSocket()
+    // io.emit('stock/', {});
 
     res.status(200).json({
       status: 200,
@@ -627,8 +627,8 @@ exports.getQty = async (req, res, next) => {
       unitData
     }
 
-    const io = getSocket()
-    io.emit('stock/get', {});
+    // const io = getSocket()
+    // io.emit('stock/get', {});
 
     return res.status(200).json({
       status: 200,
@@ -955,8 +955,8 @@ exports.availableStock = async (req, res, next) => {
     const sorted = groupList.flatMap(g => g.items)
 
 
-    const io = getSocket()
-    io.emit('stock/availableStock', {});
+    // const io = getSocket()
+    // io.emit('stock/availableStock', {});
 
 
     res.status(200).json({
@@ -1216,8 +1216,8 @@ exports.getStockQty = async (req, res) => {
     delete item.pcsMain
   })
 
-  const io = getSocket()
-  io.emit('stock/getStockQty', {});
+  // const io = getSocket()
+  // io.emit('stock/getStockQty', {});
 
   res.status(200).json({
     status: 200,
@@ -1704,8 +1704,8 @@ exports.getStockQtyNew = async (req, res) => {
     delete item.pcsMain
   })
 
-  const io = getSocket()
-  io.emit('stock/getStockQtyNew', {});
+  // const io = getSocket()
+  // io.emit('stock/getStockQtyNew', {});
 
 
   res.status(200).json({
@@ -1778,8 +1778,8 @@ exports.getWeightProduct = async (req, res) => {
     weightNet += net * qty
   }
 
-  const io = getSocket()
-  io.emit('stock/getWeightProduct', {});
+  // const io = getSocket()
+  // io.emit('stock/getWeightProduct', {});
 
 
   res.status(200).json({
@@ -2100,8 +2100,8 @@ exports.getStockQtyDetail = async (req, res) => {
       'sale'
     )
 
-  const io = getSocket()
-  io.emit('stock/getStockQtyDetail', {});
+  // const io = getSocket()
+  // io.emit('stock/getStockQtyDetail', {});
 
 
 

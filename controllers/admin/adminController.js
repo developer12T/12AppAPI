@@ -143,8 +143,8 @@ exports.reportCheck = async (req, res) => {
 
 
 
-    const io = getSocket()
-    io.emit('admin/reportCheck', {});
+    // const io = getSocket()
+    // io.emit('admin/reportCheck', {});
 
 
     res.status(200).json({

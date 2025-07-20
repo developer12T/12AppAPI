@@ -24,8 +24,8 @@ exports.getCallCard = async (req, res) => {
       { $match: query }
     ]);
 
-    const io = getSocket()
-    io.emit('store/getCallCard', {});
+    // const io = getSocket()
+    // io.emit('store/getCallCard', {});
 
     res.status(200).json({
       status: 200,
