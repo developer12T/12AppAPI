@@ -255,12 +255,12 @@ exports.checkout = async (req, res) => {
       res
     )
 
-    if (checkIn.status === 409) {
-      return res.status(409).json({
-        status: 409,
-        message: 'Duplicate Store on this day'
-      })
-    }
+    // if (checkIn.status === 409) {
+    //   return res.status(409).json({
+    //     status: 409,
+    //     message: 'Duplicate Store on this day'
+    //   })
+    // }
 
     const promotion = await applyPromotion(summary, channel, res)
 
