@@ -125,6 +125,7 @@ exports.getCart = async (req, res) => {
     res.status(500).json({ status: '500', message: error.message })
   }
 }
+
 exports.addProduct = async (req, res) => {
   try {
     const {
@@ -337,8 +338,8 @@ exports.addProduct = async (req, res) => {
 
     await cart.save()
 
-    const io = getSocket()
-    io.emit('cart/add', {})
+    // const io = getSocket()
+    // io.emit('cart/add', {})
 
     res.status(200).json({
       status: 200,
@@ -350,6 +351,8 @@ exports.addProduct = async (req, res) => {
     res.status(500).json({ status: '500', message: error.message })
   }
 }
+
+
 exports.adjustProduct = async (req, res) => {
   try {
     const { type, area, storeId, id, unit, qty, condition, expire, stockType } =

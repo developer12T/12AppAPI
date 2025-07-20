@@ -17,7 +17,10 @@ const { Warehouse, Locate, Balance } = require('../../models/cash/master')
 const { Op } = require('sequelize')
 const fs = require('fs')
 // const { Refund } = require('../../models/cash/refund')
-const { stockQuery } = require('../../controllers/queryFromM3/querySctipt')
+const {
+  stockQuery,
+  withdrawQuery
+} = require('../../controllers/queryFromM3/querySctipt')
 const userModel = require('../../models/cash/user')
 const distributionModel = require('../../models/cash/distribution')
 const productModel = require('../../models/cash/product')
@@ -81,18 +84,24 @@ const fetchArea = async warehouse => {
 
 exports.getAdjustStockDetail = async (req, res) => {
   try {
-    const { orderId } = req.query
+    const { orderId, withdrawId } = req.query
 
     const channel = req.headers['x-channel']
     const { AdjustStock } = getModelsByChannel(channel, res, adjustStockModel)
 
-    if (!orderId) {
-      return res
-        .status(400)
-        .json({ status: 400, message: 'orderId is required!' })
-    }
+    // if (!orderId) {
+    //   return res
+    //     .status(400)
+    //     .json({ status: 400, message: 'orderId is required!' })
+    // }
 
-    const order = await AdjustStock.find({ orderId })
+    let order = []
+
+    if (withdrawId) {
+      order = await AdjustStock.find({ withdrawId })
+    } else {
+      order = await AdjustStock.find({ orderId })
+    }
 
     if (order.length === 0) {
       return res
@@ -104,6 +113,7 @@ exports.getAdjustStockDetail = async (req, res) => {
       return {
         type: u.type,
         orderId: u.orderId,
+        withdrawId: u.withdrawId,
         type: u.type,
         area: u.area,
         saleCode: u.saleCode,
@@ -128,7 +138,7 @@ exports.getAdjustStockDetail = async (req, res) => {
     })
 
     const io = getSocket()
-    io.emit('stock/getAdjustStockDetail', {});
+    io.emit('stock/getAdjustStockDetail', {})
 
     res.status(200).json({
       status: 200,
@@ -228,7 +238,7 @@ exports.getAdjustStock = async (req, res) => {
     }))
 
     const io = getSocket()
-    io.emit('stock/adjuststock', {});
+    io.emit('stock/adjuststock', {})
 
     res.status(200).json({
       status: 200,
@@ -298,14 +308,19 @@ exports.addStock = async (req, res) => {
     // emit socket event ถ้ามีรายการถูกเพิ่ม
     if (createdStocks.length > 0) {
       const io = getSocket()
-      io.emit('stock/added', { count: createdStocks.length, data: createdStocks })
+      io.emit('stock/added', {
+        count: createdStocks.length,
+        data: createdStocks
+      })
       return res.status(200).json({
         status: 200,
         message: 'Stock added',
         data: createdStocks
       })
     } else {
-      return res.status(400).json({ status: 400, message: 'No stock was added' })
+      return res
+        .status(400)
+        .json({ status: 400, message: 'No stock was added' })
     }
   } catch (error) {
     console.error('Error adding stock:', error)
@@ -544,7 +559,7 @@ exports.getStock = async (req, res, next) => {
     }
 
     const io = getSocket()
-    io.emit('stock/', {});
+    io.emit('stock/', {})
 
     res.status(200).json({
       status: 200,
@@ -628,7 +643,7 @@ exports.getQty = async (req, res, next) => {
     }
 
     const io = getSocket()
-    io.emit('stock/get', {});
+    io.emit('stock/get', {})
 
     return res.status(200).json({
       status: 200,
@@ -682,9 +697,8 @@ exports.addStockMovement = async (req, res, next) => {
       })
       newStockMovement.save()
 
-
       const io = getSocket()
-      io.emit('stock/addStockMovement', {});
+      io.emit('stock/addStockMovement', {})
 
       res.status(200).json({
         status: 200,
@@ -726,7 +740,7 @@ exports.updateStockMovement = async (req, res, next) => {
     )
 
     const io = getSocket()
-    io.emit('stock/updateStockMovement', {});
+    io.emit('stock/updateStockMovement', {})
 
     res.status(200).json({
       status: 200,
@@ -834,57 +848,57 @@ exports.availableStock = async (req, res, next) => {
       // console.log('lot', lot)
       const tranFromProduct = product
         ? {
-          // ...product,
-          _id: product._id,
-          id: product.id,
-          name: product.name,
-          group: product.group,
-          groupCode: product.groupCode,
-          brandCode: product.brandCode,
-          brand: product.brand,
-          size: product.size,
-          flavourCode: product.flavourCode,
-          flavour: product.flavour,
-          type: product.type,
-          weightGross: product.weightGross,
-          weightNet: product.weightNet,
-          statusSale: product.statusSale,
-          statusWithdraw: product.statusWithdraw,
-          statusRefund: product.statusRefund,
-          image: product.image,
+            // ...product,
+            _id: product._id,
+            id: product.id,
+            name: product.name,
+            group: product.group,
+            groupCode: product.groupCode,
+            brandCode: product.brandCode,
+            brand: product.brand,
+            size: product.size,
+            flavourCode: product.flavourCode,
+            flavour: product.flavour,
+            type: product.type,
+            weightGross: product.weightGross,
+            weightNet: product.weightNet,
+            statusSale: product.statusSale,
+            statusWithdraw: product.statusWithdraw,
+            statusRefund: product.statusRefund,
+            image: product.image,
 
-          listUnit: product.listUnit.map(unit => {
-            // console.log("lot",lot)
-            // const totalQtyPcsToCtn = Math.floor(
-            //   lot.available.reduce((sum, item) => {
-            //     return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor
-            //   }, 0)
-            // )
-            if (unit.unit == 'CTN') {
-              qty = lot.available.reduce((total, u) => total + u.qtyCtn, 0)
-            } else if (unit.unit == 'PCS') {
-              qty = lot.available.reduce((total, u) => total + u.qtyPcs, 0)
-            } else {
-              qty = 0
-            }
-
-            return {
-              unit: unit.unit,
-              name: unit.name,
-              factor: unit.factor,
-              // qty: totalQtyPcsToCtn,
-
-              qty: qty,
-              price: {
-                sale: unit.price.sale,
-                Refund: unit.price.refund
+            listUnit: product.listUnit.map(unit => {
+              // console.log("lot",lot)
+              // const totalQtyPcsToCtn = Math.floor(
+              //   lot.available.reduce((sum, item) => {
+              //     return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor
+              //   }, 0)
+              // )
+              if (unit.unit == 'CTN') {
+                qty = lot.available.reduce((total, u) => total + u.qtyCtn, 0)
+              } else if (unit.unit == 'PCS') {
+                qty = lot.available.reduce((total, u) => total + u.qtyPcs, 0)
+              } else {
+                qty = 0
               }
-            }
-          }),
-          created: product.created,
-          updated: product.updated,
-          __v: product.__v
-        }
+
+              return {
+                unit: unit.unit,
+                name: unit.name,
+                factor: unit.factor,
+                // qty: totalQtyPcsToCtn,
+
+                qty: qty,
+                price: {
+                  sale: unit.price.sale,
+                  Refund: unit.price.refund
+                }
+              }
+            }),
+            created: product.created,
+            updated: product.updated,
+            __v: product.__v
+          }
         : null
 
       // console.log(lot)
@@ -912,7 +926,7 @@ exports.availableStock = async (req, res, next) => {
       }
     })
 
-    function parseSize(sizeStr) {
+    function parseSize (sizeStr) {
       if (!sizeStr) return 0
 
       const units = {
@@ -954,10 +968,8 @@ exports.availableStock = async (req, res, next) => {
 
     const sorted = groupList.flatMap(g => g.items)
 
-
     const io = getSocket()
-    io.emit('stock/availableStock', {});
-
+    io.emit('stock/availableStock', {})
 
     res.status(200).json({
       status: 200,
@@ -1054,8 +1066,7 @@ exports.addStockFromERP = async (req, res) => {
   }
 
   const io = getSocket()
-  io.emit('stock/addStockFromERP', {});
-
+  io.emit('stock/addStockFromERP', {})
 
   res.status(200).json({
     status: 200,
@@ -1217,7 +1228,7 @@ exports.getStockQty = async (req, res) => {
   })
 
   const io = getSocket()
-  io.emit('stock/getStockQty', {});
+  io.emit('stock/getStockQty', {})
 
   res.status(200).json({
     status: 200,
@@ -1234,7 +1245,6 @@ exports.getStockQty = async (req, res) => {
   })
 }
 
-
 exports.getStockQtyNew = async (req, res) => {
   const { area, period } = req.body
   const channel = req.headers['x-channel']
@@ -1246,8 +1256,6 @@ exports.getStockQtyNew = async (req, res) => {
   const { Order } = getModelsByChannel(channel, res, orderModel)
   const { Giveaway } = getModelsByChannel(channel, res, giveModel)
 
-
-
   let areaQuery = {}
   if (area) {
     if (area.length == 2) {
@@ -1257,24 +1265,20 @@ exports.getStockQtyNew = async (req, res) => {
     }
   }
 
-  let areaQueryRefund = {};
+  let areaQueryRefund = {}
   if (area) {
     if (area.length === 2) {
-      areaQueryRefund['store.zone'] = area.slice(0, 2);
+      areaQueryRefund['store.zone'] = area.slice(0, 2)
     } else if (area.length === 5) {
-      areaQueryRefund['store.area'] = area;
+      areaQueryRefund['store.area'] = area
     }
   }
-
-
-
 
   const matchQuery = { ...areaQuery, period }
 
   const matchQueryRefund = { ...areaQueryRefund, period }
 
   const dataRefund = await Refund.aggregate([
-
     { $match: matchQueryRefund },
     {
       $project: {
@@ -1363,14 +1367,12 @@ exports.getStockQtyNew = async (req, res) => {
     }
   ])
 
-
-
-  const allWithdrawProducts = dataWithdraw.flatMap(doc => doc.listProduct || []);
-  const allRefundProducts = dataRefund.flatMap(doc => doc.listProduct || []);
-  const allOrderProducts = dataOrder.flatMap(doc => doc.listProduct || []);
-  const allChangeProducts = dataChange.flatMap(doc => doc.listProduct || []);
-  const allAdjustProducts = dataAdjust.flatMap(doc => doc.listProduct || []);
-  const allGiveProducts = dataGive.flatMap(doc => doc.listProduct || []);
+  const allWithdrawProducts = dataWithdraw.flatMap(doc => doc.listProduct || [])
+  const allRefundProducts = dataRefund.flatMap(doc => doc.listProduct || [])
+  const allOrderProducts = dataOrder.flatMap(doc => doc.listProduct || [])
+  const allChangeProducts = dataChange.flatMap(doc => doc.listProduct || [])
+  const allAdjustProducts = dataAdjust.flatMap(doc => doc.listProduct || [])
+  const allGiveProducts = dataGive.flatMap(doc => doc.listProduct || [])
 
   const dataStock = await Stock.aggregate([
     {
@@ -1389,109 +1391,101 @@ exports.getStockQtyNew = async (req, res) => {
 
   // console.log(dataStock)
 
-
-
-
-
   const refundProductArray = Object.values(
     allRefundProducts.reduce((acc, curr) => {
-      const key = `${curr.id}_${curr.unit}_${curr.condition}`;
+      const key = `${curr.id}_${curr.unit}_${curr.condition}`
       if (acc[key]) {
         acc[key] = {
           ...curr,
           qty: (acc[key].qty || 0) + (curr.qty || 0),
           qtyPcs: (acc[key].qtyPcs || 0) + (curr.qtyPcs || 0)
-        };
+        }
       } else {
-        acc[key] = { ...curr };
+        acc[key] = { ...curr }
       }
-      return acc;
+      return acc
     }, {})
-  );
-
+  )
 
   const withdrawProductArray = Object.values(
     allWithdrawProducts.reduce((acc, curr) => {
-      const key = `${curr.id}_${curr.unit}`;
+      const key = `${curr.id}_${curr.unit}`
       if (acc[key]) {
         acc[key] = {
           ...curr,
           qty: (acc[key].qty || 0) + (curr.qty || 0),
           qtyPcs: (acc[key].qtyPcs || 0) + (curr.qtyPcs || 0)
-        };
+        }
       } else {
-        acc[key] = { ...curr };
+        acc[key] = { ...curr }
       }
-      return acc;
+      return acc
     }, {})
-  );
+  )
 
   const orderProductArray = Object.values(
     allOrderProducts.reduce((acc, curr) => {
-      const key = `${curr.id}_${curr.unit}`;
+      const key = `${curr.id}_${curr.unit}`
       if (acc[key]) {
         acc[key] = {
           ...curr,
           qty: (acc[key].qty || 0) + (curr.qty || 0),
           qtyPcs: (acc[key].qtyPcs || 0) + (curr.qtyPcs || 0)
-        };
+        }
       } else {
-        acc[key] = { ...curr };
+        acc[key] = { ...curr }
       }
-      return acc;
+      return acc
     }, {})
-  );
+  )
 
   const changeProductArray = Object.values(
     allChangeProducts.reduce((acc, curr) => {
-      const key = `${curr.id}_${curr.unit}`;
+      const key = `${curr.id}_${curr.unit}`
       if (acc[key]) {
         acc[key] = {
           ...curr,
           qty: (acc[key].qty || 0) + (curr.qty || 0),
           qtyPcs: (acc[key].qtyPcs || 0) + (curr.qtyPcs || 0)
-        };
+        }
       } else {
-        acc[key] = { ...curr };
+        acc[key] = { ...curr }
       }
-      return acc;
+      return acc
     }, {})
-  );
+  )
 
   const adjustProductArray = Object.values(
     allAdjustProducts.reduce((acc, curr) => {
-      const key = `${curr.id}_${curr.unit}`;
+      const key = `${curr.id}_${curr.unit}`
       if (acc[key]) {
         acc[key] = {
           ...curr,
           qty: (acc[key].qty || 0) + (curr.qty || 0),
           qtyPcs: (acc[key].qtyPcs || 0) + (curr.qtyPcs || 0)
-        };
+        }
       } else {
-        acc[key] = { ...curr };
+        acc[key] = { ...curr }
       }
-      return acc;
+      return acc
     }, {})
-  );
+  )
 
   const giveProductArray = Object.values(
     allGiveProducts.reduce((acc, curr) => {
-      const key = `${curr.id}_${curr.unit}`;
+      const key = `${curr.id}_${curr.unit}`
       if (acc[key]) {
         acc[key] = {
           ...curr,
           qty: (acc[key].qty || 0) + (curr.qty || 0),
           qtyPcs: (acc[key].qtyPcs || 0) + (curr.qtyPcs || 0)
-        };
+        }
       } else {
-        acc[key] = { ...curr };
+        acc[key] = { ...curr }
       }
-      return acc;
+      return acc
     }, {})
-  );
-
-
-
+  )
 
   if (dataStock.length === 0) {
     return res.status(404).json({
@@ -1500,36 +1494,21 @@ exports.getStockQtyNew = async (req, res) => {
     })
   }
 
-
-
   const dataStockTran = dataStock
   const productIdListStock = dataStockTran.flatMap(item =>
     item.listProduct.map(u => u.productId)
   )
-  const productIdListWithdraw = withdrawProductArray.flatMap(item =>
-    item.id
-  )
+  const productIdListWithdraw = withdrawProductArray.flatMap(item => item.id)
 
-  const productIdListRefund = refundProductArray.flatMap(item =>
-    item.id
-  )
+  const productIdListRefund = refundProductArray.flatMap(item => item.id)
 
-  const productIdListOrder = orderProductArray.flatMap(item =>
-    item.id
-  )
+  const productIdListOrder = orderProductArray.flatMap(item => item.id)
 
-  const productIdListChange = changeProductArray.flatMap(item =>
-    item.id
-  )
+  const productIdListChange = changeProductArray.flatMap(item => item.id)
 
-  const productIdListAdjust = adjustProductArray.flatMap(item =>
-    item.id
-  )
+  const productIdListAdjust = adjustProductArray.flatMap(item => item.id)
 
-  const productIdListGive = giveProductArray.flatMap(item =>
-    item.id
-  )
-
+  const productIdListGive = giveProductArray.flatMap(item => item.id)
 
   const uniqueProductId = [
     ...new Set([
@@ -1541,12 +1520,12 @@ exports.getStockQtyNew = async (req, res) => {
       ...productIdListAdjust,
       ...productIdListGive
     ])
-  ];
+  ]
 
   // console.log(productIdListWithdraw)
   const allProducts = dataStockTran.flatMap(item => item.listProduct)
 
-  const haveProductIdSet = new Set(allProducts.map(p => p.productId));
+  const haveProductIdSet = new Set(allProducts.map(p => p.productId))
 
   uniqueProductId.forEach(productId => {
     if (!haveProductIdSet.has(productId)) {
@@ -1557,13 +1536,9 @@ exports.getStockQtyNew = async (req, res) => {
         balancePcs: 0,
         stockCtn: 0,
         balanceCtn: 0
-      });
+      })
     }
-  });
-
-
-
-
+  })
 
   // 2. รวมยอดแต่ละ field ตาม productId
   const sumById = {} // { productId: { ...sum } }
@@ -1613,11 +1588,21 @@ exports.getStockQtyNew = async (req, res) => {
 
   for (const stockItem of productSum) {
     const productDetail = dataProduct.find(u => u.id == stockItem.id)
-    const productDetailRufund = refundProductArray.filter(u => u.id == stockItem.id)
-    const productDetailWithdraw = withdrawProductArray.filter(u => u.id == stockItem.id)
-    const productDetailOrder = orderProductArray.filter(u => u.id == stockItem.id)
-    const productDetailChange = changeProductArray.filter(u => u.id == stockItem.id)
-    const productDetailAdjust = adjustProductArray.filter(u => u.id == stockItem.id)
+    const productDetailRufund = refundProductArray.filter(
+      u => u.id == stockItem.id
+    )
+    const productDetailWithdraw = withdrawProductArray.filter(
+      u => u.id == stockItem.id
+    )
+    const productDetailOrder = orderProductArray.filter(
+      u => u.id == stockItem.id
+    )
+    const productDetailChange = changeProductArray.filter(
+      u => u.id == stockItem.id
+    )
+    const productDetailAdjust = adjustProductArray.filter(
+      u => u.id == stockItem.id
+    )
     const productDetailGive = giveProductArray.filter(u => u.id == stockItem.id)
 
     if (!productDetail) continue
@@ -1639,12 +1624,21 @@ exports.getStockQtyNew = async (req, res) => {
     summaryStockBalPcs += stockItem.balancePcs || 0
 
     const listUnitStock = productDetail.listUnit.map(u => {
-      const goodQty = productDetailRufund.find(i => i.unit === u.unit && i.condition === 'good')?.qty ?? 0
-      const damagedQty = productDetailRufund.find(i => i.unit === u.unit && i.condition === 'damaged')?.qty ?? 0
-      const withdrawQty = productDetailWithdraw.find(i => i.unit === u.unit)?.qty ?? 0
+      const goodQty =
+        productDetailRufund.find(
+          i => i.unit === u.unit && i.condition === 'good'
+        )?.qty ?? 0
+      const damagedQty =
+        productDetailRufund.find(
+          i => i.unit === u.unit && i.condition === 'damaged'
+        )?.qty ?? 0
+      const withdrawQty =
+        productDetailWithdraw.find(i => i.unit === u.unit)?.qty ?? 0
       const saleQty = productDetailOrder.find(i => i.unit === u.unit)?.qty ?? 0
-      const changeQty = productDetailChange.find(i => i.unit === u.unit)?.qty ?? 0
-      const adjustQty = productDetailAdjust.find(i => i.unit === u.unit)?.qty ?? 0
+      const changeQty =
+        productDetailChange.find(i => i.unit === u.unit)?.qty ?? 0
+      const adjustQty =
+        productDetailAdjust.find(i => i.unit === u.unit)?.qty ?? 0
       const giveQty = productDetailGive.find(i => i.unit === u.unit)?.qty ?? 0
       // console.log(goodQty)
 
@@ -1656,7 +1650,6 @@ exports.getStockQtyNew = async (req, res) => {
       const stockQty = Math.floor(stock / factor) || 0
       const balanceQty = Math.floor(balance / factor) || 0
       // console.log(goodQty)
-
 
       stock -= stockQty * factor
       balance -= balanceQty * factor
@@ -1670,8 +1663,6 @@ exports.getStockQtyNew = async (req, res) => {
       summaryChange += (changeQty || 0) * changeSale
       summaryAdjust += (adjustQty || 0) * sale
       summaryGive += (giveQty || 0) * sale
-
-
 
       return {
         unit: u.unit,
@@ -1705,8 +1696,7 @@ exports.getStockQtyNew = async (req, res) => {
   })
 
   const io = getSocket()
-  io.emit('stock/getStockQtyNew', {});
-
+  io.emit('stock/getStockQtyNew', {})
 
   res.status(200).json({
     status: 200,
@@ -1725,15 +1715,6 @@ exports.getStockQtyNew = async (req, res) => {
     summaryStockBalPcs: Number(summaryStockBalPcs.toFixed(2))
   })
 }
-
-
-
-
-
-
-
-
-
 
 exports.getWeightProduct = async (req, res) => {
   const { area, period } = req.body
@@ -1779,8 +1760,7 @@ exports.getWeightProduct = async (req, res) => {
   }
 
   const io = getSocket()
-  io.emit('stock/getWeightProduct', {});
-
+  io.emit('stock/getWeightProduct', {})
 
   res.status(200).json({
     status: 200,
@@ -2100,10 +2080,8 @@ exports.getStockQtyDetail = async (req, res) => {
       'sale'
     )
 
-  const io = getSocket()
-  io.emit('stock/getStockQtyDetail', {});
-
-
+    const io = getSocket()
+    io.emit('stock/getStockQtyDetail', {})
 
     res.status(200).json({
       status: 200,
@@ -2148,7 +2126,7 @@ exports.getStockQtyDetail = async (req, res) => {
 
 exports.checkout = async (req, res) => {
   try {
-    const { type, area, period, note } = req.body
+    const { type, area, period, note, withdrawId } = req.body
     const channel = req.headers['x-channel']
     const { Cart } = getModelsByChannel(channel, res, cartModel)
     const { User } = getModelsByChannel(channel, res, userModel)
@@ -2195,6 +2173,7 @@ exports.checkout = async (req, res) => {
     const newOrder = {
       type,
       orderId,
+      withdrawId: withdrawId,
       area: area,
       saleCode: sale.saleCode,
       period: period,
@@ -2227,9 +2206,8 @@ exports.checkout = async (req, res) => {
       createdAt: { $gte: startDate, $lt: endDate }
     })
 
-  const io = getSocket()
-  io.emit('stock/checkout', {});
-
+    const io = getSocket()
+    io.emit('stock/checkout', {})
 
     res.status(200).json({
       status: 200,
@@ -2262,7 +2240,6 @@ exports.approveAdjustStock = async (req, res) => {
 
   const DataAdjustStock = await AdjustStock.findOne({ orderId: orderId })
   if (statusStr === 'approved') {
-
     for (const item of DataAdjustStock.listProduct) {
       const factorPcsResult = await Product.aggregate([
         { $match: { id: item.id } },
@@ -2350,9 +2327,8 @@ exports.approveAdjustStock = async (req, res) => {
     { new: true }
   )
 
-
   const io = getSocket()
-  io.emit('stock/approveAdjustStock', {});
+  io.emit('stock/approveAdjustStock', {})
 
   res.status(200).json({
     status: 200,
@@ -2756,7 +2732,7 @@ exports.stockToExcel = async (req, res) => {
           res.status(500).send('Download failed')
         }
       }
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
   } else {
     res.status(200).json({

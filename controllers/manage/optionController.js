@@ -22,8 +22,8 @@ exports.getOption = async (req, res) => {
         }
         response = option.list
 
-        const io = getSocket()
-        io.emit('manage/option/get', {});
+        // const io = getSocket()
+        // io.emit('manage/option/get', {});
 
         res.status(200).json({
             status: 200,
