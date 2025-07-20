@@ -6,7 +6,7 @@ const { getRewardProduct } = require('./calculate')
 const promotionModel = require('../../models/cash/promotion');
 const CartModel = require('../../models/cash/cart')
 const productModel = require('../../models/cash/product')
-
+const { getSocket } = require('../../socket')
 const { getModelsByChannel } = require('../../middleware/channel')
 
 exports.addPromotion = async (req, res) => {
@@ -34,7 +34,6 @@ exports.addPromotion = async (req, res) => {
         .json({ status: 400, message: 'Missing required fields!' })
     }
 
-
     const proId = await generatePromotionId(channel, res)
 
     const newPromotion = new Promotion({
@@ -55,6 +54,9 @@ exports.addPromotion = async (req, res) => {
     })
 
     await newPromotion.save()
+
+    const io = getSocket()
+    io.emit('promotion/add', {});
 
     res.status(201).json({
       status: 201,
@@ -87,36 +89,37 @@ exports.updatePromotion = async (req, res) => {
       validTo
     } = req.body
 
-    if (!name || !proType || !validFrom || !validTo) {
-      return res
-        .status(400)
-        .json({ status: 400, message: 'Missing required fields!' })
+    if (!proId) {
+      return res.status(400).json({ status: 400, message: 'Missing proId!' })
     }
+
+    const updateFields = {};
+    if (name !== undefined) updateFields.name = name;
+    if (description !== undefined) updateFields.description = description;
+    if (proType !== undefined) updateFields.proType = proType;
+    if (proCode !== undefined) updateFields.proCode = proCode;
+    if (coupon !== undefined) updateFields.coupon = coupon;
+    if (applicableTo !== undefined) updateFields.applicableTo = applicableTo;
+    if (except !== undefined) updateFields.except = except;
+    if (conditions !== undefined) updateFields.conditions = conditions;
+    if (rewards !== undefined) updateFields.rewards = rewards;
+    if (discounts !== undefined) updateFields.discounts = discounts;
+    if (validFrom !== undefined) updateFields.validFrom = validFrom;
+    if (validTo !== undefined) updateFields.validTo = validTo;
+    // updateFields.status = 'active';
+
     const updatedPromotion = await Promotion.findOneAndUpdate(
-      { proId }, // เงื่อนไขการค้นหา
-      {
-        $set: {
-          name,
-          description,
-          proType,
-          proCode,
-          coupon,
-          applicableTo,
-          except,
-          conditions,
-          rewards,
-          discounts,
-          validFrom,
-          validTo,
-          status: 'active'
-        }
-      },
-      { upsert: true, new: true } // upsert = ถ้าไม่เจอให้สร้างใหม่, new = คืนค่าหลังอัปเดต
+      { proId },
+      { $set: updateFields },
+      { upsert: true, new: true }
     )
+
+    const io = getSocket()
+    io.emit('promotion/updatePromotion', {});
 
     res.status(201).json({
       status: 201,
-      message: 'Promotion created successfully!',
+      message: 'Promotion updated successfully!',
       data: updatedPromotion
     })
   } catch (error) {
@@ -124,9 +127,6 @@ exports.updatePromotion = async (req, res) => {
     res.status(500).json({ status: '500', message: error.message })
   }
 }
-
-
-
 
 
 exports.getPromotionProduct = async (req, res) => {
@@ -147,7 +147,7 @@ exports.getPromotionProduct = async (req, res) => {
     }
 
     const cart = await Cart.findOne({ type, storeId }).lean()
-    console.log(cart)
+    // console.log(cart)
     if (!cart || !cart.listPromotion.length) {
       return res
         .status(404)
@@ -204,6 +204,9 @@ exports.getPromotionProduct = async (req, res) => {
       qty: promotion.proQty,
       listProduct: Object.values(groupedProducts)
     }
+
+    // const io = getSocket()
+    // io.emit('promotion/getPromotionProduct', {});
 
     res.status(200).json({
       status: 200,
@@ -289,6 +292,9 @@ exports.updateCartPromotion = async (req, res) => {
 
     await cart.save()
 
+
+
+
     res.status(200).json({
       status: 200,
       message: 'Promotion updated successfully!',
@@ -302,10 +308,10 @@ exports.updateCartPromotion = async (req, res) => {
 
 exports.getPromotionDetail = async (req, res) => {
   const { proId } = req.query
-  const channel = req.headers['x-channel']; 
+  const channel = req.headers['x-channel'];
   const { Promotion } = getModelsByChannel(channel, res, promotionModel);
-  
-  const data = await Promotion.findOne({proId:proId})
+
+  const data = await Promotion.findOne({ proId: proId })
 
   if (data.length == 0) {
     return res.status(404).json({
@@ -314,12 +320,13 @@ exports.getPromotionDetail = async (req, res) => {
     })
   }
 
-
+  // const io = getSocket()
+  // io.emit('promotion/getPromotionDetail', {});
 
   res.status(200).json({
     status: 200,
     message: 'sucess',
-    data:data
+    data: data
   })
 
 }
@@ -346,7 +353,7 @@ exports.getPromotion = async (req, res) => {
   res.status(200).json({
     status: 200,
     message: 'sucess',
-    data:data
+    data: data
   })
 }
 
@@ -394,6 +401,10 @@ exports.addPromotionLimit = async (req, res) => {
   })
 
   await newPromotionLimit.save()
+
+  const io = getSocket()
+  io.emit('promotion/addPromotionLimit', {});
+
 
   res.status(201).json({
     status: 201,
@@ -450,6 +461,9 @@ exports.updatePromotionLimit = async (req, res) => {
     }
   );
 
+  const io = getSocket()
+  io.emit('promotion/updatePromotionLimit', {});
+
   return res.status(200).json({ status: 200, message: 'Updated successfully' });
 }
 
@@ -482,6 +496,9 @@ exports.addQuota = async (req, res) => {
     validFrom: validFrom,
     validTo: validTo
   })
+
+  const io = getSocket()
+  io.emit('promotion/addQuota', {});
 
   res.status(200).json({
     status: 200,
@@ -532,6 +549,9 @@ exports.updateQuota = async (req, res) => {
 
   )
 
+  const io = getSocket()
+  io.emit('promotion/updateQuota', {});
+
   res.status(200).json({
     status: 200,
     message: 'sucess',
@@ -562,7 +582,8 @@ exports.addPromotionShelf = async (req, res) => {
     price: price
   })
 
-
+  const io = getSocket()
+  io.emit('promotion/addPromotionShelf', {});
 
   res.status(200).json({
     status: 200,

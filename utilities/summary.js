@@ -426,197 +426,110 @@ async function summaryGive (cart, channel, res) {
     return null
   }
 }
-
 async function summaryOrderProStatusOne (cart, listPromotion, channel, res) {
-  try {
-    if (!cart) {
-      throw new Error('Cart data is required')
-    }
-    const { Store } = getModelsByChannel(channel, res, storeModel)
+  if (!cart) {
+    throw new Error('Cart data is required')
+  }
+  const { Store } = getModelsByChannel(channel, res, storeModel)
 
-    const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
-
-    const store = storeData
-      ? {
-          _id: storeData._id,
-          storeId: storeData.storeId,
-          name: storeData.name || '',
-          taxId: storeData.taxId || '',
-          tel: storeData.tel || '',
-          route: storeData.route || '',
-          storeType: storeData.type || '',
-          typeName: storeData.typeName || '',
-          address: storeData.address || '',
-          subDistrict: storeData.subDistrict || '',
-          district: storeData.district || '',
-          province: storeData.province || '',
-          zone: storeData.zone || '',
-          area: storeData.area || ''
-        }
-      : {}
-
-    const productIds = [
-      ...cart.listProduct.map(p => p.id),
-      ...(cart.listPromotion
-        ? cart.listPromotion.flatMap(promo => promo.listProduct.map(p => p.id))
-        : [])
-    ]
-    const { Product } = getModelsByChannel(channel, res, productModel)
-
-    const productDetails = await Product.find({
-      id: { $in: productIds }
-    }).lean()
-
-    let enrichedProducts = [] // ประกาศตัวแปรไว้ก่อน
-    // if (changePromotionStatus == 0) {
-    // console.log('changePromotionStatus = 0', changePromotionStatus);
-    enrichedProducts = cart.listProduct.map(cartItem => {
-      const productInfo = productDetails.find(p => p.id === cartItem.id) || {}
-      const unitData =
-        productInfo.listUnit?.find(u => u.unit === cartItem.unit) || {}
-      const factor = parseInt(unitData?.factor, 10) || 1
-      // console.log("factor",factor);
-      const qtyPcs = cartItem.qty * factor
-      const totalPrice = cartItem.qty * cartItem.price
-      return {
-        id: cartItem.id,
-        // lot: cartItem.lot,
-        name: cartItem.name,
-        groupCode: productInfo.groupCode || '',
-        group: productInfo.group || '',
-        brandCode: productInfo.brandCode || '',
-        brand: productInfo.brand || '',
-        size: productInfo.size || '',
-        flavourCode: productInfo.flavourCode || '',
-        flavour: productInfo.flavour || '',
-        qty: cartItem.qty,
-        unit: cartItem.unit,
-        unitName: unitData.name || '',
-        price: cartItem.price,
-        total: totalPrice,
-        qtyPcs
+  // 1. Get store info
+  const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
+  const store = storeData
+    ? {
+        _id: storeData._id,
+        storeId: storeData.storeId,
+        name: storeData.name || '',
+        taxId: storeData.taxId || '',
+        tel: storeData.tel || '',
+        route: storeData.route || '',
+        storeType: storeData.type || '',
+        typeName: storeData.typeName || '',
+        address: storeData.address || '',
+        subDistrict: storeData.subDistrict || '',
+        district: storeData.district || '',
+        province: storeData.province || '',
+        zone: storeData.zone || '',
+        area: storeData.area || ''
       }
-    })
+    : {}
 
-    // let unitDataArray = []
-    // listProducts.forEach(innerArray => {
-    //   innerArray.forEach(item => {
-    //     const productInfo = productDetails.find(p => p.id === item.id) || {}
+  // 2. Get all product ids (main + promotions)
+  const productIds = [
+    ...(cart.listProduct || []).map(p => p.id),
+    ...(cart.listPromotion
+      ? cart.listPromotion.flatMap(promo =>
+          (promo.listProduct || []).map(p => p.id)
+        )
+      : [])
+  ]
+  const { Product } = getModelsByChannel(channel, res, productModel)
 
-    //     if (productInfo.listUnit) {
-    //       const foundUnit = productInfo.listUnit.find(u => u.unit === item.unit)
-    //       if (foundUnit) {
-    //         // เก็บ item.id ร่วมกับข้อมูล unit ที่พบ
-    //         unitDataArray.push({
-    //           itemId: item.id,
-    //           unit: foundUnit.unit,
-    //           name: foundUnit.name,
-    //           factor: foundUnit.factor,
-    //           sale: foundUnit.price.sale,
-    //           refund: foundUnit.price.refund
-    //         })
-    //       }
-    //     }
-    //   })
-    // })
+  const productDetails = await Product.find({
+    id: { $in: productIds }
+  }).lean()
 
-    // listPromotion.forEach(promo => {
-    //   promo.listProduct.forEach(product => {
-    //     const unitData = unitDataArray.find(unit => unit.itemId === product.id)
+  // 3. Enrich main cart products
+  const enrichedProducts = (cart.listProduct || []).map(cartItem => {
+    const productInfo = productDetails.find(p => p.id === cartItem.id) || {}
+    const unitData =
+      productInfo.listUnit?.find(u => u.unit === cartItem.unit) || {}
+    const factor = parseInt(unitData?.factor, 10) || 1
+    const qtyPcs = cartItem.qty * factor
+    const totalPrice = cartItem.qty * cartItem.price
+    return {
+      id: cartItem.id,
+      name: cartItem.name,
+      groupCode: productInfo.groupCode || '',
+      group: productInfo.group || '',
+      brandCode: productInfo.brandCode || '',
+      brand: productInfo.brand || '',
+      size: productInfo.size || '',
+      flavourCode: productInfo.flavourCode || '',
+      flavour: productInfo.flavour || '',
+      qty: cartItem.qty,
+      unit: cartItem.unit,
+      unitName: unitData.name || '',
+      price: cartItem.price,
+      total: totalPrice,
+      qtyPcs
+    }
+  })
 
-    //     if (unitData) {
-    //       product.unitData = {
-    //         unit: unitData.unit,
-    //         name: unitData.name,
-    //         factor: unitData.factor,
-    //         sale: unitData.sale,
-    //         refund: unitData.refund
-    //       }
-    //     }
-    //   })
-    // })
-    // console.log(cart.listPromotion)
-    const enrichedPromotions = (cart.listPromotion || []).map(promo => {
-      const plainPromo = promo.toObject ? promo.toObject() : promo
-
-      const enrichedProducts = plainPromo.listProduct.map(promoProduct => {
-        const productInfo =
-          productDetails.find(p => p.id === promoProduct.id) || {}
+  // 4. Enrich promotion products from req.body
+  const enrichedPromotions =
+    (cart.listPromotion || []).map(promo => ({
+      ...promo,
+      listProduct: (promo.listProduct || []).map(product => {
+        const prodDetail = productDetails.find(p => p.id === product.id) || {}
         const unitData =
-          productInfo.listUnit?.find(u => u.unit === promoProduct.unit) || {}
+          prodDetail.listUnit?.find(u => u.unit === product.unit) || {}
         const factor = parseInt(unitData?.factor, 10) || 1
-        const qtyPcs = promoProduct.qty * factor
-
         return {
-          ...promoProduct,
-          qtyPcs
+          ...product,
+          group: prodDetail.group || '',
+          brand: prodDetail.brand || '',
+          size: prodDetail.size || '',
+          flavour: prodDetail.flavour || '',
+          unitName: unitData.name || '',
+          qtyPcs: (product.qty ?? 1) * factor
         }
       })
+    })) || []
 
-      return {
-        ...plainPromo,
-        listProduct: enrichedProducts
-      }
-    })
-
-    const order = {
-      order: {
-        store: store.storeId
-      },
-      listProduct: enrichedProducts
-    }
-    const promotion = await applyPromotion(order, channel, res)
-
-    const mergedMap = new Map()
-
-    // listPromotion.forEach(promo => {
-    // mergedMap.set(promo.proId, promo)
-    // })
-
-    let listPromotionNew = ''
-
-    listPromotionNew = listPromotion.map(listItem => {
-      const promo = promotion.appliedPromotions.find(
-        p => p.proId === listItem.proId
-      )
-
-      if (promo && promo.proQty !== listItem.proQty) {
-        return promo
-      }
-
-      return listItem
-    })
-
-    enrichedPromotions.forEach(promo => {
-      mergedMap.set(promo.proId, promo)
-    })
-
-    listPromotionNew.forEach(promo => {
-      mergedMap.set(promo.proId, promo)
-    })
-
-    const promoProduct = Array.from(mergedMap.values())
-
-    // console.log(listPromotionNew)
-
-    return {
-      type: cart.type,
-      store,
-      shipping: [],
-      listProduct: enrichedProducts,
-      // listRefund: [],
-      listPromotion: promoProduct,
-      listQuota: cart.listQuota,
-      total: parseFloat(cart.total.toFixed(2)),
-      subtotal: 0,
-      discount: 0,
-      discountProduct: 0,
-      vat: 0,
-      totalExVat: 0
-    }
-  } catch (error) {
-    console.error('Error transforming cart data:', error.message)
-    return null
+  // 5. Return response: เหมือนกับ summaryOrder
+  return {
+    type: cart.type,
+    store,
+    shipping: [],
+    listProduct: enrichedProducts,
+    listPromotion: listPromotion || [],
+    listQuota: cart.listQuota || [],
+    total: parseFloat(cart.total?.toFixed(2) || 0),
+    subtotal: parseFloat(cart.total?.toFixed(2) || 0),
+    discount: 0,
+    discountProduct: 0,
+    vat: parseFloat(((cart.total || 0) - (cart.total || 0) / 1.07).toFixed(2)),
+    totalExVat: parseFloat(((cart.total || 0) / 1.07).toFixed(2))
   }
 }
 

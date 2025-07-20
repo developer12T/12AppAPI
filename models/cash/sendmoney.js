@@ -15,7 +15,9 @@ const sendMoneySchema = mongoose.Schema({
   status: { type: String },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
-  dateAt: { type: Date }
+  dateAt: { type: Date },
+  salePayer: { type: String, require: true },
+  saleCode: { type: String, require: true },
 }, {
   timestamps: true
 })

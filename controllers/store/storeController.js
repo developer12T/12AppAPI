@@ -1,10 +1,12 @@
+const mongoose = require('mongoose');
+
 const { uploadFiles } = require('../../utilities/upload')
 const { calculateSimilarity } = require('../../utilities/utility')
 const axios = require('axios')
 const multer = require('multer')
 const userModel = require('../../models/cash/user')
 const ExcelJS = require('exceljs')
-
+const { getSocket } = require('../../socket')
 const addUpload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages'
 )
@@ -47,56 +49,95 @@ const path = require('path')
 const { v4: uuidv4 } = require('uuid')
 
 uuidv4() // ⇨ '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed'
-const { productQuery } = require('../../controllers/queryFromM3/querySctipt')
+const { productQuery, bueatyStoreQuery } = require('../../controllers/queryFromM3/querySctipt')
+const store = require('../../models/cash/store')
+
+exports.getDetailStore = async (req, res) => {
+  try {
+    const { storeId } = req.params
+    const channel = req.headers['x-channel'] // 'credit' or 'cash'
+
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    // ตัวอย่างดึงข้อมูลจาก MongoDB
+    const storeData = await Store.findOne({ storeId }).lean()
+
+    if (!storeData) {
+      return res.status(404).json({ status: 404, message: 'Store not found' })
+    }
+
+
+    // const io = getSocket()
+    // io.emit('store/', {});
+
+    // ส่งข้อมูลกลับ
+    res.status(200).json({
+      status: 200,
+      data: storeData
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
 
 exports.getStore = async (req, res) => {
   try {
-    const { area, type, route } = req.query
+    const { area, type, route, zone, team, year, month, showMap } = req.query
     const channel = req.headers['x-channel'] // 'credit' or 'cash'
 
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
     const currentDate = new Date()
+    // startMonth: 3 เดือนที่แล้ว (นับรวมเดือนนี้)
     const startMonth = new Date(
       currentDate.getFullYear(),
-      currentDate.getMonth() - 3,
+      currentDate.getMonth() - 2,
       1
     )
-    const NextMonth = new Date(
+    const nextMonth = new Date(
       currentDate.getFullYear(),
       currentDate.getMonth() + 1,
       1
     )
-    console.log(startMonth)
-    console.log(NextMonth)
+
     let query = {}
 
-    if (area) {
-      query.area = { $regex: `^${area}`, $options: 'i' }
-    }
-
-    if (type === 'new') {
+    // Priority: ใช้ month/year filter ก่อน type
+    if (month && year) {
+      // หมายเหตุ: month ใน JS index เริ่มที่ 0 (มกราคม=0), แต่ใน req.query month=7 (กรกฎาคม)
+      // query.status = '20'
+      const m = parseInt(month) - 1 // ปรับ index ให้เป็น 0-based
+      const y = parseInt(year)
+      const startDate = new Date(y, m, 1)
+      // หา "วันสุดท้ายของเดือน"
+      const endDate = new Date(y, m + 1, 0, 23, 59, 59, 999)
+      query.createdAt = {
+        $gte: startDate,
+        $lte: endDate
+      }
+    } else if (type === 'new') {
+      // 3 เดือนล่าสุด
+      // query.status = { $in: ['20', '10'] }
       query.createdAt = {
         $gte: startMonth,
-        $lt: NextMonth
+        $lt: nextMonth
       }
-    } else if (type === 'all') {
-      // query.createdAt = {
-      //   $not: {
-      //     $gte: startMonth,
-      //     $lt: NextMonth
-      //   }
-      // }
-      delete query.createdAt
+    } else {
+      query.status = { $nin: ['10'] }
+    } // ถ้า type=all ไม่ต้อง filter createdAt เลย
+
+    if (area) {
+      query.area = area
+    } else if (zone) {
+      query.area = { $regex: `^${zone}`, $options: 'i' }
     }
 
     if (route) {
       query.route = route
     }
 
-    // console.log(query)
-
-    const data = await Store.aggregate([
+    const pipeline = [
       { $match: query },
       {
         $lookup: {
@@ -116,9 +157,26 @@ exports.getStore = async (req, res) => {
                 $concatArrays: ['$$value', '$$this.type']
               }
             }
+          },
+          team3: {
+            $concat: [
+              { $substrCP: ['$area', 0, 2] },
+              { $substrCP: ['$area', 3, 1] }
+            ]
           }
         }
-      },
+      }
+    ]
+
+    if (team) {
+      pipeline.push({
+        $match: {
+          team3: { $regex: `^${team}`, $options: 'i' }
+        }
+      })
+    }
+
+    pipeline.push(
       {
         $project: {
           _id: 0,
@@ -127,11 +185,22 @@ exports.getStore = async (req, res) => {
         }
       },
       {
-        $sort: { createdAt: -1 }
+        $sort: { status: 1 }
       }
-    ])
+    )
 
-    // console.log(data)
+    let data = await Store.aggregate(pipeline)
+
+    if (showMap === 'true') {
+      data = data.map(item => ({
+        storeId: item.storeId,
+        name: item.name,
+        zone: item.zone,
+        address: item.address,
+        latitude: item.latitude ? parseFloat(item.latitude) : null,
+        longitude: item.longtitude ? parseFloat(item.longtitude) : null
+      }))
+    }
 
     if (data.length === 0) {
       return res.status(404).json({
@@ -139,6 +208,9 @@ exports.getStore = async (req, res) => {
         message: 'Not Found Store'
       })
     }
+
+    // const io = getSocket()
+    // io.emit('store/getStore', {});
 
     res.status(200).json({
       status: '200',
@@ -269,62 +341,6 @@ exports.addStore = async (req, res) => {
         })
       }
 
-      const existingStores = await Store.find(
-        {},
-        { _id: 0, __v: 0, idIndex: 0 },
-        { area: store.area }
-      )
-      // console.log(store.area)
-      const fieldsToCheck = [
-        'name',
-        'taxId',
-        'tel',
-        'address',
-        // 'district',
-        // 'subDistrict',
-        // 'province',
-        // 'postCode',
-        'latitude',
-        'longtitude'
-      ]
-
-      const similarStores = existingStores
-        .map(existingStore => {
-          let totalSimilarity = 0
-          fieldsToCheck.forEach(field => {
-            const similarity = calculateSimilarity(
-              store[field]?.toString() || '',
-              existingStore[field]?.toString() || ''
-            )
-            totalSimilarity += similarity
-          })
-
-          const averageSimilarity = totalSimilarity / fieldsToCheck.length
-          return {
-            store: existingStore,
-            similarity: averageSimilarity
-          }
-        })
-        .filter(result => result.similarity > 70)
-        .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, 3)
-
-      if (similarStores.length > 0) {
-        const sanitizedStores = similarStores.map(item => ({
-          store: Object.fromEntries(
-            Object.entries(item.store._doc || item.store).filter(
-              ([key]) => key !== '_id'
-            )
-          ),
-          similarity: item.similarity.toFixed(2)
-        }))
-        return res.status(200).json({
-          status: '200',
-          message: 'similar store',
-          data: sanitizedStores
-        })
-      }
-
       const uploadedFiles = []
       for (let i = 0; i < files.length; i++) {
         const uploadedFile = await uploadFiles(
@@ -407,6 +423,9 @@ exports.addStore = async (req, res) => {
       await storeData.save()
       // console.log(storeData)
 
+      const io = getSocket()
+      io.emit('store/addStore', {});
+
       res.status(200).json({
         status: '200',
         message: 'Store added successfully'
@@ -419,6 +438,77 @@ exports.addStore = async (req, res) => {
   })
 }
 
+exports.checkSimilarStores = async (req, res) => {
+  const { storeId } = req.params
+  const channel = req.headers['x-channel']
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const store = await Store.findOne({ storeId })
+
+  const existingStores = await Store.find(
+    { storeId: { $ne: storeId } },
+    { _id: 0, __v: 0, idIndex: 0 },
+    { area: store.area }
+  )
+
+  const fieldsToCheck = [
+    'name',
+    'taxId',
+    'tel',
+    'address',
+    'district',
+    'subDistrict',
+    'province',
+    'postCode',
+    'latitude',
+    'longtitude'
+  ]
+
+  const similarStores = existingStores
+    .map(existingStore => {
+      let totalSimilarity = 0
+      fieldsToCheck.forEach(field => {
+        const similarity = calculateSimilarity(
+          store[field]?.toString() || '',
+          existingStore[field]?.toString() || ''
+        )
+        totalSimilarity += similarity
+      })
+
+      const averageSimilarity = totalSimilarity / fieldsToCheck.length
+      return {
+        store: existingStore,
+        similarity: averageSimilarity
+      }
+    })
+    .filter(result => result.similarity > 50)
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, 3)
+
+  if (similarStores.length > 0) {
+    const sanitizedStores = similarStores.map(item => ({
+      store: Object.fromEntries(
+        Object.entries(item.store._doc || item.store).filter(
+          ([key]) => key !== '_id'
+        )
+      ),
+      similarity: item.similarity.toFixed(2)
+    }))
+
+    // const io = getSocket()
+    // io.emit('store/check', {});
+
+
+    return res.status(200).json({
+      status: '200',
+      message: 'similar store',
+      data: sanitizedStores
+    })
+  }
+  return res.status(204).json({
+    status: '204',
+    message: 'Do not have similar store'
+  })
+}
 exports.editStore = async (req, res) => {
   const { storeId } = req.params
   const data = req.body
@@ -454,6 +544,10 @@ exports.editStore = async (req, res) => {
     if (!store) {
       return res.status(404).json({ status: '404', message: 'Store not found' })
     }
+
+    const io = getSocket()
+    io.emit('store/editStore', {});
+
 
     res.status(200).json({
       status: '200',
@@ -601,6 +695,9 @@ exports.addFromERPnew = async (req, res) => {
       }
     }
 
+    const io = getSocket()
+    io.emit('store/addFromERPnew', {});
+
     res.status(200).json({
       status: 200,
       message: 'Sync Store Success',
@@ -644,9 +741,12 @@ exports.checkInStore = async (req, res) => {
         .json({ status: '404', message: 'store not found!' })
     }
 
+    const io = getSocket()
+    io.emit('store/checkIn', {});
+
     res.status(200).json({
       status: '200',
-      message: 'Checked In Successfully',
+      message: 'Checked In Successfully', 
       data: {
         latitude: result.checkIn.latitude,
         longtitude: result.checkIn.latitude,
@@ -664,36 +764,26 @@ exports.updateStoreStatus = async (req, res) => {
   const channel = req.headers['x-channel']
   const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
   const store = await Store.findOne({ storeId: storeId })
-  const storetest = await Store.findOne({ _id: store._id })
   if (!store) {
     return res.status(404).json({
       status: 404,
       message: 'Not found store'
     })
   }
-  console.log(store._id)
-  const maxRunningAll = await Store.aggregate([
-    {
-      $match: {
-        zone: store.zone,
-        storeId: {
-          $regex: /^V.{0,9}$/,
-          $options: 'i'
-        }
-      }
-    },
-    {
-      $group: {
-        _id: '$zone',
-        maxStoreId: { $max: '$storeId' }
-      }
-    }
-  ])
-  const oldId = maxRunningAll.flatMap(u => u.maxStoreId)
-  const newId = oldId[0].replace(/\d+$/, n =>
+  const storeZone = store.area.substring(0, 2)
+  const maxRunningAll = await RunningNumber.findOne({ zone: storeZone }).select("last")
+
+  // console.log(maxRunningAll)
+
+  const oldId = maxRunningAll
+  // console.log(oldId,"oldId")
+  const newId = oldId.last.replace(/\d+$/, n =>
     String(+n + 1).padStart(n.length, '0')
   )
-  // console.log(maxRunningAll)
+
+  // console.log(newId,"newId")
+
+  // console.log("oldId",oldId)
   if (status === '20') {
     await RunningNumber.findOneAndUpdate(
       { zone: store.zone },
@@ -713,6 +803,11 @@ exports.updateStoreStatus = async (req, res) => {
       },
       { new: true }
     )
+    res.status(200).json({
+      status: 200,
+      storeId: newId,
+      message: 'Update storeId successful'
+    })
   } else {
     await Store.findOneAndUpdate(
       { _id: store._id },
@@ -726,12 +821,15 @@ exports.updateStoreStatus = async (req, res) => {
       },
       { new: true }
     )
-  }
 
-  res.status(200).json({
-    status: 200,
-    message: 'Update storeId successful'
-  })
+    const io = getSocket()
+    io.emit('store/updateStoreStatus', {});
+
+    res.status(200).json({
+      status: 200,
+      message: 'Reject Store successful'
+    })
+  }
 }
 
 exports.rejectStore = async (req, res) => {
@@ -862,7 +960,7 @@ exports.createRunningNumber = async (req, res) => {
   let running = ''
   if (channel == 'cash') {
     type = '101'
-    running = 'V'
+    running = 'CV'
   } else if (channel == 'credit') {
     type = '103'
   }
@@ -870,7 +968,7 @@ exports.createRunningNumber = async (req, res) => {
   const zoneId = await Store.aggregate([
     {
       $match: {
-        zone: { $ne: null, $ne: '' }
+        zone: { $ne: null, $nin: ['', null] }
       }
     },
     {
@@ -880,10 +978,13 @@ exports.createRunningNumber = async (req, res) => {
     }
   ])
 
+  // console.log(zoneId)
+
+
   const maxRunningAll = await Store.aggregate([
     {
       $match: {
-        zone: { $ne: null, $ne: '' }
+        zone: { $ne: null, $nin: ['', null] }
       }
     },
     {
@@ -901,7 +1002,7 @@ exports.createRunningNumber = async (req, res) => {
       type: type,
       name: channel,
       start: `${running}${u._id}2500000`,
-      last: maxRunning.maxStoreId
+      last: `${running}${u._id}2500000`
     }
   })
 
@@ -970,36 +1071,46 @@ exports.updateRunningNumber = async (req, res) => {
 
 exports.addBueatyStore = async (req, res) => {
   const channel = req.headers['x-channel']
-  let pathPhp = ''
 
-  switch (channel) {
-    case 'cash':
-      pathPhp = 'ca_api/ca_customer_beauty.php'
-      break
-    case 'credit':
-      pathPhp = 'cr_api/cr_customer_beauty.php'
-      break
-    default:
-      break
+  // 1. Start session
+  const session = await mongoose.startSession()
+  session.startTransaction()
+
+  try {
+    const bueatydata = await bueatyStoreQuery()
+
+    const { TypeStore } = getModelsByChannel(channel, res, storeModel)
+
+    // 2. Delete all
+    await TypeStore.deleteMany({}, { session })
+
+    // 3. Insert new
+    // (สามารถ optimize เป็น insertMany ได้ ถ้าไม่มีเงื่อนไข exists)
+    await TypeStore.insertMany(bueatydata.map(x => ({ ...x, type: ['beauty'] })), { session })
+
+
+    // 4. Commit
+    await session.commitTransaction()
+    session.endSession()
+
+    const io = getSocket()
+    io.emit('store/addBueatyStore', {});
+
+
+
+    res.status(200).json({
+      status: 200,
+      message: bueatydata
+    })
+  } catch (error) {
+    // 5. Rollback
+    await session.abortTransaction()
+    session.endSession()
+    console.error(error)
+    res.status(500).json({ status: 500, message: error.message })
   }
-  const response = await axios.post(
-    `http://58.181.206.159:9814/apps_api/${pathPhp}`
-  )
-
-  const { TypeStore } = getModelsByChannel(channel, res, storeModel)
-
-  for (const data of response.data) {
-    const exists = await TypeStore.findOne({ storeId: data.storeId })
-    if (!exists) {
-      await TypeStore.create({ ...data, type: ['beauty'] })
-    }
-  }
-
-  res.status(200).json({
-    status: 200,
-    message: response.data
-  })
 }
+
 
 exports.getBueatyStore = async (req, res) => {
   const channel = req.headers['x-channel']
@@ -1049,6 +1160,9 @@ exports.addStoreArray = async (req, res) => {
     }
   }
 
+  const io = getSocket()
+  io.emit('store/addStoreArray', {});
+
   res.status(200).json({
     status: 200,
     message: 'Store sync completed',
@@ -1088,6 +1202,9 @@ exports.updateStoreArray = async (req, res) => {
       }
     }
   }
+  const io = getSocket()
+  io.emit('store/updateStoreArray', {});
+
   res.status(200).json({
     status: 200,
     message: 'Store update check completed',
@@ -1105,6 +1222,10 @@ exports.deleteStoreArray = async (req, res) => {
   const deletedStoreId = storeToDelete.map(store => store.storeId)
 
   await Store.deleteMany({ storeId: { $in: storeId } })
+
+  const io = getSocket()
+  io.emit('store/deleteStoreArray', {});
+
 
   res.status(200).json({
     status: 200,
@@ -1235,4 +1356,216 @@ exports.insertStoreToErpOne = async (req, res) => {
   //   message: 'successfully',
   //   data: dataTran
   // })
+}
+
+
+exports.getShipping = async (req, res) => {
+
+  const { storeId } = req.body
+  // console.log(storeId)
+  const channel = req.headers['x-channel']
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+
+  const dataStore = await Store.findOne({ storeId: storeId }).select("shippingAddress")
+
+  if (!dataStore) {
+    return res.status(404).json({
+      status: 404,
+      message: 'Not found store',
+    })
+  }
+
+
+  // const io = getSocket()
+  // io.emit('store/getShipping', {});
+
+  return res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: dataStore.shippingAddress
+  })
+
+
+}
+
+exports.addShippingInStore = async (req, res) => {
+  try {
+    const { storeId, defaultId, shippingId, address, district,
+      subDistrict, province, postCode, latitude, longtitude
+    } = req.body
+
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const existStore = await Store.aggregate([
+      {
+        $match: {
+          storeId: storeId
+        }
+      }
+    ])
+
+    if (existStore.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found store',
+      })
+    }
+
+    const storeWithShipping = await Store.findOne({
+      storeId: storeId,
+      'shippingAddress.shippingId': shippingId
+    });
+    if (storeWithShipping) {
+      return res.status(409).json({
+        status: 409,
+        message: 'This shippingId already exists for this store.',
+      });
+    }
+
+    const addShipping = await Store.findOneAndUpdate(
+      { storeId: storeId },
+      {
+        $push: {
+          shippingAddress: {
+            default: defaultId,
+            shippingId: shippingId,
+            address: address,
+            district: district,
+            subDistrict: subDistrict,
+            province: province,
+            postCode: postCode,
+            latitude: latitude,
+            longtitude: longtitude,
+          }
+        }
+      },
+      { new: true }
+    );
+
+    const io = getSocket()
+    io.emit('store/addShippingInStore', {});
+
+    return res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: addShipping
+    })
+
+  } catch (error) {
+    console.error('addShippingInStore error:', error)
+    return res.status(500).json({ status: 500, message: 'Internal server error' })
+  }
+}
+
+
+exports.editShippingInStore = async (req, res) => {
+  try {
+    const {
+      storeId,
+      defaultId,
+      shippingId,
+      address,
+      district,
+      subDistrict,
+      province,
+      postCode,
+      latitude,
+      longitude
+    } = req.body;
+
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const existStore = await Store.findOne({
+      storeId: storeId,
+      'shippingAddress.shippingId': shippingId
+    });
+
+    if (!existStore) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found this shippingId in this store',
+      });
+    }
+
+    let setObj = {};
+    if (defaultId !== undefined && defaultId !== "") setObj["shippingAddress.$.default"] = defaultId;
+    if (address !== undefined && address !== "") setObj["shippingAddress.$.address"] = address;
+    if (district !== undefined && district !== "") setObj["shippingAddress.$.district"] = district;
+    if (subDistrict !== undefined && subDistrict !== "") setObj["shippingAddress.$.subDistrict"] = subDistrict;
+    if (province !== undefined && province !== "") setObj["shippingAddress.$.province"] = province;
+    if (postCode !== undefined && postCode !== "") setObj["shippingAddress.$.postCode"] = postCode;
+    if (latitude !== undefined && latitude !== "") setObj["shippingAddress.$.latitude"] = latitude;
+    if (longitude !== undefined && longitude !== "") setObj["shippingAddress.$.longitude"] = longitude;
+
+    if (Object.keys(setObj).length === 0) {
+      return res.status(400).json({
+        status: 400,
+        message: 'No valid fields to update',
+      });
+    }
+
+    const updatedStore = await Store.findOneAndUpdate(
+      { storeId: storeId, 'shippingAddress.shippingId': shippingId },
+      { $set: setObj },
+      { new: true }
+    );
+
+    const io = getSocket()
+    io.emit('store/editShippingInStore', {});
+
+
+    return res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: updatedStore
+    });
+  } catch (error) {
+    console.error('editShippingInStore error:', error)
+    return res.status(500).json({ status: 500, message: 'Internal server error' });
+  }
+}
+
+
+
+exports.deleteShippingFromStore = async (req, res) => {
+  try {
+    const { storeId, shippingId } = req.body; // หรือ req.params, แล้วแต่ดีไซน์
+
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    // เช็กว่าร้านนี้มี shippingId นี้จริงหรือไม่
+    const existStore = await Store.findOne({
+      storeId: storeId,
+      'shippingAddress.shippingId': shippingId
+    });
+
+    if (!existStore) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found this shippingId in this store',
+      });
+    }
+
+    // ลบ shippingAddress ที่ตรงกับ shippingId นี้
+    const updatedStore = await Store.findOneAndUpdate(
+      { storeId: storeId },
+      { $pull: { shippingAddress: { shippingId: shippingId } } },
+      { new: true }
+    );
+
+    const io = getSocket()
+    io.emit('store/deleteShippingFromStore', {});
+
+    return res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: updatedStore
+    });
+  } catch (error) {
+    console.error('deleteShippingFromStore error:', error)
+    return res.status(500).json({ status: 500, message: 'Internal server error' });
+  }
 }

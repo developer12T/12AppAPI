@@ -17,24 +17,27 @@ const { withdrawQuery } = require('../../controllers/queryFromM3/querySctipt')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { query } = require('mssql')
 const { exists } = require('fs')
-
-
-
+const { formatDateTimeToThai } = require('../../middleware/order')
+const { to2, updateStockMongo } = require('../../middleware/order')
+const { getSocket } = require('../../socket')
 
 exports.checkout = async (req, res) => {
-  const transaction = await sequelize.transaction();
+  const transaction = await sequelize.transaction()
   try {
-    const { type, area, shippingId, withdrawType, sendDate, note, period } = req.body
+    const { type, area, shippingId, withdrawType, sendDate, note, period } =
+      req.body
 
-    const channel = req.headers['x-channel'];
-    const { Cart } = getModelsByChannel(channel, res, cartModel);
-    const { User } = getModelsByChannel(channel, res, userModel);
-    const { Place } = getModelsByChannel(channel, res, distributionModel);
+    const channel = req.headers['x-channel']
+    const { Cart } = getModelsByChannel(channel, res, cartModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { Place } = getModelsByChannel(channel, res, distributionModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Distribution } = getModelsByChannel(channel, res, distributionModel)
-    const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(channel, res, stockModel);
-
-
+    const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
+      channel,
+      res,
+      stockModel
+    )
 
     if (!type || !area || !shippingId || !withdrawType || !sendDate || !note) {
       return res
@@ -67,19 +70,19 @@ exports.checkout = async (req, res) => {
         .json({ status: 404, message: 'Shipping address not found!' })
     }
     const shipping = shippingData.listAddress[0]
-
-    const fromWarehouse =
-      withdrawType === 'normal'
-        ? shipping.warehouse?.normal
-        : shipping.warehouse?.clearance
+    // console.log(shipping)
+    let fromWarehouse
+    if (withdrawType === 'normal') {
+      fromWarehouse = shipping.warehouse?.normal
+    } else {
+      fromWarehouse = shipping.warehouse?.clearance
+    }
 
     if (!fromWarehouse) {
-      return res
-        .status(400)
-        .json({
-          status: 400,
-          message: 'Invalid withdrawType or missing warehouse data!'
-        })
+      return res.status(400).json({
+        status: 400,
+        message: 'Invalid withdrawType or missing warehouse data!'
+      })
     }
 
     // console.log("cart",cart)
@@ -134,8 +137,12 @@ exports.checkout = async (req, res) => {
 
     if (listProduct.includes(null)) return
     // if (listProduct.some(p => p === null)) return res.status(400).json({ status: 400, message: 'Invalid product in cart!' })
-    const orderId = await generateDistributionId(area, sale.warehouse, channel, res)
-
+    const orderId = await generateDistributionId(
+      area,
+      sale.warehouse,
+      channel,
+      res
+    )
 
     // const series = await getSeries(shipping.type)
     // if (series == null) {
@@ -143,7 +150,6 @@ exports.checkout = async (req, res) => {
     //   error.statusCode = 422
     //   throw error
     // }
-
 
     // const runningJson = {
     //   coNo: '410',
@@ -170,11 +176,6 @@ exports.checkout = async (req, res) => {
     //   transaction
     // )
 
-
-
-
-
-
     const newOrder = new Distribution({
       orderId,
       orderType: shipping.type,
@@ -197,19 +198,15 @@ exports.checkout = async (req, res) => {
       period: period
     })
 
-
-
-
     const productQty = newOrder.listProduct.map(u => {
       return {
-        productId: u.id,
+        id: u.id,
         // lot: u.lot,
         unit: u.unit,
         qty: u.qty,
         statusMovement: 'OUT'
       }
     })
-
 
     // for (const item of productQty) {
     //   const factorPcsResult = await Product.aggregate([
@@ -270,16 +267,6 @@ exports.checkout = async (req, res) => {
     //   );
     // }
 
-
-
-
-
-
-
-
-
-
-
     const calStock = {
       // storeId: refundOrder.store.storeId,
       orderId: newOrder.orderId,
@@ -289,24 +276,27 @@ exports.checkout = async (req, res) => {
       warehouse: newOrder.fromWarehouse,
       status: 'pending',
       statusTH: 'รอนำเข้า',
-      action: "Withdraw",
-      type: "Withdraw",
+      action: 'Withdraw',
+      type: 'Withdraw',
       product: productQty
     }
 
     const createdMovement = await StockMovement.create({
       ...calStock
-    });
+    })
 
     await StockMovementLog.create({
       ...calStock,
       refOrderId: createdMovement._id
-    });
-
+    })
 
     await newOrder.save()
     await Cart.deleteOne({ type, area })
     await transaction.commit()
+
+    const io = getSocket()
+    io.emit('distribution/checkout', {});
+
     res.status(200).json({
       status: 200,
       message: 'Checkout successful!',
@@ -323,10 +313,10 @@ exports.checkout = async (req, res) => {
 
 exports.getOrder = async (req, res) => {
   try {
-    const { type, area, period } = req.query
-    const channel = req.headers['x-channel'];
+    const { type, area, period, zone, team, year, month } = req.query
+    const channel = req.headers['x-channel']
 
-    const { Distribution } = getModelsByChannel(channel, res, distributionModel);
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
     let response = []
     if (!type || !period) {
@@ -338,38 +328,67 @@ exports.getOrder = async (req, res) => {
     const { startDate, endDate } = rangeDate(period)
     let statusQuery = {}
     if (type === 'pending') {
-      statusQuery.status = { $in: ['pending','approved','rejected'] };
+      statusQuery.status = { $in: ['pending', 'approved', 'rejected'] }
     } else if (type === 'history') {
-      statusQuery.status = { $in: ['approved','rejected','success'] };
+      statusQuery.status = { $in: ['approved', 'rejected', 'success'] }
     }
 
     // const status = type === 'history' ? { $ne: 'pending' } : 'pending'
     let areaQuery = {}
+
     if (area) {
-      if (area.length == 2) {
-        areaQuery.zone = area.slice(0, 2)
-      }
-      else if (area.length == 5) {
-        areaQuery.area = area
-      }
+      areaQuery.area = area
+    } else if (zone) {
+      areaQuery.area = { $regex: `^${zone}`, $options: 'i' }
     }
+
     let query = {
       ...areaQuery,
       ...statusQuery,
       period: period
     }
-    // console.log(query)
-    const order = await Distribution.aggregate([
+
+    const pipeline = [
       {
         $addFields: {
-          zone: { $substrBytes: ["$area", 0, 2] }
+          team3: {
+            $concat: [
+              { $substrCP: ['$area', 0, 2] },
+              { $substrCP: ['$area', 3, 1] }
+            ]
+          },
+          statusASC: {
+            $cond: [
+              { $eq: ['$status', 'pending'] },
+              0,
+              {
+                $cond: [
+                  { $eq: ['$status', 'approved'] },
+                  1,
+                  2 // else: rejected (or other status)
+                ]
+              }
+            ]
+          }
         }
       },
       { $match: query }
-    ])
-    // const order = await Distribution.find(query)
-    // const order2 = await Distribution.find();
-    // console.log(order)
+    ]
+
+    if (team) {
+      pipeline.push({
+        $match: {
+          team3: { $regex: `^${team}`, $options: 'i' }
+        }
+      })
+    }
+
+    pipeline.push({
+      $sort: { statusASC: 1, createdAt: -1 }
+    })
+
+    const order = await Distribution.aggregate(pipeline)
+
     if (order.length == 0) {
       return res
         .status(404)
@@ -384,8 +403,12 @@ exports.getOrder = async (req, res) => {
       sendDate: o.sendDate,
       total: o.totalQty || 0,
       status: o.status,
-      created: o.created
+      createdAt: formatDateTimeToThai(o.createdAt)
     }))
+
+    // const io = getSocket()
+    // io.emit('distribution/get', {});
+
 
     res.status(200).json({
       status: 200,
@@ -402,9 +425,9 @@ exports.getDetail = async (req, res) => {
   try {
     const { orderId } = req.params
 
-    const channel = req.headers['x-channel'];
+    const channel = req.headers['x-channel']
 
-    const { Distribution } = getModelsByChannel(channel, res, distributionModel);
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
     if (!orderId) {
       return res
         .status(400)
@@ -452,7 +475,7 @@ exports.getDetail = async (req, res) => {
             weightNet: p.weightNet,
             receiveQty: p.receiveQty,
             _id: p._id
-          };
+          }
         }),
         total: u.total,
         totalQty: u.totalQty,
@@ -463,9 +486,12 @@ exports.getDetail = async (req, res) => {
         receivetotalWeightGross: u.receivetotalWeightGross,
         receivetotalWeightNet: u.receivetotalWeightNet,
         status: u.status
-      };
-    });
+      }
+    })
 
+
+    // const io = getSocket()
+    // io.emit('distribution/detail', {});
 
     res.status(200).json({
       status: 200,
@@ -482,9 +508,9 @@ exports.updateStatus = async (req, res) => {
   try {
     const { orderId, status } = req.body
 
-    const channel = req.headers['x-channel'];
+    const channel = req.headers['x-channel']
 
-    const { Distribution } = getModelsByChannel(channel, res, distributionModel);
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
     if (!orderId || !status) {
       return res
@@ -498,36 +524,25 @@ exports.updateStatus = async (req, res) => {
     }
 
     if (order.status !== 'pending' && status !== 'canceled') {
-      return res
-        .status(400)
-        .json({
-          status: 400,
-          message: 'Cannot update status, distribution is not in pending state!'
-        })
+      return res.status(400).json({
+        status: 400,
+        message: 'Cannot update status, distribution is not in pending state!'
+      })
     }
 
-    let newOrderId = orderId
-
-    if (status === 'canceled' && !orderId.endsWith('CC')) {
-      newOrderId = `${orderId}CC`
-
-      const isDuplicate = await Distribution.findOne({ orderId: newOrderId })
-      if (isDuplicate) {
-        let counter = 1
-        while (
-          await Distribution.findOne({ orderId: `${orderId}CC${counter}` })
-        ) {
-          counter++
-        }
-        newOrderId = `${orderId}CC${counter}`
-      }
+    if (status === 'canceled') {
+      statusTH = 'ยกเลิก'
     }
 
     const updatedOrder = await Distribution.findOneAndUpdate(
       { orderId },
-      { $set: { status, orderId: newOrderId } },
+      { $set: { status, statusTH } },
       { new: true }
     )
+
+
+    const io = getSocket()
+    io.emit('distribution/updateStatus', {});
 
     res.status(200).json({
       status: 200,
@@ -540,61 +555,63 @@ exports.updateStatus = async (req, res) => {
 }
 
 exports.updateStockWithdraw = async (req, res) => {
-
   const { orderId, status } = req.body
-  const channel = req.headers['x-channel'];
-  const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(channel, res, stockModel);
+  const channel = req.headers['x-channel']
+  const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
+    channel,
+    res,
+    stockModel
+  )
 
-  const stockmovements = await StockMovement.findOne({ orderId: orderId, status: status })
+  const stockmovements = await StockMovement.findOne({
+    orderId: orderId,
+    status: status
+  })
 
   const productId = stockmovements.product.flatMap(u => u.productId)
 
   const stock = await Stock.aggregate([
     { $match: { area: stockmovements.area, period: stockmovements.period } },
     { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
-    { $match: { "listProduct.productId": { $in: productId } } },
+    { $match: { 'listProduct.productId': { $in: productId } } },
     // { $match : { "listProduct.available.lot": u.lot } },
     {
       $project: {
         _id: 0,
-        productId: "$listProduct.productId",
-        sumQtyPcs: "$listProduct.sumQtyPcs",
-        sumQtyCtn: "$listProduct.sumQtyCtn",
-        sumQtyPcsStockIn: "$listProduct.sumQtyPcsStockIn",
-        sumQtyCtnStockIn: "$listProduct.sumQtyCtnStockIn",
-        sumQtyPcsStockOut: "$listProduct.sumQtyPcsStockOut",
-        sumQtyCtnStockOut: "$listProduct.sumQtyCtnStockOut",
-        available: "$listProduct.available"
+        productId: '$listProduct.productId',
+        sumQtyPcs: '$listProduct.sumQtyPcs',
+        sumQtyCtn: '$listProduct.sumQtyCtn',
+        sumQtyPcsStockIn: '$listProduct.sumQtyPcsStockIn',
+        sumQtyCtnStockIn: '$listProduct.sumQtyCtnStockIn',
+        sumQtyPcsStockOut: '$listProduct.sumQtyPcsStockOut',
+        sumQtyCtnStockOut: '$listProduct.sumQtyCtnStockOut',
+        available: '$listProduct.available'
       }
     }
-  ]);
-
+  ])
 
   let listProductWithDraw = []
   let updateLot = []
-
 
   for (const stockDetail of stock) {
     for (const lot of stockDetail.available) {
       const calDetails = calStock.product.filter(
         u => u.productId === stockDetail.productId && u.lot === lot.lot
-      );
+      )
 
-
-      let pcsQty = 0;
-      let ctnQty = 0;
+      let pcsQty = 0
+      let ctnQty = 0
 
       for (const cal of calDetails) {
         if (cal.unit === 'PCS' || cal.unit === 'BOT') {
-          pcsQty += cal.qty || 0;
+          pcsQty += cal.qty || 0
         }
         if (cal.unit === 'CTN') {
-          ctnQty += cal.qty || 0;
+          ctnQty += cal.qty || 0
         }
       }
       checkQtyPcs = lot.qtyPcs + pcsQty
       checkQtyCtn = lot.qtyCtn + ctnQty
-
 
       updateLot.push({
         productId: stockDetail.productId,
@@ -609,58 +626,73 @@ exports.updateStockWithdraw = async (req, res) => {
       })
     }
 
-    const relatedLots = updateLot.filter((u) => u.productId === stockDetail.productId);
+    const relatedLots = updateLot.filter(
+      u => u.productId === stockDetail.productId
+    )
     listProductWithDraw.push({
       productId: stockDetail.productId,
       sumQtyPcs: relatedLots.reduce((total, item) => total + item.qtyPcs, 0),
       sumQtyCtn: relatedLots.reduce((total, item) => total + item.qtyCtn, 0),
-      sumQtyPcsStockIn: relatedLots.reduce((total, item) => total + item.qtyPcsStockIn, 0),
-      sumQtyCtnStockIn: relatedLots.reduce((total, item) => total + item.qtyCtnStockIn, 0),
-      sumQtyPcsStockOut: relatedLots.reduce((total, item) => total + item.qtyPcsStockOut, 0),
-      sumQtyCtnStockOut: relatedLots.reduce((total, item) => total + item.qtyCtnStockOut, 0),
-      available: relatedLots.map(({ id, ...rest }) => rest),
-    });
+      sumQtyPcsStockIn: relatedLots.reduce(
+        (total, item) => total + item.qtyPcsStockIn,
+        0
+      ),
+      sumQtyCtnStockIn: relatedLots.reduce(
+        (total, item) => total + item.qtyCtnStockIn,
+        0
+      ),
+      sumQtyPcsStockOut: relatedLots.reduce(
+        (total, item) => total + item.qtyPcsStockOut,
+        0
+      ),
+      sumQtyCtnStockOut: relatedLots.reduce(
+        (total, item) => total + item.qtyCtnStockOut,
+        0
+      ),
+      available: relatedLots.map(({ id, ...rest }) => rest)
+    })
   }
   // console.log("listProductWithDraw:\n", JSON.stringify(listProductWithDraw, null, 2));
   for (const updated of listProductWithDraw) {
     await Stock.findOneAndUpdate(
-      { area: area, period: period },
+      { area: area, period: stockmovements.period },
       {
         $set: {
-          "listProduct.$[product].sumQtyPcs": updated.sumQtyPcs,
-          "listProduct.$[product].sumQtyCtn": updated.sumQtyCtn,
-          "listProduct.$[product].sumQtyPcsStockIn": updated.sumQtyPcsStockIn,
-          "listProduct.$[product].sumQtyCtnStockIn": updated.sumQtyCtnStockIn,
-          "listProduct.$[product].sumQtyPcsStockOut": updated.sumQtyPcsStockOut,
-          "listProduct.$[product].sumQtyCtnStockOut": updated.sumQtyCtnStockOut,
-          "listProduct.$[product].available": updated.available
+          'listProduct.$[product].sumQtyPcs': updated.sumQtyPcs,
+          'listProduct.$[product].sumQtyCtn': updated.sumQtyCtn,
+          'listProduct.$[product].sumQtyPcsStockIn': updated.sumQtyPcsStockIn,
+          'listProduct.$[product].sumQtyCtnStockIn': updated.sumQtyCtnStockIn,
+          'listProduct.$[product].sumQtyPcsStockOut': updated.sumQtyPcsStockOut,
+          'listProduct.$[product].sumQtyCtnStockOut': updated.sumQtyCtnStockOut,
+          'listProduct.$[product].available': updated.available
         }
       },
-      { arrayFilters: [{ "product.productId": updated.productId }], new: true }
+      { arrayFilters: [{ 'product.productId': updated.productId }], new: true }
     )
   }
 
+  const io = getSocket()
+  io.emit('distribution/updateStockWithdraw', {});
 
   res.status(200).json({
     status: 200,
-    message: "successfully",
+    message: 'successfully',
     stock
   })
 }
 
 exports.insertWithdrawToErp = async (req, res) => {
-
   const { area, period } = req.body
-  const channel = req.headers['x-channel'];
-  const { Distribution } = getModelsByChannel(channel, res, distributionModel);
+  const channel = req.headers['x-channel']
+  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
   const distributionData = await Distribution.find({ area: area })
 
   let data = []
   for (const item of distributionData) {
-    const sendDate = new Date(item.sendDate); // สร้าง Date object
-    const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, ''); // "20250222"
-    const MGNUGL = item.listProduct.map(i => i.id);
-    const uniqueCount = new Set(MGNUGL).size;
+    const sendDate = new Date(item.sendDate) // สร้าง Date object
+    const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '') // "20250222"
+    const MGNUGL = item.listProduct.map(i => i.id)
+    const uniqueCount = new Set(MGNUGL).size
 
     const dataTran = {
       Hcase: 0,
@@ -697,7 +729,11 @@ exports.insertWithdrawToErp = async (req, res) => {
   const response = await axios.post(
     `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
     data
-  );
+  )
+
+  const io = getSocket()
+  io.emit('distribution/insertWithdrawToErp', {});
+
 
   res.status(200).json({
     status: 200,
@@ -706,20 +742,18 @@ exports.insertWithdrawToErp = async (req, res) => {
   })
 }
 
-
 exports.insertOneWithdrawToErp = async (req, res) => {
-
   const { orderId } = req.body
-  const channel = req.headers['x-channel'];
-  const { Distribution } = getModelsByChannel(channel, res, distributionModel);
+  const channel = req.headers['x-channel']
+  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
   const distributionData = await Distribution.find({ orderId: orderId })
 
   let data = []
   for (const item of distributionData) {
-    const sendDate = new Date(item.sendDate);
-    const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '');
-    const MGNUGL = item.listProduct.map(i => i.id);
-    const uniqueCount = new Set(MGNUGL).size;
+    const sendDate = new Date(item.sendDate)
+    const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '')
+    const MGNUGL = item.listProduct.map(i => i.id)
+    const uniqueCount = new Set(MGNUGL).size
 
     const dataTran = {
       Hcase: 1,
@@ -756,7 +790,10 @@ exports.insertOneWithdrawToErp = async (req, res) => {
   const response = await axios.post(
     `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
     data
-  );
+  )
+
+  const io = getSocket()
+  io.emit('distribution/insertOneWithdrawToErp', {});
 
   res.status(200).json({
     status: 200,
@@ -765,21 +802,25 @@ exports.insertOneWithdrawToErp = async (req, res) => {
   })
 }
 
-
-
 exports.addFromERPWithdraw = async (req, res) => {
-  const channel = req.headers['x-channel'];
-  const { Withdraw } = getModelsByChannel(channel, res, distributionModel);
+  const channel = req.headers['x-channel']
+  const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
   const result = await withdrawQuery(channel)
-
+  // console.log(result)
   for (const item of result) {
-    const existWithdraw = await Withdraw.findOne({ Des_No: item.Des_No });
+    const existWithdraw = await Withdraw.findOne({ Des_No: item.Des_No })
     if (existWithdraw) {
-      await Withdraw.findOneAndUpdate({ Des_No: item.Des_No }, item, { new: true });
+      await Withdraw.findOneAndUpdate({ Des_No: item.Des_No }, item, {
+        new: true
+      })
     } else {
-      await Withdraw.create(item);
+      await Withdraw.create(item)
     }
   }
+
+  const io = getSocket()
+  io.emit('distribution/addFromERPWithdraw', {});
+
 
   res.status(200).json({
     status: 200,
@@ -789,78 +830,238 @@ exports.addFromERPWithdraw = async (req, res) => {
 }
 
 exports.approveWithdraw = async (req, res) => {
-  const { orderId, status } = req.body
+  try {
+    const { orderId, status } = req.body
+    let statusStr = status === true ? 'approved' : 'rejected'
+    let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ'
 
-  let statusStr = ''
-  let statusThStr = ''
-  if (status === true) {
-    statusStr = 'approved'
-    statusThStr = 'อนุมัติ'
-  } else {
-    statusStr = 'rejected'
-    statusThStr = 'ไม่อนุมัติ'
-  }
+    const channel = req.headers['x-channel']
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
 
-  const channel = req.headers['x-channel'];
-  const { Distribution } = getModelsByChannel(channel, res, distributionModel);
-  const distributionData = await Distribution.findOneAndUpdate(
-    { orderId: orderId, type: 'withdraw' },
-    { $set: { statusTH: statusThStr, status: statusStr } },
-    { new: true }
-  );
+    if (statusStr === 'approved') {
+      // console.log(orderId)
+      const distributionTran = await Distribution.findOne({
+        orderId: orderId,
+        type: 'withdraw'
+      })
 
-  if (!distributionData) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found withdraw'
-    });
-  }
+      const distributionData = await Distribution.findOneAndUpdate(
+        { orderId: orderId, type: 'withdraw' },
+        { $set: { statusTH: statusThStr, status: statusStr } },
+        { new: true }
+      )
 
-  const distributionTran = await Distribution.find({ orderId: orderId, type: 'withdraw' })
-  const sendDate = new Date(distributionTran.sendDate);
-  
-  const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '');
-  const MGNUGL = distributionTran.listProduct.map(i => i.id);
-  const uniqueCount = new Set(MGNUGL).size;
-
-  const dataTran = {
-    Hcase: 1,
-    orderNo: distributionTran.orderId,
-    statusLow: '22',
-    statusHigh: '22',
-    orderType: distributionTran.orderType,
-    tranferDate: formattedDate,
-    warehouse: distributionTran.fromWarehouse,
-    towarehouse: distributionTran.toWarehouse,
-    routeCode: distributionTran.shippingRoute,
-    addressCode: distributionTran.shippingId,
-    location: '',
-    MGNUGL: uniqueCount,
-    MGDEPT: '',
-    remark: '',
-    items: distributionTran.listProduct.map(u => {
-      return {
-        itemCode: u.id,
-        itemStatus: '22',
-        MRWHLO: distributionTran.fromWarehouse,
-        itemQty: u.qty,
-        itemUnit: u.unit,
-        toLocation: '',
-        itemLot: '',
-        location: '',
-        itemLocation: ''
+      if (!distributionData) {
+        return res
+          .status(404)
+          .json({ status: 404, message: 'Not found withdraw' })
       }
+
+      if (!distributionTran.period) {
+        return res
+          .status(404)
+          .json({ status: 404, message: 'Not found period in doc' })
+      }
+
+      const sendDate = new Date(distributionTran.sendDate)
+      const formattedDate = sendDate
+        .toISOString()
+        .slice(0, 10)
+        .replace(/-/g, '')
+      const MGNUGL = distributionTran.listProduct.map(i => i.id)
+      const uniqueCount = new Set(MGNUGL).size
+      let data = []
+      dataTran = {
+        Hcase: 1,
+        orderNo: distributionTran.orderId,
+        statusLow: '22',
+        statusHigh: '22',
+        orderType: distributionTran.orderType,
+        tranferDate: formattedDate,
+        warehouse: distributionTran.fromWarehouse,
+        towarehouse: distributionTran.toWarehouse,
+        routeCode: distributionTran.shippingRoute,
+        addressCode: distributionTran.shippingId,
+        location: '',
+        MGNUGL: uniqueCount,
+        MGDEPT: '',
+        remark: '',
+        items: distributionTran.listProduct.map(u => ({
+          itemCode: u.id,
+          itemStatus: '22',
+          MRWHLO: distributionTran.fromWarehouse,
+          itemQty: u.qty,
+          itemUnit: u.unit,
+          toLocation: '',
+          itemLot: '',
+          location: '',
+          itemLocation: ''
+        }))
+      }
+      data.push(dataTran)
+
+      // 2. ส่งไป External API (ถ้า fail -> return error)
+      // let response;
+      // try {
+      //   response = await axios.post(
+      //     `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
+      //     data
+      //   );
+      // } catch (err) {
+      //   if (err.response) {
+      //     console.log('API error response:', err.response.data);
+      //     console.log('Status:', err.response.status);
+      //     return res.status(500).json({
+      //       status: 500,
+      //       message: 'External API failed',
+      //       error: err.response.data    // <-- error ที่มาจากปลายทางจริง
+      //     });
+      //   } else if (err.request) {
+      //     console.log('No response from API:', err.message);
+      //     return res.status(500).json({
+      //       status: 500,
+      //       message: 'External API unreachable',
+      //       error: err.message
+      //     });
+      //   } else {
+      //     console.log('Other error:', err.message);
+      //     return res.status(500).json({
+      //       status: 500,
+      //       message: 'External API error',
+      //       error: err.message
+      //     });
+      //   }
+      // }
+
+      const qtyproduct = dataTran.items
+        .filter(u => u?.itemCode && u?.itemUnit && u?.itemQty > 0)
+        .map(u => ({
+          id: u.itemCode,
+          unit: u.itemUnit,
+          qty: u.itemQty,
+          statusMovement: 'OUT'
+        }))
+      // console.log(distributionTran)
+      // 3. UPDATE Stock ตามรายการ
+      for (const item of qtyproduct) {
+        // for (const item of dataTran.items) {
+        // console.log(item)
+        // await updateStockMongo(item, distributionTran.area, distributionTran.period, 'withdraw', channel)
+        const updateResult = await updateStockMongo(
+          item,
+          distributionTran.area,
+          distributionTran.period,
+          'withdraw',
+          channel,
+          res
+        )
+        if (updateResult) return
+        // const factorPcsResult = await Product.aggregate([
+        //   { $match: { id: item.itemCode } },
+        //   {
+        //     $project: {
+        //       id: 1,
+        //       listUnit: {
+        //         $filter: {
+        //           input: '$listUnit',
+        //           as: 'unitItem',
+        //           cond: { $eq: ['$$unitItem.unit', item.itemUnit] }
+        //         }
+        //       }
+        //     }
+        //   }
+        // ]);
+        // const factorCtnResult = await Product.aggregate([
+        //   { $match: { id: item.itemCode } },
+        //   {
+        //     $project: {
+        //       id: 1,
+        //       listUnit: {
+        //         $filter: {
+        //           input: '$listUnit',
+        //           as: 'unitItem',
+        //           cond: { $eq: ['$$unitItem.unit', 'CTN'] }
+        //         }
+        //       }
+        //     }
+        //   }
+        // ]);
+        // const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0;
+        // const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 0;
+        // const factorPcsQty = item.itemQty * factorPcs;
+        // const factorCtnQty = factorCtn ? Math.floor(factorPcsQty / factorCtn) : 0;
+
+        // const existsProduct = await Stock.aggregate([
+        //   {
+        //     $match: {
+        //       area: distributionTran.area,
+        //       period: distributionTran.period,
+        //       'listProduct.productId': item.itemCode
+        //     }
+        //   }
+        // ]);
+
+        // if (existsProduct.length > 0) {
+        //   await Stock.findOneAndUpdate(
+        //     {
+        //       area: distributionTran.area,
+        //       period: distributionTran.period,
+        //       'listProduct.productId': item.itemCode
+        //     },
+        //     {
+        //       $inc: {
+        //         'listProduct.$[elem].stockInPcs': +factorPcsQty,
+        //         'listProduct.$[elem].stockInCtn': +factorCtnQty,
+        //         'listProduct.$[elem].balancePcs': +factorPcsQty,
+        //         'listProduct.$[elem].balanceCtn': +factorCtnQty
+        //       }
+        //     },
+        //     {
+        //       arrayFilters: [{ 'elem.productId': item.itemCode }],
+        //       new: true
+        //     }
+        //   );
+        // } else {
+
+        //   const newProduct = {
+        //     productId: item.itemCode,
+        //     stockPcs: 0,
+        //     stockInPcs: factorPcsQty,
+        //     stockOutPcs: 0,
+        //     balancePcs: factorPcsQty,
+        //     stockCtn: 0,
+        //     stockInCtn: factorCtnQty,
+        //     stockOutCtn: 0,
+        //     balanceCtn: factorCtnQty
+        //   };
+
+        //   await Stock.findOneAndUpdate(
+        //     { area: distributionTran.area, period: distributionTran.period },
+        //     { $push: { listProduct: newProduct } },
+        //     { upsert: true, new: true }
+        //   );
+
+        // }
+      }
+    }
+
+    const io = getSocket()
+    io.emit('distribution/approveWithdraw', {});
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'successfully',
+      data: dataTran
+    })
+  } catch (error) {
+    console.error('[❌ approveWithdraw ERROR]', error) // แสดงใน console
+    res.status(500).json({
+      status: 500,
+      message: error.message,
+      stack: error.stack // เพิ่มเพื่อ debug ลึกขึ้น (optional)
     })
   }
-
-  // console.log(dataTran)
-
-
-
-  res.status(200).json({
-    status: 200,
-    message: 'successfully',
-    data: dataTran
-  })
-
 }

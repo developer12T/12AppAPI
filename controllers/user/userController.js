@@ -14,6 +14,7 @@ const userModel = require('../../models/cash/user')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { userQuery, userQueryFilter, userQueryManeger } = require('../../controllers/queryFromM3/querySctipt');
 const user = require('../../models/cash/user');
+const { getSocket } = require('../../socket')
 exports.getUser = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
@@ -406,12 +407,13 @@ exports.addUserManeger = async (req, res) => {
           )
 
           if (hasChanged) {
+            // console.log(m3.username)
             await User.updateOne(
-              { saleCode: m3.saleCode },
+              { username: m3.username },
               {
                 $set: {
                   salePayer: m3.salePayer,
-                  username: m3.username,
+                  // username: m3.username,
                   firstName: m3.firstName,
                   surName: m3.surName,
                   password: m3.password,
@@ -465,7 +467,7 @@ exports.addUserNew = async (req, res) => {
 
   const tableData = await userQuery(channel); // ข้อมูลจาก table
   const tableMap = new Map(tableData.map(item => [item.saleCode, item]));
-
+  // console.log(tableData)
   const mongoUsers = await User.find(); // ผู้ใช้ใน MongoDB
   const result = [];
 
@@ -478,7 +480,7 @@ exports.addUserNew = async (req, res) => {
       let isModified = false;
       const fields = [
         'salePayer', 'username', 'firstName', 'surName', 'password',
-        'tel', 'zone', 'area', 'warehouse', 'role', 'status', 'qrCodeImage'
+        'tel', 'zone', 'area', 'warehouse', 'role', 'status', 'qrCodeImage', 'typeTruck'
       ];
 
       for (const field of fields) {
@@ -510,7 +512,8 @@ exports.addUserNew = async (req, res) => {
         status: sale.status,
         qrCodeImage: sale.qrCodeImage,
         period: period(),
-        image: ''
+        image: '',
+        typeTruck: sale.typeTruck
       });
       await newUser.save();
       result.push(newUser);

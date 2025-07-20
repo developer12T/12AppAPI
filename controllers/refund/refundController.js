@@ -20,7 +20,14 @@ const productModel = require('../../models/cash/product')
 const userModel = require('../../models/cash/user')
 const stockModel = require('../../models/cash/stock')
 const { getModelsByChannel } = require('../../middleware/channel')
-
+const {
+  to2,
+  getQty,
+  updateStockMongo,
+  getPeriodFromDate
+} = require('../../middleware/order')
+const { update } = require('lodash')
+const { getSocket } = require('../../socket')
 exports.checkout = async (req, res) => {
   try {
     const {
@@ -176,7 +183,7 @@ exports.checkout = async (req, res) => {
     const qtyproduct = refundOrder.listProduct
       .filter(u => u.condition === 'good')
       .map(u => ({
-        productId: u.id,
+        id: u.id,
         unit: u.unit,
         qty: u.qty,
         condition: u.condition,
@@ -186,7 +193,7 @@ exports.checkout = async (req, res) => {
     const qtyproductchange = changeOrder.listProduct.map(u => {
       //   const promoDetail = u.listProduct.map(item => {
       return {
-        productId: u.id,
+        id: u.id,
         unit: u.unit,
         qty: u.qty,
         statusMovement: 'OUT'
@@ -362,6 +369,11 @@ exports.checkout = async (req, res) => {
     await refundOrder.save()
     await changeOrder.save()
     await Cart.deleteOne({ type, area, storeId })
+
+    const io = getSocket()
+    io.emit('refund/checkout', {});
+
+
     res.status(200).json({
       status: 200,
       message: 'Checkout successful!',
@@ -387,7 +399,7 @@ exports.getRefund = async (req, res) => {
 
     let response = []
 
-    if (!type  || !period) {
+    if (!type || !period) {
       return res
         .status(400)
         .json({ status: 400, message: 'type,  period are required!' })
@@ -395,14 +407,12 @@ exports.getRefund = async (req, res) => {
 
     const { startDate, endDate } = rangeDate(period)
 
-
     let areaQuery = {}
     if (area) {
       if (area.length == 2) {
         areaQuery.zone = area.slice(0, 2)
-      }
-      else if (area.length == 5) {
-        areaQuery['store.area'] = area;
+      } else if (area.length == 5) {
+        areaQuery['store.area'] = area
       }
     }
     let query = {
@@ -420,7 +430,7 @@ exports.getRefund = async (req, res) => {
     const refunds = await Refund.aggregate([
       {
         $addFields: {
-          zone: { $substrBytes: ["$store.area", 0, 2] }
+          zone: { $substrBytes: ['$store.area', 0, 2] }
         }
       },
 
@@ -458,10 +468,15 @@ exports.getRefund = async (req, res) => {
           totalChange: totalChange.toFixed(2),
           totalRefund: totalRefund.toFixed(2),
           total: total,
-          status: refund.status
+          status: refund.status,
+          createdAt: refund.createdAt,
+          updatedAt: refund.updatedAt
         }
       })
     )
+
+    // const io = getSocket()
+    // io.emit('refund/all', {});
 
     res.status(200).json({
       status: 200,
@@ -541,6 +556,11 @@ exports.getDetail = async (req, res) => {
       (totalRefund - totalRefundExVat).toFixed(2)
     )
     const total = parseFloat((totalChange - totalRefund).toFixed(2))
+
+
+    // const io = getSocket()
+    // io.emit('refund/detail', {});
+
 
     res.status(200).json({
       type: refund.type,
@@ -626,6 +646,10 @@ exports.addSlip = async (req, res) => {
 
       await order.save()
 
+
+    const io = getSocket()
+    io.emit('refund/addSlip', {});
+
       res.status(200).json({
         status: 200,
         message: 'Images uploaded successfully!',
@@ -668,32 +692,77 @@ exports.updateStatus = async (req, res) => {
       })
     }
 
-    let newOrderId = orderId
+    const productQty = refundOrder.listProduct.map(u => {
+      return {
+        id: u.id,
+        // lot: u.lot,
+        unit: u.unit,
+        qty: u.qty
+        // statusMovement: 'OUT'
+      }
+    })
 
-    if (status === 'canceled' && !orderId.endsWith('CC')) {
-      newOrderId = `${orderId}CC`
-
-      const isDuplicate = await Refund.findOne({ orderId: newOrderId })
-      if (isDuplicate) {
-        let counter = 1
-        while (await Refund.findOne({ orderId: `${orderId}CC${counter}` })) {
-          counter++
-        }
-        newOrderId = `${orderId}CC${counter}`
+    if (status === 'canceled') {
+      statusTH = 'ยกเลิก'
+      for (const item of productQty) {
+        // await updateStockMongo(item, refundOrder.store.area, refundOrder.period, 'rufundCanceled', channel)
+        const updateResult = await updateStockMongo(
+          item,
+          refundOrder.store.area,
+          refundOrder.period,
+          'rufundCanceled',
+          channel,
+          res
+        )
+        if (updateResult) return
+      }
+    } else if (status === 'rejected') {
+      statusTH = 'ถูกปฏิเสธ'
+      for (const item of productQty) {
+        // await updateStockMongo(item, refundOrder.store.area, refundOrder.period, 'rufundCanceled', channel)
+        const updateResult = await updateStockMongo(
+          item,
+          refundOrder.store.area,
+          refundOrder.period,
+          'rufundCanceled',
+          channel,
+          res
+        )
+        if (updateResult) return
+      }
+    } else if (status === 'completed') {
+      statusTH = 'สำเร็จ'
+      for (const item of productQty) {
+        // await updateStockMongo(item, refundOrder.store.area, refundOrder.period, 'refund', channel)
+        const updateResult = await updateStockMongo(
+          item,
+          refundOrder.store.area,
+          refundOrder.period,
+          'refund',
+          channel,
+          res
+        )
+        if (updateResult) return
       }
     }
 
+    // console.log(productQty)
+
     const updatedRefund = await Refund.findOneAndUpdate(
       { orderId },
-      { $set: { status, orderId: newOrderId } },
+      { $set: { status, statusTH } },
       { new: true }
     )
 
     const updatedOrder = await Order.findOneAndUpdate(
       { orderId: refundOrder.reference, type: 'change' },
-      { $set: { status } },
+      { $set: { status, statusTH } },
       { new: true }
     )
+
+    const io = getSocket()
+    io.emit('refund/updateStatus', {});
+
 
     res.status(200).json({
       status: 200,

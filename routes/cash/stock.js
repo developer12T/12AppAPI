@@ -1,6 +1,7 @@
 const express = require('express')
 const {
   addStock,
+  getAdjustStock,
   available,
   addStockNew,
   fetchArea,
@@ -17,12 +18,16 @@ const {
   getStockQtyDetail,
   approveAdjustStock,
   checkout,
-  stockToExcel
+  getAdjustStockDetail,
+  stockToExcel,
+  getStockQtyNew,
 } = require('../../controllers/stock/stockController')
 
 const router = express.Router()
 
 router.post('/add', addStock)
+router.get('/adjuststock', getAdjustStock)
+router.get('/getAdjustStockDetail/', getAdjustStockDetail)
 router.get('/available', available)
 // router.post('/rollbackStock', rollbackStock)
 router.post('/get', getQty)
@@ -36,6 +41,7 @@ router.post('/addNew', addStockNew)
 router.post('/availableStock', availableStock)
 router.post('/addStockFromERP', addStockFromERP)
 router.post('/getStockQty', getStockQty)
+router.post('/getStockQtyNew', getStockQtyNew)
 router.post('/getWeightProduct', getWeightProduct)
 // router.post('/stocktoexcel', stockToExcel)
 // router.get('/movement', available)

@@ -16,6 +16,7 @@ const deliveryRoute = require('./delivery')
 const sendmoney = require('./sendmoney')
 const admin = require('./admin')
 const campaign = require('./campaign')
+const typetruck = require('./typetrucks')
 const { login } = require('../../controllers/authen/login')
 
 const router = express.Router()
@@ -38,6 +39,6 @@ router.use('/delivery', deliveryRoute)
 router.use('/sendmoney', sendmoney)
 router.use('/admin', admin)
 router.use('/campaign', campaign)
-
+router.use('/typetruck', typetruck)
 
 module.exports = router

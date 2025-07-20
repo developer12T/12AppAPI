@@ -12,8 +12,6 @@ const stock = require('../../models/cash/stock')
 
 
 
-
-
 async function rewardProduct(rewards, order, multiplier, channel, res) {
     if (!rewards || rewards.length === 0) return []
     const { Product } = getModelsByChannel(channel, res, productModel);
@@ -46,6 +44,11 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
         },
         { $unwind: '$productDetail' },
         {
+            $match: {
+                'productDetail.statusSale': 'Y'
+            }
+        },
+        {
             $replaceRoot: {
                 newRoot: {
                     $mergeObjects: ['$listProduct', '$productDetail']
@@ -53,6 +56,8 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
             }
         }
     ]);
+
+    // console.log(stockList)
 
     // 2. Filter เฉพาะที่ match กับ rewardFilters
     function matchFilter(obj, filter) {
@@ -121,7 +126,7 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
         const factor = parseInt(unitData?.factor, 10) || 1
         const productQty = r.limitType === 'limited' ? r.productQty : r.productQty * multiplier
         const productQtyPcs = productQty * factor
-        // console.log(productQtyPcs)
+        // console.log(r.productUnit)
 
         return {
             productId: product.id,
@@ -172,7 +177,7 @@ async function applyPromotion(order, channel, res) {
             }
         }])
     const newStore = dataStore[0]
-
+    // console.log(order.store.storeId)
     const beautyStore = await TypeStore.findOne({
         storeId: order.store.storeId,
         type: { $in: ["beauty"] }
@@ -251,6 +256,7 @@ async function applyPromotion(order, channel, res) {
                 }
                 return multiplier
             }, 1)
+            // console.log(multiplier)
         }
         // console.log(promo.rewards)
         switch (promo.proType) {
@@ -395,6 +401,7 @@ async function getRewardProduct(proId, channel, res) {
         if (reward.productFlavour) condition.flavour = reward.productFlavour
         if (reward.productBrand) condition.brand = reward.productBrand
         if (reward.productSize) condition.size = reward.productSize
+        condition.statusSale = "Y"  // <== ใส่แบบนี้ถูกต้อง
         productQuery.$or.push(condition)
     })
 

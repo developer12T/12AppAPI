@@ -5,9 +5,15 @@
 // const { Route } = require('../../models/cash/route')
 const { period, previousPeriod } = require('../../utilities/datetime')
 const axios = require('axios')
-const dayjs = require('dayjs');
+const dayjs = require('dayjs')
 const { getSeries, updateRunningNumber } = require('../../middleware/order')
-const { Warehouse, Locate, Balance, Sale, DisributionM3 } = require('../../models/cash/master')
+const {
+  Warehouse,
+  Locate,
+  Balance,
+  Sale,
+  DisributionM3
+} = require('../../models/cash/master')
 const { generateOrderId } = require('../../utilities/genetateId')
 const {
   summaryOrder,
@@ -21,6 +27,7 @@ const { checkInRoute } = require('../route/checkIn')
 const multer = require('multer')
 const upload = multer({ storage: multer.memoryStorage() }).single('image')
 const _ = require('lodash')
+const { to2, updateStockMongo } = require('../../middleware/order')
 const { DateTime } = require('luxon')
 const { getSocket } = require('../../socket')
 const {
@@ -45,10 +52,6 @@ const xlsx = require('xlsx')
 const path = require('path')
 const os = require('os')
 const fs = require('fs')
-const { group } = require('console');
-const { query } = require('mssql');
-
-
 
 exports.checkout = async (req, res) => {
   // const transaction = await sequelize.transaction();
@@ -62,6 +65,8 @@ exports.checkout = async (req, res) => {
       note,
       latitude,
       longitude,
+      // shippingId,
+      // address,
       shipping,
       payment,
       changePromotionStatus,
@@ -75,14 +80,18 @@ exports.checkout = async (req, res) => {
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
-    const { Promotion, PromotionShelf, Quota } = getModelsByChannel(channel, res, promotionModel);
+    const { Promotion, PromotionShelf, Quota } = getModelsByChannel(
+      channel,
+      res,
+      promotionModel
+    )
     const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
       channel,
       res,
       stockModel
     )
 
-    if (!type || !area || !storeId || !shipping || !payment) {
+    if (!type || !area || !storeId || !payment) {
       return res
         .status(400)
         .json({ status: 400, message: 'Missing required fields!' })
@@ -105,8 +114,15 @@ exports.checkout = async (req, res) => {
     if (changePromotionStatus == 0) {
       summary = await summaryOrder(cart, channel, res)
     } else if (changePromotionStatus == 1) {
-      summary = await summaryOrderProStatusOne(cart, listPromotion, channel, res)
+      summary = await summaryOrderProStatusOne(
+        cart,
+        listPromotion,
+        channel,
+        res
+      )
+      // res.json(summary); // return ตรงนี้เลย
     }
+    // console.log(summary)
     const productIds = cart.listProduct.map(p => p.id)
     const products = await Product.find({ id: { $in: productIds } }).select(
       'id name groupCode group brandCode brand size flavourCode flavour listUnit'
@@ -150,20 +166,27 @@ exports.checkout = async (req, res) => {
     })
     if (listProduct.includes(null)) return
 
-
     const orderId = await generateOrderId(area, sale.warehouse, channel, res)
 
     // if () {
 
     // }
 
-    const promotionshelf = await PromotionShelf.find({ storeId: storeId, period: period, qty: 1 }) || {}
+    const promotionshelf =
+      (await PromotionShelf.find({
+        storeId: storeId,
+        period: period,
+        qty: 1
+      })) || {}
     const discountProduct = promotionshelf?.length
-      ? promotionshelf.map(item => item.price).reduce((sum, price) => sum + price, 0)
-      : 0;
+      ? promotionshelf
+          .map(item => item.price)
+          .reduce((sum, price) => sum + price, 0)
+      : 0
     const total = subtotal - discountProduct
     const newOrder = new Order({
       orderId,
+      routeId,
       type,
       status: 'pending',
       statusTH: 'รอนำเข้า',
@@ -183,8 +206,10 @@ exports.checkout = async (req, res) => {
         tel: summary.store.tel,
         area: summary.store.area,
         zone: summary.store.zone,
-        isBeauty: summary.store.isBeauty,
+        isBeauty: summary.store.isBeauty
       },
+      // shipping,
+      // address,
       note,
       latitude,
       longitude,
@@ -193,19 +218,18 @@ exports.checkout = async (req, res) => {
       listQuota: summary.listQuota,
       subtotal,
       discount: 0,
-      discountProductId: promotionshelf.map(item => ({ proShelfId: item.proShelfId })),
+      discountProductId: promotionshelf.map(item => ({
+        proShelfId: item.proShelfId
+      })),
       discountProduct: discountProduct,
       vat: parseFloat((total - total / 1.07).toFixed(2)),
       totalExVat: parseFloat((total / 1.07).toFixed(2)),
       total: total,
-      shipping: {
-        shippingId: '',
-        address: ''
-      },
+      shipping: shipping,
       paymentMethod: 'cash',
       paymentStatus: 'paid',
       createdBy: sale.username,
-      period: period,
+      period: period
     })
     applyPromotionUsage(
       newOrder.store.storeId,
@@ -228,25 +252,26 @@ exports.checkout = async (req, res) => {
       res
     )
 
-    if (checkIn.status === 409) {
-      return res.status(409).json({
-        status: 409,
-        message: 'Duplicate route or listStore found on this day'
-      })
-    }
+    // if (checkIn.status === 409) {
+    //   return res.status(409).json({
+    //     status: 409,
+    //     message: 'Duplicate Store on this day'
+    //   })
+    // }
 
     const promotion = await applyPromotion(summary, channel, res)
 
     newOrder.listPromotions.forEach(item => {
-      const promo = promotion.appliedPromotions.find(u => u.proId === item.proId);
+      const promo = promotion.appliedPromotions.find(
+        u => u.proId === item.proId
+      )
 
-      if (!promo) return; 
+      if (!promo) return
 
       if (promo.proQty - item.proQty < 0) {
-
-        item.proQty = promo.proQty;
+        item.proQty = promo.proQty
       }
-    });
+    })
 
     for (const item of newOrder.listQuota) {
       await Quota.findOneAndUpdate(
@@ -254,107 +279,68 @@ exports.checkout = async (req, res) => {
         {
           $inc: {
             quota: -item.quota,
-            quotaUse: + item.quota
+            quotaUse: +item.quota
           }
         }
       )
     }
 
-    const qtyproduct = newOrder.listProduct.map(u => {
-      return {
-        productId: u.id,
-        // lot: u.lot,
+    const qtyproduct = newOrder.listProduct
+      .filter(u => u?.id && u?.unit && u?.qty > 0)
+      .map(u => ({
+        id: u.id,
         unit: u.unit,
         qty: u.qty,
         statusMovement: 'OUT'
-      }
-    })
+      }))
     const qtyproductPro = newOrder.listPromotions.flatMap(u => {
-      const promoDetail = u.listProduct.map(item => {
-        return {
-          productId: item.id,
+      const promoDetail = u.listProduct
+        .filter(item => item?.id && item?.unit && item?.qty > 0)
+        .map(item => ({
+          id: item.id,
           unit: item.unit,
           qty: item.qty,
           statusMovement: 'OUT'
-        }
-      })
+        }))
       return promoDetail
     })
-
-    // console.log(qtyproductPro)
 
     const productQty = Object.values(
       [...qtyproductPro, ...qtyproduct].reduce((acc, cur) => {
         // [, ...qtyproduct].reduce((acc, cur) => {
 
-        const key = `${cur.productId}-${cur.unit}`;
+        const key = `${cur.productId}-${cur.unit}`
         acc[key] = acc[key]
           ? { ...cur, qty: acc[key].qty + cur.qty }
-          : { ...cur };
-        return acc;
+          : { ...cur }
+        return acc
       }, {})
-    );
+    )
     // ตัด stock เบล ver
-    for (const item of productQty) {
-      const factorPcsResult = await Product.aggregate([
-        { $match: { id: item.productId } },
-        {
-          $project: {
-            id: 1,
-            listUnit: {
-              $filter: {
-                input: "$listUnit",
-                as: "unitItem",
-                cond: { $eq: ["$$unitItem.unit", item.unit] }
-              }
-            }
-          }
-        }
-      ]);
-      // console.log(factorPcsResult)
-      const factorCtnResult = await Product.aggregate([
-        { $match: { id: item.productId } },
-        {
-          $project: {
-            id: 1,
-            listUnit: {
-              $filter: {
-                input: "$listUnit",
-                as: "unitItem",
-                cond: { $eq: ["$$unitItem.unit", "CTN"] }
-              }
-            }
-          }
-        }
-      ]);
-      const factorCtn = factorCtnResult[0].listUnit[0].factor
-      const factorPcs = factorPcsResult[0].listUnit[0].factor
-      const factorPcsQty = item.qty * factorPcs
-      const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
-      // console.log('factorPcsQty', factorPcsQty)
-      // console.log('factorCtnQty', factorCtnQty)
-      const data = await Stock.findOneAndUpdate(
-        {
-          area: area,
-          period: period,
-          'listProduct.productId': item.productId
-        },
-        {
-          $inc: {
-            'listProduct.$[elem].stockOutPcs': +factorPcsQty,
-            // 'listProduct.$[elem].balancePcs': -factorPcsQty,
-            'listProduct.$[elem].stockOutCtn': +factorCtnQty,
-            // 'listProduct.$[elem].balanceCtn': -factorCtnQty
-          }
-        },
-        {
-          arrayFilters: [
-            { 'elem.productId': item.productId }
-          ],
-          new: true
-        }
-      );
+    for (const item of qtyproduct) {
+      const updateResult = await updateStockMongo(
+        item,
+        area,
+        period,
+        'sale',
+        channel,
+        res
+      )
+      if (updateResult) return
     }
+
+    for (const item of qtyproductPro) {
+      const updateResult = await updateStockMongo(
+        item,
+        area,
+        period,
+        'promotion',
+        channel,
+        res
+      )
+      if (updateResult) return
+    }
+
     const calStock = {
       // storeId: refundOrder.store.storeId,
       orderId: newOrder.orderId,
@@ -369,15 +355,14 @@ exports.checkout = async (req, res) => {
       product: [...productQty]
     }
 
-
     const createdMovement = await StockMovement.create({
       ...calStock
-    });
+    })
 
     await StockMovementLog.create({
       ...calStock,
       refOrderId: createdMovement._id
-    });
+    })
     await newOrder.save()
     await PromotionShelf.findOneAndUpdate(
       { proShelfId: promotionshelf.proShelfId },
@@ -386,13 +371,14 @@ exports.checkout = async (req, res) => {
     await Cart.deleteOne({ type, area, storeId })
     const currentDate = new Date()
     let query = {}
-    const promoIds = newOrder.listPromotions.map(u => u.proId);
-    const promoDetail = await Promotion.find({ proId: { $in: promoIds } });
+    const promoIds = newOrder.listPromotions.map(u => u.proId)
+    const promoDetail = await Promotion.find({ proId: { $in: promoIds } })
     const startMonth = new Date(
       currentDate.getFullYear(),
       currentDate.getMonth(),
       1
     )
+    
     const NextMonth = new Date(
       currentDate.getFullYear(),
       currentDate.getMonth() + 1,
@@ -413,9 +399,8 @@ exports.checkout = async (req, res) => {
               'applicableTo.completeStoreNew': newOrder.store.storeId
             }
           }
-        );
-      }
-      else if (item.applicableTo.isbeauty === true) {
+        )
+      } else if (item.applicableTo.isbeauty === true) {
         await Promotion.findOneAndUpdate(
           { proId: item.proId },
           {
@@ -423,11 +408,12 @@ exports.checkout = async (req, res) => {
               'applicableTo.completeStoreBeauty': newOrder.store.storeId
             }
           }
-        );
+        )
       }
     }
 
-
+    const io = getSocket()
+    io.emit('order/checkout', {})
 
     // await transaction.commit()
     res.status(200).json({
@@ -463,9 +449,8 @@ exports.getOrder = async (req, res) => {
     if (area) {
       if (area.length == 2) {
         areaQuery.zone = area.slice(0, 2)
-      }
-      else if (area.length == 5) {
-        areaQuery['store.area'] = area;
+      } else if (area.length == 5) {
+        areaQuery['store.area'] = area
       }
     }
     let query = {
@@ -483,14 +468,13 @@ exports.getOrder = async (req, res) => {
     const order = await Order.aggregate([
       {
         $addFields: {
-          zone: { $substrBytes: ["$store.area", 0, 2] }
+          zone: { $substrBytes: ['$store.area', 0, 2] }
         }
       },
       { $match: query }
     ])
 
     // console.log(order)
-
 
     // const order = await Order.find(query)
     //   .select(
@@ -518,6 +502,9 @@ exports.getOrder = async (req, res) => {
       statusTH: o.statusTH,
       createdAt: o.createdAt
     }))
+
+    // const io = getSocket()
+    // io.emit('order/all', {});
 
     res.status(200).json({
       status: 200,
@@ -553,6 +540,9 @@ exports.getDetail = async (req, res) => {
       })
     }
 
+    // const io = getSocket()
+    // io.emit('order/detail', {});
+
     res.status(200).json({
       status: 200,
       message: 'successful!',
@@ -568,18 +558,20 @@ exports.updateStatus = async (req, res) => {
   // const session = await require('mongoose').startSession();
   // session.startTransaction();
   try {
-    const { orderId, status } = req.body;
+    const { orderId, status } = req.body
 
-    const channel = req.headers['x-channel'];
-    const { Promotion } = getModelsByChannel(channel, res, promotionModel);
-    const { Product } = getModelsByChannel(channel, res, productModel);
-    const { Order } = getModelsByChannel(channel, res, orderModel);
-    const { Stock } = getModelsByChannel(channel, res, stockModel);
+    const channel = req.headers['x-channel']
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
 
     if (!orderId || !status) {
       // await session.abortTransaction();
       // session.endSession();
-      return res.status(400).json({ status: 400, message: 'orderId, status are required!' });
+      return res
+        .status(400)
+        .json({ status: 400, message: 'orderId, status are required!' })
     }
 
     const order = await Order.findOne({ orderId })
@@ -587,7 +579,7 @@ exports.updateStatus = async (req, res) => {
     if (!order) {
       // await session.abortTransaction();
       // session.endSession();
-      return res.status(404).json({ status: 404, message: 'Order not found!' });
+      return res.status(404).json({ status: 404, message: 'Order not found!' })
     }
 
     if (order.status !== 'pending' && status !== 'canceled') {
@@ -596,193 +588,201 @@ exports.updateStatus = async (req, res) => {
       return res.status(400).json({
         status: 400,
         message: 'Cannot update status, order is not in pending state!'
-      });
+      })
     }
 
-    let newOrderId = orderId;
-
-    if (status === 'canceled' && !orderId.endsWith('CC')) {
-      newOrderId = `${orderId}CC`;
-
-      const isDuplicate = await Order.findOne({ orderId: newOrderId })
-      // .session(session);
-      if (isDuplicate) {
-        let counter = 1;
-        while (await Order.findOne({ orderId: `${orderId}CC${counter}` })) {
-          counter++;
-        }
-        newOrderId = `${orderId}CC${counter}`;
-      }
+    if (status === 'canceled') {
+      statusTH = 'ยกเลิก'
     }
 
     if (order.listProduct.length > 0) {
       for (const u of order.listProduct) {
-        const factorPcsResult = await Product.aggregate([
-          { $match: { id: u.id } },
-          {
-            $project: {
-              id: 1,
-              listUnit: {
-                $filter: {
-                  input: "$listUnit",
-                  as: "unitItem",
-                  cond: { $eq: ["$$unitItem.unit", u.unit] }
-                }
-              }
-            }
-          }
-        ])
-        // .session(session);
+        // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
+        const updateResult = await updateStockMongo(
+          u,
+          order.store.area,
+          order.period,
+          'orderCanceled',
+          channel,
+          res
+        )
+        if (updateResult) return
+        // const factorPcsResult = await Product.aggregate([
+        //   { $match: { id: u.id } },
+        //   {
+        //     $project: {
+        //       id: 1,
+        //       listUnit: {
+        //         $filter: {
+        //           input: '$listUnit',
+        //           as: 'unitItem',
+        //           cond: { $eq: ['$$unitItem.unit', u.unit] }
+        //         }
+        //       }
+        //     }
+        //   }
+        // ])
+        // // .session(session);
 
-        const factorCtnResult = await Product.aggregate([
-          { $match: { id: u.id } },
-          {
-            $project: {
-              id: 1,
-              listUnit: {
-                $filter: {
-                  input: "$listUnit",
-                  as: "unitItem",
-                  cond: { $eq: ["$$unitItem.unit", "CTN"] }
-                }
-              }
-            }
-          }
-        ]) || [];
+        // const factorCtnResult =
+        //   (await Product.aggregate([
+        //     { $match: { id: u.id } },
+        //     {
+        //       $project: {
+        //         id: 1,
+        //         listUnit: {
+        //           $filter: {
+        //             input: '$listUnit',
+        //             as: 'unitItem',
+        //             cond: { $eq: ['$$unitItem.unit', 'CTN'] }
+        //           }
+        //         }
+        //       }
+        //     }
+        //   ])) || []
 
-        const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0;
-        const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 1;
-        const factorPcsQty = u.qty * factorPcs;
-        const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
-        await Stock.findOneAndUpdate(
-          {
-            area: order.store.area,
-            period: order.period,
-            'listProduct.productId': u.id
-          },
-          {
-            $inc: {
-              'listProduct.$[elem].stockOutPcs': -factorPcsQty,
-              'listProduct.$[elem].balancePcs': +factorPcsQty,
-              'listProduct.$[elem].stockOutCtn': -factorCtnQty,
-              'listProduct.$[elem].balanceCtn': +factorCtnQty
-            }
-          },
-          {
-            arrayFilters: [
-              { 'elem.productId': u.id }
-            ],
-            new: true,
-            // session
-          }
-        );
+        // const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0
+        // const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 1
+        // const factorPcsQty = u.qty * factorPcs
+        // const factorCtnQty = Math.floor(factorPcsQty / factorCtn)
+        // await Stock.findOneAndUpdate(
+        //   {
+        //     area: order.store.area,
+        //     period: order.period,
+        //     'listProduct.productId': u.id
+        //   },
+        //   {
+        //     $inc: {
+        //       'listProduct.$[elem].stockOutPcs': -factorPcsQty,
+        //       'listProduct.$[elem].balancePcs': +factorPcsQty,
+        //       'listProduct.$[elem].stockOutCtn': -factorCtnQty,
+        //       'listProduct.$[elem].balanceCtn': +factorCtnQty
+        //     }
+        //   },
+        //   {
+        //     arrayFilters: [{ 'elem.productId': u.id }],
+        //     new: true
+        //     // session
+        //   }
+        // )
       }
     }
 
     if (order.listPromotions.length > 0) {
       for (const item of order.listPromotions) {
-        const promotionDetail = await Promotion.findOne({ proId: item.proId }) || {};
-        const storeIdToRemove = order.store.storeId;
+        const promotionDetail =
+          (await Promotion.findOne({ proId: item.proId })) ||
+          new Promotion({ proId: item.proId })
+        const storeIdToRemove = order.store.storeId
         if (promotionDetail.applicableTo?.isNewStore === true) {
-          promotionDetail.applicableTo.completeStoreNew = promotionDetail.applicableTo.completeStoreNew?.filter(
-            storeId => storeId !== storeIdToRemove
-          ) || [];
+          promotionDetail.applicableTo.completeStoreNew =
+            promotionDetail.applicableTo.completeStoreNew?.filter(
+              storeId => storeId !== storeIdToRemove
+            ) || []
         } else if (promotionDetail.applicableTo?.isbeauty === true) {
-          promotionDetail.applicableTo.completeStoreBeauty = promotionDetail.applicableTo.completeStoreBeauty?.filter(
-            storeId => storeId !== storeIdToRemove
-          ) || [];
+          promotionDetail.applicableTo.completeStoreBeauty =
+            promotionDetail.applicableTo.completeStoreBeauty?.filter(
+              storeId => storeId !== storeIdToRemove
+            ) || []
         }
-        await promotionDetail.save().catch(() => { }); // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
+          // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
+          const updateResult = await updateStockMongo(
+            u,
+            order.store.area,
+            order.period,
+            'orderCanceled',
+            channel,
+            res
+          )
+          if (updateResult) return
+          // const factorPcsResult = await Product.aggregate([
+          //   { $match: { id: u.id } },
+          //   {
+          //     $project: {
+          //       id: 1,
+          //       listUnit: {
+          //         $filter: {
+          //           input: '$listUnit',
+          //           as: 'unitItem',
+          //           cond: { $eq: ['$$unitItem.unit', u.unit] }
+          //         }
+          //       }
+          //     }
+          //   }
+          // ])
+          // // .session(session);
 
-          const factorPcsResult = await Product.aggregate([
-            { $match: { id: u.id } },
-            {
-              $project: {
-                id: 1,
-                listUnit: {
-                  $filter: {
-                    input: "$listUnit",
-                    as: "unitItem",
-                    cond: { $eq: ["$$unitItem.unit", u.unit] }
-                  }
-                }
-              }
-            }
-          ])
-          // .session(session);
+          // const factorCtnResult =
+          //   (await Product.aggregate([
+          //     { $match: { id: u.id } },
+          //     {
+          //       $project: {
+          //         id: 1,
+          //         listUnit: {
+          //           $filter: {
+          //             input: '$listUnit',
+          //             as: 'unitItem',
+          //             cond: { $eq: ['$$unitItem.unit', 'CTN'] }
+          //           }
+          //         }
+          //       }
+          //     }
+          //   ])) || []
 
-          const factorCtnResult = await Product.aggregate([
-            { $match: { id: u.id } },
-            {
-              $project: {
-                id: 1,
-                listUnit: {
-                  $filter: {
-                    input: "$listUnit",
-                    as: "unitItem",
-                    cond: { $eq: ["$$unitItem.unit", "CTN"] }
-                  }
-                }
-              }
-            }
-          ]) || [];
-
-          const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0;
-          const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 1;
-          const factorPcsQty = u.qty * factorPcs;
-          const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
-          await Stock.findOneAndUpdate(
-            {
-              area: order.store.area,
-              period: order.period,
-              'listProduct.productId': u.id
-            },
-            {
-              $inc: {
-                'listProduct.$[elem].stockOutPcs': -factorPcsQty,
-                'listProduct.$[elem].balancePcs': +factorPcsQty,
-                'listProduct.$[elem].stockOutCtn': -factorCtnQty,
-                'listProduct.$[elem].balanceCtn': +factorCtnQty
-              }
-            },
-            {
-              arrayFilters: [
-                { 'elem.productId': u.id }
-              ],
-              new: true,
-              // session
-            }
-          );
+          // const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0
+          // const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 1
+          // const factorPcsQty = u.qty * factorPcs
+          // const factorCtnQty = Math.floor(factorPcsQty / factorCtn)
+          // await Stock.findOneAndUpdate(
+          //   {
+          //     area: order.store.area,
+          //     period: order.period,
+          //     'listProduct.productId': u.id
+          //   },
+          //   {
+          //     $inc: {
+          //       'listProduct.$[elem].stockOutPcs': -factorPcsQty,
+          //       'listProduct.$[elem].balancePcs': +factorPcsQty,
+          //       'listProduct.$[elem].stockOutCtn': -factorCtnQty,
+          //       'listProduct.$[elem].balanceCtn': +factorCtnQty
+          //     }
+          //   },
+          //   {
+          //     arrayFilters: [{ 'elem.productId': u.id }],
+          //     new: true
+          //     // session
+          //   }
+          // )
         }
       }
     }
 
     const updatedOrder = await Order.findOneAndUpdate(
       { orderId },
-      { $set: { status, orderId: newOrderId } },
-      { new: true, }
-    );
+      { $set: { status, statusTH } },
+      { new: true }
+    )
 
     // await session.commitTransaction();
     // session.endSession();
 
     const io = getSocket()
-    io.emit('order/updateStatus', {});
+    io.emit('order/updateStatus', {})
 
     res.status(200).json({
       status: 200,
       message: 'Updated status successfully!',
       data: updatedOrder
-    });
+    })
   } catch (error) {
     // await session.abortTransaction();
     // session.endSession();
-    console.error('Error updating order:', error);
-    res.status(500).json({ status: 500, message: 'Server error' });
+    console.error('Error updating order:', error)
+    res.status(500).json({ status: 500, message: 'Server error' })
   }
-};
-
+}
 
 exports.addSlip = async (req, res) => {
   try {
@@ -837,6 +837,9 @@ exports.addSlip = async (req, res) => {
 
       await order.save()
 
+      const io = getSocket()
+      io.emit('order/addSlip', {})
+
       res.status(200).json({
         status: 200,
         message: 'Images uploaded successfully!',
@@ -868,10 +871,10 @@ exports.OrderToExcel = async (req, res) => {
 
   const start = new Date(
     `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00`
-  );
+  )
   const end = new Date(
     `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T23:59:59.999`
-  );
+  )
 
   // const channel = 'cash';
   const { Order } = getModelsByChannel(channel, res, orderModel)
@@ -910,21 +913,19 @@ exports.OrderToExcel = async (req, res) => {
   // console.log(modelOrder)
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
-      const d = new Date(date);
-      d.setHours(d.getHours() + 7); // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
+    function formatDateToThaiYYYYMMDD (date) {
+      const d = new Date(date)
+      d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
+      const yyyy = d.getFullYear()
+      const mm = String(d.getMonth() + 1).padStart(2, '0')
+      const dd = String(d.getDate()).padStart(2, '0')
 
-      return `${yyyy}${mm}${dd}`;
+      return `${yyyy}${mm}${dd}`
     }
 
     // ใช้งาน
-    const RLDT = formatDateToThaiYYYYMMDD(order.createdAt);
-
-
+    const RLDT = formatDateToThaiYYYYMMDD(order.createdAt)
 
     const listProduct = order.listProduct.map(product => {
       return {
@@ -1045,7 +1046,7 @@ exports.OrderToExcel = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => { })
+    fs.unlink(tempPath, () => {})
   })
 
   // res.status(200).json({
@@ -1067,10 +1068,10 @@ exports.OrderToExcelConJob = async (req, res) => {
 
     const start = new Date(
       `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00`
-    );
+    )
     const end = new Date(
       `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T23:59:59.999`
-    );
+    )
 
     // const channel = req.headers['x-channel'];
     const { Order } = getModelsByChannel(ch, res, orderModel)
@@ -1110,8 +1111,7 @@ exports.OrderToExcelConJob = async (req, res) => {
     const tranFromOrder = modelOrder.flatMap(order => {
       let counterOrder = 0
 
-      const RLDT = dayjs().tz('Asia/Bangkok').format('YYYYMMDD');
-
+      const RLDT = dayjs().tz('Asia/Bangkok').format('YYYYMMDD')
 
       const listProduct = order.listProduct.map(product => {
         return {
@@ -1329,6 +1329,9 @@ exports.getAllOrder = async (req, res) => {
         summary: item.summary
       }))
 
+      // const io = getSocket()
+      // io.emit('order/getAllOrder', {});
+
       res.status(200).json({
         status: 200,
         message: 'success',
@@ -1514,6 +1517,9 @@ exports.getSummaryItem = async (req, res) => {
       // console.log(result)
     }
 
+    // const io = getSocket()
+    // io.emit('order/getSummaryItem', {});
+
     res.status(200).json({
       status: 200,
       message: 'success',
@@ -1602,6 +1608,9 @@ exports.getSummarybyRoute = async (req, res) => {
         summary: item.totalAmount
       }
     })
+
+    // const io = getSocket()
+    // io.emit('order/getSummarybyRoute', {});
 
     res.status(200).json({
       status: 200,
@@ -1718,6 +1727,9 @@ exports.getSummarybyMonth = async (req, res) => {
     modelOrderValue.forEach(d => {
       result[d.month - 1].summary = d.summary
     })
+
+    // const io = getSocket()
+    // io.emit('order/getSummarybyMonth', {});
 
     res.status(200).json({
       status: 200,
@@ -1957,6 +1969,9 @@ exports.getSummarybyArea = async (req, res) => {
       })
     }
 
+    // const io = getSocket()
+    // io.emit('order/getSummarybyArea', {});
+
     res.status(200).json({
       status: 200,
       message: 'Success',
@@ -2088,6 +2103,9 @@ exports.getSummarybyGroup = async (req, res) => {
       }
     }
 
+    // const io = getSocket()
+    // io.emit('order/getSummarybyGroup', {});
+
     res.status(200).json({
       status: 200,
       message: 'Success',
@@ -2201,8 +2219,6 @@ exports.getSummarybyGroup = async (req, res) => {
 //       });
 //     }
 
-
-
 //     console.log('✅ Updated Distribution Order IDs:', orderIdList);
 
 //     // 4. Broadcast ให้ client อัปเดต
@@ -2237,12 +2253,6 @@ exports.getSummarybyGroup = async (req, res) => {
 //     // res.status(500).json({ status: 500, message: 'Internal server error' });
 //   }
 // };
-
-
-
-
-
-
 
 exports.getSummarybyChoice = async (req, res) => {
   const { storeId, area, date, type } = req.body
@@ -2317,15 +2327,15 @@ exports.getSummarybyChoice = async (req, res) => {
     }
   ])
 
-
-
-
   if (modelOrder.length === 0) {
     return res.status(404).json({
       status: 404,
       message: 'Not found order'
     })
   }
+
+  // const io = getSocket()
+  // io.emit('order/getSummarybyChoice', {});
 
   res.status(200).json({
     status: 200,
@@ -2419,6 +2429,9 @@ exports.getSaleSummaryByStore = async (req, res) => {
     }
   ])
 
+  // const io = getSocket()
+  // io.emit('order/getSaleSummaryByStore', {});
+
   res.status(200).json({
     status: 200,
     message: 'sucess',
@@ -2456,7 +2469,6 @@ exports.getGroup = async (req, res) => {
   ])
 
   res.status(200).json({
-
     message: 'Success',
     data: product
   })
@@ -2700,11 +2712,9 @@ exports.getSummaryProduct = async (req, res) => {
     }
   ])
 
-
   const productTran = areaProduct.map(item => {
     const productDetail = grouped.find(
-      u => u.productId == item.productId
-        && u.area == item.area
+      u => u.productId == item.productId && u.area == item.area
     )
     // if (productDetail && productDetail.qty > 1) {
     //   console.log(item.groupSize)
@@ -2719,7 +2729,6 @@ exports.getSummaryProduct = async (req, res) => {
     const percentStore = allStoreCount?.constStore
       ? (((storeCount?.count || 0) / allStoreCount.constStore) * 100).toFixed(2)
       : 0
-
 
     return {
       // productId: item.productId,
@@ -2805,6 +2814,9 @@ exports.getSummaryProduct = async (req, res) => {
     summaryPercentStore: summaryPercentStore
   }
 
+  // const io = getSocket()
+  // io.emit('order/getSummaryProduct', {});
+
   res.status(200).json({
     status: 200,
     message: 'Success',
@@ -2841,7 +2853,6 @@ exports.getProductLimit = async (req, res) => {
     message: productLimitList
   })
 }
-
 
 exports.summaryAllProduct = async (req, res) => {
   const { area, period } = req.query
@@ -2882,18 +2893,21 @@ exports.summaryAllProduct = async (req, res) => {
   let sumPrice = 0
 
   for (const item of dataStock.listProduct) {
-    const getPcs = dataProduct.find(u => u.id == item.productId && u.listUnit.unit == 'PCS') || {}
+    const getPcs =
+      dataProduct.find(
+        u => u.id == item.productId && u.listUnit.unit == 'PCS'
+      ) || {}
     // const getCtn = dataProduct.find(u => u.id == item.productId && u.listUnit.unit == 'CTN') || {}
     if (getPcs && getPcs.listUnit && getPcs.listUnit.price.sale) {
-      sumPrice += item.balancePcs * getPcs.listUnit.price.sale;
+      sumPrice += item.balancePcs * getPcs.listUnit.price.sale
     }
     // if (getCtn && getCtn.listUnit && getCtn.listUnit.price.sale) {
     //   sumPrice += item.balanceCtn * getCtn.listUnit.price.sale;
     // }
-
   }
 
-
+  // const io = getSocket()
+  // io.emit('order/summaryAllProduct', {});
 
   res.status(200).json({
     status: 200,
@@ -2902,93 +2916,100 @@ exports.summaryAllProduct = async (req, res) => {
   })
 }
 
-
 exports.summaryDaily = async (req, res) => {
   try {
-    const { area } = req.query;
-    const channel = req.headers['x-channel'];
-    const { Order } = getModelsByChannel(channel, res, orderModel);
-    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel);
-    const { Refund } = getModelsByChannel(channel, res, refundModel);
+    const { area } = req.query
+    const channel = req.headers['x-channel']
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
 
     // รับ period และคำนวณปี เดือน
-    const periodStr = period();
-    const year = Number(periodStr.substring(0, 4));
-    const month = Number(periodStr.substring(4, 6));
+    const periodStr = period()
+    const year = Number(periodStr.substring(0, 4))
+    const month = Number(periodStr.substring(4, 6))
 
     // หาช่วงเวลา UTC ของเดือนที่ต้องการ (แปลงจากเวลาไทย)
-    const thOffset = 7 * 60 * 60 * 1000;
-    const startOfMonthTH = new Date(year, month - 1, 1, 0, 0, 0, 0);
-    const endOfMonthTH = new Date(year, month, 0, 23, 59, 59, 999);
-    const startOfMonthUTC = new Date(startOfMonthTH.getTime() - thOffset);
-    const endOfMonthUTC = new Date(endOfMonthTH.getTime() - thOffset);
+    const thOffset = 7 * 60 * 60 * 1000
+    const startOfMonthTH = new Date(year, month - 1, 1, 0, 0, 0, 0)
+    const endOfMonthTH = new Date(year, month, 0, 23, 59, 59, 999)
+    const startOfMonthUTC = new Date(startOfMonthTH.getTime() - thOffset)
+    const endOfMonthUTC = new Date(endOfMonthTH.getTime() - thOffset)
 
     // ฟังก์ชันสำหรับแปลงวันที่เป็น dd/mm/yyyy ตามเวลาไทย
     const getDateStrTH = dateUTC => {
-      const dateTH = new Date(new Date(dateUTC).getTime() + thOffset);
-      const day = dateTH.getDate().toString().padStart(2, '0');
-      const mon = (dateTH.getMonth() + 1).toString().padStart(2, '0');
-      const yr = dateTH.getFullYear();
-      return `${day}/${mon}/${yr}`;
-    };
-    const [dataSendmoney, dataRefund, dataOrderSale, dataOrderChange] = await Promise.all([
-      // SendMoney.find({
-      //   area: area,
-      //   dateAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
-      // }),
-      SendMoney.aggregate([
-        {
-          $match: {
-            area: area,
-            dateAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC }
+      const dateTH = new Date(new Date(dateUTC).getTime() + thOffset)
+      const day = dateTH.getDate().toString().padStart(2, '0')
+      const mon = (dateTH.getMonth() + 1).toString().padStart(2, '0')
+      const yr = dateTH.getFullYear()
+      return `${day}/${mon}/${yr}`
+    }
+    const [dataSendmoney, dataRefund, dataOrderSale, dataOrderChange] =
+      await Promise.all([
+        // SendMoney.find({
+        //   area: area,
+        //   dateAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+        // }),
+        SendMoney.aggregate([
+          {
+            $match: {
+              area: area,
+              dateAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC }
+            }
+          },
+          {
+            $addFields: {
+              createdAt: '$dateAt'
+            }
           }
-        },
-        {
-          $addFields: {
-            createdAt: "$dateAt"
-          }
-        }
-      ]),
-      Refund.find({
-        'store.area': area,
-        period: periodStr,
-        createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
-        type: 'refund'
-      }),
-      Order.find({
-        'store.area': area,
-        period: periodStr,
-        createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
-        type: 'sale'
-      }),
-      Order.find({
-        'store.area': area,
-        period: periodStr,
-        createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
-        type: 'change'
-      })
-    ]);
+        ]),
+        Refund.find({
+          'store.area': area,
+          period: periodStr,
+          createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+          type: 'refund',
+          status: { $nin: ['canceled'] }
+        }),
+        Order.find({
+          'store.area': area,
+          period: periodStr,
+          createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+          type: 'sale',
+          status: { $nin: ['canceled'] }
+        }),
+        Order.find({
+          'store.area': area,
+          period: periodStr,
+          createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+          type: 'change',
+          status: { $nin: ['canceled'] }
+        })
+      ])
 
     // รวม summary และ status ต่อวันจาก sendmoney
     const sumByDate = dataSendmoney.reduce((acc, item) => {
-      const dateStr = getDateStrTH(item.createdAt);
+      const dateStr = getDateStrTH(item.createdAt)
       if (!acc[dateStr]) {
-        acc[dateStr] = { summary: 0, status: item.status || '' };
+        acc[dateStr] = { summary: 0, status: item.status || '' }
       }
-      acc[dateStr].summary += item.sendmoney || 0;
+      acc[dateStr].summary += item.sendmoney || 0
       // acc[dateStr].status = item.status; // ถ้าอยากใช้ status อันสุดท้ายในวันนั้น
-      return acc;
-    }, {});
+      return acc
+    }, {})
 
     // ทำให้ array พร้อม map สำหรับ summary กับ status
     const dataSendMoneyTran = Object.entries(sumByDate).map(([date, val]) => ({
       date,
       summary: val.summary,
       status: val.status
-    }));
+    }))
     // console.log(dataSendMoneyTran)
-    const sendMoneyMap = Object.fromEntries(dataSendMoneyTran.map(d => [d.date, d.summary]));
-    const statusMap = Object.fromEntries(dataSendMoneyTran.map(d => [d.date, d.status]));
+    const sendMoneyMap = Object.fromEntries(
+      dataSendMoneyTran.map(d => [d.date, d.summary])
+    )
+    const statusMap = Object.fromEntries(
+      dataSendMoneyTran.map(d => [d.date, d.status])
+    )
 
     // สร้างรายการ refund แบบแบน
     const refundListFlat = dataRefund.flatMap(item =>
@@ -2997,116 +3018,308 @@ exports.summaryDaily = async (req, res) => {
         condition: u.condition,
         date: getDateStrTH(item.createdAt)
       }))
-    );
+    )
     const refundByDate = refundListFlat.reduce((acc, r) => {
-      if (!acc[r.date]) acc[r.date] = [];
-      acc[r.date].push(r);
-      return acc;
-    }, {});
-
+      if (!acc[r.date]) acc[r.date] = []
+      acc[r.date].push(r)
+      return acc
+    }, {})
 
     const orderSaleListFlat = dataOrderSale.flatMap(item =>
       item.listProduct.map(u => ({
         price: u.netTotal,
         date: getDateStrTH(item.createdAt)
       }))
-    );
+    )
 
     const orderChangeListFlat = dataOrderChange.flatMap(item =>
       item.listProduct.map(u => ({
         price: u.netTotal,
         date: getDateStrTH(item.createdAt)
       }))
-    );
+    )
 
     // Group by date
     const saleByDate = orderSaleListFlat.reduce((acc, o) => {
-      acc[o.date] = (acc[o.date] || 0) + Number(o.price || 0);
-      return acc;
-    }, {});
+      acc[o.date] = (acc[o.date] || 0) + Number(o.price || 0)
+      return acc
+    }, {})
 
     const changeByDate = orderChangeListFlat.reduce((acc, o) => {
-      acc[o.date] = (acc[o.date] || 0) + Number(o.price || 0);
-      return acc;
-    }, {});
-
+      acc[o.date] = (acc[o.date] || 0) + Number(o.price || 0)
+      return acc
+    }, {})
 
     // เตรียม array วันที่ครบทั้งเดือน
-    const lastDay = new Date(year, month, 0).getDate();
-    const allDateArr = Array.from({ length: lastDay }, (_, i) =>
-      `${(i + 1).toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`
-    );
+    const lastDay = new Date(year, month, 0).getDate()
+    const allDateArr = Array.from(
+      { length: lastDay },
+      (_, i) =>
+        `${(i + 1).toString().padStart(2, '0')}/${month
+          .toString()
+          .padStart(2, '0')}/${year}`
+    )
 
     // สร้างผลลัพธ์รายวัน (ใส่ 0 ถ้าไม่มีข้อมูล)
     const fullMonthArr = allDateArr.map(date => {
-      const sendmoney = sendMoneyMap[date] || 0;
+      const sendmoneyRaw = sendMoneyMap[date] || 0
+      const sendmoney = to2(sendmoneyRaw)
       let status = ''
-      const refundToday = refundByDate[date] || [];
-      const good = refundToday
+      const refundTodayRaw = refundByDate[date] || []
+      const refundToday = refundTodayRaw
+      const goodRaw = refundToday
         .filter(x => x.condition === 'good')
-        .reduce((sum, x) => sum + Number(x.price), 0);
-      const damaged = refundToday
+        .reduce((sum, x) => sum + Number(x.price), 0)
+      const good = to2(goodRaw)
+      const damagedRaw = refundToday
         .filter(x => x.condition === 'damaged')
-        .reduce((sum, x) => sum + Number(x.price), 0);
-
+        .reduce((sum, x) => sum + Number(x.price), 0)
+      const damaged = to2(damagedRaw)
       // เพิ่ม sale และ change
-      const summary = saleByDate[date] || 0;
-      const change = changeByDate[date] || 0;
-
-
-      if (sendmoney == 0 && summary == 0) {
-        status = 'วันนี้ไม่มียอดต้องส่ง';
-      }
-      else if (sendmoney - summary == 0) {
-        status = 'ส่งเงินครบ';
-      }
-      else {
-        status = 'ยังส่งเงินไม่ครบ';
+      const summaryRaw = saleByDate[date] || 0
+      const summary = to2(summaryRaw)
+      const changeRaw = changeByDate[date] || 0
+      const change = to2(changeRaw)
+      const diffRaw = sendmoney - summary
+      const diff = to2(diffRaw)
+      if (sendmoney > 0) {
+        status = 'ส่งเงินแล้ว'
+      } else {
+        status = 'ยังไม่ส่งเงิน'
       }
 
-
-
-      return { date, sendmoney, summary, change, status, good, damaged, };
-    });
-
+      return { date, sendmoney, summary, diff, change, status, good, damaged }
+    })
 
     const sumSendMoney = fullMonthArr.reduce((sum, item) => {
       return sum + (item.sendmoney || 0)
-    }, 0);
+    }, 0)
 
     const sumSummary = fullMonthArr.reduce((sum, item) => {
       return sum + (item.summary || 0)
-    }, 0);
+    }, 0)
+
+    const sumSummaryDif = fullMonthArr.reduce((sum, item) => {
+      return sum + (item.diff || 0)
+    }, 0)
+
     const sumChange = fullMonthArr.reduce((sum, item) => {
       return sum + (item.change || 0)
-    }, 0);
+    }, 0)
     const sumGood = fullMonthArr.reduce((sum, item) => {
       return sum + (item.good || 0)
-    }, 0);
+    }, 0)
     const sumDamaged = fullMonthArr.reduce((sum, item) => {
       return sum + (item.damaged || 0)
-    }, 0);
+    }, 0)
+
+    // const io = getSocket()
+    // io.emit('order/summaryDaily', {});
 
     res.status(200).json({
       status: 200,
       message: 'success',
       data: fullMonthArr,
-      sumSendMoney: sumSendMoney,
-      sumSummary: sumSummary,
-      sumChange: sumChange,
-      sumGood: sumGood,
-      sumDamaged: sumDamaged
-    });
+      sumSendMoney: to2(sumSendMoney),
+      sumSummary: to2(sumSummary),
+      sumSummaryDif: to2(sumSummary - sumSendMoney),
+      sumChange: to2(sumChange),
+      sumGood: to2(sumGood),
+      sumDamaged: to2(sumDamaged)
+    })
   } catch (err) {
-    res.status(500).json({ status: 500, message: err.message });
+    res.status(500).json({ status: 500, message: err.message })
   }
-};
+}
 
+exports.summaryDailyByZone = async (req, res) => {
+  try {
+    // รับ areas ได้จาก query (เช่น areas=BE215,BE221) หรือจาก body
+    const areas = (req.query.areas || '').split(',').filter(Boolean)
+    if (!areas.length)
+      return res
+        .status(400)
+        .json({ status: 400, message: 'areas is required!' })
+
+    const channel = req.headers['x-channel']
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+
+    const periodStr = period()
+    const year = Number(periodStr.substring(0, 4))
+    const month = Number(periodStr.substring(4, 6))
+    const thOffset = 7 * 60 * 60 * 1000
+    const startOfMonthTH = new Date(year, month - 1, 1, 0, 0, 0, 0)
+    const endOfMonthTH = new Date(year, month, 0, 23, 59, 59, 999)
+    const startOfMonthUTC = new Date(startOfMonthTH.getTime() - thOffset)
+    const endOfMonthUTC = new Date(endOfMonthTH.getTime() - thOffset)
+
+    const getDateStrTH = dateUTC => {
+      const dateTH = new Date(new Date(dateUTC).getTime() + thOffset)
+      const day = dateTH.getDate().toString().padStart(2, '0')
+      const mon = (dateTH.getMonth() + 1).toString().padStart(2, '0')
+      const yr = dateTH.getFullYear()
+      return `${day}/${mon}/${yr}`
+    }
+    const lastDay = new Date(year, month, 0).getDate()
+    const allDateArr = Array.from(
+      { length: lastDay },
+      (_, i) =>
+        `${(i + 1).toString().padStart(2, '0')}/${month
+          .toString()
+          .padStart(2, '0')}/${year}`
+    )
+
+    // ============ Main Loop (Per Area) ============
+    const result = []
+
+    for (const area of areas) {
+      // ดึงข้อมูลแต่ละ area แบบ await ทีละอัน หรือ optimize เพิ่มเติมถ้าต้องการ
+      const [dataSendmoney, dataRefund, dataOrderSale, dataOrderChange] =
+        await Promise.all([
+          SendMoney.aggregate([
+            {
+              $match: {
+                area: area,
+                dateAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC }
+              }
+            },
+            { $addFields: { createdAt: '$dateAt' } }
+          ]),
+          Refund.find({
+            'store.area': area,
+            period: periodStr,
+            createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+            type: 'refund',
+            status: { $nin: ['canceled'] }
+          }),
+          Order.find({
+            'store.area': area,
+            period: periodStr,
+            createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+            type: 'sale',
+            status: { $nin: ['canceled'] }
+          }),
+          Order.find({
+            'store.area': area,
+            period: periodStr,
+            createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+            type: 'change',
+            status: { $nin: ['canceled'] }
+          })
+        ])
+
+      // === ... ส่วนการประมวลผลข้อมูล เหมือนกับของเดิมเป๊ะ (copy มาวางได้) ===
+      const sumByDate = dataSendmoney.reduce((acc, item) => {
+        const dateStr = getDateStrTH(item.createdAt)
+        if (!acc[dateStr]) {
+          acc[dateStr] = { summary: 0, status: item.status || '' }
+        }
+        acc[dateStr].summary += item.sendmoney || 0
+        return acc
+      }, {})
+      const dataSendMoneyTran = Object.entries(sumByDate).map(
+        ([date, val]) => ({
+          date,
+          summary: val.summary,
+          status: val.status
+        })
+      )
+      const sendMoneyMap = Object.fromEntries(
+        dataSendMoneyTran.map(d => [d.date, d.summary])
+      )
+      const statusMap = Object.fromEntries(
+        dataSendMoneyTran.map(d => [d.date, d.status])
+      )
+
+      const refundListFlat = dataRefund.flatMap(item =>
+        item.listProduct.map(u => ({
+          price: u.total,
+          condition: u.condition,
+          date: getDateStrTH(item.createdAt)
+        }))
+      )
+      const refundByDate = refundListFlat.reduce((acc, r) => {
+        if (!acc[r.date]) acc[r.date] = []
+        acc[r.date].push(r)
+        return acc
+      }, {})
+
+      const orderSaleListFlat = dataOrderSale.flatMap(item =>
+        item.listProduct.map(u => ({
+          price: u.netTotal,
+          date: getDateStrTH(item.createdAt)
+        }))
+      )
+      const orderChangeListFlat = dataOrderChange.flatMap(item =>
+        item.listProduct.map(u => ({
+          price: u.netTotal,
+          date: getDateStrTH(item.createdAt)
+        }))
+      )
+      const saleByDate = orderSaleListFlat.reduce((acc, o) => {
+        acc[o.date] = (acc[o.date] || 0) + Number(o.price || 0)
+        return acc
+      }, {})
+      const changeByDate = orderChangeListFlat.reduce((acc, o) => {
+        acc[o.date] = (acc[o.date] || 0) + Number(o.price || 0)
+        return acc
+      }, {})
+
+      // ==== Create daily array ====
+      const fullMonthArr = allDateArr.map(date => {
+        const sendmoneyRaw = sendMoneyMap[date] || 0
+        const sendmoney = to2(sendmoneyRaw)
+        let status = ''
+        const refundTodayRaw = refundByDate[date] || []
+        const refundToday = refundTodayRaw
+        const goodRaw = refundToday
+          .filter(x => x.condition === 'good')
+          .reduce((sum, x) => sum + Number(x.price), 0)
+        const good = to2(goodRaw)
+        const damagedRaw = refundToday
+          .filter(x => x.condition === 'damaged')
+          .reduce((sum, x) => sum + Number(x.price), 0)
+        const damaged = to2(damagedRaw)
+        const summaryRaw = saleByDate[date] || 0
+        const summary = to2(summaryRaw)
+        const changeRaw = changeByDate[date] || 0
+        const change = to2(changeRaw)
+        const diffRaw = sendmoney - summary
+        const diff = to2(diffRaw)
+        if (sendmoney > 0) {
+          status = 'ส่งเงินแล้ว'
+        } else {
+          status = 'ยังไม่ส่งเงิน'
+        }
+
+        return { date, sendmoney, summary, diff, change, status, good, damaged }
+      })
+
+      result.push({
+        area,
+        daily: fullMonthArr
+      })
+    }
+
+    // const io = getSocket()
+    // io.emit('order/summaryDailyByZone', {});
+
+    res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: result
+    })
+  } catch (err) {
+    res.status(500).json({ status: 500, message: err.message })
+  }
+}
 
 exports.saleReport = async (req, res) => {
-  const { area, type, date, role } = req.query;
-  const channel = req.headers['x-channel'];
-  const { Order } = getModelsByChannel(channel, res, orderModel);
+  const { area, type, date, role } = req.query
+  const channel = req.headers['x-channel']
+  const { Order } = getModelsByChannel(channel, res, orderModel)
 
   if (role == 'sale' || role == '' || !role) {
     let filterCreatedAt = {}
@@ -3119,13 +3332,13 @@ exports.saleReport = async (req, res) => {
       filterType = { type: type }
     }
     if (date) {
-      const year = Number(date.substring(0, 4));
-      const month = Number(date.substring(4, 6)) - 1;
-      const day = Number(date.substring(6, 8));
-      const bangkokStart = new Date(year, month, day, 0, 0, 0, 0);
-      startDate = new Date(bangkokStart.getTime() - 7 * 60 * 60 * 1000);
-      const bangkokEnd = new Date(year, month, day + 1, 0, 0, 0, 0);
-      endDate = new Date(bangkokEnd.getTime() - 7 * 60 * 60 * 1000);
+      const year = Number(date.substring(0, 4))
+      const month = Number(date.substring(4, 6)) - 1
+      const day = Number(date.substring(6, 8))
+      const bangkokStart = new Date(year, month, day, 0, 0, 0, 0)
+      startDate = new Date(bangkokStart.getTime() - 7 * 60 * 60 * 1000)
+      const bangkokEnd = new Date(year, month, day + 1, 0, 0, 0, 0)
+      endDate = new Date(bangkokEnd.getTime() - 7 * 60 * 60 * 1000)
       filterCreatedAt = {
         createdAt: {
           $gte: startDate,
@@ -3137,7 +3350,7 @@ exports.saleReport = async (req, res) => {
       ...filterArea,
       ...filterCreatedAt,
       ...filterType
-    });
+    })
 
     if (dataOrder.length === 0) {
       return res.status(404).json({
@@ -3149,11 +3362,9 @@ exports.saleReport = async (req, res) => {
       let paymentMethodTH = ''
       if (item.paymentMethod === 'cash') {
         paymentMethodTH = 'เงินสด'
-      }
-      else if (item.paymentMethod === 'qr') {
+      } else if (item.paymentMethod === 'qr') {
         paymentMethodTH = 'QR Payment'
-      }
-      else {
+      } else {
         paymentMethodTH = item.paymentMethod
       }
       return {
@@ -3173,24 +3384,21 @@ exports.saleReport = async (req, res) => {
       message: 'sucess',
       data: data
     })
-  }
-
-  else if (role == 'supervisor') {
-    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel);
+  } else if (role == 'supervisor') {
+    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
     let areaQuery = {}
     if (area) {
       if (area.length == 2) {
         areaQuery.zone = area.slice(0, 2)
-      }
-      else if (area.length == 5) {
-        areaQuery.area = area;
+      } else if (area.length == 5) {
+        areaQuery.area = area
       }
     }
 
     const sendMoneyData = await SendMoney.aggregate([
       {
         $addFields: {
-          zone: { $substrBytes: ["$area", 0, 2] }
+          zone: { $substrBytes: ['$area', 0, 2] }
         }
       },
       {
@@ -3200,39 +3408,34 @@ exports.saleReport = async (req, res) => {
       }
     ])
 
-
-
-
+    // const io = getSocket()
+    // io.emit('order/saleReport', {});
 
     res.status(200).json({
       status: 200,
       sendMoneyData
     })
-
-
-
   }
 }
 
-
 exports.getSummary18SKU = async (req, res) => {
   const { zone, area, team } = req.query
-  const channel = req.headers['x-channel'];
-  const { Order } = getModelsByChannel(channel, res, orderModel);
-  const { Product } = getModelsByChannel(channel, res, productModel);
+  const channel = req.headers['x-channel']
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+  const { Product } = getModelsByChannel(channel, res, productModel)
 
-  const matchStage = {};
-  if (zone) matchStage['store.zone'] = zone;
-  if (area) matchStage['store.area'] = area;
-  if (team) matchStage['team'] = team;
+  const matchStage = {}
+  if (zone) matchStage['store.zone'] = zone
+  if (area) matchStage['store.area'] = area
+  if (team) matchStage['team'] = team
   // console.log(team)
   const dataOrder = await Order.aggregate([
     {
       $addFields: {
         team: {
           $concat: [
-            { $substr: ['$store.area', 0, 2] },    // 2 ตัวแรก
-            { $substr: ['$store.area', 3, 1] }     // ตัวที่ 4 (index เริ่ม 0)
+            { $substr: ['$store.area', 0, 2] }, // 2 ตัวแรก
+            { $substr: ['$store.area', 3, 1] } // ตัวที่ 4 (index เริ่ม 0)
           ]
         }
       }
@@ -3240,18 +3443,18 @@ exports.getSummary18SKU = async (req, res) => {
     { $match: matchStage },
     { $match: { team: { $ne: '' } } },
     { $unwind: '$listProduct' },
-    { $replaceRoot: { newRoot: '$listProduct' } },
-  ]);
+    { $replaceRoot: { newRoot: '$listProduct' } }
+  ])
 
-  const productlist = dataOrder.map(item => item.id); // หรือ flatMap ถ้าเป็น array
-  const productId = [...new Set(productlist)];
-  const productData = await Product.find({ id: { $in: productId } });
-
+  const productlist = dataOrder.map(item => item.id) // หรือ flatMap ถ้าเป็น array
+  const productId = [...new Set(productlist)]
+  const productData = await Product.find({ id: { $in: productId } })
 
   const emptyGroup = await Product.aggregate([
     {
       $match: {
-        group: { $nin: ['สินค้าช่วยระบาย'] }  // หรือ { $ne: '' } 
+        group: { $nin: ['สินค้าช่วยระบาย'] },
+        groupCodeM3: { $nin: [''] }
       }
     },
     {
@@ -3269,9 +3472,8 @@ exports.getSummary18SKU = async (req, res) => {
         summaryQty: 0,
         summary: 0
       }
-    },
-  ]
-  )
+    }
+  ])
   // console.log(emptyGroup)
 
   data = []
@@ -3289,38 +3491,37 @@ exports.getSummary18SKU = async (req, res) => {
     data.push(dataTran)
   }
 
-
   const mergedGroup = emptyGroup.map(group => {
     const groupItems = data.filter(
       item =>
         item.groupCode === group.groupCode &&
         item.group === group.group &&
         item.groupCodeM3 === group.groupCodeM3
-    );
-    const summaryQtySum = groupItems.reduce((sum, i) => sum + i.summaryQty, 0);
-    const summarySum = groupItems.reduce((sum, i) => sum + i.summary, 0);
+    )
+    const summaryQtySum = groupItems.reduce((sum, i) => sum + i.summaryQty, 0)
+    const summarySum = groupItems.reduce((sum, i) => sum + i.summary, 0)
 
     return {
       ...group,
       summaryQty: Number(summaryQtySum.toFixed(2)),
       summary: Number(summarySum.toFixed(2))
-    };
-  });
+    }
+  })
 
   const sortedMergedGroup = mergedGroup.sort((a, b) => {
-    if (!a.groupCodeM3) return 1;
-    if (!b.groupCodeM3) return -1;
-    return a.groupCodeM3.localeCompare(b.groupCodeM3, undefined, { numeric: true });
-  });
+    if (!a.groupCodeM3) return 1
+    if (!b.groupCodeM3) return -1
+    return a.groupCodeM3.localeCompare(b.groupCodeM3, undefined, {
+      numeric: true
+    })
+  })
 
-
-
-
+  //  const io = getSocket()
+  //   io.emit('order/getSummary18SKU', {});
 
   res.status(200).json({
     status: 200,
     // data: data,
     data: sortedMergedGroup
   })
-
 }

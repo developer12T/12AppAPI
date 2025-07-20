@@ -1,10 +1,12 @@
 const { getModelsByChannel } = require('../../middleware/channel')
 const { uploadFiles } = require('../../utilities/upload')
+const { getSocket } = require('../../socket')
 const orderModel = require('../../models/cash/sale')
 const routeModel = require('../../models/cash/route')
 const sendmoneyModel = require('../../models/cash/sendmoney')
 const path = require('path')
 const multer = require('multer')
+const { replace } = require('lodash')
 const upload = multer({ storage: multer.memoryStorage() }).array(
   'sendmoneyImage',
   1
@@ -13,7 +15,7 @@ const upload = multer({ storage: multer.memoryStorage() }).array(
 exports.addSendMoney = async (req, res) => {
   const channel = req.headers['x-channel']
   const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
-  const { area, date, sendmoney } = req.body
+  const { area, date, sendmoney, salePayer, saleCode } = req.body
 
   const year = parseInt(date.slice(0, 4), 10)
   const month = parseInt(date.slice(4, 6), 10)
@@ -54,7 +56,9 @@ exports.addSendMoney = async (req, res) => {
     sendmoneyData = await SendMoney.create({
       area: area,
       dateAt: dateObj,
-      sendmoney: sendmoney
+      sendmoney: sendmoney,
+      salePayer: salePayer,
+      saleCode: saleCode
     })
   } else {
     sendmoneyData = await SendMoney.findOneAndUpdate(
@@ -62,10 +66,16 @@ exports.addSendMoney = async (req, res) => {
       {
         $inc: {
           sendmoney: + sendmoney
-        }
+        },
+        salePayer: salePayer,
+        saleCode: saleCode
       }
     )
   }
+
+  const io = getSocket()
+  io.emit('sendmoney/addSendMoney', {});
+
   res.status(200).json({
     status: 200,
     message: 'success',
@@ -148,6 +158,10 @@ exports.addSendMoneyImage = async (req, res) => {
           { $push: { imageList: { $each: uploadedFiles } } }
         )
       }
+
+      const io = getSocket()
+      io.emit('sendmoney/addSendMoneyImage', {});
+
       res.status(200).json({
         status: '200',
         message: 'Sendmoney upload successfully'
@@ -199,7 +213,7 @@ exports.getSendMoney = async (req, res) => {
       {
         $match: {
           'store.area': area,
-          status: 'pending',
+          status: { $nin: ['canceled'] },
           day,
           month,
           year
@@ -255,14 +269,11 @@ exports.getSendMoney = async (req, res) => {
     // console.log(totalToSend, alreadySent)
 
     let status = ''
-    if (totalToSend == 0 && alreadySent == 0) {
-      status = 'ยังส่งเงินไม่ครบ'
-    }
-    else if (totalToSend - alreadySent == 0) {
-      status = 'ส่งเงินครบ';
+    if (alreadySent > 0) {
+      status = 'ส่งเงินแล้ว'
     }
     else {
-      status = 'ยังส่งเงินไม่ครบ';
+      status = 'ยังไม่ส่งเงิน';
     }
     const remaining = parseFloat((totalToSend - alreadySent).toFixed(2))
 
@@ -296,12 +307,15 @@ exports.getSendMoney = async (req, res) => {
 
 
     for (const doc of SentDocsForUpdate) {
-      console.log(doc._id)
       await SendMoney.updateOne(
         { _id: doc._id },
         { $set: { different: remaining } }
       );
     }
+
+    // const io = getSocket()
+    // io.emit('sendmoney/getSendMoney', {});
+
 
     res.status(200).json({
       message: 'success',
@@ -347,10 +361,106 @@ exports.getAllSendMoney = async (req, res) => {
 
   const sendMoneyData = await SendMoney.aggregate(pipeline);
 
+  // const io = getSocket()
+  // io.emit('sendmoney/getAllSendMoney', {});
+
   res.status(200).json({
     status: 200,
     message: 'success',
     data: sendMoneyData
+  })
+
+}
+
+exports.getSendMoneyForAcc = async (req, res) => {
+  const { date } = req.query
+  const channel = req.headers['x-channel']
+  const { area, zone } = req.query
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+  const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+
+
+
+  const start = new Date(date + 'T00:00:00.000Z');
+  const end = new Date(date + 'T23:59:59.999Z');
+
+  const data = await SendMoney.aggregate([
+    {
+      $match: {
+        dateAt: {
+          $gte: start,
+          $lte: end
+        }
+      }
+    },
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'saleCode',
+        foreignField: 'saleCode',
+        as: 'user'
+      }
+    },
+    {
+      $unwind: {
+        path: '$user',
+        preserveNullAndEmptyArrays: true
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        area: '$area',
+        sale: '$user.firstName',
+        STATUS: 'รอตรวจสอบ',
+        TRANSFER_DATE: `${date}`,
+        VALUES: '$sendmoney',
+        ZONE: { $substrBytes: ['$area', 0, 2] }
+      }
+    },
+    {
+      $group: {
+        _id: { area: '$area', sale: '$sale', STATUS: '$STATUS', TRANSFER_DATE: '$TRANSFER_DATE', ZONE: '$ZONE' },
+        VALUES: { $sum: '$VALUES' },
+        COUNT: { $sum: 1 }
+      }
+    },
+    {
+      $project: {
+        _id: 0,                           // ไม่เอา _id
+        AREA: '$_id.area',
+        ZONE: '$_id.ZONE',
+        sale: '$_id.sale',
+        STATUS: '$_id.STATUS',
+        TRANSFER_DATE: '$_id.TRANSFER_DATE',
+        VALUES: 1,                         // เอา field value, COUNT ตามเดิม
+        COUNT: 1
+      }
+    }
+  ]);
+
+  const dataFinal = data.map(item => {
+
+    return {
+      AREA: item.AREA,
+      COUNT: item.COUNT,
+      SALE: item.SALE,
+      STATUS: item.STATUS,
+      TRANSFER_DATE: item.TRANSFER_DATE,
+      VALUES: item.VALUES,
+      ZONE: item.ZONE
+    }
+  })
+
+
+  // const io = getSocket()
+  // io.emit('sendmoney/getSendMoneyForAcc', {});
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'success',
+    data: dataFinal
   })
 
 }

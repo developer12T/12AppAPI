@@ -2,6 +2,7 @@ const cron = require('node-cron')
 // const { erpApiCheckOrder,erpApiCheckDisributionM3 } = require('../../controllers/sale/orderController')
 const { OrderToExcelConJob } = require('../../controllers/sale/orderController')
 const { period, } = require('../../utilities/datetime')
+const { to2, updateStockMongo } = require('../../middleware/order')
 
 
 const { Warehouse, Locate, Balance, Sale, DisributionM3 } = require('../../models/cash/master')
@@ -53,23 +54,12 @@ async function erpApiCheckOrderJob(channel = 'cash') {
       }
     }
 
-    // 5. Broadcast event
-    // const io = getSocket();
-    // const events = [
-    //   'sale_getSummarybyArea',
-    //   'sale_getSummarybyMonth',
-    //   'sale_getSummarybyRoute',
-    //   'sale_getSummaryItem',
-    //   'sale_getSummarybyGroup',
-    //   'sale_getRouteCheckinAll',
-    //   'sale_getTimelineCheckin',
-    //   'sale_routeTimeline'
-    // ];
-    // events.forEach(event => {
-    //   io.emit(event, {
-    //     status: 200,
-    //     message: 'New Update Data'
-    //   });
+    const io = getSocket()
+    io.emit('order/statusOrderUpdated', {
+      updatedCount,
+      updatedAt: new Date()
+    })
+
     // });
 
     console.log(`Total updated Order: ${updatedCount}`);
@@ -139,6 +129,12 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
     //     message: 'New Update Data'
     //   });
     // });
+    const io = getSocket()
+    io.emit('order/statusWithdrawUpdated', {
+      updatedCount,
+      updatedAt: new Date()
+    })
+
 
     console.log(`Total updated Distribution: ${updatedCount}`);
     return updatedCount;
@@ -161,12 +157,15 @@ async function DeleteCartDaily(channel = 'cash') {
     const { Product } = getModelsByChannel(channel, null, productModel);
 
     // ดึงข้อมูล cart ทั้งหมด (เช่นเดิม)
+    await Cart.deleteMany({ type: 'withdraw' });
+
     const data = await Cart.find({})
     // .session(session);
-
+    // console.log(data)
     // ดึงข้อมูล listProduct และ listPromotion
     const listProduct = data.flatMap(sub =>
       sub.listProduct.map(item => ({
+        storeId: sub.storeId,
         area: sub.area,
         id: item.id,
         unit: item.unit,
@@ -176,6 +175,7 @@ async function DeleteCartDaily(channel = 'cash') {
 
     const listPromotion = data.flatMap(sub =>
       sub.listPromotion.flatMap(item => item.listProduct.map(y => ({
+        storeId: sub.storeId,
         area: sub.area,
         id: y.id,
         unit: y.unit,
@@ -184,72 +184,81 @@ async function DeleteCartDaily(channel = 'cash') {
     );
 
     for (const item of [...listProduct, ...listPromotion]) {
+      // console.log(item)
+      // console.log(item)
+      // await updateStockMongo(item, item.area, period(), 'deleteCart', channel)
+      const updateResult = await updateStockMongo(item, item.area, period(), 'deleteCart', channel);
+      if (updateResult) return;
       // ดึง factor สำหรับแต่ละ unit
-      const factorPcsResult = await Product.aggregate([
-        { $match: { id: item.id } },
-        {
-          $project: {
-            id: 1,
-            listUnit: {
-              $filter: {
-                input: "$listUnit",
-                as: "unitItem",
-                cond: { $eq: ["$$unitItem.unit", item.unit] }
-              }
-            }
-          }
-        }
-      ])
-      // .session(session);
+      // console.log("item ",item.storeId,item.area)
+      // const factorPcsResult = await Product.aggregate([
+      //   { $match: { id: item.id } },
+      //   {
+      //     $project: {
+      //       id: 1,
+      //       listUnit: {
+      //         $filter: {
+      //           input: "$listUnit",
+      //           as: "unitItem",
+      //           cond: { $eq: ["$$unitItem.unit", item.unit] }
+      //         }
+      //       }
+      //     }
+      //   }
+      // ])
+      // // .session(session);
 
-      const factorCtnResult = await Product.aggregate([
-        { $match: { id: item.id } },
-        {
-          $project: {
-            id: 1,
-            listUnit: {
-              $filter: {
-                input: "$listUnit",
-                as: "unitItem",
-                cond: { $eq: ["$$unitItem.unit", "CTN"] }
-              }
-            }
-          }
-        }
-      ])
-      // .session(session);
+      // const factorCtnResult = await Product.aggregate([
+      //   { $match: { id: item.id } },
+      //   {
+      //     $project: {
+      //       id: 1,
+      //       listUnit: {
+      //         $filter: {
+      //           input: "$listUnit",
+      //           as: "unitItem",
+      //           cond: { $eq: ["$$unitItem.unit", "CTN"] }
+      //         }
+      //       }
+      //     }
+      //   }
+      // ])
+      // // .session(session);
 
-      // ตรวจสอบว่ามีข้อมูล unit
-      if (!factorCtnResult.length || !factorCtnResult[0].listUnit.length ||
-          !factorPcsResult.length || !factorPcsResult[0].listUnit.length) {
-        throw new Error(`unit factor not found for product ${item.id}`);
-      }
+      // // ตรวจสอบว่ามีข้อมูล unit
+      // if (!factorCtnResult.length || !factorCtnResult[0].listUnit.length ||
+      //     !factorPcsResult.length || !factorPcsResult[0].listUnit.length) {
+      //   // throw new Error(`unit factor not found for product ${item.id}`);
+      //   // console.log(item.id,"item.unit :",item.unit, item.area )
+      // }
 
-      const factorCtn = factorCtnResult[0].listUnit[0].factor;
-      const factorPcs = factorPcsResult[0].listUnit[0].factor;
+      // const factorCtn = factorCtnResult[0].listUnit[0].factor;
+      // const factorPcs = factorPcsResult[0].listUnit[0].factor;
 
-      const factorPcsQty = item.qty * factorPcs;
-      const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
+      // const factorPcsQty = item.qty * factorPcs;
+      // const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
+
+      // console.log("factorPcsQty",factorPcsQty,"factorCtnQty",factorCtnQty)
 
       // อัปเดต Stock
-      await Stock.findOneAndUpdate(
-        {
-          area: item.area,
-          period: period(),
-          'listProduct.productId': item.id
-        },
-        {
-          $inc: {
-            'listProduct.$[elem].balancePcs': +factorPcsQty,
-            'listProduct.$[elem].balanceCtn': +factorCtnQty
-          }
-        },
-        {
-          arrayFilters: [{ 'elem.productId': item.id }],
-          new: true,
-          // session // สำคัญ!
-        }
-      );
+      // await Stock.findOneAndUpdate(
+      //   {
+      //     area: item.area,
+      //     period: period(),
+      //     'listProduct.productId': item.id
+      //   },
+      //   {
+      //     $inc: {
+      //       'listProduct.$[elem].balancePcs': +factorPcsQty,
+      //       'listProduct.$[elem].balanceCtn': +factorCtnQty
+      //     }
+      //   },
+      //   {
+      //     arrayFilters: [{ 'elem.productId': item.id }],
+      //     new: true,
+      // session // สำคัญ!
+      // }
+      // );
     }
 
     // ลบ Cart ทั้งหมด (ตามเงื่อนไขที่คุณต้องการ)
@@ -287,10 +296,8 @@ const startCronJobErpApiCheckDisribution = () => {
 }
 
 const startCronJobDeleteCartDaily = () => {
-  cron.schedule(
-    '0 0 * * *',
-    async () => {
-  // cron.schedule('*/1 * * * *', async () => {
+  cron.schedule('0 0 * * *', async () => {
+    // cron.schedule('*/1 * * * *', async () => {
     console.log('Running cron job DeleteCartDaily at 00:00 (Asia/Bangkok)');
     await DeleteCartDaily();
   },

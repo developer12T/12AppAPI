@@ -36,6 +36,7 @@ SELECT
     DA.WH AS warehouse,
     'sale' AS role,
     '1' AS status,
+    '6W' AS typeTruck,
     'https://apps.onetwotrading.co.th/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
 FROM 
   [DATA_OMS].[dbo].[DATA_Area] AS DA
@@ -95,7 +96,7 @@ exports.userQueryManeger = async function (channel, area) {
   let result = ''
   if (channel == 'cash') {
     result = await sql.query`
- SELECT 
+SELECT 
      '' AS saleCode,
      '' AS salePayer,
     Col_LoginName AS username,
@@ -119,6 +120,8 @@ exports.userQueryManeger = async function (channel, area) {
 --     Col_o_JobTitle AS role,
     '1' AS status
     FROM [192.168.0.3].[AntDB].[dbo].[hs_User] AS hr
+    WHERE Col_o_JobTitle NOT IN ('cash', 'credit', 'Credit Top', 'PC', 'EV', 'Food Service','DC')
+
 --     WHERE 
 --       Col_o_JobTitle in ('Developer','IT Support','Sale_Manager','Supervisor','Area_Manager','IT')
     `;
@@ -274,7 +277,6 @@ exports.storeQuery = async function (channel) {
             LEFT JOIN [192.168.2.74].[M3FDBPRD].[MVXJDTA].[OCUSMA] ON customerCode = OKCUNO COLLATE Latin1_General_BIN AND OKCONO = 410
             LEFT JOIN [192.168.2.74].[M3FDBPRD].[MVXJDTA].[OCUSAD] ON OKCUNO = OPCUNO AND OPCONO = 410
             LEFT JOIN [dbo].[data_shoptype] ON OKCFC6 = type_id COLLATE Thai_CI_AS
-            WHERE store_status <> '90' 
   `;
   }
   else if (channel === 'credit') {
@@ -858,14 +860,16 @@ exports.routeQuery = async function (channel) {
                     CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
                     RIGHT(RouteSet, 2) AS day, 
                     CONVERT(nvarchar(6), GETDATE(), 112) AS period, 
-                    StoreID AS storeId
+                    a.StoreID AS storeId
              FROM [DATA_OMS].[dbo].[DATA_StoreSet] a
              LEFT JOIN [DATA_OMS].[dbo].[OCUSMA] ON StoreID = OKCUNO COLLATE Latin1_General_BIN
              LEFT JOIN [dbo].[data_store] b ON StoreID = customerCode
-            WHERE store_status <> '90'
-               AND OKCFC3 <> 'DEL'
-               AND LEFT(OKRGDT, 6) <> CONVERT(nvarchar(6), GETDATE(), 112)
+            WHERE 
+                store_status <> '90' AND 
+                LEFT(OKRGDT, 6) <> CONVERT(nvarchar(6), GETDATE(), 112)
                AND a.Channel = '103'
+--                AND StoreID = 'VB22500328'
+--               AND CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet ='202507BE214R19'
              ORDER BY a.Area, RouteSet
         `
   }
@@ -888,6 +892,67 @@ SELECT a.Area AS area,
   await sql.close();
   return result.recordset
 }
+
+
+exports.routeQueryOne = async function (channel, RouteId) {
+
+  const config = {
+    user: process.env.MS_SQL_USER,
+    password: process.env.MS_SQL_PASSWORD,
+    server: process.env.MS_SQL_SERVER,
+    database: process.env.MS_SQL_DATABASE,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  };
+  // console.log(RouteId)
+  await sql.connect(config);
+
+  let result = ''
+  if (channel == 'cash') {
+    result = await sql.query`
+                  SELECT a.Area AS area, 
+                    CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
+                    RIGHT(RouteSet, 2) AS day, 
+                    CONVERT(nvarchar(6), GETDATE(), 112) AS period, 
+                    StoreID AS storeId
+             FROM [DATA_OMS].[dbo].[DATA_StoreSet] a
+             LEFT JOIN [DATA_OMS].[dbo].[OCUSMA] ON StoreID = OKCUNO COLLATE Latin1_General_BIN
+             LEFT JOIN [dbo].[data_store] b ON StoreID = customerCode
+            WHERE store_status <> '90'
+               AND OKCFC3 <> 'DEL'
+               AND LEFT(OKRGDT, 6) <> CONVERT(nvarchar(6), GETDATE(), 112)
+               AND a.Channel = '103'
+               AND CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet =${RouteId}
+             ORDER BY a.Area, RouteSet
+        `
+  }
+  //   if (channel == 'credit') {
+  //     result = await sql.query`
+
+  // SELECT a.Area AS area, 
+  //                     CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
+  //                     RIGHT(RouteSet, 2) AS day, 
+  //                     CONVERT(nvarchar(6), GETDATE(), 112) AS period, 
+  //                     StoreID AS storeId
+  //              FROM [DATA_OMS].[dbo].[DATA_StoreSet] a
+  //              LEFT JOIN [DATA_OMS].[dbo].[OCUSMA] ON StoreID = OKCUNO COLLATE Latin1_General_BIN
+  //              LEFT JOIN [dbo].[store_credit] b ON StoreID = customerCode
+  //             WHERE a.Channel = '102'
+  //             ORDER BY a.Area, RouteSet
+
+  //     `
+  //   }
+  await sql.close();
+  return result.recordset
+}
+
+
+
+
+
+
 
 
 exports.stockQuery = async function (channel, period) {
@@ -972,25 +1037,53 @@ exports.groupStoreType = async function () {
 
 exports.withdrawQuery = async function (channel) {
 
-const config = {
-  host: process.env.MY_SQL_SERVER,
-  user: process.env.MY_SQL_USER,
-  password: process.env.MY_SQL_PASSWORD,
-  database: process.env.MY_SQL_DATABASE,
-};
+  const config = {
+    user: process.env.MS_SQL_USER,
+    password: process.env.MS_SQL_PASSWORD,
+    server: process.env.MS_SQL_SERVER,
+    database: process.env.MS_SQL_DATABASE_OMS,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  };
+  // console.log(RouteId)
+  await sql.connect(config);
 
-const connection = await mysql.createConnection(config);
+  result = await sql.query`
+       SELECT * FROM pc_withdraws_destination
+   `
 
-let rows = [];
-if (channel === 'cash') {
-  [rows] = await connection.execute(`
-    SELECT * FROM vancash.pc_withdraws_destination
-  `);
-  await connection.end(); 
-
-
-    // console.log(rows)
-
-  return rows; 
+  await sql.close();
+  return result.recordset
 }
+
+
+exports.bueatyStoreQuery = async function (channel) {
+
+  const config = {
+    user: process.env.MS_SQL_USER,
+    password: process.env.MS_SQL_PASSWORD,
+    server: process.env.MS_SQL_SERVER,
+    // database: process.env.MS_SQL_DATABASE_OMS,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  };
+  // console.log(RouteId)
+  await sql.connect(config);
+
+  result = await sql.query`
+SELECT 
+cus_code as storeId,
+cus_area as area
+
+ FROM [DATA_BEAUTY].[dbo].[DATA_BEAUTY_CUSTOMER]
+WHERE CUS_STATUS = 'N'
+
+   `
+
+  await sql.close();
+  return result.recordset
 }

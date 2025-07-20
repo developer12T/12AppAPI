@@ -3,7 +3,12 @@ const { Cart } = require('../../models/cash/cart')
 const { Product } = require('../../models/cash/product')
 const { Stock } = require('../../models/cash/stock')
 const { applyPromotion, applyQuota } = require('../promotion/calculate')
-const { to2 } = require('../../middleware/order')
+const {
+  to2,
+  getQty,
+  updateStockMongo,
+  getPeriodFromDate
+} = require('../../middleware/order')
 const {
   summaryOrder,
   summaryWithdraw,
@@ -11,7 +16,7 @@ const {
   summaryGive,
   summaryAjustStock
 } = require('../../utilities/summary')
-const { forEach } = require('lodash')
+const { forEach, chain } = require('lodash')
 const { error } = require('console')
 const cartModel = require('../../models/cash/cart')
 const productModel = require('../../models/cash/product')
@@ -105,8 +110,8 @@ exports.getCart = async (req, res) => {
 
     // session.endSession();
 
-    const io = getSocket()
-    io.emit('cart/get', {})
+    // const io = getSocket()
+    // io.emit('cart/get', {})
 
     res.status(200).json({
       status: '200',
@@ -122,8 +127,6 @@ exports.getCart = async (req, res) => {
 }
 
 exports.addProduct = async (req, res) => {
-  // const session = await require('mongoose').startSession();
-  // session.startTransaction();
   try {
     const {
       type,
@@ -135,7 +138,7 @@ exports.addProduct = async (req, res) => {
       condition,
       action,
       expire,
-      period
+      typeref
     } = req.body
 
     const channel = req.headers['x-channel']
@@ -143,8 +146,6 @@ exports.addProduct = async (req, res) => {
     const { Stock } = getModelsByChannel(channel, res, stockModel)
 
     if (!type || !area || !id || !qty || !unit) {
-      // await session.abortTransaction();
-      // session.endSession();
       return res.status(400).json({
         status: 400,
         message: 'type, area, id, qty, and unit are required!'
@@ -152,8 +153,6 @@ exports.addProduct = async (req, res) => {
     }
 
     if ((type === 'sale' || type === 'refund' || type === 'give') && !storeId) {
-      // await session.abortTransaction();
-      // session.endSession();
       return res.status(400).json({
         status: 400,
         message:
@@ -162,8 +161,6 @@ exports.addProduct = async (req, res) => {
     }
 
     if (type === 'adjuststock' && !action && !period) {
-      // await session.abortTransaction();
-      // session.endSession();
       return res.status(400).json({
         status: 400,
         message: 'action,period is required for adjuststock!'
@@ -172,18 +169,13 @@ exports.addProduct = async (req, res) => {
 
     const product = await Product.findOne({ id }).lean()
     if (!product) {
-      // await session.abortTransaction();
-      // session.endSession();
       return res
         .status(404)
         .json({ status: 404, message: 'Product not found!' })
     }
 
     const unitData = product.listUnit.find(u => u.unit === unit)
-
     if (!unitData) {
-      // await session.abortTransaction();
-      // session.endSession();
       return res.status(400).json({
         status: 400,
         message: `Unit '${unit}' not found for this product!`
@@ -196,9 +188,7 @@ exports.addProduct = async (req, res) => {
     const cartQuery =
       type === 'withdraw' ? { type, area } : { type, area, storeId }
     const { Cart } = getModelsByChannel(channel, res, cartModel)
-
-    // เพิ่ม session ตอน findOne
-    let cart = await Cart.findOne(cartQuery) //.session(session);
+    let cart = await Cart.findOne(cartQuery)
 
     if (!cart) {
       cart = await Cart.create([
@@ -210,10 +200,11 @@ exports.addProduct = async (req, res) => {
           listProduct: [],
           listRefund: []
         }
-      ]) //, { session });
-      cart = cart[0] // Cart.create แบบ array
+      ])
+      cart = cart[0]
     }
 
+    // ----- ด้านล่างนี้เหมือนเดิม -----
     if (type === 'refund') {
       if (condition && expire) {
         const existingRefund = cart.listRefund.find(
@@ -265,7 +256,7 @@ exports.addProduct = async (req, res) => {
       cart.total = to2(cart.total)
     } else if (type === 'adjuststock') {
       const existingProduct = cart.listProduct.find(
-        p => p.id === id && p.unit === unit
+        p => p.id === id && p.unit === unit && p.action === action
       )
       if (existingProduct && existingProduct.unit === unit) {
         existingProduct.qty += qty
@@ -304,13 +295,51 @@ exports.addProduct = async (req, res) => {
     }
     cart.createdAt = new Date()
 
-    await cart.save() //{ session }
+    // ---------- ส่วนสำคัญที่ต้องแก้ไข ------------
+    const qtyProduct = { id: id, qty: qty, unit: unit, condition }
+    const period = getPeriodFromDate(cart.createdAt)
 
-    // await session.commitTransaction();
-    // session.endSession();
+    // =========== NEW LOGIC เลือก stockType ให้ updateStockMongo ===========
 
-    const io = getSocket()
-    io.emit('cart/add', {})
+    let stockType = ''
+    if (type === 'sale' || type === 'give' || typeref === 'change') {
+      stockType = 'OUT' // เพิ่มใน cart คือลดของใน stock จริง
+    } else if (type === 'adjuststock') {
+      // สมมติ action มีค่าเป็น 'IN' หรือ 'OUT'
+      stockType = action || '' // กำหนดตาม action ที่รับเข้ามา
+    } else {
+      stockType = 'OUT' // default เป็น OUT (กรณี add ใน cart)
+    }
+    if (typeref === 'change') {
+      const updateResult = await updateStockMongo(
+        qtyProduct,
+        area,
+        period,
+        'addproduct',
+        channel,
+        stockType, // ส่ง stockType เข้าไปด้วย!
+        res
+      )
+      if (updateResult) return
+    }
+
+    if (type !== 'withdraw' && type !== 'refund') {
+      const updateResult = await updateStockMongo(
+        qtyProduct,
+        area,
+        period,
+        'addproduct',
+        channel,
+        stockType, // ส่ง stockType เข้าไปด้วย!
+        res
+      )
+      if (updateResult) return
+    }
+
+    await cart.save()
+
+    // const io = getSocket()
+    // io.emit('cart/add', {})
 
     res.status(200).json({
       status: 200,
@@ -318,140 +347,105 @@ exports.addProduct = async (req, res) => {
       data: cart
     })
   } catch (error) {
-    // await session.abortTransaction().catch(() => { });
-    // session.endSession();
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
   }
 }
 
+
 exports.adjustProduct = async (req, res) => {
-  // const session = await require('mongoose').startSession();
-  // session.startTransaction();
   try {
-    const { type, area, storeId, id, unit, qty, condition, expire } = req.body
+    const { type, area, storeId, id, unit, qty, condition, expire, stockType } =
+      req.body
     const channel = req.headers['x-channel']
     const { Cart } = getModelsByChannel(channel, res, cartModel)
 
+    // Validation
     if (!type || !area || !id || !unit || qty === undefined) {
-      // await session.abortTransaction();
-      // session.endSession();
       return res.status(400).json({
         status: 400,
         message: 'type, area, id, unit, and qty are required!'
       })
     }
-
     if ((type === 'sale' || type === 'refund' || type === 'give') && !storeId) {
-      // await session.abortTransaction();
-      // session.endSession();
       return res.status(400).json({
         status: 400,
         message: 'storeId is required for sale, refund, or give!'
       })
     }
 
+    // Find Cart
     const cartQuery =
       type === 'withdraw' ? { type, area } : { type, area, storeId }
-
     let cart = await Cart.findOne(cartQuery)
-    // .session(session);
     if (!cart) {
-      // await session.abortTransaction();
-      // session.endSession();
       return res.status(404).json({ status: 404, message: 'Cart not found!' })
     }
+    const period = getPeriodFromDate(cart.createdAt)
 
-    let updated = false
+    // --- STEP 1: หาค่า qty เดิมใน cart
+    const idx = cart.listProduct.findIndex(p => p.id === id && p.unit === unit)
+    if (idx === -1) {
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Product not found in cart!' })
+    }
+    const oldQty = cart.listProduct[idx].qty
 
-    if (type === 'refund' && condition !== undefined && expire !== undefined) {
-      const existingRefundIndex = cart.listRefund.findIndex(
-        p =>
-          p.id === id &&
-          p.unit === unit &&
-          p.condition === condition &&
-          p.expireDate === expire
+    // --- STEP 2: คำนวณ delta ระหว่าง qty ใหม่ (user ส่งมา) กับ qty เดิม (ที่อยู่ใน cart)
+    const delta = qty - oldQty
+
+    // --- STEP 3: ถ้าไม่มีการเปลี่ยนแปลง
+    if (delta === 0) {
+      return res
+        .status(200)
+        .json({ status: 200, message: 'No changes made', data: cart })
+    }
+
+    // --- STEP 4: อัพเดต stock ตาม delta
+    let updateResult = null
+    if (delta !== 0) {
+      const qtyProductStock = { id, qty: Math.abs(delta), unit }
+      // เพิ่มใน cart (OUT = หักจาก stock) | ลดใน cart (IN = คืนเข้า stock)
+      const adjStockType = delta > 0 ? 'OUT' : 'IN'
+      updateResult = await updateStockMongo(
+        qtyProductStock,
+        area,
+        period,
+        'adjust',
+        channel,
+        adjStockType,
+        res
       )
+      if (updateResult) return // (กรณี stock ไม่พอ)
+    }
 
-      if (existingRefundIndex === -1) {
-        // await session.abortTransaction();
-        // session.endSession();
-        return res
-          .status(404)
-          .json({ status: 404, message: 'Refund product not found in cart!' })
-      }
-
-      if (qty === 0) {
-        cart.listRefund.splice(existingRefundIndex, 1)
-      } else {
-        cart.listRefund[existingRefundIndex].qty = qty
-      }
-      updated = true
+    // --- STEP 5: อัพเดตจำนวนใน cart ให้ตรงกับ qty ล่าสุด
+    if (qty === 0) {
+      cart.listProduct.splice(idx, 1) // Remove item
     } else {
-      const existingProductIndex = cart.listProduct.findIndex(
-        p => p.id === id && p.unit === unit
-      )
-
-      if (existingProductIndex === -1) {
-        // await session.abortTransaction();
-        // session.endSession();
-        return res
-          .status(404)
-          .json({ status: 404, message: 'Product not found in cart!' })
-      }
-
-      if (qty === 0) {
-        cart.listProduct.splice(existingProductIndex, 1)
-      } else {
-        cart.listProduct[existingProductIndex].qty = qty
-      }
-      updated = true
+      cart.listProduct[idx].qty = qty
     }
 
-    if (updated) {
-      if (type === 'refund') {
-        cart.total =
-          cart.listRefund.reduce(
-            (sum, item) => sum + item.qty * item.price,
-            0
-          ) -
-          cart.listProduct.reduce((sum, item) => sum + item.qty * item.price, 0)
-      } else {
-        cart.total = cart.listProduct.reduce(
-          (sum, item) => sum + item.qty * item.price,
-          0
-        )
-      }
-    }
-
-    if (cart.listProduct.length === 0 && cart.listRefund.length === 0) {
-      await Cart.deleteOne(cartQuery)
-      // await session.commitTransaction();
-      // session.endSession();
-      return res.status(200).json({
-        status: 200,
-        message: 'Cart deleted successfully!',
-        data: null
-      })
-    }
+    // --- STEP 6: อัพเดตยอดรวม
+    cart.total = cart.listProduct.reduce(
+      (sum, item) => sum + item.qty * item.price,
+      0
+    )
 
     await cart.save()
-    // await session.commitTransaction();
-    // session.endSession();
 
+    // --- STEP 7: Emit socket & return
     const io = getSocket()
     io.emit('cart/adjust', {})
 
-    res.status(200).json({
+    return res.status(200).json({
       status: 200,
       message: 'Cart updated successfully!',
       data: cart
     })
-  } catch (error) {
-    // await session.abortTransaction().catch(() => { });
-    // session.endSession();
-    console.error(error)
-    res.status(500).json({ status: 500, message: error.message })
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message })
   }
 }
 
@@ -493,7 +487,7 @@ exports.deleteProduct = async (req, res) => {
     }
 
     let updated = false
-
+    // console.log(type,condition)
     if ((type === 'refund' && condition) || expire) {
       const refundIndex = cart.listRefund.findIndex(
         p =>
@@ -526,7 +520,7 @@ exports.deleteProduct = async (req, res) => {
           .json({ status: 404, message: 'Product not found in cart!' })
       }
 
-      const product = cart.listProduct[productIndex]
+      product = cart.listProduct[productIndex]
       cart.listProduct.splice(productIndex, 1)
       cart.total += product.qty * product.price
       updated = true
@@ -542,10 +536,26 @@ exports.deleteProduct = async (req, res) => {
           .json({ status: 404, message: 'Product not found in cart!' })
       }
 
-      const product = cart.listProduct[productIndex]
+      product = cart.listProduct[productIndex]
       cart.listProduct.splice(productIndex, 1)
       cart.total -= product.qty * product.price
       updated = true
+
+      // console.log(product)
+    }
+
+    const period = getPeriodFromDate(cart.createdAt)
+    if (type != 'withdraw') {
+      // await updateStockMongo(product, area, period, 'deleteCart', channel)
+      const updateResult = await updateStockMongo(
+        product,
+        area,
+        period,
+        'deleteCart',
+        channel,
+        res
+      )
+      if (updateResult) return
     }
 
     if (cart.listProduct.length === 0 && cart.listRefund.length === 0) {
@@ -650,7 +660,7 @@ exports.updateCartPromotion = async (req, res) => {
     // session.endSession();
 
     const io = getSocket()
-    io.emit('cart/ssssssssss', {})
+    io.emit('cart/updateStock', {})
 
     res.status(200).json({
       status: '200',
@@ -729,13 +739,12 @@ exports.updateStock = async (req, res) => {
       }
       qty = parseInt(unitData.factor) * qty
     }
-
     // Update based on IN or OUT
     if (type === 'IN') {
-      // productStock.stockInPcs += qty;
+      productStock.stockInPcs += qty
       productStock.balancePcs += qty
     } else if (type === 'OUT') {
-      // productStock.stockOutPcs += qty;
+      productStock.stockOutPcs += qty
       productStock.balancePcs -= qty
     } else {
       // await session.abortTransaction();
@@ -756,6 +765,7 @@ exports.updateStock = async (req, res) => {
       productStock.balanceCtn = Math.floor(productStock.balancePcs / factor)
     }
 
+    // console.log(productStock)
     // Save updated document
     await stockDoc.save()
 

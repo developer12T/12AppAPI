@@ -10,14 +10,15 @@ const upload = multer({ storage: multer.memoryStorage() }).array(
   1
 )
 const sql = require('mssql')
-const { routeQuery } = require('../../controllers/queryFromM3/querySctipt')
+const { routeQuery, routeQueryOne } = require('../../controllers/queryFromM3/querySctipt')
 const orderModel = require('../../models/cash/sale')
 const routeModel = require('../../models/cash/route')
 const storeModel = require('../../models/cash/store')
 const productModel = require('../../models/cash/product')
-
+const { getSocket } = require('../../socket')
 const { getModelsByChannel } = require('../../middleware/channel')
 const path = require('path')
+const { group } = require('console')
 
 exports.getRoute = async (req, res) => {
   try {
@@ -100,6 +101,9 @@ exports.getRoute = async (req, res) => {
         listStore: enrichedListStore
       }
     })
+
+    // const io = getSocket()
+    // io.emit('route/getRoute', {});
 
     res.status(200).json({
       status: 200,
@@ -374,6 +378,10 @@ exports.addFromERPnew = async (req, res) => {
       }
     }
 
+    const io = getSocket()
+    io.emit('route/addFromERPnew', {});
+
+
     res.status(200).json({
       status: 200,
       message: 'sucess'
@@ -384,6 +392,163 @@ exports.addFromERPnew = async (req, res) => {
     res.status(500).json({ status: '500', message: error.message })
   }
 }
+
+exports.addFromERPOne = async (req, res) => {
+  try {
+    const { id } = req.body
+    const channel = req.headers['x-channel']
+
+    const result = await routeQueryOne(channel, id)
+    await Route.deleteOne({ id: id });
+    const return_arr = []
+    for (const row of result) {
+      const area = String(row.area ?? '').trim()
+      const id = String(row.id ?? '').trim()
+      const day = String(row.day ?? '').trim()
+      const period = String(row.period ?? '').trim()
+      const storeId = String(row.storeId ?? '').trim()
+
+      const storeInfo = {
+        storeInfo: storeId,
+        latitude: '',
+        longtitude: '',
+        note: '',
+        status: '0',
+        statusText: '',
+        date: '',
+        listOrder: []
+      }
+
+      let groupFound = false
+
+      for (const group of return_arr) {
+        if (group.id === id && group.area === area) {
+          group.listStore.push(storeInfo)
+          groupFound = true
+          break
+        }
+      }
+
+      if (!groupFound) {
+        return_arr.push({
+          id,
+          area,
+          period,
+          day,
+          listStore: [storeInfo]
+        })
+      }
+    }
+
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+
+    const route = await Route.find({ period: period(), id: id })
+    const routeMap = new Map(route.map(route => [route.id, route]))
+    // console.log(route)
+    // let routeId
+    // const latestRoute = route.sort((a, b) => b.id.localeCompare(a.id))[0]
+    // if (!latestRoute) {
+    //   routeId = `${period()}${return_arr.area}R01`
+    //   console.log('route', routeId)
+    //   console.log('period', period())
+    // } else {
+    //   const prefix = latestRoute.id.slice(0, 6)
+    //   const subfix = (parseInt(latestRoute.id.slice(7)) + 1)
+    //     .toString()
+    //     .padStart(2, '0')
+    //   routeId = prefix + subfix
+    // }
+
+    for (const storeList of return_arr) {
+      try {
+        const existingRoute = routeMap.get(storeList.id)
+
+        if (existingRoute) {
+          for (const list of storeList.storeInfo || []) {
+            const store = await Store.findOne({ storeId: list })
+            if (!store) {
+              // console.warn(`Store with storeId ${list} not found`)
+              continue
+            }
+
+            const storeExists = existingRoute.listStore.some(
+              store => store.storeInfo.toString() === store._id.toString()
+            )
+            if (!storeExists) {
+              const newData = {
+                storeInfo: store._id,
+                note: '',
+                image: '',
+                latitude: '',
+                longtitude: '',
+                status: 0,
+                statusText: 'รอเยี่ยม',
+                listOrder: [],
+                date: ''
+              }
+              existingRoute.listStore.push(newData)
+            }
+          }
+          await existingRoute.save()
+        } else {
+          const listStore = []
+
+          for (const storeId of storeList.listStore || []) {
+            const idStore = storeId.storeInfo
+            const store = await Store.findOne({ storeId: idStore })
+            if (store) {
+              listStore.push({
+                storeInfo: store._id,
+                latitude: '',
+                longtitude: '',
+                status: 0,
+                statusText: 'รอเยี่ยม',
+                note: '',
+                date: '',
+                listOrder: []
+              })
+            } else {
+              // console.warn(`Store with storeId ${storeId} not found`)
+            }
+          }
+
+          const data = {
+            id: storeList.id,
+            area: storeList.area,
+            period: period(),
+            day: storeList.day,
+            listStore
+          }
+          // console.log(data)
+          await Route.create(data)
+        }
+      } catch (err) {
+        console.error(
+          `Error processing storeList with id ${storeList.id}:`,
+          err.message
+        )
+        continue
+      }
+    }
+
+    const io = getSocket()
+    io.emit('route/addFromERPOne', {});
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: return_arr
+    })
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+
 
 exports.checkIn = async (req, res) => {
   upload(req, res, async err => {
@@ -411,13 +576,55 @@ exports.checkIn = async (req, res) => {
           .json({ status: '404', message: 'Store not found' })
       }
 
+      const period = routeId.substring(0, 6)
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+
+      let allRoute = await Route.aggregate([
+        {
+          $match: {
+            period: period
+          }
+        },
+        { $unwind: '$listStore' },
+        {
+          $project: {
+            listStore: 1
+          }
+        },
+        {
+          $replaceRoot: { newRoot: "$listStore" }
+        },
+        {
+          $match: {
+            status: { $nin: ['0'] },
+            storeInfo: store._id.toString(),
+            date: { $gte: startOfDay, $lte: endOfDay }
+          }
+        }
+
+      ])
+      // console.log(allRoute.length)
+
+      if (allRoute.length > 0) {
+        return res.status(409).json({
+          status: 409,
+          message: 'Duplicate Store on this day'
+        });
+      }
+
+
+
       let image = null
       if (req.files) {
         try {
           const files = req.files
           const uploadedFile = await uploadFilesCheckin(
             files,
-            path.join(__dirname, '../stores/checkin'),
+            path.join(__dirname, '../../public/images/stores/checkin'),
             store.area,
             storeId
           )
@@ -433,7 +640,7 @@ exports.checkIn = async (req, res) => {
         }
       }
 
-      const route = await Route.findOneAndUpdate(
+      const routeUpdate = await Route.findOneAndUpdate(
         { id: routeId, 'listStore.storeInfo': store._id },
         {
           $set: {
@@ -449,12 +656,16 @@ exports.checkIn = async (req, res) => {
         { new: true }
       )
 
-      if (!route) {
+      if (!routeUpdate) {
         return res.status(404).json({
           status: '404',
           message: 'Route not found or listStore not matched'
         })
       }
+
+
+      const io = getSocket()
+      io.emit('route/checkIn', {});
 
       res.status(200).json({
         status: '200',
@@ -491,6 +702,47 @@ exports.checkInVisit = async (req, res) => {
         return res
           .status(404)
           .json({ status: '404', message: 'Store not found' })
+      }
+
+
+      const period = routeId.substring(0, 6)
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+
+      let allRoute = await Route.aggregate([
+        {
+          $match: {
+            period: period
+          }
+        },
+        { $unwind: '$listStore' },
+        {
+          $project: {
+            listStore: 1
+          }
+        },
+        {
+          $replaceRoot: { newRoot: "$listStore" }
+        },
+        {
+          $match: {
+            status: { $nin: ['0'] },
+            storeInfo: store._id.toString(),
+            date: { $gte: startOfDay, $lte: endOfDay }
+          }
+        }
+
+      ])
+      // console.log(allRoute.length)
+
+      if (allRoute.length > 0) {
+        return res.status(409).json({
+          status: 409,
+          message: 'Duplicate Store on this day'
+        });
       }
 
       let image = null
@@ -538,6 +790,11 @@ exports.checkInVisit = async (req, res) => {
         })
       }
 
+
+
+      const io = getSocket()
+      io.emit('route/checkInVisit', {});
+
       res.status(200).json({
         status: '200',
         message: 'check in successfully'
@@ -556,7 +813,7 @@ exports.changeRoute = async (req, res) => {
     const channel = req.headers['x-channel']
 
     const { Store } = getModelsByChannel(channel, res, storeModel)
-
+    const { RouteChangeLog } = getModelsByChannel(channel, res, routeModel)
     if (
       !area ||
       !period ||
@@ -599,6 +856,10 @@ exports.changeRoute = async (req, res) => {
     })
 
     await newRouteChangeLog.save()
+
+
+    const io = getSocket()
+    io.emit('route/change', {});
 
     res.status(201).json({
       status: '201',
@@ -644,7 +905,7 @@ exports.createRoute = async (req, res) => {
           changedStoreMap[store.storeInfo] = log
         })
       })
-      console.log('12', JSON.stringify(changeLogs, null, 2))
+      // console.log('12', JSON.stringify(changeLogs, null, 2))
 
       const routesGroupedByToRoute = previousRoutes.reduce((grouped, route) => {
         const routeId = `${period}${currentArea}${route.id.slice(-3)}`
@@ -729,6 +990,9 @@ exports.createRoute = async (req, res) => {
       )
     }
 
+    const io = getSocket()
+    io.emit('route/createRoute', {});
+
     res.status(200).json({
       status: '200',
       message: 'Routes created successfully.',
@@ -781,6 +1045,10 @@ exports.routeHistory = async (req, res) => {
         .status(404)
         .json({ status: '404', message: 'History not found.' })
     }
+
+
+    const io = getSocket()
+    io.emit('route/history', {});
 
     res.status(200).json({
       status: '200',
@@ -890,6 +1158,10 @@ exports.getTimelineCheckin = async (req, res) => {
         message: 'Not Found'
       })
     }
+
+    // const io = getSocket()
+    // io.emit('route/getTimelineCheckin', {});
+
     res.status(200).json({
       status: 200,
       message: 'Success',
@@ -987,7 +1259,9 @@ exports.getRouteCheckinAll = async (req, res) => {
 
     const data = await Route.aggregate(query)
 
-    // const data = await aggregate.exec()
+    // const io = getSocket()
+    // io.emit('route/getRouteCheckinAll', {});
+
 
     res.status(200).json({
       status: 200,
@@ -1060,6 +1334,10 @@ exports.routeTimeline = async (req, res) => {
           count: hourCountMap[hour] || 0
         })
       }
+
+      // const io = getSocket()
+      // io.emit('route/routeTimeline', {});
+
 
       res.status(200).json({
         response: data
@@ -1253,6 +1531,10 @@ exports.getRouteProvince = async (req, res) => {
     .flatMap(item => item.province)
     .filter(p => p && p.trim() !== '')
 
+
+  // const io = getSocket()
+  // io.emit('route/getRouteProvince', {});
+
   res.status(200).json({
     status: 200,
     message: 'successful',
@@ -1422,6 +1704,10 @@ exports.getRouteEffective = async (req, res) => {
     }
   })
 
+
+  // const io = getSocket()
+  // io.emit('route/getRouteEffective', {});
+
   res.status(200).json({
     status: 200,
     message: 'successful',
@@ -1449,7 +1735,7 @@ exports.getRouteEffectiveAll = async (req, res) => {
 
   if (zone) {
     routes = routes.filter(u => u.area.slice(0, 2) === zone)
-    console.log(routes)
+    // console.log(routes)
   }
 
   if (routes.length == 0) {
@@ -1527,6 +1813,10 @@ exports.getRouteEffectiveAll = async (req, res) => {
 
   const percentVisitAvg = count > 0 ? totalVisit / count : 0
   const percentEffectiveAvg = count > 0 ? totalEffective / count : 0
+
+  // const io = getSocket()
+  // io.emit('route/getRouteEffectiveAll', {});
+
 
   res.status(200).json({
     status: 200,
@@ -1676,6 +1966,10 @@ exports.getRouteByArea = async (req, res) => {
     })
   }
 
+  // const io = getSocket()
+  // io.emit('route/getRouteByArea', {});
+
+
   res.status(200).json({
     status: 200,
     message: 'sucess',
@@ -1683,12 +1977,109 @@ exports.getRouteByArea = async (req, res) => {
   })
 }
 
-exports.deleteAndAddOne = async (req, res) => {
+exports.CheckRouteStore = async (req, res) => {
+  try {
+    const { zone, period } = req.query
+    const channel = req.headers['x-channel']
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
+
+    if (!period) {
+      return res.status(409).json({
+        status: 409,
+        message: 'period is require'
+      })
+    }
+
+
+
+    const dataRoute = await Route.aggregate([
+      {
+        $addFields: {
+          zone: { $substrBytes: ["$area", 0, 2] }
+        }
+      },
+      {
+        $match: {
+          zone: zone,
+          period: period
+        }
+      },
+      {
+        $group: {
+          _id: { area: "$area", day: "$day" },
+          count: { $sum: { $size: "$listStore" } } // <<< ตรงนี้!
+        }
+      }
+    ]);
+
+    if (dataRoute.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not Found this zone'
+      })
+    }
+
+
+
+    function sortKeys(obj) {
+      const area = obj.area;
+      // ดึง key ทั้งหมดที่เป็น R+เลข (ยกเว้น 'R')
+      const rKeys = Object.keys(obj)
+        .filter(k => /^R\d+$/.test(k))
+        .sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1)));
+
+      // หา R ที่ไม่ใช่ Rxx (คือ 'R' อย่างเดียว)
+      const rTotal = obj.R;
+      const delTotal = obj.del;
+
+      // สร้าง object ใหม่
+      const newObj = { area };
+      for (const k of rKeys) newObj[k] = obj[k];
+      if (rTotal !== undefined) newObj['R'] = rTotal;
+      if (delTotal !== undefined) newObj['del'] = delTotal;
+
+      return newObj;
+    }
+
+
+    const allDel = await Store.find({ zone: zone, route: 'DEL' });
+    const allR = await Store.find({ zone: zone, route: { $regex: '^R' } });
+    const areaMap = {};
+
+    for (const item of dataRoute) {
+
+      const area = item._id.area;
+      const day = item._id.day;
+      const key = day.startsWith('R') ? day : `R${day}`; // ให้ day มี R นำหน้า
+
+      if (!areaMap[area]) areaMap[area] = { area };
+
+      areaMap[area][key] = item.count;
+
+
+      areaMap[area].R = allR.filter(store => store.area === area).length;
+      areaMap[area].del = allDel.filter(store => store.area === area).length;
+    }
+
+
+    const result = Object.values(areaMap).sort((a, b) => a.area.localeCompare(b.area));
+    const sortedResult = result.map(sortKeys);
+    // console.log(sortedResult);
+
+
+    // const io = getSocket()
+    // io.emit('route/CheckRouteStore', {});
 
     res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    // data: data
-  })
+      status: 200,
+      message: 'sucess',
+      data: sortedResult
+    })
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ status: 500, message: 'Internal server error' });
+  }
 }

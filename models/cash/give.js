@@ -33,7 +33,7 @@ const giveTypeSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 }, {
-  timestamps: true
+    timestamps: true
 })
 
 const giveInfoSchema = new mongoose.Schema({
@@ -95,7 +95,9 @@ const giveawaysSchema = new mongoose.Schema({
     giveInfo: giveInfoSchema,
     sale: giveSaleSchema,
     store: giveStoreSchema,
-    shipping: giveShipingSchema,
+    // shipping: giveShipingSchema,
+    shippingId: { type: String, require: true },
+    address: { type: String, require: true },
     note: { type: String, require: true },
     latitude: { type: String, require: true },
     longitude: { type: String, require: true },
@@ -111,7 +113,7 @@ const giveawaysSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now },
     period: { type: String, require: true },
 }, {
-  timestamps: true
+    timestamps: true
 })
 
 // const Giveaway = dbCA.model('Giveaway', giveawaysSchema)

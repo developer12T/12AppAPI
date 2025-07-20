@@ -28,11 +28,16 @@ async function checkInRoute(data, channel, res) {
 
         // let route = await Route.findOne({ id: data.routeId, "listStore.storeInfo": store._id.toString(), "listStore.status": "0" })
         let route = await Route.findOne({ id: data.routeId, "listStore.storeInfo": store._id })
-        const startOfDay = new Date();
-        startOfDay.setHours(0, 0, 0, 0);
 
-        const endOfDay = new Date();
-        endOfDay.setHours(23, 59, 59, 999);
+        if (!route) {
+            return { status: 404, message: 'Route not found or listStore not matched' }
+        }
+
+        // const startOfDay = new Date();
+        // startOfDay.setHours(0, 0, 0, 0);
+
+        // const endOfDay = new Date();
+        // endOfDay.setHours(23, 59, 59, 999);
 
         // let allRoute = await Route.aggregate([
         //     {
@@ -58,14 +63,13 @@ async function checkInRoute(data, channel, res) {
         //     }
 
         // ])
+        // // console.log(allRoute)
 
         // if (allRoute.length > 0) {
         //     return { status: 409, message: 'Duplicate route or listStore found' };
         // }
+        
 
-        if (!route) {
-            return { status: 404, message: 'Route not found or listStore not matched' }
-        }
 
         const storeIndex = route.listStore.findIndex(storeItem => storeItem.storeInfo.toString() === store._id.toString())
 

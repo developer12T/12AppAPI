@@ -4,7 +4,7 @@ const fs = require('fs')
 const path = require('path')
 const productModel = require('../../models/cash/product')
 const stockModel = require('../../models/cash/stock')
-
+const { getSocket } = require('../../socket')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { productQuery } = require('../../controllers/queryFromM3/querySctipt')
 const { group } = require('console')
@@ -35,6 +35,10 @@ exports.getProductAll = async (req, res) => {
       return modifiedProduct
     })
 
+
+    // const io = getSocket()
+    // io.emit('product/all', {});
+
     res.status(200).json({
       status: '200',
       message: 'Products fetched successfully!',
@@ -50,7 +54,19 @@ exports.getProductSwitch = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
     const { Product } = getModelsByChannel(channel, res, productModel)
-    const products = await Product.find().lean()
+    const products = await Product.aggregate([
+      {
+        $addFields: {
+          statusSaleOrder: { $cond: [{ $eq: ['$statusSale', 'Y'] }, 0, 1] }
+        }
+      },
+      { $sort: { statusSaleOrder: 1, groupCode: 1 } },
+      { $project: { statusSaleOrder: 0 } } // Remove the helper field from the result
+    ])
+
+    // const io = getSocket()
+    // io.emit('product/getProductSwitch', {});
+
     res.status(200).json({
       status: '200',
       message: 'Products fetched successfully!',
@@ -120,7 +136,7 @@ exports.getProduct = async (req, res) => {
           balanceCtn: { $sum: '$listProduct.balanceCtn' },
           balancePcs: { $sum: '$listProduct.balancePcs' }
         }
-      },
+      }
     ])
 
     if (!products.length) {
@@ -166,34 +182,33 @@ exports.getProduct = async (req, res) => {
 
     function parseGram(sizeStr) {
       // support "800 G", "1 KG", "850-P G", "420-N G", "850-S G", "350-P G"
-      let match = sizeStr.match(/^([\d.]+)(?:-[A-Z])?\s*(KG|G|g|kg)?/i);
-      if (!match) return 0;
-      let value = parseFloat(match[1]);
-      let unit = (match[2] || "G").toUpperCase();
-      if (unit === "KG") return value * 1000;
-      return value;
+      let match = sizeStr.match(/^([\d.]+)(?:-[A-Z])?\s*(KG|G|g|kg)?/i)
+      if (!match) return 0
+      let value = parseFloat(match[1])
+      let unit = (match[2] || 'G').toUpperCase()
+      if (unit === 'KG') return value * 1000
+      return value
     }
-
-
-
 
     const data = products
       .map(product => {
-        const matchedStock = stock.find(s => s._id === product.id) || {};
+        const matchedStock = stock.find(s => s._id === product.id) || {}
         return {
           ...product,
           qtyCtn: matchedStock.balanceCtn || 0,
           qtyPcs: matchedStock.balancePcs || 0
-        };
+        }
       })
       .sort((a, b) => {
         // เรียง groupCode จากน้อยไปมาก
-        if (a.groupCode < b.groupCode) return -1;
-        if (a.groupCode > b.groupCode) return 1;
+        if (a.groupCode < b.groupCode) return -1
+        if (a.groupCode > b.groupCode) return 1
         // ถ้า groupCode เท่ากันให้ sort อย่างอื่นต่อ
-        return parseGram(a.size) - parseGram(b.size);
-      });
+        return parseGram(a.size) - parseGram(b.size)
+      })
 
+    // const io = getSocket()
+    // io.emit('product/get', {});
 
     res.status(200).json({
       status: '200',
@@ -221,12 +236,14 @@ exports.getFilters = async (req, res) => {
         isEmptyArray(size) &&
         isEmptyArray(flavour))
 
-    // ✅ กรอง group ที่ไม่ใช่ null ตอนดึงทั้งหมด
     const allGroups = await Product.aggregate([
       { $match: { group: { $ne: null } } },
       { $group: { _id: '$group' } },
-      { $project: { _id: 0, group: '$_id' } }
-    ])
+      { $project: { _id: 0, group: '$_id' } },
+      { $sort: { group: 1 } }
+    ]);
+
+
 
     if (isEmptyRequest) {
       return res.status(200).json({
@@ -241,12 +258,20 @@ exports.getFilters = async (req, res) => {
       })
     }
 
-    let matchCondition = {}
-    if (group && !isEmptyArray(group)) matchCondition.group = { $in: group }
-    if (brand && !isEmptyArray(brand)) matchCondition.brand = { $in: brand }
-    if (size && !isEmptyArray(size)) matchCondition.size = { $in: size }
-    if (flavour && !isEmptyArray(flavour))
-      matchCondition.flavour = { $in: flavour }
+    let matchCondition = {};
+
+    if (Array.isArray(group) && group.length > 0) {
+      matchCondition.group = { $in: group };
+    }
+    if (Array.isArray(brand) && brand.length > 0) {
+      matchCondition.brand = { $in: brand };
+    }
+    if (Array.isArray(size) && size.length > 0) {
+      matchCondition.size = { $in: size };
+    }
+    if (Array.isArray(flavour) && flavour.length > 0) {
+      matchCondition.flavour = { $in: flavour };
+    }
 
     const attributes = await Product.aggregate([
       { $match: matchCondition },
@@ -259,10 +284,14 @@ exports.getFilters = async (req, res) => {
         }
       },
       { $project: { _id: 0, brand: 1, size: 1, flavour: 1 } }
-    ])
+    ]);
 
     // ✅ กรอง null ออกจากผลลัพธ์สุดท้ายด้วย
     const clean = arr => (arr || []).filter(item => item !== null)
+
+    // const io = getSocket()
+    // io.emit('product/filter', {});
+
 
     res.status(200).json({
       status: '200',
@@ -319,6 +348,9 @@ exports.searchProduct = async (req, res) => {
         .json({ status: '404', message: 'No products found!' })
     }
 
+    // const io = getSocket()
+    // io.emit('product/search', {});
+
     res.status(200).json({
       status: '200',
       message: 'Search results fetched successfully!',
@@ -363,6 +395,9 @@ exports.updateStatus = async (req, res) => {
         .status(404)
         .json({ status: '404', message: 'product not found!' })
     }
+
+    const io = getSocket()
+    io.emit('product/onOff', {});
 
     res.status(200).json({
       status: '200',
@@ -528,6 +563,9 @@ exports.addProduct = async (req, res) => {
       })
 
       await storeData.save()
+
+
+
       res.status(200).json({
         status: '200',
         message: 'Store added successfully'
@@ -715,6 +753,11 @@ exports.addFromERPnew = async (req, res) => {
     await newProduct.save()
     data.push(newProduct)
   }
+
+  const io = getSocket()
+  io.emit('product/addFromERPnew', {});
+
+
   res.status(200).json({
     status: 200,
     message: 'Products added successfully',
@@ -742,6 +785,8 @@ exports.groupProductId = async (req, res) => {
       }
     }
   ])
+
+
 
   res.status(200).json({
     status: 200,
@@ -771,6 +816,8 @@ exports.groupBrandId = async (req, res) => {
     }
   ])
 
+
+
   res.status(200).json({
     status: 200,
     message: 'sucess',
@@ -796,6 +843,8 @@ exports.groupSize = async (req, res) => {
       }
     }
   ])
+
+
 
   res.status(200).json({
     status: 200,
@@ -825,6 +874,8 @@ exports.groupFlavourId = async (req, res) => {
     }
   ])
 
+
+
   res.status(200).json({
     status: 200,
     message: 'sucess',
@@ -837,13 +888,13 @@ exports.groupByFilter = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
 
-  let query = {};
-  if (size) query.size = size;
-  if (brand) query.brand = brand;
-  if (flavour) query.flavour = flavour;
+  let query = {}
+  if (size) query.size = size
+  if (brand) query.brand = brand
+  if (flavour) query.flavour = flavour
 
-  let queryUnit = {};
-  if (unit) queryUnit['listUnit.name'] = unit;
+  let queryUnit = {}
+  if (unit) queryUnit['listUnit.name'] = unit
 
   const dataProduct = await Product.aggregate([
     { $match: query },
@@ -869,12 +920,13 @@ exports.groupByFilter = async (req, res) => {
   ])
 
   if (dataProduct.length === 0) {
-
     return res.status(404).json({
       status: 404,
       message: 'Not found group'
     })
   }
+
+
 
   res.status(200).json({
     status: 200,
@@ -883,19 +935,18 @@ exports.groupByFilter = async (req, res) => {
   })
 }
 
-
 exports.flavourByFilter = async (req, res) => {
   const { size, brand, group, unit } = req.body
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
 
-  let query = {};
-  if (size) query.size = size;
-  if (brand) query.brand = brand;
-  if (group) query.group = group;
+  let query = {}
+  if (size) query.size = size
+  if (brand) query.brand = brand
+  if (group) query.group = group
 
-  let queryUnit = {};
-  if (unit) queryUnit['listUnit.name'] = unit;
+  let queryUnit = {}
+  if (unit) queryUnit['listUnit.name'] = unit
 
   const dataProduct = await Product.aggregate([
     { $match: query },
@@ -921,12 +972,13 @@ exports.flavourByFilter = async (req, res) => {
   ])
 
   if (dataProduct.length === 0) {
-
     return res.status(404).json({
       status: 404,
       message: 'Not found flavour'
     })
   }
+
+
 
   res.status(200).json({
     status: 200,
@@ -935,19 +987,18 @@ exports.flavourByFilter = async (req, res) => {
   })
 }
 
-
 exports.sizeByFilter = async (req, res) => {
   const { flavour, brand, group, unit } = req.body
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
 
-  let query = {};
-  if (flavour) query.flavour = flavour;
-  if (brand) query.brand = brand;
-  if (group) query.group = group;
+  let query = {}
+  if (flavour) query.flavour = flavour
+  if (brand) query.brand = brand
+  if (group) query.group = group
 
-  let queryUnit = {};
-  if (unit) queryUnit['listUnit.name'] = unit;
+  let queryUnit = {}
+  if (unit) queryUnit['listUnit.name'] = unit
 
   const dataProduct = await Product.aggregate([
     { $match: query },
@@ -973,12 +1024,13 @@ exports.sizeByFilter = async (req, res) => {
   ])
 
   if (dataProduct.length === 0) {
-
     return res.status(404).json({
       status: 404,
       message: 'Not found size'
     })
   }
+
+
 
   res.status(200).json({
     status: 200,
@@ -992,13 +1044,13 @@ exports.brandByFilter = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
 
-  let query = {};
-  if (flavour) query.flavour = flavour;
-  if (size) query.size = size;
-  if (group) query.group = group;
+  let query = {}
+  if (flavour) query.flavour = flavour
+  if (size) query.size = size
+  if (group) query.group = group
 
-  let queryUnit = {};
-  if (unit) queryUnit['listUnit.name'] = unit;
+  let queryUnit = {}
+  if (unit) queryUnit['listUnit.name'] = unit
 
   const dataProduct = await Product.aggregate([
     { $match: query },
@@ -1024,7 +1076,6 @@ exports.brandByFilter = async (req, res) => {
   ])
 
   if (dataProduct.length === 0) {
-
     return res.status(404).json({
       status: 404,
       message: 'Not found brand'
@@ -1043,10 +1094,10 @@ exports.unitByFilter = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
 
-  let query = {};
-  if (flavour) query.flavour = flavour;
-  if (brand) query.brand = brand;
-  if (group) query.group = group;
+  let query = {}
+  if (flavour) query.flavour = flavour
+  if (brand) query.brand = brand
+  if (group) query.group = group
   if (size) query.size = size
   // let queryUnit = {};
   // if (unit) queryUnit['listUnit.name'] = unit;
@@ -1075,7 +1126,6 @@ exports.unitByFilter = async (req, res) => {
   ])
 
   if (dataProduct.length === 0) {
-
     return res.status(404).json({
       status: 404,
       message: 'Not found unit'
@@ -1090,30 +1140,30 @@ exports.unitByFilter = async (req, res) => {
 }
 
 exports.addProductimage = async (req, res) => {
-
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
 
-  const productIds = await Product.find().select('id -_id');
+  const productIds = await Product.find().select('id -_id')
 
   // อัปเดตแต่ละ product ทีละรายการ (ถ้าต้องการใช้ id เองใน URL)
   for (const product of productIds) {
-    const id = product.id;
+    const id = product.id
     await Product.updateMany(
       { id: id },
-      { $set: { image: `https://apps.onetwotrading.co.th/images/products/${id}.webp` } }
-    );
+      {
+        $set: {
+          image: `https://apps.onetwotrading.co.th/images/products/${id}.webp`
+        }
+      }
+    )
   }
 
-
+  const io = getSocket()
+  io.emit('product/addProductimage', {});
 
   res.status(200).json({
     status: 200,
-    message: 'sucess',
+    message: 'sucess'
     // data: productId
   })
-
 }
-
-
-
