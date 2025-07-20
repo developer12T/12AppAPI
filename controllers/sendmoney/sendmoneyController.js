@@ -313,8 +313,8 @@ exports.getSendMoney = async (req, res) => {
       );
     }
 
-    const io = getSocket()
-    io.emit('sendmoney/getSendMoney', {});
+    // const io = getSocket()
+    // io.emit('sendmoney/getSendMoney', {});
 
 
     res.status(200).json({
@@ -361,8 +361,8 @@ exports.getAllSendMoney = async (req, res) => {
 
   const sendMoneyData = await SendMoney.aggregate(pipeline);
 
-  const io = getSocket()
-  io.emit('sendmoney/getAllSendMoney', {});
+  // const io = getSocket()
+  // io.emit('sendmoney/getAllSendMoney', {});
 
   res.status(200).json({
     status: 200,
@@ -453,8 +453,8 @@ exports.getSendMoneyForAcc = async (req, res) => {
   })
 
 
-  const io = getSocket()
-  io.emit('sendmoney/getSendMoneyForAcc', {});
+  // const io = getSocket()
+  // io.emit('sendmoney/getSendMoneyForAcc', {});
 
 
   res.status(200).json({

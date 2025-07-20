@@ -467,7 +467,7 @@ exports.addUserNew = async (req, res) => {
 
   const tableData = await userQuery(channel); // ข้อมูลจาก table
   const tableMap = new Map(tableData.map(item => [item.saleCode, item]));
-
+  // console.log(tableData)
   const mongoUsers = await User.find(); // ผู้ใช้ใน MongoDB
   const result = [];
 
@@ -513,7 +513,7 @@ exports.addUserNew = async (req, res) => {
         qrCodeImage: sale.qrCodeImage,
         period: period(),
         image: '',
-        typeTruck: typeTruck
+        typeTruck: sale.typeTruck
       });
       await newUser.save();
       result.push(newUser);

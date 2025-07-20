@@ -507,8 +507,8 @@ exports.getOrder = async (req, res) => {
       createdAt: o.createdAt
     }))
 
-    const io = getSocket()
-    io.emit('order/all', {});
+    // const io = getSocket()
+    // io.emit('order/all', {});
 
     res.status(200).json({
       status: 200,
@@ -544,8 +544,8 @@ exports.getDetail = async (req, res) => {
       })
     }
 
-    const io = getSocket()
-    io.emit('order/detail', {});
+    // const io = getSocket()
+    // io.emit('order/detail', {});
 
     res.status(200).json({
       status: 200,
@@ -1334,8 +1334,8 @@ exports.getAllOrder = async (req, res) => {
         summary: item.summary
       }))
 
-      const io = getSocket()
-      io.emit('order/getAllOrder', {});
+      // const io = getSocket()
+      // io.emit('order/getAllOrder', {});
 
       res.status(200).json({
         status: 200,
@@ -1522,8 +1522,8 @@ exports.getSummaryItem = async (req, res) => {
       // console.log(result)
     }
 
-    const io = getSocket()
-    io.emit('order/getSummaryItem', {});
+    // const io = getSocket()
+    // io.emit('order/getSummaryItem', {});
 
     res.status(200).json({
       status: 200,
@@ -1614,8 +1614,8 @@ exports.getSummarybyRoute = async (req, res) => {
       }
     })
 
-    const io = getSocket()
-    io.emit('order/getSummarybyRoute', {});
+    // const io = getSocket()
+    // io.emit('order/getSummarybyRoute', {});
 
     res.status(200).json({
       status: 200,
@@ -1734,8 +1734,8 @@ exports.getSummarybyMonth = async (req, res) => {
     })
 
 
-    const io = getSocket()
-    io.emit('order/getSummarybyMonth', {});
+    // const io = getSocket()
+    // io.emit('order/getSummarybyMonth', {});
 
     res.status(200).json({
       status: 200,
@@ -1975,8 +1975,8 @@ exports.getSummarybyArea = async (req, res) => {
       })
     }
 
-    const io = getSocket()
-    io.emit('order/getSummarybyArea', {});
+    // const io = getSocket()
+    // io.emit('order/getSummarybyArea', {});
 
     res.status(200).json({
       status: 200,
@@ -2109,8 +2109,8 @@ exports.getSummarybyGroup = async (req, res) => {
       }
     }
 
-    const io = getSocket()
-    io.emit('order/getSummarybyGroup', {});
+    // const io = getSocket()
+    // io.emit('order/getSummarybyGroup', {});
 
     res.status(200).json({
       status: 200,
@@ -2340,8 +2340,8 @@ exports.getSummarybyChoice = async (req, res) => {
     })
   }
 
-  const io = getSocket()
-  io.emit('order/getSummarybyChoice', {});
+  // const io = getSocket()
+  // io.emit('order/getSummarybyChoice', {});
 
 
   res.status(200).json({
@@ -2436,8 +2436,8 @@ exports.getSaleSummaryByStore = async (req, res) => {
     }
   ])
 
-  const io = getSocket()
-  io.emit('order/getSaleSummaryByStore', {});
+  // const io = getSocket()
+  // io.emit('order/getSaleSummaryByStore', {});
 
 
   res.status(200).json({
@@ -2822,8 +2822,8 @@ exports.getSummaryProduct = async (req, res) => {
     summaryPercentStore: summaryPercentStore
   }
 
-  const io = getSocket()
-  io.emit('order/getSummaryProduct', {});
+  // const io = getSocket()
+  // io.emit('order/getSummaryProduct', {});
 
 
   res.status(200).json({
@@ -2915,8 +2915,8 @@ exports.summaryAllProduct = async (req, res) => {
     // }
   }
 
-  const io = getSocket()
-  io.emit('order/summaryAllProduct', {});
+  // const io = getSocket()
+  // io.emit('order/summaryAllProduct', {});
 
 
   res.status(200).json({
@@ -3123,8 +3123,8 @@ exports.summaryDaily = async (req, res) => {
       return sum + (item.damaged || 0)
     }, 0)
 
-    const io = getSocket()
-    io.emit('order/summaryDaily', {});
+    // const io = getSocket()
+    // io.emit('order/summaryDaily', {});
 
     res.status(200).json({
       status: 200,
@@ -3313,8 +3313,8 @@ exports.summaryDailyByZone = async (req, res) => {
       })
     }
 
-    const io = getSocket()
-    io.emit('order/summaryDailyByZone', {});
+    // const io = getSocket()
+    // io.emit('order/summaryDailyByZone', {});
 
     res.status(200).json({
       status: 200,
@@ -3418,8 +3418,8 @@ exports.saleReport = async (req, res) => {
       }
     ])
 
-    const io = getSocket()
-    io.emit('order/saleReport', {});
+    // const io = getSocket()
+    // io.emit('order/saleReport', {});
 
 
     res.status(200).json({
@@ -3527,8 +3527,8 @@ exports.getSummary18SKU = async (req, res) => {
     })
   })
 
-   const io = getSocket()
-    io.emit('order/getSummary18SKU', {});
+  //  const io = getSocket()
+  //   io.emit('order/getSummary18SKU', {});
 
 
   res.status(200).json({

@@ -36,8 +36,8 @@ exports.getProductAll = async (req, res) => {
     })
 
 
-    const io = getSocket()
-    io.emit('product/all', {});
+    // const io = getSocket()
+    // io.emit('product/all', {});
 
     res.status(200).json({
       status: '200',
@@ -64,8 +64,8 @@ exports.getProductSwitch = async (req, res) => {
       { $project: { statusSaleOrder: 0 } } // Remove the helper field from the result
     ])
 
-    const io = getSocket()
-    io.emit('product/getProductSwitch', {});
+    // const io = getSocket()
+    // io.emit('product/getProductSwitch', {});
 
     res.status(200).json({
       status: '200',
@@ -207,8 +207,8 @@ exports.getProduct = async (req, res) => {
         return parseGram(a.size) - parseGram(b.size)
       })
 
-    const io = getSocket()
-    io.emit('product/get', {});
+    // const io = getSocket()
+    // io.emit('product/get', {});
 
     res.status(200).json({
       status: '200',
@@ -289,8 +289,8 @@ exports.getFilters = async (req, res) => {
     // ✅ กรอง null ออกจากผลลัพธ์สุดท้ายด้วย
     const clean = arr => (arr || []).filter(item => item !== null)
 
-    const io = getSocket()
-    io.emit('product/filter', {});
+    // const io = getSocket()
+    // io.emit('product/filter', {});
 
 
     res.status(200).json({
@@ -348,8 +348,8 @@ exports.searchProduct = async (req, res) => {
         .json({ status: '404', message: 'No products found!' })
     }
 
-    const io = getSocket()
-    io.emit('product/search', {});
+    // const io = getSocket()
+    // io.emit('product/search', {});
 
     res.status(200).json({
       status: '200',

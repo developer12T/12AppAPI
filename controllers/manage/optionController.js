@@ -2,6 +2,7 @@ const axios = require('axios')
 const { Option } = require('../../models/cash/option')
 const optionModel = require('../../models/cash/option')
 const { getModelsByChannel } = require('../../middleware/channel')
+const { getSocket } = require('../../socket')
 
 exports.getOption = async (req, res) => {
     try {

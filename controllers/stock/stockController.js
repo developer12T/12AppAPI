@@ -137,8 +137,13 @@ exports.getAdjustStockDetail = async (req, res) => {
       }
     })
 
+<<<<<<< HEAD
     const io = getSocket()
     io.emit('stock/getAdjustStockDetail', {})
+=======
+    // const io = getSocket()
+    // io.emit('stock/getAdjustStockDetail', {});
+>>>>>>> 9f7dcd5b8c9d0c92cf8e5a6e7094600dd1a2a9b4
 
     res.status(200).json({
       status: 200,
@@ -237,8 +242,13 @@ exports.getAdjustStock = async (req, res) => {
       updatedAt: o.updatedAt
     }))
 
+<<<<<<< HEAD
     const io = getSocket()
     io.emit('stock/adjuststock', {})
+=======
+    // const io = getSocket()
+    // io.emit('stock/adjuststock', {});
+>>>>>>> 9f7dcd5b8c9d0c92cf8e5a6e7094600dd1a2a9b4
 
     res.status(200).json({
       status: 200,
@@ -558,8 +568,13 @@ exports.getStock = async (req, res, next) => {
       })
     }
 
+<<<<<<< HEAD
     const io = getSocket()
     io.emit('stock/', {})
+=======
+    // const io = getSocket()
+    // io.emit('stock/', {});
+>>>>>>> 9f7dcd5b8c9d0c92cf8e5a6e7094600dd1a2a9b4
 
     res.status(200).json({
       status: 200,
@@ -642,8 +657,13 @@ exports.getQty = async (req, res, next) => {
       unitData
     }
 
+<<<<<<< HEAD
     const io = getSocket()
     io.emit('stock/get', {})
+=======
+    // const io = getSocket()
+    // io.emit('stock/get', {});
+>>>>>>> 9f7dcd5b8c9d0c92cf8e5a6e7094600dd1a2a9b4
 
     return res.status(200).json({
       status: 200,
@@ -968,8 +988,15 @@ exports.availableStock = async (req, res, next) => {
 
     const sorted = groupList.flatMap(g => g.items)
 
+<<<<<<< HEAD
     const io = getSocket()
     io.emit('stock/availableStock', {})
+=======
+
+    // const io = getSocket()
+    // io.emit('stock/availableStock', {});
+
+>>>>>>> 9f7dcd5b8c9d0c92cf8e5a6e7094600dd1a2a9b4
 
     res.status(200).json({
       status: 200,
@@ -1227,8 +1254,13 @@ exports.getStockQty = async (req, res) => {
     delete item.pcsMain
   })
 
+<<<<<<< HEAD
   const io = getSocket()
   io.emit('stock/getStockQty', {})
+=======
+  // const io = getSocket()
+  // io.emit('stock/getStockQty', {});
+>>>>>>> 9f7dcd5b8c9d0c92cf8e5a6e7094600dd1a2a9b4
 
   res.status(200).json({
     status: 200,
@@ -1695,8 +1727,14 @@ exports.getStockQtyNew = async (req, res) => {
     delete item.pcsMain
   })
 
+<<<<<<< HEAD
   const io = getSocket()
   io.emit('stock/getStockQtyNew', {})
+=======
+  // const io = getSocket()
+  // io.emit('stock/getStockQtyNew', {});
+
+>>>>>>> 9f7dcd5b8c9d0c92cf8e5a6e7094600dd1a2a9b4
 
   res.status(200).json({
     status: 200,
@@ -1759,8 +1797,14 @@ exports.getWeightProduct = async (req, res) => {
     weightNet += net * qty
   }
 
+<<<<<<< HEAD
   const io = getSocket()
   io.emit('stock/getWeightProduct', {})
+=======
+  // const io = getSocket()
+  // io.emit('stock/getWeightProduct', {});
+
+>>>>>>> 9f7dcd5b8c9d0c92cf8e5a6e7094600dd1a2a9b4
 
   res.status(200).json({
     status: 200,
@@ -2080,8 +2124,15 @@ exports.getStockQtyDetail = async (req, res) => {
       'sale'
     )
 
+<<<<<<< HEAD
     const io = getSocket()
     io.emit('stock/getStockQtyDetail', {})
+=======
+  // const io = getSocket()
+  // io.emit('stock/getStockQtyDetail', {});
+
+
+>>>>>>> 9f7dcd5b8c9d0c92cf8e5a6e7094600dd1a2a9b4
 
     res.status(200).json({
       status: 200,

@@ -88,8 +88,8 @@ exports.getGiveType = async (req, res) => {
       })
     }
 
-    const io = getSocket()
-    io.emit('give/getGiveType', {});
+    // const io = getSocket()
+    // io.emit('give/getGiveType', {});
 
     res.status(200).json({
       status: 200,
@@ -174,8 +174,8 @@ exports.getGiveProductFilter = async (req, res) => {
       )
     }
 
-    const io = getSocket()
-    io.emit('give/getGiveProductFilter', {});
+    // const io = getSocket()
+    // io.emit('give/getGiveProductFilter', {});
 
     res.status(200).json({
       status: 200,
@@ -194,8 +194,8 @@ exports.getGiveStoreFilter = async (req, res) => {
     const channel = req.headers['x-channel']
     const store = await getStoreGive(giveId, area, channel, res)
 
-    const io = getSocket()
-    io.emit('give/getGiveStoreFilter', {});
+    // const io = getSocket()
+    // io.emit('give/getGiveStoreFilter', {});
 
 
 
@@ -503,8 +503,8 @@ exports.getOrder = async (req, res) => {
       status: o.status
     }))
 
-    const io = getSocket()
-    io.emit('give/all', {});
+    // const io = getSocket()
+    // io.emit('give/all', {});
 
     res.status(200).json({
       status: 200,
@@ -531,8 +531,8 @@ exports.getDetail = async (req, res) => {
 
     const order = await Giveaway.findOne({ orderId })
 
-    const io = getSocket()
-    io.emit('give/detail', {});
+    // const io = getSocket()
+    // io.emit('give/detail', {});
 
     res.status(200).json({
       status: 200,
@@ -550,8 +550,8 @@ exports.getGiveaways = async (req, res) => {
   const { Givetype } = getModelsByChannel(channel, res, giveawaysModel)
   let data = await Givetype.find()
 
-  const io = getSocket()
-  io.emit('give/getGiveaways', {});
+  // const io = getSocket()
+  // io.emit('give/getGiveaways', {});
 
   res.status(200).json({
     status: 200,
@@ -565,8 +565,8 @@ exports.getGiveawaysDetail = async (req, res) => {
   const { Givetype } = getModelsByChannel(channel, res, giveawaysModel)
   let data = await Givetype.findOne({ giveId: req.params.giveId })
 
-  const io = getSocket()
-  io.emit('give/getGiveawaysDetail', {});
+  // const io = getSocket()
+  // io.emit('give/getGiveawaysDetail', {});
 
   res.status(200).json({
     status: 200,

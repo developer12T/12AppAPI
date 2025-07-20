@@ -67,8 +67,8 @@ exports.getDetailStore = async (req, res) => {
     }
 
 
-    const io = getSocket()
-    io.emit('store/', {});
+    // const io = getSocket()
+    // io.emit('store/', {});
 
     // ส่งข้อมูลกลับ
     res.status(200).json({
@@ -209,8 +209,8 @@ exports.getStore = async (req, res) => {
       })
     }
 
-    const io = getSocket()
-    io.emit('store/getStore', {});
+    // const io = getSocket()
+    // io.emit('store/getStore', {});
 
     res.status(200).json({
       status: '200',
@@ -494,8 +494,8 @@ exports.checkSimilarStores = async (req, res) => {
       similarity: item.similarity.toFixed(2)
     }))
 
-    const io = getSocket()
-    io.emit('store/check', {});
+    // const io = getSocket()
+    // io.emit('store/check', {});
 
 
     return res.status(200).json({
@@ -1376,8 +1376,8 @@ exports.getShipping = async (req, res) => {
   }
 
 
-  const io = getSocket()
-  io.emit('store/getShipping', {});
+  // const io = getSocket()
+  // io.emit('store/getShipping', {});
 
   return res.status(200).json({
     status: 200,

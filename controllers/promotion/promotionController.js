@@ -205,8 +205,8 @@ exports.getPromotionProduct = async (req, res) => {
       listProduct: Object.values(groupedProducts)
     }
 
-    const io = getSocket()
-    io.emit('promotion/getPromotionProduct', {});
+    // const io = getSocket()
+    // io.emit('promotion/getPromotionProduct', {});
 
     res.status(200).json({
       status: 200,
@@ -320,8 +320,8 @@ exports.getPromotionDetail = async (req, res) => {
     })
   }
 
-  const io = getSocket()
-  io.emit('promotion/getPromotionDetail', {});
+  // const io = getSocket()
+  // io.emit('promotion/getPromotionDetail', {});
 
   res.status(200).json({
     status: 200,

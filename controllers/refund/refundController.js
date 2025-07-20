@@ -475,8 +475,8 @@ exports.getRefund = async (req, res) => {
       })
     )
 
-    const io = getSocket()
-    io.emit('refund/all', {});
+    // const io = getSocket()
+    // io.emit('refund/all', {});
 
     res.status(200).json({
       status: 200,
@@ -558,8 +558,8 @@ exports.getDetail = async (req, res) => {
     const total = parseFloat((totalChange - totalRefund).toFixed(2))
 
 
-    const io = getSocket()
-    io.emit('refund/detail', {});
+    // const io = getSocket()
+    // io.emit('refund/detail', {});
 
 
     res.status(200).json({

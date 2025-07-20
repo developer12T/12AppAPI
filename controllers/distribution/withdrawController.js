@@ -406,8 +406,8 @@ exports.getOrder = async (req, res) => {
       createdAt: formatDateTimeToThai(o.createdAt)
     }))
 
-    const io = getSocket()
-    io.emit('distribution/get', {});
+    // const io = getSocket()
+    // io.emit('distribution/get', {});
 
 
     res.status(200).json({
@@ -490,8 +490,8 @@ exports.getDetail = async (req, res) => {
     })
 
 
-    const io = getSocket()
-    io.emit('distribution/detail', {});
+    // const io = getSocket()
+    // io.emit('distribution/detail', {});
 
     res.status(200).json({
       status: 200,
