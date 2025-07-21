@@ -531,18 +531,18 @@ exports.getDetail = async (req, res) => {
 
     const listProductChange = order
       ? order.listProduct.map(product => ({
-          id: product.id,
-          name: product.name,
-          group: product.group,
-          brand: product.brand,
-          size: product.size,
-          flavour: product.flavour,
-          qty: product.qty,
-          unit: product.unit,
-          unitName: product.unitName,
-          price: product.price,
-          netTotal: product.netTotal
-        }))
+        id: product.id,
+        name: product.name,
+        group: product.group,
+        brand: product.brand,
+        size: product.size,
+        flavour: product.flavour,
+        qty: product.qty,
+        unit: product.unit,
+        unitName: product.unitName,
+        price: product.price,
+        netTotal: product.netTotal
+      }))
       : []
 
     const totalChange = order ? order.total : 0
@@ -664,24 +664,36 @@ exports.addSlip = async (req, res) => {
 exports.updateStatus = async (req, res) => {
   try {
     const { orderId, status } = req.body
-
     const channel = req.headers['x-channel']
+
     const { Refund } = getModelsByChannel(channel, res, refundModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
+
+    const changeOrder = await Order.findOne({ reference: orderId })
+
+    if (!changeOrder) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found change Order'
+      })
+    }
 
     let statusTH = ''
 
     if (!orderId || !status) {
-      return res
-        .status(400)
-        .json({ status: 400, message: 'orderId and status are required!' })
+      return res.status(400).json({
+        status: 400,
+        message: 'orderId and status are required!'
+      })
     }
 
     const refundOrder = await Refund.findOne({ orderId })
+
     if (!refundOrder) {
-      return res
-        .status(404)
-        .json({ status: 404, message: 'Refund order not found!' })
+      return res.status(404).json({
+        status: 404,
+        message: 'Refund order not found!'
+      })
     }
 
     if (refundOrder.status !== 'pending' && status !== 'canceled') {
@@ -691,48 +703,84 @@ exports.updateStatus = async (req, res) => {
       })
     }
 
+    const productChange = changeOrder.listProduct.map(u => {
+      return {
+        id: u.id,
+        unit: u.unit,
+        qty: u.qty
+      }
+    })
+
     const productQty = refundOrder.listProduct.map(u => {
       return {
         id: u.id,
-        // lot: u.lot,
         unit: u.unit,
-        qty: u.qty
-        // statusMovement: 'OUT'
+        qty: u.qty,
+        condition: u.condition
       }
     })
 
     if (status === 'canceled') {
       statusTH = 'ยกเลิก'
-      for (const item of productQty) {
-        // await updateStockMongo(item, refundOrder.store.area, refundOrder.period, 'rufundCanceled', channel)
+
+
+      // for (const item of productQty) {
+
+        // console.log(item)
+        //   const updateResult = await updateStockMongo(
+        //     item,
+        //     refundOrder.store.area,
+        //     refundOrder.period,
+        //     'rufundCanceled',
+        //     channel,
+        //     res
+        //   )
+        //   if (updateResult) return
+      // }
+
+      for (const item of productChange) {
         const updateResult = await updateStockMongo(
           item,
-          refundOrder.store.area,
-          refundOrder.period,
-          'rufundCanceled',
+          changeOrder.store.area,
+          changeOrder.period,
+          'deleteCart',
           channel,
           res
         )
         if (updateResult) return
       }
+
     } else if (status === 'rejected') {
       statusTH = 'ถูกปฏิเสธ'
-      for (const item of productQty) {
-        // await updateStockMongo(item, refundOrder.store.area, refundOrder.period, 'rufundCanceled', channel)
+
+      // for (const item of productQty) {
+      //   const updateResult = await updateStockMongo(
+      //     item,
+      //     refundOrder.store.area,
+      //     refundOrder.period,
+      //     'rufundCanceled',
+      //     channel,
+      //     res
+      //   )
+      //   if (updateResult) return
+      // }
+
+      for (const item of productChange) {
         const updateResult = await updateStockMongo(
           item,
-          refundOrder.store.area,
-          refundOrder.period,
-          'rufundCanceled',
+          changeOrder.store.area,
+          changeOrder.period,
+          'deleteCart',
           channel,
           res
         )
         if (updateResult) return
       }
+
     } else if (status === 'completed') {
       statusTH = 'สำเร็จ'
+
       for (const item of productQty) {
-        // await updateStockMongo(item, refundOrder.store.area, refundOrder.period, 'refund', channel)
         const updateResult = await updateStockMongo(
           item,
           refundOrder.store.area,
@@ -743,9 +791,19 @@ exports.updateStatus = async (req, res) => {
         )
         if (updateResult) return
       }
-    }
 
-    // console.log(productQty)
+      for (const item of productChange) {
+        const updateResult = await updateStockMongo(
+          item,
+          changeOrder.store.area,
+          changeOrder.period,
+          'sale',
+          channel,
+          res
+        )
+        if (updateResult) return
+      }
+    }
 
     await Refund.findOneAndUpdate(
       { orderId },
@@ -766,6 +824,7 @@ exports.updateStatus = async (req, res) => {
       status: 200,
       message: 'Updated status successfully!'
     })
+
   } catch (error) {
     console.error('Error updating refund status:', error)
     res.status(500).json({ status: 500, message: 'Server error' })

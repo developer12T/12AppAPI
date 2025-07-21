@@ -149,8 +149,7 @@ module.exports.updateStockMongo = async function (
   type,
   channel,
   stockType = '',
-  res = null
-) {
+  res = null) {
   const { id, unit, qty, condition } = data
 
   const { Stock } = getModelsByChannel(channel, '', stockModel)
@@ -233,7 +232,8 @@ module.exports.updateStockMongo = async function (
       'rufundCanceled',
       'promotion',
       'approvedAdjustStockReduce',
-      'approvedAdjustStockAdd'
+      'approvedAdjustStockAdd',
+      'approvedChangeOrder'
     ].includes(type)
   )
     throw new Error('Invalid stock update type: ' + type)
@@ -449,7 +449,7 @@ module.exports.updateStockMongo = async function (
         }
       )
     }
-  } else if (type === 'refund' ) {
+  } else if (type === 'refund') {
     // In: เพิ่ม stock จากคืนสินค้า
     const found = await checkProductInStock(Stock, area, period, id)
     if (!found)
@@ -567,5 +567,5 @@ module.exports.updateStockMongo = async function (
     } catch (err) {
       throw new Error('Error updating stock for rufundCanceled: ' + err.message)
     }
-  }
+  } 
 }
