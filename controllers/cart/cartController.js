@@ -417,6 +417,7 @@ exports.adjustProduct = async (req, res) => {
 
     // --- STEP 4: อัพเดต stock ตาม delta
     let updateResult = null
+    if (!condition) {
     if (delta !== 0) {
       const qtyProductStock = { id, qty: Math.abs(delta), unit }
       // เพิ่มใน cart (OUT = หักจาก stock) | ลดใน cart (IN = คืนเข้า stock)
@@ -432,7 +433,7 @@ exports.adjustProduct = async (req, res) => {
       )
       if (updateResult) return // (กรณี stock ไม่พอ)
     }
-
+  }
     // --- STEP 5: อัพเดตจำนวนใน cart ให้ตรงกับ qty ล่าสุด
 
     if (condition) {

@@ -1993,7 +1993,10 @@ exports.checkRouteStore = async (req, res) => {
       })
     }
 
-
+    const queryZone = {}
+    if ( zone ) {
+      queryZone.zone = zone
+    }
 
     const dataRoute = await Route.aggregate([
       {
@@ -2003,7 +2006,8 @@ exports.checkRouteStore = async (req, res) => {
       },
       {
         $match: {
-          zone: zone,
+          // zone: zone,
+          ...queryZone,
           period: period
         }
       },
@@ -2015,12 +2019,12 @@ exports.checkRouteStore = async (req, res) => {
       }
     ]);
 
-    if (dataRoute.length === 0) {
-      return res.status(404).json({
-        status: 404,
-        message: 'Not Found this zone'
-      })
-    }
+    // if (dataRoute.length === 0) {
+    //   return res.status(404).json({
+    //     status: 404,
+    //     message: 'Not Found this zone'
+    //   })
+    // }
 
 
 

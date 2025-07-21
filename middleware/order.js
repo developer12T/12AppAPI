@@ -449,7 +449,7 @@ module.exports.updateStockMongo = async function (
         }
       )
     }
-  } else if (type === 'refund' || type === 'rufund') {
+  } else if (type === 'refund' ) {
     // In: เพิ่ม stock จากคืนสินค้า
     const found = await checkProductInStock(Stock, area, period, id)
     if (!found)
@@ -457,7 +457,7 @@ module.exports.updateStockMongo = async function (
         `Product id:${id} not found in stock for area:${area} period:${period}`
       )
     // ถ้ามี condition ให้ใช้เพิ่ม logic ได้
-    if (type === 'rufund' && condition !== 'good') return
+    if (type === 'refund' && condition !== 'good') return
     try {
       await Stock.findOneAndUpdate(
         {
