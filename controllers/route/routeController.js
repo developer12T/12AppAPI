@@ -397,8 +397,11 @@ exports.addFromERPOne = async (req, res) => {
   try {
     const { id } = req.body
     const channel = req.headers['x-channel']
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+        const { Store } = getModelsByChannel(channel, res, storeModel)
 
     const result = await routeQueryOne(channel, id)
+    // console.log(result)
     await Route.deleteOne({ id: id });
     const return_arr = []
     for (const row of result) {
@@ -440,8 +443,6 @@ exports.addFromERPOne = async (req, res) => {
       }
     }
 
-    const { Store } = getModelsByChannel(channel, res, storeModel)
-    const { Route } = getModelsByChannel(channel, res, routeModel)
 
     const route = await Route.find({ period: period(), id: id })
     const routeMap = new Map(route.map(route => [route.id, route]))

@@ -921,10 +921,9 @@ exports.routeQueryOne = async function (channel, RouteId) {
              LEFT JOIN [DATA_OMS].[dbo].[OCUSMA] ON StoreID = OKCUNO COLLATE Latin1_General_BIN
              LEFT JOIN [dbo].[data_store] b ON StoreID = customerCode
             WHERE store_status <> '90'
-               AND OKCFC3 <> 'DEL'
                AND LEFT(OKRGDT, 6) <> CONVERT(nvarchar(6), GETDATE(), 112)
                AND a.Channel = '103'
-               AND CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet =${RouteId}
+                AND CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet =${RouteId}
              ORDER BY a.Area, RouteSet
         `
   }

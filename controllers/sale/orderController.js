@@ -65,8 +65,6 @@ exports.checkout = async (req, res) => {
       note,
       latitude,
       longitude,
-      // shippingId,
-      // address,
       shipping,
       payment,
       changePromotionStatus,

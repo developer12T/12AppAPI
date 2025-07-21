@@ -94,8 +94,15 @@ const listQuotaSchema = new mongoose.Schema({
 })
 
 const orderShipingSchema = new mongoose.Schema({
+  default: { type: String, require: true },
   shippingId: { type: String, require: true },
-  address: { type: String, require: true }
+  address: { type: String, require: true },
+  district: { type: String, },
+  subDistrict: { type: String, },
+  province: { type: String, },
+  postCode: { type: String, },
+  latitude: { type: String, },
+  longtitude: { type: String, }
 })
 
 const orderImageSchema = mongoose.Schema({
@@ -111,9 +118,7 @@ const orderSchema = new mongoose.Schema(
     routeId: { type: String },
     sale: orderSaleSchema,
     store: orderStoreSchema,
-    // shipping: orderShipingSchema,
-    shippingId: { type: String, require: true },
-    address: { type: String, require: true },
+    shipping: orderShipingSchema,
     note: { type: String, require: true },
     latitude: { type: String, require: true },
     longitude: { type: String, require: true },
