@@ -2293,9 +2293,9 @@ exports.approveAdjustStock = async (req, res) => {
           },
           {
             $inc: {
-              'listProduct.$[elem].stockPcs': -factorPcsQty,
+              'listProduct.$[elem].stockOutPcs': -factorPcsQty,
               'listProduct.$[elem].balancePcs': -factorPcsQty,
-              'listProduct.$[elem].stockCtn': -factorCtnQty,
+              'listProduct.$[elem].stockOutCtn': -factorCtnQty,
               'listProduct.$[elem].balanceCtn': -factorCtnQty
             }
           },
@@ -2313,10 +2313,10 @@ exports.approveAdjustStock = async (req, res) => {
           },
           {
             $inc: {
-              'listProduct.$[elem].stockPcs': +factorPcsQty,
+              'listProduct.$[elem].stockOutPcs': +factorPcsQty,
               'listProduct.$[elem].balancePcs': +factorPcsQty,
               'listProduct.$[elem].stockCtn': +factorCtnQty,
-              'listProduct.$[elem].balanceCtn': +factorCtnQty
+              'listProduct.$[elem].stockOutPcs': +factorCtnQty
             }
           },
           {
