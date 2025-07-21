@@ -33,7 +33,7 @@ const adjustStockModel = require('../../models/cash/stock')
 const { getModelsByChannel } = require('../../middleware/channel')
 const os = require('os')
 const { summaryOrder } = require('../../utilities/summary')
-const { to2 } = require('../../middleware/order')
+const { to2, updateStockMongo } = require('../../middleware/order')
 const { getSocket } = require('../../socket')
 const fetchArea = async warehouse => {
   try {
@@ -2315,8 +2315,8 @@ exports.approveAdjustStock = async (req, res) => {
             $inc: {
               'listProduct.$[elem].stockOutPcs': +factorPcsQty,
               'listProduct.$[elem].balancePcs': +factorPcsQty,
-              'listProduct.$[elem].stockCtn': +factorCtnQty,
-              'listProduct.$[elem].stockOutPcs': +factorCtnQty
+              'listProduct.$[elem].stockOutCtn': +factorCtnQty,
+              'listProduct.$[elem].balanceCtn': +factorCtnQty
             }
           },
           {
