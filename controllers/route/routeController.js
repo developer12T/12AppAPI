@@ -1978,7 +1978,7 @@ exports.getRouteByArea = async (req, res) => {
   })
 }
 
-exports.CheckRouteStore = async (req, res) => {
+exports.checkRouteStore = async (req, res) => {
   try {
     const { zone, period } = req.query
     const channel = req.headers['x-channel']

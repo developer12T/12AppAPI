@@ -384,17 +384,30 @@ exports.adjustProduct = async (req, res) => {
     const period = getPeriodFromDate(cart.createdAt)
 
     // --- STEP 1: หาค่า qty เดิมใน cart
-    const idx = cart.listProduct.findIndex(p => p.id === id && p.unit === unit)
-    if (idx === -1) {
-      return res
-        .status(404)
-        .json({ status: 404, message: 'Product not found in cart!' })
+
+    if (condition) {
+      idx = cart.listRefund.findIndex(p => p.id === id && p.unit === unit && p.condition === condition)
+      if (idx === -1) {
+        return res
+          .status(404)
+          .json({ status: 404, message: 'Product not found in cart refund!' })
+      }
+      oldQty = cart.listRefund[idx].qty
+    } else {
+      idx = cart.listProduct.findIndex(p => p.id === id && p.unit === unit)
+      if (idx === -1) {
+        return res
+          .status(404)
+          .json({ status: 404, message: 'Product not found in cart!' })
+      }
+      oldQty = cart.listProduct[idx].qty
     }
-    const oldQty = cart.listProduct[idx].qty
+
 
     // --- STEP 2: คำนวณ delta ระหว่าง qty ใหม่ (user ส่งมา) กับ qty เดิม (ที่อยู่ใน cart)
     const delta = qty - oldQty
 
+    // console.log(delta)
     // --- STEP 3: ถ้าไม่มีการเปลี่ยนแปลง
     if (delta === 0) {
       return res
@@ -421,18 +434,32 @@ exports.adjustProduct = async (req, res) => {
     }
 
     // --- STEP 5: อัพเดตจำนวนใน cart ให้ตรงกับ qty ล่าสุด
-    if (qty === 0) {
-      cart.listProduct.splice(idx, 1) // Remove item
+
+    if (condition) {
+      if (qty === 0) {
+        cart.listRefund.splice(idx, 1) // Remove item
+      } else {
+        cart.listRefund[idx].qty = qty
+      }
+
+      cart.total = cart.listRefund.reduce(
+        (sum, item) => sum + item.qty * item.price,
+        0
+      )
+
     } else {
-      cart.listProduct[idx].qty = qty
+      if (qty === 0) {
+        cart.listProduct.splice(idx, 1) // Remove item
+      } else {
+        cart.listProduct[idx].qty = qty
+      }
+
+      cart.total = cart.listProduct.reduce(
+        (sum, item) => sum + item.qty * item.price,
+        0
+      )
+
     }
-
-    // --- STEP 6: อัพเดตยอดรวม
-    cart.total = cart.listProduct.reduce(
-      (sum, item) => sum + item.qty * item.price,
-      0
-    )
-
     await cart.save()
 
     // --- STEP 7: Emit socket & return
