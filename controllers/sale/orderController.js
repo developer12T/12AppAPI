@@ -165,7 +165,7 @@ exports.checkout = async (req, res) => {
     if (listProduct.includes(null)) return
 
     const orderId = await generateOrderId(area, sale.warehouse, channel, res)
-
+    // console.log(orderId)
     // if () {
 
     // }
