@@ -378,7 +378,7 @@ exports.checkout = async (req, res) => {
       currentDate.getMonth(),
       1
     )
-    
+
     const NextMonth = new Date(
       currentDate.getFullYear(),
       currentDate.getMonth() + 1,
@@ -3131,8 +3131,7 @@ exports.summaryDaily = async (req, res) => {
     res.status(500).json({ status: 500, message: err.message })
   }
 }
-
-exports.summaryDailyByZone = async (req, res) => {
+exports.summaryMonthlyByZone = async (req, res) => {
   try {
     // รับ areas ได้จาก query (เช่น areas=BE215,BE221) หรือจาก body
     const areas = (req.query.areas || '').split(',').filter(Boolean)
@@ -3155,27 +3154,12 @@ exports.summaryDailyByZone = async (req, res) => {
     const startOfMonthUTC = new Date(startOfMonthTH.getTime() - thOffset)
     const endOfMonthUTC = new Date(endOfMonthTH.getTime() - thOffset)
 
-    const getDateStrTH = dateUTC => {
-      const dateTH = new Date(new Date(dateUTC).getTime() + thOffset)
-      const day = dateTH.getDate().toString().padStart(2, '0')
-      const mon = (dateTH.getMonth() + 1).toString().padStart(2, '0')
-      const yr = dateTH.getFullYear()
-      return `${day}/${mon}/${yr}`
-    }
-    const lastDay = new Date(year, month, 0).getDate()
-    const allDateArr = Array.from(
-      { length: lastDay },
-      (_, i) =>
-        `${(i + 1).toString().padStart(2, '0')}/${month
-          .toString()
-          .padStart(2, '0')}/${year}`
-    )
+    // ถ้าคุณมีฟังก์ชัน to2 ให้ใส่ไว้ข้างบนนี้ได้เลย
+    // function to2(num) { return Math.round((num + Number.EPSILON) * 100) / 100 }
 
-    // ============ Main Loop (Per Area) ============
     const result = []
 
     for (const area of areas) {
-      // ดึงข้อมูลแต่ละ area แบบ await ทีละอัน หรือ optimize เพิ่มเติมถ้าต้องการ
       const [dataSendmoney, dataRefund, dataOrderSale, dataOrderChange] =
         await Promise.all([
           SendMoney.aggregate([
@@ -3210,101 +3194,61 @@ exports.summaryDailyByZone = async (req, res) => {
           })
         ])
 
-      // === ... ส่วนการประมวลผลข้อมูล เหมือนกับของเดิมเป๊ะ (copy มาวางได้) ===
-      const sumByDate = dataSendmoney.reduce((acc, item) => {
-        const dateStr = getDateStrTH(item.createdAt)
-        if (!acc[dateStr]) {
-          acc[dateStr] = { summary: 0, status: item.status || '' }
-        }
-        acc[dateStr].summary += item.sendmoney || 0
-        return acc
-      }, {})
-      const dataSendMoneyTran = Object.entries(sumByDate).map(
-        ([date, val]) => ({
-          date,
-          summary: val.summary,
-          status: val.status
-        })
+      // ===== Sum ข้อมูลทั้งเดือน =====
+      const sumSendmoney = dataSendmoney.reduce(
+        (sum, item) => sum + (item.sendmoney || 0),
+        0
       )
-      const sendMoneyMap = Object.fromEntries(
-        dataSendMoneyTran.map(d => [d.date, d.summary])
-      )
-      const statusMap = Object.fromEntries(
-        dataSendMoneyTran.map(d => [d.date, d.status])
-      )
+      const status = sumSendmoney > 0 ? 'ส่งเงินแล้ว' : 'ยังไม่ส่งเงิน'
 
       const refundListFlat = dataRefund.flatMap(item =>
         item.listProduct.map(u => ({
           price: u.total,
-          condition: u.condition,
-          date: getDateStrTH(item.createdAt)
+          condition: u.condition
         }))
       )
-      const refundByDate = refundListFlat.reduce((acc, r) => {
-        if (!acc[r.date]) acc[r.date] = []
-        acc[r.date].push(r)
-        return acc
-      }, {})
+      const good = refundListFlat
+        .filter(x => x.condition === 'good')
+        .reduce((sum, x) => sum + Number(x.price), 0)
+      const damaged = refundListFlat
+        .filter(x => x.condition === 'damaged')
+        .reduce((sum, x) => sum + Number(x.price), 0)
 
       const orderSaleListFlat = dataOrderSale.flatMap(item =>
         item.listProduct.map(u => ({
-          price: u.netTotal,
-          date: getDateStrTH(item.createdAt)
+          price: u.netTotal
         }))
       )
+      const summary = orderSaleListFlat.reduce(
+        (sum, o) => sum + Number(o.price || 0),
+        0
+      )
+
       const orderChangeListFlat = dataOrderChange.flatMap(item =>
         item.listProduct.map(u => ({
-          price: u.netTotal,
-          date: getDateStrTH(item.createdAt)
+          price: u.netTotal
         }))
       )
-      const saleByDate = orderSaleListFlat.reduce((acc, o) => {
-        acc[o.date] = (acc[o.date] || 0) + Number(o.price || 0)
-        return acc
-      }, {})
-      const changeByDate = orderChangeListFlat.reduce((acc, o) => {
-        acc[o.date] = (acc[o.date] || 0) + Number(o.price || 0)
-        return acc
-      }, {})
+      const change = orderChangeListFlat.reduce(
+        (sum, o) => sum + Number(o.price || 0),
+        0
+      )
 
-      // ==== Create daily array ====
-      const fullMonthArr = allDateArr.map(date => {
-        const sendmoneyRaw = sendMoneyMap[date] || 0
-        const sendmoney = to2(sendmoneyRaw)
-        let status = ''
-        const refundTodayRaw = refundByDate[date] || []
-        const refundToday = refundTodayRaw
-        const goodRaw = refundToday
-          .filter(x => x.condition === 'good')
-          .reduce((sum, x) => sum + Number(x.price), 0)
-        const good = to2(goodRaw)
-        const damagedRaw = refundToday
-          .filter(x => x.condition === 'damaged')
-          .reduce((sum, x) => sum + Number(x.price), 0)
-        const damaged = to2(damagedRaw)
-        const summaryRaw = saleByDate[date] || 0
-        const summary = to2(summaryRaw)
-        const changeRaw = changeByDate[date] || 0
-        const change = to2(changeRaw)
-        const diffRaw = sendmoney - summary
-        const diff = to2(diffRaw)
-        if (sendmoney > 0) {
-          status = 'ส่งเงินแล้ว'
-        } else {
-          status = 'ยังไม่ส่งเงิน'
-        }
-
-        return { date, sendmoney, summary, diff, change, status, good, damaged }
-      })
+      const diff = sumSendmoney - summary
 
       result.push({
         area,
-        daily: fullMonthArr
+        monthly: {
+          sendmoney: to2(sumSendmoney),
+          summary: to2(summary),
+          diff: to2(diff),
+          change: to2(change),
+          status,
+          good: to2(good),
+          damaged: to2(damaged)
+        }
       })
     }
-
-    // const io = getSocket()
-    // io.emit('order/summaryDailyByZone', {});
 
     res.status(200).json({
       status: 200,

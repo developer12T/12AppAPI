@@ -28,6 +28,7 @@ const {
 } = require('../../middleware/order')
 const { update } = require('lodash')
 const { getSocket } = require('../../socket')
+
 exports.checkout = async (req, res) => {
   try {
     const {
@@ -371,8 +372,7 @@ exports.checkout = async (req, res) => {
     await Cart.deleteOne({ type, area, storeId })
 
     const io = getSocket()
-    io.emit('refund/checkout', {});
-
+    io.emit('refund/checkout', {})
 
     res.status(200).json({
       status: 200,
@@ -531,18 +531,18 @@ exports.getDetail = async (req, res) => {
 
     const listProductChange = order
       ? order.listProduct.map(product => ({
-        id: product.id,
-        name: product.name,
-        group: product.group,
-        brand: product.brand,
-        size: product.size,
-        flavour: product.flavour,
-        qty: product.qty,
-        unit: product.unit,
-        unitName: product.unitName,
-        price: product.price,
-        netTotal: product.netTotal
-      }))
+          id: product.id,
+          name: product.name,
+          group: product.group,
+          brand: product.brand,
+          size: product.size,
+          flavour: product.flavour,
+          qty: product.qty,
+          unit: product.unit,
+          unitName: product.unitName,
+          price: product.price,
+          netTotal: product.netTotal
+        }))
       : []
 
     const totalChange = order ? order.total : 0
@@ -557,10 +557,8 @@ exports.getDetail = async (req, res) => {
     )
     const total = parseFloat((totalChange - totalRefund).toFixed(2))
 
-
     // const io = getSocket()
     // io.emit('refund/detail', {});
-
 
     res.status(200).json({
       type: refund.type,
@@ -646,9 +644,8 @@ exports.addSlip = async (req, res) => {
 
       await order.save()
 
-
-    const io = getSocket()
-    io.emit('refund/addSlip', {});
+      const io = getSocket()
+      io.emit('refund/addSlip', {})
 
       res.status(200).json({
         status: 200,
@@ -671,6 +668,8 @@ exports.updateStatus = async (req, res) => {
     const channel = req.headers['x-channel']
     const { Refund } = getModelsByChannel(channel, res, refundModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
+
+    let statusTH = ''
 
     if (!orderId || !status) {
       return res
@@ -748,21 +747,20 @@ exports.updateStatus = async (req, res) => {
 
     // console.log(productQty)
 
-    const updatedRefund = await Refund.findOneAndUpdate(
+    await Refund.findOneAndUpdate(
       { orderId },
       { $set: { status, statusTH } },
       { new: true }
     )
 
-    const updatedOrder = await Order.findOneAndUpdate(
+    await Order.findOneAndUpdate(
       { orderId: refundOrder.reference, type: 'change' },
       { $set: { status, statusTH } },
       { new: true }
     )
 
     const io = getSocket()
-    io.emit('refund/updateStatus', {});
-
+    io.emit('refund/updateStatus', {})
 
     res.status(200).json({
       status: 200,

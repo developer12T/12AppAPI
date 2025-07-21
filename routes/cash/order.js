@@ -6,7 +6,7 @@ const { getOrder, getDetail, updateStatus, checkout, addSlip, OrderToExcel, getA
     // erpApiCheckDisributionM3,
     summaryAllProduct,
     summaryDaily,
-    summaryDailyByZone,
+    summaryMonthlyByZone,
     saleReport,
     getSummary18SKU
 
@@ -38,7 +38,7 @@ router.get('/getSummaryProduct', getSummaryProduct)
 router.get('/getProductLimit', getProductLimit)
 router.get('/summaryAllProduct', summaryAllProduct)
 router.get('/summaryDaily', summaryDaily)
-router.post('/summaryDailyByZone', summaryDailyByZone)
+router.post('/summaryMonthlyByZone', summaryMonthlyByZone)
 router.get('/saleReport', saleReport)
 router.get('/getSummary18SKU', getSummary18SKU)
 module.exports = router
