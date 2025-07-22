@@ -187,7 +187,10 @@ exports.getStore = async (req, res) => {
         }
       },
       {
-        $sort: { status: 1 }
+        $sort: {
+          status: 1,
+          createdAt: -1
+        }
       }
     )
 
