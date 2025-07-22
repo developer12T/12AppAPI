@@ -631,3 +631,4 @@ module.exports.sendEmail = async function ({ to, subject, html }) {
     console.error('❌ Failed to send email:', err.message);
   }
 };
+

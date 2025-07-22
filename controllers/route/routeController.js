@@ -21,6 +21,7 @@ const { getSocket } = require('../../socket')
 const { getModelsByChannel } = require('../../middleware/channel')
 const path = require('path')
 const { group } = require('console')
+const { formatDateTimeToThai } = require('../../middleware/order')
 
 exports.getRoute = async (req, res) => {
   try {
@@ -2180,6 +2181,7 @@ exports.polylineRoute = async (req, res) => {
             storeId: store?.storeId,
             // storeName: store?.name ?? '',
             route: `R${item.day}`,
+            date:formatDateTimeToThai(u.date),
             location: [
               parseFloat(u.longtitude),
               parseFloat(u.latitude)

@@ -1313,7 +1313,7 @@ exports.insertStoreToErpOne = async (req, res) => {
         shippingAddress1: u.address,
         shippingAddress2: u.district,
         shippingAddress3: u.subDistrict,
-        shippingAddress4: u.province,
+        shippingAddress4: u.province?? '' ,
         shippingPoscode: u.postCode,
         shippingPhone: item.tel,
         shippingRoute: item.postCode,
@@ -1323,29 +1323,29 @@ exports.insertStoreToErpOne = async (req, res) => {
     })
   }
 
+  // console.log(dataTran)
   try {
     const response = await axios.post(
       `${process.env.API_URL_12ERP}/customer/insert`,
       dataTran
     )
 
-    // ถ้ามาถึงตรงนี้ แปลว่า status = 2xx เท่านั้น!
-    return res.status(200).json({
-      message: 'Success',
-      data: response.data
-    })
+    // ส่งกลับไปให้ client ที่เรียก Express API
+    return res.status(response.status).json(response.data)
   } catch (error) {
-    // ถ้ามี error (status != 2xx) จะเข้าตรงนี้เสมอ
-    if (error.response && error.response.status === 400) {
-      return res.status(400).json({
-        message: error.response.data?.message || 'Already Exists'
-      })
-    } else {
-      return res.status(500).json({
-        message: 'Internal Server Error',
-        error: error.message
+    if (error.response) {
+      // หาก ERP ส่ง 400 หรือ 500 หรืออื่นๆ กลับมา
+      return res.status(error.response.status).json({
+        message: error.response.data?.message || 'Request Failed',
+        data: error.response.data
       })
     }
+
+    // กรณีอื่นๆ ที่ไม่ใช่ response จาก ERP เช่น network error
+    return res.status(500).json({
+      message: 'Internal Server Error',
+      error: error.message
+    })
   }
 
   // res.status(200).json({
@@ -1581,3 +1581,5 @@ exports.deleteShippingFromStore = async (req, res) => {
       .json({ status: 500, message: 'Internal server error' })
   }
 }
+
+
