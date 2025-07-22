@@ -9,6 +9,8 @@ const upload = multer({ storage: multer.memoryStorage() }).array(
   'checkInImage',
   1
 )
+const mongoose = require('mongoose')
+
 const sql = require('mssql')
 const { routeQuery, routeQueryOne } = require('../../controllers/queryFromM3/querySctipt')
 const orderModel = require('../../models/cash/sale')
@@ -2120,7 +2122,14 @@ exports.polylineRoute = async (req, res) => {
       const visited = []
       const remaining = [...points]
 
-      let current = remaining.reduce((a, b) => a[1] < b[1] ? a : b) // [lng, lat]
+      // หาจุดเริ่มต้นที่ "น้อยที่สุด" โดยเปรียบเทียบ lng ก่อน แล้ว lat
+      let current = remaining.reduce((a, b) => {
+        const [lngA, latA] = a.location
+        const [lngB, latB] = b.location
+        if (lngA < lngB) return a
+        if (lngA > lngB) return b
+        return latA < latB ? a : b
+      })
 
       visited.push(current)
       remaining.splice(remaining.indexOf(current), 1)
@@ -2128,10 +2137,12 @@ exports.polylineRoute = async (req, res) => {
       while (remaining.length > 0) {
         const next = remaining.reduce((nearest, point) => {
           const distToNearest = haversineDistance(
-            current[1], current[0], nearest[1], nearest[0]
+            current.location[1], current.location[0],
+            nearest.location[1], nearest.location[0]
           )
           const distToPoint = haversineDistance(
-            current[1], current[0], point[1], point[0]
+            current.location[1], current.location[0],
+            point.location[1], point.location[0]
           )
           return distToPoint < distToNearest ? point : nearest
         })
@@ -2146,17 +2157,35 @@ exports.polylineRoute = async (req, res) => {
 
     const dataRoute = await Route.find({ area: area, period: period })
 
-    const locations = dataRoute.flatMap(i =>
-      i.listStore
+    const storeId = dataRoute.flatMap(item =>
+      item.listStore.map(i => i.storeInfo)
+    )
+
+    const objectIds = storeId
+      .filter(id => mongoose.Types.ObjectId.isValid(id))
+      .map(id => new mongoose.Types.ObjectId(id))
+
+    const dataStore = await Store.find({ _id: { $in: objectIds } })
+
+    const locations = dataRoute.flatMap(item =>
+      item.listStore
         .filter(u => {
           const lat = parseFloat(u.latitude)
           const lng = parseFloat(u.longtitude)
           return !isNaN(lat) && !isNaN(lng)
         })
-        .map(u => [
-          parseFloat(u.longtitude),
-          parseFloat(u.latitude)
-        ])
+        .map(u => {
+          const store = dataStore.find(s => s._id.equals(u.storeInfo));
+          return {
+            storeId: store?.storeId,
+            // storeName: store?.name ?? '',
+            route: `R${item.day}`,
+            location: [
+              parseFloat(u.longtitude),
+              parseFloat(u.latitude)
+            ]
+          };
+        })
     )
 
     if (locations.length === 0) {
