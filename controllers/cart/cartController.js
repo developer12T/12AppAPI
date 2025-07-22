@@ -160,12 +160,12 @@ exports.addProduct = async (req, res) => {
       })
     }
 
-    if (type === 'adjuststock' && !action && !period) {
-      return res.status(400).json({
-        status: 400,
-        message: 'action,period is required for adjuststock!'
-      })
-    }
+    // if (type === 'adjuststock' && !action ) {
+    //   return res.status(400).json({
+    //     status: 400,
+    //     message: 'action,period is required for adjuststock!'
+    //   })
+    // }
 
     const product = await Product.findOne({ id }).lean()
     if (!product) {
@@ -323,7 +323,7 @@ exports.addProduct = async (req, res) => {
       if (updateResult) return
     }
 
-    if (type !== 'withdraw' && type !== 'refund') {
+    if (type !== 'withdraw' && type !== 'refund' && type != 'adjuststock' ) {
       const updateResult = await updateStockMongo(
         qtyProduct,
         area,
