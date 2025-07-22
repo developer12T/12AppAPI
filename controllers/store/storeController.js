@@ -653,6 +653,7 @@ exports.addFromERPnew = async (req, res) => {
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
     const result = await storeQuery(channel) // ข้อมูลจาก ERP
+    // console.log(result)
     const storeMap = new Map(result.map(item => [item.storeId, item]))
 
     const mongoStores = await Store.find()

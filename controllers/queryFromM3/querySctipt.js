@@ -255,7 +255,7 @@ exports.storeQuery = async function (channel) {
                     api_status,
                     head_no,
                     run_no,
-                    store_status,
+                    store_status as status,
                     run_id,
                     OKCUA1,
                     OKCFC3,
@@ -337,6 +337,7 @@ exports.storeQuery = async function (channel) {
     const province = row.province || ''.trim();
     const provinceCode = row.provinceCode || ''.trim();
     const postCode = row.postCode?.trim();
+    const status = row.status?.trim();
     const zone = row.OKSDST?.trim();
     const area = row.area?.trim();
     const latitude = row.lat?.trim();
@@ -384,6 +385,8 @@ exports.storeQuery = async function (channel) {
         province,
         provinceCode,
         zone,
+        postCode,
+        status,
         area,
         latitude,
         longtitude,
@@ -426,7 +429,7 @@ exports.storeQuery = async function (channel) {
       lineId: '',
       'note ': '',
       approve: approveData,
-      status: '20',
+      status: splitData.status,
       policyConsent: poliAgree,
       imageList: [],
       shippingAddress: splitData.shippingAddress,
