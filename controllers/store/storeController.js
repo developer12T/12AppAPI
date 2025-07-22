@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require('mongoose')
 
 const { uploadFiles } = require('../../utilities/upload')
 const { calculateSimilarity } = require('../../utilities/utility')
@@ -49,7 +49,10 @@ const path = require('path')
 const { v4: uuidv4 } = require('uuid')
 
 uuidv4() // ⇨ '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed'
-const { productQuery, bueatyStoreQuery } = require('../../controllers/queryFromM3/querySctipt')
+const {
+  productQuery,
+  bueatyStoreQuery
+} = require('../../controllers/queryFromM3/querySctipt')
 const store = require('../../models/cash/store')
 
 exports.getDetailStore = async (req, res) => {
@@ -65,7 +68,6 @@ exports.getDetailStore = async (req, res) => {
     if (!storeData) {
       return res.status(404).json({ status: 404, message: 'Store not found' })
     }
-
 
     // const io = getSocket()
     // io.emit('store/', {});
@@ -424,7 +426,7 @@ exports.addStore = async (req, res) => {
       // console.log(storeData)
 
       const io = getSocket()
-      io.emit('store/addStore', {});
+      io.emit('store/addStore', {})
 
       res.status(200).json({
         status: '200',
@@ -497,7 +499,6 @@ exports.checkSimilarStores = async (req, res) => {
     // const io = getSocket()
     // io.emit('store/check', {});
 
-
     return res.status(200).json({
       status: '200',
       message: 'similar store',
@@ -546,8 +547,7 @@ exports.editStore = async (req, res) => {
     }
 
     const io = getSocket()
-    io.emit('store/editStore', {});
-
+    io.emit('store/editStore', {})
 
     res.status(200).json({
       status: '200',
@@ -696,7 +696,7 @@ exports.addFromERPnew = async (req, res) => {
     }
 
     const io = getSocket()
-    io.emit('store/addFromERPnew', {});
+    io.emit('store/addFromERPnew', {})
 
     res.status(200).json({
       status: 200,
@@ -742,11 +742,11 @@ exports.checkInStore = async (req, res) => {
     }
 
     const io = getSocket()
-    io.emit('store/checkIn', {});
+    io.emit('store/checkIn', {})
 
     res.status(200).json({
       status: '200',
-      message: 'Checked In Successfully', 
+      message: 'Checked In Successfully',
       data: {
         latitude: result.checkIn.latitude,
         longtitude: result.checkIn.latitude,
@@ -771,7 +771,9 @@ exports.updateStoreStatus = async (req, res) => {
     })
   }
   const storeZone = store.area.substring(0, 2)
-  const maxRunningAll = await RunningNumber.findOne({ zone: storeZone }).select("last")
+  const maxRunningAll = await RunningNumber.findOne({ zone: storeZone }).select(
+    'last'
+  )
 
   // console.log(maxRunningAll)
 
@@ -823,7 +825,7 @@ exports.updateStoreStatus = async (req, res) => {
     )
 
     const io = getSocket()
-    io.emit('store/updateStoreStatus', {});
+    io.emit('store/updateStoreStatus', {})
 
     res.status(200).json({
       status: 200,
@@ -980,7 +982,6 @@ exports.createRunningNumber = async (req, res) => {
 
   // console.log(zoneId)
 
-
   const maxRunningAll = await Store.aggregate([
     {
       $match: {
@@ -1086,17 +1087,17 @@ exports.addBueatyStore = async (req, res) => {
 
     // 3. Insert new
     // (สามารถ optimize เป็น insertMany ได้ ถ้าไม่มีเงื่อนไข exists)
-    await TypeStore.insertMany(bueatydata.map(x => ({ ...x, type: ['beauty'] })), { session })
-
+    await TypeStore.insertMany(
+      bueatydata.map(x => ({ ...x, type: ['beauty'] })),
+      { session }
+    )
 
     // 4. Commit
     await session.commitTransaction()
     session.endSession()
 
     const io = getSocket()
-    io.emit('store/addBueatyStore', {});
-
-
+    io.emit('store/addBueatyStore', {})
 
     res.status(200).json({
       status: 200,
@@ -1110,7 +1111,6 @@ exports.addBueatyStore = async (req, res) => {
     res.status(500).json({ status: 500, message: error.message })
   }
 }
-
 
 exports.getBueatyStore = async (req, res) => {
   const channel = req.headers['x-channel']
@@ -1161,7 +1161,7 @@ exports.addStoreArray = async (req, res) => {
   }
 
   const io = getSocket()
-  io.emit('store/addStoreArray', {});
+  io.emit('store/addStoreArray', {})
 
   res.status(200).json({
     status: 200,
@@ -1203,7 +1203,7 @@ exports.updateStoreArray = async (req, res) => {
     }
   }
   const io = getSocket()
-  io.emit('store/updateStoreArray', {});
+  io.emit('store/updateStoreArray', {})
 
   res.status(200).json({
     status: 200,
@@ -1224,8 +1224,7 @@ exports.deleteStoreArray = async (req, res) => {
   await Store.deleteMany({ storeId: { $in: storeId } })
 
   const io = getSocket()
-  io.emit('store/deleteStoreArray', {});
-
+  io.emit('store/deleteStoreArray', {})
 
   res.status(200).json({
     status: 200,
@@ -1358,23 +1357,22 @@ exports.insertStoreToErpOne = async (req, res) => {
   // })
 }
 
-
 exports.getShipping = async (req, res) => {
-
   const { storeId } = req.body
   // console.log(storeId)
   const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
 
-  const dataStore = await Store.findOne({ storeId: storeId }).select("shippingAddress")
+  const dataStore = await Store.findOne({ storeId: storeId }).select(
+    'shippingAddress'
+  )
 
   if (!dataStore) {
     return res.status(404).json({
       status: 404,
-      message: 'Not found store',
+      message: 'Not found store'
     })
   }
-
 
   // const io = getSocket()
   // io.emit('store/getShipping', {});
@@ -1384,14 +1382,21 @@ exports.getShipping = async (req, res) => {
     message: 'sucess',
     data: dataStore.shippingAddress
   })
-
-
 }
 
 exports.addShippingInStore = async (req, res) => {
   try {
-    const { storeId, defaultId, shippingId, address, district,
-      subDistrict, province, postCode, latitude, longtitude
+    const {
+      storeId,
+      defaultId,
+      shippingId,
+      address,
+      district,
+      subDistrict,
+      province,
+      postCode,
+      latitude,
+      longtitude
     } = req.body
 
     const channel = req.headers['x-channel']
@@ -1408,19 +1413,19 @@ exports.addShippingInStore = async (req, res) => {
     if (existStore.length === 0) {
       return res.status(404).json({
         status: 404,
-        message: 'Not found store',
+        message: 'Not found store'
       })
     }
 
     const storeWithShipping = await Store.findOne({
       storeId: storeId,
       'shippingAddress.shippingId': shippingId
-    });
+    })
     if (storeWithShipping) {
       return res.status(409).json({
         status: 409,
-        message: 'This shippingId already exists for this store.',
-      });
+        message: 'This shippingId already exists for this store.'
+      })
     }
 
     const addShipping = await Store.findOneAndUpdate(
@@ -1436,28 +1441,28 @@ exports.addShippingInStore = async (req, res) => {
             province: province,
             postCode: postCode,
             latitude: latitude,
-            longtitude: longtitude,
+            longtitude: longtitude
           }
         }
       },
       { new: true }
-    );
+    )
 
     const io = getSocket()
-    io.emit('store/addShippingInStore', {});
+    io.emit('store/addShippingInStore', {})
 
     return res.status(200).json({
       status: 200,
       message: 'sucess',
       data: addShipping
     })
-
   } catch (error) {
     console.error('addShippingInStore error:', error)
-    return res.status(500).json({ status: 500, message: 'Internal server error' })
+    return res
+      .status(500)
+      .json({ status: 500, message: 'Internal server error' })
   }
 }
-
 
 exports.editShippingInStore = async (req, res) => {
   try {
@@ -1472,7 +1477,7 @@ exports.editShippingInStore = async (req, res) => {
       postCode,
       latitude,
       longitude
-    } = req.body;
+    } = req.body
 
     const channel = req.headers['x-channel']
     const { Store } = getModelsByChannel(channel, res, storeModel)
@@ -1480,58 +1485,65 @@ exports.editShippingInStore = async (req, res) => {
     const existStore = await Store.findOne({
       storeId: storeId,
       'shippingAddress.shippingId': shippingId
-    });
+    })
 
     if (!existStore) {
       return res.status(404).json({
         status: 404,
-        message: 'Not found this shippingId in this store',
-      });
+        message: 'Not found this shippingId in this store'
+      })
     }
 
-    let setObj = {};
-    if (defaultId !== undefined && defaultId !== "") setObj["shippingAddress.$.default"] = defaultId;
-    if (address !== undefined && address !== "") setObj["shippingAddress.$.address"] = address;
-    if (district !== undefined && district !== "") setObj["shippingAddress.$.district"] = district;
-    if (subDistrict !== undefined && subDistrict !== "") setObj["shippingAddress.$.subDistrict"] = subDistrict;
-    if (province !== undefined && province !== "") setObj["shippingAddress.$.province"] = province;
-    if (postCode !== undefined && postCode !== "") setObj["shippingAddress.$.postCode"] = postCode;
-    if (latitude !== undefined && latitude !== "") setObj["shippingAddress.$.latitude"] = latitude;
-    if (longitude !== undefined && longitude !== "") setObj["shippingAddress.$.longitude"] = longitude;
+    let setObj = {}
+    if (defaultId !== undefined && defaultId !== '')
+      setObj['shippingAddress.$.default'] = defaultId
+    if (address !== undefined && address !== '')
+      setObj['shippingAddress.$.address'] = address
+    if (district !== undefined && district !== '')
+      setObj['shippingAddress.$.district'] = district
+    if (subDistrict !== undefined && subDistrict !== '')
+      setObj['shippingAddress.$.subDistrict'] = subDistrict
+    if (province !== undefined && province !== '')
+      setObj['shippingAddress.$.province'] = province
+    if (postCode !== undefined && postCode !== '')
+      setObj['shippingAddress.$.postCode'] = postCode
+    if (latitude !== undefined && latitude !== '')
+      setObj['shippingAddress.$.latitude'] = latitude
+    if (longitude !== undefined && longitude !== '')
+      setObj['shippingAddress.$.longitude'] = longitude
 
     if (Object.keys(setObj).length === 0) {
       return res.status(400).json({
         status: 400,
-        message: 'No valid fields to update',
-      });
+        message: 'No valid fields to update'
+      })
     }
 
     const updatedStore = await Store.findOneAndUpdate(
       { storeId: storeId, 'shippingAddress.shippingId': shippingId },
       { $set: setObj },
       { new: true }
-    );
+    )
 
     const io = getSocket()
-    io.emit('store/editShippingInStore', {});
-
+    io.emit('store/editShippingInStore', {})
 
     return res.status(200).json({
       status: 200,
       message: 'success',
       data: updatedStore
-    });
+    })
   } catch (error) {
     console.error('editShippingInStore error:', error)
-    return res.status(500).json({ status: 500, message: 'Internal server error' });
+    return res
+      .status(500)
+      .json({ status: 500, message: 'Internal server error' })
   }
 }
 
-
-
 exports.deleteShippingFromStore = async (req, res) => {
   try {
-    const { storeId, shippingId } = req.body; // หรือ req.params, แล้วแต่ดีไซน์
+    const { storeId, shippingId } = req.body // หรือ req.params, แล้วแต่ดีไซน์
 
     const channel = req.headers['x-channel']
     const { Store } = getModelsByChannel(channel, res, storeModel)
@@ -1540,13 +1552,13 @@ exports.deleteShippingFromStore = async (req, res) => {
     const existStore = await Store.findOne({
       storeId: storeId,
       'shippingAddress.shippingId': shippingId
-    });
+    })
 
     if (!existStore) {
       return res.status(404).json({
         status: 404,
-        message: 'Not found this shippingId in this store',
-      });
+        message: 'Not found this shippingId in this store'
+      })
     }
 
     // ลบ shippingAddress ที่ตรงกับ shippingId นี้
@@ -1554,18 +1566,20 @@ exports.deleteShippingFromStore = async (req, res) => {
       { storeId: storeId },
       { $pull: { shippingAddress: { shippingId: shippingId } } },
       { new: true }
-    );
+    )
 
     const io = getSocket()
-    io.emit('store/deleteShippingFromStore', {});
+    io.emit('store/deleteShippingFromStore', {})
 
     return res.status(200).json({
       status: 200,
       message: 'success',
       data: updatedStore
-    });
+    })
   } catch (error) {
     console.error('deleteShippingFromStore error:', error)
-    return res.status(500).json({ status: 500, message: 'Internal server error' });
+    return res
+      .status(500)
+      .json({ status: 500, message: 'Internal server error' })
   }
 }
