@@ -120,7 +120,7 @@ SELECT
 --     Col_o_JobTitle AS role,
     '1' AS status
     FROM [192.168.0.3].[AntDB].[dbo].[hs_User] AS hr
-    WHERE Col_o_JobTitle NOT IN ('cash', 'credit', 'Credit Top', 'PC', 'EV', 'Food Service','DC')
+    WHERE Col_o_JobTitle NOT IN ('cash', 'credit', 'Credit Top', 'PC', 'EV', 'Food Service')
 
 --     WHERE 
 --       Col_o_JobTitle in ('Developer','IT Support','Sale_Manager','Supervisor','Area_Manager','IT')
@@ -868,8 +868,6 @@ exports.routeQuery = async function (channel) {
                 store_status <> '90' AND 
                 LEFT(OKRGDT, 6) <> CONVERT(nvarchar(6), GETDATE(), 112)
                AND a.Channel = '103'
---                AND StoreID = 'VB22500328'
---               AND CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet ='202507BE214R19'
              ORDER BY a.Area, RouteSet
         `
   }

@@ -2076,3 +2076,99 @@ exports.checkRouteStore = async (req, res) => {
     res.status(500).json({ status: 500, message: 'Internal server error' });
   }
 }
+
+exports.polylineRoute = async (req, res) => {
+  try {
+
+    const { area, period } = req.query
+    const channel = req.headers['x-channel']
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+
+    function haversineDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371 // Earth's radius in km
+      const toRad = deg => (deg * Math.PI) / 180
+
+      const dLat = toRad(lat2 - lat1)
+      const dLon = toRad(lon2 - lon1)
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) ** 2
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+      return R * c
+    }
+
+    function sortNearest(points) {
+      if (!points.length) return []
+
+      const visited = []
+      const remaining = [...points]
+
+      // เริ่มจากจุดที่ latitude น้อยที่สุด
+      let current = remaining.reduce((a, b) =>
+        parseFloat(a.latitude) < parseFloat(b.latitude) ? a : b
+      )
+
+      visited.push(current)
+      remaining.splice(remaining.indexOf(current), 1)
+
+      while (remaining.length > 0) {
+        const next = remaining.reduce((nearest, point) => {
+          const distToNearest = haversineDistance(
+            current.latitude, current.longtitude,
+            nearest.latitude, nearest.longtitude
+          )
+          const distToPoint = haversineDistance(
+            current.latitude, current.longtitude,
+            point.latitude, point.longtitude
+          )
+          return distToPoint < distToNearest ? point : nearest
+        })
+
+        visited.push(next)
+        remaining.splice(remaining.indexOf(next), 1)
+        current = next
+      }
+
+      return visited
+    }
+
+    const dataRoute = await Route.find({ area: area, period: period })
+
+    const locations = dataRoute.flatMap(i =>
+      i.listStore
+        .filter(u => {
+          const lat = parseFloat(u.latitude)
+          const lng = parseFloat(u.longtitude)
+          return !isNaN(lat) && !isNaN(lng)
+        })
+        .map(u => ({
+          latitude: u.latitude,
+          longtitude: u.longtitude
+        }))
+    )
+
+    if (locations.length === 0) {
+
+      return res.status(404).json({
+        status : 404 ,
+        message:'Not found latitude, locations'
+      })
+    }
+
+    const sortedPath = sortNearest(locations)
+
+    res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: sortedPath
+    })
+
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ status: 500, message: 'Internal server error' });
+  }
+}
