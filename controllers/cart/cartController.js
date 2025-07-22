@@ -417,7 +417,7 @@ exports.adjustProduct = async (req, res) => {
 
     // --- STEP 4: อัพเดต stock ตาม delta
     let updateResult = null
-    if (!condition) {
+    if (  type === 'sale' || type === 'give') {
     if (delta !== 0) {
       const qtyProductStock = { id, qty: Math.abs(delta), unit }
       // เพิ่มใน cart (OUT = หักจาก stock) | ลดใน cart (IN = คืนเข้า stock)
@@ -433,7 +433,29 @@ exports.adjustProduct = async (req, res) => {
       )
       if (updateResult) return // (กรณี stock ไม่พอ)
     }
+  } 
+  else if (type === 'withdraw' ) {
+
+
+      // const qtyProductStock = { id, qty: Math.abs(delta), unit }
+      // // เพิ่มใน cart (OUT = หักจาก stock) | ลดใน cart (IN = คืนเข้า stock)
+      // const adjStockType = delta > 0 ? 'OUT' : 'IN'
+      // updateResult = await updateStockMongo(
+      //   qtyProductStock,
+      //   area,
+      //   period,
+      //   'adjust',
+      //   channel,
+      //   adjStockType,
+      //   res
+      // )
+      // if (updateResult) return // (กรณี stock ไม่พอ)
+
+
+  }else if (type === 'withdraw' ) {
+
   }
+
     // --- STEP 5: อัพเดตจำนวนใน cart ให้ตรงกับ qty ล่าสุด
 
     if (condition) {

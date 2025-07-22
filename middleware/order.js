@@ -233,7 +233,8 @@ module.exports.updateStockMongo = async function (
       'promotion',
       'approvedAdjustStockReduce',
       'approvedAdjustStockAdd',
-      'approvedChangeOrder'
+      'approvedChangeOrder',
+      'adjustWithdraw'
     ].includes(type)
   )
     throw new Error('Invalid stock update type: ' + type)
@@ -449,7 +450,39 @@ module.exports.updateStockMongo = async function (
         }
       )
     }
-  } else if (type === 'refund') {
+  } else if (type === 'adjustWithdraw') {
+
+    const found = await checkProductInStock(Stock, area, period, id)
+    if (!found)
+      throw new Error(
+        `Product id:${id} not found in stock for area:${area} period:${period}`
+      )
+    let incObj = {}
+    if (stockType === 'IN') {
+      incObj['listProduct.$[elem].balancePcs'] = +factorPcsQty
+      incObj['listProduct.$[elem].balanceCtn'] = +factorCtnQty
+    } else if (stockType === 'OUT') {
+      incObj['listProduct.$[elem].balancePcs'] = -factorPcsQty
+      incObj['listProduct.$[elem].balanceCtn'] = -factorCtnQty
+    }
+
+    if (Object.keys(incObj).length > 0) {
+      await Stock.findOneAndUpdate(
+        {
+          area: area,
+          period: period,
+          'listProduct.productId': id
+        },
+        { $inc: incObj },
+        {
+          arrayFilters: [{ 'elem.productId': id }],
+          new: true
+        }
+      )
+    }
+
+  }
+  else if (type === 'refund') {
     // In: เพิ่ม stock จากคืนสินค้า
     const found = await checkProductInStock(Stock, area, period, id)
     if (!found)
@@ -567,5 +600,5 @@ module.exports.updateStockMongo = async function (
     } catch (err) {
       throw new Error('Error updating stock for rufundCanceled: ' + err.message)
     }
-  } 
+  }
 }
