@@ -429,7 +429,7 @@ exports.getOrder = async (req, res) => {
         .status(404)
         .json({ status: 404, message: 'Distribution order not found!' })
     }
-
+    // console.log(order)
     response = order.map(o => ({
       area: o.area,
       orderId: o.orderId,

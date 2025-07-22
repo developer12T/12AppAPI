@@ -17,6 +17,8 @@ const cartModel = require('../../models/cash/cart')
 const userModel = require('../../models/cash/user')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { to2, updateStockMongo } = require('../../middleware/order')
+const { formatDateTimeToThai } = require('../../middleware/order')
+const { create } = require('lodash')
 
 exports.addGiveType = async (req, res) => {
   try {
@@ -491,18 +493,20 @@ exports.getOrder = async (req, res) => {
       })
     }
 
-    response = order.map(o => ({
-      orderId: o.orderId,
-      area: o.store.area,
-      giveName: o.giveInfo?.name || '',
-      storeId: o.store?.storeId || '',
-      storeName: o.store?.name || '',
-      storeAddress: o.store?.address || '',
-      createAt: o.createdAt,
-      total: o.total,
-      status: o.status
-    }))
-
+    response = order
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) // เรียงจากใหม่ไปเก่า
+      .map(o => ({
+        orderId: o.orderId,
+        area: o.store.area,
+        giveName: o.giveInfo?.name || '',
+        storeId: o.store?.storeId || '',
+        storeName: o.store?.name || '',
+        storeAddress: o.store?.address || '',
+        createAt: o.createdAt,
+        total: o.total,
+        status: o.status
+      }))
+    // console.log(response)
     // const io = getSocket()
     // io.emit('give/all', {});
 
