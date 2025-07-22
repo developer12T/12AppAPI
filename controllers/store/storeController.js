@@ -1073,40 +1073,28 @@ exports.updateRunningNumber = async (req, res) => {
 exports.addBueatyStore = async (req, res) => {
   const channel = req.headers['x-channel']
 
-  // 1. Start session
-  const session = await mongoose.startSession()
-  session.startTransaction()
-
   try {
     const bueatydata = await bueatyStoreQuery()
-
     const { TypeStore } = getModelsByChannel(channel, res, storeModel)
 
-    // 2. Delete all
-    await TypeStore.deleteMany({}, { session })
+    // 1. ลบข้อมูลเดิมทั้งหมด
+    await TypeStore.deleteMany({})
 
-    // 3. Insert new
-    // (สามารถ optimize เป็น insertMany ได้ ถ้าไม่มีเงื่อนไข exists)
+    // 2. เพิ่มข้อมูลใหม่
     await TypeStore.insertMany(
-      bueatydata.map(x => ({ ...x, type: ['beauty'] })),
-      { session }
+      bueatydata.map(x => ({ ...x, type: ['beauty'] }))
     )
 
-    // 4. Commit
-    await session.commitTransaction()
-    session.endSession()
-
+    // 3. ส่ง socket event
     const io = getSocket()
     io.emit('store/addBueatyStore', {})
 
+    // 4. ตอบกลับ
     res.status(200).json({
       status: 200,
       message: bueatydata
     })
   } catch (error) {
-    // 5. Rollback
-    await session.abortTransaction()
-    session.endSession()
     console.error(error)
     res.status(500).json({ status: 500, message: error.message })
   }
