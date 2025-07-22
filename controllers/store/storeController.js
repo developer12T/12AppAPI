@@ -452,37 +452,42 @@ exports.checkSimilarStores = async (req, res) => {
     { area: store.area }
   )
 
+  // 1. กำหนด weight ของแต่ละ field (ค่า sum ต้องไม่จำเป็นต้องรวมกันเท่ากับ 100)
   const fieldsToCheck = [
-    'name',
-    'taxId',
-    'tel',
-    'address',
-    'district',
-    'subDistrict',
-    'province',
-    'postCode',
-    'latitude',
-    'longtitude'
+    { field: 'name', weight: 2 },
+    { field: 'taxId', weight: 4 },
+    { field: 'tel', weight: 3 },
+    { field: 'address', weight: 2 },
+    { field: 'district', weight: 0.5 },
+    { field: 'subDistrict', weight: 0.5 },
+    { field: 'province', weight: 0.5 },
+    { field: 'postCode', weight: 0.5 },
+    { field: 'latitude', weight: 0.5 },
+    { field: 'longtitude', weight: 0.5 }
   ]
+
+  const totalWeight = fieldsToCheck.reduce((sum, cur) => sum + cur.weight, 0)
 
   const similarStores = existingStores
     .map(existingStore => {
-      let totalSimilarity = 0
-      fieldsToCheck.forEach(field => {
+      let weightedSimilarity = 0
+      fieldsToCheck.forEach(({ field, weight }) => {
         const similarity = calculateSimilarity(
           store[field]?.toString() || '',
           existingStore[field]?.toString() || ''
         )
-        totalSimilarity += similarity
+        weightedSimilarity += similarity * weight
       })
 
-      const averageSimilarity = totalSimilarity / fieldsToCheck.length
+      // Average, normalized by total weight
+      const averageSimilarity = weightedSimilarity / totalWeight
+
       return {
         store: existingStore,
         similarity: averageSimilarity
       }
     })
-    .filter(result => result.similarity > 50)
+    .filter(result => result.similarity > 75) // threshold
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, 3)
 
@@ -507,7 +512,8 @@ exports.checkSimilarStores = async (req, res) => {
   }
   return res.status(204).json({
     status: '204',
-    message: 'Do not have similar store'
+    message: 'Do not have similar store',
+    data: []
   })
 }
 exports.editStore = async (req, res) => {
