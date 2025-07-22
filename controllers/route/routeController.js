@@ -2100,16 +2100,27 @@ exports.polylineRoute = async (req, res) => {
       return R * c
     }
 
+    function haversineDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371
+      const toRad = deg => (deg * Math.PI) / 180
+
+      const dLat = toRad(lat2 - lat1)
+      const dLon = toRad(lon2 - lon1)
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) ** 2
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+      return R * c
+    }
+
     function sortNearest(points) {
       if (!points.length) return []
 
       const visited = []
       const remaining = [...points]
 
-      // เริ่มจากจุดที่ latitude น้อยที่สุด
-      let current = remaining.reduce((a, b) =>
-        parseFloat(a.latitude) < parseFloat(b.latitude) ? a : b
-      )
+      let current = remaining.reduce((a, b) => a[1] < b[1] ? a : b) // [lng, lat]
 
       visited.push(current)
       remaining.splice(remaining.indexOf(current), 1)
@@ -2117,12 +2128,10 @@ exports.polylineRoute = async (req, res) => {
       while (remaining.length > 0) {
         const next = remaining.reduce((nearest, point) => {
           const distToNearest = haversineDistance(
-            current.latitude, current.longtitude,
-            nearest.latitude, nearest.longtitude
+            current[1], current[0], nearest[1], nearest[0]
           )
           const distToPoint = haversineDistance(
-            current.latitude, current.longtitude,
-            point.latitude, point.longtitude
+            current[1], current[0], point[1], point[0]
           )
           return distToPoint < distToNearest ? point : nearest
         })
@@ -2144,17 +2153,17 @@ exports.polylineRoute = async (req, res) => {
           const lng = parseFloat(u.longtitude)
           return !isNaN(lat) && !isNaN(lng)
         })
-        .map(u => ({
-          latitude: u.latitude,
-          longtitude: u.longtitude
-        }))
+        .map(u => [
+          parseFloat(u.longtitude),
+          parseFloat(u.latitude)
+        ])
     )
 
     if (locations.length === 0) {
 
       return res.status(404).json({
-        status : 404 ,
-        message:'Not found latitude, locations'
+        status: 404,
+        message: 'Not found latitude, locations'
       })
     }
 
