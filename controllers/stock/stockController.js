@@ -231,6 +231,7 @@ exports.getAdjustStock = async (req, res) => {
       area: o.area,
       saleCode: o.saleCode,
       period: o.period,
+      listProduct : o.listProduct,
       statusTH: o.statusTH,
       status: o.status,
       createdAt: o.createdAt,
