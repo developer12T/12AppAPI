@@ -136,6 +136,7 @@ const withdrawSchema = mongoose.Schema({
     WH: { type: String, required: true },
     ROUTE: { type: String, required: true },
     WH1: { type: String, required: true },
+    Dc_Email: { type: String,  },
 });
 
 

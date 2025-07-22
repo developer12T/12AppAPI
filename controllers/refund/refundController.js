@@ -474,6 +474,8 @@ exports.getRefund = async (req, res) => {
         }
       })
     )
+    
+    const responseSort = response.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 
     // const io = getSocket()
     // io.emit('refund/all', {});
@@ -481,7 +483,7 @@ exports.getRefund = async (req, res) => {
     res.status(200).json({
       status: 200,
       message: 'Successful!',
-      data: response
+      data: responseSort
     })
   } catch (error) {
     console.error(error)
