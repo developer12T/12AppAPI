@@ -3,6 +3,8 @@ const { getModelsByChannel } = require('../middleware/channel')
 const cartModel = require('../models/cash/cart')
 const productModel = require('../models/cash/product')
 const stockModel = require('../models/cash/stock')
+const nodemailer = require('nodemailer')
+require('dotenv').config()
 
 exports.updateRunningNumber = async (data, transaction) => {
   try {
@@ -602,3 +604,30 @@ module.exports.updateStockMongo = async function (
     }
   }
 }
+
+
+
+module.exports.sendEmail = async function ({ to, subject, html }) {
+  try {
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.office365.com',
+      port: 587,
+      secure: false, // ใช้ STARTTLS
+      auth: {
+        user: process.env.MY_MAIL_USER, // เช่น your_email@outlook.com
+        pass: process.env.MY_MAIL_PASS,
+      },
+    });
+
+    const info = await transporter.sendMail({
+      from: `"it test" <${process.env.MY_MAIL_USER}>`, // ผู้ส่งต้องเป็น email ที่คุณใช้จริง
+      to,
+      subject,
+      html,
+    });
+
+    console.log('✅ Email sent:', info.messageId);
+  } catch (err) {
+    console.error('❌ Failed to send email:', err.message);
+  }
+};

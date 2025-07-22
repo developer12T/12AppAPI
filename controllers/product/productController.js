@@ -87,13 +87,32 @@ exports.getProduct = async (req, res) => {
     const { Stock } = getModelsByChannel(channel, res, stockModel)
     const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
+    const parseArrayParam = param => {
+      if (!param) return []
+      try {
+        return typeof param === 'string' ? JSON.parse(param) : param
+      } catch {
+        return param.split(',')
+      }
+    }
+
+    const parseGram = sizeStr => {
+      const match = sizeStr.match(/^([\d.]+)(?:-[A-Z])?\s*(KG|G|g|kg)?/i)
+      if (!match) return 0
+      const value = parseFloat(match[1])
+      const unit = (match[2] || 'G').toUpperCase()
+      return unit === 'KG' ? value * 1000 : value
+    }
+
+    let products = []
+    let stock = []
+
     if (orderId) {
-      const dataWithdraw = await Distribution.findOne({ orderId: orderId })
+      const dataWithdraw = await Distribution.findOne({ orderId })
+      const productIds = dataWithdraw.listProduct.map(item => item.id)
 
-      orderProductId = dataWithdraw.listProduct.map(item => ({ id: item.id }))
-      let products = await Product.find({ id: { $eq: orderProductId[0].id } }).lean()
+      products = await Product.find({ id: { $in: productIds } }).lean()
 
-      // console.log(orderProductId)
       stock = await Stock.aggregate([
         {
           $match: {
@@ -101,10 +120,10 @@ exports.getProduct = async (req, res) => {
             area: dataWithdraw.area
           }
         },
-        { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
+        { $unwind: '$listProduct' },
         {
           $match: {
-            'listProduct.productId': { $eq: orderProductId[0].id }
+            'listProduct.productId': { $in: productIds }
           }
         },
         {
@@ -115,80 +134,7 @@ exports.getProduct = async (req, res) => {
           }
         }
       ])
-
-
-
-      products = products.map(product => {
-        const modifiedProduct = { ...product }
-
-        if (type === 'sale') {
-          modifiedProduct.listUnit = modifiedProduct.listUnit.map(unit => ({
-            unit: unit.unit,
-            name: unit.name,
-            factor: unit.factor,
-            price: unit.price.sale
-          }))
-        }
-
-        if (type === 'refund') {
-          modifiedProduct.listUnit = modifiedProduct.listUnit.map(unit => ({
-            unit: unit.unit,
-            name: unit.name,
-            factor: unit.factor,
-            price: unit.price.refund
-          }))
-        }
-
-        if (type === 'withdraw') {
-          modifiedProduct.listUnit = modifiedProduct.listUnit
-            .filter(unit => unit.unit === 'CTN')
-            .map(unit => ({
-              unit: unit.unit,
-              name: unit.name,
-              factor: unit.factor
-            }))
-        }
-
-        return modifiedProduct
-      })
-
-      function parseGram(sizeStr) {
-        // support "800 G", "1 KG", "850-P G", "420-N G", "850-S G", "350-P G"
-        let match = sizeStr.match(/^([\d.]+)(?:-[A-Z])?\s*(KG|G|g|kg)?/i)
-        if (!match) return 0
-        let value = parseFloat(match[1])
-        let unit = (match[2] || 'G').toUpperCase()
-        if (unit === 'KG') return value * 1000
-        return value
-      }
-
-
-      data = products
-        .map(product => {
-          const matchedStock = stock.find(s => s._id === product.id) || {}
-          return {
-            ...product,
-            qtyCtn: matchedStock.balanceCtn || 0,
-            qtyPcs: matchedStock.balancePcs || 0
-          }
-        })
-        .sort((a, b) => {
-          // เรียง groupCode จากน้อยไปมาก
-          if (a.groupCode < b.groupCode) return -1
-          if (a.groupCode > b.groupCode) return 1
-          // ถ้า groupCode เท่ากันให้ sort อย่างอื่นต่อ
-          return parseGram(a.size) - parseGram(b.size)
-        })
-
-      res.status(200).json({
-        status: '200',
-        message: 'Products fetched successfully!',
-        data: data
-      })
-
-
     } else {
-
       if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
         return res.status(400).json({
           status: '400',
@@ -196,35 +142,25 @@ exports.getProduct = async (req, res) => {
         })
       }
 
-      let filter = {}
-
-      if (type === 'sale') filter.statusSale = 'Y'
-      if (type === 'refund') filter.statusRefund = 'Y'
-      if (type === 'withdraw') filter.statusWithdraw = 'Y'
-
-      const parseArrayParam = param => {
-        if (!param) return []
-        try {
-          return typeof param === 'string' ? JSON.parse(param) : param
-        } catch (error) {
-          return param.split(',')
-        }
-      }
-
       const groupArray = parseArrayParam(group)
       const brandArray = parseArrayParam(brand)
       const sizeArray = parseArrayParam(size)
       const flavourArray = parseArrayParam(flavour)
 
-      let conditions = []
-      if (groupArray.length) conditions.push({ group: { $in: groupArray } })
-      if (brandArray.length) conditions.push({ brand: { $in: brandArray } })
-      if (sizeArray.length) conditions.push({ size: { $in: sizeArray } })
-      if (flavourArray.length) conditions.push({ flavour: { $in: flavourArray } })
+      const filter = {
+        ...(type === 'sale' && { statusSale: 'Y' }),
+        ...(type === 'refund' && { statusRefund: 'Y' }),
+        ...(type === 'withdraw' && { statusWithdraw: 'Y' })
+      }
 
-      if (conditions.length) filter.$and = conditions
+      const andConditions = []
+      if (groupArray.length) andConditions.push({ group: { $in: groupArray } })
+      if (brandArray.length) andConditions.push({ brand: { $in: brandArray } })
+      if (sizeArray.length) andConditions.push({ size: { $in: sizeArray } })
+      if (flavourArray.length) andConditions.push({ flavour: { $in: flavourArray } })
+      if (andConditions.length) filter.$and = andConditions
 
-      let products = await Product.find(filter).lean()
+      products = await Product.find(filter).lean()
 
       stock = await Stock.aggregate([
         {
@@ -233,7 +169,7 @@ exports.getProduct = async (req, res) => {
             area: area
           }
         },
-        { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
+        { $unwind: '$listProduct' },
         {
           $group: {
             _id: '$listProduct.productId',
@@ -242,97 +178,49 @@ exports.getProduct = async (req, res) => {
           }
         }
       ])
+    }
 
+    if (!products.length) {
+      return res.status(404).json({ status: '404', message: 'No products found!' })
+    }
 
-
-      if (!products.length) {
-        return res.status(404).json({
-          status: '404',
-          message: 'No products found!'
-        })
-      }
-
-      products = products.map(product => {
-        const modifiedProduct = { ...product }
+    const data = products
+      .map(product => {
+        const stockMatch = stock.find(s => s._id === product.id) || {}
+        let listUnit = product.listUnit || []
 
         if (type === 'sale') {
-          modifiedProduct.listUnit = modifiedProduct.listUnit.map(unit => ({
-            unit: unit.unit,
-            name: unit.name,
-            factor: unit.factor,
-            price: unit.price.sale
-          }))
+          listUnit = listUnit.map(u => ({ ...u, price: u.price?.sale }))
+        } else if (type === 'refund') {
+          listUnit = listUnit.map(u => ({ ...u, price: u.price?.refund }))
+        } else if (type === 'withdraw') {
+          listUnit = listUnit.filter(u => u.unit === 'CTN')
         }
 
-        if (type === 'refund') {
-          modifiedProduct.listUnit = modifiedProduct.listUnit.map(unit => ({
-            unit: unit.unit,
-            name: unit.name,
-            factor: unit.factor,
-            price: unit.price.refund
-          }))
+        return {
+          ...product,
+          listUnit,
+          qtyCtn: stockMatch.balanceCtn || 0,
+          qtyPcs: stockMatch.balancePcs || 0
         }
-
-        if (type === 'withdraw') {
-          modifiedProduct.listUnit = modifiedProduct.listUnit
-            .filter(unit => unit.unit === 'CTN')
-            .map(unit => ({
-              unit: unit.unit,
-              name: unit.name,
-              factor: unit.factor
-            }))
-        }
-
-        return modifiedProduct
+      })
+      .sort((a, b) => {
+        if (a.groupCode < b.groupCode) return -1
+        if (a.groupCode > b.groupCode) return 1
+        return parseGram(a.size) - parseGram(b.size)
       })
 
-      function parseGram(sizeStr) {
-        // support "800 G", "1 KG", "850-P G", "420-N G", "850-S G", "350-P G"
-        let match = sizeStr.match(/^([\d.]+)(?:-[A-Z])?\s*(KG|G|g|kg)?/i)
-        if (!match) return 0
-        let value = parseFloat(match[1])
-        let unit = (match[2] || 'G').toUpperCase()
-        if (unit === 'KG') return value * 1000
-        return value
-      }
-
-
-      data = products
-        .map(product => {
-          const matchedStock = stock.find(s => s._id === product.id) || {}
-          return {
-            ...product,
-            qtyCtn: matchedStock.balanceCtn || 0,
-            qtyPcs: matchedStock.balancePcs || 0
-          }
-        })
-        .sort((a, b) => {
-          // เรียง groupCode จากน้อยไปมาก
-          if (a.groupCode < b.groupCode) return -1
-          if (a.groupCode > b.groupCode) return 1
-          // ถ้า groupCode เท่ากันให้ sort อย่างอื่นต่อ
-          return parseGram(a.size) - parseGram(b.size)
-        })
-
-
-
-
-
-      // const io = getSocket()
-      // io.emit('product/get', {});
-
-      res.status(200).json({
-        status: '200',
-        message: 'Products fetched successfully!',
-        data: data
-      })
-
-    }
+    res.status(200).json({
+      status: '200',
+      message: 'Products fetched successfully!',
+      data
+    })
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '501', message: error.message })
   }
 }
+
 
 exports.getFilters = async (req, res) => {
   try {
