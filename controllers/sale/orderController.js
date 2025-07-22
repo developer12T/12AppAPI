@@ -1635,7 +1635,8 @@ exports.getSummarybyMonth = async (req, res) => {
     pipeline.push(
       {
         $match: {
-          'store.area': area
+          'store.area': area,
+          status:'pending'
         }
       },
       { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
