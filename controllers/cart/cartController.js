@@ -595,8 +595,9 @@ exports.deleteProduct = async (req, res) => {
     }
 
     const period = getPeriodFromDate(cart.createdAt)
-    if (type != 'withdraw' || type != 'adjuststock') {
+    if (type != 'withdraw' && type != 'adjuststock') {
       // await updateStockMongo(product, area, period, 'deleteCart', channel)
+      // console.log(type)
       const updateResult = await updateStockMongo(
         product,
         area,
