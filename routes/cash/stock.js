@@ -51,5 +51,5 @@ router.post('/approveAdjustStock', approveAdjustStock)
 router.post('/checkout', checkout)
 router.post('/stockToExcel', stockToExcel)
 
-router.delete('/deleteStockAdjust', deleteStockAdjust)
+router.post('/deleteStockAdjust', deleteStockAdjust)
 module.exports = router

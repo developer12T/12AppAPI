@@ -181,6 +181,9 @@ exports.getAdjustStock = async (req, res) => {
     }
 
     const pipeline = [
+      {$match:{
+        status:'pending'
+      }},
       {
         $addFields: {
           zone: { $substrBytes: ['$area', 0, 2] },
@@ -2790,11 +2793,15 @@ exports.deleteStockAdjust = async (req, res) => {
       })
     }
 
-    await AdjustStock.deleteOne({ orderId })
+    // อัปเดตสถานะแทนการลบจริง
+    await AdjustStock.updateOne(
+      { orderId },
+      { status: 'delete', statusTH: 'ถูกลบ' }
+    )
 
     return res.status(200).json({
       status: 200,
-      message: 'Stock adjustment deleted successfully'
+      message: 'Stock adjustment marked as deleted successfully'
     })
   } catch (error) {
     console.error('deleteStockAdjust error:', error)

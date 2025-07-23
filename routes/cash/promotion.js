@@ -18,5 +18,5 @@ router.post('/addQuota', addQuota)
 router.post('/updateQuota', updateQuota)
 router.post('/addPromotionShelf', addPromotionShelf)
 
-router.delete('/deletePromotion', deletePromotion)
+router.post('/deletePromotion', deletePromotion)
 module.exports = router
