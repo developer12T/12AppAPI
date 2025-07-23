@@ -66,7 +66,7 @@ router.post('/insertStoreToErpOne', insertStoreToErpOne)
 router.post('/addShippingInStore', addShippingInStore)
 router.post('/deleteShippingFromStore', deleteShippingFromStore)
 router.post('/editShippingInStore', editShippingInStore)
-router.delete('/deleteStore', deleteStore)
+router.post('/deleteStore', deleteStore)
 
 
 // router.get('/test', test)

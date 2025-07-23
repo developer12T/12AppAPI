@@ -1684,11 +1684,12 @@ exports.deleteStore = async (req, res) => {
       })
     }
 
-    await Store.deleteOne({ storeId })
+    // เปลี่ยนสถานะเป็น 90 (soft delete)
+    await Store.updateOne({ storeId }, { status: 90 })
 
     return res.status(200).json({
       status: 200,
-      message: 'Store deleted successfully'
+      message: 'Store marked as deleted (status 90)'
     })
   } catch (error) {
     console.error('deleteStore error:', error)
