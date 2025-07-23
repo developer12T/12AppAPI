@@ -10,6 +10,7 @@ const { getSocket } = require('../../socket')
 const addUpload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages'
 )
+
 const sql = require('mssql')
 const {
   storeQuery,
@@ -947,6 +948,49 @@ exports.rejectStore = async (req, res) => {
     data: result
   })
 }
+
+exports.updateStoreStatusNoNewId = async (req, res) => {
+  try {
+    const { storeId, status, user } = req.body
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const store = await Store.findOne({ storeId })
+
+    if (!store) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Store not found'
+      })
+    }
+
+    const result = await Store.findOneAndUpdate(
+      { storeId },
+      {
+        status,
+        updatedDate: Date(),
+        'approve.dateAction': new Date(),
+        'approve.appPerson': user
+      },
+      { new: true }
+    )
+
+    return res.status(200).json({
+      status: 200,
+      message: 'Store status updated successfully',
+    })
+  } catch (error) {
+    console.error('updateStoreStatusNoNewId error:', error)
+    return res.status(500).json({
+      status: 500,
+      message: 'Internal server error'
+    })
+  }
+}
+
+
+
+
 
 exports.addAndUpdateStore = async (req, res) => {
   const channel = req.headers['x-channel']

@@ -2699,6 +2699,11 @@ exports.getSummaryProduct = async (req, res) => {
 
   const constStoreOnArea = await Store.aggregate([
     {
+      $match: {
+        status: { $ne: 'delete' }
+      }
+    },
+    {
       $group: {
         _id: '$area',
         storeIds: { $addToSet: '$storeId' } // เก็บ storeId ที่ไม่ซ้ำใน array
@@ -2969,7 +2974,7 @@ exports.summaryDaily = async (req, res) => {
           period: periodStr,
           createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
           type: 'refund',
-          status: { $nin: ['canceled'] }
+          status: { $nin: ['canceled', 'delete'] }
         }),
         Order.find({
           'store.area': area,
@@ -3177,7 +3182,7 @@ exports.summaryMonthlyByZone = async (req, res) => {
             period: periodStr,
             createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
             type: 'refund',
-            status: { $nin: ['canceled'] }
+            status: { $nin: ['canceled', 'delete'] }
           }),
           Order.find({
             'store.area': area,
