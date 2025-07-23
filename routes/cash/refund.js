@@ -1,5 +1,5 @@
 const express = require('express')
-const { getRefund, getDetail, checkout, addSlip, updateStatus } = require('../../controllers/refund/refundController')
+const { getRefund, getDetail, checkout, addSlip, updateStatus, deleteRefund } = require('../../controllers/refund/refundController')
 
 const router = express.Router()
 
@@ -8,5 +8,5 @@ router.get('/detail/:orderId', getDetail)
 router.post('/checkout', checkout)
 router.post('/addSlip', addSlip)
 router.post('/updateStatus', updateStatus)
-
+router.delete('/deleteRefund', deleteRefund)
 module.exports = router

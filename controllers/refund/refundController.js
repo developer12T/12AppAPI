@@ -832,3 +832,25 @@ exports.updateStatus = async (req, res) => {
     res.status(500).json({ status: 500, message: 'Server error' })
   }
 }
+
+exports.deleteRefund = async (req, res) => {
+  try {
+    const { type, area, store, period } = req.query
+
+    const channel = req.headers['x-channel']
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+
+    let response = []
+
+
+    
+
+
+  } catch (error) {
+    console.error('Error updating refund status:', error)
+    res.status(500).json({ status: 500, message: 'Server error' })
+  }
+
+}
+
