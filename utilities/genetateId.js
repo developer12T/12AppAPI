@@ -81,7 +81,7 @@ const generateOrderId = async (area, warehouse, channel, res) => {
 
     const latestOrder = await Order.findOne({
         "store.area": area,
-        type:'sale',
+        // type:'sale',
         createdAt: {
             $gte: new Date(`${new Date().getFullYear()}-${currentMonth}-01`),
             $lt: new Date(`${new Date().getFullYear()}-${parseInt(currentMonth) + 1}-01`)
