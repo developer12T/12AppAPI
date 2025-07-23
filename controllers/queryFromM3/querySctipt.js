@@ -120,7 +120,7 @@ SELECT
 --     Col_o_JobTitle AS role,
     '1' AS status
     FROM [192.168.0.3].[AntDB].[dbo].[hs_User] AS hr
-    WHERE Col_o_JobTitle NOT IN ('cash', 'credit', 'Credit Top', 'PC', 'EV', 'Food Service','DC')
+    WHERE Col_o_JobTitle NOT IN ('cash', 'credit', 'Credit Top', 'PC', 'EV', 'Food Service')
 
 --     WHERE 
 --       Col_o_JobTitle in ('Developer','IT Support','Sale_Manager','Supervisor','Area_Manager','IT')
@@ -255,7 +255,7 @@ exports.storeQuery = async function (channel) {
                     api_status,
                     head_no,
                     run_no,
-                    store_status,
+                    store_status as status,
                     run_id,
                     OKCUA1,
                     OKCFC3,
@@ -337,6 +337,7 @@ exports.storeQuery = async function (channel) {
     const province = row.province || ''.trim();
     const provinceCode = row.provinceCode || ''.trim();
     const postCode = row.postCode?.trim();
+    const status = row.status?.trim();
     const zone = row.OKSDST?.trim();
     const area = row.area?.trim();
     const latitude = row.lat?.trim();
@@ -384,6 +385,8 @@ exports.storeQuery = async function (channel) {
         province,
         provinceCode,
         zone,
+        postCode,
+        status,
         area,
         latitude,
         longtitude,
@@ -426,7 +429,7 @@ exports.storeQuery = async function (channel) {
       lineId: '',
       'note ': '',
       approve: approveData,
-      status: '20',
+      status: splitData.status,
       policyConsent: poliAgree,
       imageList: [],
       shippingAddress: splitData.shippingAddress,
@@ -868,8 +871,6 @@ exports.routeQuery = async function (channel) {
                 store_status <> '90' AND 
                 LEFT(OKRGDT, 6) <> CONVERT(nvarchar(6), GETDATE(), 112)
                AND a.Channel = '103'
---                AND StoreID = 'VB22500328'
---               AND CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet ='202507BE214R19'
              ORDER BY a.Area, RouteSet
         `
   }
@@ -921,10 +922,9 @@ exports.routeQueryOne = async function (channel, RouteId) {
              LEFT JOIN [DATA_OMS].[dbo].[OCUSMA] ON StoreID = OKCUNO COLLATE Latin1_General_BIN
              LEFT JOIN [dbo].[data_store] b ON StoreID = customerCode
             WHERE store_status <> '90'
-               AND OKCFC3 <> 'DEL'
                AND LEFT(OKRGDT, 6) <> CONVERT(nvarchar(6), GETDATE(), 112)
                AND a.Channel = '103'
-               AND CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet =${RouteId}
+                AND CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet =${RouteId}
              ORDER BY a.Area, RouteSet
         `
   }

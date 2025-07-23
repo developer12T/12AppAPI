@@ -28,5 +28,7 @@ module.exports = {
   MY_SQL_SERVER: process.env.MY_SQL_SERVER,
   MY_SQL_DATABASE: process.env.MY_SQL_DATABASE,
 
-
+  MY_MAIL_USER: process.env.MY_MAIL_USER,
+  MY_MAIL_PASS: process.env.MY_MAIL_PASS,
+  MY_MAIL_HOST: process.env.MY_MAIL_HOST
 };

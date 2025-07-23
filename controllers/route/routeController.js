@@ -9,6 +9,8 @@ const upload = multer({ storage: multer.memoryStorage() }).array(
   'checkInImage',
   1
 )
+const mongoose = require('mongoose')
+
 const sql = require('mssql')
 const { routeQuery, routeQueryOne } = require('../../controllers/queryFromM3/querySctipt')
 const orderModel = require('../../models/cash/sale')
@@ -19,6 +21,7 @@ const { getSocket } = require('../../socket')
 const { getModelsByChannel } = require('../../middleware/channel')
 const path = require('path')
 const { group } = require('console')
+const { formatDateTimeToThai } = require('../../middleware/order')
 
 exports.getRoute = async (req, res) => {
   try {
@@ -397,8 +400,11 @@ exports.addFromERPOne = async (req, res) => {
   try {
     const { id } = req.body
     const channel = req.headers['x-channel']
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
     const result = await routeQueryOne(channel, id)
+    // console.log(result)
     await Route.deleteOne({ id: id });
     const return_arr = []
     for (const row of result) {
@@ -440,8 +446,6 @@ exports.addFromERPOne = async (req, res) => {
       }
     }
 
-    const { Store } = getModelsByChannel(channel, res, storeModel)
-    const { Route } = getModelsByChannel(channel, res, routeModel)
 
     const route = await Route.find({ period: period(), id: id })
     const routeMap = new Map(route.map(route => [route.id, route]))
@@ -1977,22 +1981,18 @@ exports.getRouteByArea = async (req, res) => {
   })
 }
 
-exports.CheckRouteStore = async (req, res) => {
+exports.checkRouteStore = async (req, res) => {
   try {
+
     const { zone, period } = req.query
     const channel = req.headers['x-channel']
     const { Route } = getModelsByChannel(channel, res, routeModel)
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
-
-    if (!period) {
-      return res.status(409).json({
-        status: 409,
-        message: 'period is require'
-      })
+    const queryZone = {}
+    if (zone) {
+      queryZone.zone = zone
     }
-
-
 
     const dataRoute = await Route.aggregate([
       {
@@ -2002,80 +2002,76 @@ exports.CheckRouteStore = async (req, res) => {
       },
       {
         $match: {
-          zone: zone,
-          period: period
+          ...queryZone,
+          period
+        }
+      },
+      {
+        $project: {
+          area: 1,
+          day: 1,
+          storeCount: { $size: "$listStore" }
         }
       },
       {
         $group: {
           _id: { area: "$area", day: "$day" },
-          count: { $sum: { $size: "$listStore" } } // <<< ตรงนี้!
+          count: { $sum: "$storeCount" }
         }
       }
     ]);
 
-    if (dataRoute.length === 0) {
-      return res.status(404).json({
-        status: 404,
-        message: 'Not Found this zone'
-      })
+    const zoneList = [...new Set(dataRoute.map(u => u._id.area.slice(0, 2)))]
+
+    const allStores = await Store.find({
+      zone: zoneList,
+      route: { $in: ['DEL', /^R/] }
+    }).select('area route')
+
+    const storeCountMap = {}
+    for (const store of allStores) {
+      const area = store.area
+      if (!storeCountMap[area]) storeCountMap[area] = { R: 0, del: 0 }
+
+      if (store.route === 'DEL') storeCountMap[area].del++
+      else if (/^R/.test(store.route)) storeCountMap[area].R++
     }
 
-
-
-    function sortKeys(obj) {
-      const area = obj.area;
-      // ดึง key ทั้งหมดที่เป็น R+เลข (ยกเว้น 'R')
-      const rKeys = Object.keys(obj)
-        .filter(k => /^R\d+$/.test(k))
-        .sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1)));
-
-      // หา R ที่ไม่ใช่ Rxx (คือ 'R' อย่างเดียว)
-      const rTotal = obj.R;
-      const delTotal = obj.del;
-
-      // สร้าง object ใหม่
-      const newObj = { area };
-      for (const k of rKeys) newObj[k] = obj[k];
-      if (rTotal !== undefined) newObj['R'] = rTotal;
-      if (delTotal !== undefined) newObj['del'] = delTotal;
-
-      return newObj;
-    }
-
-
-    const allDel = await Store.find({ zone: zone, route: 'DEL' });
-    const allR = await Store.find({ zone: zone, route: { $regex: '^R' } });
-    const areaMap = {};
+    const areaMap = {}
 
     for (const item of dataRoute) {
+      const area = item._id.area
+      const day = item._id.day
+      const key = day.startsWith('R') ? day : `R${day}`
 
-      const area = item._id.area;
-      const day = item._id.day;
-      const key = day.startsWith('R') ? day : `R${day}`; // ให้ day มี R นำหน้า
+      if (!areaMap[area]) areaMap[area] = { area }
 
-      if (!areaMap[area]) areaMap[area] = { area };
-
-      areaMap[area][key] = item.count;
-
-
-      areaMap[area].R = allR.filter(store => store.area === area).length;
-      areaMap[area].del = allDel.filter(store => store.area === area).length;
+      areaMap[area][key] = item.count
+      areaMap[area].R = storeCountMap[area]?.R || 0
+      areaMap[area].del = storeCountMap[area]?.del || 0
     }
 
+    function sortKeys(obj) {
+      const { area, R, del, ...days } = obj
+      const sortedDays = Object.keys(days)
+        .filter(k => /^R\d+$/.test(k))
+        .sort((a, b) => +a.slice(1) - +b.slice(1))
 
-    const result = Object.values(areaMap).sort((a, b) => a.area.localeCompare(b.area));
-    const sortedResult = result.map(sortKeys);
-    // console.log(sortedResult);
+      const newObj = { area }
+      for (const k of sortedDays) newObj[k] = obj[k]
+      if (R !== undefined) newObj.R = R
+      if (del !== undefined) newObj.del = del
+      return newObj
+    }
 
-
-    // const io = getSocket()
-    // io.emit('route/CheckRouteStore', {});
+    const result = Object.values(areaMap)
+      .map(sortKeys)
+      .sort((a, b) => a.area.localeCompare(b.area))
 
     res.status(200).json({
       status: 200,
-      message: 'sucess',
-      data: sortedResult
+      message: 'success',
+      data: result
     })
 
   } catch (error) {
@@ -2083,3 +2079,66 @@ exports.CheckRouteStore = async (req, res) => {
     res.status(500).json({ status: 500, message: 'Internal server error' });
   }
 }
+
+exports.polylineRoute = async (req, res) => {
+  try {
+    const { area, period } = req.query;
+    const channel = req.headers['x-channel'];
+    const { Route } = getModelsByChannel(channel, res, routeModel);
+    const { Store } = getModelsByChannel(channel, res, storeModel);
+
+    const dataRoute = await Route.find({ area, period });
+
+    const storeId = dataRoute.flatMap(item =>
+      item.listStore.map(i => i.storeInfo)
+    );
+
+    const objectIds = storeId
+      .filter(id => mongoose.Types.ObjectId.isValid(id))
+      .map(id => new mongoose.Types.ObjectId(id));
+
+    const dataStore = await Store.find({ _id: { $in: objectIds } });
+
+    const locations = dataRoute.flatMap(item =>
+      item.listStore
+        .filter(u => {
+          const lat = parseFloat(u.latitude);
+          const lng = parseFloat(u.longtitude);
+          return !isNaN(lat) && !isNaN(lng);
+        })
+        .map(u => {
+          const store = dataStore.find(s => s._id.equals(u.storeInfo));
+          const dateObj = new Date(u.date);
+          return {
+            storeId: store?.storeId,
+            route: `R${item.day}`,
+            date: formatDateTimeToThai(u.date),
+            timestamp: dateObj.getTime(),
+            location: [
+              parseFloat(u.longtitude),
+              parseFloat(u.latitude)
+            ]
+          };
+        })
+    ).sort((a, b) => a.timestamp - b.timestamp);
+
+    if (locations.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found latitude, locations'
+      });
+    }
+
+    const finalLocations = locations.map(({ timestamp, ...rest }) => rest);
+
+    res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: finalLocations
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ status: 500, message: 'Internal server error' });
+  }
+};

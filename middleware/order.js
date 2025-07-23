@@ -3,6 +3,8 @@ const { getModelsByChannel } = require('../middleware/channel')
 const cartModel = require('../models/cash/cart')
 const productModel = require('../models/cash/product')
 const stockModel = require('../models/cash/stock')
+const nodemailer = require('nodemailer')
+require('dotenv').config()
 
 exports.updateRunningNumber = async (data, transaction) => {
   try {
@@ -133,7 +135,7 @@ module.exports.getPeriodFromDate = function (createdAt) {
   return `${year}${month}`
 }
 
-async function checkProductInStock (Stock, area, period, id) {
+async function checkProductInStock(Stock, area, period, id) {
   const stock = await Stock.findOne({
     area: area,
     period: period,
@@ -149,8 +151,7 @@ module.exports.updateStockMongo = async function (
   type,
   channel,
   stockType = '',
-  res = null
-) {
+  res = null) {
   const { id, unit, qty, condition } = data
 
   const { Stock } = getModelsByChannel(channel, '', stockModel)
@@ -231,13 +232,17 @@ module.exports.updateStockMongo = async function (
       'refund',
       'change',
       'rufundCanceled',
-      'promotion'
+      'promotion',
+      'approvedAdjustStockReduce',
+      'approvedAdjustStockAdd',
+      'approvedChangeOrder',
+      'adjustWithdraw'
     ].includes(type)
   )
     throw new Error('Invalid stock update type: ' + type)
 
   // Utility: Check enough balance before deduct
-  async function checkBalanceEnough (area, period, id, pcsNeed) {
+  async function checkBalanceEnough(area, period, id, pcsNeed) {
     const stockDoc = await Stock.findOne(
       { area, period, 'listProduct.productId': id },
       { 'listProduct.$': 1 }
@@ -356,7 +361,7 @@ module.exports.updateStockMongo = async function (
     } catch (err) {
       throw new Error('Error updating stock for deleteCart: ' + err.message)
     }
-} else if (type === 'promotion') {
+  } else if (type === 'promotion') {
     // In: Increase stock (return cart to stock)
     try {
       await Stock.findOneAndUpdate(
@@ -432,19 +437,54 @@ module.exports.updateStockMongo = async function (
       incObj['listProduct.$[elem].balancePcs'] = -factorPcsQty
       incObj['listProduct.$[elem].balanceCtn'] = -factorCtnQty
     }
-    await Stock.findOneAndUpdate(
-      {
-        area: area,
-        period: period,
-        'listProduct.productId': id
-      },
-      { $inc: incObj },
-      {
-        arrayFilters: [{ 'elem.productId': id }],
-        new: true
-      }
-    )
-  } else if (type === 'refund' || type === 'rufund') {
+
+    if (Object.keys(incObj).length > 0) {
+      await Stock.findOneAndUpdate(
+        {
+          area: area,
+          period: period,
+          'listProduct.productId': id
+        },
+        { $inc: incObj },
+        {
+          arrayFilters: [{ 'elem.productId': id }],
+          new: true
+        }
+      )
+    }
+  } else if (type === 'adjustWithdraw') {
+
+    const found = await checkProductInStock(Stock, area, period, id)
+    if (!found)
+      throw new Error(
+        `Product id:${id} not found in stock for area:${area} period:${period}`
+      )
+    let incObj = {}
+    if (stockType === 'IN') {
+      incObj['listProduct.$[elem].balancePcs'] = +factorPcsQty
+      incObj['listProduct.$[elem].balanceCtn'] = +factorCtnQty
+    } else if (stockType === 'OUT') {
+      incObj['listProduct.$[elem].balancePcs'] = -factorPcsQty
+      incObj['listProduct.$[elem].balanceCtn'] = -factorCtnQty
+    }
+
+    if (Object.keys(incObj).length > 0) {
+      await Stock.findOneAndUpdate(
+        {
+          area: area,
+          period: period,
+          'listProduct.productId': id
+        },
+        { $inc: incObj },
+        {
+          arrayFilters: [{ 'elem.productId': id }],
+          new: true
+        }
+      )
+    }
+
+  }
+  else if (type === 'refund') {
     // In: เพิ่ม stock จากคืนสินค้า
     const found = await checkProductInStock(Stock, area, period, id)
     if (!found)
@@ -452,7 +492,7 @@ module.exports.updateStockMongo = async function (
         `Product id:${id} not found in stock for area:${area} period:${period}`
       )
     // ถ้ามี condition ให้ใช้เพิ่ม logic ได้
-    if (type === 'rufund' && condition !== 'good') return
+    if (type === 'refund' && condition !== 'good') return
     try {
       await Stock.findOneAndUpdate(
         {
@@ -504,5 +544,91 @@ module.exports.updateStockMongo = async function (
     } catch (err) {
       throw new Error('Error updating stock for rufundCanceled: ' + err.message)
     }
+  } else if (type === 'approvedAdjustStockReduce') {
+    const found = await checkProductInStock(Stock, area, period, id)
+    if (!found)
+      throw new Error(
+        `Product id:${id} not found in stock for area:${area} period:${period}`
+      )
+    try {
+      await Stock.findOneAndUpdate(
+        {
+          area: area,
+          period: period,
+          'listProduct.productId': id
+        },
+        {
+          $inc: {
+            'listProduct.$[elem].stockOutPcs': -factorPcsQty,
+            'listProduct.$[elem].balancePcs': -factorPcsQty,
+            'listProduct.$[elem].stockOutCtn': -factorCtnQty,
+            'listProduct.$[elem].balanceCtn': -factorCtnQty
+          }
+        },
+        {
+          arrayFilters: [{ 'elem.productId': id }],
+          new: true
+        }
+      )
+    } catch (err) {
+      throw new Error('Error updating stock for rufundCanceled: ' + err.message)
+    }
+  } else if (type === 'approvedAdjustStockAdd') {
+    const found = await checkProductInStock(Stock, area, period, id)
+    if (!found)
+      throw new Error(
+        `Product id:${id} not found in stock for area:${area} period:${period}`
+      )
+    try {
+      await Stock.findOneAndUpdate(
+        {
+          area: area,
+          period: period,
+          'listProduct.productId': id
+        },
+        {
+          $inc: {
+            'listProduct.$[elem].stockOutPcs': +factorPcsQty,
+            'listProduct.$[elem].balancePcs': +factorPcsQty,
+            'listProduct.$[elem].stockOutCtn': +factorCtnQty,
+            'listProduct.$[elem].balanceCtn': +factorCtnQty
+          }
+        },
+        {
+          arrayFilters: [{ 'elem.productId': id }],
+          new: true
+        }
+      )
+    } catch (err) {
+      throw new Error('Error updating stock for rufundCanceled: ' + err.message)
+    }
   }
 }
+
+
+
+module.exports.sendEmail = async function ({ to, subject, html }) {
+  try {
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.office365.com',
+      port: 587,
+      secure: false, // ใช้ STARTTLS
+      auth: {
+        user: process.env.MY_MAIL_USER, // เช่น your_email@outlook.com
+        pass: process.env.MY_MAIL_PASS,
+      },
+    });
+
+    const info = await transporter.sendMail({
+      from: `"it test" <${process.env.MY_MAIL_USER}>`, // ผู้ส่งต้องเป็น email ที่คุณใช้จริง
+      to,
+      subject,
+      html,
+    });
+
+    console.log('✅ Email sent:', info.messageId);
+  } catch (err) {
+    console.error('❌ Failed to send email:', err.message);
+  }
+};
+

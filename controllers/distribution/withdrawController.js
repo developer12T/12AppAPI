@@ -98,7 +98,9 @@ exports.checkout = async (req, res) => {
     let listProduct = cart.listProduct.map(item => {
       //มาเช็คตรงนี้
       const product = products.find(p => p.id === item.id)
-      if (!product) return null
+      if (!product) {
+        return res.status(400).json({ status: 400, message: `Product ${item.id} not found!` })
+      }
 
       const unitData = product.listUnit.find(u => u.unit === item.unit)
       if (!unitData) {
@@ -208,64 +210,93 @@ exports.checkout = async (req, res) => {
       }
     })
 
-    // for (const item of productQty) {
-    //   const factorPcsResult = await Product.aggregate([
-    //     { $match: { id: item.productId } },
-    //     {
-    //       $project: {
-    //         id: 1,
-    //         listUnit: {
-    //           $filter: {
-    //             input: "$listUnit",
-    //             as: "unitItem",
-    //             cond: { $eq: ["$$unitItem.unit", item.unit] }
-    //           }
-    //         }
-    //       }
-    //     }
-    //   ]);
+    for (const item of productQty) {
 
-    //   const factorCtnResult = await Product.aggregate([
-    //     { $match: { id: item.productId } },
-    //     {
-    //       $project: {
-    //         id: 1,
-    //         listUnit: {
-    //           $filter: {
-    //             input: "$listUnit",
-    //             as: "unitItem",
-    //             cond: { $eq: ["$$unitItem.unit", "CTN"] }
-    //           }
-    //         }
-    //       }
-    //     }
-    //   ]);
-    //   const factorCtn = factorCtnResult[0].listUnit[0].factor
-    //   const factorPcs = factorPcsResult[0].listUnit[0].factor
-    //   const factorPcsQty = item.qty * factorPcs
-    //   const factorCtnQty = Math.floor(factorPcsQty / factorCtn);
-    //   const data = await Stock.findOneAndUpdate(
-    //     {
-    //       area: area,
-    //       period: period,
-    //       'listProduct.productId': item.productId
-    //     },
-    //     {
-    //       $inc: {
-    // 'listProduct.$[elem].stockOutPcs': +factorPcsQty,
-    // 'listProduct.$[elem].balancePcs': -factorPcsQty,
-    // 'listProduct.$[elem].stockOutCtn': +factorCtnQty,
-    // 'listProduct.$[elem].balanceCtn': -factorCtnQty
-    //       }
-    //     },
-    //     {
-    //       arrayFilters: [
-    //         { 'elem.productId': item.productId }
-    //       ],
-    //       new: true
-    //     }
-    //   );
+      const updateResult = await updateStockMongo(
+        item,
+        area,
+        period,
+        'withdraw',
+        channel,
+        res
+      )
+      if (updateResult) return
+
+    }
+
+    // const sendDateFormat = new Date(newOrder.sendDate)
+    // const formattedDate = sendDateFormat
+    //   .toISOString()
+    //   .slice(0, 10)
+    //   .replace(/-/g, '')
+    // const MGNUGL = newOrder.listProduct.map(i => i.id)
+    // const uniqueCount = new Set(MGNUGL).size
+    // let data = []
+    // dataTran = {
+    //   Hcase: 1,
+    //   orderNo: newOrder.orderId,
+    //   statusLow: '22',
+    //   statusHigh: '22',
+    //   orderType: newOrder.orderType,
+    //   tranferDate: formattedDate,
+    //   warehouse: newOrder.fromWarehouse,
+    //   towarehouse: newOrder.toWarehouse,
+    //   routeCode: newOrder.shippingRoute,
+    //   addressCode: newOrder.shippingId,
+    //   location: '',
+    //   MGNUGL: uniqueCount,
+    //   MGDEPT: '',
+    //   remark: '',
+    //   items: newOrder.listProduct.map(u => ({
+    //     itemCode: u.id,
+    //     itemStatus: '22',
+    //     MRWHLO: newOrder.fromWarehouse,
+    //     itemQty: u.qty,
+    //     itemUnit: u.unit,
+    //     toLocation: '',
+    //     itemLot: '',
+    //     location: '',
+    //     itemLocation: ''
+    //   }))
     // }
+    // data.push(dataTran)
+
+
+    // // 2. ส่งไป External API (ถ้า fail -> return error)
+    // let response;
+    // try {
+    //   response = await axios.post(
+    //     `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
+    //     data
+    //   );
+    // } catch (err) {
+    //   if (err.response) {
+    //     console.log('API error response:', err.response.data);
+    //     console.log('Status:', err.response.status);
+    //     return res.status(500).json({
+    //       status: 500,
+    //       message: 'External API failed',
+    //       error: err.response.data    // <-- error ที่มาจากปลายทางจริง
+    //     });
+    //   } else if (err.request) {
+    //     console.log('No response from API:', err.message);
+    //     return res.status(500).json({
+    //       status: 500,
+    //       message: 'External API unreachable',
+    //       error: err.message
+    //     });
+    //   } else {
+    //     console.log('Other error:', err.message);
+    //     return res.status(500).json({
+    //       status: 500,
+    //       message: 'External API error',
+    //       error: err.message
+    //     });
+    //   }
+    // }
+
+
+
 
     const calStock = {
       // storeId: refundOrder.store.storeId,
@@ -305,7 +336,11 @@ exports.checkout = async (req, res) => {
       // data:listProductWithDraw
     })
   } catch (error) {
-    await transaction.rollback()
+    try {
+      await transaction.rollback()
+    } catch (rollbackErr) {
+      console.error('Transaction rollback failed:', rollbackErr)
+    }
     console.error('Error saving store to MongoDB:', error)
     res.status(500).json({ status: '500', message: 'Server Error' })
   }
@@ -394,7 +429,7 @@ exports.getOrder = async (req, res) => {
         .status(404)
         .json({ status: 404, message: 'Distribution order not found!' })
     }
-
+    // console.log(order)
     response = order.map(o => ({
       area: o.area,
       orderId: o.orderId,
@@ -943,12 +978,9 @@ exports.approveWithdraw = async (req, res) => {
           qty: u.itemQty,
           statusMovement: 'OUT'
         }))
-      // console.log(distributionTran)
-      // 3. UPDATE Stock ตามรายการ
+
       for (const item of qtyproduct) {
-        // for (const item of dataTran.items) {
-        // console.log(item)
-        // await updateStockMongo(item, distributionTran.area, distributionTran.period, 'withdraw', channel)
+
         const updateResult = await updateStockMongo(
           item,
           distributionTran.area,
@@ -958,92 +990,7 @@ exports.approveWithdraw = async (req, res) => {
           res
         )
         if (updateResult) return
-        // const factorPcsResult = await Product.aggregate([
-        //   { $match: { id: item.itemCode } },
-        //   {
-        //     $project: {
-        //       id: 1,
-        //       listUnit: {
-        //         $filter: {
-        //           input: '$listUnit',
-        //           as: 'unitItem',
-        //           cond: { $eq: ['$$unitItem.unit', item.itemUnit] }
-        //         }
-        //       }
-        //     }
-        //   }
-        // ]);
-        // const factorCtnResult = await Product.aggregate([
-        //   { $match: { id: item.itemCode } },
-        //   {
-        //     $project: {
-        //       id: 1,
-        //       listUnit: {
-        //         $filter: {
-        //           input: '$listUnit',
-        //           as: 'unitItem',
-        //           cond: { $eq: ['$$unitItem.unit', 'CTN'] }
-        //         }
-        //       }
-        //     }
-        //   }
-        // ]);
-        // const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0;
-        // const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 0;
-        // const factorPcsQty = item.itemQty * factorPcs;
-        // const factorCtnQty = factorCtn ? Math.floor(factorPcsQty / factorCtn) : 0;
 
-        // const existsProduct = await Stock.aggregate([
-        //   {
-        //     $match: {
-        //       area: distributionTran.area,
-        //       period: distributionTran.period,
-        //       'listProduct.productId': item.itemCode
-        //     }
-        //   }
-        // ]);
-
-        // if (existsProduct.length > 0) {
-        //   await Stock.findOneAndUpdate(
-        //     {
-        //       area: distributionTran.area,
-        //       period: distributionTran.period,
-        //       'listProduct.productId': item.itemCode
-        //     },
-        //     {
-        //       $inc: {
-        //         'listProduct.$[elem].stockInPcs': +factorPcsQty,
-        //         'listProduct.$[elem].stockInCtn': +factorCtnQty,
-        //         'listProduct.$[elem].balancePcs': +factorPcsQty,
-        //         'listProduct.$[elem].balanceCtn': +factorCtnQty
-        //       }
-        //     },
-        //     {
-        //       arrayFilters: [{ 'elem.productId': item.itemCode }],
-        //       new: true
-        //     }
-        //   );
-        // } else {
-
-        //   const newProduct = {
-        //     productId: item.itemCode,
-        //     stockPcs: 0,
-        //     stockInPcs: factorPcsQty,
-        //     stockOutPcs: 0,
-        //     balancePcs: factorPcsQty,
-        //     stockCtn: 0,
-        //     stockInCtn: factorCtnQty,
-        //     stockOutCtn: 0,
-        //     balanceCtn: factorCtnQty
-        //   };
-
-        //   await Stock.findOneAndUpdate(
-        //     { area: distributionTran.area, period: distributionTran.period },
-        //     { $push: { listProduct: newProduct } },
-        //     { upsert: true, new: true }
-        //   );
-
-        // }
       }
     }
 

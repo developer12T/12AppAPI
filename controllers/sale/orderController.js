@@ -65,8 +65,6 @@ exports.checkout = async (req, res) => {
       note,
       latitude,
       longitude,
-      // shippingId,
-      // address,
       shipping,
       payment,
       changePromotionStatus,
@@ -167,7 +165,7 @@ exports.checkout = async (req, res) => {
     if (listProduct.includes(null)) return
 
     const orderId = await generateOrderId(area, sale.warehouse, channel, res)
-
+    // console.log(orderId)
     // if () {
 
     // }
@@ -180,8 +178,8 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-          .map(item => item.price)
-          .reduce((sum, price) => sum + price, 0)
+        .map(item => item.price)
+        .reduce((sum, price) => sum + price, 0)
       : 0
     const total = subtotal - discountProduct
     const newOrder = new Order({
@@ -490,18 +488,20 @@ exports.getOrder = async (req, res) => {
       })
     }
 
-    response = order.map(o => ({
-      orderId: o.orderId,
-      area: o.store.area,
-      storeId: o.store?.storeId || '',
-      storeName: o.store?.name || '',
-      storeAddress: o.store?.address || '',
-      createAt: o.createdAt,
-      total: o.total,
-      status: o.status,
-      statusTH: o.statusTH,
-      createdAt: o.createdAt
-    }))
+    response = order
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) // เรียงใหม่ไปเก่า
+      .map(o => ({
+        orderId: o.orderId,
+        area: o.store.area,
+        storeId: o.store?.storeId || '',
+        storeName: o.store?.name || '',
+        storeAddress: o.store?.address || '',
+        createAt: o.createdAt,
+        total: to2(o.total),
+        status: o.status,
+        statusTH: o.statusTH,
+        createdAt: o.createdAt
+      }))
 
     // const io = getSocket()
     // io.emit('order/all', {});
@@ -685,7 +685,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -913,7 +913,7 @@ exports.OrderToExcel = async (req, res) => {
   // console.log(modelOrder)
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD (date) {
+    function formatDateToThaiYYYYMMDD(date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1046,7 +1046,7 @@ exports.OrderToExcel = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => {})
+    fs.unlink(tempPath, () => { })
   })
 
   // res.status(200).json({
@@ -1637,7 +1637,8 @@ exports.getSummarybyMonth = async (req, res) => {
     pipeline.push(
       {
         $match: {
-          'store.area': area
+          'store.area': area,
+          status: 'pending'
         }
       },
       { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },

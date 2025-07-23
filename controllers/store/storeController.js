@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require('mongoose')
 
 const { uploadFiles } = require('../../utilities/upload')
 const { calculateSimilarity } = require('../../utilities/utility')
@@ -49,7 +49,10 @@ const path = require('path')
 const { v4: uuidv4 } = require('uuid')
 
 uuidv4() // ⇨ '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed'
-const { productQuery, bueatyStoreQuery } = require('../../controllers/queryFromM3/querySctipt')
+const {
+  productQuery,
+  bueatyStoreQuery
+} = require('../../controllers/queryFromM3/querySctipt')
 const store = require('../../models/cash/store')
 
 exports.getDetailStore = async (req, res) => {
@@ -65,7 +68,6 @@ exports.getDetailStore = async (req, res) => {
     if (!storeData) {
       return res.status(404).json({ status: 404, message: 'Store not found' })
     }
-
 
     // const io = getSocket()
     // io.emit('store/', {});
@@ -185,7 +187,10 @@ exports.getStore = async (req, res) => {
         }
       },
       {
-        $sort: { status: 1 }
+        $sort: {
+          status: 1,
+          createdAt: -1
+        }
       }
     )
 
@@ -384,7 +389,7 @@ exports.addStore = async (req, res) => {
         address: ship.address || '',
         district: ship.district || '',
         subDistrict: ship.subDistrict || '',
-        provinceCode: ship.provinceCode || '',
+        province: ship.provinceCode || '',
         postCode: ship.postCode || '',
         latitude: ship.latitude || '',
         longtitude: ship.longtitude || ''
@@ -424,7 +429,7 @@ exports.addStore = async (req, res) => {
       // console.log(storeData)
 
       const io = getSocket()
-      io.emit('store/addStore', {});
+      io.emit('store/addStore', {})
 
       res.status(200).json({
         status: '200',
@@ -450,37 +455,42 @@ exports.checkSimilarStores = async (req, res) => {
     { area: store.area }
   )
 
+  // 1. กำหนด weight ของแต่ละ field (ค่า sum ต้องไม่จำเป็นต้องรวมกันเท่ากับ 100)
   const fieldsToCheck = [
-    'name',
-    'taxId',
-    'tel',
-    'address',
-    'district',
-    'subDistrict',
-    'province',
-    'postCode',
-    'latitude',
-    'longtitude'
+    { field: 'name', weight: 2 },
+    { field: 'taxId', weight: 4 },
+    { field: 'tel', weight: 3 },
+    { field: 'address', weight: 2 },
+    { field: 'district', weight: 0.5 },
+    { field: 'subDistrict', weight: 0.5 },
+    { field: 'province', weight: 0.5 },
+    { field: 'postCode', weight: 0.5 },
+    { field: 'latitude', weight: 0.5 },
+    { field: 'longtitude', weight: 0.5 }
   ]
+
+  const totalWeight = fieldsToCheck.reduce((sum, cur) => sum + cur.weight, 0)
 
   const similarStores = existingStores
     .map(existingStore => {
-      let totalSimilarity = 0
-      fieldsToCheck.forEach(field => {
+      let weightedSimilarity = 0
+      fieldsToCheck.forEach(({ field, weight }) => {
         const similarity = calculateSimilarity(
           store[field]?.toString() || '',
           existingStore[field]?.toString() || ''
         )
-        totalSimilarity += similarity
+        weightedSimilarity += similarity * weight
       })
 
-      const averageSimilarity = totalSimilarity / fieldsToCheck.length
+      // Average, normalized by total weight
+      const averageSimilarity = weightedSimilarity / totalWeight
+
       return {
         store: existingStore,
         similarity: averageSimilarity
       }
     })
-    .filter(result => result.similarity > 50)
+    .filter(result => result.similarity > 75) // threshold
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, 3)
 
@@ -497,7 +507,6 @@ exports.checkSimilarStores = async (req, res) => {
     // const io = getSocket()
     // io.emit('store/check', {});
 
-
     return res.status(200).json({
       status: '200',
       message: 'similar store',
@@ -506,7 +515,8 @@ exports.checkSimilarStores = async (req, res) => {
   }
   return res.status(204).json({
     status: '204',
-    message: 'Do not have similar store'
+    message: 'Do not have similar store',
+    data: []
   })
 }
 exports.editStore = async (req, res) => {
@@ -546,8 +556,7 @@ exports.editStore = async (req, res) => {
     }
 
     const io = getSocket()
-    io.emit('store/editStore', {});
-
+    io.emit('store/editStore', {})
 
     res.status(200).json({
       status: '200',
@@ -653,6 +662,7 @@ exports.addFromERPnew = async (req, res) => {
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
     const result = await storeQuery(channel) // ข้อมูลจาก ERP
+    // console.log(result)
     const storeMap = new Map(result.map(item => [item.storeId, item]))
 
     const mongoStores = await Store.find()
@@ -696,7 +706,7 @@ exports.addFromERPnew = async (req, res) => {
     }
 
     const io = getSocket()
-    io.emit('store/addFromERPnew', {});
+    io.emit('store/addFromERPnew', {})
 
     res.status(200).json({
       status: 200,
@@ -742,11 +752,11 @@ exports.checkInStore = async (req, res) => {
     }
 
     const io = getSocket()
-    io.emit('store/checkIn', {});
+    io.emit('store/checkIn', {})
 
     res.status(200).json({
       status: '200',
-      message: 'Checked In Successfully', 
+      message: 'Checked In Successfully',
       data: {
         latitude: result.checkIn.latitude,
         longtitude: result.checkIn.latitude,
@@ -759,78 +769,160 @@ exports.checkInStore = async (req, res) => {
   }
 }
 
-exports.updateStoreStatus = async (req, res) => {
-  const { storeId, status, user } = req.body
-  const channel = req.headers['x-channel']
-  const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
-  const store = await Store.findOne({ storeId: storeId })
-  if (!store) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found store'
-    })
-  }
-  const storeZone = store.area.substring(0, 2)
-  const maxRunningAll = await RunningNumber.findOne({ zone: storeZone }).select("last")
-
-  // console.log(maxRunningAll)
-
-  const oldId = maxRunningAll
-  // console.log(oldId,"oldId")
-  const newId = oldId.last.replace(/\d+$/, n =>
-    String(+n + 1).padStart(n.length, '0')
-  )
-
-  // console.log(newId,"newId")
-
-  // console.log("oldId",oldId)
-  if (status === '20') {
-    await RunningNumber.findOneAndUpdate(
-      { zone: store.zone },
-      { $set: { last: newId } },
-      { new: true }
+  exports.updateStoreStatus = async (req, res) => {
+    const { storeId, status, user } = req.body
+    const channel = req.headers['x-channel']
+    const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const store = await Store.findOne({ storeId: storeId })
+    if (!store) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found store'
+      })
+    }
+    const storeZone = store.area.substring(0, 2)
+    const maxRunningAll = await RunningNumber.findOne({ zone: storeZone }).select(
+      'last'
     )
-    await Store.findOneAndUpdate(
-      { _id: store._id },
-      {
-        $set: {
-          storeId: newId,
-          status: status,
-          updatedDate: Date(),
-          'approve.dateAction': new Date(),
-          'approve.appPerson': user
+
+    // console.log(maxRunningAll)
+
+    const oldId = maxRunningAll
+    // console.log(oldId,"oldId")
+    const newId = oldId.last.replace(/\d+$/, n =>
+      String(+n + 1).padStart(n.length, '0')
+    )
+
+    // console.log(newId,"newId")
+
+    // console.log("oldId",oldId)
+    if (status === '20') {
+      await RunningNumber.findOneAndUpdate(
+        { zone: store.zone },
+        { $set: { last: newId } },
+        { new: true }
+      )
+      await Store.findOneAndUpdate(
+        { _id: store._id },
+        {
+          $set: {
+            storeId: newId,
+            status: status,
+            updatedDate: Date(),
+            'approve.dateAction': new Date(),
+            'approve.appPerson': user
+          }
+        },
+        { new: true }
+      )
+
+      const item = await Store.findOne({ storeId: newId, area: store.area })
+      const dataUser = await User.findOne({ area: store.area, role: 'sale' })
+
+
+      if (!item) {
+        return res.status(404).json({
+          json: 404,
+          message: 'Not found Store'
+        })
+      }
+
+      if (!item.postCode) {
+        return res.status(404).json({
+          json: 404,
+          message: 'Not found postCode'
+        })
+      }
+
+      // console.log(item)
+      const dataTran = {
+        Hcase: 1,
+        customerNo: item.storeId,
+        customerStatus: item.status,
+        customerName: item.name,
+        customerChannel: '103',
+        customerCoType: item.type,
+        customerAddress1: item.address,
+        customerAddress2: item.subDistrict,
+        customerAddress3: item.district,
+        customerAddress4: item.province,
+        customerPoscode: item.postCode,
+        customerPhone: item.tel,
+        warehouse: dataUser.warehouse,
+        OKSDST: item.zone,
+        saleTeam: dataUser.area.slice(0, 2) + dataUser.area[3],
+        OKCFC1: item.area,
+        OKCFC3: item.route,
+        OKCFC6: item.type,
+        salePayer: dataUser.salePayer,
+        creditLimit: '000',
+        taxno: item.taxId,
+        saleCode: dataUser.saleCode,
+        saleZone: dataUser.zone,
+        shippings: item.shippingAddress.map(u => {
+          return {
+            shippingAddress1: u.address,
+            shippingAddress2: u.district,
+            shippingAddress3: u.subDistrict,
+            shippingAddress4: u.province ?? '',
+            shippingPoscode: u.postCode,
+            shippingPhone: item.tel,
+            shippingRoute: item.postCode,
+            OPGEOX: u.latitude,
+            OPGEOY: u.longtitude
+          }
+        })
+      }
+
+
+      try {
+        const response = await axios.post(
+          `${process.env.API_URL_12ERP}/customer/insert`,
+          dataTran
+        )
+
+        // ส่งกลับไปให้ client ที่เรียก Express API
+        return res.status(response.status).json(response.data)
+      } catch (error) {
+        if (error.response) {
+          // หาก ERP ส่ง 400 หรือ 500 หรืออื่นๆ กลับมา
+          return res.status(error.response.status).json({
+            message: error.response.data?.message || 'Request Failed',
+            data: error.response.data
+          })
         }
-      },
-      { new: true }
-    )
-    res.status(200).json({
-      status: 200,
-      storeId: newId,
-      message: 'Update storeId successful'
-    })
-  } else {
-    await Store.findOneAndUpdate(
-      { _id: store._id },
-      {
-        $set: {
-          status: status,
-          updatedDate: Date(),
-          'approve.dateAction': new Date(),
-          'approve.appPerson': user
-        }
-      },
-      { new: true }
-    )
 
-    const io = getSocket()
-    io.emit('store/updateStoreStatus', {});
+        const io = getSocket()
+        io.emit('store/updateStoreStatus', {})
 
-    res.status(200).json({
-      status: 200,
-      message: 'Reject Store successful'
-    })
+        return res.status(500).json({
+          message: 'Internal Server Error',
+          error: error.message
+        })
+      }
+
+    } else {
+      await Store.findOneAndUpdate(
+        { _id: store._id },
+        {
+          $set: {
+            status: status,
+            updatedDate: Date(),
+            'approve.dateAction': new Date(),
+            'approve.appPerson': user
+          }
+        },
+        { new: true }
+      )
+
+      res.status(200).json({
+        status: 200,
+        message: 'Reject Store successful'
+      })
+    }
+
   }
-}
 
 exports.rejectStore = async (req, res) => {
   const { storeId, area } = req.body
@@ -980,7 +1072,6 @@ exports.createRunningNumber = async (req, res) => {
 
   // console.log(zoneId)
 
-
   const maxRunningAll = await Store.aggregate([
     {
       $match: {
@@ -1072,45 +1163,32 @@ exports.updateRunningNumber = async (req, res) => {
 exports.addBueatyStore = async (req, res) => {
   const channel = req.headers['x-channel']
 
-  // 1. Start session
-  const session = await mongoose.startSession()
-  session.startTransaction()
-
   try {
     const bueatydata = await bueatyStoreQuery()
-
     const { TypeStore } = getModelsByChannel(channel, res, storeModel)
 
-    // 2. Delete all
-    await TypeStore.deleteMany({}, { session })
+    // 1. ลบข้อมูลเดิมทั้งหมด
+    await TypeStore.deleteMany({})
 
-    // 3. Insert new
-    // (สามารถ optimize เป็น insertMany ได้ ถ้าไม่มีเงื่อนไข exists)
-    await TypeStore.insertMany(bueatydata.map(x => ({ ...x, type: ['beauty'] })), { session })
+    // 2. เพิ่มข้อมูลใหม่
+    await TypeStore.insertMany(
+      bueatydata.map(x => ({ ...x, type: ['beauty'] }))
+    )
 
-
-    // 4. Commit
-    await session.commitTransaction()
-    session.endSession()
-
+    // 3. ส่ง socket event
     const io = getSocket()
-    io.emit('store/addBueatyStore', {});
+    io.emit('store/addBueatyStore', {})
 
-
-
+    // 4. ตอบกลับ
     res.status(200).json({
       status: 200,
       message: bueatydata
     })
   } catch (error) {
-    // 5. Rollback
-    await session.abortTransaction()
-    session.endSession()
     console.error(error)
     res.status(500).json({ status: 500, message: error.message })
   }
 }
-
 
 exports.getBueatyStore = async (req, res) => {
   const channel = req.headers['x-channel']
@@ -1161,7 +1239,7 @@ exports.addStoreArray = async (req, res) => {
   }
 
   const io = getSocket()
-  io.emit('store/addStoreArray', {});
+  io.emit('store/addStoreArray', {})
 
   res.status(200).json({
     status: 200,
@@ -1203,7 +1281,7 @@ exports.updateStoreArray = async (req, res) => {
     }
   }
   const io = getSocket()
-  io.emit('store/updateStoreArray', {});
+  io.emit('store/updateStoreArray', {})
 
   res.status(200).json({
     status: 200,
@@ -1224,8 +1302,7 @@ exports.deleteStoreArray = async (req, res) => {
   await Store.deleteMany({ storeId: { $in: storeId } })
 
   const io = getSocket()
-  io.emit('store/deleteStoreArray', {});
-
+  io.emit('store/deleteStoreArray', {})
 
   res.status(200).json({
     status: 200,
@@ -1316,7 +1393,7 @@ exports.insertStoreToErpOne = async (req, res) => {
         shippingAddress1: u.address,
         shippingAddress2: u.district,
         shippingAddress3: u.subDistrict,
-        shippingAddress4: u.province,
+        shippingAddress4: u.province ?? '',
         shippingPoscode: u.postCode,
         shippingPhone: item.tel,
         shippingRoute: item.postCode,
@@ -1326,29 +1403,29 @@ exports.insertStoreToErpOne = async (req, res) => {
     })
   }
 
+  // console.log(dataTran)
   try {
     const response = await axios.post(
       `${process.env.API_URL_12ERP}/customer/insert`,
       dataTran
     )
 
-    // ถ้ามาถึงตรงนี้ แปลว่า status = 2xx เท่านั้น!
-    return res.status(200).json({
-      message: 'Success',
-      data: response.data
-    })
+    // ส่งกลับไปให้ client ที่เรียก Express API
+    return res.status(response.status).json(response.data)
   } catch (error) {
-    // ถ้ามี error (status != 2xx) จะเข้าตรงนี้เสมอ
-    if (error.response && error.response.status === 400) {
-      return res.status(400).json({
-        message: error.response.data?.message || 'Already Exists'
-      })
-    } else {
-      return res.status(500).json({
-        message: 'Internal Server Error',
-        error: error.message
+    if (error.response) {
+      // หาก ERP ส่ง 400 หรือ 500 หรืออื่นๆ กลับมา
+      return res.status(error.response.status).json({
+        message: error.response.data?.message || 'Request Failed',
+        data: error.response.data
       })
     }
+
+    // กรณีอื่นๆ ที่ไม่ใช่ response จาก ERP เช่น network error
+    return res.status(500).json({
+      message: 'Internal Server Error',
+      error: error.message
+    })
   }
 
   // res.status(200).json({
@@ -1358,23 +1435,22 @@ exports.insertStoreToErpOne = async (req, res) => {
   // })
 }
 
-
 exports.getShipping = async (req, res) => {
-
   const { storeId } = req.body
   // console.log(storeId)
   const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
 
-  const dataStore = await Store.findOne({ storeId: storeId }).select("shippingAddress")
+  const dataStore = await Store.findOne({ storeId: storeId }).select(
+    'shippingAddress'
+  )
 
   if (!dataStore) {
     return res.status(404).json({
       status: 404,
-      message: 'Not found store',
+      message: 'Not found store'
     })
   }
-
 
   // const io = getSocket()
   // io.emit('store/getShipping', {});
@@ -1384,14 +1460,21 @@ exports.getShipping = async (req, res) => {
     message: 'sucess',
     data: dataStore.shippingAddress
   })
-
-
 }
 
 exports.addShippingInStore = async (req, res) => {
   try {
-    const { storeId, defaultId, shippingId, address, district,
-      subDistrict, province, postCode, latitude, longtitude
+    const {
+      storeId,
+      defaultId,
+      shippingId,
+      address,
+      district,
+      subDistrict,
+      province,
+      postCode,
+      latitude,
+      longtitude
     } = req.body
 
     const channel = req.headers['x-channel']
@@ -1408,19 +1491,19 @@ exports.addShippingInStore = async (req, res) => {
     if (existStore.length === 0) {
       return res.status(404).json({
         status: 404,
-        message: 'Not found store',
+        message: 'Not found store'
       })
     }
 
     const storeWithShipping = await Store.findOne({
       storeId: storeId,
       'shippingAddress.shippingId': shippingId
-    });
+    })
     if (storeWithShipping) {
       return res.status(409).json({
         status: 409,
-        message: 'This shippingId already exists for this store.',
-      });
+        message: 'This shippingId already exists for this store.'
+      })
     }
 
     const addShipping = await Store.findOneAndUpdate(
@@ -1436,28 +1519,28 @@ exports.addShippingInStore = async (req, res) => {
             province: province,
             postCode: postCode,
             latitude: latitude,
-            longtitude: longtitude,
+            longtitude: longtitude
           }
         }
       },
       { new: true }
-    );
+    )
 
     const io = getSocket()
-    io.emit('store/addShippingInStore', {});
+    io.emit('store/addShippingInStore', {})
 
     return res.status(200).json({
       status: 200,
       message: 'sucess',
       data: addShipping
     })
-
   } catch (error) {
     console.error('addShippingInStore error:', error)
-    return res.status(500).json({ status: 500, message: 'Internal server error' })
+    return res
+      .status(500)
+      .json({ status: 500, message: 'Internal server error' })
   }
 }
-
 
 exports.editShippingInStore = async (req, res) => {
   try {
@@ -1472,7 +1555,7 @@ exports.editShippingInStore = async (req, res) => {
       postCode,
       latitude,
       longitude
-    } = req.body;
+    } = req.body
 
     const channel = req.headers['x-channel']
     const { Store } = getModelsByChannel(channel, res, storeModel)
@@ -1480,58 +1563,65 @@ exports.editShippingInStore = async (req, res) => {
     const existStore = await Store.findOne({
       storeId: storeId,
       'shippingAddress.shippingId': shippingId
-    });
+    })
 
     if (!existStore) {
       return res.status(404).json({
         status: 404,
-        message: 'Not found this shippingId in this store',
-      });
+        message: 'Not found this shippingId in this store'
+      })
     }
 
-    let setObj = {};
-    if (defaultId !== undefined && defaultId !== "") setObj["shippingAddress.$.default"] = defaultId;
-    if (address !== undefined && address !== "") setObj["shippingAddress.$.address"] = address;
-    if (district !== undefined && district !== "") setObj["shippingAddress.$.district"] = district;
-    if (subDistrict !== undefined && subDistrict !== "") setObj["shippingAddress.$.subDistrict"] = subDistrict;
-    if (province !== undefined && province !== "") setObj["shippingAddress.$.province"] = province;
-    if (postCode !== undefined && postCode !== "") setObj["shippingAddress.$.postCode"] = postCode;
-    if (latitude !== undefined && latitude !== "") setObj["shippingAddress.$.latitude"] = latitude;
-    if (longitude !== undefined && longitude !== "") setObj["shippingAddress.$.longitude"] = longitude;
+    let setObj = {}
+    if (defaultId !== undefined && defaultId !== '')
+      setObj['shippingAddress.$.default'] = defaultId
+    if (address !== undefined && address !== '')
+      setObj['shippingAddress.$.address'] = address
+    if (district !== undefined && district !== '')
+      setObj['shippingAddress.$.district'] = district
+    if (subDistrict !== undefined && subDistrict !== '')
+      setObj['shippingAddress.$.subDistrict'] = subDistrict
+    if (province !== undefined && province !== '')
+      setObj['shippingAddress.$.province'] = province
+    if (postCode !== undefined && postCode !== '')
+      setObj['shippingAddress.$.postCode'] = postCode
+    if (latitude !== undefined && latitude !== '')
+      setObj['shippingAddress.$.latitude'] = latitude
+    if (longitude !== undefined && longitude !== '')
+      setObj['shippingAddress.$.longitude'] = longitude
 
     if (Object.keys(setObj).length === 0) {
       return res.status(400).json({
         status: 400,
-        message: 'No valid fields to update',
-      });
+        message: 'No valid fields to update'
+      })
     }
 
     const updatedStore = await Store.findOneAndUpdate(
       { storeId: storeId, 'shippingAddress.shippingId': shippingId },
       { $set: setObj },
       { new: true }
-    );
+    )
 
     const io = getSocket()
-    io.emit('store/editShippingInStore', {});
-
+    io.emit('store/editShippingInStore', {})
 
     return res.status(200).json({
       status: 200,
       message: 'success',
       data: updatedStore
-    });
+    })
   } catch (error) {
     console.error('editShippingInStore error:', error)
-    return res.status(500).json({ status: 500, message: 'Internal server error' });
+    return res
+      .status(500)
+      .json({ status: 500, message: 'Internal server error' })
   }
 }
 
-
-
 exports.deleteShippingFromStore = async (req, res) => {
   try {
-    const { storeId, shippingId } = req.body; // หรือ req.params, แล้วแต่ดีไซน์
+    const { storeId, shippingId } = req.body // หรือ req.params, แล้วแต่ดีไซน์
 
     const channel = req.headers['x-channel']
     const { Store } = getModelsByChannel(channel, res, storeModel)
@@ -1540,13 +1630,13 @@ exports.deleteShippingFromStore = async (req, res) => {
     const existStore = await Store.findOne({
       storeId: storeId,
       'shippingAddress.shippingId': shippingId
-    });
+    })
 
     if (!existStore) {
       return res.status(404).json({
         status: 404,
-        message: 'Not found this shippingId in this store',
-      });
+        message: 'Not found this shippingId in this store'
+      })
     }
 
     // ลบ shippingAddress ที่ตรงกับ shippingId นี้
@@ -1554,18 +1644,22 @@ exports.deleteShippingFromStore = async (req, res) => {
       { storeId: storeId },
       { $pull: { shippingAddress: { shippingId: shippingId } } },
       { new: true }
-    );
+    )
 
     const io = getSocket()
-    io.emit('store/deleteShippingFromStore', {});
+    io.emit('store/deleteShippingFromStore', {})
 
     return res.status(200).json({
       status: 200,
       message: 'success',
       data: updatedStore
-    });
+    })
   } catch (error) {
     console.error('deleteShippingFromStore error:', error)
-    return res.status(500).json({ status: 500, message: 'Internal server error' });
+    return res
+      .status(500)
+      .json({ status: 500, message: 'Internal server error' })
   }
 }
+
+
