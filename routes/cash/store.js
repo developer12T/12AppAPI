@@ -25,7 +25,8 @@ const {
   getShipping,
   addShippingInStore,
   deleteShippingFromStore,
-  editShippingInStore
+  editShippingInStore,
+  deleteStore
   // test
 } = require('../../controllers/store/storeController')
 
@@ -65,6 +66,9 @@ router.post('/insertStoreToErpOne', insertStoreToErpOne)
 router.post('/addShippingInStore', addShippingInStore)
 router.post('/deleteShippingFromStore', deleteShippingFromStore)
 router.post('/editShippingInStore', editShippingInStore)
+router.delete('/deleteStore', deleteStore)
+
+
 // router.get('/test', test)
 
 router.post('/addCallCard', addCallCard)

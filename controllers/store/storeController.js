@@ -902,11 +902,11 @@ exports.updateStoreStatus = async (req, res) => {
     //   })
     // }
 
-      return res.status(200).json({
-        status:200,
-        message: 'update Store Status sucess',
+    return res.status(200).json({
+      status: 200,
+      message: 'update Store Status sucess',
 
-      })
+    })
 
   } else {
     await Store.findOneAndUpdate(
@@ -1669,3 +1669,32 @@ exports.deleteShippingFromStore = async (req, res) => {
 }
 
 
+exports.deleteStore = async (req, res) => {
+  try {
+    const { storeId } = req.body
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const store = await Store.findOne({ storeId })
+
+    if (!store) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Store not found'
+      })
+    }
+
+    await Store.deleteOne({ storeId })
+
+    return res.status(200).json({
+      status: 200,
+      message: 'Store deleted successfully'
+    })
+  } catch (error) {
+    console.error('deleteStore error:', error)
+    return res.status(500).json({
+      status: 500,
+      message: 'Internal server error'
+    })
+  }
+}

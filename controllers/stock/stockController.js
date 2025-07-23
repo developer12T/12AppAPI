@@ -2773,3 +2773,13 @@ exports.stockToExcel = async (req, res) => {
     })
   }
 }
+
+
+exports.deleteStockAdjust = async ( req,res ) => {
+
+
+
+
+
+  
+}
