@@ -24,6 +24,7 @@ const userSchema = mongoose.Schema({
   period: { type: String, require: true },
   image: { imageSchema },
   typeTruck: { type: String  },
+  noTruck: { type: String  },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 }, {

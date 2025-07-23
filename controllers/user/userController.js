@@ -480,7 +480,7 @@ exports.addUserNew = async (req, res) => {
       let isModified = false;
       const fields = [
         'salePayer', 'username', 'firstName', 'surName', 'password',
-        'tel', 'zone', 'area', 'warehouse', 'role', 'status', 'qrCodeImage', 'typeTruck'
+        'tel', 'zone', 'area', 'warehouse', 'role', 'status', 'qrCodeImage', 'typeTruck', 'noTruck'
       ];
 
       for (const field of fields) {
@@ -513,7 +513,8 @@ exports.addUserNew = async (req, res) => {
         qrCodeImage: sale.qrCodeImage,
         period: period(),
         image: '',
-        typeTruck: sale.typeTruck
+        typeTruck: sale.typeTruck,
+        noTruck:sale.noTruck
       });
       await newUser.save();
       result.push(newUser);

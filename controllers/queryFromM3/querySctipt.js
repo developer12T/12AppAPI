@@ -30,13 +30,14 @@ SELECT
     LEFT(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') - 1) AS firstName,
     SUBSTRING(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') + 1, LEN(DA.Col_NameTH)) AS surName,
     ${hash} AS password,
-    'TEL' AS tel,
+    SALE_MOBILE AS tel,
     DA.ZONE AS zone,
     DA.AREA AS area,
     DA.WH AS warehouse,
     'sale' AS role,
     '1' AS status,
-    '6W' AS typeTruck,
+    TRUCK_SIZE AS typeTruck,
+    TRUCK_NO as noTruck,
     'https://apps.onetwotrading.co.th/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
 FROM 
   [DATA_OMS].[dbo].[DATA_Area] AS DA
