@@ -591,3 +591,35 @@ exports.addPromotionShelf = async (req, res) => {
     data: data
   })
 }
+
+
+
+exports.deletePromotion = async  (req, res) => {
+  try {
+    const { proId } = req.body
+    const channel = req.headers['x-channel']
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel)
+
+    const promotion = await Promotion.findOne({ proId })
+
+    if (!promotion) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Stock adjustment not found'
+      })
+    }
+
+    await Promotion.deleteOne({ proId })
+
+    return res.status(200).json({
+      status: 200,
+      message: 'Stock adjustment deleted successfully'
+    })
+  } catch (error) {
+    console.error('deleteStockAdjust error:', error)
+    return res.status(500).json({
+      status: 500,
+      message: 'Internal server error'
+    })
+  }
+}

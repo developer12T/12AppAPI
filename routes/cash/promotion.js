@@ -1,6 +1,6 @@
 const express = require('express')
 const { addPromotion, getPromotionProduct,getPromotion,addPromotionLimit,updatePromotionLimit,addQuota,
-    updateQuota,addPromotionShelf,updatePromotion,getPromotionDetail
+    updateQuota,addPromotionShelf,updatePromotion,getPromotionDetail,deletePromotion
  } = require('../../controllers/promotion/promotionController')
 
 const router = express.Router()
@@ -18,5 +18,5 @@ router.post('/addQuota', addQuota)
 router.post('/updateQuota', updateQuota)
 router.post('/addPromotionShelf', addPromotionShelf)
 
-
+router.delete('/deletePromotion', deletePromotion)
 module.exports = router
