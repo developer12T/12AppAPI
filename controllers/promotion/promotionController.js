@@ -339,7 +339,7 @@ exports.getPromotion = async (req, res) => {
   const channel = req.headers['x-channel']; // 'credit' or 'cash'
   const { Promotion } = getModelsByChannel(channel, res, promotionModel);
 
-  const data = await Promotion.find()
+  const data = await Promotion.find({status:'active'})
 
   if (data.length == 0) {
     return res.status(404).json({
@@ -609,11 +609,12 @@ exports.deletePromotion = async (req, res) => {
       })
     }
 
-    await Promotion.deleteOne({ proId })
+    // เปลี่ยนสถานะเป็น inactive แทนการลบ
+    await Promotion.updateOne({ proId }, { status: 'inactive' })
 
     return res.status(200).json({
       status: 200,
-      message: 'Promotion deleted successfully'
+      message: 'Promotion marked as inactive successfully'
     })
   } catch (error) {
     console.error('deletePromotion error:', error)
