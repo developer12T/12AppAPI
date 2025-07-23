@@ -2082,133 +2082,63 @@ exports.checkRouteStore = async (req, res) => {
 
 exports.polylineRoute = async (req, res) => {
   try {
+    const { area, period } = req.query;
+    const channel = req.headers['x-channel'];
+    const { Route } = getModelsByChannel(channel, res, routeModel);
+    const { Store } = getModelsByChannel(channel, res, storeModel);
 
-    const { area, period } = req.query
-    const channel = req.headers['x-channel']
-    const { Route } = getModelsByChannel(channel, res, routeModel)
-    const { Store } = getModelsByChannel(channel, res, storeModel)
-
-
-    function haversineDistance(lat1, lon1, lat2, lon2) {
-      const R = 6371 // Earth's radius in km
-      const toRad = deg => (deg * Math.PI) / 180
-
-      const dLat = toRad(lat2 - lat1)
-      const dLon = toRad(lon2 - lon1)
-      const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-        Math.sin(dLon / 2) ** 2
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-      return R * c
-    }
-
-    function haversineDistance(lat1, lon1, lat2, lon2) {
-      const R = 6371
-      const toRad = deg => (deg * Math.PI) / 180
-
-      const dLat = toRad(lat2 - lat1)
-      const dLon = toRad(lon2 - lon1)
-      const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-        Math.sin(dLon / 2) ** 2
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-      return R * c
-    }
-
-    function sortNearest(points) {
-      if (!points.length) return []
-
-      const visited = []
-      const remaining = [...points]
-
-      // หาจุดเริ่มต้นที่ "น้อยที่สุด" โดยเปรียบเทียบ lng ก่อน แล้ว lat
-      let current = remaining.reduce((a, b) => {
-        const [lngA, latA] = a.location
-        const [lngB, latB] = b.location
-        if (lngA < lngB) return a
-        if (lngA > lngB) return b
-        return latA < latB ? a : b
-      })
-
-      visited.push(current)
-      remaining.splice(remaining.indexOf(current), 1)
-
-      while (remaining.length > 0) {
-        const next = remaining.reduce((nearest, point) => {
-          const distToNearest = haversineDistance(
-            current.location[1], current.location[0],
-            nearest.location[1], nearest.location[0]
-          )
-          const distToPoint = haversineDistance(
-            current.location[1], current.location[0],
-            point.location[1], point.location[0]
-          )
-          return distToPoint < distToNearest ? point : nearest
-        })
-
-        visited.push(next)
-        remaining.splice(remaining.indexOf(next), 1)
-        current = next
-      }
-
-      return visited
-    }
-
-    const dataRoute = await Route.find({ area: area, period: period })
+    const dataRoute = await Route.find({ area, period });
 
     const storeId = dataRoute.flatMap(item =>
       item.listStore.map(i => i.storeInfo)
-    )
+    );
 
     const objectIds = storeId
       .filter(id => mongoose.Types.ObjectId.isValid(id))
-      .map(id => new mongoose.Types.ObjectId(id))
+      .map(id => new mongoose.Types.ObjectId(id));
 
-    const dataStore = await Store.find({ _id: { $in: objectIds } })
+    const dataStore = await Store.find({ _id: { $in: objectIds } });
 
     const locations = dataRoute.flatMap(item =>
       item.listStore
         .filter(u => {
-          const lat = parseFloat(u.latitude)
-          const lng = parseFloat(u.longtitude)
-          return !isNaN(lat) && !isNaN(lng)
+          const lat = parseFloat(u.latitude);
+          const lng = parseFloat(u.longtitude);
+          return !isNaN(lat) && !isNaN(lng);
         })
         .map(u => {
           const store = dataStore.find(s => s._id.equals(u.storeInfo));
+          const dateObj = new Date(u.date);
           return {
             storeId: store?.storeId,
-            // storeName: store?.name ?? '',
             route: `R${item.day}`,
-            date:formatDateTimeToThai(u.date),
+            date: formatDateTimeToThai(u.date),
+            timestamp: dateObj.getTime(),
             location: [
               parseFloat(u.longtitude),
               parseFloat(u.latitude)
             ]
           };
         })
-    )
+    ).sort((a, b) => a.timestamp - b.timestamp);
 
     if (locations.length === 0) {
-
       return res.status(404).json({
         status: 404,
         message: 'Not found latitude, locations'
-      })
+      });
     }
 
-    const sortedPath = sortNearest(locations)
+    const finalLocations = locations.map(({ timestamp, ...rest }) => rest);
 
     res.status(200).json({
       status: 200,
       message: 'success',
-      data: sortedPath
-    })
-
+      data: finalLocations
+    });
 
   } catch (error) {
     console.error(error);
     res.status(500).json({ status: 500, message: 'Internal server error' });
   }
-}
+};
