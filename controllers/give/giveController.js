@@ -313,12 +313,13 @@ exports.checkout = async (req, res) => {
       period: period
     })
 
-    if (!newOrder.store.area) {
-      return res.status(400).json({
-        status: 400,
-        message: 'Not found store'
-      })
-    }
+    // console.log(newOrder.store.area)
+    // if (!newOrder.store.area) {
+    //   return res.status(400).json({
+    //     status: 400,
+    //     message: 'Not found store'
+    //   })
+    // }
 
     const calStock = {
       // storeId: refundOrder.store.storeId,
