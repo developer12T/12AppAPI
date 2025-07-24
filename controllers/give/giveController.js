@@ -19,7 +19,10 @@ const { getModelsByChannel } = require('../../middleware/channel')
 const { to2, updateStockMongo } = require('../../middleware/order')
 const { formatDateTimeToThai } = require('../../middleware/order')
 const { create } = require('lodash')
-
+const path = require('path')
+const multer = require('multer')
+const upload = multer({ storage: multer.memoryStorage() }).single('image')
+const { uploadFiles } = require('../../utilities/upload')
 exports.addGiveType = async (req, res) => {
   try {
     const {
@@ -240,7 +243,7 @@ exports.checkout = async (req, res) => {
       stockModel
     )
 
-    if (!type || !area || !storeId || !giveId ) {
+    if (!type || !area || !storeId || !giveId) {
       return res
         .status(400)
         .json({ status: 400, message: 'Missing required fields!' })
@@ -580,3 +583,74 @@ exports.getGiveawaysDetail = async (req, res) => {
     data: data
   })
 }
+
+exports.addimageGive = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel)
+
+
+    upload(req, res, async err => {
+      if (err) {
+        return res.status(400).json({
+          status: 400,
+          message: 'Error uploading file',
+          error: err.message
+        })
+      }
+
+      const { orderId, type } = req.body
+      if (!orderId || !type) {
+        return res
+          .status(400)
+          .json({ status: 400, message: 'orderId and type required!' })
+      }
+
+      const order = await Giveaway.findOne({ orderId })
+      if (!order) {
+        return res
+          .status(404)
+          .json({ status: 404, message: 'Giveaway not found!' })
+      }
+
+      if (!req.file) {
+        return res
+          .status(400)
+          .json({ status: 400, message: 'No images uploaded!' })
+      }
+
+      const basePath = path.join(__dirname, '../../public/images')
+      const uploadedImage = await uploadFiles(
+        [req.file],
+        basePath,
+        type,
+        order.orderId
+      )
+
+      order.listImage = [
+        {
+          name: uploadedImage[0].name,
+          path: uploadedImage[0].path,
+          type: type
+        }
+      ]
+
+      await order.save()
+
+      const io = getSocket()
+      io.emit('give/addimageGive', {})
+
+      res.status(200).json({
+        status: 200,
+        message: 'Images uploaded successfully!',
+        data: order.listImage
+      })
+    })
+  } catch (error) {
+    console.error('Error uploading images:', error)
+    res
+      .status(500)
+      .json({ status: 500, message: 'Server error', error: error.message })
+  }
+}
+

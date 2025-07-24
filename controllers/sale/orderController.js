@@ -805,7 +805,6 @@ exports.addSlip = async (req, res) => {
           .status(400)
           .json({ status: 400, message: 'orderId and type required!' })
       }
-
       const order = await Order.findOne({ orderId })
       if (!order) {
         return res
