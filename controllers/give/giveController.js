@@ -552,7 +552,7 @@ exports.getDetail = async (req, res) => {
 exports.getGiveaways = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Givetype } = getModelsByChannel(channel, res, giveawaysModel)
-  let data = await Givetype.find()
+  let data = await Givetype.find().sort({ createdAt: -1 })
 
   // const io = getSocket()
   // io.emit('give/getGiveaways', {});
