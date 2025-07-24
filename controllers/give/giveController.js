@@ -240,7 +240,7 @@ exports.checkout = async (req, res) => {
       stockModel
     )
 
-    if (!type || !area || !storeId || !giveId || !shippingId || !address) {
+    if (!type || !area || !storeId || !giveId ) {
       return res
         .status(400)
         .json({ status: 400, message: 'Missing required fields!' })

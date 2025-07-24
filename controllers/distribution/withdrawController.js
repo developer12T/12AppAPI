@@ -39,7 +39,7 @@ exports.checkout = async (req, res) => {
       stockModel
     )
 
-    if (!type || !area || !shippingId || !withdrawType || !sendDate || !note) {
+    if (!type || !area || !withdrawType || !sendDate || !note) {
       return res
         .status(400)
         .json({ status: 400, message: 'Missing required fields!' })
