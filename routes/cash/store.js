@@ -25,24 +25,30 @@ const {
   getShipping,
   addShippingInStore,
   deleteShippingFromStore,
-  editShippingInStore
+  editShippingInStore,
+  deleteStore,
+  updateStoreStatusNoNewId
   // test
 } = require('../../controllers/store/storeController')
 
-
-const { addCallCard, delCallCard, addFlowAction,getCallCard, 
-  updateDetailStore, updateDailyvisit, updateGooglemap, addVisit
- } = require('../../controllers/store/callCardController')
-
-
-
+const {
+  addCallCard,
+  delCallCard,
+  addFlowAction,
+  getCallCard,
+  updateDetailStore,
+  updateDailyvisit,
+  updateGooglemap,
+  addVisit
+} = require('../../controllers/store/callCardController')
 
 const router = express.Router()
 
 router.get('/getStore', getStore)
+router.get('/getTypeStore', getTypeStore)
+router.get('/check/:storeId', checkSimilarStores)
 router.get('/:storeId', getDetailStore)
 router.post('/addStore', addStore)
-router.get('/check/:storeId', checkSimilarStores)
 router.post('/updateImage', updateImage)
 router.post('/addFromERP', addFromERP)
 router.post('/addFromERPnew', addFromERPnew)
@@ -59,12 +65,14 @@ router.post('/getBueatyStore', getBueatyStore)
 router.post('/addStoreArray', addStoreArray)
 router.post('/updateStoreArray', updateStoreArray)
 router.post('/deleteStoreArray', deleteStoreArray)
-router.get('/getTypeStore', getTypeStore)
 router.post('/addTypeStore', addTypeStore)
 router.post('/insertStoreToErpOne', insertStoreToErpOne)
 router.post('/addShippingInStore', addShippingInStore)
 router.post('/deleteShippingFromStore', deleteShippingFromStore)
 router.post('/editShippingInStore', editShippingInStore)
+router.post('/deleteStore', deleteStore)
+router.post('/updateStoreStatusNoNewId', updateStoreStatusNoNewId)
+
 // router.get('/test', test)
 
 router.post('/addCallCard', addCallCard)

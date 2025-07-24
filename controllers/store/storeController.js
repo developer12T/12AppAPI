@@ -10,6 +10,7 @@ const { getSocket } = require('../../socket')
 const addUpload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages'
 )
+
 const sql = require('mssql')
 const {
   storeQuery,
@@ -452,7 +453,7 @@ exports.checkSimilarStores = async (req, res) => {
   const existingStores = await Store.find(
     { storeId: { $ne: storeId } },
     { _id: 0, __v: 0, idIndex: 0 },
-    { area: store.area }
+    // { area: store.area }
   )
 
   // 1. กำหนด weight ของแต่ละ field (ค่า sum ต้องไม่จำเป็นต้องรวมกันเท่ากับ 100)
@@ -461,12 +462,12 @@ exports.checkSimilarStores = async (req, res) => {
     { field: 'taxId', weight: 4 },
     { field: 'tel', weight: 3 },
     { field: 'address', weight: 2 },
-    { field: 'district', weight: 0.5 },
-    { field: 'subDistrict', weight: 0.5 },
-    { field: 'province', weight: 0.5 },
-    { field: 'postCode', weight: 0.5 },
-    { field: 'latitude', weight: 0.5 },
-    { field: 'longtitude', weight: 0.5 }
+    // { field: 'district', weight: 0.5 },
+    // { field: 'subDistrict', weight: 0.5 },
+    // { field: 'province', weight: 0.5 },
+    // { field: 'postCode', weight: 0.5 },
+    // { field: 'latitude', weight: 4 },
+    // { field: 'longtitude', weight: 4 }
   ]
 
   const totalWeight = fieldsToCheck.reduce((sum, cur) => sum + cur.weight, 0)
@@ -902,11 +903,11 @@ exports.updateStoreStatus = async (req, res) => {
     //   })
     // }
 
-      return res.status(200).json({
-        status:200,
-        message: 'update Store Status sucess',
+    return res.status(200).json({
+      status: 200,
+      message: 'update Store Status sucess',
 
-      })
+    })
 
   } else {
     await Store.findOneAndUpdate(
@@ -947,6 +948,49 @@ exports.rejectStore = async (req, res) => {
     data: result
   })
 }
+
+exports.updateStoreStatusNoNewId = async (req, res) => {
+  try {
+    const { storeId, status, user } = req.body
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const store = await Store.findOne({ storeId })
+
+    if (!store) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Store not found'
+      })
+    }
+
+    const result = await Store.findOneAndUpdate(
+      { storeId },
+      {
+        status,
+        updatedDate: Date(),
+        'approve.dateAction': new Date(),
+        'approve.appPerson': user
+      },
+      { new: true }
+    )
+
+    return res.status(200).json({
+      status: 200,
+      message: 'Store status updated successfully',
+    })
+  } catch (error) {
+    console.error('updateStoreStatusNoNewId error:', error)
+    return res.status(500).json({
+      status: 500,
+      message: 'Internal server error'
+    })
+  }
+}
+
+
+
+
 
 exports.addAndUpdateStore = async (req, res) => {
   const channel = req.headers['x-channel']
@@ -1669,3 +1713,33 @@ exports.deleteShippingFromStore = async (req, res) => {
 }
 
 
+exports.deleteStore = async (req, res) => {
+  try {
+    const { storeId } = req.body
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const store = await Store.findOne({ storeId })
+
+    if (!store) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Store not found'
+      })
+    }
+
+    // เปลี่ยนสถานะเป็น 90 (soft delete)
+    await Store.updateOne({ storeId }, { status: 'delete' })
+
+    return res.status(200).json({
+      status: 200,
+      message: 'Store marked as deleted (status delete)'
+    })
+  } catch (error) {
+    console.error('deleteStore error:', error)
+    return res.status(500).json({
+      status: 500,
+      message: 'Internal server error'
+    })
+  }
+}

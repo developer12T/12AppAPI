@@ -428,6 +428,7 @@ exports.getRefund = async (req, res) => {
     }
 
     const refunds = await Refund.aggregate([
+      {$match:{status:'pending'}},
       {
         $addFields: {
           zone: { $substrBytes: ['$store.area', 0, 2] }
@@ -835,22 +836,52 @@ exports.updateStatus = async (req, res) => {
 
 exports.deleteRefund = async (req, res) => {
   try {
-    const { type, area, store, period } = req.query
-
+    const { orderId } = req.body
     const channel = req.headers['x-channel']
     const { Refund } = getModelsByChannel(channel, res, refundModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
 
-    let response = []
+    // ตรวจสอบ Refund ก่อน
+    const refundExists = await Refund.findOne({ orderId })
+    if (!refundExists) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Refund not found'
+      })
+    }
 
+    // ตรวจสอบ Order ก่อน
+    const orderExists = await Order.findOne({ reference:orderId, type: 'change' })
+    if (!orderExists) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Order (change type) not found'
+      })
+    }
 
-    
+    // อัปเดต refund
+    const refund = await Refund.findOneAndUpdate(
+      { orderId },
+      { status: 'delete', statusTH: 'ถูกลบ' },
+      { new: true }
+    )
 
+    // อัปเดต order
+    const order = await Order.findOneAndUpdate(
+      { reference:orderId, type: 'change' },
+      { status: 'delete', statusTH: 'ถูกลบ' },
+      { new: true }
+    )
 
+    res.status(200).json({
+      status: 200,
+      message: 'Refund and order marked as deleted successfully!',
+      // data: refund,
+      // order: order
+    })
   } catch (error) {
     console.error('Error updating refund status:', error)
     res.status(500).json({ status: 500, message: 'Server error' })
   }
-
 }
 

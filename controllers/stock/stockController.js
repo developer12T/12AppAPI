@@ -182,6 +182,11 @@ exports.getAdjustStock = async (req, res) => {
 
     const pipeline = [
       {
+        $match: {
+          status: 'pending'
+        }
+      },
+      {
         $addFields: {
           zone: { $substrBytes: ['$area', 0, 2] },
           team3: {
@@ -231,7 +236,7 @@ exports.getAdjustStock = async (req, res) => {
       area: o.area,
       saleCode: o.saleCode,
       period: o.period,
-      listProduct : o.listProduct,
+      listProduct: o.listProduct,
       statusTH: o.statusTH,
       status: o.status,
       createdAt: o.createdAt,
@@ -1317,6 +1322,7 @@ exports.getStockQtyNew = async (req, res) => {
     {
       $project: {
         listProduct: 1,
+        listPromotions: 1,
         _id: 0
       }
     }
@@ -1373,6 +1379,7 @@ exports.getStockQtyNew = async (req, res) => {
   const allWithdrawProducts = dataWithdraw.flatMap(doc => doc.listProduct || [])
   const allRefundProducts = dataRefund.flatMap(doc => doc.listProduct || [])
   const allOrderProducts = dataOrder.flatMap(doc => doc.listProduct || [])
+  const allOrderPromotion = dataOrder.flatMap(doc => doc.listPromotions || [])
   const allChangeProducts = dataChange.flatMap(doc => doc.listProduct || [])
   const allAdjustProducts = dataAdjust.flatMap(doc => doc.listProduct || [])
   const allGiveProducts = dataGive.flatMap(doc => doc.listProduct || [])
@@ -1442,6 +1449,28 @@ exports.getStockQtyNew = async (req, res) => {
     }, {})
   )
 
+  const mergedProductPromotions = allOrderPromotion.reduce((acc, promo) => {
+    promo.listProduct.forEach(prod => {
+      const key = `${prod.productId}_${prod.unit}`;
+      if (acc[key]) {
+        acc[key].qty += prod.qty || 0;
+        acc[key].qtyPcs += prod.qtyPcs || 0;
+      } else {
+        acc[key] = {
+          ...prod,
+          qty: prod.qty || 0,
+          qtyPcs: prod.qtyPcs || 0
+        };
+      }
+    });
+    return acc;
+  }, {});
+
+  // แปลงเป็น array ถ้าต้องการใช้งานต่อ
+  const orderPromotionArray = Object.values(mergedProductPromotions);
+  // console.log(orderPromotionArray)
+
+
   const changeProductArray = Object.values(
     allChangeProducts.reduce((acc, curr) => {
       const key = `${curr.id}_${curr.unit}`
@@ -1507,11 +1536,15 @@ exports.getStockQtyNew = async (req, res) => {
 
   const productIdListOrder = orderProductArray.flatMap(item => item.id)
 
+  const productIdListPromotion = orderPromotionArray.flatMap(item => item.id)
+
   const productIdListChange = changeProductArray.flatMap(item => item.id)
 
   const productIdListAdjust = adjustProductArray.flatMap(item => item.id)
 
   const productIdListGive = giveProductArray.flatMap(item => item.id)
+
+  
 
   const uniqueProductId = [
     ...new Set([
@@ -1519,6 +1552,7 @@ exports.getStockQtyNew = async (req, res) => {
       ...productIdListWithdraw,
       ...productIdListRefund,
       ...productIdListOrder,
+      ...productIdListPromotion,
       ...productIdListChange,
       ...productIdListAdjust,
       ...productIdListGive
@@ -1579,6 +1613,7 @@ exports.getStockQtyNew = async (req, res) => {
   let summaryGood = 0
   let summaryDamaged = 0
   let summarySale = 0
+  let summaryPromotion = 0
   let summaryChange = 0
   let summaryAdjust = 0
   let summaryGive = 0
@@ -1600,6 +1635,11 @@ exports.getStockQtyNew = async (req, res) => {
     const productDetailOrder = orderProductArray.filter(
       u => u.id == stockItem.id
     )
+
+    const productDetailPromotion = orderPromotionArray.filter(
+      u => u.id == stockItem.id
+    )
+
     const productDetailChange = changeProductArray.filter(
       u => u.id == stockItem.id
     )
@@ -1613,6 +1653,7 @@ exports.getStockQtyNew = async (req, res) => {
     if (!productDetailWithdraw) continue
     if (!productDetailOrder) continue
     if (!productDetailChange) continue
+    if (!productDetailPromotion) continue
     if (!productDetailAdjust) continue
     if (!productDetailGive) continue
 
@@ -1638,6 +1679,7 @@ exports.getStockQtyNew = async (req, res) => {
       const withdrawQty =
         productDetailWithdraw.find(i => i.unit === u.unit)?.qty ?? 0
       const saleQty = productDetailOrder.find(i => i.unit === u.unit)?.qty ?? 0
+      const promoQty = productDetailPromotion.find(i => i.unit === u.unit)?.qty ?? 0
       const changeQty =
         productDetailChange.find(i => i.unit === u.unit)?.qty ?? 0
       const adjustQty =
@@ -1663,6 +1705,7 @@ exports.getStockQtyNew = async (req, res) => {
       summaryGood += (goodQty || 0) * goodSale
       summaryDamaged += (damagedQty || 0) * damagedSale
       summarySale += (saleQty || 0) * sale
+      summaryPromotion += (promoQty || 0) * sale
       summaryChange += (changeQty || 0) * changeSale
       summaryAdjust += (adjustQty || 0) * sale
       summaryGive += (giveQty || 0) * sale
@@ -1675,6 +1718,7 @@ exports.getStockQtyNew = async (req, res) => {
         good: goodQty,
         damaged: damagedQty,
         sale: saleQty,
+        promotion : promoQty,
         change: changeQty,
         adjust: adjustQty,
         give: giveQty,
@@ -1712,6 +1756,7 @@ exports.getStockQtyNew = async (req, res) => {
     summaryGood: Number(summaryGood.toFixed(2)),
     summaryDamaged: Number(summaryDamaged.toFixed(2)),
     summarySale: Number(summarySale.toFixed(2)),
+    summaryPromotion: Number(summaryPromotion.toFixed(2)),
     summaryChange: Number(summaryChange.toFixed(2)),
     summaryAdjust: Number(summaryAdjust.toFixed(2)),
     summaryGive: Number(summaryGive.toFixed(2)),
@@ -2770,6 +2815,41 @@ exports.stockToExcel = async (req, res) => {
         sumBalanceDamaged,
         sumBalanceSummary: to2(sumBalancesummary)
       }
+    })
+  }
+}
+
+
+exports.deleteStockAdjust = async (req, res) => {
+  try {
+    const { orderId } = req.body
+    const channel = req.headers['x-channel']
+    const { AdjustStock } = getModelsByChannel(channel, res, stockModel)
+
+    const adjust = await AdjustStock.findOne({ orderId })
+
+    if (!adjust) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Stock adjustment not found'
+      })
+    }
+
+    // อัปเดตสถานะแทนการลบจริง
+    await AdjustStock.updateOne(
+      { orderId },
+      { status: 'delete', statusTH: 'ถูกลบ' }
+    )
+
+    return res.status(200).json({
+      status: 200,
+      message: 'Stock adjustment marked as deleted successfully'
+    })
+  } catch (error) {
+    console.error('deleteStockAdjust error:', error)
+    return res.status(500).json({
+      status: 500,
+      message: 'Internal server error'
     })
   }
 }

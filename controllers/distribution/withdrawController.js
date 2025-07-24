@@ -39,7 +39,7 @@ exports.checkout = async (req, res) => {
       stockModel
     )
 
-    if (!type || !area || !shippingId || !withdrawType || !sendDate || !note) {
+    if (!type || !area || !withdrawType || !sendDate || !note) {
       return res
         .status(400)
         .json({ status: 400, message: 'Missing required fields!' })
@@ -210,19 +210,19 @@ exports.checkout = async (req, res) => {
       }
     })
 
-    for (const item of productQty) {
+    // for (const item of productQty) {
 
-      const updateResult = await updateStockMongo(
-        item,
-        area,
-        period,
-        'withdraw',
-        channel,
-        res
-      )
-      if (updateResult) return
+    //   const updateResult = await updateStockMongo(
+    //     item,
+    //     area,
+    //     period,
+    //     'withdraw',
+    //     channel,
+    //     res
+    //   )
+    //   if (updateResult) return
 
-    }
+    // }
 
     // const sendDateFormat = new Date(newOrder.sendDate)
     // const formattedDate = sendDateFormat

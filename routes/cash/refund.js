@@ -8,5 +8,5 @@ router.get('/detail/:orderId', getDetail)
 router.post('/checkout', checkout)
 router.post('/addSlip', addSlip)
 router.post('/updateStatus', updateStatus)
-router.delete('/deleteRefund', deleteRefund)
+router.post('/deleteRefund', deleteRefund)
 module.exports = router
