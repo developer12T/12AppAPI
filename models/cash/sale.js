@@ -94,9 +94,9 @@ const listQuotaSchema = new mongoose.Schema({
 })
 
 const orderShipingSchema = new mongoose.Schema({
-  default: { type: String, require: true },
-  shippingId: { type: String, require: true },
-  address: { type: String, require: true },
+  default: { type: String,  },
+  shippingId: { type: String,  },
+  address: { type: String,  },
   district: { type: String, },
   subDistrict: { type: String, },
   province: { type: String, },
@@ -150,7 +150,7 @@ const orderSchema = new mongoose.Schema(
     total: { type: Number, require: true },
     paymentMethod: { type: String, default: 'cash' },
     paymentStatus: { type: String, default: 'unpaid' },
-    route: { type: String, default: 'out' },
+    // route: { type: String, default: 'out' },
     listImage: [orderImageSchema],
     reference: { type: String, require: true, default: '' },
     createdBy: { type: String, require: true },

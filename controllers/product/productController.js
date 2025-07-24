@@ -184,26 +184,37 @@ exports.getProduct = async (req, res) => {
       return res.status(404).json({ status: '404', message: 'No products found!' })
     }
 
-    const data = products
-      .map(product => {
-        const stockMatch = stock.find(s => s._id === product.id) || {}
-        let listUnit = product.listUnit || []
+const data = products
+  .filter(product => {
+    if (type === 'withdraw') {
+      return product.listUnit?.some(u => u.unit === 'CTN') // ✅ เฉพาะที่มี CTN
+    }
+    return true // แสดงทุกตัวถ้าไม่ใช่ withdraw
+  })
+  .map(product => {
+    const stockMatch = stock.find(s => s._id === product.id) || {}
+    let listUnit = product.listUnit || []
 
-        if (type === 'sale') {
-          listUnit = listUnit.map(u => ({ ...u, price: u.price?.sale }))
-        } else if (type === 'refund') {
-          listUnit = listUnit.map(u => ({ ...u, price: u.price?.refund }))
-        } else if (type === 'withdraw') {
-          listUnit = listUnit.filter(u => u.unit === 'CTN')
-        }
+    if (type === 'sale') {
+      listUnit = listUnit.map(u => ({ ...u, price: u.price?.sale }))
+    } else if (type === 'refund') {
+      listUnit = listUnit.map(u => ({ ...u, price: u.price?.refund }))
+    } else if (type === 'withdraw') {
+      listUnit = listUnit
+        .filter(u => u.unit === 'CTN') // ✅ เฉพาะ CTN
+        .map(u => ({
+          ...u,
+          price: u.price?.sale
+        }))
+    }
 
-        return {
-          ...product,
-          listUnit,
-          qtyCtn: stockMatch.balanceCtn || 0,
-          qtyPcs: stockMatch.balancePcs || 0
-        }
-      })
+    return {
+      ...product,
+      listUnit,
+      qtyCtn: stockMatch.balanceCtn || 0,
+      qtyPcs: stockMatch.balancePcs || 0
+    }
+  })
       .sort((a, b) => {
         if (a.groupCode < b.groupCode) return -1
         if (a.groupCode > b.groupCode) return 1

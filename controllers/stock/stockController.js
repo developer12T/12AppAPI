@@ -181,6 +181,9 @@ exports.getAdjustStock = async (req, res) => {
     }
 
     const pipeline = [
+      {$match:{
+        status:'pending'
+      }},
       {
         $addFields: {
           zone: { $substrBytes: ['$area', 0, 2] },
@@ -231,7 +234,7 @@ exports.getAdjustStock = async (req, res) => {
       area: o.area,
       saleCode: o.saleCode,
       period: o.period,
-      listProduct : o.listProduct,
+      listProduct: o.listProduct,
       statusTH: o.statusTH,
       status: o.status,
       createdAt: o.createdAt,
@@ -2770,6 +2773,41 @@ exports.stockToExcel = async (req, res) => {
         sumBalanceDamaged,
         sumBalanceSummary: to2(sumBalancesummary)
       }
+    })
+  }
+}
+
+
+exports.deleteStockAdjust = async (req, res) => {
+  try {
+    const { orderId } = req.body
+    const channel = req.headers['x-channel']
+    const { AdjustStock } = getModelsByChannel(channel, res, stockModel)
+
+    const adjust = await AdjustStock.findOne({ orderId })
+
+    if (!adjust) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Stock adjustment not found'
+      })
+    }
+
+    // อัปเดตสถานะแทนการลบจริง
+    await AdjustStock.updateOne(
+      { orderId },
+      { status: 'delete', statusTH: 'ถูกลบ' }
+    )
+
+    return res.status(200).json({
+      status: 200,
+      message: 'Stock adjustment marked as deleted successfully'
+    })
+  } catch (error) {
+    console.error('deleteStockAdjust error:', error)
+    return res.status(500).json({
+      status: 500,
+      message: 'Internal server error'
     })
   }
 }
