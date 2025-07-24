@@ -227,8 +227,7 @@ exports.checkout = async (req, res) => {
       note,
       latitude,
       longitude,
-      shippingId,
-      address,
+      shipping
     } = req.body
     const channel = req.headers['x-channel']
     const { Cart } = getModelsByChannel(channel, res, cartModel)
@@ -311,8 +310,7 @@ exports.checkout = async (req, res) => {
       totalVat: summary.totalVat,
       totalExVat: summary.totalExVat,
       total: summary.total,
-      shippingId: shippingId,
-      address: address,
+      shipping: shipping,
       createdBy: sale.username,
       period: period
     })

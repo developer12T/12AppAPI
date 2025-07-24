@@ -61,10 +61,16 @@ const giveStoreSchema = new mongoose.Schema({
     area: { type: String, require: true },
     zone: { type: String, require: true },
 })
-
-const giveShipingSchema = new mongoose.Schema({
-    shippingId: { type: String, require: true },
-    address: { type: String, require: true }
+const orderShipingSchema = new mongoose.Schema({
+  default: { type: String,  },
+  shippingId: { type: String,  },
+  address: { type: String,  },
+  district: { type: String, },
+  subDistrict: { type: String, },
+  province: { type: String, },
+  postCode: { type: String, },
+  latitude: { type: String, },
+  longtitude: { type: String, }
 })
 
 const listGiveProductSchema = new mongoose.Schema({
@@ -95,7 +101,7 @@ const giveawaysSchema = new mongoose.Schema({
     giveInfo: giveInfoSchema,
     sale: giveSaleSchema,
     store: giveStoreSchema,
-    // shipping: giveShipingSchema,
+    shipping: orderShipingSchema,
     shippingId: { type: String, require: true },
     address: { type: String, require: true },
     note: { type: String, require: true },
