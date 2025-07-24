@@ -109,7 +109,7 @@ exports.getGiveProductFilter = async (req, res) => {
     const { area, giveId, group, brand, size, flavour } = req.body
     const channel = req.headers['x-channel']
 
-    if (!giveId || !area) {
+    if (!giveId) {
       return res.status(400).json({
         status: 400,
         message: 'area and giveId are required!'
@@ -117,6 +117,7 @@ exports.getGiveProductFilter = async (req, res) => {
     }
 
     const products = await getProductGive(giveId, area, channel, res)
+    // console.log('products',products)
 
     if (!products.length) {
       return res.status(404).json({
