@@ -452,7 +452,7 @@ exports.checkSimilarStores = async (req, res) => {
   const existingStores = await Store.find(
     { storeId: { $ne: storeId } },
     { _id: 0, __v: 0, idIndex: 0 },
-    { area: store.area }
+    // { area: store.area }
   )
 
   // 1. กำหนด weight ของแต่ละ field (ค่า sum ต้องไม่จำเป็นต้องรวมกันเท่ากับ 100)
@@ -461,12 +461,12 @@ exports.checkSimilarStores = async (req, res) => {
     { field: 'taxId', weight: 4 },
     { field: 'tel', weight: 3 },
     { field: 'address', weight: 2 },
-    { field: 'district', weight: 0.5 },
-    { field: 'subDistrict', weight: 0.5 },
-    { field: 'province', weight: 0.5 },
-    { field: 'postCode', weight: 0.5 },
-    { field: 'latitude', weight: 0.5 },
-    { field: 'longtitude', weight: 0.5 }
+    // { field: 'district', weight: 0.5 },
+    // { field: 'subDistrict', weight: 0.5 },
+    // { field: 'province', weight: 0.5 },
+    // { field: 'postCode', weight: 0.5 },
+    // { field: 'latitude', weight: 4 },
+    // { field: 'longtitude', weight: 4 }
   ]
 
   const totalWeight = fieldsToCheck.reduce((sum, cur) => sum + cur.weight, 0)
