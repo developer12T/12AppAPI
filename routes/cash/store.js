@@ -31,20 +31,24 @@ const {
   // test
 } = require('../../controllers/store/storeController')
 
-
-const { addCallCard, delCallCard, addFlowAction,getCallCard, 
-  updateDetailStore, updateDailyvisit, updateGooglemap, addVisit
- } = require('../../controllers/store/callCardController')
-
-
-
+const {
+  addCallCard,
+  delCallCard,
+  addFlowAction,
+  getCallCard,
+  updateDetailStore,
+  updateDailyvisit,
+  updateGooglemap,
+  addVisit
+} = require('../../controllers/store/callCardController')
 
 const router = express.Router()
 
 router.get('/getStore', getStore)
+router.get('/getTypeStore', getTypeStore)
+router.get('/check/:storeId', checkSimilarStores)
 router.get('/:storeId', getDetailStore)
 router.post('/addStore', addStore)
-router.get('/check/:storeId', checkSimilarStores)
 router.post('/updateImage', updateImage)
 router.post('/addFromERP', addFromERP)
 router.post('/addFromERPnew', addFromERPnew)
@@ -61,7 +65,6 @@ router.post('/getBueatyStore', getBueatyStore)
 router.post('/addStoreArray', addStoreArray)
 router.post('/updateStoreArray', updateStoreArray)
 router.post('/deleteStoreArray', deleteStoreArray)
-router.get('/getTypeStore', getTypeStore)
 router.post('/addTypeStore', addTypeStore)
 router.post('/insertStoreToErpOne', insertStoreToErpOne)
 router.post('/addShippingInStore', addShippingInStore)
