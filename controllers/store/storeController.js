@@ -1671,7 +1671,7 @@ exports.editShippingInStore = async (req, res) => {
 
 exports.deleteShippingFromStore = async (req, res) => {
   try {
-    const { storeId, shippingId } = req.body // หรือ req.params, แล้วแต่ดีไซน์
+    const { storeId, shippingId } = req.body
 
     const channel = req.headers['x-channel']
     const { Store } = getModelsByChannel(channel, res, storeModel)
@@ -1743,3 +1743,6 @@ exports.deleteStore = async (req, res) => {
     })
   }
 }
+
+
+

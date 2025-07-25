@@ -47,6 +47,7 @@ const distributionModel = require('../../models/cash/distribution')
 const refundModel = require('../../models/cash/refund')
 const storeModel = require('../../models/cash/store')
 const { getModelsByChannel } = require('../../middleware/channel')
+const { formatDateTimeToThai } = require('../../middleware/order')
 
 const xlsx = require('xlsx')
 const path = require('path')
@@ -3473,4 +3474,71 @@ exports.getSummary18SKU = async (req, res) => {
     // data: data,
     data: sortedMergedGroup
   })
+}
+
+
+exports.reportCheckin = async (req, res) => {
+
+  const { zone, area, period } = req.body
+  const channel = req.headers['x-channel']
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+
+  let match = {}
+  if (zone) {
+    match['store.zone'] = zone
+  }
+
+  if (area) {
+    match['store.area'] = area
+
+  }
+
+  const dataOrder = await Order.aggregate([
+    { $match: match },
+    {
+      $match: {
+        period: period,
+
+      }
+    },
+    {
+      $project: {
+        store: 1,
+        listProduct: 1, // เอา listProduct หลักออกมา
+        promotionProducts: {
+          $reduce: {
+            input: "$listPromotions",
+            initialValue: [],
+            in: {
+              $concatArrays: ["$$value", "$$this.listProduct"]
+            }
+          }
+        },
+        createdAt: 1
+      }
+    }
+  ])
+
+  const { startDate, endDate } = rangeDate(period)
+
+
+  // for (const i of dataOrder) {
+
+  //   const date = formatDateTimeToThai(i.createdAt)
+  //   console.log(date)
+
+  // }
+
+
+
+
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: [{startDate:startDate,endDate:endDate}]
+  })
+
 }
