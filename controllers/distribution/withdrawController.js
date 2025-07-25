@@ -996,7 +996,7 @@ exports.approveWithdraw = async (req, res) => {
       }
 
       const email = await Withdraw.findOne({ ROUTE: distributionTran.shippingRoute }).select("Dc_Email")
-a
+
       sendEmail({
         to: 'aukrit.chi@onetwotrading.co.th',
         subject: 'แจ้งเตือนระบบ (เทสระบบ 12App cash)',
