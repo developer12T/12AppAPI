@@ -607,7 +607,7 @@ module.exports.updateStockMongo = async function (
 
 
 
-module.exports.sendEmail = async function ({ to, subject, html }) {
+module.exports.sendEmail = async function ({ to,cc, subject, html }) {
   try {
     const transporter = nodemailer.createTransport({
       host: 'smtp.office365.com',
@@ -622,6 +622,7 @@ module.exports.sendEmail = async function ({ to, subject, html }) {
     const info = await transporter.sendMail({
       from: `"it test" <${process.env.MY_MAIL_USER}>`, // ผู้ส่งต้องเป็น email ที่คุณใช้จริง
       to,
+      cc, 
       subject,
       html,
     });

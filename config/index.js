@@ -30,5 +30,8 @@ module.exports = {
 
   MY_MAIL_USER: process.env.MY_MAIL_USER,
   MY_MAIL_PASS: process.env.MY_MAIL_PASS,
-  MY_MAIL_HOST: process.env.MY_MAIL_HOST
+  MY_MAIL_HOST: process.env.MY_MAIL_HOST,
+
+  BELL_MAIL: process.env.BELL_MAIL,
+  BANK_MAIL: process.env.BANK_MAIL
 };
