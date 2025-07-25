@@ -18,6 +18,7 @@ const { getModelsByChannel } = require('../../middleware/channel')
 const { query } = require('mssql')
 const { exists } = require('fs')
 const DistributionModel = require('../../models/cash/distribution')
+require('dotenv').config()
 
 const { formatDateTimeToThai } = require('../../middleware/order')
 const { to2, updateStockMongo } = require('../../middleware/order')
@@ -996,12 +997,25 @@ exports.approveWithdraw = async (req, res) => {
       }
 
       const email = await Withdraw.findOne({ ROUTE: distributionTran.shippingRoute }).select("Dc_Email")
-
       sendEmail({
-        to: 'aukrit.chi@onetwotrading.co.th',
+        to: email.Dc_Email,
+        cc: [
+          process.env.BELL_MAIL,
+          process.env.BANK_MAIL
+        ],
         subject: 'แจ้งเตือนระบบ (เทสระบบ 12App cash)',
-        html: '<h1>ทดสอบส่งเมล</h1><p>เลขที่ใบเบิก ${distributionTran.orderId}</p>',
-      })
+        html: `
+    <h1>ทดสอบส่งเมลใบเบิก</h1>
+    <p>
+      <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
+      <strong>ประเภทการเบิก:</strong> ${distributionTran.orderTypeName}<br>
+      <strong>จัดส่งจาก:</strong> ${distributionTran.fromWarehouse}<br>
+      <strong>สถานที่จัดส่งไป:</strong> ${distributionTran.toWarehouse}<br>
+      <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
+      <strong>หมายเหตุ:</strong> ${distributionTran.remark}
+    </p>
+  `
+      });
 
     }
 
