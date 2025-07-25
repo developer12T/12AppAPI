@@ -17,10 +17,12 @@ const { withdrawQuery } = require('../../controllers/queryFromM3/querySctipt')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { query } = require('mssql')
 const { exists } = require('fs')
+const DistributionModel = require('../../models/cash/distribution')
+
 const { formatDateTimeToThai } = require('../../middleware/order')
 const { to2, updateStockMongo } = require('../../middleware/order')
 const { getSocket } = require('../../socket')
-
+const { sendEmail } = require('../../middleware/order')
 exports.checkout = async (req, res) => {
   const transaction = await sequelize.transaction()
   try {
@@ -874,7 +876,7 @@ exports.approveWithdraw = async (req, res) => {
     const { Distribution } = getModelsByChannel(channel, res, distributionModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Stock } = getModelsByChannel(channel, res, stockModel)
-
+    const { Withdraw } = getModelsByChannel(channel, res, DistributionModel)
     if (statusStr === 'approved') {
       // console.log(orderId)
       const distributionTran = await Distribution.findOne({
@@ -992,6 +994,15 @@ exports.approveWithdraw = async (req, res) => {
         if (updateResult) return
 
       }
+
+      const email = await Withdraw.findOne({ ROUTE: distributionTran.shippingRoute }).select("Dc_Email")
+a
+      sendEmail({
+        to: 'aukrit.chi@onetwotrading.co.th',
+        subject: 'แจ้งเตือนระบบ (เทสระบบ 12App cash)',
+        html: '<h1>ทดสอบส่งเมล</h1><p>เลขที่ใบเบิก ${distributionTran.orderId}</p>',
+      })
+
     }
 
     const io = getSocket()
