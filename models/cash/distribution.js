@@ -140,6 +140,12 @@ const withdrawSchema = mongoose.Schema({
 });
 
 
+const wereHouseSchema = mongoose.Schema({
+    wh_code: { type: String, required: true },
+    wh_name: { type: String, required: true },
+});
+
+
 
 
 
@@ -157,6 +163,6 @@ module.exports = (conn) => {
         Place: conn.model('Place', placeSchema),
         Distribution: conn.model('Distribution', distributionSchema),
         Receive: conn.model('Receive', receiveSchema),
-
+        WereHouse: conn.model('wereHouse', wereHouseSchema),
     };
 };

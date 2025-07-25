@@ -6,6 +6,7 @@ const { getSocket } = require('../../socket')
 const userModel = require('../../models/cash/user')
 const distributionModel = require('../../models/cash/distribution')
 const { getModelsByChannel } = require('../../middleware/channel')
+const { wereHouseQuery } = require('../../controllers/queryFromM3/querySctipt')
 
 
 exports.getPlace = async (req, res) => {
@@ -253,3 +254,30 @@ exports.addAllPlace = async (req, res) => {
     }
 }
 
+
+
+exports.addWereHouse = async (req, res) => {
+    try {
+        const channel = req.headers['x-channel'];
+        const dataWereHouseTable = await wereHouseQuery(); // ควรคืนค่าที่เป็น Array
+        // console.log(dataWereHouseTable)
+
+        const { WereHouse } = getModelsByChannel(channel, res, distributionModel);
+
+        await WereHouse.deleteMany();
+
+        if (Array.isArray(dataWereHouseTable) && dataWereHouseTable.length > 0) {
+            await WereHouse.insertMany(dataWereHouseTable);
+        }
+
+        res.status(200).json({
+            status: '200',
+            message: 'Successfully added warehouse data',
+            count: dataWereHouseTable.length
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ status: '500', message: error.message });
+    }
+};

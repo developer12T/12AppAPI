@@ -874,7 +874,7 @@ exports.approveWithdraw = async (req, res) => {
     let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ'
 
     const channel = req.headers['x-channel']
-    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+    const { Distribution,WereHouse } = getModelsByChannel(channel, res, distributionModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Stock } = getModelsByChannel(channel, res, stockModel)
     const { Withdraw } = getModelsByChannel(channel, res, DistributionModel)
@@ -996,7 +996,12 @@ exports.approveWithdraw = async (req, res) => {
 
       }
 
-      const email = await Withdraw.findOne({ ROUTE: distributionTran.shippingRoute }).select("Dc_Email")
+      const email = await Withdraw.findOne({ ROUTE: distributionTran.shippingRoute,
+        Des_No:distributionTran.shippingId
+       }).select("Dc_Email Des_Name")
+      const wereHouseName = await WereHouse.findOne({wh_code:distributionTran.fromWarehouse}).select("wh_name")
+
+      // console.log(wereHouseName)
       sendEmail({
         to: email.Dc_Email,
         cc: [
@@ -1009,8 +1014,8 @@ exports.approveWithdraw = async (req, res) => {
     <p>
       <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
       <strong>ประเภทการเบิก:</strong> ${distributionTran.orderTypeName}<br>
-      <strong>จัดส่งจาก:</strong> ${distributionTran.fromWarehouse}<br>
-      <strong>สถานที่จัดส่งไป:</strong> ${distributionTran.toWarehouse}<br>
+      <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}-${wereHouseName.wh_name}<br>
+      <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${email.Des_Name}<br>
       <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
       <strong>หมายเหตุ:</strong> ${distributionTran.remark}
     </p>
