@@ -120,7 +120,6 @@ exports.getGiveProductFilter = async (req, res) => {
     }
 
     const products = await getProductGive(giveId, area, channel, res)
-    // console.log('products',products)
 
     if (!products.length) {
       return res.status(404).json({
@@ -139,10 +138,15 @@ exports.getGiveProductFilter = async (req, res) => {
       isEmptyArray(flavour)
     ) {
       const uniqueGroups = [...new Set(products.map(p => p.group))]
+      const uniqueBrands = [...new Set(products.map(p => p.brand))]
+      const uniqueSizes = [...new Set(products.map(p => p.size))]
+      const uniqueflavours = [...new Set(products.map(p => p.flavour))]
+
+
       return res.status(200).json({
         status: 200,
         message: 'Successfully fetched product groups!',
-        data: { group: uniqueGroups, brand: [], size: [], flavour: [] }
+        data: { group: uniqueGroups, brand: uniqueBrands, size: uniqueSizes, flavour: uniqueflavours }
       })
     }
 
@@ -170,7 +174,6 @@ exports.getGiveProductFilter = async (req, res) => {
         data: []
       })
     }
-
     const groupedData = {
       group: [...new Set(filteredProducts.map(p => p.group))],
       brand: [...new Set(filteredProducts.map(p => p.brand))].filter(Boolean),
