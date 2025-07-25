@@ -877,6 +877,7 @@ exports.approveWithdraw = async (req, res) => {
     const { Distribution,WereHouse } = getModelsByChannel(channel, res, distributionModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Stock } = getModelsByChannel(channel, res, stockModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
     const { Withdraw } = getModelsByChannel(channel, res, DistributionModel)
     if (statusStr === 'approved') {
       // console.log(orderId)
@@ -995,28 +996,34 @@ exports.approveWithdraw = async (req, res) => {
         if (updateResult) return
 
       }
-
+      const userData = await User.findOne({role:'sale',area:distributionTran.area})
       const email = await Withdraw.findOne({ ROUTE: distributionTran.shippingRoute,
         Des_No:distributionTran.shippingId
        }).select("Dc_Email Des_Name")
       const wereHouseName = await WereHouse.findOne({wh_code:distributionTran.fromWarehouse}).select("wh_name")
 
-      // console.log(wereHouseName)
+
+
+      // <strong>ประเภทการเบิก:</strong> ${distributionTran.orderTypeName}<br> ยังไม่มี
+
       sendEmail({
         to: email.Dc_Email,
         cc: [
           process.env.BELL_MAIL,
-          process.env.BANK_MAIL
+          // process.env.BANK_MAIL
         ],
         subject: 'แจ้งเตือนระบบ (เทสระบบ 12App cash)',
         html: `
     <h1>ทดสอบส่งเมลใบเบิก</h1>
     <p>
       <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-      <strong>ประเภทการเบิก:</strong> ${distributionTran.orderTypeName}<br>
+      <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName}<br>
       <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}-${wereHouseName.wh_name}<br>
-      <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${email.Des_Name}<br>
+      <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName}<br>
       <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
+      <strong>เขต:</strong> ${distributionTran.area}<br>
+      <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
+      <strong>เบอร์โทรศัพท์เซลล์:</strong> ${userData.tel}<br>
       <strong>หมายเหตุ:</strong> ${distributionTran.remark}
     </p>
   `
