@@ -2330,9 +2330,9 @@ exports.approveAdjustStock = async (req, res) => {
       // const factorPcsQty = item.qty * factorPcs
       // const factorCtnQty = Math.floor(factorPcsQty / factorCtn)
 
-      if (item.action === 'reduce') {
+      if (item.action === 'OUT') {
         const updateResult = await updateStockMongo(
-          item.id,
+          item,
           DataAdjustStock.area,
           DataAdjustStock.period,
           'approvedAdjustStockReduce',
@@ -2362,7 +2362,7 @@ exports.approveAdjustStock = async (req, res) => {
         //   )
       } else if (item.action === 'add') {
         const updateResult = await updateStockMongo(
-          item.id,
+          item,
           DataAdjustStock.area,
           DataAdjustStock.period,
           'approvedAdjustStockAdd',

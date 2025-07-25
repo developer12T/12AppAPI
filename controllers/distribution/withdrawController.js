@@ -983,23 +983,23 @@ exports.approveWithdraw = async (req, res) => {
 
       for (const item of qtyproduct) {
 
-        // const updateResult = await updateStockMongo(
-        //   item,
-        //   distributionTran.area,
-        //   distributionTran.period,
-        //   'withdraw',
-        //   channel,
-        //   res
-        // )
-        // if (updateResult) return
+        const updateResult = await updateStockMongo(
+          item,
+          distributionTran.area,
+          distributionTran.period,
+          'withdraw',
+          channel,
+          res
+        )
+        if (updateResult) return
 
       }
 
       const email = await Withdraw.findOne({ ROUTE: distributionTran.shippingRoute }).select("Dc_Email")
-
+a
       sendEmail({
         to: 'aukrit.chi@onetwotrading.co.th',
-        subject: 'แจ้งเตือนระบบ',
+        subject: 'แจ้งเตือนระบบ (เทสระบบ 12App cash)',
         html: '<h1>ทดสอบส่งเมล</h1><p>เลขที่ใบเบิก ${distributionTran.orderId}</p>',
       })
 
