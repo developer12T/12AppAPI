@@ -33,5 +33,7 @@ module.exports = {
   MY_MAIL_HOST: process.env.MY_MAIL_HOST,
 
   BELL_MAIL: process.env.BELL_MAIL,
-  BANK_MAIL: process.env.BANK_MAIL
+  BANK_MAIL: process.env.BANK_MAIL,
+
+  SERVER_WEREHOUSE: process.env.SERVER_WEREHOUSE
 };

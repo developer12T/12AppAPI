@@ -1088,3 +1088,29 @@ WHERE CUS_STATUS = 'N'
   await sql.close();
   return result.recordset
 }
+
+exports.wereHouseQuery = async function (channel) {
+
+  const config = {
+    user: process.env.MS_SQL_USER,
+    password: process.env.MS_SQL_PASSWORD,
+    server: process.env.MS_SQL_SERVER,
+    // database: process.env.MS_SQL_DATABASE_OMS,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  };
+  // console.log(RouteId)
+  await sql.connect(config);
+
+  result = await sql.query`
+      SELECT MWWHLO as wh_code, MWWHNM as wh_name
+      FROM     [192.168.2.74].[M3FDBPRD].[MVXJDTA].[MITWHL]
+      WHERE  (MWCONO = 410) AND (MWWHNM LIKE N'ศูนย์%') AND (MWWHLO <> N'100')
+
+   `
+// FROM     [${process.env.SERVER_WEREHOUSE}].[M3FDBPRD].[MVXJDTA].[MITWHL]
+  await sql.close();
+  return result.recordset
+}

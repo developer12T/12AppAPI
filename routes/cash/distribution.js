@@ -7,9 +7,10 @@ const { checkout,
     insertWithdrawToErp,
     insertOneWithdrawToErp,
     addFromERPWithdraw,
-    approveWithdraw 
+    approveWithdraw,
+    
 } = require('../../controllers/distribution/withdrawController')
-const { getPlace, addPlace, getType, addAllPlace } = require('../../controllers/distribution/placeController')
+const { getPlace, addPlace, getType, addAllPlace, addWereHouse } = require('../../controllers/distribution/placeController')
 
 const router = express.Router()
 
@@ -29,4 +30,7 @@ router.post('/insertWithdrawToErp', insertWithdrawToErp)
 router.post('/insertOneWithdrawToErp', insertOneWithdrawToErp)
 router.post('/addFromERPWithdraw', addFromERPWithdraw)
 router.post('/approveWithdraw', approveWithdraw)
+
+router.post('/addWereHouse', addWereHouse)
+
 module.exports = router
