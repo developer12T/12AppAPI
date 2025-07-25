@@ -874,9 +874,10 @@ exports.approveWithdraw = async (req, res) => {
     let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ'
 
     const channel = req.headers['x-channel']
-    const { Distribution,WereHouse } = getModelsByChannel(channel, res, distributionModel)
+    const { Distribution, WereHouse } = getModelsByChannel(channel, res, distributionModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Stock } = getModelsByChannel(channel, res, stockModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
     const { Withdraw } = getModelsByChannel(channel, res, DistributionModel)
     if (statusStr === 'approved') {
       // console.log(orderId)
@@ -973,35 +974,18 @@ exports.approveWithdraw = async (req, res) => {
       //   }
       // }
 
-      const qtyproduct = dataTran.items
-        .filter(u => u?.itemCode && u?.itemUnit && u?.itemQty > 0)
-        .map(u => ({
-          id: u.itemCode,
-          unit: u.itemUnit,
-          qty: u.itemQty,
-          statusMovement: 'OUT'
-        }))
 
-      for (const item of qtyproduct) {
+      const userData = await User.findOne({ role: 'sale', area: distributionTran.area })
+      const email = await Withdraw.findOne({
+        ROUTE: distributionTran.shippingRoute,
+        Des_No: distributionTran.shippingId
+      }).select("Dc_Email Des_Name")
+      const wereHouseName = await WereHouse.findOne({ wh_code: distributionTran.fromWarehouse }).select("wh_name")
 
-        const updateResult = await updateStockMongo(
-          item,
-          distributionTran.area,
-          distributionTran.period,
-          'withdraw',
-          channel,
-          res
-        )
-        if (updateResult) return
 
-      }
 
-      const email = await Withdraw.findOne({ ROUTE: distributionTran.shippingRoute,
-        Des_No:distributionTran.shippingId
-       }).select("Dc_Email Des_Name")
-      const wereHouseName = await WereHouse.findOne({wh_code:distributionTran.fromWarehouse}).select("wh_name")
-
-      // console.log(wereHouseName)
+      // <strong>ประเภทการเบิก:</strong> ${distributionTran.orderTypeName}<br> ยังไม่มี
+      console.log(process.env.BANK_MAIL)
       sendEmail({
         to: email.Dc_Email,
         cc: [
@@ -1013,10 +997,14 @@ exports.approveWithdraw = async (req, res) => {
     <h1>ทดสอบส่งเมลใบเบิก</h1>
     <p>
       <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-      <strong>ประเภทการเบิก:</strong> ${distributionTran.orderTypeName}<br>
-      <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}-${wereHouseName.wh_name}<br>
-      <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${email.Des_Name}<br>
+      <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName}<br>
+      <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}-${wereHouseName?.wh_name || ''}<br>
+
+      <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName}<br>
       <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
+      <strong>เขต:</strong> ${distributionTran.area}<br>
+      <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
+      <strong>เบอร์โทรศัพท์เซลล์:</strong> ${userData.tel}<br>
       <strong>หมายเหตุ:</strong> ${distributionTran.remark}
     </p>
   `
@@ -1042,3 +1030,75 @@ exports.approveWithdraw = async (req, res) => {
     })
   }
 }
+
+
+exports.saleConfirmWithdraw = async (req, res) => {
+  const { orderId, status } = req.body;
+
+  const channel = req.headers['x-channel'];
+  const { Distribution, WereHouse } = getModelsByChannel(channel, res, distributionModel);
+  const { Product } = getModelsByChannel(channel, res, productModel);
+  const { Stock } = getModelsByChannel(channel, res, stockModel);
+  const { User } = getModelsByChannel(channel, res, userModel);
+  const { Withdraw } = getModelsByChannel(channel, res, DistributionModel);
+
+  if (status === true) {
+    let statusStr = 'confirm';
+    let statusThStr = 'ยืนยันรับของ';
+
+    const distributionTran = await Distribution.findOne({
+      orderId: orderId,
+      type: 'withdraw'
+    });
+
+    const distributionData = await Distribution.findOneAndUpdate(
+      { orderId: orderId, type: 'withdraw' },
+      { $set: { statusTH: statusThStr, status: statusStr } },
+      { new: true }
+    );
+
+    if (!distributionData) {
+      return res.status(404).json({ status: 404, message: 'Not found withdraw' });
+    }
+
+    if (!distributionTran?.period) {
+      return res.status(404).json({ status: 404, message: 'Not found period in doc' });
+    }
+
+    // console.log(distributionData)
+    const dataTran = distributionData; // <- แก้ไข: dataTran ยังไม่ถูกนิยาม (จากเดิมที่ใช้ `dataTran.items`)
+    const qtyproduct = dataTran.listProduct
+      .filter(u => u?.itemCode && u?.itemUnit && u?.itemQty > 0)
+      .map(u => ({
+        id: u.itemCode,
+        unit: u.itemUnit,
+        qty: u.itemQty,
+        statusMovement: 'OUT'
+      }));
+
+    for (const item of qtyproduct) {
+      const updateResult = await updateStockMongo(
+        item,
+        distributionTran.area,
+        distributionTran.period,
+        'withdraw',
+        channel,
+        res
+      );
+      if (updateResult) return;
+    }
+
+    const io = getSocket()
+    io.emit('distribution/saleConfirmWithdraw', {});
+
+    return res.status(200).json({ status: 200, message: 'Confirm withdraw success' });
+  }
+
+  // ✅ กรณีไม่อนุมัติ
+  if (status === false) {
+    return res.status(200).json({
+      status: 200,
+      message: 'The withdrawal request has been rejected'
+    });
+  }
+};

@@ -27,7 +27,7 @@ const { checkInRoute } = require('../route/checkIn')
 const multer = require('multer')
 const upload = multer({ storage: multer.memoryStorage() }).single('image')
 const _ = require('lodash')
-const { to2, updateStockMongo } = require('../../middleware/order')
+const { to2, updateStockMongo, generateDateList } = require('../../middleware/order')
 const { DateTime } = require('luxon')
 const { getSocket } = require('../../socket')
 const {
@@ -3483,7 +3483,7 @@ exports.reportCheckin = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const { Order } = getModelsByChannel(channel, res, orderModel)
-
+  const { Product } = getModelsByChannel(channel, res, productModel)
   let match = {}
   if (zone) {
     match['store.zone'] = zone
@@ -3522,13 +3522,82 @@ exports.reportCheckin = async (req, res) => {
 
   const { startDate, endDate } = rangeDate(period)
 
+  const dates = generateDateList(startDate, endDate)
+  const areaAll = await Store.aggregate([
+    {
+      $match: {
+        area: { $ne: null, $ne: '' }
+      }
+    },
+    {
+      $group: {
+        _id: '$area'
+      }
+    },
+    {
+      $sort: { _id: 1 }
+    }
+  ]);
 
-  // for (const i of dataOrder) {
+  const saleProductId = dataOrder.flatMap(i => i.listProduct.map(item => item.id))
+  const promoProductId = dataOrder.flatMap(i => i.promotionProducts.map(item => item.id))
 
-  //   const date = formatDateTimeToThai(i.createdAt)
-  //   console.log(date)
+  const productIdUnique = [...new Set([...saleProductId, ...promoProductId])];
 
-  // }
+  const productList = await Product.find({ id: { $in: productIdUnique } })
+
+  const newDataOrder = dataOrder.map(order => {
+    const newListProduct = (order.listProduct || []).map(item => {
+      const productDetail = productList.find(i => i.id === item.id);
+      const productUnit = productDetail?.listUnit.find(i => i.unit === item.unit)?.factor || 1;
+      const productUnitCtn = productDetail?.listUnit.find(i => i.unit === 'CTN')?.factor || 0;
+      const qtyPcs = item.qty * productUnit
+      const qtyCtn = productUnitCtn > 0 ? Math.floor(qtyPcs / productUnitCtn) : 0;
+
+      return {
+        ...item,
+        qtyCtn
+      };
+    });
+
+    const newPromotionProducts = (order.promotionProducts || []).map(item => {
+      const productDetail = productList.find(i => i.id === item.id);
+      const productUnit = productDetail?.listUnit.find(i => i.unit === item.unit)?.factor || 1;
+      const productUnitCtn = productDetail?.listUnit.find(i => i.unit === 'CTN')?.factor || 0;
+      const qtyPcs = item.qty * productUnit
+      const qtyCtn = productUnitCtn > 0 ? Math.floor(qtyPcs / productUnitCtn) : 0;
+
+      return {
+        ...item,
+        qtyCtn
+      };
+    });
+
+    return {
+      ...order,
+      listProduct: newListProduct,
+      promotionProducts: newPromotionProducts
+    };
+  });
+
+  // console.log(newDataOrder)
+
+  const areaList = areaAll.map(item => item._id);
+  for (const i of dates) {
+
+    const orderDetails = newDataOrder.filter(item => {
+      const itemDateStr = new Date(item.createdAt).toISOString().slice(0, 10);
+      return itemDateStr === i
+    })
+
+    const daily = {
+      date: i,
+      areas: orderDetails.map(u => u.area === areaList)
+    }
+
+    console.log(daily)
+
+  }
 
 
 
@@ -3538,7 +3607,7 @@ exports.reportCheckin = async (req, res) => {
   res.status(200).json({
     status: 200,
     message: 'sucess',
-    data: [{startDate:startDate,endDate:endDate}]
+    data: newDataOrder
   })
 
 }
