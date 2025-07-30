@@ -455,7 +455,7 @@ exports.checkSimilarStores = async (req, res) => {
 
   const existingStores = await Store.find(
     { storeId: { $ne: storeId } },
-    { _id: 0, __v: 0, idIndex: 0 },
+    { _id: 0, __v: 0, idIndex: 0 }
     // { area: store.area }
   )
 
@@ -464,7 +464,7 @@ exports.checkSimilarStores = async (req, res) => {
     { field: 'name', weight: 2 },
     { field: 'taxId', weight: 4 },
     { field: 'tel', weight: 3 },
-    { field: 'address', weight: 2 },
+    { field: 'address', weight: 2 }
     // { field: 'district', weight: 0.5 },
     // { field: 'subDistrict', weight: 0.5 },
     // { field: 'province', weight: 0.5 },
@@ -836,7 +836,6 @@ exports.updateStoreStatus = async (req, res) => {
     // const item = await Store.findOne({ storeId: newId, area: store.area })
     // const dataUser = await User.findOne({ area: store.area, role: 'sale' })
 
-
     // if (!item) {
     //   return res.status(404).json({
     //     json: 404,
@@ -891,7 +890,6 @@ exports.updateStoreStatus = async (req, res) => {
     //   })
     // }
 
-
     // try {
     //   const response = await axios.post(
     //     `${process.env.API_URL_12ERP}/customer/insert`,
@@ -909,8 +907,11 @@ exports.updateStoreStatus = async (req, res) => {
     //     })
     //   }
 
-    //   const io = getSocket()
-    //   io.emit('store/updateStoreStatus', {})
+    const io = getSocket()
+    io.emit('store/updateStoreStatus', {
+      status: 'success',
+      data: newId
+    })
 
     //   return res.status(500).json({
     //     message: 'Internal Server Error',
@@ -920,10 +921,8 @@ exports.updateStoreStatus = async (req, res) => {
 
     return res.status(200).json({
       status: 200,
-      message: 'update Store Status sucess',
-
+      message: 'update Store Status sucess'
     })
-
   } else {
     await Store.findOneAndUpdate(
       { _id: store._id },
@@ -943,7 +942,6 @@ exports.updateStoreStatus = async (req, res) => {
       message: 'Reject Store successful'
     })
   }
-
 }
 
 exports.rejectStore = async (req, res) => {
@@ -992,7 +990,7 @@ exports.updateStoreStatusNoNewId = async (req, res) => {
 
     return res.status(200).json({
       status: 200,
-      message: 'Store status updated successfully',
+      message: 'Store status updated successfully'
     })
   } catch (error) {
     console.error('updateStoreStatusNoNewId error:', error)
@@ -1002,10 +1000,6 @@ exports.updateStoreStatusNoNewId = async (req, res) => {
     })
   }
 }
-
-
-
-
 
 exports.addAndUpdateStore = async (req, res) => {
   const channel = req.headers['x-channel']
@@ -1743,7 +1737,6 @@ exports.deleteShippingFromStore = async (req, res) => {
   }
 }
 
-
 exports.deleteStore = async (req, res) => {
   try {
     const { storeId } = req.body
@@ -1774,6 +1767,3 @@ exports.deleteStore = async (req, res) => {
     })
   }
 }
-
-
-
