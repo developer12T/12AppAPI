@@ -430,7 +430,10 @@ exports.addStore = async (req, res) => {
       // console.log(storeData)
 
       const io = getSocket()
-      io.emit('store/addStore', {})
+      io.emit('store/addStore', {
+        status: '200',
+        message: 'Store added successfully'
+      })
 
       res.status(200).json({
         status: '200',
@@ -557,7 +560,11 @@ exports.editStore = async (req, res) => {
     }
 
     const io = getSocket()
-    io.emit('store/editStore', {})
+    io.emit('store/editStore', {
+      status: '200',
+      message: 'Store updated successfully',
+      data: store
+    })
 
     res.status(200).json({
       status: '200',
@@ -753,7 +760,15 @@ exports.checkInStore = async (req, res) => {
     }
 
     const io = getSocket()
-    io.emit('store/checkIn', {})
+    io.emit('store/checkIn', {
+      status: '200',
+      message: 'Checked In Successfully',
+      data: {
+        latitude: result.checkIn.latitude,
+        longtitude: result.checkIn.latitude,
+        updateDate: result.checkIn.updateDate
+      }
+    })
 
     res.status(200).json({
       status: '200',
@@ -1352,7 +1367,11 @@ exports.deleteStoreArray = async (req, res) => {
   await Store.deleteMany({ storeId: { $in: storeId } })
 
   const io = getSocket()
-  io.emit('store/deleteStoreArray', {})
+  io.emit('store/deleteStoreArray', {
+    status: 200,
+    message: 'Deleted successfully',
+    deletedStore: deletedStoreId
+  })
 
   res.status(200).json({
     status: 200,
@@ -1577,7 +1596,11 @@ exports.addShippingInStore = async (req, res) => {
     )
 
     const io = getSocket()
-    io.emit('store/addShippingInStore', {})
+    io.emit('store/addShippingInStore', {
+      status: 200,
+      message: 'sucess',
+      data: addShipping
+    })
 
     return res.status(200).json({
       status: 200,
@@ -1654,7 +1677,11 @@ exports.editShippingInStore = async (req, res) => {
     )
 
     const io = getSocket()
-    io.emit('store/editShippingInStore', {})
+    io.emit('store/editShippingInStore', {
+      status: 200,
+      message: 'success',
+      data: updatedStore
+    })
 
     return res.status(200).json({
       status: 200,
@@ -1697,7 +1724,11 @@ exports.deleteShippingFromStore = async (req, res) => {
     )
 
     const io = getSocket()
-    io.emit('store/deleteShippingFromStore', {})
+    io.emit('store/deleteShippingFromStore', {
+      status: 200,
+      message: 'success',
+      data: updatedStore
+    })
 
     return res.status(200).json({
       status: 200,

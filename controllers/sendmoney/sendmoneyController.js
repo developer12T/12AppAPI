@@ -74,7 +74,10 @@ exports.addSendMoney = async (req, res) => {
   }
 
   const io = getSocket()
-  io.emit('sendmoney/addSendMoney', {});
+  io.emit('sendmoney/addSendMoney', {
+    status: 200,
+    message: 'success',
+  });
 
   res.status(200).json({
     status: 200,
@@ -160,7 +163,10 @@ exports.addSendMoneyImage = async (req, res) => {
       }
 
       const io = getSocket()
-      io.emit('sendmoney/addSendMoneyImage', {});
+      io.emit('sendmoney/addSendMoneyImage', {
+        status: '200',
+        message: 'Sendmoney upload successfully'
+      });
 
       res.status(200).json({
         status: '200',

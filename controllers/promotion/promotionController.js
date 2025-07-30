@@ -56,7 +56,11 @@ exports.addPromotion = async (req, res) => {
     await newPromotion.save()
 
     const io = getSocket()
-    io.emit('promotion/add', {});
+    io.emit('promotion/add', {
+      status: 201,
+      message: 'Promotion created successfully!',
+      data: newPromotion
+    });
 
     res.status(201).json({
       status: 201,
@@ -115,7 +119,11 @@ exports.updatePromotion = async (req, res) => {
     )
 
     const io = getSocket()
-    io.emit('promotion/updatePromotion', {});
+    io.emit('promotion/updatePromotion', {
+      status: 201,
+      message: 'Promotion updated successfully!',
+      data: updatedPromotion
+    });
 
     res.status(201).json({
       status: 201,

@@ -409,7 +409,10 @@ exports.updateStatus = async (req, res) => {
     }
 
     const io = getSocket()
-    io.emit('product/onOff', {});
+    io.emit('product/onOff', {
+      status: '200',
+      message: 'Updated status successfully!'
+    });
 
     res.status(200).json({
       status: '200',
