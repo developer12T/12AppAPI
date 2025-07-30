@@ -2202,6 +2202,7 @@ exports.checkout = async (req, res) => {
     const cart = await Cart.findOne({
       type,
       area,
+      withdrawId,
       createdAt: { $gte: startDate, $lt: endDate }
     })
     if (!cart || cart.listProduct.length === 0) {
@@ -2255,6 +2256,7 @@ exports.checkout = async (req, res) => {
     await Cart.deleteOne({
       type,
       area,
+      withdrawId,
       createdAt: { $gte: startDate, $lt: endDate }
     })
 

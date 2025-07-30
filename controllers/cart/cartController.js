@@ -30,7 +30,7 @@ exports.getCart = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
     const { Cart } = getModelsByChannel(channel, res, cartModel)
-    const { type, area, storeId } = req.query
+    const { type, area, storeId, withdrawId } = req.query
 
     if (!type || !area) {
       return res.status(400).json({
@@ -45,10 +45,13 @@ exports.getCart = async (req, res) => {
         message: 'storeId is required for sale or refund or give!'
       })
     }
+    // const cartQuery = { type, area, withdrawId }
 
     const cartQuery =
-      type === 'withdraw' || type === 'adjuststock'
+      type === 'withdraw'
         ? { type, area }
+        : type === 'adjuststock'
+        ? { type, area, withdrawId }
         : { type, area, storeId }
 
     // ใช้ session ใน findOne เฉพาะกรณีที่ต้อง update ข้อมูล (กัน dirty read ใน replica set)
@@ -138,7 +141,8 @@ exports.addProduct = async (req, res) => {
       condition,
       action,
       expire,
-      typeref
+      typeref,
+      withdrawId
     } = req.body
 
     const channel = req.headers['x-channel']
@@ -186,7 +190,7 @@ exports.addProduct = async (req, res) => {
     const price = parseFloat(unitData.price[priceField])
 
     const cartQuery =
-      type === 'withdraw' ? { type, area } : { type, area, storeId }
+      type === 'withdraw' ? { type, area } : { type, area, withdrawId }
     const { Cart } = getModelsByChannel(channel, res, cartModel)
     let cart = await Cart.findOne(cartQuery)
 
@@ -194,6 +198,7 @@ exports.addProduct = async (req, res) => {
       cart = await Cart.create([
         {
           type,
+          withdrawId,
           area,
           ...(type === 'withdraw' ? {} : { storeId }),
           total: 0,
@@ -237,6 +242,7 @@ exports.addProduct = async (req, res) => {
           cart.listProduct.push({
             id,
             name: product.name,
+
             qty,
             unit,
             price
@@ -323,7 +329,7 @@ exports.addProduct = async (req, res) => {
       if (updateResult) return
     }
 
-    if (type !== 'withdraw' && type !== 'refund' && type != 'adjuststock' ) {
+    if (type !== 'withdraw' && type !== 'refund' && type != 'adjuststock') {
       const updateResult = await updateStockMongo(
         qtyProduct,
         area,
@@ -352,11 +358,20 @@ exports.addProduct = async (req, res) => {
   }
 }
 
-
 exports.adjustProduct = async (req, res) => {
   try {
-    const { type, area, storeId, id, unit, qty, condition, expire, stockType } =
-      req.body
+    const {
+      type,
+      area,
+      storeId,
+      id,
+      unit,
+      qty,
+      condition,
+      expire,
+      stockType,
+      withdrawId
+    } = req.body
     const channel = req.headers['x-channel']
     const { Cart } = getModelsByChannel(channel, res, cartModel)
 
@@ -376,7 +391,12 @@ exports.adjustProduct = async (req, res) => {
 
     // Find Cart
     const cartQuery =
-      type === 'withdraw' ? { type, area } : { type, area, storeId }
+      type === 'withdraw'
+        ? { type, area }
+        : type === 'adjuststock'
+        ? { type, area, withdrawId }
+        : { type, area, storeId }
+
     let cart = await Cart.findOne(cartQuery)
     if (!cart) {
       return res.status(404).json({ status: 404, message: 'Cart not found!' })
@@ -386,7 +406,9 @@ exports.adjustProduct = async (req, res) => {
     // --- STEP 1: หาค่า qty เดิมใน cart
 
     if (condition) {
-      idx = cart.listRefund.findIndex(p => p.id === id && p.unit === unit && p.condition === condition)
+      idx = cart.listRefund.findIndex(
+        p => p.id === id && p.unit === unit && p.condition === condition
+      )
       if (idx === -1) {
         return res
           .status(404)
@@ -403,7 +425,6 @@ exports.adjustProduct = async (req, res) => {
       oldQty = cart.listProduct[idx].qty
     }
 
-
     // --- STEP 2: คำนวณ delta ระหว่าง qty ใหม่ (user ส่งมา) กับ qty เดิม (ที่อยู่ใน cart)
     const delta = qty - oldQty
 
@@ -417,26 +438,23 @@ exports.adjustProduct = async (req, res) => {
 
     // --- STEP 4: อัพเดต stock ตาม delta
     let updateResult = null
-    if (  type === 'sale' || type === 'give') {
-    if (delta !== 0) {
-      const qtyProductStock = { id, qty: Math.abs(delta), unit }
-      // เพิ่มใน cart (OUT = หักจาก stock) | ลดใน cart (IN = คืนเข้า stock)
-      const adjStockType = delta > 0 ? 'OUT' : 'IN'
-      updateResult = await updateStockMongo(
-        qtyProductStock,
-        area,
-        period,
-        'adjust',
-        channel,
-        adjStockType,
-        res
-      )
-      if (updateResult) return // (กรณี stock ไม่พอ)
-    }
-  } 
-  else if (type === 'withdraw' ) {
-
-
+    if (type === 'sale' || type === 'give') {
+      if (delta !== 0) {
+        const qtyProductStock = { id, qty: Math.abs(delta), unit }
+        // เพิ่มใน cart (OUT = หักจาก stock) | ลดใน cart (IN = คืนเข้า stock)
+        const adjStockType = delta > 0 ? 'OUT' : 'IN'
+        updateResult = await updateStockMongo(
+          qtyProductStock,
+          area,
+          period,
+          'adjust',
+          channel,
+          adjStockType,
+          res
+        )
+        if (updateResult) return // (กรณี stock ไม่พอ)
+      }
+    } else if (type === 'withdraw') {
       // const qtyProductStock = { id, qty: Math.abs(delta), unit }
       // // เพิ่มใน cart (OUT = หักจาก stock) | ลดใน cart (IN = คืนเข้า stock)
       // const adjStockType = delta > 0 ? 'OUT' : 'IN'
@@ -450,11 +468,8 @@ exports.adjustProduct = async (req, res) => {
       //   res
       // )
       // if (updateResult) return // (กรณี stock ไม่พอ)
-
-
-  }else if (type === 'withdraw' ) {
-
-  }
+    } else if (type === 'withdraw') {
+    }
 
     // --- STEP 5: อัพเดตจำนวนใน cart ให้ตรงกับ qty ล่าสุด
 
@@ -469,7 +484,6 @@ exports.adjustProduct = async (req, res) => {
         (sum, item) => sum + item.qty * item.price,
         0
       )
-
     } else {
       if (qty === 0) {
         cart.listProduct.splice(idx, 1) // Remove item
@@ -481,7 +495,6 @@ exports.adjustProduct = async (req, res) => {
         (sum, item) => sum + item.qty * item.price,
         0
       )
-
     }
     await cart.save()
 
