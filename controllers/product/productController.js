@@ -185,12 +185,12 @@ exports.getProduct = async (req, res) => {
     }
 
 const data = products
-  .filter(product => {
-    if (type === 'withdraw') {
-      return product.listUnit?.some(u => u.unit === 'CTN') // ✅ เฉพาะที่มี CTN
-    }
-    return true // แสดงทุกตัวถ้าไม่ใช่ withdraw
-  })
+  // .filter(product => {
+  //   if (type === 'withdraw') {
+  //     return product.listUnit?.some(u => u.unit === 'CTN') // ✅ เฉพาะที่มี CTN
+  //   }
+  //   return true // แสดงทุกตัวถ้าไม่ใช่ withdraw
+  // })
   .map(product => {
     const stockMatch = stock.find(s => s._id === product.id) || {}
     let listUnit = product.listUnit || []
@@ -201,7 +201,7 @@ const data = products
       listUnit = listUnit.map(u => ({ ...u, price: u.price?.refund }))
     } else if (type === 'withdraw') {
       listUnit = listUnit
-        .filter(u => u.unit === 'CTN') // ✅ เฉพาะ CTN
+        // .filter(u => u.unit === 'CTN') // ✅ เฉพาะ CTN
         .map(u => ({
           ...u,
           price: u.price?.sale

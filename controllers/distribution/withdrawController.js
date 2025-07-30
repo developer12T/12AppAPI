@@ -372,7 +372,7 @@ exports.getOrder = async (req, res) => {
     if (type === 'pending') {
       statusQuery.status = { $in: ['pending', 'approved', 'rejected'] }
     } else if (type === 'history') {
-      statusQuery.status = { $in: ['approved', 'rejected', 'success'] }
+      statusQuery.status = { $in: ['approved', 'rejected', 'success','confirm'] }
     }
 
     // const status = type === 'history' ? { $ne: 'pending' } : 'pending'
@@ -1082,7 +1082,12 @@ exports.saleConfirmWithdraw = async (req, res) => {
 
     const distributionData = await Distribution.findOneAndUpdate(
       { orderId: orderId, type: 'withdraw' },
-      { $set: { statusTH: statusThStr, status: statusStr } },
+      { $set: { statusTH: statusThStr, status: statusStr ,
+        receivetotal:distributionTran.total,
+        receivetotalQty:distributionTran.totalQty,
+        receivetotalWeightGross:distributionTran.totalWeightGross,
+        receivetotalWeightNet:distributionTran.totalWeightNet
+      } },
       { new: true }
     )
 
