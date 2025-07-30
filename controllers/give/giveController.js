@@ -351,74 +351,7 @@ exports.checkout = async (req, res) => {
       })
     }
 
-    const productQty = newOrder.listProduct.map(u => {
-      return {
-        id: u.id,
-        unit: u.unit,
-        qty: u.qty
-      }
-    })
 
-    for (const item of productQty) {
-
-      // await updateStockMongo(item, area, period, 'give', channel)
-      const updateResult = await updateStockMongo(item, area, period, 'give', channel, res);
-      if (updateResult) return;
-      // const factorPcsResult = await Product.aggregate([
-      //   { $match: { id: item.productId } },
-      //   {
-      //     $project: {
-      //       id: 1,
-      //       listUnit: {
-      //         $filter: {
-      //           input: '$listUnit',
-      //           as: 'unitItem',
-      //           cond: { $eq: ['$$unitItem.unit', item.unit] }
-      //         }
-      //       }
-      //     }
-      //   }
-      // ])
-
-      // const factorCtnResult = await Product.aggregate([
-      //   { $match: { id: item.productId } },
-      //   {
-      //     $project: {
-      //       id: 1,
-      //       listUnit: {
-      //         $filter: {
-      //           input: '$listUnit',
-      //           as: 'unitItem',
-      //           cond: { $eq: ['$$unitItem.unit', 'CTN'] }
-      //         }
-      //       }
-      //     }
-      //   }
-      // ])
-      // const factorCtn = factorCtnResult[0].listUnit[0].factor
-      // const factorPcs = factorPcsResult[0].listUnit[0].factor
-      // const factorPcsQty = item.qty * factorPcs
-      // const factorCtnQty = Math.floor(factorPcsQty / factorCtn)
-      // const data = await Stock.findOneAndUpdate(
-      //   {
-      //     area: area,
-      //     period: period,
-      //     'listProduct.productId': item.productId
-      //   },
-      //   {
-      //     $inc: {
-      //       'listProduct.$[elem].stockOutPcs': +factorPcsQty,
-      //       // 'listProduct.$[elem].balancePcs': -factorPcsQty,
-      //       'listProduct.$[elem].stockOutCtn': +factorCtnQty
-      //       // 'listProduct.$[elem].balanceCtn': -factorCtnQty
-      //     }
-      //   },
-      //   {
-      //     arrayFilters: [{ 'elem.productId': item.productId }],
-      //     new: true
-      //   }
-      // )
-    }
 
     // console.log(newOrder)
 
@@ -667,4 +600,55 @@ exports.addimageGive = async (req, res) => {
   }
 }
 
-// exports.approve = async ( req, )
+exports.approveGive = async (req, res) => {
+  try {
+    const { orderId, status } = req.body;
+    let statusStr = status === true ? 'approved' : 'rejected';
+    let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ';
+    const channel = req.headers['x-channel'];
+    const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel);
+
+    const giveawayData = await Giveaway.findOneAndUpdate(
+      { orderId: orderId, type: 'give' },
+      { $set: { statusTH: statusThStr, status: statusStr } },
+      { new: true }
+    );
+
+
+    if (!giveawayData) {
+      return res.status(404).json({
+        status: 404,
+        message: `ไม่พบข้อมูลที่มี orderId: ${orderId}`,
+      });
+    }
+
+
+    const productQty = giveawayData.listProduct.map(u => {
+      return {
+        id: u.id,
+        unit: u.unit,
+        qty: u.qty
+      }
+    })
+
+    for (const item of productQty) {
+      const updateResult = await updateStockMongo(item, giveawayData.store.area, giveawayData.period, 'give', channel, res);
+      if (updateResult) return;
+    }
+
+
+    res.status(200).json({
+      status: 200,
+      message: `อัปเดตสถานะเรียบร้อย (${statusThStr})`,
+      data: giveawayData,
+    });
+  } catch (error) {
+    console.error('Error approving giveaway:', error);
+    res.status(500).json({
+      status: 500,
+      message: 'Server error',
+      error: error.message,
+    });
+  }
+};
+

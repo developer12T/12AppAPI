@@ -1111,7 +1111,7 @@ exports.createRunningNumber = async (req, res) => {
   let running = ''
   if (channel == 'cash') {
     type = '101'
-    running = 'CV'
+    running = 'V'
   } else if (channel == 'credit') {
     type = '103'
   }
@@ -1153,6 +1153,7 @@ exports.createRunningNumber = async (req, res) => {
       name: channel,
       start: `${running}${u._id}2500000`,
       last: `${running}${u._id}2500000`
+      // last: maxRunning.maxStoreId
     }
   })
 

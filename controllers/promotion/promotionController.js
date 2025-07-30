@@ -181,6 +181,8 @@ exports.getPromotionProduct = async (req, res) => {
         .json({ status: 404, message: 'No reward products found!' })
     }
 
+    // console.log(rewardProducts)
+
     const groupedProducts = {}
 
     rewardProducts.forEach(product => {
