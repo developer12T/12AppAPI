@@ -375,7 +375,7 @@ exports.getOrder = async (req, res) => {
     if (type === 'pending') {
       statusQuery.status = { $in: ['pending', 'approved', 'rejected'] }
     } else if (type === 'history') {
-      statusQuery.status = { $in: ['approved', 'rejected', 'success'] }
+      statusQuery.status = { $in: ['approved', 'rejected', 'success','confirm'] }
     }
 
     // const status = type === 'history' ? { $ne: 'pending' } : 'pending'
