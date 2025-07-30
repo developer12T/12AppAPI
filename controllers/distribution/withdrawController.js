@@ -1079,7 +1079,12 @@ exports.saleConfirmWithdraw = async (req, res) => {
 
     const distributionData = await Distribution.findOneAndUpdate(
       { orderId: orderId, type: 'withdraw' },
-      { $set: { statusTH: statusThStr, status: statusStr } },
+      { $set: { statusTH: statusThStr, status: statusStr ,
+        receivetotal:distributionTran.total,
+        receivetotalQty:distributionTran.totalQty,
+        receivetotalWeightGross:distributionTran.totalWeightGross,
+        receivetotalWeightNet:distributionTran.totalWeightNet
+      } },
       { new: true }
     );
 
