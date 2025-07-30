@@ -190,8 +190,13 @@ exports.addProduct = async (req, res) => {
     const price = parseFloat(unitData.price[priceField])
 
     const cartQuery =
-      type === 'withdraw' ? { type, area } : { type, area, withdrawId }
+      type === 'withdraw'
+        ? { type, area }
+        : type === 'adjuststock'
+        ? { type, area, withdrawId }
+        : { type, area, storeId }
     const { Cart } = getModelsByChannel(channel, res, cartModel)
+    
     let cart = await Cart.findOne(cartQuery)
 
     if (!cart) {
