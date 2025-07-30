@@ -13,6 +13,7 @@ const productModel = require('../../models/cash/product')
 const distributionModel = require('../../models/cash/distribution')
 const userModel = require('../../models/cash/user')
 const stockModel = require('../../models/cash/stock')
+const optionsModel = require('../../models/cash/option')
 const { withdrawQuery } = require('../../controllers/queryFromM3/querySctipt')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { query } = require('mssql')
@@ -75,7 +76,7 @@ exports.checkout = async (req, res) => {
     const shipping = shippingData.listAddress[0]
     // console.log(shipping)
     let fromWarehouse
-    if (withdrawType === 'normal') {
+    if (withdrawType === 'normal' || withdrawType === 'credit') {
       fromWarehouse = shipping.warehouse?.normal
     } else {
       fromWarehouse = shipping.warehouse?.clearance
@@ -181,10 +182,12 @@ exports.checkout = async (req, res) => {
     //   transaction
     // )
 
+
     const newOrder = new Distribution({
       orderId,
       orderType: shipping.type,
       orderTypeName: shipping.typeNameTH,
+      withdrawType: withdrawType,
       area,
       fromWarehouse,
       toWarehouse: sale.warehouse,
@@ -329,7 +332,11 @@ exports.checkout = async (req, res) => {
     await transaction.commit()
 
     const io = getSocket()
-    io.emit('distribution/checkout', {});
+    io.emit('distribution/checkout', {
+      status: 200,
+      message: 'Checkout successful!',
+      data: newOrder
+    });
 
     res.status(200).json({
       status: 200,
@@ -580,7 +587,10 @@ exports.updateStatus = async (req, res) => {
 
 
     const io = getSocket()
-    io.emit('distribution/updateStatus', {});
+    io.emit('distribution/updateStatus', {
+      status: 200,
+      message: 'Updated status successfully!'
+    });
 
     res.status(200).json({
       status: 200,
@@ -770,7 +780,11 @@ exports.insertWithdrawToErp = async (req, res) => {
   )
 
   const io = getSocket()
-  io.emit('distribution/insertWithdrawToErp', {});
+  io.emit('distribution/insertWithdrawToErp', {
+    status: 200,
+    message: 'successfully',
+    data
+  });
 
 
   res.status(200).json({
@@ -831,7 +845,11 @@ exports.insertOneWithdrawToErp = async (req, res) => {
   )
 
   const io = getSocket()
-  io.emit('distribution/insertOneWithdrawToErp', {});
+  io.emit('distribution/insertOneWithdrawToErp', {
+    status: 200,
+    message: 'successfully',
+    data
+  });
 
   res.status(200).json({
     status: 200,
@@ -877,6 +895,8 @@ exports.approveWithdraw = async (req, res) => {
     const { Distribution, WereHouse } = getModelsByChannel(channel, res, distributionModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Stock } = getModelsByChannel(channel, res, stockModel)
+    const { Option } = getModelsByChannel(channel, res, optionsModel)
+
     const { User } = getModelsByChannel(channel, res, userModel)
     const { Withdraw } = getModelsByChannel(channel, res, DistributionModel)
     if (statusStr === 'approved') {
@@ -974,7 +994,9 @@ exports.approveWithdraw = async (req, res) => {
       //   }
       // }
 
-
+      const withdrawType = await Option.findOne({ module: 'withdraw' });
+      const withdrawTypeTh = withdrawType.list.find(item => item.value === distributionTran.withdrawType).name
+      // console.log(withdrawTypeTh)
       const userData = await User.findOne({ role: 'sale', area: distributionTran.area })
       const email = await Withdraw.findOne({
         ROUTE: distributionTran.shippingRoute,
@@ -985,7 +1007,7 @@ exports.approveWithdraw = async (req, res) => {
 
 
       // <strong>ประเภทการเบิก:</strong> ${distributionTran.orderTypeName}<br> ยังไม่มี
-      console.log(process.env.BANK_MAIL)
+      // console.log(process.env.BANK_MAIL)
       sendEmail({
         to: email.Dc_Email,
         cc: [
@@ -996,10 +1018,10 @@ exports.approveWithdraw = async (req, res) => {
         html: `
     <h1>ทดสอบส่งเมลใบเบิก</h1>
     <p>
+      <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
       <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
       <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName}<br>
       <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}-${wereHouseName?.wh_name || ''}<br>
-
       <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName}<br>
       <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
       <strong>เขต:</strong> ${distributionTran.area}<br>
@@ -1013,7 +1035,11 @@ exports.approveWithdraw = async (req, res) => {
     }
 
     const io = getSocket()
-    io.emit('distribution/approveWithdraw', {});
+    io.emit('distribution/approveWithdraw', {
+      status: 200,
+      message: 'successfully',
+      data: dataTran
+    });
 
 
     res.status(200).json({
@@ -1065,16 +1091,18 @@ exports.saleConfirmWithdraw = async (req, res) => {
       return res.status(404).json({ status: 404, message: 'Not found period in doc' });
     }
 
-    // console.log(distributionData)
-    const dataTran = distributionData; // <- แก้ไข: dataTran ยังไม่ถูกนิยาม (จากเดิมที่ใช้ `dataTran.items`)
+
+    const dataTran = distributionTran;
+    // console.log(dataTran.listProduct)
     const qtyproduct = dataTran.listProduct
-      .filter(u => u?.itemCode && u?.itemUnit && u?.itemQty > 0)
+      .filter(u => u?.id && u?.unit && u?.qty > 0)
       .map(u => ({
-        id: u.itemCode,
-        unit: u.itemUnit,
-        qty: u.itemQty,
+        id: u.id,
+        unit: u.unit,
+        qty: u.qty,
         statusMovement: 'OUT'
       }));
+    // console.log(qtyproduct)
 
     for (const item of qtyproduct) {
       const updateResult = await updateStockMongo(
@@ -1089,7 +1117,7 @@ exports.saleConfirmWithdraw = async (req, res) => {
     }
 
     const io = getSocket()
-    io.emit('distribution/saleConfirmWithdraw', {});
+    io.emit('distribution/saleConfirmWithdraw', { status: 200, message: 'Confirm withdraw success' });
 
     return res.status(200).json({ status: 200, message: 'Confirm withdraw success' });
   }

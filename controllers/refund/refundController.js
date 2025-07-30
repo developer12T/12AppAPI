@@ -372,7 +372,15 @@ exports.checkout = async (req, res) => {
     await Cart.deleteOne({ type, area, storeId })
 
     const io = getSocket()
-    io.emit('refund/checkout', {})
+    io.emit('refund/checkout', {
+      status: 200,
+      message: 'Checkout successful!',
+      data: {
+        refundOrder,
+        // listProduct
+        changeOrder
+      }
+    })
 
     res.status(200).json({
       status: 200,
@@ -428,7 +436,7 @@ exports.getRefund = async (req, res) => {
     }
 
     const refunds = await Refund.aggregate([
-      {$match:{status:'pending'}},
+      { $match: { status: 'pending' } },
       {
         $addFields: {
           zone: { $substrBytes: ['$store.area', 0, 2] }
@@ -475,7 +483,7 @@ exports.getRefund = async (req, res) => {
         }
       })
     )
-    
+
     const responseSort = response.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 
     // const io = getSocket()
@@ -648,7 +656,11 @@ exports.addSlip = async (req, res) => {
       await order.save()
 
       const io = getSocket()
-      io.emit('refund/addSlip', {})
+      io.emit('refund/addSlip', {
+        status: 200,
+        message: 'Images uploaded successfully!',
+        data: order.listImage
+      })
 
       res.status(200).json({
         status: 200,
@@ -729,16 +741,16 @@ exports.updateStatus = async (req, res) => {
 
       // for (const item of productQty) {
 
-        // console.log(item)
-        //   const updateResult = await updateStockMongo(
-        //     item,
-        //     refundOrder.store.area,
-        //     refundOrder.period,
-        //     'rufundCanceled',
-        //     channel,
-        //     res
-        //   )
-        //   if (updateResult) return
+      // console.log(item)
+      //   const updateResult = await updateStockMongo(
+      //     item,
+      //     refundOrder.store.area,
+      //     refundOrder.period,
+      //     'rufundCanceled',
+      //     channel,
+      //     res
+      //   )
+      //   if (updateResult) return
       // }
 
       for (const item of productChange) {
@@ -821,7 +833,10 @@ exports.updateStatus = async (req, res) => {
     )
 
     const io = getSocket()
-    io.emit('refund/updateStatus', {})
+    io.emit('refund/updateStatus', {
+      status: 200,
+      message: 'Updated status successfully!'
+    })
 
     res.status(200).json({
       status: 200,
@@ -851,7 +866,7 @@ exports.deleteRefund = async (req, res) => {
     }
 
     // ตรวจสอบ Order ก่อน
-    const orderExists = await Order.findOne({ reference:orderId, type: 'change' })
+    const orderExists = await Order.findOne({ reference: orderId, type: 'change' })
     if (!orderExists) {
       return res.status(404).json({
         status: 404,
@@ -868,7 +883,7 @@ exports.deleteRefund = async (req, res) => {
 
     // อัปเดต order
     const order = await Order.findOneAndUpdate(
-      { reference:orderId, type: 'change' },
+      { reference: orderId, type: 'change' },
       { status: 'delete', statusTH: 'ถูกลบ' },
       { new: true }
     )

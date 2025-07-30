@@ -64,7 +64,11 @@ exports.addGiveType = async (req, res) => {
 
 
     const io = getSocket()
-    io.emit('give/addGiveType', {});
+    io.emit('give/addGiveType', {
+      status: 201,
+      message: 'Give type created successfully!',
+      data: newPromotion
+    });
 
 
     res.status(201).json({
@@ -431,7 +435,11 @@ exports.checkout = async (req, res) => {
     await Cart.deleteOne({ type, area, storeId })
 
     const io = getSocket()
-    io.emit('give/checkout', {});
+    io.emit('give/checkout', {
+      status: 200,
+      message: 'Checkout successful!',
+      data: newOrder
+    });
 
     res.status(200).json({
       status: 200,
@@ -639,7 +647,11 @@ exports.addimageGive = async (req, res) => {
       await order.save()
 
       const io = getSocket()
-      io.emit('give/addimageGive', {})
+      io.emit('give/addimageGive', {
+        status: 200,
+        message: 'Images uploaded successfully!',
+        data: order.listImage
+      })
 
       res.status(200).json({
         status: 200,
