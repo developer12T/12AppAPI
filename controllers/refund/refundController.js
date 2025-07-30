@@ -484,7 +484,9 @@ exports.getRefund = async (req, res) => {
       })
     )
 
-    const responseSort = response.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    const responseSort = response.sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    )
 
     // const io = getSocket()
     // io.emit('refund/all', {});
@@ -542,18 +544,18 @@ exports.getDetail = async (req, res) => {
 
     const listProductChange = order
       ? order.listProduct.map(product => ({
-        id: product.id,
-        name: product.name,
-        group: product.group,
-        brand: product.brand,
-        size: product.size,
-        flavour: product.flavour,
-        qty: product.qty,
-        unit: product.unit,
-        unitName: product.unitName,
-        price: product.price,
-        netTotal: product.netTotal
-      }))
+          id: product.id,
+          name: product.name,
+          group: product.group,
+          brand: product.brand,
+          size: product.size,
+          flavour: product.flavour,
+          qty: product.qty,
+          unit: product.unit,
+          unitName: product.unitName,
+          price: product.price,
+          netTotal: product.netTotal
+        }))
       : []
 
     const totalChange = order ? order.total : 0
@@ -738,7 +740,6 @@ exports.updateStatus = async (req, res) => {
     if (status === 'canceled') {
       statusTH = 'ยกเลิก'
 
-
       // for (const item of productQty) {
 
       // console.log(item)
@@ -764,7 +765,6 @@ exports.updateStatus = async (req, res) => {
         )
         if (updateResult) return
       }
-
     } else if (status === 'rejected') {
       statusTH = 'ถูกปฏิเสธ'
 
@@ -791,7 +791,6 @@ exports.updateStatus = async (req, res) => {
         )
         if (updateResult) return
       }
-
     } else if (status === 'completed') {
       statusTH = 'สำเร็จ'
 
@@ -835,14 +834,14 @@ exports.updateStatus = async (req, res) => {
     const io = getSocket()
     io.emit('refund/updateStatus', {
       status: 200,
-      message: 'Updated status successfully!'
+      message: 'Updated status successfully!',
+      data: orderId
     })
 
     res.status(200).json({
       status: 200,
       message: 'Updated status successfully!'
     })
-
   } catch (error) {
     console.error('Error updating refund status:', error)
     res.status(500).json({ status: 500, message: 'Server error' })
@@ -866,7 +865,10 @@ exports.deleteRefund = async (req, res) => {
     }
 
     // ตรวจสอบ Order ก่อน
-    const orderExists = await Order.findOne({ reference: orderId, type: 'change' })
+    const orderExists = await Order.findOne({
+      reference: orderId,
+      type: 'change'
+    })
     if (!orderExists) {
       return res.status(404).json({
         status: 404,
@@ -890,7 +892,7 @@ exports.deleteRefund = async (req, res) => {
 
     res.status(200).json({
       status: 200,
-      message: 'Refund and order marked as deleted successfully!',
+      message: 'Refund and order marked as deleted successfully!'
       // data: refund,
       // order: order
     })
@@ -899,4 +901,3 @@ exports.deleteRefund = async (req, res) => {
     res.status(500).json({ status: 500, message: 'Server error' })
   }
 }
-

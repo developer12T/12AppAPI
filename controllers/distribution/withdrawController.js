@@ -103,7 +103,9 @@ exports.checkout = async (req, res) => {
       //มาเช็คตรงนี้
       const product = products.find(p => p.id === item.id)
       if (!product) {
-        return res.status(400).json({ status: 400, message: `Product ${item.id} not found!` })
+        return res
+          .status(400)
+          .json({ status: 400, message: `Product ${item.id} not found!` })
       }
 
       const unitData = product.listUnit.find(u => u.unit === item.unit)
@@ -181,7 +183,6 @@ exports.checkout = async (req, res) => {
     //   },
     //   transaction
     // )
-
 
     const newOrder = new Distribution({
       orderId,
@@ -267,7 +268,6 @@ exports.checkout = async (req, res) => {
     // }
     // data.push(dataTran)
 
-
     // // 2. ส่งไป External API (ถ้า fail -> return error)
     // let response;
     // try {
@@ -301,9 +301,6 @@ exports.checkout = async (req, res) => {
     //   }
     // }
 
-
-
-
     const calStock = {
       // storeId: refundOrder.store.storeId,
       orderId: newOrder.orderId,
@@ -336,7 +333,7 @@ exports.checkout = async (req, res) => {
       status: 200,
       message: 'Checkout successful!',
       data: newOrder
-    });
+    })
 
     res.status(200).json({
       status: 200,
@@ -454,7 +451,6 @@ exports.getOrder = async (req, res) => {
     // const io = getSocket()
     // io.emit('distribution/get', {});
 
-
     res.status(200).json({
       status: 200,
       message: 'Successful!',
@@ -534,7 +530,6 @@ exports.getDetail = async (req, res) => {
       }
     })
 
-
     // const io = getSocket()
     // io.emit('distribution/detail', {});
 
@@ -585,12 +580,11 @@ exports.updateStatus = async (req, res) => {
       { new: true }
     )
 
-
     const io = getSocket()
     io.emit('distribution/updateStatus', {
       status: 200,
       message: 'Updated status successfully!'
-    });
+    })
 
     res.status(200).json({
       status: 200,
@@ -720,7 +714,7 @@ exports.updateStockWithdraw = async (req, res) => {
   }
 
   const io = getSocket()
-  io.emit('distribution/updateStockWithdraw', {});
+  io.emit('distribution/updateStockWithdraw', {})
 
   res.status(200).json({
     status: 200,
@@ -784,8 +778,7 @@ exports.insertWithdrawToErp = async (req, res) => {
     status: 200,
     message: 'successfully',
     data
-  });
-
+  })
 
   res.status(200).json({
     status: 200,
@@ -849,7 +842,7 @@ exports.insertOneWithdrawToErp = async (req, res) => {
     status: 200,
     message: 'successfully',
     data
-  });
+  })
 
   res.status(200).json({
     status: 200,
@@ -875,8 +868,7 @@ exports.addFromERPWithdraw = async (req, res) => {
   }
 
   const io = getSocket()
-  io.emit('distribution/addFromERPWithdraw', {});
-
+  io.emit('distribution/addFromERPWithdraw', {})
 
   res.status(200).json({
     status: 200,
@@ -892,7 +884,11 @@ exports.approveWithdraw = async (req, res) => {
     let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ'
 
     const channel = req.headers['x-channel']
-    const { Distribution, WereHouse } = getModelsByChannel(channel, res, distributionModel)
+    const { Distribution, WereHouse } = getModelsByChannel(
+      channel,
+      res,
+      distributionModel
+    )
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Stock } = getModelsByChannel(channel, res, stockModel)
     const { Option } = getModelsByChannel(channel, res, optionsModel)
@@ -994,26 +990,28 @@ exports.approveWithdraw = async (req, res) => {
       //   }
       // }
 
-      const withdrawType = await Option.findOne({ module: 'withdraw' });
-      const withdrawTypeTh = withdrawType.list.find(item => item.value === distributionTran.withdrawType).name
+      const withdrawType = await Option.findOne({ module: 'withdraw' })
+      const withdrawTypeTh = withdrawType.list.find(
+        item => item.value === distributionTran.withdrawType
+      ).name
       // console.log(withdrawTypeTh)
-      const userData = await User.findOne({ role: 'sale', area: distributionTran.area })
+      const userData = await User.findOne({
+        role: 'sale',
+        area: distributionTran.area
+      })
       const email = await Withdraw.findOne({
         ROUTE: distributionTran.shippingRoute,
         Des_No: distributionTran.shippingId
-      }).select("Dc_Email Des_Name")
-      const wereHouseName = await WereHouse.findOne({ wh_code: distributionTran.fromWarehouse }).select("wh_name")
-
-
+      }).select('Dc_Email Des_Name')
+      const wereHouseName = await WereHouse.findOne({
+        wh_code: distributionTran.fromWarehouse
+      }).select('wh_name')
 
       // <strong>ประเภทการเบิก:</strong> ${distributionTran.orderTypeName}<br> ยังไม่มี
       // console.log(process.env.BANK_MAIL)
       sendEmail({
         to: email.Dc_Email,
-        cc: [
-          process.env.BELL_MAIL,
-          process.env.BANK_MAIL
-        ],
+        cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
         subject: 'แจ้งเตือนระบบ (เทสระบบ 12App cash)',
         html: `
     <h1>ทดสอบส่งเมลใบเบิก</h1>
@@ -1021,8 +1019,12 @@ exports.approveWithdraw = async (req, res) => {
       <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
       <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
       <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName}<br>
-      <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}-${wereHouseName?.wh_name || ''}<br>
-      <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName}<br>
+      <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}-${
+          wereHouseName?.wh_name || ''
+        }<br>
+      <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
+          distributionTran.shippingName
+        }<br>
       <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
       <strong>เขต:</strong> ${distributionTran.area}<br>
       <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -1030,8 +1032,7 @@ exports.approveWithdraw = async (req, res) => {
       <strong>หมายเหตุ:</strong> ${distributionTran.remark}
     </p>
   `
-      });
-
+      })
     }
 
     const io = getSocket()
@@ -1039,8 +1040,7 @@ exports.approveWithdraw = async (req, res) => {
       status: 200,
       message: 'successfully',
       data: dataTran
-    });
-
+    })
 
     res.status(200).json({
       status: 200,
@@ -1057,25 +1057,28 @@ exports.approveWithdraw = async (req, res) => {
   }
 }
 
-
 exports.saleConfirmWithdraw = async (req, res) => {
-  const { orderId, status } = req.body;
+  const { orderId, status } = req.body
 
-  const channel = req.headers['x-channel'];
-  const { Distribution, WereHouse } = getModelsByChannel(channel, res, distributionModel);
-  const { Product } = getModelsByChannel(channel, res, productModel);
-  const { Stock } = getModelsByChannel(channel, res, stockModel);
-  const { User } = getModelsByChannel(channel, res, userModel);
-  const { Withdraw } = getModelsByChannel(channel, res, DistributionModel);
+  const channel = req.headers['x-channel']
+  const { Distribution, WereHouse } = getModelsByChannel(
+    channel,
+    res,
+    distributionModel
+  )
+  const { Product } = getModelsByChannel(channel, res, productModel)
+  const { Stock } = getModelsByChannel(channel, res, stockModel)
+  const { User } = getModelsByChannel(channel, res, userModel)
+  const { Withdraw } = getModelsByChannel(channel, res, DistributionModel)
 
   if (status === true) {
-    let statusStr = 'confirm';
-    let statusThStr = 'ยืนยันรับของ';
+    let statusStr = 'confirm'
+    let statusThStr = 'ยืนยันรับของ'
 
     const distributionTran = await Distribution.findOne({
       orderId: orderId,
       type: 'withdraw'
-    });
+    })
 
     const distributionData = await Distribution.findOneAndUpdate(
       { orderId: orderId, type: 'withdraw' },
@@ -1086,18 +1089,21 @@ exports.saleConfirmWithdraw = async (req, res) => {
         receivetotalWeightNet:distributionTran.totalWeightNet
       } },
       { new: true }
-    );
+    )
 
     if (!distributionData) {
-      return res.status(404).json({ status: 404, message: 'Not found withdraw' });
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Not found withdraw' })
     }
 
     if (!distributionTran?.period) {
-      return res.status(404).json({ status: 404, message: 'Not found period in doc' });
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Not found period in doc' })
     }
 
-
-    const dataTran = distributionTran;
+    const dataTran = distributionTran
     // console.log(dataTran.listProduct)
     const qtyproduct = dataTran.listProduct
       .filter(u => u?.id && u?.unit && u?.qty > 0)
@@ -1106,7 +1112,7 @@ exports.saleConfirmWithdraw = async (req, res) => {
         unit: u.unit,
         qty: u.qty,
         statusMovement: 'OUT'
-      }));
+      }))
     // console.log(qtyproduct)
 
     for (const item of qtyproduct) {
@@ -1117,14 +1123,19 @@ exports.saleConfirmWithdraw = async (req, res) => {
         'withdraw',
         channel,
         res
-      );
-      if (updateResult) return;
+      )
+      if (updateResult) return
     }
 
     const io = getSocket()
-    io.emit('distribution/saleConfirmWithdraw', { status: 200, message: 'Confirm withdraw success' });
+    io.emit('distribution/saleConfirmWithdraw', {
+      status: 200,
+      message: 'Confirm withdraw success'
+    })
 
-    return res.status(200).json({ status: 200, message: 'Confirm withdraw success' });
+    return res
+      .status(200)
+      .json({ status: 200, message: 'Confirm withdraw success' })
   }
 
   // ✅ กรณีไม่อนุมัติ
@@ -1132,6 +1143,6 @@ exports.saleConfirmWithdraw = async (req, res) => {
     return res.status(200).json({
       status: 200,
       message: 'The withdrawal request has been rejected'
-    });
+    })
   }
-};
+}
