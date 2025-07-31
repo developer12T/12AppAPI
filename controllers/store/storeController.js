@@ -666,66 +666,83 @@ exports.addFromERP = async (req, res) => {
 
 exports.addFromERPnew = async (req, res) => {
   try {
-    const channel = req.headers['x-channel']
-    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const channel = req.headers['x-channel'];
+    const { Store } = getModelsByChannel(channel, res, storeModel);
 
-    const result = await storeQuery(channel) // ข้อมูลจาก ERP
-    // console.log(result)
-    const storeMap = new Map(result.map(item => [item.storeId, item]))
+    const erpStores = await storeQuery(channel); // ข้อมูลจาก ERP
+    const erpMap = new Map(erpStores.map(item => [item.storeId, item]));
 
-    const mongoStores = await Store.find()
+    const mongoStores = await Store.find();
+    const mongoMap = new Map(mongoStores.map(item => [item.storeId, item]));
+
+    const bulkOps = [];
     const changes = {
       added: [],
       updated: [],
       deleted: []
-    }
+    };
 
-    for (const item of result) {
-      const existing = await Store.findOne({ storeId: item.storeId })
+    // ➕ เตรียม insert/update
+    for (const item of erpStores) {
+      const existing = mongoMap.get(item.storeId);
 
       if (!existing) {
-        await Store.create(item)
-        changes.added.push(item.storeId)
+        // เตรียม insert
+        bulkOps.push({
+          insertOne: { document: item }
+        });
+        changes.added.push(item.storeId);
       } else {
-        // อัปเดตถ้ามีการเปลี่ยนแปลงจริง
-        let isModified = false
-        const fields = Object.keys(item)
-
-        for (const field of fields) {
-          if (existing[field] !== item[field]) {
-            existing[field] = item[field]
-            isModified = true
+        // ตรวจสอบว่ามี field ไหนเปลี่ยน
+        let isModified = false;
+        const updatedFields = {};
+        for (const key of Object.keys(item)) {
+          if (key !== 'createdAt' && existing[key] !== item[key]) {
+            updatedFields[key] = item[key];
           }
         }
 
         if (isModified) {
-          await existing.save()
-          changes.updated.push(item.storeId)
+          bulkOps.push({
+            updateOne: {
+              filter: { _id: existing._id },
+              update: { $set: updatedFields }
+            }
+          });
+          changes.updated.push(item.storeId);
         }
       }
     }
 
-    // ลบ store ที่ไม่มีใน ERP (optional)
+    // ❌ เตรียมลบ store ที่ไม่มีใน ERP
     for (const store of mongoStores) {
-      if (!storeMap.has(store.storeId)) {
-        await Store.deleteOne({ _id: store._id })
-        changes.deleted.push(store.storeId)
+      if (!erpMap.has(store.storeId)) {
+        bulkOps.push({
+          deleteOne: { filter: { _id: store._id } }
+        });
+        changes.deleted.push(store.storeId);
       }
     }
 
-    const io = getSocket()
-    io.emit('store/addFromERPnew', {})
+    // 🔁 ทำงานจริงในครั้งเดียว
+    if (bulkOps.length > 0) {
+      await Store.bulkWrite(bulkOps);
+    }
+
+    // 🔔 แจ้ง socket
+    const io = getSocket();
+    io.emit('store/addFromERPnew', {});
 
     res.status(200).json({
       status: 200,
       message: 'Sync Store Success',
       changes
-    })
+    });
   } catch (error) {
-    console.error(error)
-    res.status(500).json({ status: 500, message: error.message })
+    console.error(error);
+    res.status(500).json({ status: 500, message: error.message });
   }
-}
+};
 
 exports.checkInStore = async (req, res) => {
   const { storeId } = req.params

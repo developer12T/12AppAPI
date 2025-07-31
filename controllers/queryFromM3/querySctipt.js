@@ -29,7 +29,10 @@ SELECT
     DA.Col_LoginName as username,
     LEFT(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') - 1) AS firstName,
     SUBSTRING(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') + 1, LEN(DA.Col_NameTH)) AS surName,
-    ${hash} AS password,
+    SUBSTRING(
+    REPLACE(CONVERT(VARCHAR(40), NEWID()), '-', ''),
+    1, 4
+) AS password,
     SALE_MOBILE AS tel,
     DA.ZONE AS zone,
     DA.AREA AS area,
@@ -860,7 +863,7 @@ exports.routeQuery = async function (channel) {
   let result = ''
   if (channel == 'cash') {
     result = await sql.query`
-                  SELECT a.Area AS area, 
+ SELECT a.Area AS area, 
                     CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
                     RIGHT(RouteSet, 2) AS day, 
                     CONVERT(nvarchar(6), GETDATE(), 112) AS period, 
@@ -869,7 +872,8 @@ exports.routeQuery = async function (channel) {
              LEFT JOIN [DATA_OMS].[dbo].[OCUSMA] ON StoreID = OKCUNO COLLATE Latin1_General_BIN
              LEFT JOIN [dbo].[data_store] b ON StoreID = customerCode
             WHERE 
-                store_status <> '90' AND 
+                store_status <> '90' 
+                AND 
                 LEFT(OKRGDT, 6) <> CONVERT(nvarchar(6), GETDATE(), 112)
                AND a.Channel = '103'
              ORDER BY a.Area, RouteSet
@@ -1110,7 +1114,7 @@ exports.wereHouseQuery = async function (channel) {
       WHERE  (MWCONO = 410) AND (MWWHNM LIKE N'ศูนย์%') AND (MWWHLO <> N'100')
 
    `
-// FROM     [${process.env.SERVER_WEREHOUSE}].[M3FDBPRD].[MVXJDTA].[MITWHL]
+  // FROM     [${process.env.SERVER_WEREHOUSE}].[M3FDBPRD].[MVXJDTA].[MITWHL]
   await sql.close();
   return result.recordset
 }

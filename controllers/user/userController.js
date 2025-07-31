@@ -20,7 +20,7 @@ exports.getUser = async (req, res) => {
     const channel = req.headers['x-channel']
     const { User } = getModelsByChannel(channel, res, userModel)
     const users = await User.find({})
-      .select('-_id salecode salePayer username firstName surName tel zone area warehouse role qrCodeImage updatedAt')
+      .select('-_id salecode salePayer username firstName password surName tel zone area warehouse role qrCodeImage updatedAt')
       .lean(); // ใช้ lean() เพื่อให้เป็น plain object และแก้ค่าภายในได้
 
     const usersWithTHTime = users.map(item => ({
@@ -471,6 +471,9 @@ exports.addUserNew = async (req, res) => {
   const mongoUsers = await User.find(); // ผู้ใช้ใน MongoDB
   const result = [];
 
+  const saltRounds = 10;
+
+
   // STEP 1: อัปเดตหรือเพิ่มผู้ใช้
   for (const sale of tableData) {
     const existingUser = await User.findOne({ saleCode: sale.saleCode });
@@ -496,6 +499,8 @@ exports.addUserNew = async (req, res) => {
         result.push(existingUser);
       }
     } else {
+      const hashedPassword = await bcrypt.hash(sale.password, saltRounds);
+
       // เพิ่มใหม่
       const newUser = new User({
         saleCode: sale.saleCode,
@@ -503,7 +508,7 @@ exports.addUserNew = async (req, res) => {
         username: sale.username,
         firstName: sale.firstName,
         surName: sale.surName,
-        password: sale.password,
+        password: hashedPassword,
         tel: sale.tel,
         zone: sale.zone,
         area: sale.area,
