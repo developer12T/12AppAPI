@@ -603,8 +603,8 @@ exports.addimageGive = async (req, res) => {
 exports.approveGive = async (req, res) => {
   try {
     const { orderId, status } = req.body;
-    let statusStr = status === true ? 'approved' : 'rejected';
-    let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ';
+    const statusStr = status === true ? 'approved' : 'rejected';
+    const statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ';
     const channel = req.headers['x-channel'];
     const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel);
 
@@ -614,7 +614,6 @@ exports.approveGive = async (req, res) => {
       { new: true }
     );
 
-
     if (!giveawayData) {
       return res.status(404).json({
         status: 404,
@@ -622,20 +621,27 @@ exports.approveGive = async (req, res) => {
       });
     }
 
+    const productQty = giveawayData.listProduct.map(u => ({
+      id: u.id,
+      unit: u.unit,
+      qty: u.qty
+    }));
 
-    const productQty = giveawayData.listProduct.map(u => {
-      return {
-        id: u.id,
-        unit: u.unit,
-        qty: u.qty
+    // 🟢 ถ้าอนุมัติ ให้ updateStock 'give'
+    if (status === true) {
+      for (const item of productQty) {
+        const updateResult = await updateStockMongo(item, giveawayData.store.area, giveawayData.period, 'give', channel, res);
+        if (updateResult) return;
       }
-    })
-
-    for (const item of productQty) {
-      const updateResult = await updateStockMongo(item, giveawayData.store.area, giveawayData.period, 'give', channel, res);
-      if (updateResult) return;
     }
 
+    // 🔴 ถ้าไม่อนุมัติ ให้ updateStock 'deleteCart'
+    else {
+      for (const item of productQty) {
+        const updateResult = await updateStockMongo(item, giveawayData.store.area, giveawayData.period, 'deleteCart', channel, res);
+        if (updateResult) return;
+      }
+    }
 
     res.status(200).json({
       status: 200,

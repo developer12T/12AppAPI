@@ -2,6 +2,28 @@ const jwt = require('jsonwebtoken')
 const bcrypt = require('bcrypt');
 
 const config = process.env
+
+
+const crypto = require('crypto');
+
+const algorithm = 'aes-256-cbc';
+const key = Buffer.from(process.env.AES_SECRET_KEY, 'hex'); // 32 bytes
+const iv = Buffer.from(process.env.AES_IV, 'hex');           // 16 bytes
+
+function encrypt(text) {
+  const cipher = crypto.createCipheriv(algorithm, key, iv);
+  let encrypted = cipher.update(text, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  return encrypted;
+}
+
+function decrypt(encryptedText) {
+  const decipher = crypto.createDecipheriv(algorithm, key, iv);
+  let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  return decrypted;
+}
+
 const verifyToken = async (req, res, next) => {
     const authHeader = req.headers.authorization
 
@@ -24,4 +46,7 @@ const verifyToken = async (req, res, next) => {
     })
 };
 
-module.exports = verifyToken
+module.exports = {
+  verifyToken,
+  encrypt,
+  decrypt};

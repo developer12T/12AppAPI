@@ -148,23 +148,23 @@ async function applyPromotion(order, channel, res) {
     // console.log(order)
     const { Promotion } = getModelsByChannel(channel, res, promotionModel);
     const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel);
+    const periodStr = period()
+    // const periodStr = "202508"
+    const year = parseInt(periodStr.slice(0, 4));
+    const month = parseInt(periodStr.slice(4, 6));
+
+    const startMonth = new Date(year, month - 1, 1);
+    const nextMonth = new Date(year, month, 1);
+
+    // console.log("startMonth",startMonth)
+    // console.log("nextMonth",nextMonth)
     let discountTotal = 0
     let appliedPromotions = []
-    const currentDate = new Date()
-    const startMonth = new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth(),
-        1
-    )
-    const NextMonth = new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth() + 1,
-        1
-    )
+
     let query = {}
     query.createdAt = {
         $gte: startMonth,
-        $lt: NextMonth
+        $lt: nextMonth
     }
 
     const promotions = await Promotion.find({ status: 'active' })
