@@ -1011,10 +1011,11 @@ exports.approveWithdraw = async (req, res) => {
       // console.log(process.env.BANK_MAIL)
       sendEmail({
         to: email.Dc_Email,
-        cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
-        subject: 'แจ้งเตือนระบบ (เทสระบบ 12App cash)',
+        // cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
+        cc:process.env.IT_MAIL,
+        subject: '12App cash',
         html: `
-    <h1>ทดสอบส่งเมลใบเบิก</h1>
+    <h1>แจ้งการส่งใบขอเบิกผ่านทางอีเมล</h1>
     <p>
       <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
       <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
