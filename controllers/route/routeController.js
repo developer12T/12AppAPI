@@ -257,7 +257,6 @@ exports.addFromERPnew = async (req, res) => {
       const area = String(row.area ?? '').trim()
       const id = String(row.id ?? '').trim()
       const day = String(row.day ?? '').trim()
-      const period = period
       const storeId = String(row.storeId ?? '').trim()
 
       const storeInfo = {

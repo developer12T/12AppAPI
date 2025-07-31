@@ -1168,9 +1168,10 @@ exports.createRunningNumber = async (req, res) => {
       zone: u._id,
       type: type,
       name: channel,
-      start: `${running}${u._id}2500000`,
-      last: `${running}${u._id}2500000`
-      // last: maxRunning.maxStoreId
+      // start: `${running}${u._id}2500000`,
+      // last: `${running}${u._id}2500000`
+      start:maxRunning.maxStoreId,
+      last: maxRunning.maxStoreId
     }
   })
 

@@ -106,7 +106,7 @@ SELECT
     Col_LoginName AS username,
     LEFT(Col_Name, CHARINDEX(' ', Col_Name + ' ') - 1) AS firstName,
     SUBSTRING(Col_Name, CHARINDEX(' ', Col_Name + ' ') + 1, LEN(Col_Name)) AS surName,
-    '$2b$10$DqTAeJ.dZ67XVLky203dn.77idSGjHqbOJ7ztOTeEpr1VeycWngua' AS password,
+    Col_PWord AS password,
     '' AS tel,
      CASE
     WHEN Col_o_JobTitle IN ('Developer', 'IT Support', 'Sale_Manager') THEN ''
@@ -125,7 +125,6 @@ SELECT
     '1' AS status
     FROM [192.168.0.3].[AntDB].[dbo].[hs_User] AS hr
     WHERE Col_o_JobTitle NOT IN ('cash', 'credit', 'Credit Top', 'PC', 'EV', 'Food Service')
-
 --     WHERE 
 --       Col_o_JobTitle in ('Developer','IT Support','Sale_Manager','Supervisor','Area_Manager','IT')
     `;
