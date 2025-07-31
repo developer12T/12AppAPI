@@ -249,7 +249,7 @@ exports.addFromERP = async (req, res) => {
 exports.addFromERPnew = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
-
+    const { period } = req.body
     const result = await routeQuery(channel)
     const return_arr = []
 
@@ -257,7 +257,6 @@ exports.addFromERPnew = async (req, res) => {
       const area = String(row.area ?? '').trim()
       const id = String(row.id ?? '').trim()
       const day = String(row.day ?? '').trim()
-      const period = String(row.period ?? '').trim()
       const storeId = String(row.storeId ?? '').trim()
 
       const storeInfo = {
@@ -294,14 +293,14 @@ exports.addFromERPnew = async (req, res) => {
 
     const { Store } = getModelsByChannel(channel, res, storeModel)
     const { Route } = getModelsByChannel(channel, res, routeModel)
-    const route = await Route.find({ period: period() })
+    const route = await Route.find({ period: '202508' })
     const routeMap = new Map(route.map(route => [route.id, route]))
     let routeId
     const latestRoute = route.sort((a, b) => b.id.localeCompare(a.id))[0]
     if (!latestRoute) {
-      routeId = `${period()}${return_arr.area}R01`
+      routeId = `${period}${return_arr.area}R01`
       console.log('route', routeId)
-      console.log('period', period())
+      console.log('period', period)
     } else {
       const prefix = latestRoute.id.slice(0, 6)
       const subfix = (parseInt(latestRoute.id.slice(7)) + 1)
@@ -366,7 +365,7 @@ exports.addFromERPnew = async (req, res) => {
           const data = {
             id: storeList.id,
             area: storeList.area,
-            period: period(),
+            period: period,
             day: storeList.day,
             listStore
           }

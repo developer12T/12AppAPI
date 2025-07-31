@@ -15,32 +15,47 @@ const { getModelsByChannel } = require('../../middleware/channel')
 const { userQuery, userQueryFilter, userQueryManeger } = require('../../controllers/queryFromM3/querySctipt');
 const user = require('../../models/cash/user');
 const { getSocket } = require('../../socket')
+const { encrypt, decrypt } = require('../../middleware/authen')
+
+
 exports.getUser = async (req, res) => {
   try {
-    const channel = req.headers['x-channel']
-    const { User } = getModelsByChannel(channel, res, userModel)
-    const users = await User.find({})
-      .select('-_id salecode salePayer username firstName surName tel zone area warehouse role qrCodeImage updatedAt')
-      .lean(); // ใช้ lean() เพื่อให้เป็น plain object และแก้ค่าภายในได้
+    const channel = req.headers['x-channel'];
+    const { User } = getModelsByChannel(channel, res, userModel);
 
-    const usersWithTHTime = users.map(item => ({
-      ...item,
-      updatedAt: new Date(new Date(item.updatedAt).getTime() + 7 * 60 * 60 * 1000)
-    }));
+    const users = await User.find({role:'sale'})
+      .select('-_id salecode salePayer username firstName password surName tel zone area warehouse role qrCodeImage updatedAt')
+      .lean();
+
+    const usersWithTHTime = users.map(item => {
+      let decryptedPassword = '';
+      try {
+        decryptedPassword = decrypt(item.password);
+      } catch (err) {
+        decryptedPassword = '[decrypt error]';
+      }
+
+      return {
+        ...item,
+        password: decryptedPassword,
+        updatedAt: new Date(new Date(item.updatedAt).getTime() + 7 * 60 * 60 * 1000)
+      };
+    });
 
     if (!users || users.length === 0) {
-      res.status(404).json({ status: 404, message: 'User is empty!' })
+      return res.status(404).json({ status: 404, message: 'User is empty!' });
     }
+
     res.status(200).json({
       status: 200,
       message: 'successful!',
       data: usersWithTHTime
-    })
+    });
   } catch (error) {
-    console.error(error)
-    res.status(500).json({ status: '500', message: error.message })
+    console.error(error);
+    res.status(500).json({ status: 500, message: error.message });
   }
-}
+};
 
 exports.editUser = async (req, res) => {
   try {
@@ -268,10 +283,10 @@ exports.updateUserOne = async (req, res) => {
   const { User } = getModelsByChannel(channel, res, userModel)
   // const user = await User.findOne({saleCode:req.body.saleCode})
 
-  if (!req.body.saleCode && !req.body.username) {
+  if (!req.body.username) {
     return res.status(400).json({
       status: 400,
-      message: 'saleCode or username is required!'
+      message: 'username is required!'
     })
   }
 
@@ -279,7 +294,7 @@ exports.updateUserOne = async (req, res) => {
 
   const hashedPassword = await bcrypt.hash(req.body.password, saltRounds);
   const user = await User.updateOne(
-    { saleCode: req.body.saleCode, username: req.body.username },
+    { username: req.body.username },
     {
       $set: {
         salePayer: req.body.salePayer,
@@ -387,96 +402,87 @@ exports.addAndUpdateUser = async (req, res) => {
 
 exports.addUserManeger = async (req, res) => {
   try {
-    const channelHeader = req.headers['x-channel']
+    const channelHeader = req.headers['x-channel'];
     const tableData = await userQueryManeger(channelHeader);
 
-    let update = 0
-    let addNew = 0
-    channel = ['cash', 'credit']
-    for (const c of channel) {
-      const { User } = getModelsByChannel(c, res, userModel)
-      const userMongo = await User.find()
+    let update = 0;
+    let addNew = 0;
 
-      for (const m3 of tableData) {
-        const userInMongo = userMongo.find(id => id.saleCode == m3.saleCode)
+    const { User } = getModelsByChannel(channelHeader, res, userModel);
 
-        if (userInMongo) {
-          const hasChanged = Object.keys(m3).some(
-            key =>
-              !['saleCode', '__v'].includes(key) && m3[key] !== userInMongo[key]
-          )
+    for (const m3 of tableData) {
+      const encryptedPassword = encrypt('2020'); // 🔐 รหัสผ่านเริ่มต้น
 
-          if (hasChanged) {
-            // console.log(m3.username)
-            await User.updateOne(
-              { username: m3.username },
-              {
-                $set: {
-                  salePayer: m3.salePayer,
-                  // username: m3.username,
-                  firstName: m3.firstName,
-                  surName: m3.surName,
-                  password: m3.password,
-                  tel: m3.tel,
-                  zone: m3.zone,
-                  area: m3.area,
-                  warehouse: m3.warehouse,
-                  role: m3.role,
-                  status: m3.status
-                  // __v: m3.__v + 1
-                }
-              }
-            )
-            update += 1
+      const existingUser = await User.findOne({ username: m3.username });
+
+      if (existingUser) {
+        // อัปเดตข้อมูล
+        await User.updateOne(
+          { username: m3.username },
+          {
+            $set: {
+              saleCode: m3.saleCode,
+              salePayer: m3.salePayer,
+              firstName: m3.firstName,
+              surName: m3.surName,
+              password: encryptedPassword,
+              tel: m3.tel,
+              zone: m3.zone,
+              area: m3.area,
+              warehouse: m3.warehouse,
+              role: m3.role,
+              status: m3.status
+            }
           }
-        } else {
-          await User.create({
-            saleCode: m3.saleCode,
-            salePayer: m3.salePayer,
-            username: m3.username,
-            firstName: m3.firstName,
-            surName: m3.surName,
-            password: m3.password,
-            tel: m3.tel,
-            zone: m3.zone,
-            area: m3.area,
-            warehouse: m3.warehouse,
-            role: m3.role,
-            status: m3.status
-            // __v: 0
-          })
-          addNew += 1
-        }
+        );
+        update += 1;
+      } else {
+        // เพิ่มใหม่
+        await User.create({
+          saleCode: m3.saleCode,
+          salePayer: m3.salePayer,
+          username: m3.username,
+          firstName: m3.firstName,
+          surName: m3.surName,
+          password: encryptedPassword,
+          tel: m3.tel,
+          zone: m3.zone,
+          area: m3.area,
+          warehouse: m3.warehouse,
+          role: m3.role,
+          status: m3.status
+        });
+        addNew += 1;
       }
     }
+
     res.status(200).json({
       status: 200,
       message: 'successful',
-      // data: result.recordset
-    })
-
+      updated: update,
+      added: addNew
+    });
   } catch (error) {
-    console.error(error)
-    res.status(500).json({ status: '500', message: error.message })
+    console.error(error);
+    res.status(500).json({ status: 500, message: error.message });
   }
-}
+};
+
 
 exports.addUserNew = async (req, res) => {
   const channel = req.headers['x-channel'];
   const { User } = getModelsByChannel(channel, res, userModel);
 
-  const tableData = await userQuery(channel); // ข้อมูลจาก table
+  const tableData = await userQuery(channel);
   const tableMap = new Map(tableData.map(item => [item.saleCode, item]));
-  // console.log(tableData)
-  const mongoUsers = await User.find(); // ผู้ใช้ใน MongoDB
+  const mongoUsers = await User.find();
   const result = [];
 
-  // STEP 1: อัปเดตหรือเพิ่มผู้ใช้
+  // STEP 1: เพิ่มหรืออัปเดต
   for (const sale of tableData) {
     const existingUser = await User.findOne({ saleCode: sale.saleCode });
 
     if (existingUser) {
-      // อัปเดตเฉพาะ field ที่เปลี่ยน
       let isModified = false;
       const fields = [
         'salePayer', 'username', 'firstName', 'surName', 'password',
@@ -484,8 +490,9 @@ exports.addUserNew = async (req, res) => {
       ];
 
       for (const field of fields) {
-        if (existingUser[field] !== sale[field]) {
-          existingUser[field] = sale[field];
+        const incomingValue = field === 'password' ? encrypt(sale.password) : sale[field];
+        if (existingUser[field] !== incomingValue) {
+          existingUser[field] = incomingValue;
           isModified = true;
         }
       }
@@ -496,14 +503,15 @@ exports.addUserNew = async (req, res) => {
         result.push(existingUser);
       }
     } else {
-      // เพิ่มใหม่
+      const encryptedPassword = encrypt(sale.password);
+
       const newUser = new User({
         saleCode: sale.saleCode,
         salePayer: sale.salePayer,
         username: sale.username,
         firstName: sale.firstName,
         surName: sale.surName,
-        password: sale.password,
+        password: encryptedPassword,
         tel: sale.tel,
         zone: sale.zone,
         area: sale.area,
@@ -514,19 +522,12 @@ exports.addUserNew = async (req, res) => {
         period: period(),
         image: '',
         typeTruck: sale.typeTruck,
-        noTruck:sale.noTruck
+        noTruck: sale.noTruck
       });
       await newUser.save();
       result.push(newUser);
     }
   }
-
-  // STEP 2: ลบผู้ใช้ที่ไม่มีใน tableData
-  // for (const user of mongoUsers) {
-  //   if (!tableMap.has(user.saleCode)) {
-  //     await User.deleteOne({ _id: user._id });
-  //   }
-  // }
 
   res.status(200).json({
     status: 200,

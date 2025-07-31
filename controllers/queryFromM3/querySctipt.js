@@ -29,7 +29,10 @@ SELECT
     DA.Col_LoginName as username,
     LEFT(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') - 1) AS firstName,
     SUBSTRING(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') + 1, LEN(DA.Col_NameTH)) AS surName,
-    ${hash} AS password,
+    SUBSTRING(
+    REPLACE(CONVERT(VARCHAR(40), NEWID()), '-', ''),
+    1, 4
+) AS password,
     SALE_MOBILE AS tel,
     DA.ZONE AS zone,
     DA.AREA AS area,
@@ -103,7 +106,7 @@ SELECT
     Col_LoginName AS username,
     LEFT(Col_Name, CHARINDEX(' ', Col_Name + ' ') - 1) AS firstName,
     SUBSTRING(Col_Name, CHARINDEX(' ', Col_Name + ' ') + 1, LEN(Col_Name)) AS surName,
-    '$2b$10$DqTAeJ.dZ67XVLky203dn.77idSGjHqbOJ7ztOTeEpr1VeycWngua' AS password,
+    Col_PWord AS password,
     '' AS tel,
      CASE
     WHEN Col_o_JobTitle IN ('Developer', 'IT Support', 'Sale_Manager') THEN ''
@@ -122,7 +125,6 @@ SELECT
     '1' AS status
     FROM [192.168.0.3].[AntDB].[dbo].[hs_User] AS hr
     WHERE Col_o_JobTitle NOT IN ('cash', 'credit', 'Credit Top', 'PC', 'EV', 'Food Service')
-
 --     WHERE 
 --       Col_o_JobTitle in ('Developer','IT Support','Sale_Manager','Supervisor','Area_Manager','IT')
     `;
@@ -860,7 +862,7 @@ exports.routeQuery = async function (channel) {
   let result = ''
   if (channel == 'cash') {
     result = await sql.query`
-                  SELECT a.Area AS area, 
+ SELECT a.Area AS area, 
                     CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
                     RIGHT(RouteSet, 2) AS day, 
                     CONVERT(nvarchar(6), GETDATE(), 112) AS period, 
@@ -869,7 +871,8 @@ exports.routeQuery = async function (channel) {
              LEFT JOIN [DATA_OMS].[dbo].[OCUSMA] ON StoreID = OKCUNO COLLATE Latin1_General_BIN
              LEFT JOIN [dbo].[data_store] b ON StoreID = customerCode
             WHERE 
-                store_status <> '90' AND 
+                store_status <> '90' 
+                AND 
                 LEFT(OKRGDT, 6) <> CONVERT(nvarchar(6), GETDATE(), 112)
                AND a.Channel = '103'
              ORDER BY a.Area, RouteSet
@@ -1110,7 +1113,7 @@ exports.wereHouseQuery = async function (channel) {
       WHERE  (MWCONO = 410) AND (MWWHNM LIKE N'ศูนย์%') AND (MWWHLO <> N'100')
 
    `
-// FROM     [${process.env.SERVER_WEREHOUSE}].[M3FDBPRD].[MVXJDTA].[MITWHL]
+  // FROM     [${process.env.SERVER_WEREHOUSE}].[M3FDBPRD].[MVXJDTA].[MITWHL]
   await sql.close();
   return result.recordset
 }
