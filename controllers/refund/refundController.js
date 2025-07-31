@@ -399,7 +399,7 @@ exports.checkout = async (req, res) => {
 
 exports.getRefund = async (req, res) => {
   try {
-    const { type, area, store, period } = req.query
+    const { type, area, zone, team, store, period } = req.query
 
     const channel = req.headers['x-channel']
     const { Refund } = getModelsByChannel(channel, res, refundModel)
@@ -416,18 +416,16 @@ exports.getRefund = async (req, res) => {
     const { startDate, endDate } = rangeDate(period)
 
     let areaQuery = {}
+
     if (area) {
-      if (area.length == 2) {
-        areaQuery.zone = area.slice(0, 2)
-      } else if (area.length == 5) {
-        areaQuery['store.area'] = area
-      }
+      areaQuery.area = area
+    } else if (zone) {
+      areaQuery.area = { $regex: `^${zone}`, $options: 'i' }
     }
+
     let query = {
       type,
       ...areaQuery,
-      // 'store.area': area,
-      // createdAt: { $gte: startDate, $lt: endDate }
       period: period
     }
 
@@ -435,7 +433,7 @@ exports.getRefund = async (req, res) => {
       query['store.storeId'] = store
     }
 
-    const refunds = await Refund.aggregate([
+    const pipeline = [
       { $match: { status: 'pending' } },
       {
         $addFields: {
@@ -444,7 +442,33 @@ exports.getRefund = async (req, res) => {
       },
 
       { $match: query }
-    ])
+    ]
+
+    if (team) {
+      pipeline.push({
+        $match: {
+          team3: { $regex: `^${team}`, $options: 'i' }
+        }
+      })
+    }
+
+    pipeline.push(
+      {
+        $project: {
+          _id: 0,
+          __v: 0,
+          beauty: 0
+        }
+      },
+      {
+        $sort: {
+          status: 1,
+          createdAt: -1
+        }
+      }
+    )
+
+    const refunds = await Refund.aggregate(pipeline)
 
     // console.log(refunds)
     if (!refunds || refunds.length === 0) {
