@@ -416,12 +416,19 @@ exports.getRefund = async (req, res) => {
     const { startDate, endDate } = rangeDate(period)
 
     let areaQuery = {}
+    // let query = {}
 
-    if (area) {
-      areaQuery.area = area
-    } else if (zone) {
-      areaQuery.area = { $regex: `^${zone}`, $options: 'i' }
+    if (zone && !area) {
+      areaQuery['store.area'] = { $regex: `^${zone}`, $options: 'i' }
+    } else if (area.length == 5) {
+      areaQuery['store.area'] = area
     }
+
+    // if (area) {
+    //   areaQuery.area = area
+    // } else if (zone) {
+    //   areaQuery.area = { $regex: `^${zone}`, $options: 'i' }
+    // }
 
     let query = {
       type,
@@ -437,7 +444,13 @@ exports.getRefund = async (req, res) => {
       { $match: { status: 'pending' } },
       {
         $addFields: {
-          zone: { $substrBytes: ['$store.area', 0, 2] }
+          zone: { $substrBytes: ['$store.area', 0, 2] },
+          team3: {
+            $concat: [
+              { $substrCP: ['$store.area', 0, 2] },
+              { $substrCP: ['$store.area', 3, 1] }
+            ]
+          }
         }
       },
 
