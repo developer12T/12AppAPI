@@ -97,6 +97,7 @@ const distributionSchema = mongoose.Schema({
     orderId: { type: String, require: true },
     orderType: { type: String, require: true }, //T04, T05
     orderTypeName: { type: String, require: true }, //รับเอง, ส่งสินค้า
+    withdrawType: { type: String, require: true }, 
     area: { type: String, require: true },
     saleCode: { type: String, require: true },
     fromWarehouse: { type: String, require: true },

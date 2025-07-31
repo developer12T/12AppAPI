@@ -372,7 +372,15 @@ exports.checkout = async (req, res) => {
     await Cart.deleteOne({ type, area, storeId })
 
     const io = getSocket()
-    io.emit('refund/checkout', {})
+    io.emit('refund/checkout', {
+      status: 200,
+      message: 'Checkout successful!',
+      data: {
+        refundOrder,
+        // listProduct
+        changeOrder
+      }
+    })
 
     res.status(200).json({
       status: 200,
@@ -428,7 +436,7 @@ exports.getRefund = async (req, res) => {
     }
 
     const refunds = await Refund.aggregate([
-      {$match:{status:'pending'}},
+      { $match: { status: 'pending' } },
       {
         $addFields: {
           zone: { $substrBytes: ['$store.area', 0, 2] }
@@ -475,8 +483,10 @@ exports.getRefund = async (req, res) => {
         }
       })
     )
-    
-    const responseSort = response.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+
+    const responseSort = response.sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    )
 
     // const io = getSocket()
     // io.emit('refund/all', {});
@@ -534,18 +544,18 @@ exports.getDetail = async (req, res) => {
 
     const listProductChange = order
       ? order.listProduct.map(product => ({
-        id: product.id,
-        name: product.name,
-        group: product.group,
-        brand: product.brand,
-        size: product.size,
-        flavour: product.flavour,
-        qty: product.qty,
-        unit: product.unit,
-        unitName: product.unitName,
-        price: product.price,
-        netTotal: product.netTotal
-      }))
+          id: product.id,
+          name: product.name,
+          group: product.group,
+          brand: product.brand,
+          size: product.size,
+          flavour: product.flavour,
+          qty: product.qty,
+          unit: product.unit,
+          unitName: product.unitName,
+          price: product.price,
+          netTotal: product.netTotal
+        }))
       : []
 
     const totalChange = order ? order.total : 0
@@ -648,7 +658,11 @@ exports.addSlip = async (req, res) => {
       await order.save()
 
       const io = getSocket()
-      io.emit('refund/addSlip', {})
+      io.emit('refund/addSlip', {
+        status: 200,
+        message: 'Images uploaded successfully!',
+        data: order.listImage
+      })
 
       res.status(200).json({
         status: 200,
@@ -726,19 +740,18 @@ exports.updateStatus = async (req, res) => {
     if (status === 'canceled') {
       statusTH = 'ยกเลิก'
 
-
       // for (const item of productQty) {
 
-        // console.log(item)
-        //   const updateResult = await updateStockMongo(
-        //     item,
-        //     refundOrder.store.area,
-        //     refundOrder.period,
-        //     'rufundCanceled',
-        //     channel,
-        //     res
-        //   )
-        //   if (updateResult) return
+      // console.log(item)
+      //   const updateResult = await updateStockMongo(
+      //     item,
+      //     refundOrder.store.area,
+      //     refundOrder.period,
+      //     'rufundCanceled',
+      //     channel,
+      //     res
+      //   )
+      //   if (updateResult) return
       // }
 
       for (const item of productChange) {
@@ -752,7 +765,6 @@ exports.updateStatus = async (req, res) => {
         )
         if (updateResult) return
       }
-
     } else if (status === 'rejected') {
       statusTH = 'ถูกปฏิเสธ'
 
@@ -779,7 +791,6 @@ exports.updateStatus = async (req, res) => {
         )
         if (updateResult) return
       }
-
     } else if (status === 'completed') {
       statusTH = 'สำเร็จ'
 
@@ -821,13 +832,16 @@ exports.updateStatus = async (req, res) => {
     )
 
     const io = getSocket()
-    io.emit('refund/updateStatus', {})
+    io.emit('refund/updateStatus', {
+      status: 200,
+      message: 'Updated status successfully!',
+      data: orderId
+    })
 
     res.status(200).json({
       status: 200,
       message: 'Updated status successfully!'
     })
-
   } catch (error) {
     console.error('Error updating refund status:', error)
     res.status(500).json({ status: 500, message: 'Server error' })
@@ -851,7 +865,10 @@ exports.deleteRefund = async (req, res) => {
     }
 
     // ตรวจสอบ Order ก่อน
-    const orderExists = await Order.findOne({ reference:orderId, type: 'change' })
+    const orderExists = await Order.findOne({
+      reference: orderId,
+      type: 'change'
+    })
     if (!orderExists) {
       return res.status(404).json({
         status: 404,
@@ -868,14 +885,14 @@ exports.deleteRefund = async (req, res) => {
 
     // อัปเดต order
     const order = await Order.findOneAndUpdate(
-      { reference:orderId, type: 'change' },
+      { reference: orderId, type: 'change' },
       { status: 'delete', statusTH: 'ถูกลบ' },
       { new: true }
     )
 
     res.status(200).json({
       status: 200,
-      message: 'Refund and order marked as deleted successfully!',
+      message: 'Refund and order marked as deleted successfully!'
       // data: refund,
       // order: order
     })
@@ -884,4 +901,3 @@ exports.deleteRefund = async (req, res) => {
     res.status(500).json({ status: 500, message: 'Server error' })
   }
 }
-

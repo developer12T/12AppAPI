@@ -1544,7 +1544,7 @@ exports.getStockQtyNew = async (req, res) => {
 
   const productIdListGive = giveProductArray.flatMap(item => item.id)
 
-  
+
 
   const uniqueProductId = [
     ...new Set([
@@ -1718,7 +1718,7 @@ exports.getStockQtyNew = async (req, res) => {
         good: goodQty,
         damaged: damagedQty,
         sale: saleQty,
-        promotion : promoQty,
+        promotion: promoQty,
         change: changeQty,
         adjust: adjustQty,
         give: giveQty,
@@ -2202,6 +2202,7 @@ exports.checkout = async (req, res) => {
     const cart = await Cart.findOne({
       type,
       area,
+      withdrawId,
       createdAt: { $gte: startDate, $lt: endDate }
     })
     if (!cart || cart.listProduct.length === 0) {
@@ -2255,11 +2256,16 @@ exports.checkout = async (req, res) => {
     await Cart.deleteOne({
       type,
       area,
+      withdrawId,
       createdAt: { $gte: startDate, $lt: endDate }
     })
 
     const io = getSocket()
-    io.emit('stock/checkout', {})
+    io.emit('stock/checkout', {
+      status: 200,
+      message: 'Sucessful',
+      newOrder
+    })
 
     res.status(200).json({
       status: 200,
@@ -2380,12 +2386,14 @@ exports.approveAdjustStock = async (req, res) => {
   )
 
   const io = getSocket()
-  io.emit('stock/approveAdjustStock', {})
+  io.emit('stock/approveAdjustStock', {
+    status: 200,
+    message: 'successfully'
+  })
 
   res.status(200).json({
     status: 200,
     message: 'successfully'
-    // data: DataAdjustStock
   })
 }
 

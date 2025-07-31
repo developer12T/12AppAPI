@@ -56,7 +56,11 @@ exports.addPromotion = async (req, res) => {
     await newPromotion.save()
 
     const io = getSocket()
-    io.emit('promotion/add', {});
+    io.emit('promotion/add', {
+      status: 201,
+      message: 'Promotion created successfully!',
+      data: newPromotion
+    });
 
     res.status(201).json({
       status: 201,
@@ -115,7 +119,11 @@ exports.updatePromotion = async (req, res) => {
     )
 
     const io = getSocket()
-    io.emit('promotion/updatePromotion', {});
+    io.emit('promotion/updatePromotion', {
+      status: 201,
+      message: 'Promotion updated successfully!',
+      data: updatedPromotion
+    });
 
     res.status(201).json({
       status: 201,
@@ -172,6 +180,8 @@ exports.getPromotionProduct = async (req, res) => {
         .status(404)
         .json({ status: 404, message: 'No reward products found!' })
     }
+
+    // console.log(rewardProducts)
 
     const groupedProducts = {}
 
@@ -339,7 +349,8 @@ exports.getPromotion = async (req, res) => {
   const channel = req.headers['x-channel']; // 'credit' or 'cash'
   const { Promotion } = getModelsByChannel(channel, res, promotionModel);
 
-  const data = await Promotion.find({status:'active'}).sort({ createdAt: -1 })
+  const data = await Promotion.find({ status: 'active' })
+    .sort({ proId: 1});
 
   if (data.length == 0) {
     return res.status(404).json({

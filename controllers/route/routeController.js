@@ -669,7 +669,10 @@ exports.checkIn = async (req, res) => {
 
 
       const io = getSocket()
-      io.emit('route/checkIn', {});
+      io.emit('route/checkIn', {
+        status: '200',
+        message: 'check in successfully'
+      });
 
       res.status(200).json({
         status: '200',
@@ -797,7 +800,10 @@ exports.checkInVisit = async (req, res) => {
 
 
       const io = getSocket()
-      io.emit('route/checkInVisit', {});
+      io.emit('route/checkInVisit', {
+        status: '200',
+        message: 'check in successfully'
+      });
 
       res.status(200).json({
         status: '200',
@@ -863,10 +869,13 @@ exports.changeRoute = async (req, res) => {
 
 
     const io = getSocket()
-    io.emit('route/change', {});
+    io.emit('route/change', {
+      status: 201,
+      message: 'Route change logged successfully!'
+    });
 
     res.status(201).json({
-      status: '201',
+      status: 201,
       message: 'Route change logged successfully!'
     })
   } catch (error) {
@@ -995,7 +1004,11 @@ exports.createRoute = async (req, res) => {
     }
 
     const io = getSocket()
-    io.emit('route/createRoute', {});
+    io.emit('route/createRoute', {
+      status: '200',
+      message: 'Routes created successfully.',
+      data: newRoutes
+    });
 
     res.status(200).json({
       status: '200',
@@ -1052,7 +1065,11 @@ exports.routeHistory = async (req, res) => {
 
 
     const io = getSocket()
-    io.emit('route/history', {});
+    io.emit('route/history', {
+      status: '200',
+      message: 'Success',
+      data: changeLogs
+    });
 
     res.status(200).json({
       status: '200',

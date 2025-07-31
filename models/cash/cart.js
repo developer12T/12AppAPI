@@ -77,6 +77,7 @@ const cartSchema = mongoose.Schema({
   type: { type: String, require: true },
   area: { type: String, require: true },
   storeId: { type: String },
+  withdrawId: { type: String },
   shippingId: { type: String },
   total: { type: Number, require: true, default: 0 },
   listProduct: [listCartProduct],

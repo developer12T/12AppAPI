@@ -430,7 +430,10 @@ exports.addStore = async (req, res) => {
       // console.log(storeData)
 
       const io = getSocket()
-      io.emit('store/addStore', {})
+      io.emit('store/addStore', {
+        status: '200',
+        message: 'Store added successfully'
+      })
 
       res.status(200).json({
         status: '200',
@@ -452,7 +455,7 @@ exports.checkSimilarStores = async (req, res) => {
 
   const existingStores = await Store.find(
     { storeId: { $ne: storeId } },
-    { _id: 0, __v: 0, idIndex: 0 },
+    { _id: 0, __v: 0, idIndex: 0 }
     // { area: store.area }
   )
 
@@ -461,7 +464,7 @@ exports.checkSimilarStores = async (req, res) => {
     { field: 'name', weight: 2 },
     { field: 'taxId', weight: 4 },
     { field: 'tel', weight: 3 },
-    { field: 'address', weight: 2 },
+    { field: 'address', weight: 2 }
     // { field: 'district', weight: 0.5 },
     // { field: 'subDistrict', weight: 0.5 },
     // { field: 'province', weight: 0.5 },
@@ -557,7 +560,11 @@ exports.editStore = async (req, res) => {
     }
 
     const io = getSocket()
-    io.emit('store/editStore', {})
+    io.emit('store/editStore', {
+      status: '200',
+      message: 'Store updated successfully',
+      data: store
+    })
 
     res.status(200).json({
       status: '200',
@@ -753,7 +760,15 @@ exports.checkInStore = async (req, res) => {
     }
 
     const io = getSocket()
-    io.emit('store/checkIn', {})
+    io.emit('store/checkIn', {
+      status: '200',
+      message: 'Checked In Successfully',
+      data: {
+        latitude: result.checkIn.latitude,
+        longtitude: result.checkIn.latitude,
+        updateDate: result.checkIn.updateDate
+      }
+    })
 
     res.status(200).json({
       status: '200',
@@ -821,7 +836,6 @@ exports.updateStoreStatus = async (req, res) => {
     // const item = await Store.findOne({ storeId: newId, area: store.area })
     // const dataUser = await User.findOne({ area: store.area, role: 'sale' })
 
-
     // if (!item) {
     //   return res.status(404).json({
     //     json: 404,
@@ -876,7 +890,6 @@ exports.updateStoreStatus = async (req, res) => {
     //   })
     // }
 
-
     // try {
     //   const response = await axios.post(
     //     `${process.env.API_URL_12ERP}/customer/insert`,
@@ -894,8 +907,11 @@ exports.updateStoreStatus = async (req, res) => {
     //     })
     //   }
 
-    //   const io = getSocket()
-    //   io.emit('store/updateStoreStatus', {})
+    const io = getSocket()
+    io.emit('store/updateStoreStatus', {
+      status: 'success',
+      data: newId
+    })
 
     //   return res.status(500).json({
     //     message: 'Internal Server Error',
@@ -905,10 +921,8 @@ exports.updateStoreStatus = async (req, res) => {
 
     return res.status(200).json({
       status: 200,
-      message: 'update Store Status sucess',
-
+      message: 'update Store Status sucess'
     })
-
   } else {
     await Store.findOneAndUpdate(
       { _id: store._id },
@@ -928,7 +942,6 @@ exports.updateStoreStatus = async (req, res) => {
       message: 'Reject Store successful'
     })
   }
-
 }
 
 exports.rejectStore = async (req, res) => {
@@ -977,7 +990,7 @@ exports.updateStoreStatusNoNewId = async (req, res) => {
 
     return res.status(200).json({
       status: 200,
-      message: 'Store status updated successfully',
+      message: 'Store status updated successfully'
     })
   } catch (error) {
     console.error('updateStoreStatusNoNewId error:', error)
@@ -987,10 +1000,6 @@ exports.updateStoreStatusNoNewId = async (req, res) => {
     })
   }
 }
-
-
-
-
 
 exports.addAndUpdateStore = async (req, res) => {
   const channel = req.headers['x-channel']
@@ -1102,7 +1111,7 @@ exports.createRunningNumber = async (req, res) => {
   let running = ''
   if (channel == 'cash') {
     type = '101'
-    running = 'CV'
+    running = 'V'
   } else if (channel == 'credit') {
     type = '103'
   }
@@ -1144,6 +1153,7 @@ exports.createRunningNumber = async (req, res) => {
       name: channel,
       start: `${running}${u._id}2500000`,
       last: `${running}${u._id}2500000`
+      // last: maxRunning.maxStoreId
     }
   })
 
@@ -1352,7 +1362,11 @@ exports.deleteStoreArray = async (req, res) => {
   await Store.deleteMany({ storeId: { $in: storeId } })
 
   const io = getSocket()
-  io.emit('store/deleteStoreArray', {})
+  io.emit('store/deleteStoreArray', {
+    status: 200,
+    message: 'Deleted successfully',
+    deletedStore: deletedStoreId
+  })
 
   res.status(200).json({
     status: 200,
@@ -1577,7 +1591,11 @@ exports.addShippingInStore = async (req, res) => {
     )
 
     const io = getSocket()
-    io.emit('store/addShippingInStore', {})
+    io.emit('store/addShippingInStore', {
+      status: 200,
+      message: 'sucess',
+      data: addShipping
+    })
 
     return res.status(200).json({
       status: 200,
@@ -1654,7 +1672,11 @@ exports.editShippingInStore = async (req, res) => {
     )
 
     const io = getSocket()
-    io.emit('store/editShippingInStore', {})
+    io.emit('store/editShippingInStore', {
+      status: 200,
+      message: 'success',
+      data: updatedStore
+    })
 
     return res.status(200).json({
       status: 200,
@@ -1697,7 +1719,11 @@ exports.deleteShippingFromStore = async (req, res) => {
     )
 
     const io = getSocket()
-    io.emit('store/deleteShippingFromStore', {})
+    io.emit('store/deleteShippingFromStore', {
+      status: 200,
+      message: 'success',
+      data: updatedStore
+    })
 
     return res.status(200).json({
       status: 200,
@@ -1711,7 +1737,6 @@ exports.deleteShippingFromStore = async (req, res) => {
       .json({ status: 500, message: 'Internal server error' })
   }
 }
-
 
 exports.deleteStore = async (req, res) => {
   try {
@@ -1743,6 +1768,3 @@ exports.deleteStore = async (req, res) => {
     })
   }
 }
-
-
-

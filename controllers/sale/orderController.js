@@ -412,7 +412,11 @@ exports.checkout = async (req, res) => {
     }
 
     const io = getSocket()
-    io.emit('order/checkout', {})
+    io.emit('order/checkout', {
+      status: 200,
+      message: 'Checkout successful!',
+      data: newOrder
+    })
 
     // await transaction.commit()
     res.status(200).json({
@@ -770,7 +774,11 @@ exports.updateStatus = async (req, res) => {
     // session.endSession();
 
     const io = getSocket()
-    io.emit('order/updateStatus', {})
+    io.emit('order/updateStatus', {
+      status: 200,
+      message: 'Updated status successfully!',
+      data: updatedOrder
+    })
 
     res.status(200).json({
       status: 200,
@@ -838,7 +846,11 @@ exports.addSlip = async (req, res) => {
       await order.save()
 
       const io = getSocket()
-      io.emit('order/addSlip', {})
+      io.emit('order/addSlip', {
+        status: 200,
+        message: 'Images uploaded successfully!',
+        data: order.listImage
+      })
 
       res.status(200).json({
         status: 200,
