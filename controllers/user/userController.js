@@ -268,10 +268,10 @@ exports.updateUserOne = async (req, res) => {
   const { User } = getModelsByChannel(channel, res, userModel)
   // const user = await User.findOne({saleCode:req.body.saleCode})
 
-  if (!req.body.saleCode && !req.body.username) {
+  if (!req.body.username) {
     return res.status(400).json({
       status: 400,
-      message: 'saleCode or username is required!'
+      message: 'username is required!'
     })
   }
 
@@ -279,7 +279,7 @@ exports.updateUserOne = async (req, res) => {
 
   const hashedPassword = await bcrypt.hash(req.body.password, saltRounds);
   const user = await User.updateOne(
-    { saleCode: req.body.saleCode, username: req.body.username },
+    { username: req.body.username },
     {
       $set: {
         salePayer: req.body.salePayer,
@@ -514,7 +514,7 @@ exports.addUserNew = async (req, res) => {
         period: period(),
         image: '',
         typeTruck: sale.typeTruck,
-        noTruck:sale.noTruck
+        noTruck: sale.noTruck
       });
       await newUser.save();
       result.push(newUser);
