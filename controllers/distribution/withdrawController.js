@@ -1065,6 +1065,7 @@ exports.saleConfirmWithdraw = async (req, res) => {
     res,
     distributionModel
   )
+
   const { Product } = getModelsByChannel(channel, res, productModel)
   const { Stock } = getModelsByChannel(channel, res, stockModel)
   const { User } = getModelsByChannel(channel, res, userModel)
@@ -1079,69 +1080,82 @@ exports.saleConfirmWithdraw = async (req, res) => {
       type: 'withdraw'
     })
 
-    distributionTran.listProduct = distributionTran.listProduct.map(item => ({
-      ...item,
-      receiveQty: item.qty
-    }));
 
-    // console.log(distributionTran.listProduct)
+    if (distributionTran.status === 'approved') {
 
-    const distributionData = await Distribution.findOneAndUpdate(
-      { orderId: orderId, type: 'withdraw' },
-      {
-        $set: {
-          statusTH: statusThStr, status: statusStr,
-          listProduct:distributionTran.listProduct,
-          receivetotal: distributionTran.total,
-          receivetotalQty: distributionTran.totalQty,
-          receivetotalWeightGross: distributionTran.totalWeightGross,
-          receivetotalWeightNet: distributionTran.totalWeightNet
-        }
-      },
-      { new: true }
-    )
+      distributionTran.listProduct = distributionTran.listProduct.map(item => ({
+        ...item,
+        receiveQty: item.qty
+      }));
 
-    if (!distributionData) {
-      return res
-        .status(404)
-        .json({ status: 404, message: 'Not found withdraw' })
-    }
+      // console.log(distributionTran.listProduct)
 
-    if (!distributionTran?.period) {
-      return res
-        .status(404)
-        .json({ status: 404, message: 'Not found period in doc' })
-    }
-
-    const dataTran = distributionTran
-    // console.log(dataTran.listProduct)
-    const qtyproduct = dataTran.listProduct
-      .filter(u => u?.id && u?.unit && u?.qty > 0)
-      .map(u => ({
-        id: u.id,
-        unit: u.unit,
-        qty: u.qty,
-        statusMovement: 'OUT'
-      }))
-    // console.log(qtyproduct)
-
-    for (const item of qtyproduct) {
-      const updateResult = await updateStockMongo(
-        item,
-        distributionTran.area,
-        distributionTran.period,
-        'withdraw',
-        channel,
-        res
+      const distributionData = await Distribution.findOneAndUpdate(
+        { orderId: orderId, type: 'withdraw' },
+        {
+          $set: {
+            statusTH: statusThStr, status: statusStr,
+            listProduct: distributionTran.listProduct,
+            receivetotal: distributionTran.total,
+            receivetotalQty: distributionTran.totalQty,
+            receivetotalWeightGross: distributionTran.totalWeightGross,
+            receivetotalWeightNet: distributionTran.totalWeightNet
+          }
+        },
+        { new: true }
       )
-      if (updateResult) return
+
+      if (!distributionData) {
+        return res
+          .status(404)
+          .json({ status: 404, message: 'Not found withdraw' })
+      }
+
+      if (!distributionTran?.period) {
+        return res
+          .status(404)
+          .json({ status: 404, message: 'Not found period in doc' })
+      }
+
+      const dataTran = distributionTran
+      // console.log(dataTran.listProduct)
+      const qtyproduct = dataTran.listProduct
+        .filter(u => u?.id && u?.unit && u?.qty > 0)
+        .map(u => ({
+          id: u.id,
+          unit: u.unit,
+          qty: u.qty,
+          statusMovement: 'OUT'
+        }))
+      // console.log(qtyproduct)
+
+      for (const item of qtyproduct) {
+        const updateResult = await updateStockMongo(
+          item,
+          distributionTran.area,
+          distributionTran.period,
+          'withdraw',
+          channel,
+          res
+        )
+        if (updateResult) return
+      }
+
+      const io = getSocket()
+      io.emit('distribution/saleConfirmWithdraw', {
+        status: 200,
+        message: 'Confirm withdraw success'
+      })
+
+    } else {
+
+      return res
+        .status(409)
+        .json({ status: 409, message: 'Status withdraw is pending' });
+
     }
 
-    const io = getSocket()
-    io.emit('distribution/saleConfirmWithdraw', {
-      status: 200,
-      message: 'Confirm withdraw success'
-    })
+
 
     return res
       .status(200)
