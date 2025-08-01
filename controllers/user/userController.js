@@ -18,16 +18,13 @@ const { getSocket } = require('../../socket')
 const { encrypt, decrypt } = require('../../middleware/authen')
 
 
-function exportUsersToXlsx(data, fileName = 'user-list.xlsx') {
+function exportUsersToXlsx(data, sheetName = 'Sheet1') {
   const worksheet = XLSX.utils.json_to_sheet(data);
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Users');
+  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
 
-  const exportPath = path.join(__dirname, '../exports', fileName);
-  fs.mkdirSync(path.dirname(exportPath), { recursive: true });
-  XLSX.writeFile(workbook, exportPath);
-
-  return exportPath;
+  // สร้าง buffer จาก workbook แทนการเขียนไฟล์
+  return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 }
 
 exports.getUser = async (req, res) => {
@@ -71,10 +68,8 @@ exports.getUser = async (req, res) => {
 
 exports.downloadUserExcel = async (req, res) => {
   try {
-    const channel = req.headers['x-channel'];
-    const { User } = getModelsByChannel(channel, res, userModel);
-
-    const users = await User.find({}).lean();
+    const { User } = getModelsByChannel('cash', res, userModel);
+    const users = await User.find({ role: 'sale' }).lean();
 
     if (!users || users.length === 0) {
       return res.status(404).json({ status: 404, message: 'User not found' });
@@ -103,9 +98,11 @@ exports.downloadUserExcel = async (req, res) => {
       };
     });
 
-    const filePath = exportUsersToXlsx(formattedUsers, 'user-export.xlsx');
+    const buffer = exportUsersToXlsx(formattedUsers, 'Users');
 
-    return res.download(filePath, 'user-export.xlsx');
+    res.setHeader('Content-Disposition', 'attachment; filename="user-export.xlsx"');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    return res.send(buffer);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ status: 500, message: err.message });
