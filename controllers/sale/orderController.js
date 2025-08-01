@@ -898,7 +898,8 @@ exports.OrderToExcel = async (req, res) => {
   const modelOrder = await Order.aggregate([
     {
       $match: {
-        orderId: { $not: /CC/ }
+        orderId: { $not: /CC/ },
+        type: { $in: ['sale', 'change'] }
       }
     },
     {
