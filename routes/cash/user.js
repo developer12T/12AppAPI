@@ -15,7 +15,8 @@ const {
   addUserArray,
   getAreaAll,
  checkUserLogin,
- getTeam
+ getTeam,
+ downloadUserExcel
 } = require('../../controllers/user/userController')
 
 const router = express.Router()
@@ -36,4 +37,5 @@ router.post('/addUserArray', addUserArray)
 router.get('/getAreaAll', getAreaAll)
 router.get('/checkUserLogin', checkUserLogin)
 router.get('/getTeam', getTeam)
+router.get('/downloadUserExcel', downloadUserExcel)
 module.exports = router

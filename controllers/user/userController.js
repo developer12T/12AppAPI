@@ -18,12 +18,21 @@ const { getSocket } = require('../../socket')
 const { encrypt, decrypt } = require('../../middleware/authen')
 
 
+function exportUsersToXlsx(data, sheetName = 'Sheet1') {
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+
+  // สร้าง buffer จาก workbook แทนการเขียนไฟล์
+  return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+}
+
 exports.getUser = async (req, res) => {
   try {
     const channel = req.headers['x-channel'];
     const { User } = getModelsByChannel(channel, res, userModel);
 
-    const users = await User.find({role:'sale'})
+    const users = await User.find({})
       .select('-_id salecode salePayer username firstName password surName tel zone area warehouse role qrCodeImage updatedAt')
       .lean();
 
@@ -56,6 +65,54 @@ exports.getUser = async (req, res) => {
     res.status(500).json({ status: 500, message: error.message });
   }
 };
+
+exports.downloadUserExcel = async (req, res) => {
+  try {
+    const { User } = getModelsByChannel('cash', res, userModel);
+    const users = await User.find({ role: 'sale' }).lean();
+
+    if (!users || users.length === 0) {
+      return res.status(404).json({ status: 404, message: 'User not found' });
+    }
+
+    const formattedUsers = users.map(user => {
+      let password = '';
+      try {
+        password = decrypt(user.password);
+      } catch {
+        password = '[decrypt error]';
+      }
+
+      return {
+        saleCode: user.saleCode,
+        username: user.username,
+        firstName: user.firstName,
+        surName: user.surName,
+        password: password,
+        tel: user.tel,
+        zone: user.zone,
+        area: user.area,
+        warehouse: user.warehouse,
+        role: user.role,
+        updatedAt: new Date(new Date(user.updatedAt).getTime() + 7 * 60 * 60 * 1000).toISOString()
+      };
+    });
+
+    const buffer = exportUsersToXlsx(formattedUsers, 'Users');
+
+    res.setHeader('Content-Disposition', 'attachment; filename="user-export.xlsx"');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    return res.send(buffer);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ status: 500, message: err.message });
+  }
+};
+
+
+
+
+
 
 exports.editUser = async (req, res) => {
   try {

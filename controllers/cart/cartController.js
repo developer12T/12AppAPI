@@ -196,7 +196,7 @@ exports.addProduct = async (req, res) => {
         ? { type, area, withdrawId }
         : { type, area, storeId }
     const { Cart } = getModelsByChannel(channel, res, cartModel)
-    
+
     let cart = await Cart.findOne(cartQuery)
 
     if (!cart) {
