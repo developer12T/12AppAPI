@@ -51,8 +51,8 @@ exports.login = async (req, res) => {
       { new: true }
     );
 
-    res.status(201).json({
-      status: 201,
+    res.status(200).json({
+      status: 200,
       message: 'Login successful',
       data: {
         username: data.username,
