@@ -54,7 +54,7 @@ exports.login = async (req, res) => {
     res.status(200).json({
       status: 200,
       message: 'Login successful',
-      data: {
+      data: [{
         username: data.username,
         firstName: data.firstName,
         surName: data.surName,
@@ -68,7 +68,7 @@ exports.login = async (req, res) => {
         warehouse: data.warehouse,
         role: data.role,
         token: token
-      }
+      }]
     });
 
   } catch (error) {
