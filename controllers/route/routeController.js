@@ -12,7 +12,10 @@ const upload = multer({ storage: multer.memoryStorage() }).array(
 const mongoose = require('mongoose')
 
 const sql = require('mssql')
-const { routeQuery, routeQueryOne } = require('../../controllers/queryFromM3/querySctipt')
+const {
+  routeQuery,
+  routeQueryOne
+} = require('../../controllers/queryFromM3/querySctipt')
 const orderModel = require('../../models/cash/sale')
 const routeModel = require('../../models/cash/route')
 const storeModel = require('../../models/cash/store')
@@ -381,8 +384,7 @@ exports.addFromERPnew = async (req, res) => {
     }
 
     const io = getSocket()
-    io.emit('route/addFromERPnew', {});
-
+    io.emit('route/addFromERPnew', {})
 
     res.status(200).json({
       status: 200,
@@ -404,7 +406,7 @@ exports.addFromERPOne = async (req, res) => {
 
     const result = await routeQueryOne(channel, id)
     // console.log(result)
-    await Route.deleteOne({ id: id });
+    await Route.deleteOne({ id: id })
     const return_arr = []
     for (const row of result) {
       const area = String(row.area ?? '').trim()
@@ -444,7 +446,6 @@ exports.addFromERPOne = async (req, res) => {
         })
       }
     }
-
 
     const route = await Route.find({ period: period(), id: id })
     const routeMap = new Map(route.map(route => [route.id, route]))
@@ -536,22 +537,18 @@ exports.addFromERPOne = async (req, res) => {
     }
 
     const io = getSocket()
-    io.emit('route/addFromERPOne', {});
-
+    io.emit('route/addFromERPOne', {})
 
     res.status(200).json({
       status: 200,
       message: 'sucess',
       data: return_arr
     })
-
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
   }
 }
-
-
 
 exports.checkIn = async (req, res) => {
   upload(req, res, async err => {
@@ -580,11 +577,11 @@ exports.checkIn = async (req, res) => {
       }
 
       const period = routeId.substring(0, 6)
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
+      const startOfDay = new Date()
+      startOfDay.setHours(0, 0, 0, 0)
 
-      const endOfDay = new Date();
-      endOfDay.setHours(23, 59, 59, 999);
+      const endOfDay = new Date()
+      endOfDay.setHours(23, 59, 59, 999)
 
       let allRoute = await Route.aggregate([
         {
@@ -599,7 +596,7 @@ exports.checkIn = async (req, res) => {
           }
         },
         {
-          $replaceRoot: { newRoot: "$listStore" }
+          $replaceRoot: { newRoot: '$listStore' }
         },
         {
           $match: {
@@ -608,7 +605,6 @@ exports.checkIn = async (req, res) => {
             date: { $gte: startOfDay, $lte: endOfDay }
           }
         }
-
       ])
       // console.log(allRoute.length)
 
@@ -616,10 +612,8 @@ exports.checkIn = async (req, res) => {
         return res.status(409).json({
           status: 409,
           message: 'Duplicate Store on this day'
-        });
+        })
       }
-
-
 
       let image = null
       if (req.files) {
@@ -666,12 +660,11 @@ exports.checkIn = async (req, res) => {
         })
       }
 
-
       const io = getSocket()
       io.emit('route/checkIn', {
         status: '200',
         message: 'check in successfully'
-      });
+      })
 
       res.status(200).json({
         status: '200',
@@ -710,13 +703,12 @@ exports.checkInVisit = async (req, res) => {
           .json({ status: '404', message: 'Store not found' })
       }
 
-
       const period = routeId.substring(0, 6)
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
+      const startOfDay = new Date()
+      startOfDay.setHours(0, 0, 0, 0)
 
-      const endOfDay = new Date();
-      endOfDay.setHours(23, 59, 59, 999);
+      const endOfDay = new Date()
+      endOfDay.setHours(23, 59, 59, 999)
 
       let allRoute = await Route.aggregate([
         {
@@ -731,7 +723,7 @@ exports.checkInVisit = async (req, res) => {
           }
         },
         {
-          $replaceRoot: { newRoot: "$listStore" }
+          $replaceRoot: { newRoot: '$listStore' }
         },
         {
           $match: {
@@ -740,7 +732,6 @@ exports.checkInVisit = async (req, res) => {
             date: { $gte: startOfDay, $lte: endOfDay }
           }
         }
-
       ])
       // console.log(allRoute.length)
 
@@ -748,7 +739,7 @@ exports.checkInVisit = async (req, res) => {
         return res.status(409).json({
           status: 409,
           message: 'Duplicate Store on this day'
-        });
+        })
       }
 
       let image = null
@@ -796,13 +787,11 @@ exports.checkInVisit = async (req, res) => {
         })
       }
 
-
-
       const io = getSocket()
       io.emit('route/checkInVisit', {
         status: '200',
         message: 'check in successfully'
-      });
+      })
 
       res.status(200).json({
         status: '200',
@@ -866,12 +855,11 @@ exports.changeRoute = async (req, res) => {
 
     await newRouteChangeLog.save()
 
-
     const io = getSocket()
     io.emit('route/change', {
       status: 201,
       message: 'Route change logged successfully!'
-    });
+    })
 
     res.status(201).json({
       status: 201,
@@ -1007,7 +995,7 @@ exports.createRoute = async (req, res) => {
       status: '200',
       message: 'Routes created successfully.',
       data: newRoutes
-    });
+    })
 
     res.status(200).json({
       status: '200',
@@ -1062,13 +1050,12 @@ exports.routeHistory = async (req, res) => {
         .json({ status: '404', message: 'History not found.' })
     }
 
-
     const io = getSocket()
     io.emit('route/history', {
       status: '200',
       message: 'Success',
       data: changeLogs
-    });
+    })
 
     res.status(200).json({
       status: '200',
@@ -1282,7 +1269,6 @@ exports.getRouteCheckinAll = async (req, res) => {
     // const io = getSocket()
     // io.emit('route/getRouteCheckinAll', {});
 
-
     res.status(200).json({
       status: 200,
       message: 'Success',
@@ -1357,7 +1343,6 @@ exports.routeTimeline = async (req, res) => {
 
       // const io = getSocket()
       // io.emit('route/routeTimeline', {});
-
 
       res.status(200).json({
         response: data
@@ -1551,7 +1536,6 @@ exports.getRouteProvince = async (req, res) => {
     .flatMap(item => item.province)
     .filter(p => p && p.trim() !== '')
 
-
   // const io = getSocket()
   // io.emit('route/getRouteProvince', {});
 
@@ -1724,7 +1708,6 @@ exports.getRouteEffective = async (req, res) => {
     }
   })
 
-
   // const io = getSocket()
   // io.emit('route/getRouteEffective', {});
 
@@ -1836,7 +1819,6 @@ exports.getRouteEffectiveAll = async (req, res) => {
 
   // const io = getSocket()
   // io.emit('route/getRouteEffectiveAll', {});
-
 
   res.status(200).json({
     status: 200,
@@ -1989,7 +1971,6 @@ exports.getRouteByArea = async (req, res) => {
   // const io = getSocket()
   // io.emit('route/getRouteByArea', {});
 
-
   res.status(200).json({
     status: 200,
     message: 'sucess',
@@ -1999,8 +1980,7 @@ exports.getRouteByArea = async (req, res) => {
 
 exports.checkRouteStore = async (req, res) => {
   try {
-
-    const { zone, period } = req.query
+    const { zone, period, team } = req.query
     const channel = req.headers['x-channel']
     const { Route } = getModelsByChannel(channel, res, routeModel)
     const { Store } = getModelsByChannel(channel, res, storeModel)
@@ -2010,32 +1990,54 @@ exports.checkRouteStore = async (req, res) => {
       queryZone.zone = zone
     }
 
-    const dataRoute = await Route.aggregate([
+    // === Build pipeline ===
+    const pipeline = [
       {
         $addFields: {
-          zone: { $substrBytes: ["$area", 0, 2] }
+          zone: { $substrBytes: ['$area', 0, 2] },
+          team3: {
+            $concat: [
+              { $substrCP: ['$area', 0, 2] },
+              { $substrCP: ['$area', 3, 1] }
+            ]
+          }
         }
       },
+      // Filter zone & period
       {
         $match: {
           ...queryZone,
           period
         }
-      },
+      }
+    ]
+
+    // ==== แทรก team filter ตรงนี้ หลัง $addFields/$match ====
+    if (team) {
+      pipeline.push({
+        $match: {
+          team3: { $regex: `^${team}`, $options: 'i' }
+        }
+      })
+    }
+
+    pipeline.push(
       {
         $project: {
           area: 1,
           day: 1,
-          storeCount: { $size: "$listStore" }
+          storeCount: { $size: '$listStore' }
         }
       },
       {
         $group: {
-          _id: { area: "$area", day: "$day" },
-          count: { $sum: "$storeCount" }
+          _id: { area: '$area', day: '$day' },
+          count: { $sum: '$storeCount' }
         }
       }
-    ]);
+    )
+
+    const dataRoute = await Route.aggregate(pipeline)
 
     const zoneList = [...new Set(dataRoute.map(u => u._id.area.slice(0, 2)))]
 
@@ -2067,7 +2069,7 @@ exports.checkRouteStore = async (req, res) => {
       areaMap[area].del = storeCountMap[area]?.del || 0
     }
 
-    function sortKeys(obj) {
+    function sortKeys (obj) {
       const { area, R, del, ...days } = obj
       const sortedDays = Object.keys(days)
         .filter(k => /^R\d+$/.test(k))
@@ -2089,72 +2091,69 @@ exports.checkRouteStore = async (req, res) => {
       message: 'success',
       data: result
     })
-
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ status: 500, message: 'Internal server error' });
+    console.error(error)
+    res.status(500).json({ status: 500, message: 'Internal server error' })
   }
 }
 
 exports.polylineRoute = async (req, res) => {
   try {
-    const { area, period } = req.query;
-    const channel = req.headers['x-channel'];
-    const { Route } = getModelsByChannel(channel, res, routeModel);
-    const { Store } = getModelsByChannel(channel, res, storeModel);
+    const { area, period } = req.query
+    const channel = req.headers['x-channel']
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
-    const dataRoute = await Route.find({ area, period });
+    const dataRoute = await Route.find({ area, period })
 
     const storeId = dataRoute.flatMap(item =>
       item.listStore.map(i => i.storeInfo)
-    );
+    )
 
     const objectIds = storeId
       .filter(id => mongoose.Types.ObjectId.isValid(id))
-      .map(id => new mongoose.Types.ObjectId(id));
+      .map(id => new mongoose.Types.ObjectId(id))
 
-    const dataStore = await Store.find({ _id: { $in: objectIds } });
+    const dataStore = await Store.find({ _id: { $in: objectIds } })
 
-    const locations = dataRoute.flatMap(item =>
-      item.listStore
-        .filter(u => {
-          const lat = parseFloat(u.latitude);
-          const lng = parseFloat(u.longtitude);
-          return !isNaN(lat) && !isNaN(lng);
-        })
-        .map(u => {
-          const store = dataStore.find(s => s._id.equals(u.storeInfo));
-          const dateObj = new Date(u.date);
-          return {
-            storeId: store?.storeId,
-            route: `R${item.day}`,
-            date: formatDateTimeToThai(u.date),
-            timestamp: dateObj.getTime(),
-            location: [
-              parseFloat(u.longtitude),
-              parseFloat(u.latitude)
-            ]
-          };
-        })
-    ).sort((a, b) => a.timestamp - b.timestamp);
+    const locations = dataRoute
+      .flatMap(item =>
+        item.listStore
+          .filter(u => {
+            const lat = parseFloat(u.latitude)
+            const lng = parseFloat(u.longtitude)
+            return !isNaN(lat) && !isNaN(lng)
+          })
+          .map(u => {
+            const store = dataStore.find(s => s._id.equals(u.storeInfo))
+            const dateObj = new Date(u.date)
+            return {
+              storeId: store?.storeId,
+              route: `R${item.day}`,
+              date: formatDateTimeToThai(u.date),
+              timestamp: dateObj.getTime(),
+              location: [parseFloat(u.longtitude), parseFloat(u.latitude)]
+            }
+          })
+      )
+      .sort((a, b) => a.timestamp - b.timestamp)
 
     if (locations.length === 0) {
       return res.status(404).json({
         status: 404,
         message: 'Not found latitude, locations'
-      });
+      })
     }
 
-    const finalLocations = locations.map(({ timestamp, ...rest }) => rest);
+    const finalLocations = locations.map(({ timestamp, ...rest }) => rest)
 
     res.status(200).json({
       status: 200,
       message: 'success',
       data: finalLocations
-    });
-
+    })
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ status: 500, message: 'Internal server error' });
+    console.error(error)
+    res.status(500).json({ status: 500, message: 'Internal server error' })
   }
-};
+}
