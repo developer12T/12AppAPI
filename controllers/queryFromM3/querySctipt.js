@@ -962,6 +962,7 @@ exports.routeQueryOne = async function (channel, RouteId) {
 exports.stockQuery = async function (channel, period) {
 
   const keyword = `%${period}%`;
+  const formatted = keyword.replace(/%/g, '').replace(/^(\d{4})(\d{2})$/, '$1-$2');
 
   const config = {
     user: process.env.MS_SQL_USER,
@@ -975,13 +976,16 @@ exports.stockQuery = async function (channel, period) {
   };
   const hash = '$2b$10$DqTAeJ.dZ67XVLky203dn.77idSGjHqbOJ7ztOTeEpr1VeycWngua';
 
+
   await sql.connect(config);
   let result = ''
   if (channel == 'cash') {
     result = await sql.query`
-  SELECT WH, ITEM_CODE, SUM(ITEM_QTY) AS ITEM_QTY
+  SELECT WH, 
+  ITEM_CODE, 
+  SUM(ITEM_QTY) AS ITEM_QTY
   FROM [dbo].[data_stock_van]
-  WHERE Stock_Date LIKE ${keyword}
+  WHERE Stock_Date LIKE '%2025-08%'
   GROUP BY WH, ITEM_CODE
 `;
   }
