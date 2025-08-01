@@ -993,6 +993,7 @@ exports.addStockFromERP = async (req, res) => {
   const { period } = req.body
   const channel = req.headers['x-channel']
   const data = await stockQuery(channel, period)
+  // console.log(data)
   const cleanPeriod = period.replace('-', '') // "202506"
   const { User } = getModelsByChannel(channel, res, userModel)
   const { Stock } = getModelsByChannel(channel, res, stockModel)
@@ -1032,8 +1033,10 @@ exports.addStockFromERP = async (req, res) => {
   const result = []
 
   for (const item of users) {
+    
     const datastock = data.filter(i => i.WH == item.warehouse)
-
+    // console.log("datastock",datastock)
+    // console
     const existingStock = await Stock.findOne({
       area: item.area,
       period: cleanPeriod,
@@ -1066,6 +1069,7 @@ exports.addStockFromERP = async (req, res) => {
         }
       })
     }
+    
 
     result.push(record)
 
