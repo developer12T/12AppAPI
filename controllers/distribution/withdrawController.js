@@ -457,7 +457,7 @@ exports.getOrder = async (req, res) => {
     res.status(200).json({
       status: 200,
       message: 'Successful!',
-      // data: response
+      data: response
     })
   } catch (error) {
     console.error('Error saving store to MongoDB:', error)
@@ -882,174 +882,172 @@ exports.addFromERPWithdraw = async (req, res) => {
 
 exports.approveWithdraw = async (req, res) => {
   try {
-    // const { orderId, status } = req.body
-    // let statusStr = status === true ? 'approved' : 'rejected'
-    // let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ'
+    const { orderId, status } = req.body
+    let statusStr = status === true ? 'approved' : 'rejected'
+    let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ'
 
-    // const channel = req.headers['x-channel']
-    // const { Distribution, WereHouse } = getModelsByChannel(
-    //   channel,
-    //   res,
-    //   distributionModel
-    // )
-    // const { Product } = getModelsByChannel(channel, res, productModel)
-    // const { Stock } = getModelsByChannel(channel, res, stockModel)
-    // const { Option } = getModelsByChannel(channel, res, optionsModel)
+    const channel = req.headers['x-channel']
+    const { Distribution, WereHouse } = getModelsByChannel(
+      channel,
+      res,
+      distributionModel
+    )
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
+    const { Option } = getModelsByChannel(channel, res, optionsModel)
 
-    // const { User } = getModelsByChannel(channel, res, userModel)
-    // const { Withdraw } = getModelsByChannel(channel, res, DistributionModel)
-    // if (statusStr === 'approved') {
-    //   // console.log(orderId)
-    //   const distributionTran = await Distribution.findOne({
-    //     orderId: orderId,
-    //     type: 'withdraw'
-    //   })
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { Withdraw } = getModelsByChannel(channel, res, DistributionModel)
+    if (statusStr === 'approved') {
+      // console.log(orderId)
+      const distributionTran = await Distribution.findOne({
+        orderId: orderId,
+        type: 'withdraw'
+      })
 
-    //   const distributionData = await Distribution.findOneAndUpdate(
-    //     { orderId: orderId, type: 'withdraw' },
-    //     { $set: { statusTH: statusThStr, status: statusStr } },
-    //     { new: true }
-    //   )
+      const distributionData = await Distribution.findOneAndUpdate(
+        { orderId: orderId, type: 'withdraw' },
+        { $set: { statusTH: statusThStr, status: statusStr } },
+        { new: true }
+      )
 
-    //   if (!distributionData) {
-    //     return res
-    //       .status(404)
-    //       .json({ status: 404, message: 'Not found withdraw' })
-    //   }
+      if (!distributionData) {
+        return res
+          .status(404)
+          .json({ status: 404, message: 'Not found withdraw' })
+      }
 
-    //   if (!distributionTran.period) {
-    //     return res
-    //       .status(404)
-    //       .json({ status: 404, message: 'Not found period in doc' })
-    //   }
+      if (!distributionTran.period) {
+        return res
+          .status(404)
+          .json({ status: 404, message: 'Not found period in doc' })
+      }
 
-    //   const sendDate = new Date(distributionTran.sendDate)
-    //   const formattedDate = sendDate
-    //     .toISOString()
-    //     .slice(0, 10)
-    //     .replace(/-/g, '')
-    //   const MGNUGL = distributionTran.listProduct.map(i => i.id)
-    //   const uniqueCount = new Set(MGNUGL).size
-    //   let data = []
-    //   dataTran = {
-    //     Hcase: 1,
-    //     orderNo: distributionTran.orderId,
-    //     statusLow: '22',
-    //     statusHigh: '22',
-    //     orderType: distributionTran.orderType,
-    //     tranferDate: formattedDate,
-    //     warehouse: distributionTran.fromWarehouse,
-    //     towarehouse: distributionTran.toWarehouse,
-    //     routeCode: distributionTran.shippingRoute,
-    //     addressCode: distributionTran.shippingId,
-    //     location: '',
-    //     MGNUGL: uniqueCount,
-    //     MGDEPT: '',
-    //     remark: '',
-    //     items: distributionTran.listProduct.map(u => ({
-    //       itemCode: u.id,
-    //       itemStatus: '22',
-    //       MRWHLO: distributionTran.fromWarehouse,
-    //       itemQtyCTN: u.qty,
-    //       itemQty: u.qtyPcs,
-    //       itemUnit: u.unit,
-    //       toLocation: '',
-    //       itemLot: '',
-    //       location: '',
-    //       itemLocation: ''
-    //     }))
-    //   }
-    //   data.push(dataTran)
+      const sendDate = new Date(distributionTran.sendDate)
+      const formattedDate = sendDate
+        .toISOString()
+        .slice(0, 10)
+        .replace(/-/g, '')
+      const MGNUGL = distributionTran.listProduct.map(i => i.id)
+      const uniqueCount = new Set(MGNUGL).size
+      let data = []
+      dataTran = {
+        Hcase: 1,
+        orderNo: distributionTran.orderId,
+        statusLow: '22',
+        statusHigh: '22',
+        orderType: distributionTran.orderType,
+        tranferDate: formattedDate,
+        warehouse: distributionTran.fromWarehouse,
+        towarehouse: distributionTran.toWarehouse,
+        routeCode: distributionTran.shippingRoute,
+        addressCode: distributionTran.shippingId,
+        location: '',
+        MGNUGL: uniqueCount,
+        MGDEPT: '',
+        remark: '',
+        items: distributionTran.listProduct.map(u => ({
+          itemCode: u.id,
+          itemStatus: '22',
+          MRWHLO: distributionTran.fromWarehouse,
+          itemQtyCTN: u.qty,
+          itemQty: u.qtyPcs,
+          itemUnit: u.unit,
+          toLocation: '',
+          itemLot: '',
+          location: '',
+          itemLocation: ''
+        }))
+      }
+      data.push(dataTran)
 
-      // 2. ส่งไป External API (ถ้า fail -> return error)
-      // let response;
-      // try {
-      //   response = await axios.post(
-      //     `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
-      //     data
-      //   );
-      // } catch (err) {
-      //   if (err.response) {
-      //     console.log('API error response:', err.response.data);
-      //     console.log('Status:', err.response.status);
-      //     return res.status(500).json({
-      //       status: 500,
-      //       message: 'External API failed',
-      //       error: err.response.data    // <-- error ที่มาจากปลายทางจริง
-      //     });
-      //   } else if (err.request) {
-      //     console.log('No response from API:', err.message);
-      //     return res.status(500).json({
-      //       status: 500,
-      //       message: 'External API unreachable',
-      //       error: err.message
-      //     });
-      //   } else {
-      //     console.log('Other error:', err.message);
-      //     return res.status(500).json({
-      //       status: 500,
-      //       message: 'External API error',
-      //       error: err.message
-      //     });
-      //   }
-      // }
+      let response;
+      try {
+        response = await axios.post(
+          `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
+          data
+        );
+      } catch (err) {
+        if (err.response) {
+          console.log('API error response:', err.response.data);
+          console.log('Status:', err.response.status);
+          return res.status(500).json({
+            status: 500,
+            message: 'External API failed',
+            error: err.response.data    // <-- error ที่มาจากปลายทางจริง
+          });
+        } else if (err.request) {
+          console.log('No response from API:', err.message);
+          return res.status(500).json({
+            status: 500,
+            message: 'External API unreachable',
+            error: err.message
+          });
+        } else {
+          console.log('Other error:', err.message);
+          return res.status(500).json({
+            status: 500,
+            message: 'External API error',
+            error: err.message
+          });
+        }
+      }
 
-  //     const withdrawType = await Option.findOne({ module: 'withdraw' })
-  //     const withdrawTypeTh = withdrawType.list.find(
-  //       item => item.value === distributionTran.withdrawType
-  //     ).name
-  //     // console.log(withdrawTypeTh)
-  //     const userData = await User.findOne({
-  //       role: 'sale',
-  //       area: distributionTran.area
-  //     })
-  //     const email = await Withdraw.findOne({
-  //       ROUTE: distributionTran.shippingRoute,
-  //       Des_No: distributionTran.shippingId
-  //     }).select('Dc_Email Des_Name')
-  //     const wereHouseName = await WereHouse.findOne({
-  //       wh_code: distributionTran.fromWarehouse
-  //     }).select('wh_name')
+      const withdrawType = await Option.findOne({ module: 'withdraw' })
+      const withdrawTypeTh = withdrawType.list.find(
+        item => item.value === distributionTran.withdrawType
+      ).name
+      // console.log(withdrawTypeTh)
+      const userData = await User.findOne({
+        role: 'sale',
+        area: distributionTran.area
+      })
+      const email = await Withdraw.findOne({
+        ROUTE: distributionTran.shippingRoute,
+        Des_No: distributionTran.shippingId
+      }).select('Dc_Email Des_Name')
+      const wereHouseName = await WereHouse.findOne({
+        wh_code: distributionTran.fromWarehouse
+      }).select('wh_name')
 
-  //     // <strong>ประเภทการเบิก:</strong> ${distributionTran.orderTypeName}<br> ยังไม่มี
-  //     // console.log(process.env.BANK_MAIL)
-  //     sendEmail({
-  //       to: email.Dc_Email,
-  //       // cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
-  //       cc: process.env.IT_MAIL,
-  //       subject: '12App cash',
-  //       html: `
-  //   <h1>แจ้งการส่งใบขอเบิกผ่านทางอีเมล</h1>
-  //   <p>
-  //     <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
-  //     <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-  //     <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName}<br>
-  //     <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}-${wereHouseName?.wh_name || ''
-  //         }<br>
-  //     <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
-  //         }<br>
-  //     <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
-  //     <strong>เขต:</strong> ${distributionTran.area}<br>
-  //     <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
-  //     <strong>เบอร์โทรศัพท์เซลล์:</strong> ${userData.tel}<br>
-  //     <strong>หมายเหตุ:</strong> ${distributionTran.remark}
-  //   </p>
-  // `
-  //     })
-  //   }
+      // console.log(process.env.BANK_MAIL)
+      sendEmail({
+        to: email.Dc_Email,
+        // cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
+        cc: process.env.IT_MAIL,
+        subject: '12App cash',
+        html: `
+    <h1>แจ้งการส่งใบขอเบิกผ่านทางอีเมล</h1>
+    <p>
+      <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
+      <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
+      <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName}<br>
+      <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}-${wereHouseName?.wh_name || ''
+          }<br>
+      <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
+          }<br>
+      <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
+      <strong>เขต:</strong> ${distributionTran.area}<br>
+      <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
+      <strong>เบอร์โทรศัพท์เซลล์:</strong> ${userData.tel}<br>
+      <strong>หมายเหตุ:</strong> ${distributionTran.remark}
+    </p>
+  `
+      })
+    }
 
-  //   const io = getSocket()
-  //   io.emit('distribution/approveWithdraw', {
-  //     status: 200,
-  //     message: 'successfully',
-  //     data: dataTran
-  //   })
+    const io = getSocket()
+    io.emit('distribution/approveWithdraw', {
+      status: 200,
+      message: 'successfully',
+      data: dataTran
+    })
 
-  //   res.status(200).json({
-  //     status: 200,
-  //     message: 'successfully',
-  //     data: dataTran
-  //   })
+    res.status(200).json({
+      status: 200,
+      message: 'successfully',
+      data: dataTran
+    })
   } catch (error) {
     console.error('[❌ approveWithdraw ERROR]', error) // แสดงใน console
     res.status(500).json({
