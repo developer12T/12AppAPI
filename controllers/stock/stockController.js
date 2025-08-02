@@ -1388,6 +1388,8 @@ exports.getStockQtyNew = async (req, res) => {
   const allAdjustProducts = dataAdjust.flatMap(doc => doc.listProduct || [])
   const allGiveProducts = dataGive.flatMap(doc => doc.listProduct || [])
 
+  // console.log('allOrderPromotion',allOrderPromotion)
+
   const dataStock = await Stock.aggregate([
     {
       $addFields: {
@@ -1455,7 +1457,7 @@ exports.getStockQtyNew = async (req, res) => {
 
   const mergedProductPromotions = allOrderPromotion.reduce((acc, promo) => {
     promo.listProduct.forEach(prod => {
-      const key = `${prod.productId}_${prod.unit}`;
+      const key = `${prod.id}_${prod.unit}`;
       if (acc[key]) {
         acc[key].qty += prod.qty || 0;
         acc[key].qtyPcs += prod.qtyPcs || 0;
@@ -1472,7 +1474,8 @@ exports.getStockQtyNew = async (req, res) => {
 
   // แปลงเป็น array ถ้าต้องการใช้งานต่อ
   const orderPromotionArray = Object.values(mergedProductPromotions);
-  // console.log(orderPromotionArray)
+  // console.log("mergedProductPromotions", JSON.stringify(mergedProductPromotions, null, 2));
+
 
 
   const changeProductArray = Object.values(
@@ -1663,7 +1666,7 @@ exports.getStockQtyNew = async (req, res) => {
 
     // let goodqty = productDetailRufund.qtyPcs
 
-    // console.log(goodqty)
+    // console.log(productDetailPromotion)
 
     const pcsMain = stockItem.stockPcs
     let stock = stockItem.stockPcs
@@ -1684,6 +1687,7 @@ exports.getStockQtyNew = async (req, res) => {
         productDetailWithdraw.find(i => i.unit === u.unit)?.qty ?? 0
       const saleQty = productDetailOrder.find(i => i.unit === u.unit)?.qty ?? 0
       const promoQty = productDetailPromotion.find(i => i.unit === u.unit)?.qty ?? 0
+      // console.log("promoQty",promoQty)
       const changeQty =
         productDetailChange.find(i => i.unit === u.unit)?.qty ?? 0
       const adjustQty =
