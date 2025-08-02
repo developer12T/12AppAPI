@@ -145,44 +145,47 @@ exports.checkout = async (req, res) => {
 
     if (listProduct.includes(null)) return
     // if (listProduct.some(p => p === null)) return res.status(400).json({ status: 400, message: 'Invalid product in cart!' })
-    // const orderId = await generateDistributionId(
-    //   area,
-    //   sale.warehouse,
-    //   channel,
-    //   res
-    // )
-
-    const series = await getSeries(shipping.type)
-    if (series == null) {
-      const error = new Error('Order Type is incorrect or not found')
-      error.statusCode = 422
-      throw error
-    }
-
-    const runningJson = {
-      coNo: '410',
-      series: series.OOOT05,
-      seriesType: '14'
-    }
-    const response = await axios.post(
-      `${process.env.API_URL_12ERP}/master/runningNumber/`,
-      {
-        coNo: runningJson.coNo,
-        series: runningJson.series,
-        seriesType: runningJson.seriesType
-      }
-    );
-    orderId = parseInt(response.data.lastNo) + 1
-
-    await updateRunningNumber(
-      {
-        coNo: runningJson.coNo,
-        series: runningJson.series,
-        seriesType: runningJson.seriesType,
-        lastNo: orderId
-      },
-      transaction
+    const orderId = await generateDistributionId(
+      area,
+      sale.warehouse,
+      channel,
+      res
     )
+
+    // const series = await getSeries(shipping.type)
+
+    // console.log(shipping.type)
+
+    // if (series == null) {
+    //   const error = new Error('Order Type is incorrect or not found')
+    //   error.statusCode = 422
+    //   throw error
+    // }
+
+    // const runningJson = {
+    //   coNo: '410',
+    //   series: series.OOOT05,
+    //   seriesType: '14'
+    // }
+    // const response = await axios.post(
+    //   `${process.env.API_URL_12ERP}/master/runningNumber/`,
+    //   {
+    //     coNo: runningJson.coNo,
+    //     series: runningJson.series,
+    //     seriesType: runningJson.seriesType
+    //   }
+    // );
+    // orderId = parseInt(response.data.lastNo) + 1
+
+    // await updateRunningNumber(
+    //   {
+    //     coNo: runningJson.coNo,
+    //     series: runningJson.series,
+    //     seriesType: runningJson.seriesType,
+    //     lastNo: orderId
+    //   },
+    //   transaction
+    // )
 
     const newOrder = new Distribution({
       orderId,
