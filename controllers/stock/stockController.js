@@ -1321,7 +1321,7 @@ exports.getStockQtyNew = async (req, res) => {
         zone: { $substrBytes: ['$area', 0, 2] }
       }
     },
-    { $match: { type: 'sale' } },
+    { $match: { type: 'sale', status: { $ne: 'canceled' } } },
     { $match: matchQueryRefund },
     {
       $project: {
