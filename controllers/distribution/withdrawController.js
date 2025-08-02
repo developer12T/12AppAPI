@@ -457,7 +457,7 @@ exports.getOrder = async (req, res) => {
     res.status(200).json({
       status: 200,
       message: 'Successful!',
-      data: response
+      // data: response
     })
   } catch (error) {
     console.error('Error saving store to MongoDB:', error)
