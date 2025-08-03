@@ -3096,9 +3096,12 @@ exports.summaryDaily = async (req, res) => {
       const damaged = to2(damagedRaw)
       // เพิ่ม sale และ change
       const summaryRaw = saleByDate[date] || 0
-      const summary = to2(summaryRaw)
+      
       const changeRaw = changeByDate[date] || 0
       const change = to2(changeRaw)
+      const diffChange = to2(change - damaged - good)
+
+      const summary = to2(summaryRaw + diffChange)
       const diffRaw = sendmoney - summary
       const diff = to2(diffRaw)
       if (sendmoney > 0) {
@@ -3107,7 +3110,7 @@ exports.summaryDaily = async (req, res) => {
         status = 'ยังไม่ส่งเงิน'
       }
 
-      return { date, sendmoney, summary, diff, change, status, good, damaged }
+      return { date, sendmoney, summary, diff, change, status, good, damaged,diffChange }
     })
 
     const sumSendMoney = fullMonthArr.reduce((sum, item) => {
@@ -3132,6 +3135,11 @@ exports.summaryDaily = async (req, res) => {
       return sum + (item.damaged || 0)
     }, 0)
 
+    const diffChange = fullMonthArr.reduce((sum, item) => {
+      return sum + (item.diffChange || 0)
+    }, 0)
+
+
     // const io = getSocket()
     // io.emit('order/summaryDaily', {});
 
@@ -3144,7 +3152,8 @@ exports.summaryDaily = async (req, res) => {
       sumSummaryDif: to2(sumSummary - sumSendMoney),
       sumChange: to2(sumChange),
       sumGood: to2(sumGood),
-      sumDamaged: to2(sumDamaged)
+      sumDamaged: to2(sumDamaged),
+      diffChange: to2(diffChange)
     })
   } catch (err) {
     res.status(500).json({ status: 500, message: err.message })
