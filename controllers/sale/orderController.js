@@ -2306,6 +2306,7 @@ exports.getSummarybyChoice = async (req, res) => {
 
   const modelOrder = await Order.aggregate([
     { $match: matchStage },
+    { $match: { status: { $ne: 'canceled' } } },
     {
       $addFields: {
         createdAtThai: {
