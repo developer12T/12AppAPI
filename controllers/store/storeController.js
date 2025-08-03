@@ -1248,19 +1248,23 @@ exports.addBueatyStore = async (req, res) => {
     const bueatydata = await bueatyStoreQuery()
     const { TypeStore } = getModelsByChannel(channel, res, storeModel)
 
-    // 1. ลบข้อมูลเดิมทั้งหมด
     await TypeStore.deleteMany({})
 
-    // 2. เพิ่มข้อมูลใหม่
     await TypeStore.insertMany(
-      bueatydata.map(x => ({ ...x, type: ['beauty'] }))
+      bueatydata.map(x => {
+        const trimmed = Object.fromEntries(
+          Object.entries(x).map(([key, value]) => [
+            key,
+            typeof value === 'string' ? value.trim() : value
+          ])
+        )
+        return { ...trimmed, type: ['beauty'] }
+      })
     )
 
-    // 3. ส่ง socket event
     const io = getSocket()
     io.emit('store/addBueatyStore', {})
 
-    // 4. ตอบกลับ
     res.status(200).json({
       status: 200,
       message: bueatydata
