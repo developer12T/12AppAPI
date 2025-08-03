@@ -441,7 +441,7 @@ exports.getRefund = async (req, res) => {
     }
 
     const pipeline = [
-      { $match: { status: 'pending' } },
+      // { $match: { status: 'pending' } },
       {
         $addFields: {
           zone: { $substrBytes: ['$store.area', 0, 2] },
