@@ -1033,7 +1033,7 @@ exports.addStockFromERP = async (req, res) => {
   const result = []
 
   for (const item of users) {
-    
+
     const datastock = data.filter(i => i.WH == item.warehouse)
     // console.log("datastock",datastock)
     // console
@@ -1069,7 +1069,7 @@ exports.addStockFromERP = async (req, res) => {
         }
       })
     }
-    
+
 
     result.push(record)
 
@@ -1893,13 +1893,13 @@ const convertToTHTime = dateField => ({
   }
 })
 
-const filterByProductId = (productList, productId) => ({
+const filterByProductId = (inputExpr, productId) => ({
   $filter: {
-    input: productList,
+    input: inputExpr,
     as: 'item',
     cond: { $eq: [{ $toString: '$$item.id' }, String(productId)] }
   }
-})
+});
 
 const calculateQtyByUnit = (unitList, items) =>
   unitList.map(unit => ({
@@ -1931,135 +1931,114 @@ const buildStock = (unitList, totalQty, date) => {
 
 exports.getStockQtyDetail = async (req, res) => {
   try {
-    const { area, productId, period } = req.body
-    const channel = req.headers['x-channel']
+    const { area, productId: rawProductId, period } = req.body;
+    const productId = String(rawProductId);
+    const channel = req.headers['x-channel'];
+
     const { Stock, Product, Distribution, Refund, Order } = {
       Stock: getModelsByChannel(channel, res, stockModel).Stock,
       Product: getModelsByChannel(channel, res, productModel).Product,
-      Distribution: getModelsByChannel(channel, res, distributionModel)
-        .Distribution,
+      Distribution: getModelsByChannel(channel, res, distributionModel).Distribution,
       Refund: getModelsByChannel(channel, res, refundModel).Refund,
       Order: getModelsByChannel(channel, res, orderModel).Order
-    }
+    };
 
-    const productData = await Product.findOne({ id: productId }).select(
-      'id name listUnit'
-    )
-    const stockData = await Stock.aggregate([
+    const filterProduct = (list = []) => list.filter(p => p.id === productId);
+
+    const productData = await Product.findOne({ id: productId }).select('id name listUnit');
+
+    const stockDocs = await Stock.aggregate([
       { $match: { area, period } },
       { $unwind: '$listProduct' },
-      { $match: { 'listProduct.productId': { $eq: productId } } },
+      { $match: { 'listProduct.productId': productId } },
       { $addFields: { createdAtTH: convertToTHTime('$createdAt') } }
-    ])
+    ]);
 
-    const date = stockData[0]?.createdAtTH
-    const pcsStock = stockData[0]?.listProduct.stockPcs || 0
-    const pcsStockIn = stockData[0]?.listProduct.stockInPcs || 0
-    const pcsBal = stockData[0]?.listProduct.balancePcs || 0
-
-    const STOCK = buildStock(productData.listUnit, pcsStock, date)
-    const STOCKIN = buildStock(productData.listUnit, pcsStock)
-    const BALANCE = buildStock(productData.listUnit, pcsBal)
+    const stockInfo = stockDocs[0] || {};
+    const STOCK = buildStock(productData.listUnit, stockInfo.listProduct?.stockPcs || 0, stockInfo.createdAtTH);
+    const STOCKIN = buildStock(productData.listUnit, stockInfo.listProduct?.stockInPcs || 0);
+    const BALANCE = buildStock(productData.listUnit, stockInfo.listProduct?.balancePcs || 0);
 
     const distributionDocs = await Distribution.aggregate([
       { $match: { area, period } },
       { $unwind: '$listProduct' },
-      { $match: { 'listProduct.id': { $eq: productId } } },
+      { $match: { 'listProduct.id': productId } },
       { $addFields: { createdAtTH: convertToTHTime('$createdAt') } }
-    ])
+    ]);
 
-    const withdraw = distributionDocs.map(doc => ({
-      area: doc.area,
-      orderId: doc.orderId,
-      orderType: doc.orderType,
-      orderTypeName: doc.orderTypeName,
-      sendDate: doc.sendDate,
-      total: doc.listProduct.qty,
-      status: doc.status
-    }))
+    const withdraw = distributionDocs.map(d => ({
+      area: d.area,
+      orderId: d.orderId,
+      orderType: d.orderType,
+      orderTypeName: d.orderTypeName,
+      sendDate: d.sendDate,
+      total: d.listProduct.qty,
+      status: d.status
+    }));
 
-    // console.log(distributionDocs)
-
-    const withdrawStockQty = withdraw.reduce((sum, item) => sum + item.total, 0)
     const withdrawStock = productData.listUnit.map(unit => ({
       unit: unit.unit,
       unitName: unit.name,
-      qty: unit.unit === 'CTN' ? withdrawStockQty : 0
-    }))
+      qty: unit.unit === 'CTN' ? withdraw.reduce((sum, i) => sum + i.total, 0) : 0
+    }));
 
     const refundDocs = await Refund.aggregate([
       { $match: { 'store.area': area, period } },
       {
         $addFields: {
           createdAtTH: convertToTHTime('$createdAt'),
-          listProduct: filterByProductId('$listProduct', productId)
-        }
-      },
-      { $match: { listProduct: { $ne: [] } } }
-    ])
-
-    NewRefund = await Promise.all(
-      refundDocs.map(async refund => {
-        const orderChange = await Order.findOne({
-          reference: refund.orderId,
-          type: 'change'
-        })
-          .select('total')
-          .lean()
-
-        const totalChange = orderChange?.total || 0
-        const totalRefund = refund.total || 0
-        const total = (totalChange - totalRefund).toFixed(2)
-
-        return {
-          orderId: refund.orderId,
-          storeId: refund.store?.storeId || '',
-          storeName: refund.store?.name || '',
-          storeAddress: refund.store?.address || '',
-          totalChange: totalChange.toFixed(2),
-          totalRefund: totalRefund.toFixed(2),
-          total: total,
-          status: refund.status
-        }
-      })
-    )
-
-    const allRefundProducts = refundDocs.flatMap(doc => doc.listProduct || [])
-    // console.log(refundDocs)
-    const refundStock = calculateQtyByUnit(
-      productData.listUnit,
-      allRefundProducts
-    )
-
-    const orderSaleDocs = await Order.aggregate([
-      { $match: { 'store.area': area, period, type: 'sale' } },
-      {
-        $addFields: {
-          createdAtTH: convertToTHTime('$createdAt'),
-          listProduct: filterByProductId('$listProduct', productId),
-          listPromotions: {
-            $map: {
-              input: '$listPromotions',
-              as: 'promo',
-              in: {
-                $mergeObjects: [
-                  '$$promo',
-                  {
-                    listProduct: filterByProductId(
-                      '$$promo.listProduct',
-                      productId
-                    )
-                  }
-                ]
-              }
+          listProduct: {
+            $filter: {
+              input: '$listProduct',
+              as: 'item',
+              cond: { $eq: ['$$item.id', productId] }
             }
           }
         }
       },
       { $match: { listProduct: { $ne: [] } } }
-    ])
+    ]);
 
-    orderDetail = orderSaleDocs.map(o => ({
+    const newRefund = await Promise.all(refundDocs.map(async refund => {
+      const change = await Order.findOne({ reference: refund.orderId, type: 'change' }).select('total').lean();
+      return {
+        orderId: refund.orderId,
+        storeId: refund.store?.storeId || '',
+        storeName: refund.store?.name || '',
+        storeAddress: refund.store?.address || '',
+        totalChange: (change?.total || 0).toFixed(2),
+        totalRefund: (refund.total || 0).toFixed(2),
+        total: ((change?.total || 0) - (refund.total || 0)).toFixed(2),
+        status: refund.status
+      };
+    }));
+
+    const refundStock = calculateQtyByUnit(productData.listUnit, refundDocs.flatMap(r => r.listProduct));
+
+    const rawOrders = await Order.find({ 'store.area': area, period, type: 'sale' }).lean();
+
+    const orderSaleDocs = rawOrders
+      .map(order => {
+        const filteredProduct = filterProduct(order.listProduct);
+
+        const listPromotions = (order.listPromotions || []).map(promo => ({
+          ...promo,
+          listProduct: filterProduct(promo.listProduct)
+        }));
+
+        return {
+          ...order,
+          listProduct: filteredProduct,
+          listPromotions,
+          createdAtTH: convertToTHTime(order.createdAt)
+        };
+      })
+      .filter(order =>
+        order.listProduct.length > 0 ||
+        order.listPromotions.some(promo => promo.listProduct.length > 0)
+      );
+
+    const orderDetail = orderSaleDocs.map(o => ({
       orderId: o.orderId,
       storeId: o.store?.storeId || '',
       storeName: o.store?.name || '',
@@ -2069,79 +2048,47 @@ exports.getStockQtyDetail = async (req, res) => {
       status: o.status,
       statusTH: o.statusTH,
       createdAt: o.createdAt
-    }))
+    }));
 
-    const allOrderProducts = orderSaleDocs.flatMap(doc => doc.listProduct || [])
-    const orderStock = calculateQtyByUnit(
-      productData.listUnit,
-      allOrderProducts
-    )
+    const orderStock = calculateQtyByUnit(productData.listUnit,
+      orderSaleDocs.flatMap(o => o.listProduct)
+    );
 
-    const promotionStockTran = orderSaleDocs.flatMap(order =>
-      order.listPromotions.flatMap(promo => promo.listProduct)
-    )
-    const promotionStock = calculateQtyByUnit(
-      productData.listUnit,
-      promotionStockTran
-    )
+    const promotionStock = calculateQtyByUnit(productData.listUnit,
+      orderSaleDocs.flatMap(o =>
+        o.listPromotions.flatMap(p => p.listProduct)
+      )
+    );
 
     const orderChangeDocs = await Order.aggregate([
       { $match: { 'store.area': area, period, type: 'change' } },
       {
         $addFields: {
           createdAtTH: convertToTHTime('$createdAt'),
-          listProduct: filterByProductId('$listProduct', productId)
+          listProduct: {
+            $filter: {
+              input: '$listProduct',
+              as: 'item',
+              cond: { $eq: ['$$item.id', productId] }
+            }
+          }
         }
       },
       { $match: { listProduct: { $ne: [] } } }
-    ])
+    ]);
 
-    const changeStockTran = orderChangeDocs.flatMap(order => order.listProduct)
-    const changeStock = calculateQtyByUnit(
-      productData.listUnit,
-      changeStockTran
-    )
+    const changeStock = calculateQtyByUnit(productData.listUnit,
+      orderChangeDocs.flatMap(o => o.listProduct)
+    );
 
-    const summaryStockIn = calculateTotalPrice(
-      productData.listUnit,
-      [...withdrawStock, ...refundStock],
-      'sale'
-    )
-    const summaryStockOut = calculateQtyByUnit(productData.listUnit, [
-      ...orderStock,
-      ...promotionStock,
-      ...changeStock
-    ])
-    const summaryStockOutPrice = calculateTotalPrice(
-      productData.listUnit,
-      summaryStockOut,
-      'sale'
-    )
-    const summaryStockBalancePrice = calculateTotalPrice(
-      productData.listUnit,
-      BALANCE.stock,
-      'sale'
-    )
-    const summaryStockOrderPrice = calculateTotalPrice(
-      productData.listUnit,
-      orderStock,
-      'sale'
-    )
-    const summaryStockPromoPrice = calculateTotalPrice(
-      productData.listUnit,
-      promotionStock,
-      'sale'
-    )
-    const summaryStockChangePrice = calculateTotalPrice(
-      productData.listUnit,
-      changeStock,
-      'sale'
-    )
+    const summaryStockIn = calculateTotalPrice(productData.listUnit,
+      [...withdrawStock, ...refundStock], 'sale');
 
-    // const io = getSocket()
-    // io.emit('stock/getStockQtyDetail', {});
+    const summaryStockOut = calculateQtyByUnit(productData.listUnit,
+      [...orderStock, ...promotionStock, ...changeStock]);
 
-
+    const summaryStockOutPrice = calculateTotalPrice(productData.listUnit, summaryStockOut, 'sale');
+    const summaryStockBalancePrice = calculateTotalPrice(productData.listUnit, BALANCE.stock, 'sale');
 
     res.status(200).json({
       status: 200,
@@ -2155,7 +2102,7 @@ exports.getStockQtyDetail = async (req, res) => {
           withdrawStock,
           withdraw,
           refundStock,
-          refund: NewRefund,
+          refund: newRefund,
           summaryStock: calculateQtyByUnit(productData.listUnit, [
             ...refundStock,
             ...withdrawStock,
@@ -2164,25 +2111,25 @@ exports.getStockQtyDetail = async (req, res) => {
           summaryStockIn
         },
         OUT: {
-          orderSum: summaryStockOrderPrice,
-          orderStock,
           order: orderDetail,
-          promotionSum: summaryStockPromoPrice,
+          orderStock,
+          orderSum: calculateTotalPrice(productData.listUnit, orderStock, 'sale'),
           promotionStock,
+          promotionSum: calculateTotalPrice(productData.listUnit, promotionStock, 'sale'),
           change: changeStock,
-          changeSum: summaryStockChangePrice,
+          changeSum: calculateTotalPrice(productData.listUnit, changeStock, 'sale'),
           summaryStock: summaryStockOut,
           summaryStockInOut: summaryStockOutPrice
         },
         BALANCE: BALANCE.stock,
         summary: summaryStockBalancePrice
       }
-    })
+    });
   } catch (error) {
-    console.error(error)
-    res.status(500).json({ message: 'Internal Server Error', error })
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error', error });
   }
-}
+};
 
 exports.checkout = async (req, res) => {
   try {
