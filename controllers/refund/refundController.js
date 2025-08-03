@@ -832,15 +832,18 @@ exports.updateStatus = async (req, res) => {
       statusTH = 'สำเร็จ'
 
       for (const item of productQty) {
+        // console.log(item)
+        if (item.condition != 'damaged') {
         const updateResult = await updateStockMongo(
           item,
           refundOrder.store.area,
           refundOrder.period,
-          'refund',
+          'withdraw',
           channel,
           res
         )
         if (updateResult) return
+        }
       }
 
       for (const item of productChange) {
@@ -853,6 +856,7 @@ exports.updateStatus = async (req, res) => {
           res
         )
         if (updateResult) return
+        console.log("item",item)
       }
     }
 
