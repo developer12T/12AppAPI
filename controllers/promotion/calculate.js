@@ -220,6 +220,7 @@ async function applyPromotion(order, channel, res) {
             }
         }
 
+
         let matchedProducts = order.listProduct.filter((product) =>
             promo.conditions.some((condition) =>
                 (condition.productId.length === 0 || condition.productId.includes(product.id)) &&
@@ -281,6 +282,9 @@ async function applyPromotion(order, channel, res) {
                 promoApplied = true
                 break
         }
+
+
+
         if (promoApplied) {
             // console.log(freeProducts)
             let selectedProduct = freeProducts.length > 0 ? freeProducts[0] : {}
