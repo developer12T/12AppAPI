@@ -2306,6 +2306,7 @@ exports.getSummarybyChoice = async (req, res) => {
 
   const modelOrder = await Order.aggregate([
     { $match: matchStage },
+    { $match: { status: { $nin: ['canceled'] } } },
     {
       $addFields: {
         createdAtThai: {
@@ -3096,7 +3097,7 @@ exports.summaryDaily = async (req, res) => {
       const damaged = to2(damagedRaw)
       // เพิ่ม sale และ change
       const summaryRaw = saleByDate[date] || 0
-      
+
       const changeRaw = changeByDate[date] || 0
       const change = to2(changeRaw)
       const diffChange = to2(change - damaged - good)
@@ -3110,7 +3111,7 @@ exports.summaryDaily = async (req, res) => {
         status = 'ยังไม่ส่งเงิน'
       }
 
-      return { date, sendmoney, summary, diff, change, status, good, damaged,diffChange }
+      return { date, sendmoney, summary, diff, change, status, good, damaged, diffChange }
     })
 
     const sumSendMoney = fullMonthArr.reduce((sum, item) => {
