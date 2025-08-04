@@ -2015,7 +2015,12 @@ exports.getStockQtyDetail = async (req, res) => {
 
     const refundStock = calculateQtyByUnit(productData.listUnit, refundDocs.flatMap(r => r.listProduct));
 
-    const rawOrders = await Order.find({ 'store.area': area, period, type: 'sale' }).lean();
+    const rawOrders = await Order.find({
+      'store.area': area,
+      period,
+      type: 'sale',
+      status: { $ne: 'canceled' }
+    }).lean();
 
     const orderSaleDocs = rawOrders
       .map(order => {
@@ -2301,26 +2306,6 @@ exports.approveAdjustStock = async (req, res) => {
           res
         )
         if (updateResult) return
-
-        //   const data = await Stock.findOneAndUpdate(
-        //     {
-        //       area: DataAdjustStock.area,
-        //       period: DataAdjustStock.period,
-        //       'listProduct.productId': item.id
-        //     },
-        //     {
-        //       $inc: {
-        //         'listProduct.$[elem].stockOutPcs': -factorPcsQty,
-        //         'listProduct.$[elem].balancePcs': -factorPcsQty,
-        //         'listProduct.$[elem].stockOutCtn': -factorCtnQty,
-        //         'listProduct.$[elem].balanceCtn': -factorCtnQty
-        //       }
-        //     },
-        //     {
-        //       arrayFilters: [{ 'elem.productId': item.id }],
-        //       new: true
-        //     }
-        //   )
       } else if (item.action === 'add') {
         const updateResult = await updateStockMongo(
           item,
