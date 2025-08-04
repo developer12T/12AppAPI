@@ -898,7 +898,7 @@ exports.OrderToExcel = async (req, res) => {
   const modelOrder = await Order.aggregate([
     {
       $match: {
-        orderId: { $not: /CC/ },
+        status: { $ne: 'canceled' },
         type: { $in: ['sale', 'change'] }
       }
     },
@@ -992,7 +992,7 @@ exports.OrderToExcel = async (req, res) => {
         ORNO: '',
         OAORTP: '',
         RLDT: RLDT,
-        ADID: order.shipping.shippingId,
+        ADID: (order.shipping?.shippingId?.trim() || '') === '' ? 'INVTSP' : order.shipping.shippingId,
         CUOR: order.orderId,
         OAOREF: '',
         OBITNO: product.id,
