@@ -122,7 +122,6 @@ const generateDistributionId = async (area, warehouse, channel, res) => {
 
     const { Distribution } = getModelsByChannel(channel, res, distributionModel);
 
-
     const latestOrder = await Distribution.findOne({
         area,
         createdAt: {
@@ -134,14 +133,9 @@ const generateDistributionId = async (area, warehouse, channel, res) => {
         .sort({ orderId: -1 })
         .select('orderId');
 
-    let runningNumber = latestOrder ? parseInt(latestOrder.orderId.slice(-2)) + 1 : 1
+    let runningNumber = latestOrder ? parseInt(latestOrder.orderId.slice(-2)) + 1 : 21
 
     const newOrderId = `W${currentYear.toString().slice(2, 4)}${currentMonth}${warehouse}${runningNumber.toString().padStart(2, '0')}`
-    // console.log("warehouse",warehouse)
-    // console.log("runningNumber",runningNumber)
-    // console.log("latestOrder",latestOrder)
-    // console.log("newOrderId",newOrderId)
-    // const oldOrderId = await Distribution.findOne({orderId:newOrderId}).select('orderId')
 
     return newOrderId
 }
