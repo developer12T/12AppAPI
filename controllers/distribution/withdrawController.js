@@ -389,7 +389,7 @@ exports.getOrder = async (req, res) => {
 
     let query = {
       ...areaQuery,
-      ...statusQuery,
+      // ...statusQuery,
       period: period
     }
 
