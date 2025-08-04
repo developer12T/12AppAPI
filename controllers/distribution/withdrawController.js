@@ -904,14 +904,7 @@ exports.approveWithdraw = async (req, res) => {
         orderId: orderId,
         type: 'withdraw'
       })
-
-      const distributionData = await Distribution.findOneAndUpdate(
-        { orderId: orderId, type: 'withdraw' },
-        { $set: { statusTH: statusThStr, status: statusStr } },
-        { new: true }
-      )
-
-      if (!distributionData) {
+      if (!distributionTran) {
         return res
           .status(404)
           .json({ status: 404, message: 'Not found withdraw' })
@@ -992,6 +985,15 @@ exports.approveWithdraw = async (req, res) => {
           });
         }
       }
+
+
+      const distributionData = await Distribution.findOneAndUpdate(
+        { orderId: orderId, type: 'withdraw' },
+        { $set: { statusTH: statusThStr, status: statusStr } },
+        { new: true }
+      )
+
+
 
       const withdrawType = await Option.findOne({ module: 'withdraw' })
       const withdrawTypeTh = withdrawType.list.find(
