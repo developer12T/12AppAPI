@@ -899,6 +899,7 @@ exports.OrderToExcel = async (req, res) => {
     {
       $match: {
         status: { $ne: 'canceled' },
+        area: { $ne: 'IT211' },
         type: { $in: ['sale', 'change'] }
       }
     },
