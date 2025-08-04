@@ -909,6 +909,7 @@ exports.updateStoreStatus = async (req, res) => {
 
     // console.log(dataTran)
 
+    if (item.area != 'IT211') {
     try {
       const response = await axios.post(
         `${process.env.API_URL_12ERP}/customer/insert`,
@@ -926,6 +927,7 @@ exports.updateStoreStatus = async (req, res) => {
         })
       }
     }
+  }
 
     const io = getSocket()
     io.emit('store/updateStoreStatus', {
