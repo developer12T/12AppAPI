@@ -13,6 +13,8 @@ const stockModel = require('../models/cash/stock')
 const promotionModel = require('../models/cash/promotion')
 const campaignModel = require('../models/cash/campaign')
 const { getModelsByChannel } = require('../middleware/channel')
+// const { sequelize, DataTypes } = require('../config/m3db')
+const { Op } = require('sequelize')
 
 const { DisributionM3 } = require('../models/cash/master')
 
@@ -145,16 +147,24 @@ const generateDistributionId = async (area, warehouse, channel, res) => {
 
   const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
-  const modelSale = await DisributionM3.findOne({
-    attributes: [
-      'MGTRNR',
-      [sequelize.fn('COUNT', sequelize.col('MGTRNR')), 'count']
-    ],
-    group: ['MGTRNR'],
+  // สร้าง prefix เช่น "W680852221"
+  const prefix = `W${currentYear
+    .toString()
+    .slice(2, 4)}${currentMonth}${warehouse}`
+
+  // หาเลขล่าสุดใน DisributionM3 ที่ขึ้นต้นด้วย prefix
+  const lastM3 = await DisributionM3.findOne({
+    attributes: ['MGTRNR'],
+    where: {
+      MGTRNR: {
+        [Op.like]: `${prefix}%`
+      }
+    },
     order: [['MGTRNR', 'DESC']],
     raw: true
   })
 
+  // หาเลขล่าสุดใน Distribution ปกติ (optional ตามโค้ดเดิม)
   const latestOrder = await Distribution.findOne({
     area,
     createdAt: {
@@ -167,16 +177,17 @@ const generateDistributionId = async (area, warehouse, channel, res) => {
     .sort({ orderId: -1 })
     .select('orderId')
 
-  let runningNumber = latestOrder
-    ? parseInt(latestOrder.orderId.slice(-2)) + 1
-    : 21
+  // เช็คเลขรันล่าสุดจาก M3
+  let runningNumber = 0
+  if (lastM3 && lastM3.MGTRNR) {
+    // ดึง 2 หลักสุดท้าย (หรือจะปรับให้มากกว่านี้ก็ได้)
+    const lastNum = parseInt(lastM3.MGTRNR.slice(-2))
+    runningNumber = isNaN(lastNum) ? 0 : lastNum + 1
+  } else if (latestOrder) {
+    runningNumber = parseInt(latestOrder.orderId.slice(-2)) + 1
+  }
 
-  const newOrderId = `W${currentYear
-    .toString()
-    .slice(2, 4)}${currentMonth}${warehouse}${runningNumber
-    .toString()
-    .padStart(2, '0')}`
-
+  const newOrderId = `${prefix}${runningNumber.toString().padStart(2, '0')}`
   return newOrderId
 }
 
