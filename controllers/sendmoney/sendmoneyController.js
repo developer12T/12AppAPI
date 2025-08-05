@@ -203,13 +203,13 @@ exports.getSendMoney = async (req, res) => {
     const month = Number(date.substring(4, 6));
     const day = Number(date.substring(6, 8));
 
-    // 🕒 Create Thai time range (fixed)
-    const startOfDayTH = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
-    const endOfDayTH = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+    // 🕒 Create Thai time range (00:00–23:59 เวลาไทย)
+    const startOfDayThai = new Date(year, month - 1, day, 0, 0, 0, 0);
+    const endOfDayThai = new Date(year, month - 1, day, 23, 59, 59, 999);
 
-    // 🔄 Convert to UTC for MongoDB query
-    const startOfDayUTC = new Date(startOfDayTH.getTime() - thOffset);
-    const endOfDayUTC = new Date(endOfDayTH.getTime() - thOffset);
+    // 🔄 Convert Thai time to UTC for MongoDB query
+    const startOfDayUTC = new Date(startOfDayThai.getTime() - thOffset);
+    const endOfDayUTC = new Date(endOfDayThai.getTime() - thOffset);
 
     // Helper function to sum total by type
     const sumByType = async (Model, type) => {
@@ -285,16 +285,17 @@ exports.getSendMoney = async (req, res) => {
       sendmoney: alreadySent,
       different: remaining,
       status: alreadySent > 0 ? 'ส่งเงินแล้ว' : 'ยังไม่ส่งเงิน',
-      // dateRangeThai: {
-      //   start: toThaiTime(startOfDayUTC),
-      //   end: toThaiTime(endOfDayUTC)
-      // }
+      dateRangeThai: {
+        start: toThaiTime(startOfDayUTC),
+        end: toThaiTime(endOfDayUTC)
+      }
     });
   } catch (err) {
     console.error('[getSendMoney Error]', err);
     res.status(500).json({ message: 'Internal Server Error', error: err.message });
   }
 };
+
 
 
 exports.getAllSendMoney = async (req, res) => {
