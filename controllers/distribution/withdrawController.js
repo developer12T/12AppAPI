@@ -362,8 +362,9 @@ exports.getOrder = async (req, res) => {
     const channel = req.headers['x-channel']
 
     const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
 
-    let response = []
+    // let response = []
     if (!type || !period) {
       return res
         .status(400)
@@ -375,7 +376,9 @@ exports.getOrder = async (req, res) => {
     if (type === 'pending') {
       statusQuery.status = { $in: ['pending', 'approved', 'rejected'] }
     } else if (type === 'history') {
-      statusQuery.status = { $in: ['approved', 'rejected', 'success', 'confirm'] }
+      statusQuery.status = {
+        $in: ['approved', 'rejected', 'success', 'confirm']
+      }
     }
 
     // const status = type === 'history' ? { $ne: 'pending' } : 'pending'
@@ -439,17 +442,33 @@ exports.getOrder = async (req, res) => {
         .status(404)
         .json({ status: 404, message: 'Distribution order not found!' })
     }
-    // console.log(order)
-    response = order.map(o => ({
-      area: o.area,
-      orderId: o.orderId,
-      orderType: o.orderType,
-      orderTypeName: o.orderTypeName,
-      sendDate: o.sendDate,
-      total: o.totalQty || 0,
-      status: o.status,
-      createdAt: formatDateTimeToThai(o.createdAt)
-    }))
+
+    const response = await Promise.all(
+      order.map(async o => {
+        // ใช้ o.area ในแต่ละรอบ
+        const userData = await User.findOne({
+          role: 'sale',
+          area: o.area // <--- ใช้อันนี้
+        })
+
+        return {
+          area: o.area,
+          sale: userData
+            ? {
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
+            : null,
+          orderId: o.orderId,
+          orderType: o.orderType,
+          orderTypeName: o.orderTypeName,
+          sendDate: o.sendDate,
+          total: o.totalQty || 0,
+          status: o.status,
+          createdAt: formatDateTimeToThai(o.createdAt)
+        }
+      })
+    )
 
     // const io = getSocket()
     // io.emit('distribution/get', {});
@@ -954,46 +973,43 @@ exports.approveWithdraw = async (req, res) => {
       }
       data.push(dataTran)
 
-      let response;
+      let response
       try {
         response = await axios.post(
           `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
           data
-        );
+        )
       } catch (err) {
         if (err.response) {
-          console.log('API error response:', err.response.data);
-          console.log('Status:', err.response.status);
+          console.log('API error response:', err.response.data)
+          console.log('Status:', err.response.status)
           return res.status(500).json({
             status: 500,
             message: 'External API failed',
-            error: err.response.data    // <-- error ที่มาจากปลายทางจริง
-          });
+            error: err.response.data // <-- error ที่มาจากปลายทางจริง
+          })
         } else if (err.request) {
-          console.log('No response from API:', err.message);
+          console.log('No response from API:', err.message)
           return res.status(500).json({
             status: 500,
             message: 'External API unreachable',
             error: err.message
-          });
+          })
         } else {
-          console.log('Other error:', err.message);
+          console.log('Other error:', err.message)
           return res.status(500).json({
             status: 500,
             message: 'External API error',
             error: err.message
-          });
+          })
         }
       }
-
 
       const distributionData = await Distribution.findOneAndUpdate(
         { orderId: orderId, type: 'withdraw' },
         { $set: { statusTH: statusThStr, status: statusStr } },
         { new: true }
       )
-
-
 
       const withdrawType = await Option.findOne({ module: 'withdraw' })
       const withdrawTypeTh = withdrawType.list.find(
@@ -1024,10 +1040,12 @@ exports.approveWithdraw = async (req, res) => {
       <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
       <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
       <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName}<br>
-      <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}-${wereHouseName?.wh_name || ''
-          }<br>
-      <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
-          }<br>
+      <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
+          '-' + wereHouseName?.wh_name || ''
+        }<br>
+      <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
+          distributionTran.shippingName
+        }<br>
       <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
       <strong>เขต:</strong> ${distributionTran.area}<br>
       <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -1084,13 +1102,11 @@ exports.saleConfirmWithdraw = async (req, res) => {
       type: 'withdraw'
     })
 
-
     if (distributionTran.status === 'approved') {
-
       distributionTran.listProduct = distributionTran.listProduct.map(item => ({
         ...item,
         receiveQty: item.qty
-      }));
+      }))
 
       // console.log(distributionTran.listProduct)
 
@@ -1098,7 +1114,8 @@ exports.saleConfirmWithdraw = async (req, res) => {
         { orderId: orderId, type: 'withdraw' },
         {
           $set: {
-            statusTH: statusThStr, status: statusStr,
+            statusTH: statusThStr,
+            status: statusStr,
             listProduct: distributionTran.listProduct,
             receivetotal: distributionTran.total,
             receivetotalQty: distributionTran.totalQty,
@@ -1150,16 +1167,11 @@ exports.saleConfirmWithdraw = async (req, res) => {
         status: 200,
         message: 'Confirm withdraw success'
       })
-
     } else {
-
       return res
         .status(409)
-        .json({ status: 409, message: 'Status withdraw is pending' });
-
+        .json({ status: 409, message: 'Status withdraw is pending' })
     }
-
-
 
     return res
       .status(200)
