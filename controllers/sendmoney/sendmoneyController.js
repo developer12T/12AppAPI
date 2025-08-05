@@ -194,13 +194,17 @@ exports.getSendMoney = async (req, res) => {
     const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel);
 
     const thOffset = 7 * 60 * 60 * 1000;
+
+    // ดึงปี เดือน วัน จาก date (YYYYMMDD)
     const year = Number(date.substring(0, 4));
     const month = Number(date.substring(4, 6));
     const day = Number(date.substring(6, 8));
 
-    const startOfDayTH = new Date(year, month - 1, day, 0, 0, 0, 0);
-    const endOfDayTH = new Date(year, month - 1, day, 23, 59, 59, 999);
+    // สร้างเวลาไทยแบบ manual (ไม่อ้างอิง timezone เครื่อง)
+    const startOfDayTH = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+    const endOfDayTH = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
 
+    // แปลงเวลาไทยเป็น UTC สำหรับ query
     const startOfDayUTC = new Date(startOfDayTH.getTime() - thOffset);
     const endOfDayUTC = new Date(endOfDayTH.getTime() - thOffset);
 
