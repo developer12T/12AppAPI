@@ -205,6 +205,7 @@ exports.getSendMoney = async (req, res) => {
     console.log(`🕒 Server Current Time (UTC): ${currentTimeUTC.toISOString()}`);
 
     const startOfDayTH = new Date(year, month - 1, day, 0, 0, 0, 0);
+
     const endOfDayTH = new Date(year, month - 1, day, 23, 59, 59, 999);
 
     // แปลงเวลาไทย -> UTC
@@ -272,9 +273,9 @@ exports.getSendMoney = async (req, res) => {
       sendmoney: alreadySent,
       different: remaining,
       status: alreadySent > 0 ? 'ส่งเงินแล้ว' : 'ยังไม่ส่งเงิน',
-      dateRangeThai: {
-        start: toThaiTime(startOfDayUTC),
-        end: toThaiTime(endOfDayUTC)
+      dateRange: {
+        start: startOfDayUTC,
+        end: endOfDayUTC
       }
     });
 
