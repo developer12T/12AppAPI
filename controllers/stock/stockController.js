@@ -1306,6 +1306,7 @@ exports.getStockQtyNew = async (req, res) => {
         zone: { $substrBytes: ['$area', 0, 2] }
       }
     },
+    { $match: { status:'confirm'}},
     { $match: matchQuery },
     {
       $project: {
