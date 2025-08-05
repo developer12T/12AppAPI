@@ -185,7 +185,6 @@ exports.getSendMoney = async (req, res) => {
     const channel = req.headers['x-channel'];
     const { area, date } = req.body;
 
-    // ✅ ตรวจสอบ input
     if (!area || !date || date.length !== 8) {
       return res.status(400).json({
         message: 'Invalid request: area and date(YYYYMMDD) are required.'
@@ -198,16 +197,16 @@ exports.getSendMoney = async (req, res) => {
 
     const thOffset = 7 * 60 * 60 * 1000; // UTC+7
 
-    // 📅 แยกปี เดือน วัน
+    // 📅 ดึงปี เดือน วันจาก date
     const year = Number(date.substring(0, 4));
     const month = Number(date.substring(4, 6));
     const day = Number(date.substring(6, 8));
 
-    // 🕒 ช่วงวันไทย (UTC+7) → แปลงเป็น UTC สำหรับ query
+    // 🕒 คำนวณวันไทย → แปลงเป็น UTC
     const startOfDayUTC = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0) - thOffset);
-    const endOfDayUTC = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999) - thOffset);
+    const endOfDayUTC   = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999) - thOffset);
 
-    // ฟังก์ชันรวมยอดตาม type
+    // Helper function รวมยอดตาม type
     const sumByType = async (Model, type) => {
       const result = await Model.aggregate([
         {
@@ -223,13 +222,15 @@ exports.getSendMoney = async (req, res) => {
       return result.length > 0 ? result[0].sendmoney : 0;
     };
 
-    // 💰 รวมยอด
+    // 💰 คำนวณยอด sale, change, refund
     const saleSum = await sumByType(Order, 'sale');
     const changeSum = await sumByType(Order, 'change');
     const refundSum = await sumByType(Refund, 'refund');
+
+    // รวมยอดตามสูตร
     const totalToSend = saleSum + (changeSum - refundSum);
 
-    // 📦 ยอดที่เคยส่งแล้ว
+    // 📦 หายอดที่เคยส่งแล้ว
     const alreadySentDocs = await SendMoney.aggregate([
       {
         $addFields: {
@@ -269,8 +270,12 @@ exports.getSendMoney = async (req, res) => {
       { $set: { different: remaining } }
     );
 
-    // 🕒 ฟังก์ชันแปลง UTC → เวลาไทย
+    // 🕒 ฟังก์ชันแปลง UTC → เวลาไทย สำหรับแสดง
     const toThaiTime = (utcDate) => new Date(utcDate.getTime() + thOffset);
+
+    // Debug log เพื่อยืนยัน
+    console.log("StartOfDayUTC:", startOfDayUTC.toISOString());
+    console.log("EndOfDayUTC:", endOfDayUTC.toISOString());
 
     res.status(200).json({
       message: 'success',
@@ -288,6 +293,8 @@ exports.getSendMoney = async (req, res) => {
     res.status(500).json({ message: 'Internal Server Error', error: err.message });
   }
 };
+
+
 
 
 
