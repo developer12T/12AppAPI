@@ -1040,8 +1040,8 @@ exports.approveWithdraw = async (req, res) => {
       <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
       <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
       <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName}<br>
-      <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}-${
-          wereHouseName?.wh_name || ''
+      <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
+          '-' + wereHouseName?.wh_name || ''
         }<br>
       <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
           distributionTran.shippingName
