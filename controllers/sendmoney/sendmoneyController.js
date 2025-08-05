@@ -183,7 +183,7 @@ exports.addSendMoneyImage = async (req, res) => {
 exports.getSendMoney = async (req, res) => {
   try {
     const channel = req.headers['x-channel'];
-    const { area, date, mockUtcNow } = req.body; // เพิ่ม mockUtcNow เพื่อจำลอง run เวลา UTC
+    const { area, date } = req.body;
 
     if (!area || !date || date.length !== 8) {
       return res.status(400).json({
@@ -195,25 +195,16 @@ exports.getSendMoney = async (req, res) => {
     const { Refund } = getModelsByChannel(channel, res, refundModel);
     const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel);
 
-    const thOffset = 7 * 60 * 60 * 1000;
+    const thOffsetHours = 7; // +7 ชั่วโมง
     const year = Number(date.substring(0, 4));
     const month = Number(date.substring(4, 6));
     const day = Number(date.substring(6, 8));
 
-    // ====== mock current time ======
-    let currentTimeUTC = mockUtcNow ? new Date(mockUtcNow) : new Date();
-    console.log(`🕒 Server Current Time (UTC): ${currentTimeUTC.toISOString()}`);
+    // ✅ คำนวณ start/end ของวันแบบ UTC ให้ตรงกับเวลาไทย
+    const startOfDayUTC = new Date(Date.UTC(year, month - 1, day, 0 - thOffsetHours, 0, 0, 0)); // 10:00 UTC = 00:00 TH
+    const endOfDayUTC = new Date(Date.UTC(year, month - 1, day, 23 - thOffsetHours, 59, 59, 999)); // 09:59 UTC = 23:59 TH
 
-    const startOfDayTH = new Date(year, month - 1, day, 0, 0, 0, 0);
-
-    const endOfDayTH = new Date(year, month - 1, day, 23, 59, 59, 999);
-
-    // แปลงเวลาไทย -> UTC
-    const startOfDayUTC = new Date(startOfDayTH.getTime() - thOffset);
-    const endOfDayUTC = new Date(endOfDayTH.getTime() - thOffset);
-
-    console.log("📅 startOfDayTH:", startOfDayTH.toISOString());
-    console.log("📅 endOfDayTH:", endOfDayTH.toISOString());
+    console.log("🕒 Server Current Time (UTC):", new Date().toISOString());
     console.log("🌐 startOfDayUTC:", startOfDayUTC.toISOString());
     console.log("🌐 endOfDayUTC:", endOfDayUTC.toISOString());
 
@@ -264,16 +255,16 @@ exports.getSendMoney = async (req, res) => {
       { $set: { different: remaining } }
     );
 
-    const toThaiTime = (utcDate) => new Date(utcDate.getTime() + thOffset);
+    // แปลงกลับเป็นเวลาไทยเพื่อส่งออก
+    const toThaiTime = (utcDate) => new Date(utcDate.getTime() + thOffsetHours * 60 * 60 * 1000);
 
     res.status(200).json({
       message: 'success',
-      currentTimeUTC: currentTimeUTC.toISOString(),
       summary: totalToSend,
       sendmoney: alreadySent,
       different: remaining,
       status: alreadySent > 0 ? 'ส่งเงินแล้ว' : 'ยังไม่ส่งเงิน',
-      dateRange: {
+      dateRangeThai: {
         start: startOfDayUTC,
         end: endOfDayUTC
       }
