@@ -145,15 +145,15 @@ const generateDistributionId = async (area, warehouse, channel, res) => {
 
   const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
-  const modelSale = await DisributionM3.findOne({
-    attributes: [
-      'MGTRNR',
-      [sequelize.fn('COUNT', sequelize.col('MGTRNR')), 'count']
-    ],
-    group: ['MGTRNR'],
-    order: [['MGTRNR', 'DESC']],
-    raw: true
-  })
+  // const modelSale = await DisributionM3.findOne({
+  //   attributes: [
+  //     'MGTRNR',
+  //     [sequelize.fn('COUNT', sequelize.col('MGTRNR')), 'count']
+  //   ],
+  //   group: ['MGTRNR'],
+  //   order: [['MGTRNR', 'DESC']],
+  //   raw: true
+  // })
 
   const latestOrder = await Distribution.findOne({
     area,
