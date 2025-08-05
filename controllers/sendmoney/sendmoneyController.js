@@ -183,7 +183,7 @@ exports.addSendMoneyImage = async (req, res) => {
 exports.getSendMoney = async (req, res) => {
   try {
     const channel = req.headers['x-channel'];
-    const { area, date } = req.body;
+    const { area, date, mockUtcNow } = req.body; // เพิ่ม mockUtcNow เพื่อจำลอง run เวลา UTC
 
     if (!area || !date || date.length !== 8) {
       return res.status(400).json({
@@ -195,18 +195,27 @@ exports.getSendMoney = async (req, res) => {
     const { Refund } = getModelsByChannel(channel, res, refundModel);
     const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel);
 
-    // คำนวณช่วงเวลา UTC ของวันนั้นจากเวลาไทย
     const thOffset = 7 * 60 * 60 * 1000;
     const year = Number(date.substring(0, 4));
     const month = Number(date.substring(4, 6));
     const day = Number(date.substring(6, 8));
 
+    // ====== mock current time ======
+    let currentTimeUTC = mockUtcNow ? new Date(mockUtcNow) : new Date();
+    console.log(`🕒 Server Current Time (UTC): ${currentTimeUTC.toISOString()}`);
+
     const startOfDayTH = new Date(year, month - 1, day, 0, 0, 0, 0);
     const endOfDayTH = new Date(year, month - 1, day, 23, 59, 59, 999);
+
+    // แปลงเวลาไทย -> UTC
     const startOfDayUTC = new Date(startOfDayTH.getTime() - thOffset);
     const endOfDayUTC = new Date(endOfDayTH.getTime() - thOffset);
 
-    // helper sum function
+    console.log("📅 startOfDayTH:", startOfDayTH.toISOString());
+    console.log("📅 endOfDayTH:", endOfDayTH.toISOString());
+    console.log("🌐 startOfDayUTC:", startOfDayUTC.toISOString());
+    console.log("🌐 endOfDayUTC:", endOfDayUTC.toISOString());
+
     const sumByType = async (Model, type) => {
       const result = await Model.aggregate([
         {
@@ -222,14 +231,12 @@ exports.getSendMoney = async (req, res) => {
       return result.length > 0 ? result[0].sendmoney : 0;
     };
 
-    // รวมยอด sale / change / refund
     const saleSum = await sumByType(Order, 'sale');
     const changeSum = await sumByType(Order, 'change');
     const refundSum = await sumByType(Refund, 'refund');
 
     const totalToSend = saleSum + (changeSum - refundSum);
 
-    // ยอดที่เคยส่ง
     const alreadySentDocs = await SendMoney.aggregate([
       {
         $match: {
@@ -248,7 +255,6 @@ exports.getSendMoney = async (req, res) => {
     const alreadySent = alreadySentDocs.length > 0 ? alreadySentDocs[0].totalSent : 0;
     const remaining = parseFloat((totalToSend - alreadySent).toFixed(2));
 
-    // อัปเดต different
     await SendMoney.updateMany(
       {
         area,
@@ -257,16 +263,11 @@ exports.getSendMoney = async (req, res) => {
       { $set: { different: remaining } }
     );
 
-    // แปลงเป็นเวลาไทยสำหรับ response
     const toThaiTime = (utcDate) => new Date(utcDate.getTime() + thOffset);
-
-    console.log("startOfDayUTC", startOfDayUTC);
-    console.log("endOfDayUTC", endOfDayUTC);
-
-    console.log({ saleSum, changeSum, refundSum });
 
     res.status(200).json({
       message: 'success',
+      currentTimeUTC: currentTimeUTC.toISOString(),
       summary: totalToSend,
       sendmoney: alreadySent,
       different: remaining,
