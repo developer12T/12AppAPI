@@ -200,9 +200,14 @@ exports.getSendMoney = async (req, res) => {
     const month = Number(date.substring(4, 6));
     const day = Number(date.substring(6, 8));
 
+
+
+    const startOfDayTH = new Date(Date.UTC(year, month - 1, day, -7, 0, 0, 0)); // 00:00 TH
+    const endOfDayTH = new Date(Date.UTC(year, month - 1, day, 16, 59, 59, 999)); // 23:59 TH
+
     // ✅ Fix เวลา UTC เป็น 10:00 ของวันนั้น และ 09:59:59.999 ของวันถัดไป
-    const startOfDayUTC = new Date(Date.UTC(year, month - 1, day - 1, 10, 0, 0, 0));
-    const endOfDayUTC = new Date(Date.UTC(year, month - 1, day , 9, 59, 59, 999));
+    const startOfDayUTC = new Date(startOfDayTH.getTime() - thOffsetHours);
+    const endOfDayUTC = new Date(endOfDayTH.getTime() - thOffsetHours);
 
     console.log("🌐 startOfDayUTC:", startOfDayUTC.toISOString());
     console.log("🌐 endOfDayUTC:", endOfDayUTC.toISOString());
@@ -225,6 +230,8 @@ exports.getSendMoney = async (req, res) => {
     const saleSum = await sumByType(Order, 'sale');
     const changeSum = await sumByType(Order, 'change');
     const refundSum = await sumByType(Refund, 'refund');
+
+    console.log(saleSum, changeSum, refundSum)
 
     const totalToSend = saleSum + (changeSum - refundSum);
 
