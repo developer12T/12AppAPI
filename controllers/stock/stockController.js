@@ -1961,6 +1961,7 @@ exports.getStockQtyDetail = async (req, res) => {
 
     const distributionDocs = await Distribution.aggregate([
       { $match: { area, period } },
+      { $match: { status:'confirm'}},
       { $unwind: '$listProduct' },
       { $match: { 'listProduct.id': productId } },
       { $addFields: { createdAtTH: convertToTHTime('$createdAt') } }
@@ -2111,7 +2112,7 @@ exports.getStockQtyDetail = async (req, res) => {
           summaryStock: calculateQtyByUnit(productData.listUnit, [
             ...refundStock,
             ...withdrawStock,
-            ...STOCKIN.stock
+            ...STOCK.stock
           ]),
           summaryStockIn
         },
