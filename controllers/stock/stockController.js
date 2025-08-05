@@ -2103,7 +2103,7 @@ exports.getStockQtyDetail = async (req, res) => {
         productName: productData.name,
         STOCK,
         IN: {
-          stock: STOCKIN,
+          stock: STOCK,
           withdrawStock,
           withdraw,
           refundStock,
