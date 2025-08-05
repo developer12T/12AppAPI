@@ -100,14 +100,14 @@ const generateOrderId = async (area, warehouse, channel, res) => {
 
   // console.log(latestOrder)
   let runningNumber = latestOrder
-    ? parseInt(latestOrder.orderId.slice(-4)) + 1
+    ? parseInt(latestOrder.orderId.slice(-3)) + 1
     : 1
 
   return `${currentYear
     .toString()
-    .slice(2, 4)}${currentMonth}13${warehouse}${runningNumber
+    .slice(2, 4)}${currentMonth}${warehouse}${runningNumber
     .toString()
-    .padStart(4, '0')}`
+    .padStart(3, '0')}`
 }
 
 const generateRefundId = async (area, warehouse, channel, res) => {
