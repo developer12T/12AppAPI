@@ -196,14 +196,14 @@ exports.getSendMoney = async (req, res) => {
     const { Refund } = getModelsByChannel(channel, res, refundModel);
     const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel);
 
-    const thOffset = 7 * 60 * 60 * 1000; // UTC+7
+    const thOffset = 7 * 60 * 60 * 1000; // UTC+7 offset
 
-    // 📅 ดึงปี/เดือน/วัน จาก date ที่ส่งมา
+    // 📅 แยกปี/เดือน/วันจาก date
     const year = Number(date.substring(0, 4));
     const month = Number(date.substring(4, 6));
     const day = Number(date.substring(6, 8));
 
-    // 🕒 สร้างวันไทย (00:00–23:59) และแปลงเป็น UTC
+    // 🕒 คำนวณช่วงเวลาไทย (00:00–23:59) → แปลงเป็น UTC
     const startOfDayThai = new Date(year, month - 1, day, 0, 0, 0, 0);
     const endOfDayThai = new Date(year, month - 1, day, 23, 59, 59, 999);
 
@@ -233,7 +233,7 @@ exports.getSendMoney = async (req, res) => {
 
     const totalToSend = saleSum + (changeSum - refundSum);
 
-    // 📦 ยอดที่เคยส่งแล้ววันนี้
+    // 📦 ยอดที่เคยส่งแล้ว
     const alreadySentDocs = await SendMoney.aggregate([
       {
         $addFields: {
@@ -258,7 +258,7 @@ exports.getSendMoney = async (req, res) => {
     const alreadySent = alreadySentDocs.length > 0 ? alreadySentDocs[0].totalSent : 0;
     const remaining = parseFloat((totalToSend - alreadySent).toFixed(2));
 
-    // ✏ อัปเดต different ให้เอกสารที่ตรงกับวันนี้
+    // ✏ อัปเดต different
     await SendMoney.updateMany(
       {
         area,
@@ -273,7 +273,7 @@ exports.getSendMoney = async (req, res) => {
       { $set: { different: remaining } }
     );
 
-    // 🕒 แปลงเวลา UTC → เวลาไทยสำหรับ response
+    // 🕒 แปลง UTC → เวลาไทยสำหรับ response
     const toThaiTime = (utcDate) => {
       return new Date(new Date(utcDate).getTime() + thOffset);
     };
@@ -294,6 +294,7 @@ exports.getSendMoney = async (req, res) => {
     res.status(500).json({ message: 'Internal Server Error', error: err.message });
   }
 };
+
 
 
 
