@@ -1033,7 +1033,7 @@ exports.approveWithdraw = async (req, res) => {
         to: email.Dc_Email,
         // cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
         cc: process.env.IT_MAIL,
-        subject: '12App cash',
+        subject: `${distributionTran.orderId} 12App cash`,
         html: `
     <h1>แจ้งการส่งใบขอเบิกผ่านทางอีเมล</h1>
     <p>
