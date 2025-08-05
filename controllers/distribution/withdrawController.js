@@ -152,6 +152,13 @@ exports.checkout = async (req, res) => {
       res
     )
 
+    //  const orderId = await generateDistributionId(
+    //   area,
+    //   sale.warehouse,
+    //   channel,
+    //   res
+    // )
+
     // const series = await getSeries(shipping.type)
 
     // console.log(shipping.type)
