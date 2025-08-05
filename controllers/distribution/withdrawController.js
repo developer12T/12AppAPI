@@ -455,9 +455,9 @@ exports.getOrder = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-                fullname: `${userData.firstName} ${userData.surName}`,
-                tel: `${userData.tel}`
-              }
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
             : null,
           orderId: o.orderId,
           orderType: o.orderType,
@@ -1033,19 +1033,17 @@ exports.approveWithdraw = async (req, res) => {
         to: email.Dc_Email,
         // cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
         cc: process.env.IT_MAIL,
-        subject: '12App cash',
+        subject: `${distributionTran.orderId} 12App cash`,
         html: `
     <h1>แจ้งการส่งใบขอเบิกผ่านทางอีเมล</h1>
     <p>
       <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
       <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
       <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName}<br>
-      <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
-          '-' + wereHouseName?.wh_name || ''
-        }<br>
-      <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
-          distributionTran.shippingName
-        }<br>
+      <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
+          }<br>
+      <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
+          }<br>
       <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
       <strong>เขต:</strong> ${distributionTran.area}<br>
       <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -1054,20 +1052,38 @@ exports.approveWithdraw = async (req, res) => {
     </p>
   `
       })
+      const io = getSocket()
+      io.emit('distribution/approveWithdraw', {
+        status: 200,
+        message: 'successfully',
+        data: dataTran
+      })
+
+      res.status(200).json({
+        status: 200,
+        message: 'successfully',
+        data: dataTran
+      })
+
+
+    } else {
+
+      const distributionData = await Distribution.findOneAndUpdate(
+        { orderId: orderId, type: 'withdraw' },
+        { $set: { statusTH: statusThStr, status: statusStr } },
+        { new: true }
+      )
+
+      res.status(200).json({
+        status: 200,
+        message: 'successfully',
+        data: statusStr
+      })
+
+
     }
 
-    const io = getSocket()
-    io.emit('distribution/approveWithdraw', {
-      status: 200,
-      message: 'successfully',
-      data: dataTran
-    })
 
-    res.status(200).json({
-      status: 200,
-      message: 'successfully',
-      data: dataTran
-    })
   } catch (error) {
     console.error('[❌ approveWithdraw ERROR]', error) // แสดงใน console
     res.status(500).json({
