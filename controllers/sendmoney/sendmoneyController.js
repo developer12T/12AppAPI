@@ -195,16 +195,15 @@ exports.getSendMoney = async (req, res) => {
     const { Refund } = getModelsByChannel(channel, res, refundModel);
     const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel);
 
-    const thOffsetHours = 7; // +7 ชั่วโมง
+    const thOffsetHours = 7;
     const year = Number(date.substring(0, 4));
     const month = Number(date.substring(4, 6));
     const day = Number(date.substring(6, 8));
 
-    // ✅ คำนวณ start/end ของวันแบบ UTC ให้ตรงกับเวลาไทย
-    const startOfDayUTC = new Date(Date.UTC(year, month - 1, day, 0 - thOffsetHours, 0, 0, 0)); // 10:00 UTC = 00:00 TH
-    const endOfDayUTC = new Date(Date.UTC(year, month - 1, day, 23 - thOffsetHours, 59, 59, 999)); // 09:59 UTC = 23:59 TH
+    // ✅ Fix เวลา UTC เป็น 10:00 ของวันนั้น และ 09:59:59.999 ของวันถัดไป
+    const startOfDayUTC = new Date(Date.UTC(year, month - 1, day - 1, 10, 0, 0, 0));
+    const endOfDayUTC = new Date(Date.UTC(year, month - 1, day , 9, 59, 59, 999));
 
-    console.log("🕒 Server Current Time (UTC):", new Date().toISOString());
     console.log("🌐 startOfDayUTC:", startOfDayUTC.toISOString());
     console.log("🌐 endOfDayUTC:", endOfDayUTC.toISOString());
 
@@ -275,6 +274,7 @@ exports.getSendMoney = async (req, res) => {
     res.status(500).json({ message: 'Internal Server Error', error: err.message });
   }
 };
+
 
 
 exports.getAllSendMoney = async (req, res) => {
