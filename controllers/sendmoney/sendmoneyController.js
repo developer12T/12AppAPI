@@ -185,30 +185,33 @@ exports.getSendMoney = async (req, res) => {
     const channel = req.headers['x-channel'];
     const { area, date } = req.body;
 
+    // ✅ Validate input
     if (!area || !date || date.length !== 8) {
-      return res.status(400).json({ message: 'Invalid area or date format (YYYYMMDD required)' });
+      return res.status(400).json({
+        message: 'Invalid request: area and date(YYYYMMDD) are required.'
+      });
     }
 
     const { Order } = getModelsByChannel(channel, res, orderModel);
     const { Refund } = getModelsByChannel(channel, res, refundModel);
     const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel);
 
-    const thOffset = 7 * 60 * 60 * 1000;
+    const thOffset = 7 * 60 * 60 * 1000; // UTC+7 offset
 
-    // ดึงปี เดือน วัน จาก date (YYYYMMDD)
+    // 📅 Extract year/month/day from request date
     const year = Number(date.substring(0, 4));
     const month = Number(date.substring(4, 6));
     const day = Number(date.substring(6, 8));
 
-    // สร้างเวลาไทยแบบ manual (ไม่อ้างอิง timezone เครื่อง)
+    // 🕒 Create Thai time range (fixed)
     const startOfDayTH = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
     const endOfDayTH = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
 
-    // แปลงเวลาไทยเป็น UTC สำหรับ query
+    // 🔄 Convert to UTC for MongoDB query
     const startOfDayUTC = new Date(startOfDayTH.getTime() - thOffset);
     const endOfDayUTC = new Date(endOfDayTH.getTime() - thOffset);
 
-    // Helper function
+    // Helper function to sum total by type
     const sumByType = async (Model, type) => {
       const result = await Model.aggregate([
         {
@@ -219,21 +222,19 @@ exports.getSendMoney = async (req, res) => {
             createdAt: { $gte: startOfDayUTC, $lte: endOfDayUTC }
           }
         },
-        {
-          $group: { _id: null, sendmoney: { $sum: '$total' } }
-        }
+        { $group: { _id: null, sendmoney: { $sum: '$total' } } }
       ]);
       return result.length > 0 ? result[0].sendmoney : 0;
     };
 
-    // Calculate sums
+    // 💰 Calculate totals
     const saleSum = await sumByType(Order, 'sale');
     const changeSum = await sumByType(Order, 'change');
     const refundSum = await sumByType(Refund, 'refund');
 
     const totalToSend = saleSum + (changeSum - refundSum);
 
-    // Step 2: Already sent
+    // 📦 Already sent today
     const alreadySentDocs = await SendMoney.aggregate([
       {
         $addFields: {
@@ -252,15 +253,13 @@ exports.getSendMoney = async (req, res) => {
           }
         }
       },
-      {
-        $group: { _id: null, totalSent: { $sum: '$sendmoney' } }
-      }
+      { $group: { _id: null, totalSent: { $sum: '$sendmoney' } } }
     ]);
 
     const alreadySent = alreadySentDocs.length > 0 ? alreadySentDocs[0].totalSent : 0;
     const remaining = parseFloat((totalToSend - alreadySent).toFixed(2));
 
-    // Update difference for today
+    // ✏ Update difference for today
     await SendMoney.updateMany(
       {
         area,
@@ -275,12 +274,21 @@ exports.getSendMoney = async (req, res) => {
       { $set: { different: remaining } }
     );
 
+    // 🕒 Convert UTC back to Thai time for response
+    const toThaiTime = (utcDate) => {
+      return new Date(new Date(utcDate).getTime() + thOffset);
+    };
+
     res.status(200).json({
       message: 'success',
       summary: totalToSend,
       sendmoney: alreadySent,
       different: remaining,
-      status: alreadySent > 0 ? 'ส่งเงินแล้ว' : 'ยังไม่ส่งเงิน'
+      status: alreadySent > 0 ? 'ส่งเงินแล้ว' : 'ยังไม่ส่งเงิน',
+      // dateRangeThai: {
+      //   start: toThaiTime(startOfDayUTC),
+      //   end: toThaiTime(endOfDayUTC)
+      // }
     });
   } catch (err) {
     console.error('[getSendMoney Error]', err);
