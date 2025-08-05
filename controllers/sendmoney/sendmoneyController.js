@@ -195,25 +195,25 @@ exports.getSendMoney = async (req, res) => {
     const { Refund } = getModelsByChannel(channel, res, refundModel);
     const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel);
 
-    const thOffset = 7 * 60 * 60 * 1000; // UTC+7
-
-    // 📅 ดึงปี เดือน วันจาก date
+    // คำนวณช่วงเวลา UTC ของวันนั้นจากเวลาไทย
+    const thOffset = 7 * 60 * 60 * 1000;
     const year = Number(date.substring(0, 4));
     const month = Number(date.substring(4, 6));
     const day = Number(date.substring(6, 8));
 
-    // 🕒 คำนวณวันไทย → แปลงเป็น UTC
-    const startOfDayUTC = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0) - thOffset);
-    const endOfDayUTC   = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999) - thOffset);
+    const startOfDayTH = new Date(year, month - 1, day, 0, 0, 0, 0);
+    const endOfDayTH = new Date(year, month - 1, day, 23, 59, 59, 999);
+    const startOfDayUTC = new Date(startOfDayTH.getTime() - thOffset);
+    const endOfDayUTC = new Date(endOfDayTH.getTime() - thOffset);
 
-    // Helper function รวมยอดตาม type
+    // helper sum function
     const sumByType = async (Model, type) => {
       const result = await Model.aggregate([
         {
           $match: {
             type,
             'store.area': area,
-            status: { $nin: ['canceled'] },
+            status: { $nin: ['canceled', 'delete'] },
             createdAt: { $gte: startOfDayUTC, $lte: endOfDayUTC }
           }
         },
@@ -222,60 +222,48 @@ exports.getSendMoney = async (req, res) => {
       return result.length > 0 ? result[0].sendmoney : 0;
     };
 
-    // 💰 คำนวณยอด sale, change, refund
+    // รวมยอด sale / change / refund
     const saleSum = await sumByType(Order, 'sale');
     const changeSum = await sumByType(Order, 'change');
     const refundSum = await sumByType(Refund, 'refund');
 
-    // รวมยอดตามสูตร
     const totalToSend = saleSum + (changeSum - refundSum);
 
-    // 📦 หายอดที่เคยส่งแล้ว
+    // ยอดที่เคยส่ง
     const alreadySentDocs = await SendMoney.aggregate([
-      {
-        $addFields: {
-          thaiDate: { $dateAdd: { startDate: '$dateAt', unit: 'hour', amount: 7 } }
-        }
-      },
       {
         $match: {
           area,
-          $expr: {
-            $and: [
-              { $eq: [{ $dayOfMonth: '$thaiDate' }, day] },
-              { $eq: [{ $month: '$thaiDate' }, month] },
-              { $eq: [{ $year: '$thaiDate' }, year] }
-            ]
-          }
+          dateAt: { $gte: startOfDayUTC, $lte: endOfDayUTC }
         }
       },
-      { $group: { _id: null, totalSent: { $sum: '$sendmoney' } } }
+      {
+        $group: {
+          _id: null,
+          totalSent: { $sum: '$sendmoney' }
+        }
+      }
     ]);
 
     const alreadySent = alreadySentDocs.length > 0 ? alreadySentDocs[0].totalSent : 0;
     const remaining = parseFloat((totalToSend - alreadySent).toFixed(2));
 
-    // ✏ อัปเดตต่างยอด
+    // อัปเดต different
     await SendMoney.updateMany(
       {
         area,
-        $expr: {
-          $and: [
-            { $eq: [{ $dayOfMonth: { $dateAdd: { startDate: '$dateAt', unit: 'hour', amount: 7 } } }, day] },
-            { $eq: [{ $month: { $dateAdd: { startDate: '$dateAt', unit: 'hour', amount: 7 } } }, month] },
-            { $eq: [{ $year: { $dateAdd: { startDate: '$dateAt', unit: 'hour', amount: 7 } } }, year] }
-          ]
-        }
+        dateAt: { $gte: startOfDayUTC, $lte: endOfDayUTC }
       },
       { $set: { different: remaining } }
     );
 
-    // 🕒 ฟังก์ชันแปลง UTC → เวลาไทย สำหรับแสดง
+    // แปลงเป็นเวลาไทยสำหรับ response
     const toThaiTime = (utcDate) => new Date(utcDate.getTime() + thOffset);
 
-    // Debug log เพื่อยืนยัน
-    console.log("StartOfDayUTC:", startOfDayUTC.toISOString());
-    console.log("EndOfDayUTC:", endOfDayUTC.toISOString());
+    console.log("startOfDayUTC", startOfDayUTC);
+    console.log("endOfDayUTC", endOfDayUTC);
+
+    console.log({ saleSum, changeSum, refundSum });
 
     res.status(200).json({
       message: 'success',
@@ -288,16 +276,12 @@ exports.getSendMoney = async (req, res) => {
         end: toThaiTime(endOfDayUTC)
       }
     });
+
   } catch (err) {
     console.error('[getSendMoney Error]', err);
     res.status(500).json({ message: 'Internal Server Error', error: err.message });
   }
 };
-
-
-
-
-
 
 
 exports.getAllSendMoney = async (req, res) => {
