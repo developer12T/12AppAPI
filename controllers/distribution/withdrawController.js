@@ -2,6 +2,7 @@
 // const { User } = require('../../models/cash/user')
 // const { Product } = require('../../models/cash/product')
 // const { Distribution, Place } = require('../../models/cash/distribution')
+const { MHDISL, MHDISH } = require('../../models/cash/master')
 const { sequelize, DataTypes } = require('../../config/m3db')
 const { getSeries, updateRunningNumber } = require('../../middleware/order')
 const axios = require('axios')
@@ -25,6 +26,7 @@ const { formatDateTimeToThai } = require('../../middleware/order')
 const { to2, updateStockMongo } = require('../../middleware/order')
 const { getSocket } = require('../../socket')
 const { sendEmail } = require('../../middleware/order')
+const product = require('../../models/cash/product')
 exports.checkout = async (req, res) => {
   const transaction = await sequelize.transaction()
   try {
@@ -1102,110 +1104,171 @@ exports.approveWithdraw = async (req, res) => {
 }
 
 exports.saleConfirmWithdraw = async (req, res) => {
-  const { orderId, status } = req.body
+  try {
+    const { orderId, status } = req.body;
 
-  const channel = req.headers['x-channel']
-  const { Distribution, WereHouse } = getModelsByChannel(
-    channel,
-    res,
-    distributionModel
-  )
-
-  const { Product } = getModelsByChannel(channel, res, productModel)
-  const { Stock } = getModelsByChannel(channel, res, stockModel)
-  const { User } = getModelsByChannel(channel, res, userModel)
-  const { Withdraw } = getModelsByChannel(channel, res, DistributionModel)
-
-  if (status === true) {
-    let statusStr = 'confirm'
-    let statusThStr = 'ยืนยันรับของ'
-
-    const distributionTran = await Distribution.findOne({
-      orderId: orderId,
-      type: 'withdraw'
-    })
-
-    if (distributionTran.status === 'approved') {
-      distributionTran.listProduct = distributionTran.listProduct.map(item => ({
-        ...item,
-        receiveQty: item.qty
-      }))
-
-      // console.log(distributionTran.listProduct)
-
-      const distributionData = await Distribution.findOneAndUpdate(
-        { orderId: orderId, type: 'withdraw' },
-        {
-          $set: {
-            statusTH: statusThStr,
-            status: statusStr,
-            listProduct: distributionTran.listProduct,
-            receivetotal: distributionTran.total,
-            receivetotalQty: distributionTran.totalQty,
-            receivetotalWeightGross: distributionTran.totalWeightGross,
-            receivetotalWeightNet: distributionTran.totalWeightNet
-          }
-        },
-        { new: true }
-      )
-
-      if (!distributionData) {
-        return res
-          .status(404)
-          .json({ status: 404, message: 'Not found withdraw' })
-      }
-
-      if (!distributionTran?.period) {
-        return res
-          .status(404)
-          .json({ status: 404, message: 'Not found period in doc' })
-      }
-
-      const dataTran = distributionTran
-      // console.log(dataTran.listProduct)
-      const qtyproduct = dataTran.listProduct
-        .filter(u => u?.id && u?.unit && u?.qty > 0)
-        .map(u => ({
-          id: u.id,
-          unit: u.unit,
-          qty: u.qty,
-          statusMovement: 'OUT'
-        }))
-      // console.log(qtyproduct)
-
-      for (const item of qtyproduct) {
-        const updateResult = await updateStockMongo(
-          item,
-          distributionTran.area,
-          distributionTran.period,
-          'withdraw',
-          channel,
-          res
-        )
-        if (updateResult) return
-      }
-
-      const io = getSocket()
-      io.emit('distribution/saleConfirmWithdraw', {
-        status: 200,
-        message: 'Confirm withdraw success'
-      })
-    } else {
-      return res
-        .status(409)
-        .json({ status: 409, message: 'Status withdraw is pending' })
+    // ✅ ตรวจสอบ input
+    if (!orderId || typeof status !== 'boolean') {
+      return res.status(400).json({
+        status: 400,
+        message: 'Invalid request: orderId and status(boolean) are required.'
+      });
     }
 
-    return res
-      .status(200)
-      .json({ status: 200, message: 'Confirm withdraw success' })
-  }
+    const channel = req.headers['x-channel'];
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel);
+    const { Product } = getModelsByChannel(channel, res, productModel);
 
-  // ✅ กรณีไม่อนุมัติ
-  if (status === false) {
-    return res.status(200).json({
-      status: 200,
-      message: 'The withdrawal request has been rejected'
-    })
+    // กรณี status === true
+    if (status === true) {
+      const distributionTran = await Distribution.findOne({
+        orderId,
+        type: 'withdraw'
+      });
+
+      if (!distributionTran) {
+        return res.status(404).json({ status: 404, message: 'Withdraw transaction not found.' });
+      }
+
+      if (!Array.isArray(distributionTran.listProduct) || distributionTran.listProduct.length === 0) {
+        return res.status(400).json({ status: 400, message: 'No products found in withdrawal transaction.' });
+      }
+
+      // ✅ ดึงข้อมูลสินค้าที่เกี่ยวข้อง
+      const listProductId = distributionTran.listProduct.map(i => i.id).filter(Boolean);
+      const productDetail = await Product.find({ id: { $in: listProductId } });
+
+      // ✅ ดึงข้อมูลรับสินค้าจากระบบ ERP
+      const Receive = await MHDISL.findAll({ where: { coNo: orderId }, raw: true });
+      const ReceiveWeight = await MHDISH.findAll({ where: { coNo: orderId }, raw: true });
+
+      let receivetotalQty = 0;
+      let receivetotal = 0;
+
+      for (const i of distributionTran.listProduct) {
+        const productIdTrimmed = String(i.id || '').trim();
+        const match = Receive.find(r => String(r.productId || '').trim() === productIdTrimmed);
+
+        if (match) {
+          const product = productDetail.find(u => String(u.id || '').trim() === productIdTrimmed);
+          i.receiveUnit = match.withdrawUnit || '';
+
+          if (!product || !Array.isArray(product.listUnit)) {
+            i.receiveQty = 0;
+            continue;
+          }
+
+          const unitFactor = product.listUnit.find(
+            u => String(u.unit || '').trim() === String(match.withdrawUnit || '').trim()
+          );
+
+          if (!unitFactor || !unitFactor.factor || unitFactor.factor === 0) {
+            i.receiveQty = 0;
+            continue;
+          }
+
+          const qty = match.qtyPcs / unitFactor.factor;
+          receivetotalQty += qty;
+          receivetotal += qty * (unitFactor?.price?.sale || 0);
+
+          i.receiveQty = qty;
+        } else {
+          i.receiveUnit = '';
+          i.receiveQty = 0;
+        }
+      }
+
+      // ✅ อัปเดตข้อมูลถ้า status เป็น approved
+      if (distributionTran.status === 'approved') {
+        // บันทึก listProduct ที่แก้ไขแล้ว
+        await Distribution.updateOne(
+          { _id: distributionTran._id },
+          { $set: { listProduct: distributionTran.listProduct } }
+        );
+
+        const distributionData = await Distribution.findOneAndUpdate(
+          { orderId, type: 'withdraw' },
+          {
+            $set: {
+              statusTH: 'ยืนยันรับของ',
+              status: 'confirm',
+              receivetotal: receivetotal,
+              receivetotalQty: receivetotalQty,
+              receivetotalWeightGross: ReceiveWeight?.[0]?.weightGross || 0,
+              receivetotalWeightNet: ReceiveWeight?.[0]?.weightNet || 0
+            }
+          },
+          { new: true }
+        );
+
+        if (!distributionData) {
+          return res.status(404).json({
+            status: 404,
+            message: 'Withdraw transaction not found for update.'
+          });
+        }
+
+        if (!distributionTran.period) {
+          return res.status(400).json({
+            status: 400,
+            message: 'Period is missing in withdrawal transaction.'
+          });
+        }
+
+        // ✅ อัปเดตสต๊อก
+        const qtyproduct = distributionTran.listProduct
+          .filter(u => u?.id && u?.unit && u?.qty > 0)
+          .map(u => ({
+            id: u.id,
+            unit: u.unit,
+            qty: u.qty,
+            statusMovement: 'OUT'
+          }));
+
+        for (const item of qtyproduct) {
+          const updateResult = await updateStockMongo(
+            item,
+            distributionTran.area,
+            distributionTran.period,
+            'withdraw',
+            channel,
+            res
+          );
+          if (updateResult) return;
+        }
+
+        // ✅ ส่ง socket แจ้งผล
+        const io = getSocket();
+        io.emit('distribution/saleConfirmWithdraw', {
+          status: 200,
+          message: 'Confirm withdraw success'
+        });
+
+        return res.status(200).json({
+          status: 200,
+          message: 'Confirm withdraw success'
+        });
+      } else {
+        return res.status(409).json({
+          status: 409,
+          message: 'Status withdraw is pending'
+        });
+      }
+    }
+
+    // ✅ กรณี status === false
+    if (status === false) {
+      return res.status(200).json({
+        status: 200,
+        message: 'The withdrawal request has been rejected'
+      });
+    }
+
+  } catch (error) {
+    console.error('[❌ saleConfirmWithdraw ERROR]', error);
+    return res.status(500).json({
+      status: 500,
+      message: error.message || 'Internal server error'
+    });
   }
-}
+};

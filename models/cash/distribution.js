@@ -89,6 +89,7 @@ const listProductDistribution = new mongoose.Schema({
     total: { type: Number, require: true },
     weightGross: { type: Number, require: true },
     weightNet: { type: Number, require: true },
+    receiveUnit: { type: String,  default: '' },
     receiveQty: { type: Number, require: true, default: 0 }
 })
 
