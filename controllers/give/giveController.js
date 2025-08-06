@@ -352,8 +352,17 @@ exports.checkout = async (req, res) => {
     }
 
 
+    const productQty = calStock.product.map(u => ({
+      id: u.id,
+      unit: u.unit,
+      qty: u.qty
+    }));
 
-    // console.log(newOrder)
+    // 🟢 ถ้าอนุมัติ ให้ updateStock 'give'
+      for (const item of productQty) {
+        const updateResult = await updateStockMongo(item, newOrder.store.area, period, 'give', channel, res);
+        if (updateResult) return;
+      }
 
     const createdMovement = await StockMovement.create({
       ...calStock
@@ -608,11 +617,16 @@ exports.approveGive = async (req, res) => {
     const channel = req.headers['x-channel'];
     const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel);
 
-    const giveawayData = await Giveaway.findOneAndUpdate(
+    // const giveawayData = await Giveaway.findOneAndUpdate(
+    //   { orderId: orderId, type: 'give' },
+    //   { $set: { statusTH: statusThStr, status: statusStr } },
+    //   { new: true }
+    // );
+
+    const giveawayData = await Giveaway.findOne(
       { orderId: orderId, type: 'give' },
-      { $set: { statusTH: statusThStr, status: statusStr } },
-      { new: true }
     );
+
 
     if (!giveawayData) {
       return res.status(404).json({
@@ -631,6 +645,7 @@ exports.approveGive = async (req, res) => {
     if (status === true) {
       for (const item of productQty) {
         const updateResult = await updateStockMongo(item, giveawayData.store.area, giveawayData.period, 'give', channel, res);
+        console.log(item  )
         if (updateResult) return;
       }
     }
@@ -638,7 +653,7 @@ exports.approveGive = async (req, res) => {
     // 🔴 ถ้าไม่อนุมัติ ให้ updateStock 'deleteCart'
     else {
       for (const item of productQty) {
-        const updateResult = await updateStockMongo(item, giveawayData.store.area, giveawayData.period, 'deleteCart', channel, res);
+        const updateResult = await updateStockMongo(item, giveawayData.store.area, giveawayData.period, 'orderCanceled', channel, res);
         if (updateResult) return;
       }
     }
