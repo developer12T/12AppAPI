@@ -294,7 +294,7 @@ async function applyPromotion(order, channel, res) {
                 proCode: promo.proCode,
                 proName: promo.name,
                 proType: promo.proType,
-                proQty: selectedProduct.productQty,
+                proQty: selectedProduct.productQty || 0,
                 discount: promoDiscount,
                 test: "dawd",
                 listProduct: [{
@@ -319,10 +319,12 @@ async function applyPromotion(order, channel, res) {
 
     const seenProIds = new Set();
     appliedPromotions = appliedPromotions.filter(promo => {
-        if (seenProIds.has(promo.proId)) return false;
+        if (promo.proQty === 0) return false;        // ❌ ตัดถ้า proQty = 0
+        if (seenProIds.has(promo.proId)) return false; // ❌ ตัดถ้า proId ซ้ำ
         seenProIds.add(promo.proId);
         return true;
     });
+    console.log(appliedPromotions)
 
     return { appliedPromotions }
 }
