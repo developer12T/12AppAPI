@@ -27,7 +27,12 @@ const { checkInRoute } = require('../route/checkIn')
 const multer = require('multer')
 const upload = multer({ storage: multer.memoryStorage() }).single('image')
 const _ = require('lodash')
-const { to2, updateStockMongo, generateDateList } = require('../../middleware/order')
+const {
+  to2,
+  updateStockMongo,
+  generateDateList
+} = require('../../middleware/order')
+const { DateTime } = require('luxon')
 const { getSocket } = require('../../socket')
 const {
   applyPromotion,
@@ -47,7 +52,6 @@ const refundModel = require('../../models/cash/refund')
 const storeModel = require('../../models/cash/store')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { formatDateTimeToThai } = require('../../middleware/order')
-const { DateTime, Duration } = require('luxon');
 
 const xlsx = require('xlsx')
 const path = require('path')
@@ -179,8 +183,8 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-        .map(item => item.price)
-        .reduce((sum, price) => sum + price, 0)
+          .map(item => item.price)
+          .reduce((sum, price) => sum + price, 0)
       : 0
     const total = subtotal - discountProduct
     const newOrder = new Order({
@@ -292,26 +296,17 @@ exports.checkout = async (req, res) => {
         qty: u.qty,
         statusMovement: 'OUT'
       }))
-    const seenProIds = new Set();
-
-    const qtyproductPro = newOrder.listPromotions
-      .filter(promo => {
-        if (seenProIds.has(promo.proId)) {
-          return false; // เจอ proId ซ้ำ → ตัดออก
-        }
-        seenProIds.add(promo.proId);
-        return true;
-      })
-      .flatMap(u => {
-        return u.listProduct
-          .filter(item => item?.id && item?.unit && item?.qty > 0)
-          .map(item => ({
-            id: item.id,
-            unit: item.unit,
-            qty: item.qty,
-            statusMovement: 'OUT'
-          }));
-      });
+    const qtyproductPro = newOrder.listPromotions.flatMap(u => {
+      const promoDetail = u.listProduct
+        .filter(item => item?.id && item?.unit && item?.qty > 0)
+        .map(item => ({
+          id: item.id,
+          unit: item.unit,
+          qty: item.qty,
+          statusMovement: 'OUT'
+        }))
+      return promoDetail
+    })
 
     const productQty = Object.values(
       [...qtyproductPro, ...qtyproduct].reduce((acc, cur) => {
@@ -557,10 +552,15 @@ exports.getDetail = async (req, res) => {
     // const io = getSocket()
     // io.emit('order/detail', {});
 
+    const orderWithThaiTime = {
+      ...order.toObject(),
+      createdAt: new Date(order.createdAt.getTime() + 7 * 60 * 60 * 1000)
+    }
+
     res.status(200).json({
       status: 200,
       message: 'successful!',
-      data: [order]
+      data: [orderWithThaiTime]
     })
   } catch (error) {
     console.error(error)
@@ -568,55 +568,50 @@ exports.getDetail = async (req, res) => {
   }
 }
 
-const lastUpdateMap = {}; // { ip: timestamp }
-
 exports.updateStatus = async (req, res) => {
+  // const session = await require('mongoose').startSession();
+  // session.startTransaction();
   try {
-    const { orderId, status } = req.body;
-    const userKey = req.ip; // ใช้ IP แทน userId
-    const now = Date.now();
+    const { orderId, status } = req.body
 
-    // กันกดซ้ำภายใน 1 นาที ต่อ IP
-    if (lastUpdateMap[userKey] && (now - lastUpdateMap[userKey]) < 60_000) {
-      const remaining = Math.ceil((60_000 - (now - lastUpdateMap[userKey])) / 1000);
-      return res.status(429).json({
-        status: 429,
-        message: `กรุณารอ ${remaining} วินาทีก่อนกดอีกครั้ง`
-      });
-    }
-
-    // อัปเดตเวลาล่าสุดของ IP นี้
-    lastUpdateMap[userKey] = now;
-
-    // ------- โค้ดเดิมของคุณ -------
-    const channel = req.headers['x-channel'];
-    const { Promotion } = getModelsByChannel(channel, res, promotionModel);
-    const { Product } = getModelsByChannel(channel, res, productModel);
-    const { Order } = getModelsByChannel(channel, res, orderModel);
-    const { Stock } = getModelsByChannel(channel, res, stockModel);
+    const channel = req.headers['x-channel']
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
 
     if (!orderId || !status) {
-      return res.status(400).json({ status: 400, message: 'orderId, status are required!' });
+      // await session.abortTransaction();
+      // session.endSession();
+      return res
+        .status(400)
+        .json({ status: 400, message: 'orderId, status are required!' })
     }
 
-    const order = await Order.findOne({ orderId });
+    const order = await Order.findOne({ orderId })
+    // .session(session);
     if (!order) {
-      return res.status(404).json({ status: 404, message: 'Order not found!' });
+      // await session.abortTransaction();
+      // session.endSession();
+      return res.status(404).json({ status: 404, message: 'Order not found!' })
     }
 
     if (order.status !== 'pending' && status !== 'canceled') {
+      // await session.abortTransaction();
+      // session.endSession();
       return res.status(400).json({
         status: 400,
         message: 'Cannot update status, order is not in pending state!'
-      });
+      })
     }
 
     if (status === 'canceled') {
-      statusTH = 'ยกเลิก';
+      statusTH = 'ยกเลิก'
     }
 
     if (order.listProduct.length > 0) {
       for (const u of order.listProduct) {
+        // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
         const updateResult = await updateStockMongo(
           u,
           order.store.area,
@@ -624,8 +619,66 @@ exports.updateStatus = async (req, res) => {
           'orderCanceled',
           channel,
           res
-        );
-        if (updateResult) return;
+        )
+        if (updateResult) return
+        // const factorPcsResult = await Product.aggregate([
+        //   { $match: { id: u.id } },
+        //   {
+        //     $project: {
+        //       id: 1,
+        //       listUnit: {
+        //         $filter: {
+        //           input: '$listUnit',
+        //           as: 'unitItem',
+        //           cond: { $eq: ['$$unitItem.unit', u.unit] }
+        //         }
+        //       }
+        //     }
+        //   }
+        // ])
+        // // .session(session);
+
+        // const factorCtnResult =
+        //   (await Product.aggregate([
+        //     { $match: { id: u.id } },
+        //     {
+        //       $project: {
+        //         id: 1,
+        //         listUnit: {
+        //           $filter: {
+        //             input: '$listUnit',
+        //             as: 'unitItem',
+        //             cond: { $eq: ['$$unitItem.unit', 'CTN'] }
+        //           }
+        //         }
+        //       }
+        //     }
+        //   ])) || []
+
+        // const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0
+        // const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 1
+        // const factorPcsQty = u.qty * factorPcs
+        // const factorCtnQty = Math.floor(factorPcsQty / factorCtn)
+        // await Stock.findOneAndUpdate(
+        //   {
+        //     area: order.store.area,
+        //     period: order.period,
+        //     'listProduct.productId': u.id
+        //   },
+        //   {
+        //     $inc: {
+        //       'listProduct.$[elem].stockOutPcs': -factorPcsQty,
+        //       'listProduct.$[elem].balancePcs': +factorPcsQty,
+        //       'listProduct.$[elem].stockOutCtn': -factorCtnQty,
+        //       'listProduct.$[elem].balanceCtn': +factorCtnQty
+        //     }
+        //   },
+        //   {
+        //     arrayFilters: [{ 'elem.productId': u.id }],
+        //     new: true
+        //     // session
+        //   }
+        // )
       }
     }
 
@@ -633,21 +686,22 @@ exports.updateStatus = async (req, res) => {
       for (const item of order.listPromotions) {
         const promotionDetail =
           (await Promotion.findOne({ proId: item.proId })) ||
-          new Promotion({ proId: item.proId });
-        const storeIdToRemove = order.store.storeId;
+          new Promotion({ proId: item.proId })
+        const storeIdToRemove = order.store.storeId
         if (promotionDetail.applicableTo?.isNewStore === true) {
           promotionDetail.applicableTo.completeStoreNew =
             promotionDetail.applicableTo.completeStoreNew?.filter(
               storeId => storeId !== storeIdToRemove
-            ) || [];
+            ) || []
         } else if (promotionDetail.applicableTo?.isbeauty === true) {
           promotionDetail.applicableTo.completeStoreBeauty =
             promotionDetail.applicableTo.completeStoreBeauty?.filter(
               storeId => storeId !== storeIdToRemove
-            ) || [];
+            ) || []
         }
-        await promotionDetail.save().catch(() => {});
+        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
+          // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
             u,
             order.store.area,
@@ -655,8 +709,66 @@ exports.updateStatus = async (req, res) => {
             'orderCanceled',
             channel,
             res
-          );
-          if (updateResult) return;
+          )
+          if (updateResult) return
+          // const factorPcsResult = await Product.aggregate([
+          //   { $match: { id: u.id } },
+          //   {
+          //     $project: {
+          //       id: 1,
+          //       listUnit: {
+          //         $filter: {
+          //           input: '$listUnit',
+          //           as: 'unitItem',
+          //           cond: { $eq: ['$$unitItem.unit', u.unit] }
+          //         }
+          //       }
+          //     }
+          //   }
+          // ])
+          // // .session(session);
+
+          // const factorCtnResult =
+          //   (await Product.aggregate([
+          //     { $match: { id: u.id } },
+          //     {
+          //       $project: {
+          //         id: 1,
+          //         listUnit: {
+          //           $filter: {
+          //             input: '$listUnit',
+          //             as: 'unitItem',
+          //             cond: { $eq: ['$$unitItem.unit', 'CTN'] }
+          //           }
+          //         }
+          //       }
+          //     }
+          //   ])) || []
+
+          // const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0
+          // const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 1
+          // const factorPcsQty = u.qty * factorPcs
+          // const factorCtnQty = Math.floor(factorPcsQty / factorCtn)
+          // await Stock.findOneAndUpdate(
+          //   {
+          //     area: order.store.area,
+          //     period: order.period,
+          //     'listProduct.productId': u.id
+          //   },
+          //   {
+          //     $inc: {
+          //       'listProduct.$[elem].stockOutPcs': -factorPcsQty,
+          //       'listProduct.$[elem].balancePcs': +factorPcsQty,
+          //       'listProduct.$[elem].stockOutCtn': -factorCtnQty,
+          //       'listProduct.$[elem].balanceCtn': +factorCtnQty
+          //     }
+          //   },
+          //   {
+          //     arrayFilters: [{ 'elem.productId': u.id }],
+          //     new: true
+          //     // session
+          //   }
+          // )
         }
       }
     }
@@ -665,25 +777,30 @@ exports.updateStatus = async (req, res) => {
       { orderId },
       { $set: { status, statusTH } },
       { new: true }
-    );
+    )
 
-    const io = getSocket();
+    // await session.commitTransaction();
+    // session.endSession();
+
+    const io = getSocket()
     io.emit('order/updateStatus', {
       status: 200,
       message: 'Updated status successfully!',
       data: updatedOrder
-    });
+    })
 
     res.status(200).json({
       status: 200,
       message: 'Updated status successfully!',
       data: updatedOrder
-    });
+    })
   } catch (error) {
-    console.error('Error updating order:', error);
-    res.status(500).json({ status: 500, message: 'Server error' });
+    // await session.abortTransaction();
+    // session.endSession();
+    console.error('Error updating order:', error)
+    res.status(500).json({ status: 500, message: 'Server error' })
   }
-};
+}
 
 exports.addSlip = async (req, res) => {
   try {
@@ -759,55 +876,82 @@ exports.addSlip = async (req, res) => {
 }
 
 exports.OrderToExcel = async (req, res) => {
-  try {
-    let { channel, date } = req.query;
+  const { channel, date } = req.query
 
-    // ✅ ถ้าไม่ส่ง date → ใช้วันที่ปัจจุบันของเวลาไทย
-    if (!date || date === 'null') {
-      const todayTH = new Date();
-      todayTH.setHours(todayTH.getHours() + 7); // แปลงเป็นเวลาไทย
-      const year = todayTH.getFullYear();
-      const month = String(todayTH.getMonth() + 1).padStart(2, '0');
-      const day = String(todayTH.getDate()).padStart(2, '0');
-      date = `${year}${month}${day}`;
-    }
+  // console.log(channel, date)
 
-    const year = Number(date.slice(0, 4));
-    const month = Number(date.slice(4, 6));
-    const day = Number(date.slice(6, 8));
+  if (!date || date === 'null') {
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = String(today.getMonth() + 1).padStart(2, '0') // เดือนเริ่มที่ 0
+    const day = String(today.getDate()).padStart(2, '0')
 
-    // ✅ แปลงเวลาไทย -> ช่วงเวลา UTC
-    const start = new Date(Date.UTC(year, month - 1, day - 1, 17, 0, 0, 0));
-    const end = new Date(Date.UTC(year, month - 1, day, 16, 59, 59, 999));
+    date = `${year}${month}${day}`
+    // console.log('📅 date:', date)
+  }
 
-    const { Order } = getModelsByChannel(channel, res, orderModel);
+  const start = new Date(
+    `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00`
+  )
+  const end = new Date(
+    `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T23:59:59.999`
+  )
 
-    const modelOrder = await Order.aggregate([
-      {
-        $match: {
-          status: { $ne: 'canceled' },
-          area: { $ne: 'IT211' },
-          type: { $in: ['sale', 'change'] },
-          createdAt: { $gte: start, $lte: end }
+  // const channel = 'cash';
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+
+  // const modelOrder = await Order.find({
+  //   orderId: { $not: /CC/ },
+  // })
+
+  const modelOrder = await Order.aggregate([
+    {
+      $match: {
+        status: { $ne: 'canceled' },
+        area: { $ne: 'IT211' },
+        type: { $in: ['sale', 'change'] }
+      }
+    },
+    {
+      $addFields: {
+        createdAtThai: {
+          $dateAdd: {
+            startDate: '$createdAt',
+            unit: 'hour',
+            amount: 7
+          }
         }
       }
-    ]);
-
-    const tranFromOrder = modelOrder.flatMap(order => {
-      let counterOrder = 0;
-
-      function formatDateToThaiYYYYMMDD(date) {
-        const d = new Date(date);
-        d.setHours(d.getHours() + 7); // บวก 7 ชั่วโมงให้เป็นเวลาไทย
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const dd = String(d.getDate()).padStart(2, '0');
-        return `${yyyy}${mm}${dd}`;
+    },
+    {
+      $match: {
+        createdAtThai: {
+          $gte: start,
+          $lte: end
+        }
       }
+    }
+  ])
 
-      const RLDT = formatDateToThaiYYYYMMDD(order.createdAt);
+  // console.log(modelOrder)
+  const tranFromOrder = modelOrder.flatMap(order => {
+    let counterOrder = 0
+    function formatDateToThaiYYYYMMDD (date) {
+      const d = new Date(date)
+      d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
-      const listProduct = order.listProduct.map(product => ({
+      const yyyy = d.getFullYear()
+      const mm = String(d.getMonth() + 1).padStart(2, '0')
+      const dd = String(d.getDate()).padStart(2, '0')
+
+      return `${yyyy}${mm}${dd}`
+    }
+
+    // ใช้งาน
+    const RLDT = formatDateToThaiYYYYMMDD(order.createdAt)
+
+    const listProduct = order.listProduct.map(product => {
+      return {
         proCode: '',
         id: product.id,
         name: product.name,
@@ -822,10 +966,12 @@ exports.OrderToExcel = async (req, res) => {
         subtotal: product.subtotal,
         discount: product.discount,
         netTotal: product.netTotal
-      }));
+      }
+    })
 
-      const listPromotion = order.listPromotions.flatMap(promo =>
-        promo.listProduct.map(product => ({
+    const listPromotion = order.listPromotions.map(promo =>
+      promo.listProduct.map(product => {
+        return {
           proCode: promo.proCode,
           id: product.id,
           name: product.name,
@@ -837,93 +983,106 @@ exports.OrderToExcel = async (req, res) => {
           unit: product.unit,
           unitName: product.unitName,
           qtyPcs: product.qtyPcs
-        }))
-      );
+        }
+      })
+    )
 
-      const productIDS = [...listProduct, ...listPromotion];
+    const productIDS = [...listProduct, ...listPromotion].flat()
 
-      return productIDS.map(product => {
-        counterOrder++;
-        return {
-          CUNO: order.sale.salePayer,
-          FACI: 'F10',
-          WHLO: order.sale.warehouse,
-          ORNO: "",
-          OAORTP: 'A31',
-          RLDT,
-          ADID: (order.shipping?.shippingId?.trim() || '') === '' ? 'INVTSP' : order.shipping.shippingId,
-          CUOR: order.orderId,
-          OAOREF: '',
-          OBITNO: product.id,
-          OBBANO: '',
-          OBALUN: product.unit,
-          OBORQA: String(product.qty),
-          OBSAPR: String(product.price || 0),
-          OBSPUN: product.unit,
-          OBWHSL: '',
-          ROUT: '',
-          OBPONR: String(counterOrder),
-          OBDIA2: String(product.discount || 0),
-          OBRSCD: '',
-          OBCMNO: '',
-          OBPIDE: product.proCode,
-          OBSMCD: order.sale.saleCode,
-          OAORDT: RLDT,
-          OAODAM: '0',
-          OECRID: '',
-          OECRAM: '',
-          OECRID2: '',
-          OECRAM2: '',
-          OECRID3: '',
-          OECRAM3: '',
-          OECRID4: '',
-          OECRAM4: '',
-          OECRID5: '',
-          OECRAM5: '',
-          OARESP: '',
-          OAYREF: '',
-          OATEL2: '',
-          OAWCON: '',
-          OAFRE1: '',
-          OATXAP: '',
-          OATXAP2: '',
-          OBDIA1: '',
-          OBDIA3: '',
-          OBDIA4: ''
-        };
-      });
-    });
+    // console.log("productIDS",productIDS)
+    return productIDS.map(product => {
+      counterOrder++
 
-    if (tranFromOrder.length === 0) {
-      return res.status(404).json({
-        status: 404,
-        message: 'Not Found Order'
-      });
+      // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
+
+      return {
+        CUNO: order.sale.salePayer,
+        FACI: 'F10',
+        WHLO: order.sale.warehouse,
+        ORNO: '',
+        OAORTP: 'A31',
+        RLDT: RLDT,
+        ADID: '',
+        CUOR: order.orderId,
+        OAOREF: '',
+        OBITNO: product.id,
+        OBBANO: '',
+        OBALUN: product.unit,
+        OBORQA: `${product.qty}`,
+        OBSAPR: `${product.price || 0}`,
+        OBSPUN: product.unit,
+        OBWHSL: '',
+        ROUT: '',
+        OBPONR: `${counterOrder}`,
+        OBDIA2: `${product.discount || 0}`,
+        OBRSCD: '',
+        OBCMNO: '',
+        OBPIDE: product.proCode,
+        OBSMCD: order.sale.saleCode,
+        OAORDT: RLDT,
+        OAODAM: '',
+        OECRID: '',
+        OECRAM: '',
+        OECRID2: '',
+        OECRAM2: '',
+        OECRID3: '',
+        OECRAM3: '',
+        OECRID4: '',
+        OECRAM4: '',
+        OECRID5: '',
+        OECRAM5: '',
+        OARESP: '',
+        OAYREF: '',
+        OATEL2: '',
+        OAWCON: '',
+        OAFRE1: '',
+        OATXAP: '',
+        OATXAP2: '',
+        OBDIA1: '',
+        OBDIA3: '',
+        OBDIA4: ''
+      }
+    })
+  })
+
+  if (tranFromOrder.length == 0) {
+    return res.status(404).json({
+      status: 404,
+      message: 'Not Found Order'
+    })
+  }
+  function yyyymmddToDdMmYyyy (dateString) {
+    // สมมติ dateString คือ '20250804'
+    const year = dateString.slice(0, 4)
+    const month = dateString.slice(4, 6)
+    const day = dateString.slice(6, 8)
+    return `${day}${month}${year}`
+  }
+
+  const wb = xlsx.utils.book_new()
+  const ws = xlsx.utils.json_to_sheet(tranFromOrder)
+  xlsx.utils.book_append_sheet(wb, ws, `ESP${yyyymmddToDdMmYyyy(date)}`)
+
+  const tempPath = path.join(os.tmpdir(), `${yyyymmddToDdMmYyyy(date)}.xlsx`)
+  xlsx.writeFile(wb, tempPath)
+
+  res.download(tempPath, `CA_${yyyymmddToDdMmYyyy(date)}.xlsx`, err => {
+    if (err) {
+      console.error('❌ Download error:', err)
+      // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+      if (!res.headersSent) {
+        res.status(500).send('Download failed')
+      }
     }
 
-    const wb = xlsx.utils.book_new();
-    const ws = xlsx.utils.json_to_sheet(tranFromOrder);
-    xlsx.utils.book_append_sheet(wb, ws, 'Orders');
+    // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+    fs.unlink(tempPath, () => {})
+  })
 
-    const tempPath = path.join(os.tmpdir(), `Order_${Date.now()}.xlsx`);
-    xlsx.writeFile(wb, tempPath);
-
-    res.download(tempPath, 'Order.xlsx', err => {
-      if (err) {
-        console.error('❌ Download error:', err);
-        if (!res.headersSent) {
-          res.status(500).send('Download failed');
-        }
-      }
-      fs.unlink(tempPath, () => { });
-    });
-
-  } catch (error) {
-    console.error('❌ OrderToExcel error:', error);
-    res.status(500).json({ status: 500, message: error.message });
-  }
-};
-
+  // res.status(200).json({
+  //   message: 'Create file successful!'
+  // })
+}
 
 exports.OrderToExcelConJob = async (req, res) => {
   channel = ['cash', 'credit']
@@ -2969,7 +3128,17 @@ exports.summaryDaily = async (req, res) => {
         status = 'ยังไม่ส่งเงิน'
       }
 
-      return { date, sendmoney, summary, diff, change, status, good, damaged, diffChange }
+      return {
+        date,
+        sendmoney,
+        summary,
+        diff,
+        change,
+        status,
+        good,
+        damaged,
+        diffChange
+      }
     })
 
     const sumSendMoney = fullMonthArr.reduce((sum, item) => {
@@ -2997,7 +3166,6 @@ exports.summaryDaily = async (req, res) => {
     const diffChange = fullMonthArr.reduce((sum, item) => {
       return sum + (item.diffChange || 0)
     }, 0)
-
 
     // const io = getSocket()
     // io.emit('order/summaryDaily', {});
@@ -3357,9 +3525,7 @@ exports.getSummary18SKU = async (req, res) => {
   })
 }
 
-
 exports.reportCheckin = async (req, res) => {
-
   const { zone, area, period } = req.body
   const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
@@ -3372,15 +3538,13 @@ exports.reportCheckin = async (req, res) => {
 
   if (area) {
     match['store.area'] = area
-
   }
 
   const dataOrder = await Order.aggregate([
     { $match: match },
     {
       $match: {
-        period: period,
-
+        period: period
       }
     },
     {
@@ -3389,10 +3553,10 @@ exports.reportCheckin = async (req, res) => {
         listProduct: 1, // เอา listProduct หลักออกมา
         promotionProducts: {
           $reduce: {
-            input: "$listPromotions",
+            input: '$listPromotions',
             initialValue: [],
             in: {
-              $concatArrays: ["$$value", "$$this.listProduct"]
+              $concatArrays: ['$$value', '$$this.listProduct']
             }
           }
         },
@@ -3418,56 +3582,65 @@ exports.reportCheckin = async (req, res) => {
     {
       $sort: { _id: 1 }
     }
-  ]);
+  ])
 
-  const saleProductId = dataOrder.flatMap(i => i.listProduct.map(item => item.id))
-  const promoProductId = dataOrder.flatMap(i => i.promotionProducts.map(item => item.id))
+  const saleProductId = dataOrder.flatMap(i =>
+    i.listProduct.map(item => item.id)
+  )
+  const promoProductId = dataOrder.flatMap(i =>
+    i.promotionProducts.map(item => item.id)
+  )
 
-  const productIdUnique = [...new Set([...saleProductId, ...promoProductId])];
+  const productIdUnique = [...new Set([...saleProductId, ...promoProductId])]
 
   const productList = await Product.find({ id: { $in: productIdUnique } })
 
   const newDataOrder = dataOrder.map(order => {
     const newListProduct = (order.listProduct || []).map(item => {
-      const productDetail = productList.find(i => i.id === item.id);
-      const productUnit = productDetail?.listUnit.find(i => i.unit === item.unit)?.factor || 1;
-      const productUnitCtn = productDetail?.listUnit.find(i => i.unit === 'CTN')?.factor || 0;
+      const productDetail = productList.find(i => i.id === item.id)
+      const productUnit =
+        productDetail?.listUnit.find(i => i.unit === item.unit)?.factor || 1
+      const productUnitCtn =
+        productDetail?.listUnit.find(i => i.unit === 'CTN')?.factor || 0
       const qtyPcs = item.qty * productUnit
-      const qtyCtn = productUnitCtn > 0 ? Math.floor(qtyPcs / productUnitCtn) : 0;
+      const qtyCtn =
+        productUnitCtn > 0 ? Math.floor(qtyPcs / productUnitCtn) : 0
 
       return {
         ...item,
         qtyCtn
-      };
-    });
+      }
+    })
 
     const newPromotionProducts = (order.promotionProducts || []).map(item => {
-      const productDetail = productList.find(i => i.id === item.id);
-      const productUnit = productDetail?.listUnit.find(i => i.unit === item.unit)?.factor || 1;
-      const productUnitCtn = productDetail?.listUnit.find(i => i.unit === 'CTN')?.factor || 0;
+      const productDetail = productList.find(i => i.id === item.id)
+      const productUnit =
+        productDetail?.listUnit.find(i => i.unit === item.unit)?.factor || 1
+      const productUnitCtn =
+        productDetail?.listUnit.find(i => i.unit === 'CTN')?.factor || 0
       const qtyPcs = item.qty * productUnit
-      const qtyCtn = productUnitCtn > 0 ? Math.floor(qtyPcs / productUnitCtn) : 0;
+      const qtyCtn =
+        productUnitCtn > 0 ? Math.floor(qtyPcs / productUnitCtn) : 0
 
       return {
         ...item,
         qtyCtn
-      };
-    });
+      }
+    })
 
     return {
       ...order,
       listProduct: newListProduct,
       promotionProducts: newPromotionProducts
-    };
-  });
+    }
+  })
 
   // console.log(newDataOrder)
 
-  const areaList = areaAll.map(item => item._id);
+  const areaList = areaAll.map(item => item._id)
   for (const i of dates) {
-
     const orderDetails = newDataOrder.filter(item => {
-      const itemDateStr = new Date(item.createdAt).toISOString().slice(0, 10);
+      const itemDateStr = new Date(item.createdAt).toISOString().slice(0, 10)
       return itemDateStr === i
     })
 
@@ -3477,18 +3650,11 @@ exports.reportCheckin = async (req, res) => {
     }
 
     // console.log(daily)
-
   }
-
-
-
-
-
 
   res.status(200).json({
     status: 200,
     message: 'sucess',
     data: newDataOrder
   })
-
 }
