@@ -673,3 +673,71 @@ exports.approveGive = async (req, res) => {
   }
 };
 
+exports.updateStatus = async (req, res) => {
+  try {
+    const { orderId, status } = req.body;
+    const channel = req.headers['x-channel'];
+    const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel);
+
+    // ✅ Validate input
+    if (!orderId || !status) {
+      return res.status(400).json({
+        status: 400,
+        message: 'orderId and status are required.',
+      });
+    }
+
+    // ✅ Set Thai status name
+    const statusTH = status === 'canceled' ? 'ยกเลิก' : 'ไม่ระบุสถานะ';
+
+    // ✅ Find giveaway data
+    const giveawayData = await Giveaway.findOne({ orderId, type: 'give' });
+    if (!giveawayData) {
+      return res.status(404).json({
+        status: 404,
+        message: `No giveaway data found for orderId: ${orderId}`,
+      });
+    }
+
+    // ✅ Return product stock
+    const productQty = (giveawayData.listProduct || []).map(u => ({
+      id: u.id,
+      unit: u.unit,
+      qty: u.qty
+    }));
+
+    for (const item of productQty) {
+      // console.log(item)
+      const updateResult = await updateStockMongo(
+        item,
+        giveawayData.store.area,
+        giveawayData.period,
+        'orderCanceled',
+        channel,
+        res
+      );
+      if (updateResult) return; // Stop if stock update fails
+    }
+
+    // ✅ Update order status
+    const updatedOrder = await Giveaway.findOneAndUpdate(
+      { orderId },
+      { $set: { status, statusTH } },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      status: 200,
+      message: `Status updated successfully (${statusTH})`,
+      data: updatedOrder,
+    });
+
+  } catch (error) {
+    console.error('Error updating giveaway status:', error);
+    return res.status(500).json({
+      status: 500,
+      message: 'Server error occurred while updating status.',
+      error: error.message,
+    });
+  }
+};
