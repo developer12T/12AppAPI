@@ -596,7 +596,7 @@ exports.updateStatus = async (req, res) => {
       return res.status(404).json({ status: 404, message: 'Order not found!' })
     }
 
-    if (order.status !== 'pending' && status !== 'canceled') {
+    if (order.status !== 'pending' ) {
       // await session.abortTransaction();
       // session.endSession();
       return res.status(400).json({
