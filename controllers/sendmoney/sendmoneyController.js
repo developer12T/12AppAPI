@@ -13,6 +13,7 @@ const upload = multer({ storage: multer.memoryStorage() }).array(
   1
 )
 const { period, previousPeriod } = require('../../utilities/datetime')
+const { query } = require('mssql')
 exports.addSendMoney = async (req, res) => {
   const channel = req.headers['x-channel']
   const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
@@ -231,7 +232,7 @@ exports.getSendMoney = async (req, res) => {
     const changeSum = await sumByType(Order, 'change');
     const refundSum = await sumByType(Refund, 'refund');
 
-    console.log(saleSum, changeSum, refundSum)
+    // console.log(saleSum, changeSum, refundSum)
 
     const totalToSend = saleSum + (changeSum - refundSum);
 
@@ -324,94 +325,101 @@ exports.getAllSendMoney = async (req, res) => {
 }
 
 exports.getSendMoneyForAcc = async (req, res) => {
-  const { date } = req.query
-  const channel = req.headers['x-channel']
-  const { area, zone } = req.query
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-  const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+  try {
+    const { date, area, zone } = req.query;
+    const channel = req.headers['x-channel'];
 
+    if (!date) {
+      return res.status(400).json({ status: 400, message: 'Missing date parameter' });
+    }
 
+    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel);
 
-  const start = new Date(date + 'T00:00:00.000Z');
-  const end = new Date(date + 'T23:59:59.999Z');
+    const year = Number(date.slice(0, 4));
+    const month = Number(date.slice(5, 7));
+    const day = Number(date.slice(8, 10));
 
-  const data = await SendMoney.aggregate([
-    {
-      $match: {
-        dateAt: {
-          $gte: start,
-          $lte: end
+    // ✅ เวลาไทย -> แปลงเป็น UTC
+    const start = new Date(Date.UTC(year, month - 1, day - 1, 17, 0, 0, 0)); // 00:00 TH
+    const end = new Date(Date.UTC(year, month - 1, day, 16, 59, 59, 999));   // 23:59:59 TH
+
+    const matchStage = {
+      dateAt: { $gte: start, $lte: end }
+    };
+
+    if (area) {
+      matchStage.area = area;
+    } else if (zone) {
+      matchStage.$expr = {
+        $eq: [{ $substrBytes: ['$area', 0, 2] }, zone]
+      };
+    }
+
+    const data = await SendMoney.aggregate([
+      { $match: matchStage },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'saleCode',
+          foreignField: 'saleCode',
+          as: 'user'
+        }
+      },
+      {
+        $unwind: {
+          path: '$user',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          area: '$area',
+          sale: '$user.firstName',
+          STATUS: 'รอตรวจสอบ',
+          TRANSFER_DATE: date,
+          VALUES: '$sendmoney',
+          ZONE: { $substrBytes: ['$area', 0, 2] }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            area: '$area',
+            sale: '$sale',
+            STATUS: '$STATUS',
+            TRANSFER_DATE: '$TRANSFER_DATE',
+            ZONE: '$ZONE'
+          },
+          VALUES: { $sum: '$VALUES' },
+          COUNT: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          AREA: '$_id.area',
+          ZONE: '$_id.ZONE',
+          SALE: '$_id.sale',
+          STATUS: '$_id.STATUS',
+          TRANSFER_DATE: '$_id.TRANSFER_DATE',
+          VALUES: 1,
+          COUNT: 1
         }
       }
-    },
-    {
-      $lookup: {
-        from: 'users',
-        localField: 'saleCode',
-        foreignField: 'saleCode',
-        as: 'user'
-      }
-    },
-    {
-      $unwind: {
-        path: '$user',
-        preserveNullAndEmptyArrays: true
-      }
-    },
-    {
-      $project: {
-        _id: 0,
-        area: '$area',
-        sale: '$user.firstName',
-        STATUS: 'รอตรวจสอบ',
-        TRANSFER_DATE: `${date}`,
-        VALUES: '$sendmoney',
-        ZONE: { $substrBytes: ['$area', 0, 2] }
-      }
-    },
-    {
-      $group: {
-        _id: { area: '$area', sale: '$sale', STATUS: '$STATUS', TRANSFER_DATE: '$TRANSFER_DATE', ZONE: '$ZONE' },
-        VALUES: { $sum: '$VALUES' },
-        COUNT: { $sum: 1 }
-      }
-    },
-    {
-      $project: {
-        _id: 0,                           // ไม่เอา _id
-        AREA: '$_id.area',
-        ZONE: '$_id.ZONE',
-        sale: '$_id.sale',
-        STATUS: '$_id.STATUS',
-        TRANSFER_DATE: '$_id.TRANSFER_DATE',
-        VALUES: 1,                         // เอา field value, COUNT ตามเดิม
-        COUNT: 1
-      }
-    }
-  ]);
+    ]);
 
-  const dataFinal = data.map(item => {
+    res.status(200).json({
+      status: 200,
+      message: 'success',
+      data
+    });
 
-    return {
-      AREA: item.AREA,
-      COUNT: item.COUNT,
-      SALE: item.SALE,
-      STATUS: item.STATUS,
-      TRANSFER_DATE: item.TRANSFER_DATE,
-      VALUES: item.VALUES,
-      ZONE: item.ZONE
-    }
-  })
-
-
-  // const io = getSocket()
-  // io.emit('sendmoney/getSendMoneyForAcc', {});
-
-
-  res.status(200).json({
-    status: 200,
-    message: 'success',
-    data: dataFinal
-  })
-
-}
+  } catch (err) {
+    console.error('[getSendMoneyForAcc] ❌', err);
+    res.status(500).json({
+      status: 500,
+      message: err.message || 'Internal server error'
+    });
+  }
+};
