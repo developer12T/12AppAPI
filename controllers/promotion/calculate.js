@@ -316,6 +316,14 @@ async function applyPromotion(order, channel, res) {
         }
         // console.log(appliedPromotions)
     }
+
+    const seenProIds = new Set();
+    appliedPromotions = appliedPromotions.filter(promo => {
+        if (seenProIds.has(promo.proId)) return false;
+        seenProIds.add(promo.proId);
+        return true;
+    });
+
     return { appliedPromotions }
 }
 
