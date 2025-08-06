@@ -292,17 +292,26 @@ exports.checkout = async (req, res) => {
         qty: u.qty,
         statusMovement: 'OUT'
       }))
-    const qtyproductPro = newOrder.listPromotions.flatMap(u => {
-      const promoDetail = u.listProduct
-        .filter(item => item?.id && item?.unit && item?.qty > 0)
-        .map(item => ({
-          id: item.id,
-          unit: item.unit,
-          qty: item.qty,
-          statusMovement: 'OUT'
-        }))
-      return promoDetail
-    })
+    const seenProIds = new Set();
+
+    const qtyproductPro = newOrder.listPromotions
+      .filter(promo => {
+        if (seenProIds.has(promo.proId)) {
+          return false; // เจอ proId ซ้ำ → ตัดออก
+        }
+        seenProIds.add(promo.proId);
+        return true;
+      })
+      .flatMap(u => {
+        return u.listProduct
+          .filter(item => item?.id && item?.unit && item?.qty > 0)
+          .map(item => ({
+            id: item.id,
+            unit: item.unit,
+            qty: item.qty,
+            statusMovement: 'OUT'
+          }));
+      });
 
     const productQty = Object.values(
       [...qtyproductPro, ...qtyproduct].reduce((acc, cur) => {
