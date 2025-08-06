@@ -568,50 +568,55 @@ exports.getDetail = async (req, res) => {
   }
 }
 
-exports.updateStatus = async (req, res) => {
-  // const session = await require('mongoose').startSession();
-  // session.startTransaction();
-  try {
-    const { orderId, status } = req.body
+const lastUpdateMap = {}; // { ip: timestamp }
 
-    const channel = req.headers['x-channel']
-    const { Promotion } = getModelsByChannel(channel, res, promotionModel)
-    const { Product } = getModelsByChannel(channel, res, productModel)
-    const { Order } = getModelsByChannel(channel, res, orderModel)
-    const { Stock } = getModelsByChannel(channel, res, stockModel)
+exports.updateStatus = async (req, res) => {
+  try {
+    const { orderId, status } = req.body;
+    const userKey = req.ip; // ใช้ IP แทน userId
+    const now = Date.now();
+
+    // กันกดซ้ำภายใน 1 นาที ต่อ IP
+    if (lastUpdateMap[userKey] && (now - lastUpdateMap[userKey]) < 60_000) {
+      const remaining = Math.ceil((60_000 - (now - lastUpdateMap[userKey])) / 1000);
+      return res.status(429).json({
+        status: 429,
+        message: `กรุณารอ ${remaining} วินาทีก่อนกดอีกครั้ง`
+      });
+    }
+
+    // อัปเดตเวลาล่าสุดของ IP นี้
+    lastUpdateMap[userKey] = now;
+
+    // ------- โค้ดเดิมของคุณ -------
+    const channel = req.headers['x-channel'];
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel);
+    const { Product } = getModelsByChannel(channel, res, productModel);
+    const { Order } = getModelsByChannel(channel, res, orderModel);
+    const { Stock } = getModelsByChannel(channel, res, stockModel);
 
     if (!orderId || !status) {
-      // await session.abortTransaction();
-      // session.endSession();
-      return res
-        .status(400)
-        .json({ status: 400, message: 'orderId, status are required!' })
+      return res.status(400).json({ status: 400, message: 'orderId, status are required!' });
     }
 
-    const order = await Order.findOne({ orderId })
-    // .session(session);
+    const order = await Order.findOne({ orderId });
     if (!order) {
-      // await session.abortTransaction();
-      // session.endSession();
-      return res.status(404).json({ status: 404, message: 'Order not found!' })
+      return res.status(404).json({ status: 404, message: 'Order not found!' });
     }
 
-    if (order.status !== 'pending' ) {
-      // await session.abortTransaction();
-      // session.endSession();
+    if (order.status !== 'pending' && status !== 'canceled') {
       return res.status(400).json({
         status: 400,
         message: 'Cannot update status, order is not in pending state!'
-      })
+      });
     }
 
     if (status === 'canceled') {
-      statusTH = 'ยกเลิก'
+      statusTH = 'ยกเลิก';
     }
 
     if (order.listProduct.length > 0) {
       for (const u of order.listProduct) {
-        // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
         const updateResult = await updateStockMongo(
           u,
           order.store.area,
@@ -619,9 +624,8 @@ exports.updateStatus = async (req, res) => {
           'orderCanceled',
           channel,
           res
-        )
-        if (updateResult) return
-
+        );
+        if (updateResult) return;
       }
     }
 
@@ -629,22 +633,21 @@ exports.updateStatus = async (req, res) => {
       for (const item of order.listPromotions) {
         const promotionDetail =
           (await Promotion.findOne({ proId: item.proId })) ||
-          new Promotion({ proId: item.proId })
-        const storeIdToRemove = order.store.storeId
+          new Promotion({ proId: item.proId });
+        const storeIdToRemove = order.store.storeId;
         if (promotionDetail.applicableTo?.isNewStore === true) {
           promotionDetail.applicableTo.completeStoreNew =
             promotionDetail.applicableTo.completeStoreNew?.filter(
               storeId => storeId !== storeIdToRemove
-            ) || []
+            ) || [];
         } else if (promotionDetail.applicableTo?.isbeauty === true) {
           promotionDetail.applicableTo.completeStoreBeauty =
             promotionDetail.applicableTo.completeStoreBeauty?.filter(
               storeId => storeId !== storeIdToRemove
-            ) || []
+            ) || [];
         }
-        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => {});
         for (const u of item.listProduct) {
-          // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
             u,
             order.store.area,
@@ -652,9 +655,8 @@ exports.updateStatus = async (req, res) => {
             'orderCanceled',
             channel,
             res
-          )
-          if (updateResult) return
-
+          );
+          if (updateResult) return;
         }
       }
     }
@@ -663,30 +665,25 @@ exports.updateStatus = async (req, res) => {
       { orderId },
       { $set: { status, statusTH } },
       { new: true }
-    )
+    );
 
-    // await session.commitTransaction();
-    // session.endSession();
-
-    const io = getSocket()
+    const io = getSocket();
     io.emit('order/updateStatus', {
       status: 200,
       message: 'Updated status successfully!',
       data: updatedOrder
-    })
+    });
 
     res.status(200).json({
       status: 200,
       message: 'Updated status successfully!',
       data: updatedOrder
-    })
+    });
   } catch (error) {
-    // await session.abortTransaction();
-    // session.endSession();
-    console.error('Error updating order:', error)
-    res.status(500).json({ status: 500, message: 'Server error' })
+    console.error('Error updating order:', error);
+    res.status(500).json({ status: 500, message: 'Server error' });
   }
-}
+};
 
 exports.addSlip = async (req, res) => {
   try {
