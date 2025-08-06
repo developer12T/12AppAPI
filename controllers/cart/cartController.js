@@ -51,8 +51,8 @@ exports.getCart = async (req, res) => {
       type === 'withdraw'
         ? { type, area }
         : type === 'adjuststock'
-          ? { type, area, withdrawId }
-          : { type, area, storeId }
+        ? { type, area, withdrawId }
+        : { type, area, storeId }
 
     // ใช้ session ใน findOne เฉพาะกรณีที่ต้อง update ข้อมูล (กัน dirty read ใน replica set)
     let cart = await Cart.findOne(cartQuery)
@@ -82,20 +82,10 @@ exports.getCart = async (req, res) => {
       let shouldRecalculatePromotion =
         cart.cartHashProduct !== newCartHashProduct
       // if (shouldRecalculatePromotion) {
-      const promotion = await applyPromotion(summary, channel, res);
-      const quota = await applyQuota(summary, channel, res);
-
-      cart.listQuota = quota.appliedPromotions;
-
-      // ลบโปรโมชั่นซ้ำโดยเช็คจาก proId
-      const seenProIds = new Set();
-      cart.listPromotion = promotion.appliedPromotions.filter(promo => {
-        if (seenProIds.has(promo.proId)) {
-          return false;
-        }
-        seenProIds.add(promo.proId);
-        return true;
-      });
+      const promotion = await applyPromotion(summary, channel, res)
+      const quota = await applyQuota(summary, channel, res)
+      cart.listQuota = quota.appliedPromotions
+      cart.listPromotion = promotion.appliedPromotions
       cart.cartHashProduct = newCartHashProduct
       cart.cartHashPromotion = newCartHashPromotion
       summary.listPromotion = cart.listPromotion
@@ -203,8 +193,8 @@ exports.addProduct = async (req, res) => {
       type === 'withdraw'
         ? { type, area }
         : type === 'adjuststock'
-          ? { type, area, withdrawId }
-          : { type, area, storeId }
+        ? { type, area, withdrawId }
+        : { type, area, storeId }
     const { Cart } = getModelsByChannel(channel, res, cartModel)
 
     let cart = await Cart.findOne(cartQuery)
@@ -409,8 +399,8 @@ exports.adjustProduct = async (req, res) => {
       type === 'withdraw'
         ? { type, area }
         : type === 'adjuststock'
-          ? { type, area, withdrawId }
-          : { type, area, storeId }
+        ? { type, area, withdrawId }
+        : { type, area, storeId }
 
     let cart = await Cart.findOne(cartQuery)
     if (!cart) {

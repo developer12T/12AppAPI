@@ -264,6 +264,19 @@ exports.checkout = async (req, res) => {
 
     const promotion = await applyPromotion(summary, channel, res)
 
+    // ลบโปรโมชั่นซ้ำโดยเช็คจาก proId
+    // const seenProIds = new Set();
+    // cart.listPromotion = promotion.appliedPromotions.filter(promo => {
+    //   // ❌ ตัดโปรที่จำนวนเป็น 0 ออก
+    //   if (promo.proQty === 0) return false;
+
+    //   // ❌ ตัดโปรที่ซ้ำ proId
+    //   if (seenProIds.has(promo.proId)) return false;
+
+    //   seenProIds.add(promo.proId);
+    //   return true;
+    // });
+
     newOrder.listPromotions.forEach(item => {
       const promo = promotion.appliedPromotions.find(
         u => u.proId === item.proId
@@ -275,6 +288,9 @@ exports.checkout = async (req, res) => {
         item.proQty = promo.proQty
       }
     })
+
+
+
 
     for (const item of newOrder.listQuota) {
       await Quota.findOneAndUpdate(
