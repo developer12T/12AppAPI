@@ -18,7 +18,7 @@ const { Op } = require('sequelize')
 
 const { DisributionM3 } = require('../models/cash/master')
 
-async function generateCampaignId (channel, res) {
+async function generateCampaignId(channel, res) {
   const { Campaign } = getModelsByChannel(channel, res, campaignModel)
   const now = new Date()
   const yyyy = now.getFullYear()
@@ -74,8 +74,8 @@ const generateStockId = async (area, warehouse, channel, res) => {
   return `S${currentYear
     .toString()
     .slice(2, 4)}${currentMonth}13${warehouse}${runningNumber
-    .toString()
-    .padStart(4, '0')}`
+      .toString()
+      .padStart(4, '0')}`
 }
 
 const generateOrderId = async (area, warehouse, channel, res) => {
@@ -106,8 +106,8 @@ const generateOrderId = async (area, warehouse, channel, res) => {
   return `${currentYear
     .toString()
     .slice(2, 4)}${currentMonth}${warehouse}${runningNumber
-    .toString()
-    .padStart(3, '0')}`
+      .toString()
+      .padStart(3, '0')}`
 }
 
 const generateRefundId = async (area, warehouse, channel, res) => {
@@ -136,8 +136,8 @@ const generateRefundId = async (area, warehouse, channel, res) => {
   return `${currentYear
     .toString()
     .slice(2, 4)}${currentMonth}93${warehouse}${runningNumber
-    .toString()
-    .padStart(4, '0')}`
+      .toString()
+      .padStart(4, '0')}`
 }
 
 const generateDistributionId = async (area, warehouse, channel, res) => {
@@ -163,7 +163,7 @@ const generateDistributionId = async (area, warehouse, channel, res) => {
     order: [['MGTRNR', 'DESC']],
     raw: true
   })
-
+  // console.log("lastM3", lastM3)
   // หาเลขล่าสุดใน Distribution ปกติ (optional ตามโค้ดเดิม)
   const latestOrder = await Distribution.findOne({
     area,
@@ -176,14 +176,18 @@ const generateDistributionId = async (area, warehouse, channel, res) => {
   })
     .sort({ orderId: -1 })
     .select('orderId')
-
+  // console.log("latestOrder", latestOrder)
   // เช็คเลขรันล่าสุดจาก M3
   let runningNumber = 0
-  if (lastM3 && lastM3.MGTRNR) {
-    // ดึง 2 หลักสุดท้าย (หรือจะปรับให้มากกว่านี้ก็ได้)
-    const lastNum = parseInt(lastM3.MGTRNR.slice(-2))
-    runningNumber = isNaN(lastNum) ? 0 : lastNum + 1
-  } else if (latestOrder) {
+  // if (lastM3 && lastM3.MGTRNR) {
+  // if (lastM3 && lastM3.MGTRNR) {
+  //   // ดึง 2 หลักสุดท้าย (หรือจะปรับให้มากกว่านี้ก็ได้)
+  //   const lastNum = parseInt(lastM3.MGTRNR.slice(-2))
+  //   runningNumber = isNaN(lastNum) ? 0 : lastNum + 1
+  //   console.log("sssssssssssss")
+  // } else if (latestOrder) {
+   if (latestOrder) {
+
     runningNumber = parseInt(latestOrder.orderId.slice(-2)) + 1
   }
 
@@ -216,8 +220,8 @@ const generateGiveawaysId = async (area, warehouse, channel, res) => {
   return `P${currentYear
     .toString()
     .slice(2, 4)}${currentMonth}${warehouse}${runningNumber
-    .toString()
-    .padStart(2, '0')}`
+      .toString()
+      .padStart(2, '0')}`
 }
 
 const generateGivetypeId = async (channel, res) => {
