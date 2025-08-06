@@ -2392,7 +2392,9 @@ exports.getSummarybyChoice = async (req, res) => {
       return res.status(404).json({ status: 404, message: 'Not found order' });
     }
 
-    const total = modelOrder[0].total + (modelChange[0].total - modelRefund[0].total);
+    const total =
+      (modelOrder[0]?.total ?? 0) +
+      ((modelChange[0]?.total ?? 0) - (modelRefund[0]?.total ?? 0));
 
     res.status(200).json({
       status: 200,

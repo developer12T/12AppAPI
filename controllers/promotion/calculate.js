@@ -324,7 +324,7 @@ async function applyPromotion(order, channel, res) {
         seenProIds.add(promo.proId);
         return true;
     });
-    console.log(appliedPromotions)
+    // console.log(appliedPromotions)
 
     return { appliedPromotions }
 }
