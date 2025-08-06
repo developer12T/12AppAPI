@@ -548,10 +548,15 @@ exports.getDetail = async (req, res) => {
     // const io = getSocket()
     // io.emit('order/detail', {});
 
+    const orderWithThaiTime = {
+      ...order.toObject(),
+      createdAt: new Date(order.createdAt.getTime() + 7 * 60 * 60 * 1000)
+    };
+
     res.status(200).json({
       status: 200,
       message: 'successful!',
-      data: [order]
+      data: [orderWithThaiTime]
     })
   } catch (error) {
     console.error(error)
