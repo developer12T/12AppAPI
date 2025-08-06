@@ -183,8 +183,8 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-          .map(item => item.price)
-          .reduce((sum, price) => sum + price, 0)
+        .map(item => item.price)
+        .reduce((sum, price) => sum + price, 0)
       : 0
     const total = subtotal - discountProduct
     const newOrder = new Order({
@@ -699,7 +699,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -936,7 +936,7 @@ exports.OrderToExcel = async (req, res) => {
   // console.log(modelOrder)
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD (date) {
+    function formatDateToThaiYYYYMMDD(date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1051,7 +1051,7 @@ exports.OrderToExcel = async (req, res) => {
       message: 'Not Found Order'
     })
   }
-  function yyyymmddToDdMmYyyy (dateString) {
+  function yyyymmddToDdMmYyyy(dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -1076,7 +1076,7 @@ exports.OrderToExcel = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => {})
+    fs.unlink(tempPath, () => { })
   })
 
   // res.status(200).json({
@@ -2286,95 +2286,110 @@ exports.getSummarybyGroup = async (req, res) => {
 // };
 
 exports.getSummarybyChoice = async (req, res) => {
-  const { storeId, area, date, type } = req.body
-  let dayStr, monthStr, yearStr
+  try {
+    const { storeId, area, date, type } = req.body;
+    const channel = req.headers['x-channel'];
 
-  const channel = req.headers['x-channel']
-
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-
-  if (!date) {
-    return res.status(400).json({
-      status: 400,
-      message: 'Date is required'
-    })
-  }
-
-  if (type == 'day') {
-    dayStr = parseInt(date.substring(0, 2), 10)
-    monthStr = parseInt(date.substring(2, 4), 10)
-    yearStr = parseInt(date.substring(4, 8), 10)
-  } else if (type == 'month') {
-    monthStr = parseInt(date.substring(2, 4), 10)
-    yearStr = parseInt(date.substring(4, 8), 10)
-  } else if (type == 'year') {
-    yearStr = parseInt(date.substring(4, 8), 10)
-  }
-
-  let matchStage = {}
-  matchStage['store.area'] = area
-  if (storeId) {
-    matchStage['store.storeId'] = storeId
-  }
-  const match = {}
-  if (dayStr) match.day = dayStr
-  if (monthStr) match.month = monthStr
-  if (yearStr) match.year = yearStr
-
-  const modelOrder = await Order.aggregate([
-    { $match: matchStage },
-    { $match: { status: { $nin: ['canceled'] } } },
-    {
-      $addFields: {
-        createdAtThai: {
-          $dateAdd: {
-            startDate: '$createdAt',
-            unit: 'hour',
-            amount: 7
-          }
-        }
-      }
-    },
-    {
-      $addFields: {
-        day: { $dayOfMonth: '$createdAtThai' },
-        month: { $month: '$createdAtThai' },
-        year: { $year: '$createdAtThai' }
-      }
-    },
-    {
-      $match: match
-    },
-    {
-      $group: {
-        _id: type,
-        total: { $sum: '$total' }
-      }
-    },
-    {
-      $project: {
-        _id: 0,
-        total: 1
-      }
+    if (!date || !type) {
+      return res.status(400).json({
+        status: 400,
+        message: 'Date and type are required'
+      });
     }
-  ])
 
-  if (modelOrder.length === 0) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found order'
-    })
+    const { Order } = getModelsByChannel(channel, res, orderModel);
+    const { Refund } = getModelsByChannel(channel, res, refundModel);
+    let year, month, day;
+    if (type === 'day') {
+      day = parseInt(date.substring(0, 2), 10);
+      month = parseInt(date.substring(2, 4), 10);
+      year = parseInt(date.substring(4, 8), 10);
+    } else if (type === 'month') {
+      month = parseInt(date.substring(0, 2), 10);
+      year = parseInt(date.substring(2, 6), 10);
+    } else if (type === 'year') {
+      year = parseInt(date.substring(0, 4), 10);
+    } else {
+      return res.status(400).json({ status: 400, message: 'Invalid type' });
+    }
+
+    // แปลงเวลาไทย → UTC
+    let start, end;
+    if (type === 'day') {
+      start = new Date(Date.UTC(year, month - 1, day - 1, 17, 0, 0, 0));
+      end = new Date(Date.UTC(year, month - 1, day, 16, 59, 59, 999));
+    } else if (type === 'month') {
+      start = new Date(Date.UTC(year, month - 1, 1 - 1, 17, 0, 0, 0));
+      end = new Date(Date.UTC(year, month, 0, 16, 59, 59, 999)); // วันสุดท้ายของเดือน
+    } else if (type === 'year') {
+      start = new Date(Date.UTC(year, 0, 1 - 1, 17, 0, 0, 0));
+      end = new Date(Date.UTC(year, 11, 31, 16, 59, 59, 999));
+    }
+
+    let matchStage = {
+      'store.area': area,
+      status: { $nin: ['canceled'] },
+      createdAt: { $gte: start, $lte: end }
+    };
+    if (storeId) {
+      matchStage['store.storeId'] = storeId;
+    }
+
+    const modelOrder = await Order.aggregate([
+      { $match: { type: 'sale' } }, // ✅ syntax ถูกต้อง
+      { $match: matchStage },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$total' }
+        }
+      },
+      { $project: { _id: 0, total: 1 } }
+    ]);
+
+    const modelChange = await Order.aggregate([
+      { $match: { type: 'change' } }, // ✅ syntax ถูกต้อง
+      { $match: matchStage },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$total' }
+        }
+      },
+      { $project: { _id: 0, total: 1 } }
+    ]);
+
+
+    const modelRefund = await Refund.aggregate([
+      { $match: { type: 'refund' } }, // ✅ syntax ถูกต้อง
+      { $match: matchStage },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$total' }
+        }
+      },
+      { $project: { _id: 0, total: 1 } }
+    ]);
+
+    if (modelOrder.length === 0) {
+      return res.status(404).json({ status: 404, message: 'Not found order' });
+    }
+
+    const total = modelOrder[0].total + (modelChange[0].total - modelRefund[0].total);
+
+    res.status(200).json({
+      status: 200,
+      message: 'Successful',
+      total: total
+    });
+
+  } catch (err) {
+    console.error('[getSummarybyChoice ERROR]', err);
+    res.status(500).json({ status: 500, message: err.message });
   }
+};
 
-  // const io = getSocket()
-  // io.emit('order/getSummarybyChoice', {});
-
-  res.status(200).json({
-    status: 200,
-    message: 'Successful',
-    total: modelOrder[0].total
-  })
-}
 
 exports.getSaleSummaryByStore = async (req, res) => {
   const { routeId } = req.body
