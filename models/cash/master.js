@@ -193,6 +193,85 @@ const DisributionM3 = sequelize.define(
   }
 )
 
+const MHDISL = sequelize.define(
+  'MHDISL',
+  {
+    coNo: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'URRIDN'
+    },
+    productId: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'URITNO'
+    },
+    qtyPcs: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      field: 'URTRQT'
+    },
+    withdrawUnit: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'URALUN'
+    },
+    weightGross: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'URGRWE'
+    },
+    weightNet: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'URNEWE'
+    },
+  },
+  {
+    freezeTableName: true,
+    timestamps: false,
+    createdAt: false,
+    updatedAt: false,
+    primaryKey: false
+  }
+)
+
+const MHDISH = sequelize.define(
+  'MHDISH',
+  {
+    coNo: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'OQRIDN'
+    },
+    weightNet: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      primaryKey: true,
+      field: 'OQNEWE'
+    },
+    weightGross: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      field: 'OQGRWE'
+    }
+  },
+  {
+    freezeTableName: true,
+    timestamps: false,
+    createdAt: false,
+    updatedAt: false,
+    primaryKey: false
+  }
+)
+
+
+
+
+
 const Item = sequelize.define('MITMAS', {
   companycode: {
     type: DataTypes.INTEGER,
@@ -367,6 +446,8 @@ module.exports = {
   // ItemFac,
   // ItemMaster,
   // ItemUnit,
+  MHDISH,
+  MHDISL,
   Item,
   ItemConvert,
   Warehouse,
