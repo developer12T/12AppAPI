@@ -135,7 +135,7 @@ module.exports.getPeriodFromDate = function (createdAt) {
   return `${year}${month}`
 }
 
-async function checkProductInStock(Stock, area, period, id) {
+async function checkProductInStock (Stock, area, period, id) {
   const stock = await Stock.findOne({
     area: area,
     period: period,
@@ -151,8 +151,10 @@ module.exports.updateStockMongo = async function (
   type,
   channel,
   stockType = '',
-  res = null) {
+  res = null
+) {
   const { id, unit, qty, condition } = data
+  console.log(data)
 
   const { Stock } = getModelsByChannel(channel, '', stockModel)
   const { Product } = getModelsByChannel(channel, '', productModel)
@@ -242,7 +244,7 @@ module.exports.updateStockMongo = async function (
     throw new Error('Invalid stock update type: ' + type)
 
   // Utility: Check enough balance before deduct
-  async function checkBalanceEnough(area, period, id, pcsNeed) {
+  async function checkBalanceEnough (area, period, id, pcsNeed) {
     const stockDoc = await Stock.findOne(
       { area, period, 'listProduct.productId': id },
       { 'listProduct.$': 1 }
@@ -453,7 +455,6 @@ module.exports.updateStockMongo = async function (
       )
     }
   } else if (type === 'adjustWithdraw') {
-
     const found = await checkProductInStock(Stock, area, period, id)
     if (!found)
       throw new Error(
@@ -482,9 +483,7 @@ module.exports.updateStockMongo = async function (
         }
       )
     }
-
-  }
-  else if (type === 'refund') {
+  } else if (type === 'refund') {
     // In: เพิ่ม stock จากคืนสินค้า
     const found = await checkProductInStock(Stock, area, period, id)
     if (!found)
@@ -605,8 +604,6 @@ module.exports.updateStockMongo = async function (
   }
 }
 
-
-
 module.exports.sendEmail = async function ({ to, cc, subject, html }) {
   try {
     const transporter = nodemailer.createTransport({
@@ -615,37 +612,36 @@ module.exports.sendEmail = async function ({ to, cc, subject, html }) {
       secure: false, // ใช้ STARTTLS
       auth: {
         user: process.env.MY_MAIL_USER, // เช่น your_email@outlook.com
-        pass: process.env.MY_MAIL_PASS,
-      },
-    });
+        pass: process.env.MY_MAIL_PASS
+      }
+    })
 
     const info = await transporter.sendMail({
       from: `"it test" <${process.env.MY_MAIL_USER}>`, // ผู้ส่งต้องเป็น email ที่คุณใช้จริง
       to,
       cc,
       subject,
-      html,
-    });
+      html
+    })
 
-    console.log('✅ Email sent:', info.messageId);
+    console.log('✅ Email sent:', info.messageId)
   } catch (err) {
-    console.error('❌ Failed to send email:', err.message);
+    console.error('❌ Failed to send email:', err.message)
   }
-};
-
+}
 
 exports.generateDateList = function (startDate, endDate) {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  const dates = [];
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  const dates = []
 
   while (start <= end) {
-    const year = start.getFullYear();
-    const month = String(start.getMonth() + 1).padStart(2, '0');
-    const day = String(start.getDate()).padStart(2, '0');
-    dates.push(`${year}-${month}-${day}`);
-    start.setDate(start.getDate() + 1);
+    const year = start.getFullYear()
+    const month = String(start.getMonth() + 1).padStart(2, '0')
+    const day = String(start.getDate()).padStart(2, '0')
+    dates.push(`${year}-${month}-${day}`)
+    start.setDate(start.getDate() + 1)
   }
 
-  return dates;
-};
+  return dates
+}
