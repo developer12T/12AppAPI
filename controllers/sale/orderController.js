@@ -183,8 +183,8 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-          .map(item => item.price)
-          .reduce((sum, price) => sum + price, 0)
+        .map(item => item.price)
+        .reduce((sum, price) => sum + price, 0)
       : 0
     const total = subtotal - discountProduct
     const newOrder = new Order({
@@ -671,7 +671,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -821,7 +821,7 @@ exports.OrderToExcel = async (req, res) => {
   const modelOrder = await Order.aggregate([
     {
       $match: {
-        status: { $ne: 'canceled' },
+        status: { $nin: ['canceled', 'completed'] },
         area: { $ne: 'IT211' },
         type: { $in: ['sale', 'change'] }
       }
@@ -850,7 +850,7 @@ exports.OrderToExcel = async (req, res) => {
   // console.log(modelOrder)
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD (date) {
+    function formatDateToThaiYYYYMMDD(date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -965,7 +965,7 @@ exports.OrderToExcel = async (req, res) => {
       message: 'Not Found Order'
     })
   }
-  function yyyymmddToDdMmYyyy (dateString) {
+  function yyyymmddToDdMmYyyy(dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -990,190 +990,8 @@ exports.OrderToExcel = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => {})
+    fs.unlink(tempPath, () => { })
   })
-
-  // res.status(200).json({
-  //   message: 'Create file successful!'
-  // })
-}
-
-exports.OrderToExcelConJob = async (req, res) => {
-  channel = ['cash', 'credit']
-
-  for (const ch of channel) {
-    const today = new Date()
-    const year = today.getFullYear()
-    const month = String(today.getMonth() + 1).padStart(2, '0') // เดือนเริ่มที่ 0
-    const day = String(today.getDate()).padStart(2, '0')
-
-    const date = `${year}${month}${day}`
-    // console.log('📅 date:', date)
-
-    const start = new Date(
-      `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00`
-    )
-    const end = new Date(
-      `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T23:59:59.999`
-    )
-
-    // const channel = req.headers['x-channel'];
-    const { Order } = getModelsByChannel(ch, res, orderModel)
-
-    // const modelOrder = await Order.find({
-    //   orderId: { $not: /CC/ },
-    // })
-
-    const modelOrder = await Order.aggregate([
-      {
-        $match: {
-          orderId: { $not: /CC/ }
-        }
-      },
-      {
-        $addFields: {
-          createdAtThai: {
-            $dateAdd: {
-              startDate: '$createdAt',
-              unit: 'hour',
-              amount: 7
-            }
-          }
-        }
-      },
-      {
-        $match: {
-          createdAtThai: {
-            $gte: start,
-            $lte: end
-          }
-        }
-      }
-    ])
-
-    // console.log(modelOrder)
-    const tranFromOrder = modelOrder.flatMap(order => {
-      let counterOrder = 0
-
-      const RLDT = dayjs().tz('Asia/Bangkok').format('YYYYMMDD')
-
-      const listProduct = order.listProduct.map(product => {
-        return {
-          proCode: '',
-          id: product.id,
-          name: product.name,
-          group: product.group,
-          brand: product.brand,
-          size: product.size,
-          flavour: product.flavour,
-          qty: product.qty,
-          unit: product.unit,
-          unitName: product.unitName,
-          price: product.price,
-          subtotal: product.subtotal,
-          discount: product.discount,
-          netTotal: product.netTotal
-        }
-      })
-
-      const listPromotion = order.listPromotions.map(promo =>
-        promo.listProduct.map(product => {
-          return {
-            proCode: promo.proCode,
-            id: product.id,
-            name: product.name,
-            group: product.group,
-            brand: product.brand,
-            size: product.size,
-            flavour: product.flavour,
-            qty: product.qty,
-            unit: product.unit,
-            unitName: product.unitName,
-            qtyPcs: product.qtyPcs
-          }
-        })
-      )
-
-      const productIDS = [...listProduct, ...listPromotion].flat()
-
-      // console.log("productIDS",productIDS)
-      return productIDS.map(product => {
-        counterOrder++
-
-        // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
-
-        return {
-          CUNO: order.sale.salePayer,
-          FACI: 'F10',
-          WHLO: order.sale.warehouse,
-          ORNO: '',
-          OAORTP: 'A31',
-          RLDT: RLDT,
-          ADID: order.shipping.shippingId,
-          CUOR: order.orderId,
-          OAOREF: '',
-          OBITNO: product.id,
-          OBBANO: '',
-          OBALUN: product.unit,
-          OBORQA: Number(product.qty),
-          OBSAPR: Number(product.price || 0),
-          OBSPUN: product.unit,
-          OBWHSL: '',
-          ROUT: '',
-          OBPONR: Number(counterOrder),
-          OBDIA2: Number(product.discount || 0),
-          OBRSCD: '',
-          OBCMNO: '',
-          OBPIDE: product.proCode,
-          OBSMCD: order.sale.saleCode,
-          OAORDT: RLDT,
-          OAODAM: '',
-          OECRID: '',
-          OECRAM: '',
-          OECRID2: '',
-          OECRAM2: '',
-          OECRID3: '',
-          OECRAM3: '',
-          OECRID4: '',
-          OECRAM4: '',
-          OECRID5: '',
-          OECRAM5: '',
-          OARESP: '',
-          OAYREF: '',
-          OATEL2: '',
-          OAWCON: '',
-          OAFRE1: '',
-          OATXAP: '',
-          OATXAP2: '',
-          OBDIA1: '',
-          OBDIA3: '',
-          OBDIA4: ''
-        }
-      })
-    })
-
-    if (tranFromOrder.length == 0) {
-      return res.status(404).json({
-        status: 404,
-        message: 'Not Found Order'
-      })
-    }
-
-    const ws = xlsx.utils.json_to_sheet(tranFromOrder)
-
-    const downloadsPath = path.join(
-      os.homedir(),
-      'Downloads',
-      `Order${ch}.xlsx`
-    )
-
-    const wb = xlsx.utils.book_new()
-    xlsx.utils.book_append_sheet(wb, ws, 'Orders')
-
-    xlsx.writeFile(wb, downloadsPath)
-
-    console.log(`✅ ไฟล์ Order${ch}.xlsx ถูกสร้างแล้วที่:`, downloadsPath)
-  }
 
   // res.status(200).json({
   //   message: 'Create file successful!'
@@ -2213,32 +2031,35 @@ exports.getSummarybyChoice = async (req, res) => {
 
     const { Order } = getModelsByChannel(channel, res, orderModel)
     const { Refund } = getModelsByChannel(channel, res, refundModel)
-    let year, month, day
+    let year, month, day;
     if (type === 'day') {
-      day = parseInt(date.substring(0, 2), 10)
-      month = parseInt(date.substring(2, 4), 10)
-      year = parseInt(date.substring(4, 8), 10)
+      day = parseInt(date.substring(0, 2), 10);
+      month = parseInt(date.substring(2, 4), 10);
+      year = parseInt(date.substring(4, 8), 10);
     } else if (type === 'month') {
-      month = parseInt(date.substring(0, 2), 10)
-      year = parseInt(date.substring(2, 6), 10)
+      month = date.substring(2, 4);
+      year = parseInt(date.substring(4, 8), 10);
     } else if (type === 'year') {
-      year = parseInt(date.substring(0, 4), 10)
+      year = parseInt(date.substring(4, 8), 10);
     } else {
-      return res.status(400).json({ status: 400, message: 'Invalid type' })
+      return res.status(400).json({ status: 400, message: 'Invalid type' });
     }
 
     // แปลงเวลาไทย → UTC
-    let start, end
+    let start, end;
     if (type === 'day') {
-      start = new Date(Date.UTC(year, month - 1, day - 1, 17, 0, 0, 0))
-      end = new Date(Date.UTC(year, month - 1, day, 16, 59, 59, 999))
+      start = new Date(Date.UTC(year, month - 1, day - 1, 17, 0, 0, 0)); // 00:00 TH
+      end = new Date(Date.UTC(year, month - 1, day, 16, 59, 59, 999));  // 23:59:59 TH
     } else if (type === 'month') {
-      start = new Date(Date.UTC(year, month - 1, 1 - 1, 17, 0, 0, 0))
-      end = new Date(Date.UTC(year, month, 0, 16, 59, 59, 999)) // วันสุดท้ายของเดือน
+      start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0)); // เริ่มต้นเดือน
+      start.setUTCHours(start.getUTCHours() - 7); // หัก 7 ชม. (UTC = TH - 7)
+      end = new Date(Date.UTC(year, month, 0, 16, 59, 59, 999));  // วันสุดท้ายของเดือน เวลา 23:59:59 TH
     } else if (type === 'year') {
-      start = new Date(Date.UTC(year, 0, 1 - 1, 17, 0, 0, 0))
-      end = new Date(Date.UTC(year, 11, 31, 16, 59, 59, 999))
+      start = new Date(Date.UTC(year - 1, 11, 31, 17, 0, 0, 0)); // 1 ม.ค. เวลา 00:00 TH
+      end = new Date(Date.UTC(year, 11, 31, 16, 59, 59, 999));   // 31 ธ.ค. เวลา 23:59:59 TH
     }
+
+    // console.log(start, end)
 
     let matchStage = {
       'store.area': area,
