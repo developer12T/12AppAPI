@@ -1310,11 +1310,41 @@ exports.getStockQtyNew = async (req, res) => {
     { $match: matchQuery },
     {
       $project: {
-        listProduct: 1,
-        _id: 0
+        _id: 0,
+        listProduct: {
+          $map: {
+            input: {
+              $filter: {
+                input: '$listProduct',
+                as: 'item',
+                cond: { $gt: ['$$item.receiveQty', 0] }
+              }
+            },
+            as: 'item',
+            in: {
+              id: '$$item.id',
+              name: '$$item.name',
+              group: '$$item.group',
+              brand: '$$item.brand',
+              size: '$$item.size',
+              flavour: '$$item.flavour',
+              qty: '$$item.receiveQty',
+              unit: '$$item.receiveUnit',
+              qtyPcs: '$$item.qtyPcs',
+              price: '$$item.price',
+              total: '$$item.total',
+              weightGross: '$$item.weightGross',
+              weightNet: '$$item.weightNet'
+            }
+          }
+        }
       }
     }
   ])
+
+  // console.log(dataWithdraw)
+  // console.log(JSON.stringify(dataWithdraw, null, 2))
+
 
   const dataOrder = await Order.aggregate([
     {
@@ -1382,6 +1412,8 @@ exports.getStockQtyNew = async (req, res) => {
   ])
 
   const allWithdrawProducts = dataWithdraw.flatMap(doc => doc.listProduct || [])
+
+  // console.log("allWithdrawProducts", allWithdrawProducts)
   const allRefundProducts = dataRefund.flatMap(doc => doc.listProduct || [])
   const allOrderProducts = dataOrder.flatMap(doc => doc.listProduct || [])
   const allOrderPromotion = dataOrder.flatMap(doc => doc.listPromotions || [])
@@ -1432,13 +1464,13 @@ exports.getStockQtyNew = async (req, res) => {
       if (acc[key]) {
         acc[key] = {
           ...acc[key], // ⬅️ เอาอันเก่ามาเป็นหลัก
-          qty: (acc[key].qty || 0) + (curr.receiveQty || 0),
+          qty: (acc[key].qty || 0) + (curr.qty || 0),
           qtyPcs: (acc[key].qtyPcs || 0) + (curr.qtyPcs || 0)
         };
       } else {
         acc[key] = {
           ...curr,
-          qty: curr.receiveQty || 0, // ⬅️ ตั้งต้นจาก receiveQty
+          qty: curr.qty || 0, // ⬅️ ตั้งต้นจาก receiveQty
           qtyPcs: curr.qtyPcs || 0
         };
       }
@@ -1715,7 +1747,7 @@ exports.getStockQtyNew = async (req, res) => {
 
       stock -= stockQty * factor
       balance -= balanceQty * factor
-
+      // console.log(withdrawQty)
       summaryStock += (stockQty || 0) * sale
       summaryStockBal += (balanceQty || 0) * sale
       summaryWithdraw += (withdrawQty || 0) * sale
