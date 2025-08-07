@@ -208,6 +208,7 @@ module.exports.updateStockMongo = async function (
       }
     }
   ])
+  // console.log("factorPcsResult",factorPcsResult)
   const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor || 0
   const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor || 0
 
