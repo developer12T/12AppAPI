@@ -1446,7 +1446,7 @@ exports.getStockQtyNew = async (req, res) => {
     }, {})
   );
 
-  console.log(withdrawProductArray)
+  // console.log(withdrawProductArray)
 
   const orderProductArray = Object.values(
     allOrderProducts.reduce((acc, curr) => {
@@ -1984,7 +1984,7 @@ exports.getStockQtyDetail = async (req, res) => {
       orderType: d.orderType,
       orderTypeName: d.orderTypeName,
       sendDate: d.sendDate,
-      total: d.listProduct.qty,
+      total: d.listProduct.receiveQty,
       status: d.status
     }));
 
