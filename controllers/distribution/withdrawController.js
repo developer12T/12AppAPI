@@ -464,9 +464,9 @@ exports.getOrder = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           orderType: o.orderType,
@@ -1049,10 +1049,12 @@ exports.approveWithdraw = async (req, res) => {
       <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
       <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
       <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName}<br>
-      <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
-          }<br>
-      <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
-          }<br>
+      <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
+          '-' + wereHouseName?.wh_name || ''
+        }<br>
+      <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
+          distributionTran.shippingName
+        }<br>
       <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
       <strong>เขต:</strong> ${distributionTran.area}<br>
       <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -1073,10 +1075,7 @@ exports.approveWithdraw = async (req, res) => {
         message: 'successfully',
         data: dataTran
       })
-
-
     } else {
-
       const distributionData = await Distribution.findOneAndUpdate(
         { orderId: orderId, type: 'withdraw' },
         { $set: { statusTH: statusThStr, status: statusStr } },
@@ -1088,11 +1087,7 @@ exports.approveWithdraw = async (req, res) => {
         message: 'successfully',
         data: statusStr
       })
-
-
     }
-
-
   } catch (error) {
     console.error('[❌ approveWithdraw ERROR]', error) // แสดงใน console
     res.status(500).json({
@@ -1103,78 +1098,117 @@ exports.approveWithdraw = async (req, res) => {
   }
 }
 
+const withdrawUpdateTimestamps = {}
+
 exports.saleConfirmWithdraw = async (req, res) => {
   try {
-    const { orderId, status } = req.body;
+    const { orderId, status } = req.body
 
     // ✅ ตรวจสอบ input
     if (!orderId || typeof status !== 'boolean') {
       return res.status(400).json({
         status: 400,
         message: 'Invalid request: orderId and status(boolean) are required.'
-      });
+      })
     }
 
-    const channel = req.headers['x-channel'];
-    const { Distribution } = getModelsByChannel(channel, res, distributionModel);
-    const { Product } = getModelsByChannel(channel, res, productModel);
+    const channel = req.headers['x-channel']
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+
+    // ===== debounce ตรงนี้ =====
+    const now = Date.now()
+    const lastUpdate = withdrawUpdateTimestamps[orderId] || 0
+    const ONE_MINUTE = 60 * 1000
+
+    if (now - lastUpdate < ONE_MINUTE) {
+      return res.status(429).json({
+        status: 429,
+        message:
+          'This order was updated less than 1 minute ago. Please try again later!'
+      })
+    }
+    withdrawUpdateTimestamps[orderId] = now
+    // ===== end debounce =====
 
     // กรณี status === true
     if (status === true) {
       const distributionTran = await Distribution.findOne({
         orderId,
         type: 'withdraw'
-      });
+      })
 
       if (!distributionTran) {
-        return res.status(404).json({ status: 404, message: 'Withdraw transaction not found.' });
+        return res
+          .status(404)
+          .json({ status: 404, message: 'Withdraw transaction not found.' })
       }
 
-      if (!Array.isArray(distributionTran.listProduct) || distributionTran.listProduct.length === 0) {
-        return res.status(400).json({ status: 400, message: 'No products found in withdrawal transaction.' });
+      if (
+        !Array.isArray(distributionTran.listProduct) ||
+        distributionTran.listProduct.length === 0
+      ) {
+        return res.status(400).json({
+          status: 400,
+          message: 'No products found in withdrawal transaction.'
+        })
       }
 
       // ✅ ดึงข้อมูลสินค้าที่เกี่ยวข้อง
-      const listProductId = distributionTran.listProduct.map(i => i.id).filter(Boolean);
-      const productDetail = await Product.find({ id: { $in: listProductId } });
+      const listProductId = distributionTran.listProduct
+        .map(i => i.id)
+        .filter(Boolean)
+      const productDetail = await Product.find({ id: { $in: listProductId } })
 
       // ✅ ดึงข้อมูลรับสินค้าจากระบบ ERP
-      const Receive = await MHDISL.findAll({ where: { coNo: orderId }, raw: true });
-      const ReceiveWeight = await MHDISH.findAll({ where: { coNo: orderId }, raw: true });
+      const Receive = await MHDISL.findAll({
+        where: { coNo: orderId },
+        raw: true
+      })
+      const ReceiveWeight = await MHDISH.findAll({
+        where: { coNo: orderId },
+        raw: true
+      })
 
-      let receivetotalQty = 0;
-      let receivetotal = 0;
+      let receivetotalQty = 0
+      let receivetotal = 0
 
       for (const i of distributionTran.listProduct) {
-        const productIdTrimmed = String(i.id || '').trim();
-        const match = Receive.find(r => String(r.productId || '').trim() === productIdTrimmed);
+        const productIdTrimmed = String(i.id || '').trim()
+        const match = Receive.find(
+          r => String(r.productId || '').trim() === productIdTrimmed
+        )
 
         if (match) {
-          const product = productDetail.find(u => String(u.id || '').trim() === productIdTrimmed);
-          i.receiveUnit = match.withdrawUnit || '';
+          const product = productDetail.find(
+            u => String(u.id || '').trim() === productIdTrimmed
+          )
+          i.receiveUnit = match.withdrawUnit || ''
 
           if (!product || !Array.isArray(product.listUnit)) {
-            i.receiveQty = 0;
-            continue;
+            i.receiveQty = 0
+            continue
           }
 
           const unitFactor = product.listUnit.find(
-            u => String(u.unit || '').trim() === String(match.withdrawUnit || '').trim()
-          );
+            u =>
+              String(u.unit || '').trim() ===
+              String(match.withdrawUnit || '').trim()
+          )
 
           if (!unitFactor || !unitFactor.factor || unitFactor.factor === 0) {
-            i.receiveQty = 0;
-            continue;
+            i.receiveQty = 0
+            continue
           }
 
-          const qty = match.qtyPcs / unitFactor.factor;
-          receivetotalQty += qty;
-          receivetotal += qty * (unitFactor?.price?.sale || 0);
+          const qty = match.qtyPcs / unitFactor.factor
+          receivetotalQty += qty
+          receivetotal += qty * (unitFactor?.price?.sale || 0)
 
-          i.receiveQty = qty;
+          i.receiveQty = qty
         } else {
-          i.receiveUnit = '';
-          i.receiveQty = 0;
+          i.receiveUnit = ''
+          i.receiveQty = 0
         }
       }
 
@@ -1184,7 +1218,7 @@ exports.saleConfirmWithdraw = async (req, res) => {
         await Distribution.updateOne(
           { _id: distributionTran._id },
           { $set: { listProduct: distributionTran.listProduct } }
-        );
+        )
 
         const distributionData = await Distribution.findOneAndUpdate(
           { orderId, type: 'withdraw' },
@@ -1199,20 +1233,20 @@ exports.saleConfirmWithdraw = async (req, res) => {
             }
           },
           { new: true }
-        );
+        )
 
         if (!distributionData) {
           return res.status(404).json({
             status: 404,
             message: 'Withdraw transaction not found for update.'
-          });
+          })
         }
 
         if (!distributionTran.period) {
           return res.status(400).json({
             status: 400,
             message: 'Period is missing in withdrawal transaction.'
-          });
+          })
         }
 
         // ✅ อัปเดตสต๊อก
@@ -1223,8 +1257,8 @@ exports.saleConfirmWithdraw = async (req, res) => {
             unit: u.receiveUnit,
             qty: u.receiveQty,
             statusMovement: 'OUT'
-          }));
-          // console.log("qtyproduct",qtyproduct)
+          }))
+        // console.log("qtyproduct",qtyproduct)
         for (const item of qtyproduct) {
           const updateResult = await updateStockMongo(
             item,
@@ -1233,26 +1267,26 @@ exports.saleConfirmWithdraw = async (req, res) => {
             'withdraw',
             channel,
             res
-          );
-          if (updateResult) return;
+          )
+          if (updateResult) return
         }
 
         // ✅ ส่ง socket แจ้งผล
-        const io = getSocket();
+        const io = getSocket()
         io.emit('distribution/saleConfirmWithdraw', {
           status: 200,
           message: 'Confirm withdraw success'
-        });
+        })
 
         return res.status(200).json({
           status: 200,
           message: 'Confirm withdraw success'
-        });
+        })
       } else {
         return res.status(409).json({
           status: 409,
           message: 'Status withdraw is pending'
-        });
+        })
       }
     }
 
@@ -1261,14 +1295,13 @@ exports.saleConfirmWithdraw = async (req, res) => {
       return res.status(200).json({
         status: 200,
         message: 'The withdrawal request has been rejected'
-      });
+      })
     }
-
   } catch (error) {
-    console.error('[❌ saleConfirmWithdraw ERROR]', error);
+    console.error('[❌ saleConfirmWithdraw ERROR]', error)
     return res.status(500).json({
       status: 500,
       message: error.message || 'Internal server error'
-    });
+    })
   }
-};
+}
