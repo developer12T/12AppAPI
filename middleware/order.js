@@ -154,7 +154,7 @@ module.exports.updateStockMongo = async function (
   res = null
 ) {
   const { id, unit, qty, condition } = data
-  console.log(data)
+  // console.log(data)
 
   const { Stock } = getModelsByChannel(channel, '', stockModel)
   const { Product } = getModelsByChannel(channel, '', productModel)

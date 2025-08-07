@@ -464,9 +464,9 @@ exports.getOrder = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-                fullname: `${userData.firstName} ${userData.surName}`,
-                tel: `${userData.tel}`
-              }
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
             : null,
           orderId: o.orderId,
           orderType: o.orderType,
@@ -1049,12 +1049,10 @@ exports.approveWithdraw = async (req, res) => {
       <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
       <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
       <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName}<br>
-      <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
-          '-' + wereHouseName?.wh_name || ''
-        }<br>
-      <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
-          distributionTran.shippingName
-        }<br>
+      <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
+          }<br>
+      <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
+          }<br>
       <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
       <strong>เขต:</strong> ${distributionTran.area}<br>
       <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -1251,14 +1249,14 @@ exports.saleConfirmWithdraw = async (req, res) => {
 
         // ✅ อัปเดตสต๊อก
         const qtyproduct = distributionTran.listProduct
-          .filter(u => u?.id && u?.unit && u?.qty > 0)
+          .filter(u => u?.id && u?.receiveUnit && u?.receiveQty > 0)
           .map(u => ({
             id: u.id,
             unit: u.receiveUnit,
             qty: u.receiveQty,
             statusMovement: 'OUT'
           }))
-        // console.log("qtyproduct",qtyproduct)
+
         for (const item of qtyproduct) {
           const updateResult = await updateStockMongo(
             item,
