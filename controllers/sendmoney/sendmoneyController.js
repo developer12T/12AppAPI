@@ -323,8 +323,8 @@ exports.getAllSendMoney = async (req, res) => {
 
 exports.getSendMoneyForAcc = async (req, res) => {
   try {
-    const { date, area, zone } = req.query
-    const channel = req.headers['x-channel']
+    const { date, area, zone, channel } = req.query
+    // const channel = req.headers['x-channel']
 
     if (!date) {
       return res
