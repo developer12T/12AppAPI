@@ -821,7 +821,7 @@ exports.OrderToExcel = async (req, res) => {
   const modelOrder = await Order.aggregate([
     {
       $match: {
-        status: { $nin: ['canceled', 'completed'] },
+        status: { $nin: ['canceled'] },
         area: { $ne: 'IT211' },
         type: { $in: ['sale', 'change'] }
       }
@@ -910,7 +910,7 @@ exports.OrderToExcel = async (req, res) => {
       // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
 
       return {
-        CUNO: order.sale.salePayer,
+        CUNO: order.store.storeId,
         FACI: 'F10',
         WHLO: order.sale.warehouse,
         ORNO: '',
