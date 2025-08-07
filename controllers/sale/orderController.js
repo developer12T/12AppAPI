@@ -183,8 +183,8 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-        .map(item => item.price)
-        .reduce((sum, price) => sum + price, 0)
+          .map(item => item.price)
+          .reduce((sum, price) => sum + price, 0)
       : 0
     const total = subtotal - discountProduct
     const newOrder = new Order({
@@ -671,7 +671,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -822,8 +822,8 @@ exports.OrderToExcel = async (req, res) => {
     {
       $match: {
         status: { $nin: ['canceled'] },
-        area: { $ne: 'IT211' },
-        type: { $in: ['sale', 'change'] }
+        'store.area': { $ne: 'IT211' },
+        type: { $in: ['sale'] }
       }
     },
     {
@@ -850,7 +850,7 @@ exports.OrderToExcel = async (req, res) => {
   // console.log(modelOrder)
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -965,7 +965,7 @@ exports.OrderToExcel = async (req, res) => {
       message: 'Not Found Order'
     })
   }
-  function yyyymmddToDdMmYyyy(dateString) {
+  function yyyymmddToDdMmYyyy (dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -990,7 +990,7 @@ exports.OrderToExcel = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => { })
+    fs.unlink(tempPath, () => {})
   })
 
   // res.status(200).json({
@@ -2031,32 +2031,32 @@ exports.getSummarybyChoice = async (req, res) => {
 
     const { Order } = getModelsByChannel(channel, res, orderModel)
     const { Refund } = getModelsByChannel(channel, res, refundModel)
-    let year, month, day;
+    let year, month, day
     if (type === 'day') {
-      day = parseInt(date.substring(0, 2), 10);
-      month = parseInt(date.substring(2, 4), 10);
-      year = parseInt(date.substring(4, 8), 10);
+      day = parseInt(date.substring(0, 2), 10)
+      month = parseInt(date.substring(2, 4), 10)
+      year = parseInt(date.substring(4, 8), 10)
     } else if (type === 'month') {
-      month = date.substring(2, 4);
-      year = parseInt(date.substring(4, 8), 10);
+      month = date.substring(2, 4)
+      year = parseInt(date.substring(4, 8), 10)
     } else if (type === 'year') {
-      year = parseInt(date.substring(4, 8), 10);
+      year = parseInt(date.substring(4, 8), 10)
     } else {
-      return res.status(400).json({ status: 400, message: 'Invalid type' });
+      return res.status(400).json({ status: 400, message: 'Invalid type' })
     }
 
     // แปลงเวลาไทย → UTC
-    let start, end;
+    let start, end
     if (type === 'day') {
-      start = new Date(Date.UTC(year, month - 1, day - 1, 17, 0, 0, 0)); // 00:00 TH
-      end = new Date(Date.UTC(year, month - 1, day, 16, 59, 59, 999));  // 23:59:59 TH
+      start = new Date(Date.UTC(year, month - 1, day - 1, 17, 0, 0, 0)) // 00:00 TH
+      end = new Date(Date.UTC(year, month - 1, day, 16, 59, 59, 999)) // 23:59:59 TH
     } else if (type === 'month') {
-      start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0)); // เริ่มต้นเดือน
-      start.setUTCHours(start.getUTCHours() - 7); // หัก 7 ชม. (UTC = TH - 7)
-      end = new Date(Date.UTC(year, month, 0, 16, 59, 59, 999));  // วันสุดท้ายของเดือน เวลา 23:59:59 TH
+      start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0)) // เริ่มต้นเดือน
+      start.setUTCHours(start.getUTCHours() - 7) // หัก 7 ชม. (UTC = TH - 7)
+      end = new Date(Date.UTC(year, month, 0, 16, 59, 59, 999)) // วันสุดท้ายของเดือน เวลา 23:59:59 TH
     } else if (type === 'year') {
-      start = new Date(Date.UTC(year - 1, 11, 31, 17, 0, 0, 0)); // 1 ม.ค. เวลา 00:00 TH
-      end = new Date(Date.UTC(year, 11, 31, 16, 59, 59, 999));   // 31 ธ.ค. เวลา 23:59:59 TH
+      start = new Date(Date.UTC(year - 1, 11, 31, 17, 0, 0, 0)) // 1 ม.ค. เวลา 00:00 TH
+      end = new Date(Date.UTC(year, 11, 31, 16, 59, 59, 999)) // 31 ธ.ค. เวลา 23:59:59 TH
     }
 
     // console.log(start, end)

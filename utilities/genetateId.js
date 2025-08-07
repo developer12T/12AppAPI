@@ -18,7 +18,7 @@ const { Op } = require('sequelize')
 
 const { DisributionM3 } = require('../models/cash/master')
 
-async function generateCampaignId(channel, res) {
+async function generateCampaignId (channel, res) {
   const { Campaign } = getModelsByChannel(channel, res, campaignModel)
   const now = new Date()
   const yyyy = now.getFullYear()
@@ -74,8 +74,8 @@ const generateStockId = async (area, warehouse, channel, res) => {
   return `S${currentYear
     .toString()
     .slice(2, 4)}${currentMonth}13${warehouse}${runningNumber
-      .toString()
-      .padStart(4, '0')}`
+    .toString()
+    .padStart(4, '0')}`
 }
 
 const generateOrderId = async (area, warehouse, channel, res) => {
@@ -86,30 +86,27 @@ const generateOrderId = async (area, warehouse, channel, res) => {
 
   const latestOrder = await Order.findOne({
     'store.area': area,
-    // type:'sale',
     createdAt: {
       $gte: new Date(`${new Date().getFullYear()}-${currentMonth}-01`),
       $lt: new Date(
         `${new Date().getFullYear()}-${parseInt(currentMonth) + 1}-01`
       )
-    }
-    // ,status: { $ne: 'canceled' }
+    },
+    status: { $ne: 'canceled' }
   })
     .sort({ orderId: -1 })
     .select('orderId')
 
-  // console.log(latestOrder)
   let runningNumber = latestOrder
-    ? parseInt(latestOrder.orderId.slice(-3)) + 1
+    ? parseInt(latestOrder.orderId.slice(-4)) + 1
     : 1
 
   return `${currentYear
     .toString()
-    .slice(2, 4)}${currentMonth}${warehouse}${runningNumber
-      .toString()
-      .padStart(3, '0')}`
+    .slice(2, 4)}${currentMonth}13${warehouse}${runningNumber
+    .toString()
+    .padStart(4, '0')}`
 }
-
 const generateRefundId = async (area, warehouse, channel, res) => {
   const currentYear = new Date().getFullYear() + 543
   const currentMonth = (new Date().getMonth() + 1).toString().padStart(2, '0')
@@ -136,8 +133,8 @@ const generateRefundId = async (area, warehouse, channel, res) => {
   return `${currentYear
     .toString()
     .slice(2, 4)}${currentMonth}93${warehouse}${runningNumber
-      .toString()
-      .padStart(4, '0')}`
+    .toString()
+    .padStart(4, '0')}`
 }
 
 const generateDistributionId = async (area, warehouse, channel, res) => {
@@ -186,8 +183,7 @@ const generateDistributionId = async (area, warehouse, channel, res) => {
   //   runningNumber = isNaN(lastNum) ? 0 : lastNum + 1
   //   console.log("sssssssssssss")
   // } else if (latestOrder) {
-   if (latestOrder) {
-
+  if (latestOrder) {
     runningNumber = parseInt(latestOrder.orderId.slice(-2)) + 1
   }
 
@@ -220,8 +216,8 @@ const generateGiveawaysId = async (area, warehouse, channel, res) => {
   return `P${currentYear
     .toString()
     .slice(2, 4)}${currentMonth}${warehouse}${runningNumber
-      .toString()
-      .padStart(2, '0')}`
+    .toString()
+    .padStart(2, '0')}`
 }
 
 const generateGivetypeId = async (channel, res) => {
