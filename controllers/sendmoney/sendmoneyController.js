@@ -67,7 +67,7 @@ exports.addSendMoney = async (req, res) => {
       { _id: existData[0]._id },
       {
         $inc: {
-          sendmoney: + sendmoney
+          sendmoney: +sendmoney
         },
         salePayer: salePayer,
         saleCode: saleCode
@@ -78,12 +78,12 @@ exports.addSendMoney = async (req, res) => {
   const io = getSocket()
   io.emit('sendmoney/addSendMoney', {
     status: 200,
-    message: 'success',
-  });
+    message: 'success'
+  })
 
   res.status(200).json({
     status: 200,
-    message: 'success',
+    message: 'success'
   })
 }
 
@@ -168,7 +168,7 @@ exports.addSendMoneyImage = async (req, res) => {
       io.emit('sendmoney/addSendMoneyImage', {
         status: '200',
         message: 'Sendmoney upload successfully'
-      });
+      })
 
       res.status(200).json({
         status: '200',
@@ -183,35 +183,33 @@ exports.addSendMoneyImage = async (req, res) => {
 
 exports.getSendMoney = async (req, res) => {
   try {
-    const channel = req.headers['x-channel'];
-    const { area, date } = req.body;
+    const channel = req.headers['x-channel']
+    const { area, date } = req.body
 
     if (!area || !date || date.length !== 8) {
       return res.status(400).json({
         message: 'Invalid request: area and date(YYYYMMDD) are required.'
-      });
+      })
     }
 
-    const { Order } = getModelsByChannel(channel, res, orderModel);
-    const { Refund } = getModelsByChannel(channel, res, refundModel);
-    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel);
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
 
-    const thOffsetHours = 7;
-    const year = Number(date.substring(0, 4));
-    const month = Number(date.substring(4, 6));
-    const day = Number(date.substring(6, 8));
+    const thOffsetHours = 7
+    const year = Number(date.substring(0, 4))
+    const month = Number(date.substring(4, 6))
+    const day = Number(date.substring(6, 8))
 
-
-
-    const startOfDayTH = new Date(Date.UTC(year, month - 1, day, -7, 0, 0, 0)); // 00:00 TH
-    const endOfDayTH = new Date(Date.UTC(year, month - 1, day, 16, 59, 59, 999)); // 23:59 TH
+    const startOfDayTH = new Date(Date.UTC(year, month - 1, day, -7, 0, 0, 0)) // 00:00 TH
+    const endOfDayTH = new Date(Date.UTC(year, month - 1, day, 16, 59, 59, 999)) // 23:59 TH
 
     // ✅ Fix เวลา UTC เป็น 10:00 ของวันนั้น และ 09:59:59.999 ของวันถัดไป
-    const startOfDayUTC = new Date(startOfDayTH.getTime() - thOffsetHours);
-    const endOfDayUTC = new Date(endOfDayTH.getTime() - thOffsetHours);
+    const startOfDayUTC = new Date(startOfDayTH.getTime() - thOffsetHours)
+    const endOfDayUTC = new Date(endOfDayTH.getTime() - thOffsetHours)
 
-    console.log("🌐 startOfDayUTC:", startOfDayUTC.toISOString());
-    console.log("🌐 endOfDayUTC:", endOfDayUTC.toISOString());
+    console.log('🌐 startOfDayUTC:', startOfDayUTC.toISOString())
+    console.log('🌐 endOfDayUTC:', endOfDayUTC.toISOString())
 
     const sumByType = async (Model, type) => {
       const result = await Model.aggregate([
@@ -224,17 +222,17 @@ exports.getSendMoney = async (req, res) => {
           }
         },
         { $group: { _id: null, sendmoney: { $sum: '$total' } } }
-      ]);
-      return result.length > 0 ? result[0].sendmoney : 0;
-    };
+      ])
+      return result.length > 0 ? result[0].sendmoney : 0
+    }
 
-    const saleSum = await sumByType(Order, 'sale');
-    const changeSum = await sumByType(Order, 'change');
-    const refundSum = await sumByType(Refund, 'refund');
+    const saleSum = await sumByType(Order, 'sale')
+    const changeSum = await sumByType(Order, 'change')
+    const refundSum = await sumByType(Refund, 'refund')
 
     // console.log(saleSum, changeSum, refundSum)
 
-    const totalToSend = saleSum + (changeSum - refundSum);
+    const totalToSend = saleSum + (changeSum - refundSum)
 
     const alreadySentDocs = await SendMoney.aggregate([
       {
@@ -249,10 +247,11 @@ exports.getSendMoney = async (req, res) => {
           totalSent: { $sum: '$sendmoney' }
         }
       }
-    ]);
+    ])
 
-    const alreadySent = alreadySentDocs.length > 0 ? alreadySentDocs[0].totalSent : 0;
-    const remaining = parseFloat((totalToSend - alreadySent).toFixed(2));
+    const alreadySent =
+      alreadySentDocs.length > 0 ? alreadySentDocs[0].totalSent : 0
+    const remaining = parseFloat((totalToSend - alreadySent).toFixed(2))
 
     await SendMoney.updateMany(
       {
@@ -260,10 +259,11 @@ exports.getSendMoney = async (req, res) => {
         dateAt: { $gte: startOfDayUTC, $lte: endOfDayUTC }
       },
       { $set: { different: remaining } }
-    );
+    )
 
     // แปลงกลับเป็นเวลาไทยเพื่อส่งออก
-    const toThaiTime = (utcDate) => new Date(utcDate.getTime() + thOffsetHours * 60 * 60 * 1000);
+    const toThaiTime = utcDate =>
+      new Date(utcDate.getTime() + thOffsetHours * 60 * 60 * 1000)
 
     res.status(200).json({
       message: 'success',
@@ -275,43 +275,41 @@ exports.getSendMoney = async (req, res) => {
         start: startOfDayUTC,
         end: endOfDayUTC
       }
-    });
-
+    })
   } catch (err) {
-    console.error('[getSendMoney Error]', err);
-    res.status(500).json({ message: 'Internal Server Error', error: err.message });
+    console.error('[getSendMoney Error]', err)
+    res
+      .status(500)
+      .json({ message: 'Internal Server Error', error: err.message })
   }
-};
-
-
+}
 
 exports.getAllSendMoney = async (req, res) => {
-
   const channel = req.headers['x-channel']
   const { area, zone } = req.query
   const { Order } = getModelsByChannel(channel, res, orderModel)
   const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
-  let pipeline = [];
+  let pipeline = []
   pipeline.push({
     $addFields: {
-      zone: { $substrBytes: ["$area", 0, 2] }
+      zone: { $substrBytes: ['$area', 0, 2] }
     }
-  });
+  })
 
-  let matchStage = {};
+  let matchStage = {}
 
   if (area) {
-    matchStage.area = area;
+    matchStage.area = area
   }
   if (zone) {
-    matchStage.zone = zone;
+    matchStage.zone = zone
   }
 
   if (Object.keys(matchStage).length > 0) {
-    pipeline.push({ $match: matchStage });
+    pipeline.push({ $match: matchStage })
   }
 
-  const sendMoneyData = await SendMoney.aggregate(pipeline);
+  const sendMoneyData = await SendMoney.aggregate(pipeline)
 
   // const io = getSocket()
   // io.emit('sendmoney/getAllSendMoney', {});
@@ -321,38 +319,39 @@ exports.getAllSendMoney = async (req, res) => {
     message: 'success',
     data: sendMoneyData
   })
-
 }
 
 exports.getSendMoneyForAcc = async (req, res) => {
   try {
-    const { date, area, zone } = req.query;
-    const channel = req.headers['x-channel'];
+    const { date, area, zone } = req.query
+    const channel = req.headers['x-channel']
 
     if (!date) {
-      return res.status(400).json({ status: 400, message: 'Missing date parameter' });
+      return res
+        .status(400)
+        .json({ status: 400, message: 'Missing date parameter' })
     }
 
-    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel);
+    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
 
-    const year = Number(date.slice(0, 4));
-    const month = Number(date.slice(5, 7));
-    const day = Number(date.slice(8, 10));
+    const year = Number(date.slice(0, 4))
+    const month = Number(date.slice(5, 7))
+    const day = Number(date.slice(8, 10))
 
     // ✅ เวลาไทย -> แปลงเป็น UTC
-    const start = new Date(Date.UTC(year, month - 1, day - 1, 17, 0, 0, 0)); // 00:00 TH
-    const end = new Date(Date.UTC(year, month - 1, day, 16, 59, 59, 999));   // 23:59:59 TH
+    const start = new Date(Date.UTC(year, month - 1, day - 1, 17, 0, 0, 0)) // 00:00 TH
+    const end = new Date(Date.UTC(year, month - 1, day, 16, 59, 59, 999)) // 23:59:59 TH
 
     const matchStage = {
       dateAt: { $gte: start, $lte: end }
-    };
+    }
 
     if (area) {
-      matchStage.area = area;
+      matchStage.area = area
     } else if (zone) {
       matchStage.$expr = {
         $eq: [{ $substrBytes: ['$area', 0, 2] }, zone]
-      };
+      }
     }
 
     const data = await SendMoney.aggregate([
@@ -403,23 +402,22 @@ exports.getSendMoneyForAcc = async (req, res) => {
           SALE: '$_id.sale',
           STATUS: '$_id.STATUS',
           TRANSFER_DATE: '$_id.TRANSFER_DATE',
-          VALUES: 1,
-          COUNT: 1
+          VALUES: { $toString: '$VALUES' }, // แปลง VALUES เป็น string
+          COUNT: { $toString: '$COUNT' } // แปลง COUNT เป็น string
         }
       }
-    ]);
+    ])
 
     res.status(200).json({
       status: 200,
       message: 'success',
       data
-    });
-
+    })
   } catch (err) {
-    console.error('[getSendMoneyForAcc] ❌', err);
+    console.error('[getSendMoneyForAcc] ❌', err)
     res.status(500).json({
       status: 500,
       message: err.message || 'Internal server error'
-    });
+    })
   }
-};
+}
