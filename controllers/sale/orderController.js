@@ -635,8 +635,18 @@ exports.updateStatus = async (req, res) => {
       })
     }
 
-    if (status === 'canceled') {
+    let newOrderId = orderId
+
+    if (status === 'canceled' && !orderId.endsWith('CC')) {
       statusTH = 'ยกเลิก'
+      const isDuplicate = await Order.findOne({ orderId: newOrderId })
+      if (isDuplicate) {
+        let counter = 1
+        while (await Order.findOne({ orderId: `${orderId}CC${counter}` })) {
+          counter++
+        }
+        newOrderId = `${orderId}CC${counter}`
+      }
     }
 
     if (order.listProduct.length > 0) {
@@ -689,7 +699,7 @@ exports.updateStatus = async (req, res) => {
 
     const updatedOrder = await Order.findOneAndUpdate(
       { orderId },
-      { $set: { status, statusTH } },
+      { $set: { status, statusTH, orderId: newOrderId } },
       { new: true }
     )
 
