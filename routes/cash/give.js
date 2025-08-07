@@ -10,7 +10,8 @@ const {
   getGiveaways,
   getGiveawaysDetail,
   addimageGive,
-  approveGive
+  approveGive,
+  updateStatus
 } = require('../../controllers/give/giveController')
 
 const router = express.Router()
@@ -26,7 +27,7 @@ router.get('/getGiveaways', getGiveaways)
 
 
 router.post('/approveGive', approveGive)
-
+router.post('/updateStatus', updateStatus)
 
 
 

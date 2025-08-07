@@ -637,64 +637,7 @@ exports.updateStatus = async (req, res) => {
           res
         )
         if (updateResult) return
-        // const factorPcsResult = await Product.aggregate([
-        //   { $match: { id: u.id } },
-        //   {
-        //     $project: {
-        //       id: 1,
-        //       listUnit: {
-        //         $filter: {
-        //           input: '$listUnit',
-        //           as: 'unitItem',
-        //           cond: { $eq: ['$$unitItem.unit', u.unit] }
-        //         }
-        //       }
-        //     }
-        //   }
-        // ])
-        // // .session(session);
 
-        // const factorCtnResult =
-        //   (await Product.aggregate([
-        //     { $match: { id: u.id } },
-        //     {
-        //       $project: {
-        //         id: 1,
-        //         listUnit: {
-        //           $filter: {
-        //             input: '$listUnit',
-        //             as: 'unitItem',
-        //             cond: { $eq: ['$$unitItem.unit', 'CTN'] }
-        //           }
-        //         }
-        //       }
-        //     }
-        //   ])) || []
-
-        // const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0
-        // const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 1
-        // const factorPcsQty = u.qty * factorPcs
-        // const factorCtnQty = Math.floor(factorPcsQty / factorCtn)
-        // await Stock.findOneAndUpdate(
-        //   {
-        //     area: order.store.area,
-        //     period: order.period,
-        //     'listProduct.productId': u.id
-        //   },
-        //   {
-        //     $inc: {
-        //       'listProduct.$[elem].stockOutPcs': -factorPcsQty,
-        //       'listProduct.$[elem].balancePcs': +factorPcsQty,
-        //       'listProduct.$[elem].stockOutCtn': -factorCtnQty,
-        //       'listProduct.$[elem].balanceCtn': +factorCtnQty
-        //     }
-        //   },
-        //   {
-        //     arrayFilters: [{ 'elem.productId': u.id }],
-        //     new: true
-        //     // session
-        //   }
-        // )
       }
     }
 
@@ -727,64 +670,7 @@ exports.updateStatus = async (req, res) => {
             res
           )
           if (updateResult) return
-          // const factorPcsResult = await Product.aggregate([
-          //   { $match: { id: u.id } },
-          //   {
-          //     $project: {
-          //       id: 1,
-          //       listUnit: {
-          //         $filter: {
-          //           input: '$listUnit',
-          //           as: 'unitItem',
-          //           cond: { $eq: ['$$unitItem.unit', u.unit] }
-          //         }
-          //       }
-          //     }
-          //   }
-          // ])
-          // // .session(session);
 
-          // const factorCtnResult =
-          //   (await Product.aggregate([
-          //     { $match: { id: u.id } },
-          //     {
-          //       $project: {
-          //         id: 1,
-          //         listUnit: {
-          //           $filter: {
-          //             input: '$listUnit',
-          //             as: 'unitItem',
-          //             cond: { $eq: ['$$unitItem.unit', 'CTN'] }
-          //           }
-          //         }
-          //       }
-          //     }
-          //   ])) || []
-
-          // const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor ?? 0
-          // const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor ?? 1
-          // const factorPcsQty = u.qty * factorPcs
-          // const factorCtnQty = Math.floor(factorPcsQty / factorCtn)
-          // await Stock.findOneAndUpdate(
-          //   {
-          //     area: order.store.area,
-          //     period: order.period,
-          //     'listProduct.productId': u.id
-          //   },
-          //   {
-          //     $inc: {
-          //       'listProduct.$[elem].stockOutPcs': -factorPcsQty,
-          //       'listProduct.$[elem].balancePcs': +factorPcsQty,
-          //       'listProduct.$[elem].stockOutCtn': -factorCtnQty,
-          //       'listProduct.$[elem].balanceCtn': +factorCtnQty
-          //     }
-          //   },
-          //   {
-          //     arrayFilters: [{ 'elem.productId': u.id }],
-          //     new: true
-          //     // session
-          //   }
-          // )
         }
       }
     }
