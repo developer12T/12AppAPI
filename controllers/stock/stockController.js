@@ -1424,21 +1424,29 @@ exports.getStockQtyNew = async (req, res) => {
     }, {})
   )
 
+  // console.log(allWithdrawProducts)
+
   const withdrawProductArray = Object.values(
     allWithdrawProducts.reduce((acc, curr) => {
-      const key = `${curr.id}_${curr.unit}`
+      const key = `${curr.id}_${curr.receiveUnit}`;
       if (acc[key]) {
         acc[key] = {
-          ...curr,
-          qty: (acc[key].qty || 0) + (curr.qty || 0),
+          ...acc[key], // ⬅️ เอาอันเก่ามาเป็นหลัก
+          qty: (acc[key].qty || 0) + (curr.receiveQty || 0),
           qtyPcs: (acc[key].qtyPcs || 0) + (curr.qtyPcs || 0)
-        }
+        };
       } else {
-        acc[key] = { ...curr }
+        acc[key] = {
+          ...curr,
+          qty: curr.receiveQty || 0, // ⬅️ ตั้งต้นจาก receiveQty
+          qtyPcs: curr.qtyPcs || 0
+        };
       }
-      return acc
+      return acc;
     }, {})
-  )
+  );
+
+  console.log(withdrawProductArray)
 
   const orderProductArray = Object.values(
     allOrderProducts.reduce((acc, curr) => {
@@ -1987,7 +1995,7 @@ exports.getStockQtyDetail = async (req, res) => {
     }));
 
     const refundDocs = await Refund.aggregate([
-      { $match: { 'store.area': area, period ,status: { $ne: 'canceled' }} },
+      { $match: { 'store.area': area, period, status: { $ne: 'canceled' } } },
       {
         $addFields: {
           createdAtTH: convertToTHTime('$createdAt'),
@@ -2004,7 +2012,7 @@ exports.getStockQtyDetail = async (req, res) => {
     ]);
 
     const newRefund = await Promise.all(refundDocs.map(async refund => {
-      const change = await Order.findOne({ reference: refund.orderId, type: 'change',status: { $ne: 'canceled' } }).select('total').lean();
+      const change = await Order.findOne({ reference: refund.orderId, type: 'change', status: { $ne: 'canceled' } }).select('total').lean();
       return {
         orderId: refund.orderId,
         storeId: refund.store?.storeId || '',
@@ -2070,7 +2078,7 @@ exports.getStockQtyDetail = async (req, res) => {
     );
 
     const orderChangeDocs = await Order.aggregate([
-      { $match: { 'store.area': area, period, type: 'change' ,status: { $ne: 'canceled' }} },
+      { $match: { 'store.area': area, period, type: 'change', status: { $ne: 'canceled' } } },
       {
         $addFields: {
           createdAtTH: convertToTHTime('$createdAt'),
@@ -2106,7 +2114,7 @@ exports.getStockQtyDetail = async (req, res) => {
 
 
     const orderGiveDocs = await Giveaway.aggregate([
-      { $match: { 'store.area': area, period, type: 'give' ,status: { $ne: 'canceled' }} },
+      { $match: { 'store.area': area, period, type: 'give', status: { $ne: 'canceled' } } },
       {
         $addFields: {
           createdAtTH: convertToTHTime('$createdAt'),
@@ -2176,8 +2184,8 @@ exports.getStockQtyDetail = async (req, res) => {
           changeDetail: changeDetail,
           change: changeStock,
           changeSum: calculateTotalPrice(productData.listUnit, changeStock, 'sale'),
-          giveDetail:giveDetail,
-          give:giveStock,
+          giveDetail: giveDetail,
+          give: giveStock,
           giveSum: calculateTotalPrice(productData.listUnit, giveStock, 'sale'),
           summaryStock: summaryStockOut,
           summaryStockInOut: summaryStockOutPrice
