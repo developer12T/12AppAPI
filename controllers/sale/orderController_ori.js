@@ -233,6 +233,8 @@ exports.getDetail = async (req, res) => {
   }
 }
 
+const orderUpdateTimestamps = {}
+
 exports.updateStatus = async (req, res) => {
   try {
     const { orderId, status } = req.body
@@ -242,6 +244,20 @@ exports.updateStatus = async (req, res) => {
         .status(400)
         .json({ status: 400, message: 'orderId, status are required!' })
     }
+
+    // ===== debounce ตรงนี้ =====
+    const now = Date.now()
+    const lastUpdate = orderUpdateTimestamps[orderId] || 0
+    const ONE_MINUTE = 60 * 1000
+
+        if (now - lastUpdate < ONE_MINUTE) {
+      return res.status(429).json({
+        status: 429,
+        message: 'This order was updated less than 1 minute ago. Please try again later!'
+      })
+    }
+    orderUpdateTimestamps[orderId] = now
+    // ===== end debounce =====
 
     const order = await Order.findOne({ orderId })
     if (!order) {
