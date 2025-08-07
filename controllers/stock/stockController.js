@@ -1343,7 +1343,7 @@ exports.getStockQtyNew = async (req, res) => {
   ])
 
   // console.log(dataWithdraw)
-  console.log(JSON.stringify(dataWithdraw, null, 2))
+  // console.log(JSON.stringify(dataWithdraw, null, 2))
 
 
   const dataOrder = await Order.aggregate([
@@ -1385,7 +1385,7 @@ exports.getStockQtyNew = async (req, res) => {
         zone: { $substrBytes: ['$area', 0, 2] }
       }
     },
-    { $match: { type: 'adjuststock' } },
+    { $match: { type: 'adjuststock' ,status:'approved'} },
     { $match: matchQuery },
     {
       $project: {
@@ -1394,6 +1394,8 @@ exports.getStockQtyNew = async (req, res) => {
       }
     }
   ])
+
+  // console.log(dataAdjust)
 
   const dataGive = await Giveaway.aggregate([
     {
@@ -1551,6 +1553,8 @@ exports.getStockQtyNew = async (req, res) => {
     }, {})
   )
 
+  // console.log(adjustProductArray)
+
   const giveProductArray = Object.values(
     allGiveProducts.reduce((acc, curr) => {
       const key = `${curr.id}_${curr.unit}`
@@ -1691,9 +1695,12 @@ exports.getStockQtyNew = async (req, res) => {
     const productDetailChange = changeProductArray.filter(
       u => u.id == stockItem.id
     )
+
     const productDetailAdjust = adjustProductArray.filter(
       u => u.id == stockItem.id
     )
+    // console.log(productDetailAdjust)
+
     const productDetailGive = giveProductArray.filter(u => u.id == stockItem.id)
 
     if (!productDetail) continue
@@ -2027,6 +2034,8 @@ exports.getStockQtyDetail = async (req, res) => {
       unitName: unit.name,
       qty: unit.unit === 'CTN' ? withdraw.reduce((sum, i) => sum + i.total, 0) : 0
     }));
+
+    // console.log(withdrawStock)
 
     const refundDocs = await Refund.aggregate([
       { $match: { 'store.area': area, period, status: { $ne: 'canceled' } } },

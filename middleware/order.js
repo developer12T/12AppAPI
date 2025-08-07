@@ -558,9 +558,9 @@ module.exports.updateStockMongo = async function (
         },
         {
           $inc: {
-            'listProduct.$[elem].stockOutPcs': -factorPcsQty,
+            'listProduct.$[elem].stockOutPcs': +factorPcsQty,
             'listProduct.$[elem].balancePcs': -factorPcsQty,
-            'listProduct.$[elem].stockOutCtn': -factorCtnQty,
+            'listProduct.$[elem].stockOutCtn': +factorCtnQty,
             'listProduct.$[elem].balanceCtn': -factorCtnQty
           }
         },
@@ -587,9 +587,9 @@ module.exports.updateStockMongo = async function (
         },
         {
           $inc: {
-            'listProduct.$[elem].stockOutPcs': +factorPcsQty,
+            'listProduct.$[elem].stockInPcs': +factorPcsQty,
             'listProduct.$[elem].balancePcs': +factorPcsQty,
-            'listProduct.$[elem].stockOutCtn': +factorCtnQty,
+            'listProduct.$[elem].stockInCtn': +factorCtnQty,
             'listProduct.$[elem].balanceCtn': +factorCtnQty
           }
         },
