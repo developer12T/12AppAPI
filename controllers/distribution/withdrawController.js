@@ -1220,11 +1220,11 @@ exports.saleConfirmWithdraw = async (req, res) => {
           .filter(u => u?.id && u?.unit && u?.qty > 0)
           .map(u => ({
             id: u.id,
-            unit: u.unit,
-            qty: u.qty,
+            unit: u.receiveUnit,
+            qty: u.receiveQty,
             statusMovement: 'OUT'
           }));
-
+          // console.log("qtyproduct",qtyproduct)
         for (const item of qtyproduct) {
           const updateResult = await updateStockMongo(
             item,
