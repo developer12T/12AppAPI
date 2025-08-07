@@ -26,12 +26,12 @@ async function erpApiCheckOrderJob(channel = 'cash') {
     // 1. Get sale order numbers (OAORNO) ที่มีใน Sale
     const modelSale = await Sale.findAll({
       attributes: [
-        'OAORNO',
-        [sequelize.fn('COUNT', sequelize.col('OAORNO')), 'count']
+        'OACUOR',
+        [sequelize.fn('COUNT', sequelize.col('OACUOR')), 'count']
       ],
-      group: ['OAORNO']
+      group: ['OACUOR']
     });
-    const saleIds = modelSale.map(row => row.get('OAORNO').toString());
+    const saleIds = modelSale.map(row => row.get('OACUOR').toString());
 
     // 2. Get pending orderIds ใน MongoDB
     const inMongo = await Order.find({ status: 'pending' }).select('orderId');

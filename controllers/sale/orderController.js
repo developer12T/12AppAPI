@@ -183,8 +183,8 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-        .map(item => item.price)
-        .reduce((sum, price) => sum + price, 0)
+          .map(item => item.price)
+          .reduce((sum, price) => sum + price, 0)
       : 0
     const total = subtotal - discountProduct
     const newOrder = new Order({
@@ -288,9 +288,6 @@ exports.checkout = async (req, res) => {
         item.proQty = promo.proQty
       }
     })
-
-
-
 
     for (const item of newOrder.listQuota) {
       await Quota.findOneAndUpdate(
@@ -584,6 +581,8 @@ exports.getDetail = async (req, res) => {
   }
 }
 
+const orderUpdateTimestamps = {}
+
 exports.updateStatus = async (req, res) => {
   // const session = await require('mongoose').startSession();
   // session.startTransaction();
@@ -603,6 +602,21 @@ exports.updateStatus = async (req, res) => {
         .status(400)
         .json({ status: 400, message: 'orderId, status are required!' })
     }
+
+    // ===== debounce ตรงนี้ =====
+    const now = Date.now()
+    const lastUpdate = orderUpdateTimestamps[orderId] || 0
+    const ONE_MINUTE = 60 * 1000
+
+    if (now - lastUpdate < ONE_MINUTE) {
+      return res.status(429).json({
+        status: 429,
+        message:
+          'This order was updated less than 1 minute ago. Please try again later!'
+      })
+    }
+    orderUpdateTimestamps[orderId] = now
+    // ===== end debounce =====
 
     const order = await Order.findOne({ orderId })
     // .session(session);
@@ -626,10 +640,10 @@ exports.updateStatus = async (req, res) => {
     }
 
     if (order.listProduct.length > 0) {
-      for (const u of order.listProduct) {
+      for (const product of order.listProduct) {
         // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
         const updateResult = await updateStockMongo(
-          u,
+          product,
           order.store.area,
           order.period,
           'orderCanceled',
@@ -637,7 +651,6 @@ exports.updateStatus = async (req, res) => {
           res
         )
         if (updateResult) return
-
       }
     }
 
@@ -658,7 +671,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -670,7 +683,6 @@ exports.updateStatus = async (req, res) => {
             res
           )
           if (updateResult) return
-
         }
       }
     }
@@ -838,7 +850,7 @@ exports.OrderToExcel = async (req, res) => {
   // console.log(modelOrder)
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -953,7 +965,7 @@ exports.OrderToExcel = async (req, res) => {
       message: 'Not Found Order'
     })
   }
-  function yyyymmddToDdMmYyyy(dateString) {
+  function yyyymmddToDdMmYyyy (dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -978,7 +990,7 @@ exports.OrderToExcel = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => { })
+    fs.unlink(tempPath, () => {})
   })
 
   // res.status(200).json({
@@ -2189,52 +2201,52 @@ exports.getSummarybyGroup = async (req, res) => {
 
 exports.getSummarybyChoice = async (req, res) => {
   try {
-    const { storeId, area, date, type } = req.body;
-    const channel = req.headers['x-channel'];
+    const { storeId, area, date, type } = req.body
+    const channel = req.headers['x-channel']
 
     if (!date || !type) {
       return res.status(400).json({
         status: 400,
         message: 'Date and type are required'
-      });
+      })
     }
 
-    const { Order } = getModelsByChannel(channel, res, orderModel);
-    const { Refund } = getModelsByChannel(channel, res, refundModel);
-    let year, month, day;
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+    let year, month, day
     if (type === 'day') {
-      day = parseInt(date.substring(0, 2), 10);
-      month = parseInt(date.substring(2, 4), 10);
-      year = parseInt(date.substring(4, 8), 10);
+      day = parseInt(date.substring(0, 2), 10)
+      month = parseInt(date.substring(2, 4), 10)
+      year = parseInt(date.substring(4, 8), 10)
     } else if (type === 'month') {
-      month = parseInt(date.substring(0, 2), 10);
-      year = parseInt(date.substring(2, 6), 10);
+      month = parseInt(date.substring(0, 2), 10)
+      year = parseInt(date.substring(2, 6), 10)
     } else if (type === 'year') {
-      year = parseInt(date.substring(0, 4), 10);
+      year = parseInt(date.substring(0, 4), 10)
     } else {
-      return res.status(400).json({ status: 400, message: 'Invalid type' });
+      return res.status(400).json({ status: 400, message: 'Invalid type' })
     }
 
     // แปลงเวลาไทย → UTC
-    let start, end;
+    let start, end
     if (type === 'day') {
-      start = new Date(Date.UTC(year, month - 1, day - 1, 17, 0, 0, 0));
-      end = new Date(Date.UTC(year, month - 1, day, 16, 59, 59, 999));
+      start = new Date(Date.UTC(year, month - 1, day - 1, 17, 0, 0, 0))
+      end = new Date(Date.UTC(year, month - 1, day, 16, 59, 59, 999))
     } else if (type === 'month') {
-      start = new Date(Date.UTC(year, month - 1, 1 - 1, 17, 0, 0, 0));
-      end = new Date(Date.UTC(year, month, 0, 16, 59, 59, 999)); // วันสุดท้ายของเดือน
+      start = new Date(Date.UTC(year, month - 1, 1 - 1, 17, 0, 0, 0))
+      end = new Date(Date.UTC(year, month, 0, 16, 59, 59, 999)) // วันสุดท้ายของเดือน
     } else if (type === 'year') {
-      start = new Date(Date.UTC(year, 0, 1 - 1, 17, 0, 0, 0));
-      end = new Date(Date.UTC(year, 11, 31, 16, 59, 59, 999));
+      start = new Date(Date.UTC(year, 0, 1 - 1, 17, 0, 0, 0))
+      end = new Date(Date.UTC(year, 11, 31, 16, 59, 59, 999))
     }
 
     let matchStage = {
       'store.area': area,
       status: { $nin: ['canceled'] },
       createdAt: { $gte: start, $lte: end }
-    };
+    }
     if (storeId) {
-      matchStage['store.storeId'] = storeId;
+      matchStage['store.storeId'] = storeId
     }
 
     const modelOrder = await Order.aggregate([
@@ -2247,7 +2259,7 @@ exports.getSummarybyChoice = async (req, res) => {
         }
       },
       { $project: { _id: 0, total: 1 } }
-    ]);
+    ])
 
     const modelChange = await Order.aggregate([
       { $match: { type: 'change' } }, // ✅ syntax ถูกต้อง
@@ -2259,8 +2271,7 @@ exports.getSummarybyChoice = async (req, res) => {
         }
       },
       { $project: { _id: 0, total: 1 } }
-    ]);
-
+    ])
 
     const modelRefund = await Refund.aggregate([
       { $match: { type: 'refund' } }, // ✅ syntax ถูกต้อง
@@ -2272,28 +2283,26 @@ exports.getSummarybyChoice = async (req, res) => {
         }
       },
       { $project: { _id: 0, total: 1 } }
-    ]);
+    ])
 
     if (modelOrder.length === 0) {
-      return res.status(404).json({ status: 404, message: 'Not found order' });
+      return res.status(404).json({ status: 404, message: 'Not found order' })
     }
 
     const total =
       (modelOrder[0]?.total ?? 0) +
-      ((modelChange[0]?.total ?? 0) - (modelRefund[0]?.total ?? 0));
+      ((modelChange[0]?.total ?? 0) - (modelRefund[0]?.total ?? 0))
 
     res.status(200).json({
       status: 200,
       message: 'Successful',
       total: total
-    });
-
+    })
   } catch (err) {
-    console.error('[getSummarybyChoice ERROR]', err);
-    res.status(500).json({ status: 500, message: err.message });
+    console.error('[getSummarybyChoice ERROR]', err)
+    res.status(500).json({ status: 500, message: err.message })
   }
-};
-
+}
 
 exports.getSaleSummaryByStore = async (req, res) => {
   const { routeId } = req.body
