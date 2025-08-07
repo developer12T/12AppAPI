@@ -1329,7 +1329,7 @@ exports.getStockQtyNew = async (req, res) => {
               size: '$$item.size',
               flavour: '$$item.flavour',
               qty: '$$item.receiveQty',
-              unit: '$$item.receiveUnit',
+              unit: '$$item.unit',
               qtyPcs: '$$item.qtyPcs',
               price: '$$item.price',
               total: '$$item.total',
@@ -1343,7 +1343,7 @@ exports.getStockQtyNew = async (req, res) => {
   ])
 
   // console.log(dataWithdraw)
-  // console.log(JSON.stringify(dataWithdraw, null, 2))
+  console.log(JSON.stringify(dataWithdraw, null, 2))
 
 
   const dataOrder = await Order.aggregate([
@@ -1593,7 +1593,7 @@ exports.getStockQtyNew = async (req, res) => {
   const productIdListGive = giveProductArray.flatMap(item => item.id)
 
 
-
+  // console.log("withdrawProductArray",withdrawProductArray)
   const uniqueProductId = [
     ...new Set([
       ...productIdListStock,
@@ -1726,6 +1726,8 @@ exports.getStockQtyNew = async (req, res) => {
         )?.qty ?? 0
       const withdrawQty =
         productDetailWithdraw.find(i => i.unit === u.unit)?.qty ?? 0
+
+      // console.log(productDetailWithdraw)
       const saleQty = productDetailOrder.find(i => i.unit === u.unit)?.qty ?? 0
       const promoQty = productDetailPromotion.find(i => i.unit === u.unit)?.qty ?? 0
       // console.log("promoQty",promoQty)
