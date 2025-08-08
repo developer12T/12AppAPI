@@ -1,12 +1,17 @@
 const cron = require('node-cron')
 // const { erpApiCheckOrder,erpApiCheckDisributionM3 } = require('../../controllers/sale/orderController')
 const { OrderToExcelConJob } = require('../../controllers/sale/orderController')
-const { period, } = require('../../utilities/datetime')
+const { period } = require('../../utilities/datetime')
 const { to2, updateStockMongo } = require('../../middleware/order')
 
-
-const { Warehouse, Locate, Balance, Sale, DisributionM3 } = require('../../models/cash/master')
-const fs = require('fs');
+const {
+  Warehouse,
+  Locate,
+  Balance,
+  Sale,
+  DisributionM3
+} = require('../../models/cash/master')
+const fs = require('fs')
 
 const { sequelize, DataTypes } = require('../../config/m3db')
 const { getSocket } = require('../../socket')
@@ -19,9 +24,9 @@ const productModel = require('../../models/cash/product')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { create } = require('lodash')
 
-async function erpApiCheckOrderJob(channel = 'cash') {
+async function erpApiCheckOrderJob (channel = 'cash') {
   try {
-    const { Order } = getModelsByChannel(channel, null, orderModel);
+    const { Order } = getModelsByChannel(channel, null, orderModel)
 
     // 1. Get sale order numbers (OAORNO) ที่มีใน Sale
     const modelSale = await Sale.findAll({
@@ -30,27 +35,33 @@ async function erpApiCheckOrderJob(channel = 'cash') {
         [sequelize.fn('COUNT', sequelize.col('OACUOR')), 'count']
       ],
       group: ['OACUOR']
-    });
-    const saleIds = modelSale.map(row => row.get('OACUOR').toString());
+    })
+    const saleIds = modelSale.map(row => row.get('OACUOR').toString())
 
     // 2. Get pending orderIds ใน MongoDB
-    const inMongo = await Order.find({ status: 'pending' }).select('orderId');
-    const orderIdsInMongo = inMongo.map(item => item.orderId.toString());
+    const inMongo = await Order.find({ status: 'pending' }).select('orderId')
+    const orderIdsInMongo = inMongo.map(item => item.orderId.toString())
 
     // 3. filter ให้เหลือเฉพาะที่อยู่ทั้งสองฝั่ง
-    const matchedIds = orderIdsInMongo.filter(id => saleIds.includes(id));
+    const matchedIds = orderIdsInMongo.filter(id => saleIds.includes(id))
 
     // 4. อัปเดตทุกตัวที่ match (วนทีละตัว)
-    let updatedCount = 0;
+    let updatedCount = 0
     for (const orderId of matchedIds) {
       try {
         const result = await Order.updateOne(
           { orderId },
-          { $set: { status: 'completed', statusTH: 'สำเร็จ', updatedAt: new Date() } }
-        );
-        if (result.modifiedCount > 0) updatedCount++;
+          {
+            $set: {
+              status: 'completed',
+              statusTH: 'สำเร็จ',
+              updatedAt: new Date()
+            }
+          }
+        )
+        if (result.modifiedCount > 0) updatedCount++
       } catch (err) {
-        console.error(`Error update orderId: ${orderId}`, err);
+        console.error(`Error update orderId: ${orderId}`, err)
       }
     }
 
@@ -62,18 +73,17 @@ async function erpApiCheckOrderJob(channel = 'cash') {
 
     // });
 
-    console.log(`Total updated Order: ${updatedCount}`);
-    return updatedCount;
-
+    console.log(`Total updated Order: ${updatedCount}`)
+    return updatedCount
   } catch (error) {
-    console.error('❌ Error in erpApiCheckOrderJob:', error);
-    return { error: true, message: error.message };
+    console.error('❌ Error in erpApiCheckOrderJob:', error)
+    return { error: true, message: error.message }
   }
 }
 
-async function erpApiCheckDisributionM3Job(channel = 'cash') {
+async function erpApiCheckDisributionM3Job (channel = 'cash') {
   try {
-    const { Distribution } = getModelsByChannel(channel, null, disributionModel);
+    const { Distribution } = getModelsByChannel(channel, null, disributionModel)
 
     // 1. Get order numbers (MGTRNR) ที่มีใน DisributionM3
     const modelSale = await DisributionM3.findAll({
@@ -82,32 +92,42 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
         [sequelize.fn('COUNT', sequelize.col('MGTRNR')), 'count']
       ],
       group: ['MGTRNR']
-    });
-    const distributionIds = modelSale.map(row => row.get('MGTRNR').toString());
+    })
+    const distributionIds = modelSale.map(row => row.get('MGTRNR').toString())
 
     // 2. Get pending orderIds ใน MongoDB
-    const inMongo = await Distribution.find({ status: 'pending' }).select('orderId');
-    const orderIdsInMongo = inMongo.map(item => item.orderId.toString());
+    const inMongo = await Distribution.find({ status: 'pending' }).select(
+      'orderId'
+    )
+    const orderIdsInMongo = inMongo.map(item => item.orderId.toString())
 
     // 3. filter ให้เหลือเฉพาะที่อยู่ทั้งสองฝั่ง
-    const matchedIds = orderIdsInMongo.filter(id => distributionIds.includes(id));
+    const matchedIds = orderIdsInMongo.filter(id =>
+      distributionIds.includes(id)
+    )
 
     if (!matchedIds.length) {
-      console.log('No new order Distribution found in the M3 system');
-      return { updated: false, updatedCount: 0 };
+      console.log('No new order Distribution found in the M3 system')
+      return { updated: false, updatedCount: 0 }
     }
 
     // 4. อัปเดตทุกตัวที่ match (วนทีละตัว)
-    let updatedCount = 0;
+    let updatedCount = 0
     for (const orderId of matchedIds) {
       try {
         const result = await Distribution.updateOne(
           { orderId },
-          { $set: { status: 'completed', statusTH: 'สำเร็จ', updatedAt: new Date() } }
-        );
-        if (result.modifiedCount > 0) updatedCount++;
+          {
+            $set: {
+              status: 'completed',
+              statusTH: 'สำเร็จ',
+              updatedAt: new Date()
+            }
+          }
+        )
+        if (result.modifiedCount > 0) updatedCount++
       } catch (err) {
-        console.error(`Error update orderId: ${orderId}`, err);
+        console.error(`Error update orderId: ${orderId}`, err)
       }
     }
 
@@ -135,29 +155,26 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
       updatedAt: new Date()
     })
 
-
-    console.log(`Total updated Distribution: ${updatedCount}`);
-    return updatedCount;
-
+    console.log(`Total updated Distribution: ${updatedCount}`)
+    return updatedCount
   } catch (error) {
-    console.error('❌ Error in erpApiCheckDisributionM3Job:', error);
-    return { error: true, message: error.message };
+    console.error('❌ Error in erpApiCheckDisributionM3Job:', error)
+    return { error: true, message: error.message }
   }
 }
 
-
-async function DeleteCartDaily(channel = 'cash') {
+async function DeleteCartDaily (channel = 'cash') {
   // เปิด session สำหรับ transaction
   // const session = await mongoose.startSession();
   // session.startTransaction();
 
   try {
-    const { Cart } = getModelsByChannel(channel, null, cartModel);
-    const { Stock } = getModelsByChannel(channel, null, stockModel);
-    const { Product } = getModelsByChannel(channel, null, productModel);
+    const { Cart } = getModelsByChannel(channel, null, cartModel)
+    const { Stock } = getModelsByChannel(channel, null, stockModel)
+    const { Product } = getModelsByChannel(channel, null, productModel)
 
     // ดึงข้อมูล cart ทั้งหมด (เช่นเดิม)
-    await Cart.deleteMany({ type: 'withdraw' });
+    await Cart.deleteMany({ type: 'withdraw' })
 
     const data = await Cart.find({})
     // .session(session);
@@ -171,24 +188,32 @@ async function DeleteCartDaily(channel = 'cash') {
         unit: item.unit,
         qty: item.qty
       }))
-    );
+    )
 
     const listPromotion = data.flatMap(sub =>
-      sub.listPromotion.flatMap(item => item.listProduct.map(y => ({
-        storeId: sub.storeId,
-        area: sub.area,
-        id: y.id,
-        unit: y.unit,
-        qty: y.qty
-      })))
-    );
+      sub.listPromotion.flatMap(item =>
+        item.listProduct.map(y => ({
+          storeId: sub.storeId,
+          area: sub.area,
+          id: y.id,
+          unit: y.unit,
+          qty: y.qty
+        }))
+      )
+    )
 
     for (const item of [...listProduct, ...listPromotion]) {
       // console.log(item)
       // console.log(item)
       // await updateStockMongo(item, item.area, period(), 'deleteCart', channel)
-      const updateResult = await updateStockMongo(item, item.area, period(), 'deleteCart', channel);
-      if (updateResult) return;
+      const updateResult = await updateStockMongo(
+        item,
+        item.area,
+        period(),
+        'deleteCart',
+        channel
+      )
+      if (updateResult) return
       // ดึง factor สำหรับแต่ละ unit
       // console.log("item ",item.storeId,item.area)
       // const factorPcsResult = await Product.aggregate([
@@ -262,24 +287,21 @@ async function DeleteCartDaily(channel = 'cash') {
     }
 
     // ลบ Cart ทั้งหมด (ตามเงื่อนไขที่คุณต้องการ)
-    await Cart.deleteMany({});
+    await Cart.deleteMany({})
 
     // ถ้าทุกอย่างสำเร็จ, commit transaction
     // await session.commitTransaction();
     // session.endSession();
 
-    return { success: true };
-
+    return { success: true }
   } catch (error) {
     // ถ้าเกิด error, rollback ทุกอย่าง
     // await session.abortTransaction();
     // session.endSession();
-    console.error('❌ Error in DeleteCartDaily:', error);
-    return { error: true, message: error.message };
+    console.error('❌ Error in DeleteCartDaily:', error)
+    return { error: true, message: error.message }
   }
 }
-
-
 
 const startCronJobErpApiCheck = () => {
   cron.schedule('*/10 * * * *', async () => {
@@ -290,30 +312,30 @@ const startCronJobErpApiCheck = () => {
 
 const startCronJobErpApiCheckDisribution = () => {
   cron.schedule('*/10 * * * *', async () => {
-    console.log('Running cron job startCronJobErpApiCheckDisribution every 10 minutes')
+    console.log(
+      'Running cron job startCronJobErpApiCheckDisribution every 10 minutes'
+    )
     await erpApiCheckDisributionM3Job()
   })
 }
 
 const startCronJobDeleteCartDaily = () => {
-  cron.schedule('0 0 * * *', async () => {
-    // cron.schedule('*/1 * * * *', async () => {
-    console.log('Running cron job DeleteCartDaily at 00:00 (Asia/Bangkok)');
-    await DeleteCartDaily();
-  },
+  cron.schedule(
+    '0 0 * * *',
+    async () => {
+      // cron.schedule('*/1 * * * *', async () => {
+      console.log('Running cron job DeleteCartDaily at 00:00 (Asia/Bangkok)')
+      await DeleteCartDaily()
+    },
     {
       timezone: 'Asia/Bangkok'
     }
-  );
+  )
 }
-
-
-
-
 
 module.exports = {
   startCronJobErpApiCheck,
   // startCronJobOrderToExcel
   startCronJobErpApiCheckDisribution,
   startCronJobDeleteCartDaily
-};
+}
