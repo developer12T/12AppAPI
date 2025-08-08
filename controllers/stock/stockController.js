@@ -1423,7 +1423,7 @@ exports.getStockQtyNew = async (req, res) => {
   const allAdjustProducts = dataAdjust.flatMap(doc => doc.listProduct || [])
   const allGiveProducts = dataGive.flatMap(doc => doc.listProduct || [])
 
-  // console.log('allOrderPromotion',allOrderPromotion)
+  // console.log('allAdjustProducts',allAdjustProducts)
 
   const dataStock = await Stock.aggregate([
     {
