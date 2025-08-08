@@ -208,6 +208,7 @@ module.exports.updateStockMongo = async function (
       }
     }
   ])
+  // console.log("factorPcsResult",factorPcsResult)
   const factorCtn = factorCtnResult?.[0]?.listUnit?.[0]?.factor || 0
   const factorPcs = factorPcsResult?.[0]?.listUnit?.[0]?.factor || 0
 
@@ -558,9 +559,9 @@ module.exports.updateStockMongo = async function (
         },
         {
           $inc: {
-            'listProduct.$[elem].stockOutPcs': -factorPcsQty,
+            'listProduct.$[elem].stockOutPcs': +factorPcsQty,
             'listProduct.$[elem].balancePcs': -factorPcsQty,
-            'listProduct.$[elem].stockOutCtn': -factorCtnQty,
+            'listProduct.$[elem].stockOutCtn': +factorCtnQty,
             'listProduct.$[elem].balanceCtn': -factorCtnQty
           }
         },
@@ -587,9 +588,9 @@ module.exports.updateStockMongo = async function (
         },
         {
           $inc: {
-            'listProduct.$[elem].stockOutPcs': +factorPcsQty,
+            'listProduct.$[elem].stockInPcs': +factorPcsQty,
             'listProduct.$[elem].balancePcs': +factorPcsQty,
-            'listProduct.$[elem].stockOutCtn': +factorCtnQty,
+            'listProduct.$[elem].stockInCtn': +factorCtnQty,
             'listProduct.$[elem].balanceCtn': +factorCtnQty
           }
         },

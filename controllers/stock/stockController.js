@@ -1310,11 +1310,41 @@ exports.getStockQtyNew = async (req, res) => {
     { $match: matchQuery },
     {
       $project: {
-        listProduct: 1,
-        _id: 0
+        _id: 0,
+        listProduct: {
+          $map: {
+            input: {
+              $filter: {
+                input: '$listProduct',
+                as: 'item',
+                cond: { $gt: ['$$item.receiveQty', 0] }
+              }
+            },
+            as: 'item',
+            in: {
+              id: '$$item.id',
+              name: '$$item.name',
+              group: '$$item.group',
+              brand: '$$item.brand',
+              size: '$$item.size',
+              flavour: '$$item.flavour',
+              qty: '$$item.receiveQty',
+              unit: '$$item.unit',
+              qtyPcs: '$$item.qtyPcs',
+              price: '$$item.price',
+              total: '$$item.total',
+              weightGross: '$$item.weightGross',
+              weightNet: '$$item.weightNet'
+            }
+          }
+        }
       }
     }
   ])
+
+  // console.log(dataWithdraw)
+  // console.log(JSON.stringify(dataWithdraw, null, 2))
+
 
   const dataOrder = await Order.aggregate([
     {
@@ -1355,7 +1385,7 @@ exports.getStockQtyNew = async (req, res) => {
         zone: { $substrBytes: ['$area', 0, 2] }
       }
     },
-    { $match: { type: 'adjuststock' } },
+    { $match: { type: 'adjuststock' ,status:'approved'} },
     { $match: matchQuery },
     {
       $project: {
@@ -1364,6 +1394,8 @@ exports.getStockQtyNew = async (req, res) => {
       }
     }
   ])
+
+  // console.log(dataAdjust)
 
   const dataGive = await Giveaway.aggregate([
     {
@@ -1382,6 +1414,8 @@ exports.getStockQtyNew = async (req, res) => {
   ])
 
   const allWithdrawProducts = dataWithdraw.flatMap(doc => doc.listProduct || [])
+
+  // console.log("allWithdrawProducts", allWithdrawProducts)
   const allRefundProducts = dataRefund.flatMap(doc => doc.listProduct || [])
   const allOrderProducts = dataOrder.flatMap(doc => doc.listProduct || [])
   const allOrderPromotion = dataOrder.flatMap(doc => doc.listPromotions || [])
@@ -1389,7 +1423,7 @@ exports.getStockQtyNew = async (req, res) => {
   const allAdjustProducts = dataAdjust.flatMap(doc => doc.listProduct || [])
   const allGiveProducts = dataGive.flatMap(doc => doc.listProduct || [])
 
-  // console.log('allOrderPromotion',allOrderPromotion)
+  // console.log('allAdjustProducts',allAdjustProducts)
 
   const dataStock = await Stock.aggregate([
     {
@@ -1432,13 +1466,13 @@ exports.getStockQtyNew = async (req, res) => {
       if (acc[key]) {
         acc[key] = {
           ...acc[key], // ⬅️ เอาอันเก่ามาเป็นหลัก
-          qty: (acc[key].qty || 0) + (curr.receiveQty || 0),
+          qty: (acc[key].qty || 0) + (curr.qty || 0),
           qtyPcs: (acc[key].qtyPcs || 0) + (curr.qtyPcs || 0)
         };
       } else {
         acc[key] = {
           ...curr,
-          qty: curr.receiveQty || 0, // ⬅️ ตั้งต้นจาก receiveQty
+          qty: curr.qty || 0, // ⬅️ ตั้งต้นจาก receiveQty
           qtyPcs: curr.qtyPcs || 0
         };
       }
@@ -1519,6 +1553,8 @@ exports.getStockQtyNew = async (req, res) => {
     }, {})
   )
 
+  // console.log(adjustProductArray)
+
   const giveProductArray = Object.values(
     allGiveProducts.reduce((acc, curr) => {
       const key = `${curr.id}_${curr.unit}`
@@ -1561,7 +1597,7 @@ exports.getStockQtyNew = async (req, res) => {
   const productIdListGive = giveProductArray.flatMap(item => item.id)
 
 
-
+  // console.log("withdrawProductArray",withdrawProductArray)
   const uniqueProductId = [
     ...new Set([
       ...productIdListStock,
@@ -1659,9 +1695,12 @@ exports.getStockQtyNew = async (req, res) => {
     const productDetailChange = changeProductArray.filter(
       u => u.id == stockItem.id
     )
+
     const productDetailAdjust = adjustProductArray.filter(
       u => u.id == stockItem.id
     )
+    // console.log(productDetailAdjust)
+
     const productDetailGive = giveProductArray.filter(u => u.id == stockItem.id)
 
     if (!productDetail) continue
@@ -1694,6 +1733,8 @@ exports.getStockQtyNew = async (req, res) => {
         )?.qty ?? 0
       const withdrawQty =
         productDetailWithdraw.find(i => i.unit === u.unit)?.qty ?? 0
+
+      // console.log(productDetailWithdraw)
       const saleQty = productDetailOrder.find(i => i.unit === u.unit)?.qty ?? 0
       const promoQty = productDetailPromotion.find(i => i.unit === u.unit)?.qty ?? 0
       // console.log("promoQty",promoQty)
@@ -1715,7 +1756,7 @@ exports.getStockQtyNew = async (req, res) => {
 
       stock -= stockQty * factor
       balance -= balanceQty * factor
-
+      // console.log(withdrawQty)
       summaryStock += (stockQty || 0) * sale
       summaryStockBal += (balanceQty || 0) * sale
       summaryWithdraw += (withdrawQty || 0) * sale
@@ -1993,6 +2034,8 @@ exports.getStockQtyDetail = async (req, res) => {
       unitName: unit.name,
       qty: unit.unit === 'CTN' ? withdraw.reduce((sum, i) => sum + i.total, 0) : 0
     }));
+
+    // console.log(withdrawStock)
 
     const refundDocs = await Refund.aggregate([
       { $match: { 'store.area': area, period, status: { $ne: 'canceled' } } },
