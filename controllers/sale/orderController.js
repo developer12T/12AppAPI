@@ -522,7 +522,9 @@ exports.getOrder = async (req, res) => {
         total: to2(o.total),
         status: o.status,
         statusTH: o.statusTH,
-        createdAt: o.createdAt
+        createdAt: o.createdAt,
+        listProduct: o.listProduct.length,
+        listPromotion: o.listPromotions.length
       }))
 
     // const io = getSocket()
@@ -823,6 +825,7 @@ exports.OrderToExcel = async (req, res) => {
 
   // const channel = 'cash';
   const { Order } = getModelsByChannel(channel, res, orderModel)
+  const { Refund } = getModelsByChannel(channel, res, refundModel)
 
   // const modelOrder = await Order.find({
   //   orderId: { $not: /CC/ },
@@ -833,7 +836,36 @@ exports.OrderToExcel = async (req, res) => {
       $match: {
         status: { $nin: ['canceled'] },
         'store.area': { $ne: 'IT211' },
-        type: { $in: ['sale'] }
+        type: { $in: ['sale', 'change'] }
+      }
+    },
+    {
+      $addFields: {
+        createdAtThai: {
+          $dateAdd: {
+            startDate: '$createdAt',
+            unit: 'hour',
+            amount: 7
+          }
+        }
+      }
+    },
+    {
+      $match: {
+        createdAtThai: {
+          $gte: start,
+          $lte: end
+        }
+      }
+    }
+  ])
+
+  const modelRefund = await Refund.aggregate([
+    {
+      $match: {
+        status: { $nin: ['canceled'] },
+        'store.area': { $ne: 'IT211' },
+        type: { $in: ['sale', 'change'] }
       }
     },
     {
@@ -924,7 +956,7 @@ exports.OrderToExcel = async (req, res) => {
         FACI: 'F10',
         WHLO: order.sale.warehouse,
         ORNO: '',
-        OAORTP: 'A31',
+        OAORTP: order.type == 'sale' ? 'A31' : 'B31',
         RLDT: RLDT,
         ADID: '',
         CUOR: order.orderId,

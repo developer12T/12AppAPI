@@ -4,6 +4,7 @@ const { getSocket } = require('../../socket')
 const orderModel = require('../../models/cash/sale')
 const refundModel = require('../../models/cash/refund')
 const routeModel = require('../../models/cash/route')
+const userModel = require('../../models/cash/user')
 const sendmoneyModel = require('../../models/cash/sendmoney')
 const path = require('path')
 const multer = require('multer')
@@ -333,6 +334,7 @@ exports.getSendMoneyForAcc = async (req, res) => {
     }
 
     const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
 
     const year = Number(date.slice(0, 4))
     const month = Number(date.slice(5, 7))
@@ -354,13 +356,29 @@ exports.getSendMoneyForAcc = async (req, res) => {
       }
     }
 
+    // 1. Count user by area (เก็บเป็น object)
+    const totalUserCountArr = await User.aggregate([
+      {
+        $match: {
+          area: { $nin: [null, ''] }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 }
+        }
+      }
+    ])
+    const totalUserCount = totalUserCountArr[0]?.count || 0
+
     const data = await SendMoney.aggregate([
       { $match: matchStage },
       {
         $lookup: {
           from: 'users',
-          localField: 'saleCode',
-          foreignField: 'saleCode',
+          localField: 'area',
+          foreignField: 'area',
           as: 'user'
         }
       },
@@ -374,8 +392,8 @@ exports.getSendMoneyForAcc = async (req, res) => {
         $project: {
           _id: 0,
           area: '$area',
-          sale: '$user.firstName',
-          STATUS: 'รอตรวจสอบ',
+          SALE: { $concat: ['$user.firstName', ' ', '$user.surName'] },
+          STATUS: 'OK',
           TRANSFER_DATE: date,
           VALUES: '$sendmoney',
           ZONE: { $substrBytes: ['$area', 0, 2] }
@@ -385,7 +403,7 @@ exports.getSendMoneyForAcc = async (req, res) => {
         $group: {
           _id: {
             area: '$area',
-            sale: '$sale',
+            SALE: '$SALE',
             STATUS: '$STATUS',
             TRANSFER_DATE: '$TRANSFER_DATE',
             ZONE: '$ZONE'
@@ -398,21 +416,34 @@ exports.getSendMoneyForAcc = async (req, res) => {
         $project: {
           _id: 0,
           AREA: '$_id.area',
-          ZONE: '$_id.ZONE',
-          SALE: '$_id.sale',
+          COUNT: { $toString: '$COUNT' },
+          SALE: '$_id.SALE',
           STATUS: '$_id.STATUS',
           TRANSFER_DATE: '$_id.TRANSFER_DATE',
-          VALUES: { $toString: '$VALUES' }, // แปลง VALUES เป็น string
-          COUNT: { $toString: '$COUNT' } // แปลง COUNT เป็น string
+          VALUES: {
+            $cond: [
+              { $eq: ['$VALUES', null] },
+              '0.00',
+              { $toString: { $round: ['$VALUES', 2] } }
+            ]
+          },
+          ZONE: '$_id.ZONE'
         }
       }
     ])
 
-    res.status(200).json({
-      status: 200,
-      message: 'success',
-      data
-    })
+    const formatted = data.map(item => ({
+      ...item,
+      COUNT: `${totalUserCount}`,
+      VALUES: Number(item.VALUES).toFixed(2)
+    }))
+
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="sendmoney_${date}.json"`
+    )
+    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+    res.send(JSON.stringify({ formatted }, null, 2)) // pretty format
   } catch (err) {
     console.error('[getSendMoneyForAcc] ❌', err)
     res.status(500).json({
