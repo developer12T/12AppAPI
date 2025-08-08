@@ -557,7 +557,8 @@ exports.getDetail = async (req, res) => {
         receivetotalQty: u.receivetotalQty,
         receivetotalWeightGross: u.receivetotalWeightGross,
         receivetotalWeightNet: u.receivetotalWeightNet,
-        status: u.status
+        status: u.status,
+        createdAt: u.createdAt
       }
     })
 
