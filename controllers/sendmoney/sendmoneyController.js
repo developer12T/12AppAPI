@@ -438,12 +438,15 @@ exports.getSendMoneyForAcc = async (req, res) => {
       VALUES: Number(item.VALUES).toFixed(2)
     }))
 
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="sendmoney_${date}.json"`
-    )
-    res.setHeader('Content-Type', 'application/json; charset=utf-8')
-    res.send(JSON.stringify({ formatted }, null, 2)) // pretty format
+    // res.setHeader(
+    //   'Content-Disposition',
+    //   `attachment; filename="sendmoney_${date}.json"`
+    // )
+    // res.setHeader('Content-Type', 'application/json; charset=utf-8')
+    // res.send(JSON.stringify({ formatted }, null, 2)) // pretty format
+    res.status(200).json({
+      formatted
+    })
   } catch (err) {
     console.error('[getSendMoneyForAcc] ❌', err)
     res.status(500).json({

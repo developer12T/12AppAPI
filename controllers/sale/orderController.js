@@ -7,19 +7,14 @@ const { period, previousPeriod } = require('../../utilities/datetime')
 const axios = require('axios')
 const dayjs = require('dayjs')
 const { getSeries, updateRunningNumber } = require('../../middleware/order')
-const {
-  Warehouse,
-  Locate,
-  Balance,
-  Sale,
-  DisributionM3
-} = require('../../models/cash/master')
+const { Item } = require('../../models/item/itemlot')
+const { Op, fn, col, where, literal } = require('sequelize')
 const { generateOrderId } = require('../../utilities/genetateId')
 const {
   summaryOrder,
   summaryOrderProStatusOne
 } = require('../../utilities/summary')
-const { fn, col } = require('sequelize')
+// const { fn, col } = require('sequelize')
 const { sequelize, DataTypes } = require('../../config/m3db')
 const { rangeDate } = require('../../utilities/datetime')
 const { uploadFiles } = require('../../utilities/upload')
@@ -836,7 +831,36 @@ exports.OrderToExcel = async (req, res) => {
       $match: {
         status: { $nin: ['canceled'] },
         'store.area': { $ne: 'IT211' },
-        type: { $in: ['sale', 'change'] }
+        type: { $in: ['sale'] }
+      }
+    },
+    {
+      $addFields: {
+        createdAtThai: {
+          $dateAdd: {
+            startDate: '$createdAt',
+            unit: 'hour',
+            amount: 7
+          }
+        }
+      }
+    },
+    {
+      $match: {
+        createdAtThai: {
+          $gte: start,
+          $lte: end
+        }
+      }
+    }
+  ])
+
+  const modelChange = await Order.aggregate([
+    {
+      $match: {
+        status: { $nin: ['canceled'] },
+        'store.area': { $ne: 'IT211' },
+        type: { $in: ['change'] }
       }
     },
     {
@@ -863,9 +887,8 @@ exports.OrderToExcel = async (req, res) => {
   const modelRefund = await Refund.aggregate([
     {
       $match: {
-        status: { $nin: ['canceled'] },
-        'store.area': { $ne: 'IT211' },
-        type: { $in: ['sale', 'change'] }
+        // status: { $nin: ['canceled'] },
+        'store.area': { $ne: 'IT211' }
       }
     },
     {
@@ -889,7 +912,6 @@ exports.OrderToExcel = async (req, res) => {
     }
   ])
 
-  // console.log(modelOrder)
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
     function formatDateToThaiYYYYMMDD (date) {
@@ -956,7 +978,7 @@ exports.OrderToExcel = async (req, res) => {
         FACI: 'F10',
         WHLO: order.sale.warehouse,
         ORNO: '',
-        OAORTP: order.type == 'sale' ? 'A31' : 'B31',
+        OAORTP: 'A31',
         RLDT: RLDT,
         ADID: '',
         CUOR: order.orderId,
@@ -976,7 +998,7 @@ exports.OrderToExcel = async (req, res) => {
         OBPIDE: product.proCode,
         OBSMCD: order.sale.saleCode,
         OAORDT: RLDT,
-        OAODAM: '',
+        OAODAM: '0',
         OECRID: '',
         OECRAM: '',
         OECRID2: '',
@@ -1001,6 +1023,225 @@ exports.OrderToExcel = async (req, res) => {
     })
   })
 
+  const tranFromChange = modelChange.flatMap(order => {
+    let counterOrder = 0
+    function formatDateToThaiYYYYMMDD (date) {
+      const d = new Date(date)
+      d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
+
+      const yyyy = d.getFullYear()
+      const mm = String(d.getMonth() + 1).padStart(2, '0')
+      const dd = String(d.getDate()).padStart(2, '0')
+
+      return `${yyyy}${mm}${dd}`
+    }
+
+    // ใช้งาน
+    const RLDT = formatDateToThaiYYYYMMDD(order.createdAt)
+
+    const listProduct = order.listProduct.map(product => {
+      return {
+        proCode: '',
+        id: product.id,
+        name: product.name,
+        group: product.group,
+        brand: product.brand,
+        size: product.size,
+        flavour: product.flavour,
+        qty: product.qty,
+        unit: product.unit,
+        unitName: product.unitName,
+        price: product.price,
+        subtotal: product.subtotal,
+        discount: product.discount,
+        netTotal: product.netTotal
+      }
+    })
+
+    const productIDS = [...listProduct].flat()
+
+    // console.log("productIDS",productIDS)
+    return productIDS.map(product => {
+      counterOrder++
+
+      // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
+
+      return {
+        CUNO: order.store.storeId,
+        FACI: 'F10',
+        WHLO: order.sale.warehouse,
+        ORNO: '',
+        OAORTP: 'B31',
+        RLDT: RLDT,
+        ADID: '',
+        CUOR: order.orderId,
+        OAOREF: '',
+        OBITNO: product.id,
+        OBBANO: '',
+        OBALUN: product.unit,
+        OBORQA: `${product.qty}`,
+        OBSAPR: `${product.price || 0}`,
+        OBSPUN: product.unit,
+        OBWHSL: '',
+        ROUT: '',
+        OBPONR: `${counterOrder}`,
+        OBDIA2: `${product.discount || 0}`,
+        OBRSCD: '',
+        OBCMNO: '',
+        OBPIDE: product.proCode,
+        OBSMCD: order.sale.saleCode,
+        OAORDT: RLDT,
+        OAODAM: '0',
+        OECRID: '',
+        OECRAM: '',
+        OECRID2: '',
+        OECRAM2: '',
+        OECRID3: '',
+        OECRAM3: '',
+        OECRID4: '',
+        OECRAM4: '',
+        OECRID5: '',
+        OECRAM5: '',
+        OARESP: '',
+        OAYREF: '',
+        OATEL2: '',
+        OAWCON: '',
+        OAFRE1: '',
+        OATXAP: '',
+        OATXAP2: '',
+        OBDIA1: '',
+        OBDIA3: '',
+        OBDIA4: ''
+      }
+    })
+  })
+
+  const currentYear = new Date().getFullYear()
+  const years = [
+    currentYear + 1,
+    currentYear, // ปีปัจจุบัน
+    currentYear - 1, // ปีก่อน
+    currentYear - 2 // ย้อนหลัง 2 ปี
+  ]
+
+  // --- สร้าง tranFromRefund ให้แบน ---
+  const tranFromRefundNested = await Promise.all(
+    modelRefund.map(async order => {
+      let counterOrder = 0
+
+      const formatDateToThaiYYYYMMDD = date => {
+        const d = new Date(date)
+        d.setHours(d.getHours() + 7)
+        const yyyy = d.getFullYear()
+        const mm = String(d.getMonth() + 1).padStart(2, '0')
+        const dd = String(d.getDate()).padStart(2, '0')
+        return `${yyyy}${mm}${dd}`
+      }
+
+      const RLDT = formatDateToThaiYYYYMMDD(order.createdAt)
+
+      const listProduct = await Promise.all(
+        order.listProduct
+          // .filter(p => p.condition === 'good')
+          .map(async p => {
+            // const lotData = await Item.findAll({
+            //   where: {
+            //     itemCode: p.id,
+            //     expireDate: { [Op.like]: `23%` },
+            //     [Op.and]: [{ lot: { [Op.regexp]: '^[0-9]{16}$' } }]
+            //   }
+            // })
+            const lotData = await Item.findOne({
+              where: {
+                itemCode: p.id,
+                expireDate: {
+                  [Op.or]: years.map(y => ({ [Op.like]: `${y}%` }))
+                },
+                // date: {
+                //   [Op.like]: `${p.expireDate.slice(0, 4)}%`
+                // },
+                // lot: { [Op.like]: `${p.expireDate.slice(2, 4)}%` },
+                [Op.and]: [
+                  literal('LEN(LTRIM(RTRIM([Lot]))) = 16') // ความยาว 16 ตัวอักษร
+                  // literal("LTRIM(RTRIM([Lot])) NOT LIKE '%[^0-9]%'") // ไม่มีตัวที่ไม่ใช่ตัวเลข
+                ]
+              }
+            })
+            return {
+              proCode: '',
+              id: p.id,
+              name: p.name,
+              group: p.group,
+              brand: p.brand,
+              size: p.size,
+              flavour: p.flavour,
+              qty: p.qty,
+              unit: p.unit,
+              unitName: p.unitName,
+              price: p.price,
+              subtotal: p.subtotal,
+              discount: p.discount,
+              netTotal: p.netTotal,
+              lotNo: lotData?.lot || null
+            }
+          })
+      )
+
+      return listProduct.map(product => {
+        counterOrder++
+        return {
+          CUNO: order.store.storeId,
+          FACI: 'F10',
+          WHLO: order.sale.warehouse,
+          ORNO: '',
+          OAORTP: 'A34', // << คืนของ
+          RLDT: RLDT,
+          ADID: '',
+          CUOR: order.orderId,
+          OAOREF: '',
+          OBITNO: product.id,
+          OBBANO: product.lotNo ?? '', // อย่าใช้ ${} ในอ็อบเจ็กต์
+          OBALUN: product.unit,
+          OBORQA: `-${product.qty}`,
+          OBSAPR: `${product.price}`,
+          OBSPUN: product.unit,
+          OBWHSL: 'CS0001',
+          ROUT: '',
+          OBPONR: `${counterOrder}`,
+          OBDIA2: `${product.discount || 0}`,
+          OBRSCD: '',
+          OBCMNO: '',
+          OBPIDE: '',
+          OBSMCD: order.sale.saleCode,
+          OAORDT: RLDT,
+          OAODAM: '0',
+          OECRID: '',
+          OECRAM: '',
+          OECRID2: '',
+          OECRAM2: '',
+          OECRID3: '',
+          OECRAM3: '',
+          OECRID4: '',
+          OECRAM4: '',
+          OECRID5: '',
+          OECRAM5: '',
+          OARESP: '',
+          OAYREF: '',
+          OATEL2: '',
+          OAWCON: '',
+          OAFRE1: '',
+          OATXAP: '',
+          OATXAP2: '',
+          OBDIA1: '',
+          OBDIA3: '',
+          OBDIA4: ''
+        }
+      })
+    })
+  )
+
+  const tranFromRefund = tranFromRefundNested.flat()
+
   if (tranFromOrder.length == 0) {
     return res.status(404).json({
       status: 404,
@@ -1015,8 +1256,15 @@ exports.OrderToExcel = async (req, res) => {
     return `${day}${month}${year}`
   }
 
+  // รวม Order + Refund ให้เป็นชุดข้อมูลเดียว
+  const allTransactions = [
+    ...tranFromOrder,
+    ...tranFromChange,
+    ...tranFromRefund
+  ]
+
   const wb = xlsx.utils.book_new()
-  const ws = xlsx.utils.json_to_sheet(tranFromOrder)
+  const ws = xlsx.utils.json_to_sheet(allTransactions)
   xlsx.utils.book_append_sheet(wb, ws, `ESP${yyyymmddToDdMmYyyy(date)}`)
 
   const tempPath = path.join(os.tmpdir(), `${yyyymmddToDdMmYyyy(date)}.xlsx`)
@@ -1034,10 +1282,6 @@ exports.OrderToExcel = async (req, res) => {
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
     fs.unlink(tempPath, () => {})
   })
-
-  // res.status(200).json({
-  //   message: 'Create file successful!'
-  // })
 }
 
 exports.getAllOrder = async (req, res) => {
