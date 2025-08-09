@@ -1305,47 +1305,71 @@ exports.getStockQtyNew = async (req, res) => {
     }
   ]);
 
-  const dataWithdraw = await Distribution.aggregate([
-    {
-      $addFields: {
-        zone: { $substrBytes: ['$area', 0, 2] }
-      }
-    },
-    { $match: { status: 'confirm' } },
-    { $match: matchQuery },
+    const dataWithdraw = await Distribution.aggregate([
+    { $match: { status: 'confirm', ...matchQuery } },
     {
       $project: {
         _id: 0,
         listProduct: {
-          $map: {
-            input: {
-              $filter: {
-                input: '$listProduct',
-                as: 'item',
-                cond: { $gt: ['$$item.receiveQty', 0] }
-              }
-            },
+          $filter: {
+            input: '$listProduct',
             as: 'item',
-            in: {
-              id: '$$item.id',
-              name: '$$item.name',
-              group: '$$item.group',
-              brand: '$$item.brand',
-              size: '$$item.size',
-              flavour: '$$item.flavour',
-              qty: '$$item.receiveQty',
-              unit: '$$item.unit',
-              qtyPcs: '$$item.qtyPcs',
-              price: '$$item.price',
-              total: '$$item.total',
-              weightGross: '$$item.weightGross',
-              weightNet: '$$item.weightNet'
-            }
+            cond: { $gt: ['$$item.receiveQty', 0] }
           }
         }
       }
+    },
+    // join ไปที่ products
+    {
+      $unwind: '$listProduct'
+    },
+    {
+      $lookup: {
+        from: 'products',
+        localField: 'listProduct.id',
+        foreignField: 'id',
+        as: 'prod'
+      }
+    },
+    { $unwind: '$prod' },
+    // หา factor ที่ unit ตรงกัน
+    {
+      $set: {
+        factor: {
+          $let: {
+            vars: {
+              matched: {
+                $first: {
+                  $filter: {
+                    input: '$prod.listUnit',
+                    as: 'u',
+                    cond: { $eq: ['$$u.unit', '$listProduct.unit'] }
+                  }
+                }
+              }
+            },
+            in: { $ifNull: ['$$matched.factor', 1] }
+          }
+        }
+      }
+    },
+    // คำนวณ qtyPcs
+    {
+      $set: {
+        'listProduct.qtyPcs': { $multiply: ['$listProduct.receiveQty', '$factor'] }
+      }
+    },
+    // กลับมา group รวมใบละรายการ
+    {
+      $group: {
+        _id: '$_id',
+        listProduct: { $push: '$listProduct' }
+      }
+    },
+    {
+      $project: { _id: 0, listProduct: 1 }
     }
-  ])
+  ]);
 
   // console.log(dataWithdraw)
   // console.log(JSON.stringify(dataWithdraw, null, 2))
@@ -1467,23 +1491,16 @@ exports.getStockQtyNew = async (req, res) => {
 
   const withdrawProductArray = Object.values(
     allWithdrawProducts.reduce((acc, curr) => {
-      const key = `${curr.id}_${curr.receiveUnit}`;
+      const key = `${curr.id}_${curr.unit}`
       if (acc[key]) {
-        acc[key] = {
-          ...acc[key], // ⬅️ เอาอันเก่ามาเป็นหลัก
-          qty: (acc[key].qty || 0) + (curr.qty || 0),
-          qtyPcs: (acc[key].qtyPcs || 0) + (curr.qtyPcs || 0)
-        };
+        acc[key].qty += curr.qty || 0
+        acc[key].qtyPcs += curr.qtyPcs || 0
       } else {
-        acc[key] = {
-          ...curr,
-          qty: curr.qty || 0, // ⬅️ ตั้งต้นจาก receiveQty
-          qtyPcs: curr.qtyPcs || 0
-        };
+        acc[key] = { ...curr }
       }
-      return acc;
+      return acc
     }, {})
-  );
+  )
 
   // console.log(withdrawProductArray)
 
