@@ -135,7 +135,7 @@ module.exports.getPeriodFromDate = function (createdAt) {
   return `${year}${month}`
 }
 
-async function checkProductInStock (Stock, area, period, id) {
+async function checkProductInStock(Stock, area, period, id) {
   const stock = await Stock.findOne({
     area: area,
     period: period,
@@ -239,13 +239,14 @@ module.exports.updateStockMongo = async function (
       'approvedAdjustStockReduce',
       'approvedAdjustStockAdd',
       'approvedChangeOrder',
-      'adjustWithdraw'
+      'adjustWithdraw',
+      'reduceWithdraw'
     ].includes(type)
   )
     throw new Error('Invalid stock update type: ' + type)
 
   // Utility: Check enough balance before deduct
-  async function checkBalanceEnough (area, period, id, pcsNeed) {
+  async function checkBalanceEnough(area, period, id, pcsNeed) {
     const stockDoc = await Stock.findOne(
       { area, period, 'listProduct.productId': id },
       { 'listProduct.$': 1 }
@@ -592,6 +593,36 @@ module.exports.updateStockMongo = async function (
             'listProduct.$[elem].balancePcs': +factorPcsQty,
             'listProduct.$[elem].stockInCtn': +factorCtnQty,
             'listProduct.$[elem].balanceCtn': +factorCtnQty
+          }
+        },
+        {
+          arrayFilters: [{ 'elem.productId': id }],
+          new: true
+        }
+      )
+    } catch (err) {
+      throw new Error('Error updating stock for rufundCanceled: ' + err.message)
+    }
+  }
+  else if (type === 'reduceWithdraw') {
+    const found = await checkProductInStock(Stock, area, period, id)
+    if (!found)
+      throw new Error(
+        `Product id:${id} not found in stock for area:${area} period:${period}`
+      )
+    try {
+      await Stock.findOneAndUpdate(
+        {
+          area: area,
+          period: period,
+          'listProduct.productId': id
+        },
+        {
+          $inc: {
+            'listProduct.$[elem].stockInPcs': -factorPcsQty,
+            'listProduct.$[elem].balancePcs': -factorPcsQty,
+            'listProduct.$[elem].stockInCtn': -factorCtnQty,
+            'listProduct.$[elem].balanceCtn': -factorCtnQty
           }
         },
         {

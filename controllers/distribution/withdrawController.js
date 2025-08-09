@@ -1255,7 +1255,7 @@ exports.saleConfirmWithdraw = async (req, res) => {
             id: u.id,
             unit: u.receiveUnit,
             qty: u.receiveQty,
-            statusMovement: 'OUT'
+            // statusMovement: 'OUT'
           }))
 
         for (const item of qtyproduct) {
@@ -1304,3 +1304,6 @@ exports.saleConfirmWithdraw = async (req, res) => {
     })
   }
 }
+
+
+

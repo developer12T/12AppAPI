@@ -24,7 +24,7 @@ const productModel = require('../../models/cash/product')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { create } = require('lodash')
 
-async function erpApiCheckOrderJob (channel = 'cash') {
+async function erpApiCheckOrderJob(channel = 'cash') {
   try {
     const { Order } = getModelsByChannel(channel, null, orderModel)
 
@@ -81,7 +81,7 @@ async function erpApiCheckOrderJob (channel = 'cash') {
   }
 }
 
-async function erpApiCheckDisributionM3Job (channel = 'cash') {
+async function erpApiCheckDisributionM3Job(channel = 'cash') {
   try {
     const { Distribution } = getModelsByChannel(channel, null, disributionModel)
 
@@ -163,7 +163,7 @@ async function erpApiCheckDisributionM3Job (channel = 'cash') {
   }
 }
 
-async function DeleteCartDaily (channel = 'cash') {
+async function DeleteCartDaily(channel = 'cash') {
   // เปิด session สำหรับ transaction
   // const session = await mongoose.startSession();
   // session.startTransaction();
@@ -304,8 +304,8 @@ async function DeleteCartDaily (channel = 'cash') {
 }
 
 const startCronJobErpApiCheck = () => {
-  cron.schedule('*/10 * * * *', async () => {
-    console.log('Running cron job startCronJobErpApiCheck every 10 minutes')
+  cron.schedule('0 5 * * *', async () => {
+    console.log('Running cron job startCronJobErpApiCheck at 6:00 AM Thai time')
     await erpApiCheckOrderJob()
   })
 }
