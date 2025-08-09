@@ -1385,7 +1385,7 @@ exports.getStockQtyNew = async (req, res) => {
         zone: { $substrBytes: ['$area', 0, 2] }
       }
     },
-    { $match: { type: 'adjuststock' ,status:'approved'} },
+    { $match: { type: 'adjuststock', status: 'approved' } },
     { $match: matchQuery },
     {
       $project: {
@@ -2907,4 +2907,36 @@ exports.deleteStockAdjust = async (req, res) => {
       message: 'Internal server error'
     })
   }
+}
+
+exports.addStockWithdraw = async (req, res) => {
+  const { area, productId, qty, unit, period } = req.body
+  const channel = req.headers['x-channel']
+  // const { Product } = getModelsByChannel(channel, res, productModel)
+  // const { Stock } = getModelsByChannel(channel, res, stockModel)
+
+  item = {
+    id: productId,
+    qty: qty,
+    unit: unit,
+  }
+
+  const updateResult = await updateStockMongo(
+    item,
+    area,
+    period,
+    'withdraw',
+    channel,
+    res
+  )
+  if (updateResult) return
+
+
+
+
+  return res.status(200).json({
+    status: 200,
+    message: 'add stock successfully'
+  })
+
 }
