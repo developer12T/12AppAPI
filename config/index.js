@@ -1,4 +1,4 @@
-require("dotenv").config();
+require('dotenv').config()
 
 module.exports = {
   JWT_SECRET: process.env.JWT_SECRET,
@@ -32,8 +32,13 @@ module.exports = {
   MY_MAIL_PASS: process.env.MY_MAIL_PASS,
   MY_MAIL_HOST: process.env.MY_MAIL_HOST,
 
+  ITEM_SERVER: process.env.ITEM_SERVER,
+  ITEM_SERVER_USER: process.env.ITEM_SERVER_USER,
+  ITEM_SERVER_PASSWORD: process.env.ITEM_SERVER_PASSWORD,
+  ITEM_SERVER_DATABASE: process.env.ITEM_SERVER_DATABASE,
+
   BELL_MAIL: process.env.BELL_MAIL,
   BANK_MAIL: process.env.BANK_MAIL,
 
   SERVER_WEREHOUSE: process.env.SERVER_WEREHOUSE
-};
+}

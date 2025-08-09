@@ -459,20 +459,37 @@ exports.adjustProduct = async (req, res) => {
         )
         if (updateResult) return // (กรณี stock ไม่พอ)
       }
-    } else if (type === 'withdraw') {
-      // const qtyProductStock = { id, qty: Math.abs(delta), unit }
-      // // เพิ่มใน cart (OUT = หักจาก stock) | ลดใน cart (IN = คืนเข้า stock)
-      // const adjStockType = delta > 0 ? 'OUT' : 'IN'
-      // updateResult = await updateStockMongo(
-      //   qtyProductStock,
-      //   area,
-      //   period,
-      //   'adjust',
-      //   channel,
-      //   adjStockType,
-      //   res
-      // )
-      // if (updateResult) return // (กรณี stock ไม่พอ)
+    } else if (type === 'refund') {
+      if (stockType == 'OUT') {
+        if (delta !== 0) {
+          const qtyProductStock = { id, qty: Math.abs(delta), unit }
+          updateResult = await updateStockMongo(
+            qtyProductStock,
+            area,
+            period,
+            'adjust',
+            channel,
+            stockType,
+            res
+          )
+          if (updateResult) return
+        }
+      }
+      if (stockType == 'IN') {
+        if (delta !== 0) {
+          const qtyProductStock = { id, qty: Math.abs(delta), unit }
+          updateResult = await updateStockMongo(
+            qtyProductStock,
+            area,
+            period,
+            'adjust',
+            channel,
+            stockType,
+            res
+          )
+          if (updateResult) return
+        }
+      }
     } else if (type === 'withdraw') {
     }
 

@@ -1,6 +1,11 @@
-const { Sequelize, DataTypes, QueryTypes } = require("sequelize");
-const mssql = require("mssql");
-const { M3_DATABASE, M3_HOST, M3_USER, M3_PASSWORD } = require("../config/index");
+const { Sequelize, DataTypes, QueryTypes } = require('sequelize')
+const mssql = require('mssql')
+const {
+  M3_DATABASE,
+  M3_HOST,
+  M3_USER,
+  M3_PASSWORD
+} = require('../config/index')
 
 const sequelize = new Sequelize(M3_DATABASE, M3_USER, M3_PASSWORD, {
   pool: {
@@ -14,7 +19,7 @@ const sequelize = new Sequelize(M3_DATABASE, M3_USER, M3_PASSWORD, {
   logging: (sql, ms) => console.log(`[SQL ${ms}ms]`, sql),
   dialect: "mssql",
   host: M3_HOST,
-  schema: "MVXJDTA",
+  schema: 'MVXJDTA',
   dialectOptions: {
     options: {
       requestTimeout: 300000, // ✅ ปล่อยได้นาน 5 นาที
@@ -34,5 +39,5 @@ module.exports = {
   sequelize: sequelize,
   DataTypes: DataTypes,
   QueryTypes: QueryTypes,
-  mssql: mssql,
-};
+  mssql: mssql
+}
