@@ -16,7 +16,7 @@ const {
   summaryGive,
   summaryAjustStock
 } = require('../../utilities/summary')
-const { forEach, chain } = require('lodash')
+const { forEach, chain, forIn } = require('lodash')
 const { error } = require('console')
 const cartModel = require('../../models/cash/cart')
 const productModel = require('../../models/cash/product')
@@ -25,6 +25,93 @@ const { getModelsByChannel } = require('../../middleware/channel')
 const { getSocket } = require('../../socket')
 const { period } = require('../../utilities/datetime')
 
+exports.getCartAll = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { Cart } = getModelsByChannel(channel, res, cartModel)
+    const { area } = req.query
+    const cartQuery = { area }
+
+    const cartData = await Cart.find(cartQuery)
+    if (!cartData) {
+      return res.status(404).json({ status: 404, message: 'Cart not found!' })
+    }
+
+    res.status(200).json({
+      status: '200',
+      message: 'success',
+      data: cartData
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.clearCartAll = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { period, cartAll } = req.body || {}
+    const { Cart } = getModelsByChannel(channel, res, cartModel)
+
+    if (!Array.isArray(cartAll) || cartAll.length === 0) {
+      return res.status(404).json({ status: 404, message: 'Cart not found!' })
+    }
+
+    const toDeleteIds = []
+    const updateErrors = []
+
+    for (const cart of cartAll) {
+      if (!cart || !cart._id) continue
+
+      // keep your condition: only update stock for non-withdraw / non-adjuststock
+      if (cart.type !== 'withdraw' && cart.type !== 'adjuststock') {
+        const products = Array.isArray(cart.listProduct) ? cart.listProduct : []
+        for (const prod of products) {
+          try {
+            if (!prod.condition && !prod.expire) {
+              // If updateStockMongo expects an ID instead of the whole object, use prod.id
+              await updateStockMongo(
+                prod, // or prod.id
+                cart.area,
+                period, // period is provided at body root
+                'deleteCart',
+                channel,
+                res
+              )
+            }
+          } catch (e) {
+            updateErrors.push({
+              cartId: cart._id,
+              product: prod?.id || prod,
+              error: e?.message
+            })
+            // keep going; don't block deletion
+          }
+        }
+      }
+
+      toDeleteIds.push(cart._id)
+    }
+
+    // delete all carts referenced in the request body by _id
+    const { acknowledged, deletedCount } = await Cart.deleteMany({
+      _id: { $in: toDeleteIds }
+    })
+
+    return res.status(200).json({
+      status: 200,
+      message: 'Clear cart successfully!',
+      acknowledged,
+      requested: toDeleteIds.length,
+      deleted: deletedCount || 0,
+      stockUpdateErrors: updateErrors // useful for debugging if any updates failed
+    })
+  } catch (error) {
+    console.error(error)
+    return res.status(500).json({ status: 500, message: error.message })
+  }
+}
 exports.getCart = async (req, res) => {
   // const session = await require('mongoose').startSession();
   try {
@@ -460,34 +547,36 @@ exports.adjustProduct = async (req, res) => {
         if (updateResult) return // (กรณี stock ไม่พอ)
       }
     } else if (type === 'refund') {
-      if (stockType == 'OUT') {
-        if (delta !== 0) {
-          const qtyProductStock = { id, qty: Math.abs(delta), unit }
-          updateResult = await updateStockMongo(
-            qtyProductStock,
-            area,
-            period,
-            'adjust',
-            channel,
-            stockType,
-            res
-          )
-          if (updateResult) return
+      if (!condition && !expire) {
+        if (stockType == 'OUT') {
+          if (delta !== 0) {
+            const qtyProductStock = { id, qty: Math.abs(delta), unit }
+            updateResult = await updateStockMongo(
+              qtyProductStock,
+              area,
+              period,
+              'adjust',
+              channel,
+              stockType,
+              res
+            )
+            if (updateResult) return
+          }
         }
-      }
-      if (stockType == 'IN') {
-        if (delta !== 0) {
-          const qtyProductStock = { id, qty: Math.abs(delta), unit }
-          updateResult = await updateStockMongo(
-            qtyProductStock,
-            area,
-            period,
-            'adjust',
-            channel,
-            stockType,
-            res
-          )
-          if (updateResult) return
+        if (stockType == 'IN') {
+          if (delta !== 0) {
+            const qtyProductStock = { id, qty: Math.abs(delta), unit }
+            updateResult = await updateStockMongo(
+              qtyProductStock,
+              area,
+              period,
+              'adjust',
+              channel,
+              stockType,
+              res
+            )
+            if (updateResult) return
+          }
         }
       }
     } else if (type === 'withdraw') {
@@ -564,6 +653,7 @@ exports.deleteProduct = async (req, res) => {
     const { Cart } = getModelsByChannel(channel, res, cartModel)
 
     let cart = await Cart.findOne(cartQuery)
+    console.log(cart)
     // .session(session);
     if (!cart) {
       // await session.abortTransaction();
@@ -633,15 +723,17 @@ exports.deleteProduct = async (req, res) => {
     if (type != 'withdraw' && type != 'adjuststock') {
       // await updateStockMongo(product, area, period, 'deleteCart', channel)
       // console.log(type)
-      const updateResult = await updateStockMongo(
-        product,
-        area,
-        period,
-        'deleteCart',
-        channel,
-        res
-      )
-      if (updateResult) return
+      if (!condition && !expire) {
+        const updateResult = await updateStockMongo(
+          product,
+          area,
+          period,
+          'deleteCart',
+          channel,
+          res
+        )
+        if (updateResult) return
+      }
     }
 
     if (cart.listProduct.length === 0 && cart.listRefund.length === 0) {
