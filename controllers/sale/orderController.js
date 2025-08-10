@@ -178,8 +178,8 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-          .map(item => item.price)
-          .reduce((sum, price) => sum + price, 0)
+        .map(item => item.price)
+        .reduce((sum, price) => sum + price, 0)
       : 0
     const total = subtotal - discountProduct
     const newOrder = new Order({
@@ -271,6 +271,20 @@ exports.checkout = async (req, res) => {
     //   seenProIds.add(promo.proId);
     //   return true;
     // });
+    // console.log(promotion)
+
+
+    const uniquePromotions = []
+    const seen = new Set()
+
+    for (const item of newOrder.listPromotions) {
+      if (!seen.has(item.proId)) {
+        seen.add(item.proId)
+        uniquePromotions.push(item)
+      }
+    }
+
+    newOrder.listPromotions = uniquePromotions
 
     newOrder.listPromotions.forEach(item => {
       const promo = promotion.appliedPromotions.find(
@@ -283,6 +297,8 @@ exports.checkout = async (req, res) => {
         item.proQty = promo.proQty
       }
     })
+
+    // console.log("newOrder.listPromotions", newOrder.listPromotions)
 
     for (const item of newOrder.listQuota) {
       await Quota.findOneAndUpdate(
@@ -678,7 +694,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -914,7 +930,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD (date) {
+    function formatDateToThaiYYYYMMDD(date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1025,7 +1041,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromChange = modelChange.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD (date) {
+    function formatDateToThaiYYYYMMDD(date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1249,7 +1265,7 @@ exports.OrderToExcel = async (req, res) => {
       message: 'Not Found Order'
     })
   }
-  function yyyymmddToDdMmYyyy (dateString) {
+  function yyyymmddToDdMmYyyy(dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -1281,7 +1297,7 @@ exports.OrderToExcel = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => {})
+    fs.unlink(tempPath, () => { })
   })
 }
 
