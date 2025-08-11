@@ -30,7 +30,7 @@ exports.getCartAll = async (req, res) => {
     const channel = req.headers['x-channel']
     const { Cart } = getModelsByChannel(channel, res, cartModel)
     const { area } = req.query
-    const cartQuery = { area }
+    const cartQuery = { area, type: { $nin: ['withdraw'] } }
 
     const cartData = await Cart.find(cartQuery)
     if (!cartData) {

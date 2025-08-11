@@ -53,6 +53,8 @@ const path = require('path')
 const os = require('os')
 const fs = require('fs')
 
+const orderTimestamps = {}
+
 exports.checkout = async (req, res) => {
   // const transaction = await sequelize.transaction();
   try {
@@ -94,6 +96,19 @@ exports.checkout = async (req, res) => {
         .status(400)
         .json({ status: 400, message: 'Missing required fields!' })
     }
+
+    const now = Date.now()
+    const lastUpdate = orderTimestamps[storeId] || 0
+    const ONE_MINUTE = 60 * 1000
+
+    if (now - lastUpdate < ONE_MINUTE) {
+      return res.status(429).json({
+        status: 429,
+        message:
+          'This order was updated less than 1 minute ago. Please try again later!'
+      })
+    }
+    orderTimestamps[storeId] = now
 
     const cart = await Cart.findOne({ type, area, storeId })
     if (!cart || cart.listProduct.length === 0) {
@@ -178,8 +193,8 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-        .map(item => item.price)
-        .reduce((sum, price) => sum + price, 0)
+          .map(item => item.price)
+          .reduce((sum, price) => sum + price, 0)
       : 0
     const total = subtotal - discountProduct
     const newOrder = new Order({
@@ -272,7 +287,6 @@ exports.checkout = async (req, res) => {
     //   return true;
     // });
     // console.log(promotion)
-
 
     const uniquePromotions = []
     const seen = new Set()
@@ -694,7 +708,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -842,34 +856,78 @@ exports.OrderToExcel = async (req, res) => {
   //   orderId: { $not: /CC/ },
   // })
 
+  // ช่วงเวลา "ไทย" ที่ผู้ใช้เลือก
+  const startTH = new Date(
+    `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00+07:00`
+  )
+  const endTH = new Date(
+    `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(
+      6,
+      8
+    )}T23:59:59.999+07:00`
+  )
+
+  // แปลงเป็น UTC เพื่อไปเทียบกับ createdAt (ซึ่งเก็บเป็น UTC)
+  const startUTC = new Date(startTH.getTime() - 7 * 60 * 60 * 1000)
+  const endUTC = new Date(endTH.getTime() - 7 * 60 * 60 * 1000)
+
+  // ใช้ $match ครั้งเดียว ให้ใช้ index ได้
+  const commonMatch = {
+    createdAt: { $gte: startUTC, $lte: endUTC },
+    'store.area': { $ne: 'IT211' },
+    status: { $nin: ['canceled'] }
+  }
+
   const modelOrder = await Order.aggregate([
     {
       $match: {
+        ...commonMatch,
         status: { $nin: ['canceled'] },
-        'store.area': { $ne: 'IT211' },
-        type: { $in: ['sale'] }
+        type: { $in: ['sale'] },
+        'store.area': { $ne: 'IT211' }
       }
     },
     {
-      $addFields: {
-        createdAtThai: {
-          $dateAdd: {
-            startDate: '$createdAt',
-            unit: 'hour',
-            amount: 7
-          }
-        }
-      }
-    },
-    {
-      $match: {
-        createdAtThai: {
-          $gte: start,
-          $lte: end
-        }
+      $project: {
+        // ดึงเฉพาะที่ต้องใช้
+        createdAt: 1,
+        orderId: 1,
+        sale: 1,
+        store: 1,
+        listProduct: 1,
+        listPromotions: 1
       }
     }
   ])
+
+  // const modelOrder = await Order.aggregate([
+  //   {
+  //     $match: {
+  //       status: { $nin: ['canceled'] },
+  //       'store.area': { $ne: 'IT211' },
+  //       type: { $in: ['sale'] }
+  //     }
+  //   },
+  //   {
+  //     $addFields: {
+  //       createdAtThai: {
+  //         $dateAdd: {
+  //           startDate: '$createdAt',
+  //           unit: 'hour',
+  //           amount: 7
+  //         }
+  //       }
+  //     }
+  //   },
+  //   {
+  //     $match: {
+  //       createdAtThai: {
+  //         $gte: start,
+  //         $lte: end
+  //       }
+  //     }
+  //   }
+  // ])
 
   const modelChange = await Order.aggregate([
     {
@@ -930,7 +988,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1041,7 +1099,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromChange = modelChange.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1132,14 +1190,51 @@ exports.OrderToExcel = async (req, res) => {
     })
   })
 
+  // const currentYear = new Date().getFullYear()
+  // const years = [
+  //   // currentYear +1
+  //   currentYear, // ปีปัจจุบัน
+  //   currentYear - 1, // ปีก่อน
+  //   currentYear - 2, // ย้อนหลัง 2 ปี
+  //   currentYear + 1 // ย้อนหลัง 2 ปี
+  // ]
+
+  // รวบรวม itemCode ทั้งหมดจาก refund
+  const refundItems = modelRefund.flatMap(o => o.listProduct.map(p => p.id))
+  const uniqueCodes = [...new Set(refundItems)]
+
+  // ปีที่ยอมรับ
   const currentYear = new Date().getFullYear()
-  const years = [
-    // currentYear +1
-    currentYear, // ปีปัจจุบัน
-    currentYear - 1, // ปีก่อน
-    currentYear - 2, // ย้อนหลัง 2 ปี
-    currentYear + 1 // ย้อนหลัง 2 ปี
-  ]
+  const years = [currentYear, currentYear - 1, currentYear - 2, currentYear + 1]
+
+  // ดึงล็อตรวดเดียวจาก MSSQL (Sequelize)
+  const lotRows = await Item.findAll({
+    where: {
+      itemCode: { [Op.in]: uniqueCodes },
+      expireDate: { [Op.or]: years.map(y => ({ [Op.like]: `${y}%` })) },
+      [Op.and]: [literal('LEN(LTRIM(RTRIM([Lot]))) = 16')]
+    },
+    attributes: ['itemCode', 'lot'], // แค่นี้พอ
+    raw: true
+  })
+
+  // ทำ map เพื่อ lookup เร็ว O(1)
+  const lotMap = new Map()
+  for (const r of lotRows) {
+    const code = (r.itemCode || '').trim() // <<<<<< สำคัญ
+    const lot = (r.lot || '').trim()
+    const curr = lotMap.get(code)
+
+    // ถ้ายังไม่มี หรือ lot นี้ใหม่กว่า ให้ทับ
+    if (!curr || lot > curr) {
+      // ตัวเลขความยาวเท่ากัน เปรียบเทียบ string ได้
+      lotMap.set(code, lot)
+    }
+  }
+
+  // console.log('uniqueCodes', uniqueCodes)
+  // console.log('lotRows', lotRows)
+  // console.log('lotMap', lotMap)
 
   // --- สร้าง tranFromRefund ให้แบน ---
   const tranFromRefundNested = await Promise.all(
@@ -1168,22 +1263,22 @@ exports.OrderToExcel = async (req, res) => {
             //     [Op.and]: [{ lot: { [Op.regexp]: '^[0-9]{16}$' } }]
             //   }
             // })
-            const lotData = await Item.findOne({
-              where: {
-                itemCode: p.id,
-                expireDate: {
-                  [Op.or]: years.map(y => ({ [Op.like]: `${y}%` }))
-                },
-                // date: {
-                //   [Op.like]: `${p.expireDate.slice(0, 4)}%`
-                // },
-                // lot: { [Op.like]: `${p.expireDate.slice(2, 4)}%` },
-                [Op.and]: [
-                  literal('LEN(LTRIM(RTRIM([Lot]))) = 16') // ความยาว 16 ตัวอักษร
-                  // literal("LTRIM(RTRIM([Lot])) NOT LIKE '%[^0-9]%'") // ไม่มีตัวที่ไม่ใช่ตัวเลข
-                ]
-              }
-            })
+            // const lotData = await Item.findOne({
+            //   where: {
+            //     itemCode: p.id,
+            //     expireDate: {
+            //       [Op.or]: years.map(y => ({ [Op.like]: `${y}%` }))
+            //     },
+            //     // date: {
+            //     //   [Op.like]: `${p.expireDate.slice(0, 4)}%`
+            //     // },
+            //     // lot: { [Op.like]: `${p.expireDate.slice(2, 4)}%` },
+            //     [Op.and]: [
+            //       literal('LEN(LTRIM(RTRIM([Lot]))) = 16') // ความยาว 16 ตัวอักษร
+            //       // literal("LTRIM(RTRIM([Lot])) NOT LIKE '%[^0-9]%'") // ไม่มีตัวที่ไม่ใช่ตัวเลข
+            //     ]
+            //   }
+            // })
             return {
               proCode: '',
               id: p.id,
@@ -1199,7 +1294,8 @@ exports.OrderToExcel = async (req, res) => {
               subtotal: p.subtotal,
               discount: p.discount,
               netTotal: p.netTotal,
-              lotNo: lotData?.lot || null
+              lotNo: lotMap.get(p.id) || ''
+              // lotNo: lotData?.lot || null
             }
           })
       )
@@ -1265,7 +1361,7 @@ exports.OrderToExcel = async (req, res) => {
       message: 'Not Found Order'
     })
   }
-  function yyyymmddToDdMmYyyy(dateString) {
+  function yyyymmddToDdMmYyyy (dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -1297,7 +1393,7 @@ exports.OrderToExcel = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => { })
+    fs.unlink(tempPath, () => {})
   })
 }
 

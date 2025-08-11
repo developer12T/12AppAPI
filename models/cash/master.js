@@ -1,6 +1,5 @@
 const { sequelize, DataTypes } = require('../../config/m3db')
 
-
 const Locate = sequelize.define(
   'MITLOC',
   {
@@ -103,6 +102,252 @@ const Balance = sequelize.define(
   }
 )
 
+const Customer = sequelize.define(
+  'OCUSMA',
+  {
+    customerNo: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'OKCUNO'
+    },
+    customerStatus: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'OKSTAT'
+    },
+    customerChannel: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKCUCL'
+    },
+    customerName: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKCUNM'
+    },
+    coNo: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'OKCONO'
+    },
+    addressID: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKADID'
+    },
+    customerAddress1: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKCUA1'
+    },
+    customerAddress2: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKCUA2'
+    },
+    customerAddress3: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKCUA3'
+    },
+    customerAddress4: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKCUA4'
+    },
+    customerPoscode: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKPONO'
+    },
+    customerPhone: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKPHNO'
+    },
+    creditTerm: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKTEPY'
+    },
+    customerCoType: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKORTP'
+    },
+    warehouse: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKWHLO'
+    },
+    saleZone: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKSDST'
+    },
+    saleTeam: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKCFC8'
+    },
+    OKCFC1: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKCFC1'
+    },
+    OKCFC3: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKCFC3'
+    },
+    OKCFC6: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKCFC6'
+    },
+    salePayer: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKPYNO'
+    },
+    creditLimit: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      field: 'OKCRL2'
+    },
+    taxno: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKVRNO'
+    },
+    saleCode: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKSMCD'
+    },
+    OKRESP: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKRESP'
+    },
+    OKUSR1: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKUSR1'
+    },
+    OKUSR2: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKUSR2'
+    },
+    OKUSR3: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKUSR3'
+    },
+    OKDTE1: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      field: 'OKDTE1'
+    },
+    OKDTE2: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      field: 'OKDTE2'
+    },
+    OKDTE3: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      field: 'OKDTE3'
+    },
+    OKRGDT: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      field: 'OKRGDT'
+    },
+    OKRGTM: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      field: 'OKRGTM'
+    },
+    OKLMDT: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      field: 'OKLMDT'
+    },
+    OKCHID: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKCHID'
+    },
+    OKLMTS: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      field: 'OKLMTS'
+    },
+    OKALCU: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'OKALCU'
+    },
+    OKCSCD: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'OKCSCD'
+    },
+    OKECAR: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'OKECAR'
+    },
+    OKFACI: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'OKFACI'
+    },
+    OKINRC: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'OKINRC'
+    },
+    OKCUCD: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'OKCUCD'
+    },
+    OKPYCD: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'OKPYCD'
+    },
+    OKMODL: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'OKMODL'
+    },
+    OKTEDL: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'OKTEDL'
+    },
+    OKFRE1: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'OKFRE1'
+    }
+  },
+  {
+    freezeTableName: true,
+    timestamps: false,
+    createdAt: false,
+    updatedAt: false,
+    primaryKey: false
+  }
+)
+
 const Warehouse = sequelize.define(
   'MITWHL',
   {
@@ -141,7 +386,7 @@ const Sale = sequelize.define(
       allowNull: false,
       primaryKey: true,
       field: 'OAORNO'
-    },
+    }
     // warehouse: {
     //   type: DataTypes.INTEGER,
     //   allowNull: false,
@@ -171,7 +416,7 @@ const DisributionM3 = sequelize.define(
       allowNull: false,
       primaryKey: true,
       field: 'MGTRNR'
-    },
+    }
     // warehouse: {
     //   type: DataTypes.INTEGER,
     //   allowNull: false,
@@ -227,7 +472,7 @@ const MHDISL = sequelize.define(
       type: DataTypes.STRING,
       allowNull: false,
       field: 'URNEWE'
-    },
+    }
   },
   {
     freezeTableName: true,
@@ -268,75 +513,91 @@ const MHDISH = sequelize.define(
   }
 )
 
-
-
-
-
-const Item = sequelize.define('MITMAS', {
-  companycode: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    field: 'MMCONO'
+const Item = sequelize.define(
+  'MITMAS',
+  {
+    companycode: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      field: 'MMCONO'
+    },
+    status: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'MMSTAT'
+    },
+    itemcode: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'MMITNO'
+    },
+    itemname: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'MMITDS'
+    },
+    itemdescripton: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'MMFUDS'
+    },
+    itemtype: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'MMITTY'
+    },
+    itemgroup: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'MMCFI3'
+    }
   },
-  status: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    field: 'MMSTAT'
-  },
-  itemcode: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    field: 'MMITNO'
-  },
-  itemname: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    field: 'MMITDS'
-  },
-  itemdescripton: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    field: 'MMFUDS'
-  },
-  itemtype: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    field: 'MMITTY'
-  },
-  itemgroup: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    field: 'MMCFI3'
+  {
+    freezeTableName: true,
+    timestamps: false,
+    createdAt: false,
+    updatedAt: false,
+    primaryKey: false
   }
-}, { freezeTableName: true, timestamps: false, createdAt: false, updatedAt: false, primaryKey: false });
+)
 
-const ItemConvert = sequelize.define('MITAUN', {
-  companycode: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    field: 'MUCONO'
+const ItemConvert = sequelize.define(
+  'MITAUN',
+  {
+    companycode: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      field: 'MUCONO'
+    },
+    factype: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      field: 'MUAUTP'
+    },
+    itemcode: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'MUITNO'
+    },
+    unit: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'MUALUN'
+    },
+    factor: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      field: 'MUCOFA'
+    }
   },
-  factype: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    field: 'MUAUTP'
-  },
-  itemcode: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    field: 'MUITNO'
-  },
-  unit: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    field: 'MUALUN'
-  },
-  factor: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    field: 'MUCOFA'
+  {
+    freezeTableName: true,
+    timestamps: false,
+    createdAt: false,
+    updatedAt: false,
+    primaryKey: false
   }
-}, { freezeTableName: true, timestamps: false, createdAt: false, updatedAt: false, primaryKey: false });
+)
 
 const OOTYPE = sequelize.define(
   'OOTYPE',
@@ -383,64 +644,56 @@ const OOTYPE = sequelize.define(
   }
 )
 
-
-
-
 const NumberSeries = sequelize.define(
-  "CSYNBR",
+  'CSYNBR',
   {
     coNo: {
       type: DataTypes.INTEGER,
       allowNull: false,
       primaryKey: true,
-      field: "CNCONO",
+      field: 'CNCONO'
     },
     series: {
       type: DataTypes.STRING,
       allowNull: false,
       primaryKey: true,
-      field: "CNNBID",
+      field: 'CNNBID'
     },
     seriesType: {
       type: DataTypes.STRING,
       allowNull: false,
       primaryKey: true,
-      field: "CNNBTY",
+      field: 'CNNBTY'
     },
     seriesName: {
       type: DataTypes.STRING,
       allowNull: false,
-      field: "CNNBDE",
+      field: 'CNNBDE'
     },
     startNo: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      field: "CNNBLO",
+      field: 'CNNBLO'
     },
     finalNo: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      field: "CNNBHI",
+      field: 'CNNBHI'
     },
     lastNo: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      field: "CNNBNR",
-    },
+      field: 'CNNBNR'
+    }
   },
   {
     freezeTableName: true,
     timestamps: false,
     createdAt: false,
     updatedAt: false,
-    primaryKey: false,
+    primaryKey: false
   }
-);
-
-
-
-
-
+)
 
 module.exports = {
   // ItemFac,
@@ -457,13 +710,7 @@ module.exports = {
   DisributionM3,
   NumberSeries,
   OOTYPE,
+  Customer
   // MGTYPE,
   // OODFLT
 }
-
-
-
-
-
-
-
