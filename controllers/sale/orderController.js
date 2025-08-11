@@ -830,6 +830,14 @@ exports.OrderToExcel = async (req, res) => {
   const { channel, date } = req.query
 
   // console.log(channel, date)
+  let statusArray = (req.query.status || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+
+  if (statusArray.length === 0) {
+    statusArray = ['pending'] // default
+  }
 
   if (!date || date === 'null') {
     const today = new Date()
@@ -873,9 +881,7 @@ exports.OrderToExcel = async (req, res) => {
 
   // ใช้ $match ครั้งเดียว ให้ใช้ index ได้
   const commonMatch = {
-    createdAt: { $gte: startUTC, $lte: endUTC },
-    'store.area': { $ne: 'IT211' },
-    status: { $nin: ['canceled'] }
+    createdAt: { $gte: startUTC, $lte: endUTC }
   }
 
   const modelOrder = await Order.aggregate([
@@ -883,6 +889,7 @@ exports.OrderToExcel = async (req, res) => {
       $match: {
         ...commonMatch,
         status: { $nin: ['canceled'] },
+        status: { $in: statusArray },
         type: { $in: ['sale'] },
         'store.area': { $ne: 'IT211' }
       }
@@ -934,6 +941,7 @@ exports.OrderToExcel = async (req, res) => {
       $match: {
         status: { $nin: ['canceled'] },
         'store.area': { $ne: 'IT211' },
+        status: { $in: statusArray },
         type: { $in: ['change'] }
       }
     },
@@ -961,7 +969,8 @@ exports.OrderToExcel = async (req, res) => {
   const modelRefund = await Refund.aggregate([
     {
       $match: {
-        // status: { $nin: ['canceled'] },
+        status: { $nin: ['canceled'] },
+        status: { $in: statusArray },
         'store.area': { $ne: 'IT211' }
       }
     },
@@ -3477,8 +3486,6 @@ exports.saleReport = async (req, res) => {
 
   // console.log(dataRefund)
 
-
-
   if (role == 'sale' || role == '' || !role) {
     let filterCreatedAt = {}
     let filterArea = {}
@@ -3490,7 +3497,6 @@ exports.saleReport = async (req, res) => {
       filterType = { type: type }
     }
     if (date) {
-
       const year = Number(date.substring(0, 4))
       const month = Number(date.substring(4, 6)) - 1
       const day = Number(date.substring(6, 8))
@@ -3508,15 +3514,14 @@ exports.saleReport = async (req, res) => {
     const dataOrder = await Order.find({
       ...filterArea,
       ...filterCreatedAt,
-      status: { $ne: "canceled" }
+      status: { $ne: 'canceled' }
     })
 
     const dataRefund = await Refund.find({
       ...filterArea,
       ...filterCreatedAt,
-      status: { $ne: "canceled" }
+      status: { $ne: 'canceled' }
     })
-
 
     if (dataOrder.length === 0) {
       return res.status(404).json({
