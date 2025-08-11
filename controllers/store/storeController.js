@@ -1,5 +1,5 @@
 const mongoose = require('mongoose')
-
+const { Customer } = require('../../models/cash/master')
 const { uploadFiles } = require('../../utilities/upload')
 const { calculateSimilarity } = require('../../utilities/utility')
 const axios = require('axios')
@@ -666,39 +666,39 @@ exports.addFromERP = async (req, res) => {
 
 exports.addFromERPnew = async (req, res) => {
   try {
-    const channel = req.headers['x-channel'];
-    const { Store } = getModelsByChannel(channel, res, storeModel);
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
-    const erpStores = await storeQuery(channel); // ข้อมูลจาก ERP
-    const erpMap = new Map(erpStores.map(item => [item.storeId, item]));
+    const erpStores = await storeQuery(channel) // ข้อมูลจาก ERP
+    const erpMap = new Map(erpStores.map(item => [item.storeId, item]))
 
-    const mongoStores = await Store.find();
-    const mongoMap = new Map(mongoStores.map(item => [item.storeId, item]));
+    const mongoStores = await Store.find()
+    const mongoMap = new Map(mongoStores.map(item => [item.storeId, item]))
 
-    const bulkOps = [];
+    const bulkOps = []
     const changes = {
       added: [],
       updated: [],
       deleted: []
-    };
+    }
 
     // ➕ เตรียม insert/update
     for (const item of erpStores) {
-      const existing = mongoMap.get(item.storeId);
+      const existing = mongoMap.get(item.storeId)
 
       if (!existing) {
         // เตรียม insert
         bulkOps.push({
           insertOne: { document: item }
-        });
-        changes.added.push(item.storeId);
+        })
+        changes.added.push(item.storeId)
       } else {
         // ตรวจสอบว่ามี field ไหนเปลี่ยน
-        let isModified = false;
-        const updatedFields = {};
+        let isModified = false
+        const updatedFields = {}
         for (const key of Object.keys(item)) {
           if (key !== 'createdAt' && existing[key] !== item[key]) {
-            updatedFields[key] = item[key];
+            updatedFields[key] = item[key]
           }
         }
 
@@ -708,8 +708,8 @@ exports.addFromERPnew = async (req, res) => {
               filter: { _id: existing._id },
               update: { $set: updatedFields }
             }
-          });
-          changes.updated.push(item.storeId);
+          })
+          changes.updated.push(item.storeId)
         }
       }
     }
@@ -719,30 +719,30 @@ exports.addFromERPnew = async (req, res) => {
       if (!erpMap.has(store.storeId)) {
         bulkOps.push({
           deleteOne: { filter: { _id: store._id } }
-        });
-        changes.deleted.push(store.storeId);
+        })
+        changes.deleted.push(store.storeId)
       }
     }
 
     // 🔁 ทำงานจริงในครั้งเดียว
     if (bulkOps.length > 0) {
-      await Store.bulkWrite(bulkOps);
+      await Store.bulkWrite(bulkOps)
     }
 
     // 🔔 แจ้ง socket
-    const io = getSocket();
-    io.emit('store/addFromERPnew', {});
+    const io = getSocket()
+    io.emit('store/addFromERPnew', {})
 
     res.status(200).json({
       status: 200,
       message: 'Sync Store Success',
       changes
-    });
+    })
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ status: 500, message: error.message });
+    console.error(error)
+    res.status(500).json({ status: 500, message: error.message })
   }
-};
+}
 
 exports.checkInStore = async (req, res) => {
   const { storeId } = req.params
@@ -900,7 +900,7 @@ exports.updateStoreStatus = async (req, res) => {
           shippingAddress4: u.province ?? '',
           shippingPoscode: u.postCode ?? '',
           shippingPhone: item.tel ?? '',
-          shippingRoute: u.postCode ,
+          shippingRoute: u.postCode,
           OPGEOX: u.latitude,
           OPGEOY: u.longtitude
         }
@@ -910,24 +910,24 @@ exports.updateStoreStatus = async (req, res) => {
     // console.log(dataTran)
 
     if (item.area != 'IT211') {
-    try {
-      const response = await axios.post(
-        `${process.env.API_URL_12ERP}/customer/insert`,
-        dataTran
-      )
+      try {
+        const response = await axios.post(
+          `${process.env.API_URL_12ERP}/customer/insert`,
+          dataTran
+        )
 
-      // ส่งกลับไปให้ client ที่เรียก Express API
-      return res.status(response.status).json(response.data)
-    } catch (error) {
-      if (error.response) {
-        // หาก ERP ส่ง 400 หรือ 500 หรืออื่นๆ กลับมา
-        return res.status(error.response.status).json({
-          message: error.response.data?.message || 'Request Failed',
-          data: error.response.data
-        })
+        // ส่งกลับไปให้ client ที่เรียก Express API
+        return res.status(response.status).json(response.data)
+      } catch (error) {
+        if (error.response) {
+          // หาก ERP ส่ง 400 หรือ 500 หรืออื่นๆ กลับมา
+          return res.status(error.response.status).json({
+            message: error.response.data?.message || 'Request Failed',
+            data: error.response.data
+          })
+        }
       }
     }
-  }
 
     const io = getSocket()
     io.emit('store/updateStoreStatus', {
@@ -1008,6 +1008,16 @@ exports.updateStoreStatusNoNewId = async (req, res) => {
         'approve.appPerson': user
       },
       { new: true }
+    )
+
+    await Customer.update(
+      { customerStatus: `${status}` },
+      {
+        where: {
+          coNo: 410,
+          customerNo: storeId
+        }
+      }
     )
 
     return res.status(200).json({
