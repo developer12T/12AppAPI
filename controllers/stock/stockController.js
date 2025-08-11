@@ -1305,7 +1305,7 @@ exports.getStockQtyNew = async (req, res) => {
     }
   ]);
 
-    const dataWithdraw = await Distribution.aggregate([
+  const dataWithdraw = await Distribution.aggregate([
     { $match: { status: 'confirm', ...matchQuery } },
     {
       $project: {
@@ -2007,14 +2007,14 @@ exports.getStockQtyDetail = async (req, res) => {
     const productId = String(rawProductId);
     const channel = req.headers['x-channel'];
 
-    const { Stock, Product, Distribution, Refund, Order, Giveaway } = {
+    const { Stock, Product, Distribution, Refund, Order, Giveaway, AdjustStock } = {
       Stock: getModelsByChannel(channel, res, stockModel).Stock,
       Product: getModelsByChannel(channel, res, productModel).Product,
       Distribution: getModelsByChannel(channel, res, distributionModel).Distribution,
       Refund: getModelsByChannel(channel, res, refundModel).Refund,
       Order: getModelsByChannel(channel, res, orderModel).Order,
       Giveaway: getModelsByChannel(channel, res, giveModel).Giveaway,
-
+      AdjustStock: getModelsByChannel(channel, res, adjustStockModel).AdjustStock
     };
 
     const filterProduct = (list = []) => list.filter(p => p.id === productId);
@@ -2057,7 +2057,27 @@ exports.getStockQtyDetail = async (req, res) => {
       qty: unit.unit === 'CTN' ? withdraw.reduce((sum, i) => sum + i.total, 0) : 0
     }));
 
-    // console.log(withdrawStock)
+    const adjustStockDocs = await AdjustStock.aggregate([
+      { $match: { area, period } },
+      { $match: { status: 'approved' } },
+      { $unwind: '$listProduct' },
+      { $match: { 'listProduct.id': productId } },
+      { $addFields: { createdAtTH: convertToTHTime('$createdAt') } }
+    ]);
+
+    const adjust = adjustStockDocs.map(d => ({
+      area: d.area,
+      orderId: d.orderId,
+      orderType: d.type,
+      orderTypeName: "ปรับสต็อคลง",
+      sendDate: d.createdAtTH,
+      total: d.listProduct.qty,
+      status: d.status
+    }));
+
+    const adjustStock = calculateQtyByUnit(productData.listUnit, adjustStockDocs.flatMap(r => r.listProduct));
+
+    // console.log(adjustStock)
 
     const refundDocs = await Refund.aggregate([
       {
