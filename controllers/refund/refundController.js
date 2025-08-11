@@ -843,8 +843,8 @@ exports.updateStatus = async (req, res) => {
         )
         if (updateResult) return
       }
-    } else if (status === 'completed') {
-      statusTH = 'สำเร็จ'
+    } else if (status === 'approved') {
+      statusTH = 'อนุมัติ'
 
       for (const item of productQty) {
         // console.log(item)
