@@ -33,7 +33,7 @@ const adjustStockModel = require('../../models/cash/stock')
 const { getModelsByChannel } = require('../../middleware/channel')
 const os = require('os')
 const { summaryOrder } = require('../../utilities/summary')
-const { to2, updateStockMongo } = require('../../middleware/order')
+const { to2, updateStockMongo,calculateStockSummary } = require('../../middleware/order')
 const { getSocket } = require('../../socket')
 const fetchArea = async warehouse => {
   try {
@@ -1487,13 +1487,17 @@ exports.getStockQtyNew = async (req, res) => {
     }, {})
   )
 
-  // console.log(allWithdrawProducts)
+  // allWithdrawProducts.forEach(item => {
+  //   if (item.id === '10011101002') {
+  //     console.log(item);
+  //   }
+  // });
 
   const withdrawProductArray = Object.values(
     allWithdrawProducts.reduce((acc, curr) => {
       const key = `${curr.id}_${curr.unit}`
       if (acc[key]) {
-        acc[key].qty += curr.qty || 0
+        acc[key].qty += curr.receiveQty || 0
         acc[key].qtyPcs += curr.qtyPcs || 0
       } else {
         acc[key] = { ...curr }
@@ -1502,7 +1506,8 @@ exports.getStockQtyNew = async (req, res) => {
     }, {})
   )
 
-  // console.log(withdrawProductArray)
+
+
 
   const orderProductArray = Object.values(
     allOrderProducts.reduce((acc, curr) => {
@@ -1706,6 +1711,9 @@ exports.getStockQtyNew = async (req, res) => {
     const productDetailWithdraw = withdrawProductArray.filter(
       u => u.id == stockItem.id
     )
+
+
+
     const productDetailOrder = orderProductArray.filter(
       u => u.id == stockItem.id
     )
@@ -1756,7 +1764,7 @@ exports.getStockQtyNew = async (req, res) => {
       const withdrawQty =
         productDetailWithdraw.find(i => i.unit === u.unit)?.qty ?? 0
 
-      // console.log(productDetailWithdraw)
+      // console.log(productDetailWithdraw.find(i => i.id === '10011101002'))
       const saleQty = productDetailOrder.find(i => i.unit === u.unit)?.qty ?? 0
       const promoQty = productDetailPromotion.find(i => i.unit === u.unit)?.qty ?? 0
       // console.log("promoQty",promoQty)
@@ -1806,11 +1814,15 @@ exports.getStockQtyNew = async (req, res) => {
       }
     })
 
+
+    const summaryQty = calculateStockSummary(productDetail, listUnitStock);
+
     const finalProductStock = {
       productId: stockItem.id,
       productName: productDetail.name,
       pcsMain: pcsMain,
-      listUnit: listUnitStock
+      listUnit: listUnitStock,
+      summaryQty: summaryQty
     }
 
     data.push(finalProductStock)
@@ -2248,11 +2260,37 @@ exports.getStockQtyDetail = async (req, res) => {
     const summaryStockIn = calculateTotalPrice(productData.listUnit,
       [...withdrawStock, ...refundStock], 'sale');
 
+
+
     const summaryStockOut = calculateQtyByUnit(productData.listUnit,
-      [...orderStock, ...promotionStock, ...changeStock, ...giveStock]);
+      [...orderStock, ...promotionStock, ...changeStock, ...giveStock, ...adjustStock]);
+
+    const summaryStockInQty = calculateQtyByUnit(productData.listUnit,
+      [...withdrawStock, ...refundStock]);
+
+    const summaryStockOutQty = calculateQtyByUnit(productData.listUnit,
+      [...orderStock, ...promotionStock, ...changeStock, ...giveStock, ...adjustStock]);
 
     const summaryStockOutPrice = calculateTotalPrice(productData.listUnit, summaryStockOut, 'sale');
     const summaryStockBalancePrice = calculateTotalPrice(productData.listUnit, BALANCE.stock, 'sale');
+
+    // console.log(summaryStockIn)
+
+    totalStockInPcs = 0
+    const stockInPcs = summaryStockInQty.map(item => {
+      const pcs = productData.listUnit.find(i => i.Unit === item.Unit).factor
+      totalStockInPcs += pcs * item.qty
+      // console.log(pcs)
+    })
+    totalStockOutPcs = 0
+    summaryStockOutQty.forEach(item => {
+      const unitObj = productData.listUnit.find(i => i.Unit === item.unit)
+      const pcs = unitObj ? unitObj.factor : 0
+      totalStockOutPcs += pcs * item.qty
+    })
+
+    // console.log(totalStockInPcs)
+    // console.log(totalStockOutPcs)
 
     res.status(200).json({
       status: 200,
@@ -2278,6 +2316,8 @@ exports.getStockQtyDetail = async (req, res) => {
           order: orderDetail,
           orderStock,
           orderSum: calculateTotalPrice(productData.listUnit, orderStock, 'sale'),
+          adjustStock,
+          adjustDetail: adjust,
           promotionStock,
           promotionSum: calculateTotalPrice(productData.listUnit, promotionStock, 'sale'),
           changeDetail: changeDetail,
@@ -2289,6 +2329,8 @@ exports.getStockQtyDetail = async (req, res) => {
           summaryStock: summaryStockOut,
           summaryStockInOut: summaryStockOutPrice
         },
+        totalStockInPcs: totalStockInPcs,
+        totalStockOutPcs: totalStockOutPcs,
         BALANCE: BALANCE.stock,
         // summaryQtyPcs:,
         summary: summaryStockBalancePrice
@@ -3380,3 +3422,9 @@ exports.checkStockWithdraw = async (req, res) => {
   }
   res.status(200).json({ status: 200, message: 'suceesful', data })
 }
+
+
+
+
+
+
