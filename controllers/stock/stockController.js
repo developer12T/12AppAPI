@@ -2270,6 +2270,7 @@ exports.getStockQtyDetail = async (req, res) => {
           summaryStockInOut: summaryStockOutPrice
         },
         BALANCE: BALANCE.stock,
+        // summaryQtyPcs:,
         summary: summaryStockBalancePrice
       }
     });
