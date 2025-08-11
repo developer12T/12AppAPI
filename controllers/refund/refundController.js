@@ -29,6 +29,8 @@ const {
 const { update } = require('lodash')
 const { getSocket } = require('../../socket')
 
+const orderTimestamps = {}
+
 exports.checkout = async (req, res) => {
   try {
     const {
@@ -60,6 +62,19 @@ exports.checkout = async (req, res) => {
         .status(400)
         .json({ status: 400, message: 'Invalid type! Must be "refund".' })
     }
+
+    const now = Date.now()
+    const lastUpdate = orderTimestamps[storeId] || 0
+    const ONE_MINUTE = 60 * 1000
+
+    if (now - lastUpdate < ONE_MINUTE) {
+      return res.status(429).json({
+        status: 429,
+        message:
+          'This order was updated less than 1 minute ago. Please try again later!'
+      })
+    }
+    orderTimestamps[storeId] = now
 
     if (!type || !area || !storeId || !shipping || !payment) {
       return res
@@ -834,15 +849,15 @@ exports.updateStatus = async (req, res) => {
       for (const item of productQty) {
         // console.log(item)
         if (item.condition != 'damaged') {
-        const updateResult = await updateStockMongo(
-          item,
-          refundOrder.store.area,
-          refundOrder.period,
-          'withdraw',
-          channel,
-          res
-        )
-        if (updateResult) return
+          const updateResult = await updateStockMongo(
+            item,
+            refundOrder.store.area,
+            refundOrder.period,
+            'withdraw',
+            channel,
+            res
+          )
+          if (updateResult) return
         }
       }
 
@@ -856,7 +871,7 @@ exports.updateStatus = async (req, res) => {
           res
         )
         if (updateResult) return
-        console.log("item",item)
+        console.log('item', item)
       }
     }
 

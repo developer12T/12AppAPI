@@ -62,14 +62,12 @@ exports.addGiveType = async (req, res) => {
     newPromotion.createdAt = new Date()
     await newPromotion.save()
 
-
     const io = getSocket()
     io.emit('give/addGiveType', {
       status: 201,
       message: 'Give type created successfully!',
       data: newPromotion
-    });
-
+    })
 
     res.status(201).json({
       status: 201,
@@ -146,11 +144,15 @@ exports.getGiveProductFilter = async (req, res) => {
       const uniqueSizes = [...new Set(products.map(p => p.size))]
       const uniqueflavours = [...new Set(products.map(p => p.flavour))]
 
-
       return res.status(200).json({
         status: 200,
         message: 'Successfully fetched product groups!',
-        data: { group: uniqueGroups, brand: uniqueBrands, size: uniqueSizes, flavour: uniqueflavours }
+        data: {
+          group: uniqueGroups,
+          brand: uniqueBrands,
+          size: uniqueSizes,
+          flavour: uniqueflavours
+        }
       })
     }
 
@@ -210,8 +212,6 @@ exports.getGiveStoreFilter = async (req, res) => {
     // const io = getSocket()
     // io.emit('give/getGiveStoreFilter', {});
 
-
-
     res.status(200).json({
       status: 200,
       message: 'Successfully fetched give store filters!',
@@ -222,7 +222,7 @@ exports.getGiveStoreFilter = async (req, res) => {
     res.status(500).json({ status: '500', message: error.message })
   }
 }
-
+const orderTimestamps = {}
 exports.checkout = async (req, res) => {
   try {
     const {
@@ -248,6 +248,18 @@ exports.checkout = async (req, res) => {
       res,
       stockModel
     )
+    const now = Date.now()
+    const lastUpdate = orderTimestamps[storeId] || 0
+    const ONE_MINUTE = 60 * 1000
+
+    if (now - lastUpdate < ONE_MINUTE) {
+      return res.status(429).json({
+        status: 429,
+        message:
+          'This order was updated less than 1 minute ago. Please try again later!'
+      })
+    }
+    orderTimestamps[storeId] = now
 
     if (!type || !area || !storeId || !giveId) {
       return res
@@ -351,18 +363,24 @@ exports.checkout = async (req, res) => {
       })
     }
 
-
     const productQty = calStock.product.map(u => ({
       id: u.id,
       unit: u.unit,
       qty: u.qty
-    }));
+    }))
 
     // 🟢 ถ้าอนุมัติ ให้ updateStock 'give'
-      for (const item of productQty) {
-        const updateResult = await updateStockMongo(item, newOrder.store.area, period, 'give', channel, res);
-        if (updateResult) return;
-      }
+    for (const item of productQty) {
+      const updateResult = await updateStockMongo(
+        item,
+        newOrder.store.area,
+        period,
+        'give',
+        channel,
+        res
+      )
+      if (updateResult) return
+    }
 
     const createdMovement = await StockMovement.create({
       ...calStock
@@ -381,7 +399,7 @@ exports.checkout = async (req, res) => {
       status: 200,
       message: 'Checkout successful!',
       data: newOrder
-    });
+    })
 
     res.status(200).json({
       status: 200,
@@ -540,7 +558,6 @@ exports.addimageGive = async (req, res) => {
     const channel = req.headers['x-channel']
     const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel)
 
-
     upload(req, res, async err => {
       if (err) {
         return res.status(400).json({
@@ -611,11 +628,11 @@ exports.addimageGive = async (req, res) => {
 
 exports.approveGive = async (req, res) => {
   try {
-    const { orderId, status } = req.body;
-    const statusStr = status === true ? 'approved' : 'rejected';
-    const statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ';
-    const channel = req.headers['x-channel'];
-    const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel);
+    const { orderId, status } = req.body
+    const statusStr = status === true ? 'approved' : 'rejected'
+    const statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ'
+    const channel = req.headers['x-channel']
+    const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel)
 
     // const giveawayData = await Giveaway.findOneAndUpdate(
     //   { orderId: orderId, type: 'give' },
@@ -623,80 +640,94 @@ exports.approveGive = async (req, res) => {
     //   { new: true }
     // );
 
-    const giveawayData = await Giveaway.findOne(
-      { orderId: orderId, type: 'give' },
-    );
-
+    const giveawayData = await Giveaway.findOne({
+      orderId: orderId,
+      type: 'give'
+    })
 
     if (!giveawayData) {
       return res.status(404).json({
         status: 404,
-        message: `ไม่พบข้อมูลที่มี orderId: ${orderId}`,
-      });
+        message: `ไม่พบข้อมูลที่มี orderId: ${orderId}`
+      })
     }
 
     const productQty = giveawayData.listProduct.map(u => ({
       id: u.id,
       unit: u.unit,
       qty: u.qty
-    }));
+    }))
 
     // 🟢 ถ้าอนุมัติ ให้ updateStock 'give'
     if (status === true) {
       for (const item of productQty) {
-        const updateResult = await updateStockMongo(item, giveawayData.store.area, giveawayData.period, 'give', channel, res);
-        console.log(item  )
-        if (updateResult) return;
+        const updateResult = await updateStockMongo(
+          item,
+          giveawayData.store.area,
+          giveawayData.period,
+          'give',
+          channel,
+          res
+        )
+        console.log(item)
+        if (updateResult) return
       }
     }
 
     // 🔴 ถ้าไม่อนุมัติ ให้ updateStock 'deleteCart'
     else {
       for (const item of productQty) {
-        const updateResult = await updateStockMongo(item, giveawayData.store.area, giveawayData.period, 'orderCanceled', channel, res);
-        if (updateResult) return;
+        const updateResult = await updateStockMongo(
+          item,
+          giveawayData.store.area,
+          giveawayData.period,
+          'orderCanceled',
+          channel,
+          res
+        )
+        if (updateResult) return
       }
     }
 
     res.status(200).json({
       status: 200,
       message: `อัปเดตสถานะเรียบร้อย (${statusThStr})`,
-      data: giveawayData,
-    });
+      data: giveawayData
+    })
   } catch (error) {
-    console.error('Error approving giveaway:', error);
+    console.error('Error approving giveaway:', error)
     res.status(500).json({
       status: 500,
       message: 'Server error',
-      error: error.message,
-    });
+      error: error.message
+    })
   }
-};
+}
 
 exports.updateStatus = async (req, res) => {
   try {
-    const { orderId, status } = req.body;
-    const channel = req.headers['x-channel'];
-    const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel);
+    const { orderId, status } = req.body
+    const channel = req.headers['x-channel']
+    const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel)
 
     // ✅ Validate input
     if (!orderId || !status) {
       return res.status(400).json({
         status: 400,
-        message: 'orderId and status are required.',
-      });
+        message: 'orderId and status are required.'
+      })
     }
 
     // ✅ Set Thai status name
-    const statusTH = status === 'canceled' ? 'ยกเลิก' : 'ไม่ระบุสถานะ';
+    const statusTH = status === 'canceled' ? 'ยกเลิก' : 'ไม่ระบุสถานะ'
 
     // ✅ Find giveaway data
-    const giveawayData = await Giveaway.findOne({ orderId, type: 'give' });
+    const giveawayData = await Giveaway.findOne({ orderId, type: 'give' })
     if (!giveawayData) {
       return res.status(404).json({
         status: 404,
-        message: `No giveaway data found for orderId: ${orderId}`,
-      });
+        message: `No giveaway data found for orderId: ${orderId}`
+      })
     }
 
     // ✅ Return product stock
@@ -704,7 +735,7 @@ exports.updateStatus = async (req, res) => {
       id: u.id,
       unit: u.unit,
       qty: u.qty
-    }));
+    }))
 
     for (const item of productQty) {
       // console.log(item)
@@ -715,8 +746,8 @@ exports.updateStatus = async (req, res) => {
         'orderCanceled',
         channel,
         res
-      );
-      if (updateResult) return; // Stop if stock update fails
+      )
+      if (updateResult) return // Stop if stock update fails
     }
 
     // ✅ Update order status
@@ -724,20 +755,19 @@ exports.updateStatus = async (req, res) => {
       { orderId },
       { $set: { status, statusTH } },
       { new: true }
-    );
+    )
 
     return res.status(200).json({
       status: 200,
       message: `Status updated successfully (${statusTH})`,
-      data: updatedOrder,
-    });
-
+      data: updatedOrder
+    })
   } catch (error) {
-    console.error('Error updating giveaway status:', error);
+    console.error('Error updating giveaway status:', error)
     return res.status(500).json({
       status: 500,
       message: 'Server error occurred while updating status.',
-      error: error.message,
-    });
+      error: error.message
+    })
   }
-};
+}
