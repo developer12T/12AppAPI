@@ -3371,6 +3371,17 @@ exports.saleReport = async (req, res) => {
   const { area, type, date, role } = req.query
   const channel = req.headers['x-channel']
   const { Order } = getModelsByChannel(channel, res, orderModel)
+  const { Refund } = getModelsByChannel(channel, res, refundModel)
+
+  // const dataRefund = await Refund.find({
+  //   // ...filterArea,
+  //   // ...filterCreatedAt,
+  //   // status: { $ne: "canceled" }
+  // })
+
+  console.log(dataRefund)
+
+
 
   if (role == 'sale' || role == '' || !role) {
     let filterCreatedAt = {}
@@ -3383,25 +3394,33 @@ exports.saleReport = async (req, res) => {
       filterType = { type: type }
     }
     if (date) {
+
       const year = Number(date.substring(0, 4))
       const month = Number(date.substring(4, 6)) - 1
       const day = Number(date.substring(6, 8))
-      const bangkokStart = new Date(year, month, day, 0, 0, 0, 0)
-      startDate = new Date(bangkokStart.getTime() - 7 * 60 * 60 * 1000)
-      const bangkokEnd = new Date(year, month, day + 1, 0, 0, 0, 0)
-      endDate = new Date(bangkokEnd.getTime() - 7 * 60 * 60 * 1000)
+
+      // เวลาตาม timezone ไทย
+      const startDateUTC = new Date(Date.UTC(year, month, day, 0, 0, 0)) // 2025-08-01T17:00:00Z
+      const endDateUTC = new Date(Date.UTC(year, month, day + 1, 0, 0, 0) - 1) // 2025-08-02T16:59:59.999Z
       filterCreatedAt = {
         createdAt: {
-          $gte: startDate,
-          $lt: endDate
+          $gte: startDateUTC,
+          $lt: endDateUTC
         }
       }
     }
     const dataOrder = await Order.find({
       ...filterArea,
       ...filterCreatedAt,
-      ...filterType
+      status: { $ne: "canceled" }
     })
+
+    const dataRefund = await Refund.find({
+      ...filterArea,
+      ...filterCreatedAt,
+      status: { $ne: "canceled" }
+    })
+
 
     if (dataOrder.length === 0) {
       return res.status(404).json({
@@ -3409,7 +3428,7 @@ exports.saleReport = async (req, res) => {
         message: 'Not found Order'
       })
     }
-    const data = dataOrder.map(item => {
+    const data = [...dataOrder, ...dataRefund].map(item => {
       let paymentMethodTH = ''
       if (item.paymentMethod === 'cash') {
         paymentMethodTH = 'เงินสด'
@@ -3418,6 +3437,11 @@ exports.saleReport = async (req, res) => {
       } else {
         paymentMethodTH = item.paymentMethod
       }
+
+      // เช็คว่าเป็น refund หรือไม่
+      const isRefund = item.type === 'refund'
+      const totalWithSign = isRefund ? -Math.abs(item.total) : item.total
+
       return {
         type: item.type,
         orderId: item.orderId,
@@ -3426,7 +3450,7 @@ exports.saleReport = async (req, res) => {
         storeId: item.store.storeId,
         storeName: item.store.name,
         storeTaxId: item.store.taxId,
-        total: item.total,
+        total: totalWithSign,
         paymentMethod: paymentMethodTH
       }
     })
