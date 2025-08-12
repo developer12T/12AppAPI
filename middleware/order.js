@@ -661,8 +661,7 @@ module.exports.sendEmail = async function ({ to, cc, subject, html }) {
     console.error('❌ Failed to send email:', err.message)
   }
 }
-
-exports.generateDateList = function (startDate, endDate) {
+function calculateStockSummary(productDetail, listUnitStock) {
   const start = new Date(startDate)
   const end = new Date(endDate)
   const dates = []
@@ -677,3 +676,82 @@ exports.generateDateList = function (startDate, endDate) {
 
   return dates
 }
+
+
+function calculateStockSummary(productDetail, listUnitStock) {
+  // helper เอา factor ของหน่วยจาก productDetail.listUnit
+  const getFactor = (unit) => {
+    const unitObj = productDetail.listUnit.find(item => item.unit === unit);
+    return unitObj ? Number(unitObj.factor) || 0 : 0;
+  };
+
+  // รวมเป็น PCS ของแต่ละฟิลด์ ด้วย factor ของหน่วยนั้น ๆ
+  const sumPCS = (field) =>
+    listUnitStock.reduce((sum, u) => {
+      const factor = getFactor(u.unit);
+      const qty = Number(u?.[field]) || 0;
+      return sum + factor * qty;
+    }, 0);
+
+  // รวมค่าเป็น PCS
+  const totalStockPCS = sumPCS('stock');
+  const totalStockWithdrawPCS = sumPCS('withdraw');
+  const totalStockGoodPCS = sumPCS('good');
+  const totalStockDamagedPCS = sumPCS('damaged');
+  const totalStockSalePCS = sumPCS('sale');
+  const totalStockPromotionPCS = sumPCS('promotion');
+  const totalStockChangePCS = sumPCS('change');
+  const totalStockAdjustPCS = sumPCS('adjust');
+  const totalStockGivePCS = sumPCS('give');
+
+  const inPCS = totalStockWithdrawPCS + totalStockGoodPCS;
+  const outPCS = totalStockSalePCS + totalStockPromotionPCS + totalStockChangePCS + totalStockAdjustPCS + totalStockGivePCS;
+  const stockWithInPCS = totalStockPCS + inPCS;
+  const balancePCS = stockWithInPCS - outPCS;
+
+  // ผลลัพธ์หน่วย PCS
+  const resultPCS = {
+    unit: 'PCS',
+    stock: totalStockPCS,
+    withdraw: totalStockWithdrawPCS,
+    good: totalStockGoodPCS,
+    damaged: totalStockDamagedPCS,
+    sale: totalStockSalePCS,
+    promotion: totalStockPromotionPCS,
+    change: totalStockChangePCS,
+    adjust: totalStockAdjustPCS,
+    give: totalStockGivePCS,
+    in: inPCS,
+    stockWithIn: stockWithInPCS,
+    out: outPCS,
+    balance: balancePCS,
+  };
+
+  // แปลงเป็น CTN โดยปัดลง
+  const factorCTN = getFactor('CTN');
+  const toCTN = (pcs) =>
+    factorCTN > 0 ? Math.floor(pcs / factorCTN) : 0;
+
+  const resultCTN = {
+    unit: 'CTN',
+    stock: toCTN(totalStockPCS),
+    withdraw: toCTN(totalStockWithdrawPCS),
+    good: toCTN(totalStockGoodPCS),
+    damaged: toCTN(totalStockDamagedPCS),
+    sale: toCTN(totalStockSalePCS),
+    promotion: toCTN(totalStockPromotionPCS),
+    change: toCTN(totalStockChangePCS),
+    adjust: toCTN(totalStockAdjustPCS),
+    give: toCTN(totalStockGivePCS),
+    in: toCTN(inPCS),
+    stockWithIn: toCTN(stockWithInPCS),
+    out: toCTN(outPCS),
+    balance: toCTN(balancePCS),
+  };
+
+  return [resultPCS, resultCTN];
+}
+
+exports.calculateStockSummary = calculateStockSummary;
+
+// module.exports = { calculateStockSummary };

@@ -871,7 +871,7 @@ exports.updateStatus = async (req, res) => {
           res
         )
         if (updateResult) return
-        console.log('item', item)
+        // console.log('item', item)
       }
     }
 

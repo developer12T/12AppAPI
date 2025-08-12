@@ -104,6 +104,9 @@ exports.reportCheck = async (req, res) => {
       }
     ])
 
+
+    // console.log(route)
+
     const refund = await Refund.find({
       'store.area': { $in: areaId },
       createdAt: { $gte: startStr, $lte: endStr }
