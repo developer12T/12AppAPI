@@ -730,7 +730,7 @@ function calculateStockSummary(productDetail, listUnitStock) {
   // แปลงเป็น CTN โดยปัดลง
   const factorCTN = getFactor('CTN');
   const toCTN = (pcs) =>
-    factorCTN > 0 ? Math.floor(pcs / factorCTN) : null;
+    factorCTN > 0 ? Math.floor(pcs / factorCTN) : 0;
 
   const resultCTN = {
     unit: 'CTN',
