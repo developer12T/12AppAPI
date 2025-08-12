@@ -2634,14 +2634,14 @@ exports.getGroup = async (req, res) => {
   const product = await Product.aggregate([
     {
       $match: {
-        group: { $nin: ['', null] }
+        groupM3: { $nin: ['', null] }
       }
     },
     {
       $group: {
         _id: {
           groupCode: '$groupCode',
-          group: '$group'
+          group: '$group',
         }
       }
     },

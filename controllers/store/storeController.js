@@ -808,49 +808,50 @@ exports.updateStoreStatus = async (req, res) => {
   const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
   const { User } = getModelsByChannel(channel, res, userModel)
   const store = await Store.findOne({ storeId: storeId })
+  console.log(store)
   if (!store) {
     return res.status(404).json({
       status: 404,
       message: 'Not found store'
     })
   }
-  const storeZone = store.area.substring(0, 2)
-  const maxRunningAll = await RunningNumber.findOne({ zone: storeZone }).select(
-    'last'
-  )
+  // const storeZone = store.area.substring(0, 2)
+  // const maxRunningAll = await RunningNumber.findOne({ zone: storeZone }).select(
+  //   'last'
+  // )
 
   // console.log(maxRunningAll)
 
-  const oldId = maxRunningAll
+  // const oldId = maxRunningAll
   // console.log(oldId,"oldId")
-  const newId = oldId.last.replace(/\d+$/, n =>
-    String(+n + 1).padStart(n.length, '0')
-  )
+  // const newId = oldId.last.replace(/\d+$/, n =>
+  //   String(+n + 1).padStart(n.length, '0')
+  // )
 
   // console.log(newId,"newId")
 
   // console.log("oldId",oldId)
   if (status === '20') {
-    await RunningNumber.findOneAndUpdate(
-      { zone: store.zone },
-      { $set: { last: newId } },
-      { new: true }
-    )
-    await Store.findOneAndUpdate(
-      { _id: store._id },
-      {
-        $set: {
-          storeId: newId,
-          status: status,
-          updatedDate: Date(),
-          'approve.dateAction': new Date(),
-          'approve.appPerson': user
-        }
-      },
-      { new: true }
-    )
+    // await RunningNumber.findOneAndUpdate(
+    //   { zone: store.zone },
+    //   { $set: { last: newId } },
+    //   { new: true }
+    // )
+    // await Store.findOneAndUpdate(
+    //   { _id: store._id },
+    //   {
+    //     $set: {
+    //       storeId: newId,
+    //       status: status,
+    //       updatedDate: Date(),
+    //       'approve.dateAction': new Date(),
+    //       'approve.appPerson': user
+    //     }
+    //   },
+    //   { new: true }
+    // )
 
-    const item = await Store.findOne({ storeId: newId, area: store.area })
+    const item = await Store.findOne({ storeId: storeId, area: store.area })
     const dataUser = await User.findOne({ area: store.area, role: 'sale' })
 
     if (!item) {
@@ -875,11 +876,11 @@ exports.updateStoreStatus = async (req, res) => {
       customerName: item.name ?? '',
       customerChannel: '103',
       customerCoType: item.type ?? '',
-      customerAddress1: (item.address ?? '').substring(0, 36),
-      customerAddress2: (item.subDistrict ?? '').substring(0, 36),
-      customerAddress3: (item.district ?? '').substring(0, 36),
-      customerAddress4: (item.province ?? '').substring(0, 36),
-      customerPoscode: (item.postCode ?? '').substring(0, 36),
+      customerAddress1: (item.address ?? '').substring(0, 35),
+      customerAddress2: (item.subDistrict ?? '').substring(0, 35),
+      customerAddress3: (item.district ?? '').substring(0, 35),
+      customerAddress4: (item.province ?? '').substring(0, 35),
+      customerPoscode: (item.postCode ?? '').substring(0, 35),
       customerPhone: item.tel ?? '',
       warehouse: dataUser.warehouse ?? '',
       OKSDST: item.zone ?? '',
@@ -894,7 +895,7 @@ exports.updateStoreStatus = async (req, res) => {
       saleZone: dataUser.zone ?? '',
       shippings: item.shippingAddress.map(u => {
         return {
-          shippingAddress1: u.address ?? '',
+          shippingAddress1: (u.address ?? '').substring(0, 35),
           shippingAddress2: u.district ?? '',
           shippingAddress3: u.subDistrict ?? '',
           shippingAddress4: u.province ?? '',
@@ -907,7 +908,7 @@ exports.updateStoreStatus = async (req, res) => {
       })
     }
 
-    // console.log(dataTran)
+    console.log(dataTran)
 
     if (item.area != 'IT211') {
       try {
@@ -930,10 +931,10 @@ exports.updateStoreStatus = async (req, res) => {
     }
 
     const io = getSocket()
-    io.emit('store/updateStoreStatus', {
-      status: 'success',
-      data: newId
-    })
+    // io.emit('store/updateStoreStatus', {
+    //   status: 'success',
+    //   data: newId
+    // })
 
     //   return res.status(500).json({
     //     message: 'Internal Server Error',
