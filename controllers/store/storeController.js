@@ -453,13 +453,21 @@ exports.checkSimilarStores = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const store = await Store.findOne({ storeId })
+  // console.log(store.zone)
+  // const existingStores = await Store.find(
+  //   { storeId: { $ne: storeId } },
+  //   { _id: 0, __v: 0, idIndex: 0 },
+  //   { zone: store.zone }
+  // )
 
   const existingStores = await Store.find(
-    { storeId: { $ne: storeId } },
-    { _id: 0, __v: 0, idIndex: 0 }
-    // { area: store.area }
+    { storeId: { $ne: storeId },zone: store.zone },
+    { _id: 0, __v: 0, idIndex: 0 },
+    // { zone: store.zone }
   )
 
+
+  console.log(existingStores.length)
   // 1. กำหนด weight ของแต่ละ field (ค่า sum ต้องไม่จำเป็นต้องรวมกันเท่ากับ 100)
   const fieldsToCheck = [
     { field: 'name', weight: 2 },
