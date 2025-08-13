@@ -27,7 +27,8 @@ const {
   deleteShippingFromStore,
   editShippingInStore,
   deleteStore,
-  updateStoreStatusNoNewId
+  updateStoreStatusNoNewId,
+  fixStatusStore
   // test
 } = require('../../controllers/store/storeController')
 
@@ -72,7 +73,7 @@ router.post('/deleteShippingFromStore', deleteShippingFromStore)
 router.post('/editShippingInStore', editShippingInStore)
 router.post('/deleteStore', deleteStore)
 router.post('/updateStoreStatusNoNewId', updateStoreStatusNoNewId)
-
+router.post('/fixStatusStore', fixStatusStore)
 // router.get('/test', test)
 
 router.post('/addCallCard', addCallCard)

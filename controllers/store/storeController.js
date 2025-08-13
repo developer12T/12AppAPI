@@ -1,6 +1,7 @@
 const mongoose = require('mongoose')
 const { Customer } = require('../../models/cash/master')
 const { uploadFiles } = require('../../utilities/upload')
+const { sequelize, DataTypes } = require('../../config/m3db')
 const { calculateSimilarity } = require('../../utilities/utility')
 const axios = require('axios')
 const multer = require('multer')
@@ -1806,3 +1807,45 @@ exports.deleteStore = async (req, res) => {
     })
   }
 }
+
+exports.fixStatusStore = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { storeId } = req.body;
+    const channel = req.headers['x-channel'];
+    const { Store } = getModelsByChannel(channel, res, storeModel);
+
+    // อ่านจาก MongoDB (ไม่ต้องผูก transaction อะไรทั้งนั้น)
+    const store = await Store.findOne({ storeId });
+    if (!store) {
+      await t.rollback();
+      return res.status(404).json({ status: 404, message: 'Store not found' });
+    }
+
+    const now = new Date();
+
+    const [updatedCount] = await Customer.update(
+      {
+        OKCFC3: 'R25',
+        OKLMDT: now.toISOString().slice(0, 10).replace(/-/g, ''), // YYYYMMDD
+        OKCHID: 'MI02',
+        customerStatus: '20' 
+      },
+      {
+        where: { OKCUNO: store.storeId },
+        transaction: t
+      }
+    );
+
+    if (updatedCount === 0) {
+      await t.rollback();
+      return res.status(400).json({ status: 400, message: 'Update failed' });
+    }
+
+    await t.commit();
+    return res.status(200).json({ status: 200, message: 'Success', updatedCount });
+  } catch (err) {
+    await t.rollback();
+    return res.status(500).json({ status: 500, message: err.message });
+  }
+};
