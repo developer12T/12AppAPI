@@ -1515,11 +1515,11 @@ exports.getStockQtyNew = async (req, res) => {
     }, {})
   );
 
-  withdrawProductArray.forEach(item => {
-    if (item.id === '10071700097') {
-      console.log(item);
-    }
-  });
+  // withdrawProductArray.forEach(item => {
+  //   if (item.id === '10071700097') {
+  //     console.log(item);
+  //   }
+  // });
 
   const orderProductArray = Object.values(
     allOrderProducts.reduce((acc, curr) => {
@@ -3489,7 +3489,7 @@ exports.addStockAllWithInOut = async (req, res) => {
       .flatMap(u => (Array.isArray(u.area) ? u.area : [u.area]))
       .filter(Boolean)
     const uniqueAreas = [...new Set(rawAreas)]
-    // uniqueAreas = ['BE212','BE222']
+    // uniqueAreas = ['CT226','BE222']
     // 2) ฟังก์ชันย่อย: ประมวลผลต่อ 1 area
     const buildAreaStock = async area => {
       // สร้าง match สำหรับ collections ต่าง ๆ
@@ -3640,14 +3640,27 @@ exports.addStockAllWithInOut = async (req, res) => {
 
       const withdrawProductArray = Object.values(
         allWithdrawProducts.reduce((acc, curr) => {
-          const key = `${curr.id}_${curr.unit}`
+          // สร้าง key สำหรับ group
+          const key = `${curr.id}_${curr.unit}`;
+
+          // ลบ qty เดิมออกก่อน
+          const { qty, ...rest } = curr;
+
           if (acc[key]) {
-            acc[key].qty += curr.receiveQty || 0
-            acc[key].qtyPcs += curr.qtyPcs || 0
-          } else acc[key] = { ...curr }
-          return acc
+            // ถ้ามีอยู่แล้ว ให้เพิ่มจากค่าใหม่
+            acc[key].qty += curr.receiveQty || 0;
+            acc[key].qtyPcs += curr.qtyPcs || 0;
+          } else {
+            // ถ้ายังไม่มี ให้สร้างใหม่ พร้อม qty จาก receiveQty
+            acc[key] = {
+              ...rest,
+              qty: curr.receiveQty || 0,
+              qtyPcs: curr.qtyPcs || 0
+            };
+          }
+          return acc;
         }, {})
-      )
+      );
 
       const orderProductArray = Object.values(
         allOrderProducts.reduce((acc, curr) => {
@@ -3941,33 +3954,33 @@ exports.addStockAllWithInOut = async (req, res) => {
       results.push(r)
     }
 
-    for (item of results) {
-      for (i of item.data) {
-        await Stock.findOneAndUpdate(
-          {
-            area: item.area,
-            period: period,
-            'listProduct.productId': i.productId
-          },
-          {
-            $set: {
-              // 'listProduct.$[elem].stockPcs': i.summaryQty.PCS.stock,
-              'listProduct.$[elem].stockInPcs': i.summaryQty.PCS.in,
-              'listProduct.$[elem].stockOutPcs': i.summaryQty.PCS.out,
-              'listProduct.$[elem].balancePcs': i.summaryQty.PCS.balance,
-              // 'listProduct.$[elem].stockCtn': i.summaryQty.CTN.stock,
-              'listProduct.$[elem].stockInCtn': i.summaryQty.CTN.in,
-              'listProduct.$[elem].stockOutCtn': i.summaryQty.CTN.out,
-              'listProduct.$[elem].balanceCtn': i.summaryQty.CTN.balance
-            }
-          },
-          {
-            arrayFilters: [{ 'elem.productId': i.productId }],
-            new: true
-          }
-        )
-      }
-    }
+    // for (item of results) {
+    //   for (i of item.data) {
+    //     await Stock.findOneAndUpdate(
+    //       {
+    //         area: item.area,
+    //         period: period,
+    //         'listProduct.productId': i.productId
+    //       },
+    //       {
+    //         $set: {
+    //           // 'listProduct.$[elem].stockPcs': i.summaryQty.PCS.stock,
+    //           'listProduct.$[elem].stockInPcs': i.summaryQty.PCS.in,
+    //           'listProduct.$[elem].stockOutPcs': i.summaryQty.PCS.out,
+    //           'listProduct.$[elem].balancePcs': i.summaryQty.PCS.balance,
+    //           // 'listProduct.$[elem].stockCtn': i.summaryQty.CTN.stock,
+    //           'listProduct.$[elem].stockInCtn': i.summaryQty.CTN.in,
+    //           'listProduct.$[elem].stockOutCtn': i.summaryQty.CTN.out,
+    //           'listProduct.$[elem].balanceCtn': i.summaryQty.CTN.balance
+    //         }
+    //       },
+    //       {
+    //         arrayFilters: [{ 'elem.productId': i.productId }],
+    //         new: true
+    //       }
+    //     )
+    //   }
+    // }
 
     return res.status(200).json({
       status: 200,
