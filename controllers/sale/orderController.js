@@ -475,7 +475,7 @@ exports.checkout = async (req, res) => {
 
 exports.getOrder = async (req, res) => {
   try {
-    const { type, area, store, period } = req.query
+    const { type, area, store, period, start, end } = req.query
 
     const channel = req.headers['x-channel']
 
@@ -2641,7 +2641,7 @@ exports.getGroup = async (req, res) => {
       $group: {
         _id: {
           groupCode: '$groupCode',
-          group: '$group',
+          group: '$group'
         }
       }
     },

@@ -815,43 +815,43 @@ exports.updateStoreStatus = async (req, res) => {
       message: 'Not found store'
     })
   }
-  // const storeZone = store.area.substring(0, 2)
-  // const maxRunningAll = await RunningNumber.findOne({ zone: storeZone }).select(
-  //   'last'
-  // )
+  const storeZone = store.area.substring(0, 2)
+  const maxRunningAll = await RunningNumber.findOne({ zone: storeZone }).select(
+    'last'
+  )
 
-  // console.log(maxRunningAll)
+  console.log(maxRunningAll)
 
-  // const oldId = maxRunningAll
-  // console.log(oldId,"oldId")
-  // const newId = oldId.last.replace(/\d+$/, n =>
-  //   String(+n + 1).padStart(n.length, '0')
-  // )
+  const oldId = maxRunningAll
+  console.log(oldId, 'oldId')
+  const newId = oldId.last.replace(/\d+$/, n =>
+    String(+n + 1).padStart(n.length, '0')
+  )
 
-  // console.log(newId,"newId")
+  console.log(newId, 'newId')
 
   // console.log("oldId",oldId)
   if (status === '20') {
-    // await RunningNumber.findOneAndUpdate(
-    //   { zone: store.zone },
-    //   { $set: { last: newId } },
-    //   { new: true }
-    // )
-    // await Store.findOneAndUpdate(
-    //   { _id: store._id },
-    //   {
-    //     $set: {
-    //       storeId: newId,
-    //       status: status,
-    //       updatedDate: Date(),
-    //       'approve.dateAction': new Date(),
-    //       'approve.appPerson': user
-    //     }
-    //   },
-    //   { new: true }
-    // )
+    await RunningNumber.findOneAndUpdate(
+      { zone: store.zone },
+      { $set: { last: newId } },
+      { new: true }
+    )
+    await Store.findOneAndUpdate(
+      { _id: store._id },
+      {
+        $set: {
+          storeId: newId,
+          status: status,
+          updatedDate: Date(),
+          'approve.dateAction': new Date(),
+          'approve.appPerson': user
+        }
+      },
+      { new: true }
+    )
 
-    const item = await Store.findOne({ storeId: storeId, area: store.area })
+    const item = await Store.findOne({ storeId: newId, area: store.area })
     const dataUser = await User.findOne({ area: store.area, role: 'sale' })
 
     if (!item) {
