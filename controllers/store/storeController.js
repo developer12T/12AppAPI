@@ -802,6 +802,103 @@ exports.checkInStore = async (req, res) => {
   }
 }
 
+exports.insertStoreToM3 = async (req, res) => {
+  const { storeId } = req.body
+  const channel = req.headers['x-channel']
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const { User } = getModelsByChannel(channel, res, userModel)
+  const store = await Store.findOne({ storeId: storeId })
+
+  const item = await Store.findOne({ storeId: storeId, area: store.area })
+  const dataUser = await User.findOne({ area: store.area, role: 'sale' })
+
+  if (!item) {
+    return res.status(404).json({
+      json: 404,
+      message: 'Not found Store'
+    })
+  }
+
+  const dataTran = {
+    Hcase: 1,
+    customerNo: item.storeId,
+    customerStatus: item.status ?? '',
+    customerName: item.name ?? '',
+    customerChannel: '103',
+    customerCoType: item.type ?? '',
+    customerAddress1: (
+      item.address +
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
+    ).substring(0, 35),
+    customerAddress2: (
+      item.address +
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
+    ).substring(35, 70),
+    customerAddress3: (
+      item.address +
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
+    ).substring(70, 105),
+    customerAddress4: '',
+    customerPoscode: (item.postCode ?? '').substring(0, 35),
+    customerPhone: item.tel ?? '',
+    warehouse: dataUser.warehouse ?? '',
+    OKSDST: item.zone ?? '',
+    saleTeam: dataUser.area.slice(0, 2) + dataUser.area[3],
+    OKCFC1: item.area ?? '',
+    OKCFC3: item.route ?? '',
+    OKCFC6: item.type ?? '',
+    salePayer: dataUser.salePayer ?? '',
+    creditLimit: '000',
+    taxno: item.taxId ?? '',
+    saleCode: dataUser.saleCode ?? '',
+    saleZone: dataUser.zone ?? '',
+    shippings: item.shippingAddress.map(u => {
+      return {
+        shippingAddress1: (u.address ?? '').substring(0, 35),
+        shippingAddress2: u.district ?? '',
+        shippingAddress3: u.subDistrict ?? '',
+        shippingAddress4: u.province ?? '',
+        shippingPoscode: u.postCode ?? '',
+        shippingPhone: item.tel ?? '',
+        shippingRoute: u.postCode,
+        OPGEOX: u.latitude,
+        OPGEOY: u.longtitude
+      }
+    })
+  }
+
+  console.log(dataTran)
+
+  if (item.area != 'IT211') {
+    try {
+      const response = await axios.post(
+        `${process.env.API_URL_12ERP}/customer/insert`,
+        dataTran
+      )
+
+      // ส่งกลับไปให้ client ที่เรียก Express API
+      return res.status(response.status).json(response.data)
+    } catch (error) {
+      if (error.response) {
+        // หาก ERP ส่ง 400 หรือ 500 หรืออื่นๆ กลับมา
+        return res.status(error.response.status).json({
+          message: error.response.data?.message || 'Request Failed',
+          data: error.response.data
+        })
+      }
+    }
+  }
+}
+
 exports.updateStoreStatus = async (req, res) => {
   const { storeId, status, user } = req.body
   const channel = req.headers['x-channel']
@@ -876,10 +973,28 @@ exports.updateStoreStatus = async (req, res) => {
       customerName: item.name ?? '',
       customerChannel: '103',
       customerCoType: item.type ?? '',
-      customerAddress1: (item.address ?? '').substring(0, 35),
-      customerAddress2: (item.subDistrict ?? '').substring(0, 35),
-      customerAddress3: (item.district ?? '').substring(0, 35),
-      customerAddress4: (item.province ?? '').substring(0, 35),
+      customerAddress1: (
+        item.address +
+          item.subDistrict +
+          item.subDistrict +
+          item.province +
+          item.postCode ?? ''
+      ).substring(0, 35),
+      customerAddress2: (
+        item.address +
+          item.subDistrict +
+          item.subDistrict +
+          item.province +
+          item.postCode ?? ''
+      ).substring(35, 70),
+      customerAddress3: (
+        item.address +
+          item.subDistrict +
+          item.subDistrict +
+          item.province +
+          item.postCode ?? ''
+      ).substring(70, 105),
+      customerAddress4: '',
       customerPoscode: (item.postCode ?? '').substring(0, 35),
       customerPhone: item.tel ?? '',
       warehouse: dataUser.warehouse ?? '',
