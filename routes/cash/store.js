@@ -28,7 +28,8 @@ const {
   editShippingInStore,
   deleteStore,
   updateStoreStatusNoNewId,
-  fixStatusStore
+  fixStatusStore,
+  insertStoreToM3
   // test
 } = require('../../controllers/store/storeController')
 
