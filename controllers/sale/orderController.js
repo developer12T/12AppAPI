@@ -3640,7 +3640,7 @@ exports.getSummary18SKU = async (req, res) => {
         _id: {
           groupCode: '$groupCode',
           group: '$group',
-          // groupCodeM3: '$groupCodeM3'
+          groupCodeM3: '$groupCode'
         }
       }
     },
@@ -3674,8 +3674,8 @@ exports.getSummary18SKU = async (req, res) => {
       item =>
         item.groupCode === group.groupCode &&
         item.group === group.group 
-        // &&
-        // item.groupCodeM3 === group.groupCodeM3
+        &&
+        item.groupCode === group.groupCode
     )
     const summaryQtySum = groupItems.reduce((sum, i) => sum + i.summaryQty, 0)
     const summarySum = groupItems.reduce((sum, i) => sum + i.summary, 0)
