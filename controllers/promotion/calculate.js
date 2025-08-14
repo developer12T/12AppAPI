@@ -68,11 +68,14 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
         rewardFilters.some(filter => matchFilter(item, filter))
     );
 
+    // console.log(filteredStock)
     // 3. แปลง reward ให้เป็นโครงสร้างที่ต้องใช้
     const rewardQty = rewards.map(item => ({
         unit: item.productUnit,
         qty: item.productQty
     }));
+
+    // console.log(rewardQty)
 
     // 4. สร้าง productStock พร้อม unitList ที่ตรงกับ reward
     const productStock = filteredStock.map(item => ({
@@ -83,19 +86,22 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
 
     // 5. ตรวจสอบว่า stock พอสำหรับ reward มั้ย
     const checkList = productStock.map(stock => {
-        const rewardPcs = rewardQty.reduce((sum, reward) => {
-            const u = stock.unitList.find(u => u.unit === reward.unit);
-            const factor = u ? u.factor : 1;
-            return sum + (reward.qty * factor);
-        }, 0);
+        // const rewardPcs = rewardQty.reduce((sum, reward) => {
+        //     const u = stock.unitList.find(u => u.unit === reward.unit);
+        //     const factor = u ? u.factor : 1;
+        //     return sum + (reward.qty * factor);
+        // }, 0);
+        // console.log(rewardQty)
+        // const rewardPcs = reward.qty
         return {
             id: stock.id,
-            totalRewardPcs: rewardPcs,
+            totalRewardPcs: rewardQty[0].qty,
             totalStockPcs: stock.balancePcs,
-            enough: stock.balancePcs >= rewardPcs
+            enough: stock.balancePcs >= rewardQty[0].qty
         };
     });
 
+    // console.log(checkList)
     const enoughList = checkList.filter(item => item.enough);
     // console.log(enoughList)
     // 6. ดึงรายละเอียดสินค้าแบบรวดเดียว (Promise.all)
