@@ -106,6 +106,7 @@ exports.getStore = async (req, res) => {
     )
 
     let query = {}
+    query.route = { $nin: ['DEL','R'] }
 
     // Priority: ใช้ month/year filter ก่อน type
     if (month && year) {
@@ -128,7 +129,7 @@ exports.getStore = async (req, res) => {
         $lt: nextMonth
       }
     } else {
-      query.status = { $nin: ['10'] }
+      query.status = { $nin: ['10','90'] }
     } // ถ้า type=all ไม่ต้อง filter createdAt เลย
 
     if (area) {
@@ -462,10 +463,9 @@ exports.checkSimilarStores = async (req, res) => {
 
   const existingStores = await Store.find(
     { storeId: { $ne: storeId }, zone: store.zone },
-    { _id: 0, __v: 0, idIndex: 0 },
+    { _id: 0, __v: 0, idIndex: 0 }
     // { zone: store.zone }
   )
-
 
   // console.log(existingStores.length)
   // 1. กำหนด weight ของแต่ละ field (ค่า sum ต้องไม่จำเป็นต้องรวมกันเท่ากับ 100)
@@ -1121,10 +1121,9 @@ exports.updateStoreStatusNoNewId = async (req, res) => {
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
     const store = await Store.findOne({ storeId })
-    const now = new Date();
-    const thailandOffsetMs = 7 * 60 * 60 * 1000;
-    const thailandTime = new Date(now.getTime() + thailandOffsetMs);
-
+    const now = new Date()
+    const thailandOffsetMs = 7 * 60 * 60 * 1000
+    const thailandTime = new Date(now.getTime() + thailandOffsetMs)
 
     if (!store) {
       return res.status(404).json({
@@ -1157,7 +1156,7 @@ exports.updateStoreStatusNoNewId = async (req, res) => {
           customerNo: storeId
         }
       }
-    );
+    )
 
     return res.status(200).json({
       status: 200,
@@ -1946,20 +1945,20 @@ exports.deleteStore = async (req, res) => {
 }
 
 exports.fixStatusStore = async (req, res) => {
-  const t = await sequelize.transaction();
+  const t = await sequelize.transaction()
   try {
-    const { storeId } = req.body;
-    const channel = req.headers['x-channel'];
-    const { Store } = getModelsByChannel(channel, res, storeModel);
+    const { storeId } = req.body
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
     // อ่านจาก MongoDB (ไม่ต้องผูก transaction อะไรทั้งนั้น)
-    const store = await Store.findOne({ storeId });
+    const store = await Store.findOne({ storeId })
     if (!store) {
-      await t.rollback();
-      return res.status(404).json({ status: 404, message: 'Store not found' });
+      await t.rollback()
+      return res.status(404).json({ status: 404, message: 'Store not found' })
     }
 
-    const now = new Date();
+    const now = new Date()
 
     const [updatedCount] = await Customer.update(
       {
@@ -1972,17 +1971,19 @@ exports.fixStatusStore = async (req, res) => {
         where: { OKCUNO: store.storeId },
         transaction: t
       }
-    );
+    )
 
     if (updatedCount === 0) {
-      await t.rollback();
-      return res.status(400).json({ status: 400, message: 'Update failed' });
+      await t.rollback()
+      return res.status(400).json({ status: 400, message: 'Update failed' })
     }
 
-    await t.commit();
-    return res.status(200).json({ status: 200, message: 'Success', updatedCount });
+    await t.commit()
+    return res
+      .status(200)
+      .json({ status: 200, message: 'Success', updatedCount })
   } catch (err) {
-    await t.rollback();
-    return res.status(500).json({ status: 500, message: err.message });
+    await t.rollback()
+    return res.status(500).json({ status: 500, message: err.message })
   }
-};
+}

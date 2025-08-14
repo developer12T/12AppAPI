@@ -591,7 +591,8 @@ exports.getDetail = async (req, res) => {
       unitName: product.unitName,
       price: product.price,
       netTotal: product.total,
-      condition: product.condition
+      condition: product.condition,
+      expireDate: product.expireDate
     }))
 
     const listProductChange = order

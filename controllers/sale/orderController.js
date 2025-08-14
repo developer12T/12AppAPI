@@ -541,7 +541,21 @@ exports.getOrder = async (req, res) => {
         .json({ status: 400, message: 'type,  period are required!' })
     }
 
-    const { startDate, endDate } = rangeDate(period)
+    // ✅ คำนวณช่วงวัน
+    let startDate, endDate
+    if (start && end) {
+      startDate = new Date(start)
+      endDate = new Date(end)
+    } else if (period) {
+      const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
+      startDate = range.startDate
+      endDate = range.endDate
+    } else {
+      return res
+        .status(400)
+        .json({ status: 400, message: 'period or start/end are required!' })
+    }
+
     let areaQuery = {}
     if (area) {
       if (area.length == 2) {
@@ -555,7 +569,8 @@ exports.getOrder = async (req, res) => {
       ...areaQuery,
       // 'store.area': area,
       // createdAt: { $gte: startDate, $lt: endDate }
-      period: period
+      period: period,
+      createdAt: { $gte: startDate, $lte: endDate } // ✅ filter ช่วงวัน
     }
 
     if (store) {
@@ -592,7 +607,7 @@ exports.getOrder = async (req, res) => {
       .map(o => ({
         orderId: o.orderId,
         area: o.store.area,
-        storeId: o.store?.storeId || '',
+        storeId: o.store?.store || '',
         storeName: o.store?.name || '',
         storeAddress: o.store?.address || '',
         createAt: o.createdAt,
@@ -2685,9 +2700,9 @@ exports.getGroup = async (req, res) => {
   const { Product } = getModelsByChannel(channel, res, productModel)
   const product = await Product.aggregate([
     // {
-      // $match: {
-      //   groupM3: { $nin: ['', null] }
-      // }
+    // $match: {
+    //   groupM3: { $nin: ['', null] }
+    // }
     // },
     {
       $group: {
@@ -3658,7 +3673,7 @@ exports.getSummary18SKU = async (req, res) => {
   if (team) matchStage['team'] = team
   // console.log(team)
   const dataOrder = await Order.aggregate([
-    {$match:{status:{ $ne: 'canceled' }}},
+    { $match: { status: { $ne: 'canceled' } } },
     {
       $addFields: {
         team: {
@@ -3725,8 +3740,7 @@ exports.getSummary18SKU = async (req, res) => {
     const groupItems = data.filter(
       item =>
         item.groupCode === group.groupCode &&
-        item.group === group.group 
-        &&
+        item.group === group.group &&
         item.groupCode === group.groupCode
     )
     const summaryQtySum = groupItems.reduce((sum, i) => sum + i.summaryQty, 0)
