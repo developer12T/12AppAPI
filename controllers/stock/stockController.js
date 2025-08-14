@@ -859,57 +859,57 @@ exports.availableStock = async (req, res, next) => {
       // console.log('lot', lot)
       const tranFromProduct = product
         ? {
-            // ...product,
-            _id: product._id,
-            id: product.id,
-            name: product.name,
-            group: product.group,
-            groupCode: product.groupCode,
-            brandCode: product.brandCode,
-            brand: product.brand,
-            size: product.size,
-            flavourCode: product.flavourCode,
-            flavour: product.flavour,
-            type: product.type,
-            weightGross: product.weightGross,
-            weightNet: product.weightNet,
-            statusSale: product.statusSale,
-            statusWithdraw: product.statusWithdraw,
-            statusRefund: product.statusRefund,
-            image: product.image,
+          // ...product,
+          _id: product._id,
+          id: product.id,
+          name: product.name,
+          group: product.group,
+          groupCode: product.groupCode,
+          brandCode: product.brandCode,
+          brand: product.brand,
+          size: product.size,
+          flavourCode: product.flavourCode,
+          flavour: product.flavour,
+          type: product.type,
+          weightGross: product.weightGross,
+          weightNet: product.weightNet,
+          statusSale: product.statusSale,
+          statusWithdraw: product.statusWithdraw,
+          statusRefund: product.statusRefund,
+          image: product.image,
 
-            listUnit: product.listUnit.map(unit => {
-              // console.log("lot",lot)
-              // const totalQtyPcsToCtn = Math.floor(
-              //   lot.available.reduce((sum, item) => {
-              //     return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor
-              //   }, 0)
-              // )
-              if (unit.unit == 'CTN') {
-                qty = lot.available.reduce((total, u) => total + u.qtyCtn, 0)
-              } else if (unit.unit == 'PCS') {
-                qty = lot.available.reduce((total, u) => total + u.qtyPcs, 0)
-              } else {
-                qty = 0
+          listUnit: product.listUnit.map(unit => {
+            // console.log("lot",lot)
+            // const totalQtyPcsToCtn = Math.floor(
+            //   lot.available.reduce((sum, item) => {
+            //     return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor
+            //   }, 0)
+            // )
+            if (unit.unit == 'CTN') {
+              qty = lot.available.reduce((total, u) => total + u.qtyCtn, 0)
+            } else if (unit.unit == 'PCS') {
+              qty = lot.available.reduce((total, u) => total + u.qtyPcs, 0)
+            } else {
+              qty = 0
+            }
+
+            return {
+              unit: unit.unit,
+              name: unit.name,
+              factor: unit.factor,
+              // qty: totalQtyPcsToCtn,
+
+              qty: qty,
+              price: {
+                sale: unit.price.sale,
+                Refund: unit.price.refund
               }
-
-              return {
-                unit: unit.unit,
-                name: unit.name,
-                factor: unit.factor,
-                // qty: totalQtyPcsToCtn,
-
-                qty: qty,
-                price: {
-                  sale: unit.price.sale,
-                  Refund: unit.price.refund
-                }
-              }
-            }),
-            created: product.created,
-            updated: product.updated,
-            __v: product.__v
-          }
+            }
+          }),
+          created: product.created,
+          updated: product.updated,
+          __v: product.__v
+        }
         : null
 
       // console.log(lot)
@@ -937,7 +937,7 @@ exports.availableStock = async (req, res, next) => {
       }
     })
 
-    function parseSize (sizeStr) {
+    function parseSize(sizeStr) {
       if (!sizeStr) return 0
 
       const units = {
@@ -1489,24 +1489,37 @@ exports.getStockQtyNew = async (req, res) => {
     }, {})
   )
 
-  // allWithdrawProducts.forEach(item => {
-  //   if (item.id === '10011101002') {
-  //     console.log(item);
-  //   }
-  // });
+
 
   const withdrawProductArray = Object.values(
     allWithdrawProducts.reduce((acc, curr) => {
-      const key = `${curr.id}_${curr.unit}`
+      // สร้าง key สำหรับ group
+      const key = `${curr.id}_${curr.unit}`;
+
+      // ลบ qty เดิมออกก่อน
+      const { qty, ...rest } = curr;
+
       if (acc[key]) {
-        acc[key].qty += curr.receiveQty || 0
-        acc[key].qtyPcs += curr.qtyPcs || 0
+        // ถ้ามีอยู่แล้ว ให้เพิ่มจากค่าใหม่
+        acc[key].qty += curr.receiveQty || 0;
+        acc[key].qtyPcs += curr.qtyPcs || 0;
       } else {
-        acc[key] = { ...curr }
+        // ถ้ายังไม่มี ให้สร้างใหม่ พร้อม qty จาก receiveQty
+        acc[key] = {
+          ...rest,
+          qty: curr.receiveQty || 0,
+          qtyPcs: curr.qtyPcs || 0
+        };
       }
-      return acc
+      return acc;
     }, {})
-  )
+  );
+
+  // withdrawProductArray.forEach(item => {
+  //   if (item.id === '10071700097') {
+  //     console.log(item);
+  //   }
+  // });
 
   const orderProductArray = Object.values(
     allOrderProducts.reduce((acc, curr) => {
@@ -2967,7 +2980,7 @@ exports.stockToExcel = async (req, res) => {
           res.status(500).send('Download failed')
         }
       }
-      fs.unlink(tempPath, () => {})
+      fs.unlink(tempPath, () => { })
     })
   } else {
     res.status(200).json({
@@ -3476,7 +3489,7 @@ exports.addStockAllWithInOut = async (req, res) => {
       .flatMap(u => (Array.isArray(u.area) ? u.area : [u.area]))
       .filter(Boolean)
     const uniqueAreas = [...new Set(rawAreas)]
-    // uniqueAreas = ['BE212','BE222']
+    // uniqueAreas = ['CT226','BE222']
     // 2) ฟังก์ชันย่อย: ประมวลผลต่อ 1 area
     const buildAreaStock = async area => {
       // สร้าง match สำหรับ collections ต่าง ๆ
@@ -3627,14 +3640,27 @@ exports.addStockAllWithInOut = async (req, res) => {
 
       const withdrawProductArray = Object.values(
         allWithdrawProducts.reduce((acc, curr) => {
-          const key = `${curr.id}_${curr.unit}`
+          // สร้าง key สำหรับ group
+          const key = `${curr.id}_${curr.unit}`;
+
+          // ลบ qty เดิมออกก่อน
+          const { qty, ...rest } = curr;
+
           if (acc[key]) {
-            acc[key].qty += curr.receiveQty || 0
-            acc[key].qtyPcs += curr.qtyPcs || 0
-          } else acc[key] = { ...curr }
-          return acc
+            // ถ้ามีอยู่แล้ว ให้เพิ่มจากค่าใหม่
+            acc[key].qty += curr.receiveQty || 0;
+            acc[key].qtyPcs += curr.qtyPcs || 0;
+          } else {
+            // ถ้ายังไม่มี ให้สร้างใหม่ พร้อม qty จาก receiveQty
+            acc[key] = {
+              ...rest,
+              qty: curr.receiveQty || 0,
+              qtyPcs: curr.qtyPcs || 0
+            };
+          }
+          return acc;
         }, {})
-      )
+      );
 
       const orderProductArray = Object.values(
         allOrderProducts.reduce((acc, curr) => {
@@ -3651,7 +3677,7 @@ exports.addStockAllWithInOut = async (req, res) => {
       )
 
       const mergedProductPromotions = allOrderPromotion.reduce((acc, promo) => {
-        ;(promo.listProduct || []).forEach(prod => {
+        ; (promo.listProduct || []).forEach(prod => {
           const key = `${prod.id}_${prod.unit}`
           if (acc[key]) {
             acc[key].qty += prod.qty || 0

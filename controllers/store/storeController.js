@@ -1,6 +1,7 @@
 const mongoose = require('mongoose')
 const { Customer } = require('../../models/cash/master')
 const { uploadFiles } = require('../../utilities/upload')
+const { sequelize, DataTypes } = require('../../config/m3db')
 const { calculateSimilarity } = require('../../utilities/utility')
 const axios = require('axios')
 const multer = require('multer')
@@ -452,13 +453,21 @@ exports.checkSimilarStores = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const store = await Store.findOne({ storeId })
+  // console.log(store.zone)
+  // const existingStores = await Store.find(
+  //   { storeId: { $ne: storeId } },
+  //   { _id: 0, __v: 0, idIndex: 0 },
+  //   { zone: store.zone }
+  // )
 
   const existingStores = await Store.find(
-    { storeId: { $ne: storeId } },
-    { _id: 0, __v: 0, idIndex: 0 }
-    // { area: store.area }
+    { storeId: { $ne: storeId }, zone: store.zone },
+    { _id: 0, __v: 0, idIndex: 0 },
+    // { zone: store.zone }
   )
 
+
+  // console.log(existingStores.length)
   // 1. กำหนด weight ของแต่ละ field (ค่า sum ต้องไม่จำเป็นต้องรวมกันเท่ากับ 100)
   const fieldsToCheck = [
     { field: 'name', weight: 2 },
@@ -905,7 +914,7 @@ exports.updateStoreStatus = async (req, res) => {
   const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
   const { User } = getModelsByChannel(channel, res, userModel)
   const store = await Store.findOne({ storeId: storeId })
-  console.log(store)
+  // console.log(store)
   if (!store) {
     return res.status(404).json({
       status: 404,
@@ -917,15 +926,15 @@ exports.updateStoreStatus = async (req, res) => {
     'last'
   )
 
-  console.log(maxRunningAll)
+  // console.log(maxRunningAll)
 
   const oldId = maxRunningAll
-  console.log(oldId, 'oldId')
+  // console.log(oldId, 'oldId')
   const newId = oldId.last.replace(/\d+$/, n =>
     String(+n + 1).padStart(n.length, '0')
   )
 
-  console.log(newId, 'newId')
+  // console.log(newId, 'newId')
 
   // console.log("oldId",oldId)
   if (status === '20') {
@@ -949,6 +958,7 @@ exports.updateStoreStatus = async (req, res) => {
     )
 
     const item = await Store.findOne({ storeId: newId, area: store.area })
+    // const item = await Store.findOne({ storeId: storeId, area: store.area })
     const dataUser = await User.findOne({ area: store.area, role: 'sale' })
 
     if (!item) {
@@ -965,7 +975,7 @@ exports.updateStoreStatus = async (req, res) => {
     //   })
     // }
 
-    // console.log(item)
+    // console.log((item.province ?? '').substring(0, 35))
     const dataTran = {
       Hcase: 1,
       customerNo: item.storeId,
@@ -1008,6 +1018,10 @@ exports.updateStoreStatus = async (req, res) => {
       taxno: item.taxId ?? '',
       saleCode: dataUser.saleCode ?? '',
       saleZone: dataUser.zone ?? '',
+      OKFRE1: item.postCode,
+      OKECAR: item.postCode.slice(0, 2),
+      OKCFC4: item.area ?? '',
+      OKTOWN: item.province,
       shippings: item.shippingAddress.map(u => {
         return {
           shippingAddress1: (u.address ?? '').substring(0, 35),
@@ -1023,7 +1037,7 @@ exports.updateStoreStatus = async (req, res) => {
       })
     }
 
-    console.log(dataTran)
+    // console.log(dataTran)
 
     if (item.area != 'IT211') {
       try {
@@ -1107,6 +1121,10 @@ exports.updateStoreStatusNoNewId = async (req, res) => {
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
     const store = await Store.findOne({ storeId })
+    const now = new Date();
+    const thailandOffsetMs = 7 * 60 * 60 * 1000;
+    const thailandTime = new Date(now.getTime() + thailandOffsetMs);
+
 
     if (!store) {
       return res.status(404).json({
@@ -1127,14 +1145,19 @@ exports.updateStoreStatusNoNewId = async (req, res) => {
     )
 
     await Customer.update(
-      { customerStatus: `${status}` },
+      {
+        customerStatus: `${status}`,
+        OKCFC3: 'R25',
+        OKLMDT: thailandTime.toISOString().slice(0, 10).replace(/-/g, ''), // YYYYMMDD
+        OKCHID: 'MI02'
+      },
       {
         where: {
           coNo: 410,
           customerNo: storeId
         }
       }
-    )
+    );
 
     return res.status(200).json({
       status: 200,
@@ -1174,7 +1197,7 @@ exports.addAndUpdateStore = async (req, res) => {
     // }
   )
 
-  console.log(response.data)
+  // console.log(response.data)
   const storeMongo = await Store.find()
   let update = 0
   let addNew = 0
@@ -1921,3 +1944,45 @@ exports.deleteStore = async (req, res) => {
     })
   }
 }
+
+exports.fixStatusStore = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { storeId } = req.body;
+    const channel = req.headers['x-channel'];
+    const { Store } = getModelsByChannel(channel, res, storeModel);
+
+    // อ่านจาก MongoDB (ไม่ต้องผูก transaction อะไรทั้งนั้น)
+    const store = await Store.findOne({ storeId });
+    if (!store) {
+      await t.rollback();
+      return res.status(404).json({ status: 404, message: 'Store not found' });
+    }
+
+    const now = new Date();
+
+    const [updatedCount] = await Customer.update(
+      {
+        OKCFC3: 'R25',
+        OKLMDT: now.toISOString().slice(0, 10).replace(/-/g, ''), // YYYYMMDD
+        OKCHID: 'MI02',
+        customerStatus: '20'
+      },
+      {
+        where: { OKCUNO: store.storeId },
+        transaction: t
+      }
+    );
+
+    if (updatedCount === 0) {
+      await t.rollback();
+      return res.status(400).json({ status: 400, message: 'Update failed' });
+    }
+
+    await t.commit();
+    return res.status(200).json({ status: 200, message: 'Success', updatedCount });
+  } catch (err) {
+    await t.rollback();
+    return res.status(500).json({ status: 500, message: err.message });
+  }
+};
