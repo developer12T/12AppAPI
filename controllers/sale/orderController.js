@@ -8,6 +8,7 @@ const axios = require('axios')
 const dayjs = require('dayjs')
 const { getSeries, updateRunningNumber } = require('../../middleware/order')
 const { Item } = require('../../models/item/itemlot')
+const { Sale } = require('../../models/cash/master')
 const { Op, fn, col, where, literal } = require('sequelize')
 const { generateOrderId } = require('../../utilities/genetateId')
 const {
@@ -473,6 +474,57 @@ exports.checkout = async (req, res) => {
   }
 }
 
+exports.reflashOrder = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { Order } = getModelsByChannel(channel, null, orderModel)
+    // 1. Get sale order numbers (OAORNO) ที่มีใน Sale
+    const modelSale = await Sale.findAll({
+      attributes: [
+        'OACUOR',
+        [sequelize.fn('COUNT', sequelize.col('OACUOR')), 'count']
+      ],
+      group: ['OACUOR']
+    })
+    const saleIds = modelSale.map(row => row.get('OACUOR').toString())
+
+    // 2. Get pending orderIds ใน MongoDB
+    const inMongo = await Order.find({ status: 'pending' }).select('orderId')
+    const orderIdsInMongo = inMongo.map(item => item.orderId.toString())
+
+    // 3. filter ให้เหลือเฉพาะที่อยู่ทั้งสองฝั่ง
+    const matchedIds = orderIdsInMongo.filter(id => saleIds.includes(id))
+
+    // 4. อัปเดตทุกตัวที่ match (วนทีละตัว)
+    let updatedCount = 0
+    for (const orderId of matchedIds) {
+      try {
+        const result = await Order.updateOne(
+          { orderId },
+          {
+            $set: {
+              status: 'completed',
+              statusTH: 'สำเร็จ',
+              updatedAt: new Date()
+            }
+          }
+        )
+        if (result.modifiedCount > 0) updatedCount++
+      } catch (err) {
+        console.error(`Error update orderId: ${orderId}`, err)
+      }
+    }
+    res.status(200).json({
+      status: 200,
+      message: 'Successful!',
+      data: updatedCount
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
 exports.getOrder = async (req, res) => {
   try {
     const { type, area, store, period, start, end } = req.query
@@ -489,7 +541,21 @@ exports.getOrder = async (req, res) => {
         .json({ status: 400, message: 'type,  period are required!' })
     }
 
-    const { startDate, endDate } = rangeDate(period)
+    // ✅ คำนวณช่วงวัน
+    let startDate, endDate
+    if (start && end) {
+      startDate = new Date(start)
+      endDate = new Date(end)
+    } else if (period) {
+      const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
+      startDate = range.startDate
+      endDate = range.endDate
+    } else {
+      return res
+        .status(400)
+        .json({ status: 400, message: 'period or start/end are required!' })
+    }
+
     let areaQuery = {}
     if (area) {
       if (area.length == 2) {
@@ -503,7 +569,8 @@ exports.getOrder = async (req, res) => {
       ...areaQuery,
       // 'store.area': area,
       // createdAt: { $gte: startDate, $lt: endDate }
-      period: period
+      period: period,
+      createdAt: { $gte: startDate, $lte: endDate } // ✅ filter ช่วงวัน
     }
 
     if (store) {
@@ -540,7 +607,7 @@ exports.getOrder = async (req, res) => {
       .map(o => ({
         orderId: o.orderId,
         area: o.store.area,
-        storeId: o.store?.storeId || '',
+        storeId: o.store?.store || '',
         storeName: o.store?.name || '',
         storeAddress: o.store?.address || '',
         createAt: o.createdAt,
@@ -2633,9 +2700,9 @@ exports.getGroup = async (req, res) => {
   const { Product } = getModelsByChannel(channel, res, productModel)
   const product = await Product.aggregate([
     // {
-      // $match: {
-      //   groupM3: { $nin: ['', null] }
-      // }
+    // $match: {
+    //   groupM3: { $nin: ['', null] }
+    // }
     // },
     {
       $group: {
@@ -3606,7 +3673,7 @@ exports.getSummary18SKU = async (req, res) => {
   if (team) matchStage['team'] = team
   // console.log(team)
   const dataOrder = await Order.aggregate([
-    {$match:{status:{ $ne: 'canceled' }}},
+    { $match: { status: { $ne: 'canceled' } } },
     {
       $addFields: {
         team: {
@@ -3673,8 +3740,7 @@ exports.getSummary18SKU = async (req, res) => {
     const groupItems = data.filter(
       item =>
         item.groupCode === group.groupCode &&
-        item.group === group.group 
-        &&
+        item.group === group.group &&
         item.groupCode === group.groupCode
     )
     const summaryQtySum = groupItems.reduce((sum, i) => sum + i.summaryQty, 0)

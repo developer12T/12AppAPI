@@ -28,7 +28,8 @@ const {
   editShippingInStore,
   deleteStore,
   updateStoreStatusNoNewId,
-  fixStatusStore
+  fixStatusStore,
+  insertStoreToM3
   // test
 } = require('../../controllers/store/storeController')
 
@@ -51,6 +52,7 @@ router.get('/check/:storeId', checkSimilarStores)
 router.get('/:storeId', getDetailStore)
 router.post('/addStore', addStore)
 router.post('/updateImage', updateImage)
+router.post('/insertStoreToM3', insertStoreToM3)
 router.post('/addFromERP', addFromERP)
 router.post('/addFromERPnew', addFromERPnew)
 router.patch('/editStore/:storeId', editStore)

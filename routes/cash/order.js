@@ -9,7 +9,8 @@ const { getOrder, getDetail, updateStatus, checkout, addSlip, OrderToExcel, getA
     summaryMonthlyByZone,
     saleReport,
     getSummary18SKU,
-    reportCheckin
+    reportCheckin,
+    reflashOrder
 
  } = require('../../controllers/sale/orderController')
 
@@ -20,6 +21,7 @@ router.get('/detail/:orderId', getDetail)
 router.post('/updateStatus', updateStatus)
 router.post('/checkout', checkout)
 router.post('/addSlip', addSlip)
+router.get('/reflashOrder', reflashOrder)
 
 router.post('/addSlip', addSlip)
 router.get('/ordertoexcel', OrderToExcel);
