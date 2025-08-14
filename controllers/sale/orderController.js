@@ -3606,6 +3606,7 @@ exports.getSummary18SKU = async (req, res) => {
   if (team) matchStage['team'] = team
   // console.log(team)
   const dataOrder = await Order.aggregate([
+    {$match:{status:{ $ne: 'canceled' }}},
     {
       $addFields: {
         team: {
@@ -3622,6 +3623,7 @@ exports.getSummary18SKU = async (req, res) => {
     { $replaceRoot: { newRoot: '$listProduct' } }
   ])
 
+  // console.log(dataOrder)
   const productlist = dataOrder.map(item => item.id) // หรือ flatMap ถ้าเป็น array
   const productId = [...new Set(productlist)]
   const productData = await Product.find({ id: { $in: productId } })
@@ -3638,7 +3640,7 @@ exports.getSummary18SKU = async (req, res) => {
         _id: {
           groupCode: '$groupCode',
           group: '$group',
-          groupCodeM3: '$groupCodeM3'
+          // groupCodeM3: '$groupCodeM3'
         }
       }
     },
@@ -3659,7 +3661,7 @@ exports.getSummary18SKU = async (req, res) => {
     const factorPcs = unit.factor
     dataTran = {
       groupCode: productDetail.groupCode,
-      groupCodeM3: productDetail.groupCodeM3,
+      // groupCodeM3: productDetail.groupCodeM3,
       group: productDetail.group,
       summaryQty: item.qty * factorPcs,
       summary: item.netTotal
@@ -3671,8 +3673,9 @@ exports.getSummary18SKU = async (req, res) => {
     const groupItems = data.filter(
       item =>
         item.groupCode === group.groupCode &&
-        item.group === group.group &&
-        item.groupCodeM3 === group.groupCodeM3
+        item.group === group.group 
+        // &&
+        // item.groupCodeM3 === group.groupCodeM3
     )
     const summaryQtySum = groupItems.reduce((sum, i) => sum + i.summaryQty, 0)
     const summarySum = groupItems.reduce((sum, i) => sum + i.summary, 0)
