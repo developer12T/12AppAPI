@@ -596,18 +596,18 @@ exports.getDetail = async (req, res) => {
 
     const listProductChange = order
       ? order.listProduct.map(product => ({
-          id: product.id,
-          name: product.name,
-          group: product.group,
-          brand: product.brand,
-          size: product.size,
-          flavour: product.flavour,
-          qty: product.qty,
-          unit: product.unit,
-          unitName: product.unitName,
-          price: product.price,
-          netTotal: product.netTotal
-        }))
+        id: product.id,
+        name: product.name,
+        group: product.group,
+        brand: product.brand,
+        size: product.size,
+        flavour: product.flavour,
+        qty: product.qty,
+        unit: product.unit,
+        unitName: product.unitName,
+        price: product.price,
+        netTotal: product.netTotal
+      }))
       : []
 
     const totalChange = order ? order.total : 0
@@ -788,24 +788,13 @@ exports.updateStatus = async (req, res) => {
         condition: u.condition
       }
     })
-
+    let newOrderId = orderId
     if (status === 'canceled') {
       statusTH = 'ยกเลิก'
-
-      // for (const item of productQty) {
-
-      // console.log(item)
-      //   const updateResult = await updateStockMongo(
-      //     item,
-      //     refundOrder.store.area,
-      //     refundOrder.period,
-      //     'rufundCanceled',
-      //     channel,
-      //     res
-      //   )
-      //   if (updateResult) return
-      // }
-
+      if (!changeOrder.orderId.endsWith('CC')) {
+        let counter = 1;
+        newOrderId = `${changeOrder.orderId}CC${counter++}`;
+      }
       for (const item of productChange) {
         const updateResult = await updateStockMongo(
           item,
@@ -817,21 +806,20 @@ exports.updateStatus = async (req, res) => {
         )
         if (updateResult) return
       }
+
+      const updatedOrder = await Order.findOneAndUpdate(
+        { reference: orderId },
+        { $set: { status, statusTH, orderId: newOrderId } },
+        { new: true }
+      )
+      // console.log(orderId)
+
     } else if (status === 'rejected') {
       statusTH = 'ถูกปฏิเสธ'
-
-      // for (const item of productQty) {
-      //   const updateResult = await updateStockMongo(
-      //     item,
-      //     refundOrder.store.area,
-      //     refundOrder.period,
-      //     'rufundCanceled',
-      //     channel,
-      //     res
-      //   )
-      //   if (updateResult) return
-      // }
-
+      if (!changeOrder.orderId.endsWith('CC')) {
+        let counter = 1;
+        newOrderId = `${changeOrder.orderId}CC${counter++}`;
+      }
       for (const item of productChange) {
         const updateResult = await updateStockMongo(
           item,
@@ -843,6 +831,12 @@ exports.updateStatus = async (req, res) => {
         )
         if (updateResult) return
       }
+      const updatedOrder = await Order.findOneAndUpdate(
+        { reference: orderId },
+        { $set: { status, statusTH, orderId: newOrderId } },
+        { new: true }
+      )
+
     } else if (status === 'approved') {
       statusTH = 'อนุมัติ'
 
