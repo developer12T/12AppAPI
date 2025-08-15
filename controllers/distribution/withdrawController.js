@@ -2,7 +2,7 @@
 // const { User } = require('../../models/cash/user')
 // const { Product } = require('../../models/cash/product')
 // const { Distribution, Place } = require('../../models/cash/distribution')
-const { MHDISL, MHDISH } = require('../../models/cash/master')
+const { MHDISL, MHDISH, DisributionM3 } = require('../../models/cash/master')
 const { sequelize, DataTypes } = require('../../config/m3db')
 const { getSeries, updateRunningNumber } = require('../../middleware/order')
 const axios = require('axios')
@@ -1153,6 +1153,22 @@ exports.saleConfirmWithdraw = async (req, res) => {
         })
       }
 
+      const row = await DisributionM3.findOne({ where: { coNo: orderId } });
+      if (!row) return res.status(404).json({ status: 404, message: `${orderId} not found` });
+
+      const toNum = v => Number(String(v ?? '').trim()); // แปลง NVARCHAR -> Number, ตัดช่องว่าง
+      const MGTRSL = toNum(row.MGTRSL);
+      const MGTRSH = toNum(row.MGTRSH);
+
+      // ถ้าต้องการให้ "ทั้งสองค่า" ต้องเป็น 90 ถึงจะผ่าน
+      if (MGTRSL !== 90 && MGTRSH !== 90) {
+        return res.status(400).json({
+          status: 400,
+          message: `${orderId} is not 90 (MGTRSL=${row.MGTRSL}, MGTRSH=${row.MGTRSH})`
+        });
+      }
+
+
       // ✅ ดึงข้อมูลสินค้าที่เกี่ยวข้อง
       const listProductId = distributionTran.listProduct
         .map(i => i.id)
@@ -1176,8 +1192,7 @@ exports.saleConfirmWithdraw = async (req, res) => {
         const productIdTrimmed = String(i.id || '').trim()
         const match = Receive.find(
           r => String(r.productId || '').trim() === productIdTrimmed
-        )
-
+        )        
         if (match) {
           const product = productDetail.find(
             u => String(u.id || '').trim() === productIdTrimmed
