@@ -908,7 +908,7 @@ exports.OrderToExcel = async (req, res) => {
     .filter(Boolean)
 
   if (statusArray.length === 0) {
-    statusArray = ['pending'] // default
+    statusArray = ['pending','approved','completed'] // default
   }
   // ,'completed'
   if (!date || date === 'null') {
