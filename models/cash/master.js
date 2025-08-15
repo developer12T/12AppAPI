@@ -416,18 +416,18 @@ const DisributionM3 = sequelize.define(
       allowNull: false,
       primaryKey: true,
       field: 'MGTRNR'
+    },
+    MGTRSL: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      primaryKey: true,
+      field: 'MGTRSL'
+    },
+    MGTRSH: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'MGTRSH'
     }
-    // warehouse: {
-    //   type: DataTypes.INTEGER,
-    //   allowNull: false,
-    //   primaryKey: true,
-    //   field: 'MWWHLO'
-    // },
-    // warehouseName: {
-    //   type: DataTypes.STRING,
-    //   allowNull: false,
-    //   field: 'MWWHNM'
-    // }
   },
   {
     freezeTableName: true,
