@@ -186,11 +186,11 @@ exports.getAdjustStock = async (req, res) => {
     }
 
     const pipeline = [
-      {
-        $match: {
-          status: 'pending'
-        }
-      },
+      // {
+      //   $match: {
+      //     status: 'pending'
+      //   }
+      // },
       {
         $addFields: {
           zone: { $substrBytes: ['$area', 0, 2] },
