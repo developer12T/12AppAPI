@@ -903,9 +903,9 @@ exports.OrderToExcel = async (req, res) => {
     .filter(Boolean)
 
   if (statusArray.length === 0) {
-    statusArray = ['pending','completed'] // default
+    statusArray = ['pending'] // default
   }
-
+// ,'completed'
   if (!date || date === 'null') {
     const today = new Date()
     const year = today.getFullYear()
