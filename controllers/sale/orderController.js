@@ -426,7 +426,7 @@ exports.checkout = async (req, res) => {
       currentDate.getMonth() + 1,
       1
     )
-    a
+    
     query.createdAt = {
       $gte: startMonth,
       $lt: NextMonth
