@@ -194,8 +194,8 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-          .map(item => item.price)
-          .reduce((sum, price) => sum + price, 0)
+        .map(item => item.price)
+        .reduce((sum, price) => sum + price, 0)
       : 0
     const total = subtotal - discountProduct
     const newOrder = new Order({
@@ -426,7 +426,7 @@ exports.checkout = async (req, res) => {
       currentDate.getMonth() + 1,
       1
     )
-
+    a
     query.createdAt = {
       $gte: startMonth,
       $lt: NextMonth
@@ -635,45 +635,50 @@ exports.getOrder = async (req, res) => {
 
 exports.getDetail = async (req, res) => {
   try {
-    const { orderId } = req.params
+    const { orderId } = req.params;
+    const channel = req.headers['x-channel'];
 
-    const channel = req.headers['x-channel']
-
-    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel);
+    const { Refund } = getModelsByChannel(channel, res, refundModel);
 
     if (!orderId) {
-      return res
-        .status(400)
-        .json({ status: 400, message: 'orderId is required!' })
+      return res.status(400).json({ status: 400, message: 'orderId is required!' });
     }
 
-    const order = await Order.findOne({ orderId })
+    // หาจาก Order ก่อน
+    let doc = await Order.findOne({ orderId });
+    let source = 'order';
 
-    if (!order) {
-      return res.status(404).json({
-        status: 404,
-        message: `Not found this ${orderId}`
-      })
+    // ถ้าไม่เจอ ค่อยหาใน Refund
+    if (!doc) {
+      doc = await Refund.findOne({ orderId });
+      source = 'refund';
     }
 
-    // const io = getSocket()
-    // io.emit('order/detail', {});
-
-    const orderWithThaiTime = {
-      ...order.toObject(),
-      createdAt: new Date(order.createdAt.getTime() + 7 * 60 * 60 * 1000)
+    if (!doc) {
+      return res.status(404).json({ status: 404, message: `Not found ${orderId} in Order or Refund` });
     }
 
-    res.status(200).json({
+    const toThai = (d) => (d instanceof Date ? new Date(d.getTime() + 7 * 60 * 60 * 1000) : d);
+
+    const data = {
+      ...doc.toObject(),
+      createdAt: toThai(doc.createdAt),
+      updatedAt: toThai(doc.updatedAt),
+      _source: source, // บอกว่าได้มาจากไหน (order/refund)
+    };
+
+    return res.status(200).json({
       status: 200,
       message: 'successful!',
-      data: [orderWithThaiTime]
-    })
+      data: [data],
+    });
   } catch (error) {
-    console.error(error)
-    res.status(500).json({ status: '500', message: error.message })
+    console.error(error);
+    return res.status(500).json({ status: 500, message: error.message });
   }
-}
+};
+
 
 const orderUpdateTimestamps = {}
 
@@ -775,7 +780,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -905,7 +910,7 @@ exports.OrderToExcel = async (req, res) => {
   if (statusArray.length === 0) {
     statusArray = ['pending'] // default
   }
-// ,'completed'
+  // ,'completed'
   if (!date || date === 'null') {
     const today = new Date()
     const year = today.getFullYear()
@@ -1064,7 +1069,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD (date) {
+    function formatDateToThaiYYYYMMDD(date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1175,7 +1180,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromChange = modelChange.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD (date) {
+    function formatDateToThaiYYYYMMDD(date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1437,7 +1442,7 @@ exports.OrderToExcel = async (req, res) => {
       message: 'Not Found Order'
     })
   }
-  function yyyymmddToDdMmYyyy (dateString) {
+  function yyyymmddToDdMmYyyy(dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -1469,7 +1474,7 @@ exports.OrderToExcel = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => {})
+    fs.unlink(tempPath, () => { })
   })
 }
 
