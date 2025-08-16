@@ -24,7 +24,8 @@ const {
   deleteStockAdjust,
   addStockWithdraw,
   checkStockWithdraw,
-  addStockAllWithInOut
+  addStockAllWithInOut,
+  stockToExcelNew
 } = require('../../controllers/stock/stockController')
 
 const router = express.Router()
@@ -60,4 +61,5 @@ router.post('/addStockWithdraw', addStockWithdraw)
 
 router.post('/checkStockWithdraw', checkStockWithdraw)
 router.post('/addStockAllWithInOut', addStockAllWithInOut)
+router.post('/stockToExcelNew', stockToExcelNew)
 module.exports = router

@@ -11,7 +11,6 @@ const { getOrder, getDetail, updateStatus, checkout, addSlip, OrderToExcel, getA
     getSummary18SKU,
     reportCheckin,
     reflashOrder
-
  } = require('../../controllers/sale/orderController')
 
 const router = express.Router()

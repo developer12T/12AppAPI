@@ -106,7 +106,7 @@ exports.getStore = async (req, res) => {
     )
 
     let query = {}
-    query.route = { $nin: ['DEL','R'] }
+    query.route = { $nin: ['DEL', 'R'] }
 
     // Priority: ใช้ month/year filter ก่อน type
     if (month && year) {
@@ -129,7 +129,7 @@ exports.getStore = async (req, res) => {
         $lt: nextMonth
       }
     } else {
-      query.status = { $nin: ['10','90'] }
+      query.status = { $nin: ['10', '90'] }
     } // ถ้า type=all ไม่ต้อง filter createdAt เลย
 
     if (area) {
@@ -462,9 +462,12 @@ exports.checkSimilarStores = async (req, res) => {
   // )
 
   const existingStores = await Store.find(
-    { storeId: { $ne: storeId }, zone: store.zone },
+    {
+      zone: store.zone,
+      storeId: { $ne: storeId },
+      $expr: { $lte: [{ $strLenCP: '$storeId' }, 12] }  // ≤ 12 ตัวอักษร
+    },
     { _id: 0, __v: 0, idIndex: 0 }
-    // { zone: store.zone }
   )
 
   // console.log(existingStores.length)
@@ -837,24 +840,24 @@ exports.insertStoreToM3 = async (req, res) => {
     customerCoType: item.type ?? '',
     customerAddress1: (
       item.address +
-        item.subDistrict +
-        item.subDistrict +
-        item.province +
-        item.postCode ?? ''
+      item.subDistrict +
+      item.subDistrict +
+      item.province +
+      item.postCode ?? ''
     ).substring(0, 35),
     customerAddress2: (
       item.address +
-        item.subDistrict +
-        item.subDistrict +
-        item.province +
-        item.postCode ?? ''
+      item.subDistrict +
+      item.subDistrict +
+      item.province +
+      item.postCode ?? ''
     ).substring(35, 70),
     customerAddress3: (
       item.address +
-        item.subDistrict +
-        item.subDistrict +
-        item.province +
-        item.postCode ?? ''
+      item.subDistrict +
+      item.subDistrict +
+      item.province +
+      item.postCode ?? ''
     ).substring(70, 105),
     customerAddress4: '',
     customerPoscode: (item.postCode ?? '').substring(0, 35),
@@ -985,24 +988,24 @@ exports.updateStoreStatus = async (req, res) => {
       customerCoType: item.type ?? '',
       customerAddress1: (
         item.address +
-          item.subDistrict +
-          item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
       ).substring(0, 35),
       customerAddress2: (
         item.address +
-          item.subDistrict +
-          item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
       ).substring(35, 70),
       customerAddress3: (
         item.address +
-          item.subDistrict +
-          item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
       ).substring(70, 105),
       customerAddress4: '',
       customerPoscode: (item.postCode ?? '').substring(0, 35),
