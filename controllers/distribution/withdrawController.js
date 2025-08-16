@@ -1161,10 +1161,10 @@ exports.saleConfirmWithdraw = async (req, res) => {
       const MGTRSH = toNum(row.MGTRSH);
 
       // ถ้าต้องการให้ "ทั้งสองค่า" ต้องเป็น 90 ถึงจะผ่าน
-      if (MGTRSL !== 90 && MGTRSH !== 90) {
+      if (MGTRSL !== 99 && MGTRSH !== 99) {
         return res.status(400).json({
           status: 400,
-          message: `${orderId} is not 90 (MGTRSL=${row.MGTRSL}, MGTRSH=${row.MGTRSH})`
+          message: `${orderId} is not 99 (MGTRSL=${row.MGTRSL}, MGTRSH=${row.MGTRSH})`
         });
       }
 
