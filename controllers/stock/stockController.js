@@ -13,8 +13,8 @@ const errorEndpoint = require('../../middleware/errorEndpoint')
 const currentFilePath = path.basename(__filename)
 const { getStockAvailable } = require('./available')
 const { getStockMovement } = require('../../utilities/movement')
-const { Warehouse, Locate, Balance } = require('../../models/cash/master')
-const { Op } = require('sequelize')
+const { Warehouse, Locate, Balance, Customer } = require('../../models/cash/master')
+const { Op, fn, col, where } = require('sequelize')
 const fs = require('fs')
 // const { Refund } = require('../../models/cash/refund')
 const {
@@ -3017,400 +3017,427 @@ exports.stockToExcel = async (req, res) => {
 
 
 exports.stockToExcelNew = async (req, res) => {
-  const { area, period, excel } = req.body
-  const channel = req.headers['x-channel']
-  const { Stock } = getModelsByChannel(channel, res, stockModel)
-  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-  const { Product } = getModelsByChannel(channel, res, productModel)
-  const { Refund } = getModelsByChannel(channel, res, refundModel)
-  const { Giveaway } = getModelsByChannel(channel, res, giveModel)
+  try {
+    const { area, period, excel } = req.body;
+    const channel = req.headers['x-channel'];
 
-  const [
-    dataRefund,
-    dataOrderSale,
-    dataOrderChange,
-    dataWithdraw,
-    dataStock,
-    dataGive
-  ] = await Promise.all([
-    Refund.find({
-      'store.area': area,
-      period: period,
-      status: 'approved',
-      type: 'refund'
-    }),
-    Order.find({
-      'store.area': area,
-      period: period,
-      type: 'sale',
-      status: { $in: ['pending', 'completed'] }   // 👈 ใช้ $in
-    }),
-    Order.find({
-      'store.area': area,
-      period: period,
-      type: 'change',
-      status: { $in: ['approved', 'completed'] }   // 👈 ใช้ $in
-    }),
-    Distribution.find({
-      area: area,
-      period: period,
-      status: { $in: ['confirm'] } ,  // 👈 ใช้ $in
-      type: 'withdraw'
-    }),
-    Stock.find({
-      area: area,
-      period: period
-    }).select('listProduct'),
-    Giveaway.find({
-      'store.area': area,
-      period: period,
-      status: { $in: ['pending','completed'] } ,
-      type: 'give',
-    }).select('listProduct')
-  ])
-
-
-  // console.log("dataOrderSale",dataOrderSale)
-
-
-  const markSource = (arr, source) =>
-    arr.map(item => ({ ...item, _source: source }))
-
-  const dataOrderPromotion = dataOrderSale.flatMap(item =>
-    (item.listPromotions || []).map(u => ({
-      _id: u._id,
-      listProduct: u.listProduct || []
-    }))
-  )
-
-  // รวม productId ที่ใช้จริง
-  const productId = [
-    ...dataOrderSale.flatMap(item => (item.listProduct || []).map(i => i.id)),
-    ...dataRefund.flatMap(item => (item.listProduct || []).map(i => i.id)),
-    ...dataOrderChange.flatMap(item => (item.listProduct || []).map(i => i.id)),
-    ...dataWithdraw.flatMap(item => (item.listProduct || []).map(i => i.id)),
-    ...dataGive.flatMap(item => (item.listProduct || []).map(i => i.id)),
-    ...dataOrderPromotion.flatMap(item =>
-      (item.listProduct || []).map(i => i.id)
-    )
-  ]
-  const uniqueProductId = [...new Set(productId)]
-
-  // โหลดรายละเอียดสินค้า
-  const productDetail = await Product.find()
-
-  // รวม stock ทั้งหมด
-  const allListProduct = dataStock.flatMap(stock => stock.listProduct || [])
-  const StockQty = allListProduct.filter(item =>
-    uniqueProductId.includes(item.productId)
-  )
-
-  let sumStockIn = 0
-  let sumStockInWithdraw = 0
-  let sumStockInGood = 0
-  let sumStockInDamaged = 0
-  let sumStockInCredit = 0
-  let sumStockInsumStock = 0
-  let sumStockInsummary = 0
-
-  const stockIn = [...dataRefund, ...dataWithdraw].flatMap(item =>
-    (item.listProduct || []).map(i => {
-      const product = productDetail.find(u => u.id === i.id)
-      const factorPcs = product?.listUnit?.find(u => u.unit === i.unit)
-      const qtyPcs = i.qty * (factorPcs?.factor || 1)
-      const sumStock = StockQty.find(u => u.productId === i.id)
-      let qtyPcsGood = 0
-      let qtyPcsDamaged = 0
-      let qtyWithdraw = 0
-      let summary = i.total || 0
-      if (i.condition === 'good') {
-        qtyPcsGood = qtyPcs
-      } else if (i.condition === 'damaged') {
-        qtyPcsDamaged = qtyPcs
-      } else {
-        qtyWithdraw = qtyPcs
-      }
-      sumStockIn += qtyPcs
-      sumStockInWithdraw += qtyWithdraw
-      sumStockInGood += qtyPcsGood
-      sumStockInDamaged += qtyPcsDamaged
-      sumStockInCredit += 0
-      sumStockInsumStock += sumStock?.stockPcs || 0
-      sumStockInsummary += to2(summary)
-
-      return {
-        productId: i.id,
-        name: product ? product.name : '',
-        // stock: qtyPcs,
-        withdraw: qtyWithdraw,
-        good: qtyPcsGood,
-        // damaged: qtyPcsDamaged,
-        // credit: 0,
-        sumStock: qtyWithdraw + qtyPcsGood ,
-        summary: to2(summary)
-      }
-    })
-  )
-
-  // ฟังก์ชันสำหรับเข้าถึง listProduct
-  const getListProduct = item => {
-    if (Array.isArray(item.listProduct)) return item.listProduct
-    if (item._doc && Array.isArray(item._doc.listProduct))
-      return item._doc.listProduct
-    return []
-  }
-
-  const dataOrderSaleMark = markSource(dataOrderSale, 'orderSale')
-  const dataOrderChangeMark = markSource(dataOrderChange, 'orderChange')
-  const dataGiveMark = markSource(dataGive, 'give')
-  const dataPromotionMark = markSource(dataOrderPromotion, 'promotion')
-
-  let sumStockOutSale = 0
-  let sumStockOutSummarySale = 0
-  let sumStockOutPromotion = 0
-  let sumStockOutSummaryPromotion = 0
-  let sumStockOutChange = 0
-  let sumStockOutSummaryChange = 0
-  let sumStockOutGive = 0
-  let sumStockOutSummaryGive = 0
-  let sumStockOutexchange = 0
-  let sumStockOutSummaryQtySalePromotionChange = 0
-  let sumStockOutSummarySalePromotionChange = 0
-  const stockOut = [
-    ...dataOrderSaleMark,
-    ...dataOrderChangeMark,
-    ...dataGiveMark,
-    ...dataPromotionMark
-  ].flatMap(item =>
-    getListProduct(item).map(i => {
-      const product = productDetail.find(u => u.id === i.id)
-      const factorPcs = product?.listUnit?.find(u => u.unit === i.unit)
-      const qtyPcs = i.qty * (factorPcs?.factor || 1)
-
-      let qtyPcsSale = 0
-      let summarySale = 0
-      let qtyPcsPromotion = 0
-      let summaryPromotion = 0
-      let qtyPcsChange = 0
-      let summaryChange = 0
-      let qtyPcsGive = 0
-      let summaryGive = 0
-
-      if (item._source === 'orderSale') {
-        qtyPcsSale = qtyPcs
-        summarySale = i.subtotal ?? 0
-      } else if (item._source === 'promotion') {
-        qtyPcsPromotion = qtyPcs
-        summaryPromotion = i.qty * (factorPcs?.price?.sale || 0)
-      } else if (item._source === 'orderChange') {
-        // console.log(i)
-        qtyPcsChange = qtyPcs
-        summaryChange = i.netTotal ?? 0
-      } else if (item._source === 'give') {
-        qtyPcsGive = qtyPcs
-        summaryGive = i.total ?? 0
-      }
-
-      sumStockOutSale += qtyPcsSale
-      sumStockOutSummarySale += to2(summarySale)
-      sumStockOutPromotion += qtyPcsPromotion
-      sumStockOutSummaryPromotion += to2(summaryPromotion)
-      sumStockOutChange += qtyPcsChange
-      sumStockOutSummaryChange += to2(summaryChange)
-      sumStockOutGive += qtyPcsGive
-      sumStockOutSummaryGive += to2(summaryGive)
-      sumStockOutexchange = 0
-      sumStockOutSummaryQtySalePromotionChange += to2(
-        (qtyPcsSale || 0) + (qtyPcsPromotion || 0) + (qtyPcsChange || 0)
-      )
-      sumStockOutSummarySalePromotionChange += to2(
-        (summarySale || 0) + (summaryPromotion || 0) + (summaryChange || 0)
-      )
-
-      return {
-        productId: i.id,
-        name: product ? product.name : '',
-        sale: qtyPcsSale,
-        summarySale: to2(summarySale),
-        promotion: qtyPcsPromotion,
-        summaryPromotion: to2(summaryPromotion),
-        change: qtyPcsChange,
-        summaryChange: to2(summaryChange),
-        give: qtyPcsGive,
-        summaryGive: to2(summaryGive),
-        exchange: 0,
-        summaryQtySalePromotionChange: to2(
-          (qtyPcsSale || 0) + (qtyPcsPromotion || 0) + (qtyPcsChange || 0)
-        ),
-        summarySalePromotionChange: to2(
-          (summarySale || 0) + (summaryPromotion || 0) + (summaryChange || 0)
-        )
-      }
-    })
-  )
-
-  // รวมยอดตาม productId
-  const stockOutFinal = Object.values(
-    stockOut.reduce((acc, cur) => {
-      if (!acc[cur.productId]) {
-        acc[cur.productId] = { ...cur }
-      } else {
-        acc[cur.productId].sale += cur.sale
-        acc[cur.productId].summarySale += cur.summarySale
-        acc[cur.productId].promotion += cur.promotion
-        acc[cur.productId].summaryPromotion += cur.summaryPromotion
-        acc[cur.productId].change += cur.change
-        acc[cur.productId].summaryChange += cur.summaryChange
-        acc[cur.productId].give += cur.give
-        acc[cur.productId].summaryGive += cur.summaryGive
-        acc[cur.productId].exchange += cur.exchange
-        acc[cur.productId].summaryQtySalePromotionChange =
-          (acc[cur.productId].summaryQtySalePromotionChange || 0) +
-          (cur.summaryQtySalePromotionChange || 0)
-        acc[cur.productId].summarySalePromotionChange =
-          (acc[cur.productId].summarySalePromotionChange || 0) +
-          (cur.summarySalePromotionChange || 0)
-      }
-      return acc
-    }, {})
-  )
-
-  // balance
-  let sumBalanceGood = 0
-  let sumBalanceDamaged = 0
-  let sumBalancesummary = 0
-
-  const balance = allListProduct.map(item => {
-    const product = productDetail.find(u => u.id === item.productId) || null
-    const factorPcs = product?.listUnit?.find(
-      u => u.unit === 'PCS' || u.unit === 'BOT'
-    )
-    sumBalanceGood += item.balancePcs || 0
-    sumBalanceDamaged += 0
-    sumBalancesummary += to2(
-      (item.balancePcs || 0) * (factorPcs?.price?.sale || 0)
-    )
-
-    return {
-      productId: item.productId,
-      productName: product?.name || '',
-      balanceGood: item.balancePcs || 0,
-      balanceDamaged: 0,
-      summary: to2((item.balancePcs || 0) * (factorPcs?.price?.sale || 0))
+    if (!area || !period) {
+      return res.status(400).json({ status: 400, message: 'area, period are required' });
     }
-  })
 
-  // ส่งออก excel หรือ json
-  if (excel === true) {
-    const stockInWithSum = [
-      ...stockIn,
-      {
-        productId: '',
-        name: 'รวมทั้งหมด',
-        stock: sumStockIn,
-        withdraw: sumStockInWithdraw,
-        good: sumStockInGood,
-        damaged: sumStockInDamaged,
-        credit: sumStockInCredit,
-        sumStock: sumStockInsumStock,
-        summary: sumStockInsummary
-      }
+    // ---------- Models ----------
+    const { Stock } = getModelsByChannel(channel, res, stockModel);
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel);
+    const { Order } = getModelsByChannel(channel, res, orderModel);
+    const { Product } = getModelsByChannel(channel, res, productModel);
+    const { Refund } = getModelsByChannel(channel, res, refundModel);
+    const { Giveaway } = getModelsByChannel(channel, res, giveModel);
+
+    // ---------- Fetch base data (รอบเดียว) ----------
+    const [
+      dataRefund,
+      dataOrderSale,
+      dataOrderChange,
+      dataWithdraw,
+      dataStockListOnly,
+      dataGive,
+      warehouseDoc
+    ] = await Promise.all([
+      Refund.find({ 'store.area': area, period, status: 'approved', type: 'refund' }).lean(),
+      Order.find({ 'store.area': area, period, type: 'sale', status: { $in: ['pending', 'completed'] } }).lean(),
+      Order.find({ 'store.area': area, period, type: 'change', status: { $in: ['approved', 'completed'] } }).lean(),
+      Distribution.find({ area, period, status: { $in: ['confirm'] }, type: 'withdraw' }).lean(),
+      Stock.find({ area, period }).select('listProduct').lean(),
+      Giveaway.find({ 'store.area': area, period, status: { $in: ['pending', 'completed'] }, type: 'give' }).lean(),
+      Stock.findOne({ area, period }).select('warehouse').lean()
+    ]);
+
+    const warehouseCode = String(warehouseDoc?.warehouse || '').trim();
+
+    // ---------- Promotions ใน order sale ----------
+    const dataOrderPromotion = dataOrderSale.flatMap(item =>
+      (item.listPromotions || []).map(u => ({
+        _id: u?._id,
+        listProduct: u?.listProduct || []
+      }))
+    );
+
+    // ---------- Unique product ids (ทุกแหล่งที่เกี่ยว) ----------
+    const productIdUsed = [
+      ...dataOrderSale.flatMap(x => (x.listProduct || []).map(i => i.id)),
+      ...dataRefund.flatMap(x => (x.listProduct || []).map(i => i.id)),
+      ...dataOrderChange.flatMap(x => (x.listProduct || []).map(i => i.id)),
+      ...dataWithdraw.flatMap(x => (x.listProduct || []).map(i => i.id)),
+      ...dataGive.flatMap(x => (x.listProduct || []).map(i => i.id)),
+      ...dataOrderPromotion.flatMap(x => (x.listProduct || []).map(i => i.id)),
+      ...dataStockListOnly.flatMap(s => (s.listProduct || []).map(i => i.productId))
     ]
+      .filter(Boolean)
+      .map(s => String(s).trim());
 
-    const stockInThai = stockInWithSum.map(item => ({
-      รหัส: item.productId,
-      ชื่อสินค้า: item.name,
-      // ยอดยกมา: item.stock,
-      เบิกระหว่างทริป: item.withdraw,
-      รับคืนดี: item.good,
-      // รับคืนเสีย: item.damaged,
-      // รับโอนจากเครดิต: item.credit,
-      // รวมจำนวนรับเข้า: item.sumStock,
-      // รวมมูลค่ารับเข้า: item.summary
-    }))
+    const uniqueProductId = [...new Set(productIdUsed)];
 
-    const stockOutWithSum = [
-      ...stockOut,
-      {
-        productId: '',
-        name: 'รวมทั้งหมด',
-        sale: sumStockOutSale,
-        summarySale: sumStockOutSummarySale,
-        promotion: sumStockOutPromotion,
-        summaryPromotion: sumStockOutSummaryPromotion,
-        change: sumStockOutChange,
-        summaryChange: sumStockOutSummaryChange,
-        give: sumStockOutGive,
-        summaryGive: sumStockOutSummaryGive,
-        exchange: sumStockOutexchange,
-        summaryQtySalePromotionChange: sumStockOutSummaryQtySalePromotionChange,
-        summarySalePromotionChange: sumStockOutSummarySalePromotionChange
-      }
-    ]
+    // ---------- Product detail (เฉพาะที่จำเป็น) ----------
+    const productDetail = await Product.find(
+      { id: { $in: uniqueProductId } },
+      { id: 1, name: 1, listUnit: 1 }
+    ).lean();
 
-    const stockOutThai = stockOutWithSum.map(item => ({
-      รหัส: item.productId,
-      ชื่อสินค้า: item.name,
-      จำนวนขาย: item.sale,
-      มูลค่าขาย: item.summarySale,
-      จำนวนแถม: item.promotion,
-      มูลค่าแถม: item.summaryPromotion,
-      จำนวนที่เปลี่ยนให้ร้านค้า: item.change,
-      มูลค่าเปลี่ยนให้ร้านค้า: item.summaryChange,
-      จำนวนแจกสินค้า: item.give,
-      มูลค่าแจกสินค้า: item.summaryGive,
-      แลกซอง: item.exchange,
-      'รวมจำนวนขาย+แถม+เปลี่ยน': item.summaryQtySalePromotionChange,
-      'รวมมูลค่าขาย+แถม+เปลี่ยน': item.summarySalePromotionChange
-    }))
+    // Fast lookup
+    const prodById = new Map((productDetail || []).map(p => [String(p.id).trim(), p]));
 
-    const balanceWithSum = [
-      ...balance,
-      {
-        productId: '',
-        productName: 'รวมทั้งหมด',
-        balanceGood: sumBalanceGood,
-        balanceDamaged: sumBalanceDamaged,
-        summary: sumBalancesummary
-      }
-    ]
+    const getFactor = (productId, unit) => {
+      const pid = String(productId ?? '').trim();
+      const u = String(unit ?? '').trim();
+      const prod = prodById.get(pid);
+      const unitInfo = prod?.listUnit?.find(x => String(x.unit ?? '').trim() === u);
+      return Number(unitInfo?.factor) || 1;
+    };
 
-    const balanceThai = balanceWithSum.map(item => ({
-      รหัส: item.productId,
-      ชื่อสินค้า: item.productName,
-      จำนวนคงเหลือดี: item.balanceGood,
-      จำนวนคงเหลือเสีย: item.balanceDamaged,
-      มูลค่าคงเหลือ: item.summary
-    }))
+    const getSalePrice = (productId) => {
+      const prod = prodById.get(String(productId).trim());
+      const u = prod?.listUnit?.find(x => {
+        const U = String(x?.unit || '').toUpperCase();
+        return U === 'PCS' || U === 'BOT';
+      });
+      return Number(u?.price?.sale) || 0;
+    };
 
-    const wb = xlsx.utils.book_new()
-    const wsStockIn = xlsx.utils.json_to_sheet(stockInThai)
-    xlsx.utils.book_append_sheet(wb, wsStockIn, 'stockIn')
+    const getPromoValue = (productId, unit, qty) => {
+      const pid = String(productId ?? '').trim();
+      const u = String(unit ?? '').trim();
+      const prod = prodById.get(pid);
+      const unitInfo = prod?.listUnit?.find(x => String(x.unit ?? '').trim() === u);
+      const price = Number(unitInfo?.price?.sale) || 0;
+      return (Number(qty) || 0) * price;
+    };
 
-    const wsStockOut = xlsx.utils.json_to_sheet(stockOutThai)
-    xlsx.utils.book_append_sheet(wb, wsStockOut, 'stockOut')
+    // ---------- Stock OUT ----------
+    const buildRowsFromListProduct = (source, sourceName) => {
+      const rows = [];
+      for (const item of source) {
+        const customerCode = item?.store?.storeId ?? '';
+        const customerName = item?.store?.name ?? '';
+        const inv = item?.orderId ?? item?.invNo ?? item?.refNo ?? '';
 
-    const wsBalance = xlsx.utils.json_to_sheet(balanceThai)
-    xlsx.utils.book_append_sheet(wb, wsBalance, 'balance')
+        if (!Array.isArray(item?.listProduct)) continue;
 
-    const tempPath = path.join(os.tmpdir(), `Stock_${area}.xlsx`)
-    xlsx.writeFile(wb, tempPath)
+        for (const p of item.listProduct) {
+          const qtyPCS = (Number(p?.qty) || 0) * getFactor(p?.id, p?.unit);
 
-    res.download(tempPath, `Stock_${area}.xlsx`, err => {
-      if (err) {
-        console.error('❌ Download error:', err)
-        if (!res.headersSent) {
-          res.status(500).send('Download failed')
+          const row = {
+            customerCode, customerName, inv,
+            productId: p?.id, productName: p?.name,
+            qtySale: 0, valSale: 0,
+            qtyPromo: 0, valPromo: 0,
+            qtyChange: 0, valChange: 0,
+            qtyGive: 0, valGive: 0
+          };
+
+          if (sourceName === 'Sale') {
+            row.qtySale = qtyPCS;
+            row.valSale = Number(p?.subtotal ?? 0);
+          } else if (sourceName === 'Change') {
+            row.qtyChange = qtyPCS;
+            row.valChange = Number(p?.netTotal ?? 0);
+          } else if (sourceName === 'Give') {
+            row.qtyGive = qtyPCS;
+            row.valGive = Number(p?.total ?? 0);
+          }
+
+          rows.push(row);
         }
       }
-      fs.unlink(tempPath, () => { })
-    })
-  } else {
-    res.status(200).json({
+      return rows;
+    };
+
+    const buildRowsPromotionFromSale = (saleOrders) => {
+      const rows = [];
+      for (const item of saleOrders) {
+        const customerCode = item?.store?.storeId ?? '';
+        const customerName = item?.store?.name ?? '';
+        const inv = item?.orderId ?? item?.invNo ?? item?.refNo ?? '';
+        if (!Array.isArray(item?.listPromotions)) continue;
+
+        for (const promo of item.listPromotions) {
+          if (!Array.isArray(promo?.listProduct)) continue;
+          for (const p of promo.listProduct) {
+            const qtyPCS = (Number(p?.qty) || 0) * getFactor(p?.id, p?.unit);
+            rows.push({
+              customerCode, customerName, inv,
+              productId: p?.id, productName: p?.name,
+              qtySale: 0, valSale: 0,
+              qtyPromo: qtyPCS,
+              valPromo: Number(p?.subtotal ?? getPromoValue(p?.id, p?.unit, p?.qty)),
+              qtyChange: 0, valChange: 0,
+              qtyGive: 0, valGive: 0
+            });
+          }
+        }
+      }
+      return rows;
+    };
+
+    const stockOutDataRaw = [
+      ...buildRowsFromListProduct(dataOrderSale, 'Sale'),
+      ...buildRowsFromListProduct(dataOrderChange, 'Change'),
+      ...buildRowsFromListProduct(dataGive, 'Give'),
+      ...buildRowsPromotionFromSale(dataOrderSale)
+    ];
+
+    // รวมซ้ำ: customerCode + customerName + inv + productId
+    const mergeDuplicateRows = (data) => {
+      const map = new Map();
+      for (const row of data) {
+        const key = `${row.customerCode}|${row.customerName}|${row.inv}|${row.productId}`;
+        if (!map.has(key)) {
+          map.set(key, { ...row });
+        } else {
+          const ex = map.get(key);
+          ex.qtySale += row.qtySale; ex.valSale += row.valSale;
+          ex.qtyPromo += row.qtyPromo; ex.valPromo += row.valPromo;
+          ex.qtyChange += row.qtyChange; ex.valChange += row.valChange;
+          ex.qtyGive += row.qtyGive; ex.valGive += row.valGive;
+        }
+      }
+      return [...map.values()];
+    };
+
+    const stockOutData = mergeDuplicateRows(stockOutDataRaw);
+
+    // รวมยอด OUT (รวมก่อน ค่อยปัดทศนิยม)
+    const sumStockOutSale = stockOutData.reduce((a, r) => a + (Number(r.qtySale) || 0), 0);
+    const sumStockOutPromotion = stockOutData.reduce((a, r) => a + (Number(r.qtyPromo) || 0), 0);
+    const sumStockOutChange = stockOutData.reduce((a, r) => a + (Number(r.qtyChange) || 0), 0);
+    const sumStockOutGive = stockOutData.reduce((a, r) => a + (Number(r.qtyGive) || 0), 0);
+
+    const sumStockOutSummarySale = to2(stockOutData.reduce((a, r) => a + (Number(r.valSale) || 0), 0));
+    const sumStockOutSummaryPromotion = to2(stockOutData.reduce((a, r) => a + (Number(r.valPromo) || 0), 0));
+    const sumStockOutSummaryChange = to2(stockOutData.reduce((a, r) => a + (Number(r.valChange) || 0), 0));
+    const sumStockOutSummaryGive = to2(stockOutData.reduce((a, r) => a + (Number(r.valGive) || 0), 0));
+
+    const sumStockOutexchange = 0;
+    const sumStockOutSummaryQtySalePromotionChange = to2(sumStockOutSale + sumStockOutPromotion + sumStockOutChange);
+    const sumStockOutSummarySalePromotionChange = to2(sumStockOutSummarySale + sumStockOutSummaryPromotion + sumStockOutSummaryChange);
+
+    // ---------- Stock IN ----------
+    const allListProduct = dataStockListOnly.flatMap(s => s.listProduct || []);
+    const stockQty = allListProduct.filter(x => uniqueProductId.includes(String(x.productId).trim()));
+
+    let sumStockIn = 0;
+    let sumStockInWithdraw = 0;
+    let sumStockInGood = 0;
+    let sumStockInDamaged = 0;
+    let sumStockInCredit = 0;
+    let sumStockInsumStock = 0;
+    let sumStockInsummary = 0;
+
+    const stockIn = [...dataRefund, ...dataWithdraw].flatMap(item =>
+      (item.listProduct || []).map(i => {
+        const pid = String(i?.id || '').trim();
+        const prod = prodById.get(pid);
+        const qtyPCS = (Number(i?.qty) || 0) * getFactor(pid, i?.unit);
+
+        const inStock = stockQty.find(u => String(u.productId).trim() === pid);
+        let qtyPcsGood = 0, qtyPcsDamaged = 0, qtyWithdraw = 0;
+
+        if (String(i?.condition || '').toLowerCase() === 'good') qtyPcsGood = qtyPCS;
+        else if (String(i?.condition || '').toLowerCase() === 'damaged') qtyPcsDamaged = qtyPCS;
+        else qtyWithdraw = qtyPCS; // สำหรับ withdraw
+
+        const summary = Number(i?.total || 0);
+
+        sumStockIn += qtyPCS;
+        sumStockInWithdraw += qtyWithdraw;
+        sumStockInGood += qtyPcsGood;
+        sumStockInDamaged += qtyPcsDamaged;
+        sumStockInCredit += 0;
+        sumStockInsumStock += (qtyWithdraw + qtyPcsGood) || 0;
+        sumStockInsummary += summary;
+
+        return {
+          productId: pid,
+          name: prod ? prod.name : '',
+          withdraw: qtyWithdraw,
+          good: qtyPcsGood,
+          sumStock: qtyWithdraw + qtyPcsGood,
+          summary: to2(summary)
+        };
+      })
+    );
+    sumStockInsummary = to2(sumStockInsummary);
+
+    // ---------- Balance: ดึง M3 ทีเดียว + damaged รวมต่อสินค้า ----------
+    // (1) แบนรายการ damaged จาก refund ทั้งหมด
+    const refundsFlat = (Array.isArray(dataRefund) ? dataRefund : (dataRefund ? [dataRefund] : []))
+      .flatMap(u => u?.listProduct || []);
+
+    // รวม damaged qty ต่อ product (ใช้ qtyPcs ถ้ามี ไม่งั้น convert)
+    const damagedById = new Map();
+    for (const r of refundsFlat) {
+      if (String(r?.condition || '').toLowerCase() !== 'damaged') continue;
+      const pid = String(r?.id || '').trim();
+      const add = Number(r?.qtyPcs ?? ((Number(r?.qty) || 0) * getFactor(pid, r?.unit))) || 0;
+      damagedById.set(pid, (damagedById.get(pid) || 0) + add);
+    }
+
+    // (2) ดึง M3 จาก MSSQL ทีเดียวด้วย IN (trim คอลัมน์ฝั่ง DB)
+    let m3ByPid = new Map();
+    if (warehouseCode && uniqueProductId.length) {
+      const m3Rows = await Balance.findAll({
+        where: {
+          coNo: 410,
+          warehouse: warehouseCode,
+          [Op.and]: [
+            where(fn('LTRIM', fn('RTRIM', col('MBITNO'))), { [Op.in]: uniqueProductId })
+          ]
+        },
+        attributes: ['MBITNO', 'itemAllowcatable'],
+        raw: true
+      });
+
+      // รวมเป็น map โดยใช้ MBITNO trim
+      m3ByPid = m3Rows.reduce((map, r) => {
+        const pid = String(r?.MBITNO || '').trim();
+        const val = Number(r?.itemAllowcatable) || 0;
+        map.set(pid, (map.get(pid) || 0) + val);
+        return map;
+      }, new Map());
+    }
+
+    // (3) ประกอบ balance ต่อสินค้าใน stock
+    const balance = allListProduct.map(item => {
+      const pid = String(item?.productId || '').trim();
+      const prod = prodById.get(pid);
+      const balancePcs = Number(item?.balancePcs) || 0;
+      const salePrice = getSalePrice(pid);
+      const balanceM3 = Number(m3ByPid.get(pid)) || 0;
+      const balanceDamaged = Number(damagedById.get(pid)) || 0;
+
+      return {
+        productId: pid,
+        productName: prod?.name || '',
+        balanceGood: balancePcs,
+        balanceM3,
+        balanceDamaged,
+        summary: to2(balancePcs * salePrice)
+      };
+    });
+
+    // รวมยอด balance
+    const totals = balance.reduce(
+      (acc, r) => {
+        acc.sumBalanceGood += Number(r.balanceGood) || 0;
+        acc.sumBalanceM3 += Number(r.balanceM3) || 0;
+        acc.sumBalanceDamaged += Number(r.balanceDamaged) || 0;
+        acc.sumBalancesummary += Number(r.summary) || 0;
+        return acc;
+      },
+      { sumBalanceGood: 0, sumBalanceM3: 0, sumBalanceDamaged: 0, sumBalancesummary: 0 }
+    );
+
+    const sumBalanceGood = totals.sumBalanceGood;
+    const sumBalanceM3 = totals.sumBalanceM3;
+    const sumBalanceDamaged = totals.sumBalanceDamaged;
+    const sumBalancesummary = to2(totals.sumBalancesummary);
+
+    // แถวสรุป (สำหรับแสดง/Excel)
+    const balanceSummaryRow = {
+      productId: 'รวมทั้งหมด',
+      productName: '',
+      balanceGood: sumBalanceGood,
+      balanceM3: sumBalanceM3,
+      balanceDamaged: sumBalanceDamaged,
+      summary: sumBalancesummary
+    };
+
+    // ---------- Export / JSON ----------
+    if (excel === true) {
+      // Sheet: stockIn
+      const stockInWithSum = [
+        ...stockIn,
+        {
+          productId: '',
+          name: 'รวมทั้งหมด',
+          withdraw: sumStockInWithdraw,
+          good: sumStockInGood,
+          sumStock: sumStockInsumStock,
+          summary: sumStockInsummary
+        }
+      ];
+      const stockInThai = stockInWithSum.map(item => ({
+        รหัส: item.productId,
+        ชื่อสินค้า: item.name,
+        เบิกระหว่างทริป: item.withdraw,
+        รับคืนดี: item.good,
+        รวมจำนวน: item.sumStock,
+        มูลค่า: item.summary
+      }));
+
+      // Sheet: stockOut
+      const stockOutSummaryRow = {
+        customerCode: '',
+        customerName: 'รวมทั้งหมด',
+        inv: '',
+        productId: '',
+        productName: '',
+        qtySale: sumStockOutSale,
+        valSale: sumStockOutSummarySale,
+        qtyPromo: sumStockOutPromotion,
+        valPromo: sumStockOutSummaryPromotion,
+        qtyChange: sumStockOutChange,
+        valChange: sumStockOutSummaryChange,
+        qtyGive: sumStockOutGive,
+        valGive: sumStockOutSummaryGive
+      };
+      const stockOutThai = [...stockOutData, stockOutSummaryRow].map(item => ({
+        customerCode: item.customerCode,
+        customerName: item.customerName,
+        Inv: item.inv,
+        รหัส: item.productId,
+        ชื่อสินค้า: item.productName,
+        จำนวนขาย: item.qtySale,
+        มูลค่าขาย: item.valSale,
+        จำนวนแถม: item.qtyPromo,
+        มูลค่าแถม: item.valPromo,
+        จำนวนที่เปลี่ยน: item.qtyChange,
+        มูลค่าเปลี่ยน: item.valChange,
+        จำนวนแจกสินค้า: item.qtyGive,
+        มูลค่าแจกสินค้า: item.valGive
+      }));
+
+      // Sheet: balance
+      const balanceThai = [...balance, balanceSummaryRow].map(item => ({
+        รหัส: item.productId,
+        ชื่อสินค้า: item.productName,
+        จำนวนคงเหลือดี: item.balanceGood,
+        จำนวนคงจากM3: item.balanceM3,
+        จำนวนคงเหลือเสีย: item.balanceDamaged,
+        มูลค่าคงเหลือ: item.summary
+      }));
+
+      const wb = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(stockInThai), 'stockIn');
+      xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(stockOutThai), 'stockOut');
+      xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(balanceThai), 'balance');
+
+      const tempPath = path.join(os.tmpdir(), `Stock_${area}.xlsx`);
+      xlsx.writeFile(wb, tempPath);
+      return res.download(tempPath, `Stock_${area}.xlsx`, err => {
+        if (err) {
+          console.error('❌ Download error:', err);
+          if (!res.headersSent) res.status(500).send('Download failed');
+        }
+        fs.unlink(tempPath, () => { });
+      });
+    }
+
+    // JSON (ไม่แนบแถวสรุป balance ซ้ำ)
+    return res.status(200).json({
       status: 200,
       message: 'successfully',
       data: {
+        // stock in
         stockIn,
         sumStockIn,
         sumStockInGood,
@@ -3418,7 +3445,9 @@ exports.stockToExcelNew = async (req, res) => {
         sumStockInCredit,
         sumStockInsumStock,
         sumStockInsummary,
-        stockOut: stockOutFinal,
+
+        // stock out (merge แล้ว)
+        stockOut: stockOutData,
         sumStockOutSale,
         sumStockOutSummarySale,
         sumStockOutPromotion,
@@ -3430,14 +3459,23 @@ exports.stockToExcelNew = async (req, res) => {
         sumStockOutexchange,
         sumStockOutSummaryQtySalePromotionChange,
         sumStockOutSummarySalePromotionChange,
+
+        // balance
         balance,
         sumBalanceGood,
+        sumBalanceM3,
         sumBalanceDamaged,
-        sumBalanceSummary: to2(sumBalancesummary)
+        sumBalancesummary
       }
-    })
+    });
+  } catch (err) {
+    console.error('stockToExcelNew error:', err);
+    if (!res.headersSent) {
+      res.status(500).json({ status: 500, message: 'internal error' });
+    }
   }
-}
+};
+
 
 
 
