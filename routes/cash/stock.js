@@ -53,7 +53,7 @@ router.post('/getWeightProduct', getWeightProduct)
 router.post('/getStockQtyDetail', getStockQtyDetail)
 router.post('/approveAdjustStock', approveAdjustStock)
 router.post('/checkout', checkout)
-router.post('/stockToExcel', stockToExcel)
+router.post('/stockToExcel', stockToExcelNew)
 
 router.post('/deleteStockAdjust', deleteStockAdjust)
 
