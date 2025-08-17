@@ -1185,14 +1185,31 @@ exports.saleConfirmWithdraw = async (req, res) => {
         raw: true
       })
 
+
+      const ReceiveQty = Object.values(
+        Receive.reduce((acc, cur) => {
+          // ใช้ key จาก coNo + withdrawUnit + productId (ถ้าอยากแยกตาม productId ด้วย)
+          const key = `${cur.coNo}_${cur.withdrawUnit}_${cur.productId.trim()}`;
+          if (!acc[key]) {
+            acc[key] = { ...cur };
+          } else {
+            acc[key].qtyPcs += cur.qtyPcs;
+            acc[key].weightGross += cur.weightGross;
+            acc[key].weightNet += cur.weightNet;
+          }
+          return acc;
+        }, {})
+      );
+
+      // console.log('merged', merged)
       let receivetotalQty = 0
       let receivetotal = 0
 
       for (const i of distributionTran.listProduct) {
         const productIdTrimmed = String(i.id || '').trim()
-        const match = Receive.find(
+        const match = ReceiveQty.find(
           r => String(r.productId || '').trim() === productIdTrimmed
-        )        
+        )
         if (match) {
           const product = productDetail.find(
             u => String(u.id || '').trim() === productIdTrimmed
@@ -1226,9 +1243,11 @@ exports.saleConfirmWithdraw = async (req, res) => {
         }
       }
 
+      // console.log(distributionTran.listProduct)
+
       // ✅ อัปเดตข้อมูลถ้า status เป็น approved
       if (distributionTran.status === 'approved') {
-        // บันทึก listProduct ที่แก้ไขแล้ว
+        // // บันทึก listProduct ที่แก้ไขแล้ว
         await Distribution.updateOne(
           { _id: distributionTran._id },
           { $set: { listProduct: distributionTran.listProduct } }
