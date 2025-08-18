@@ -3940,6 +3940,7 @@ exports.addStockAllWithInOut = async (req, res) => {
     const { Order } = getModelsByChannel(channel, res, orderModel)
     const { Giveaway } = getModelsByChannel(channel, res, giveModel)
     const { User } = getModelsByChannel(channel, res, userModel)
+    const { Cart } = getModelsByChannel(channel, res, cartModel)
 
     if (!period) {
       return res
