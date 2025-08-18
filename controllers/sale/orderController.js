@@ -426,7 +426,7 @@ exports.checkout = async (req, res) => {
       currentDate.getMonth() + 1,
       1
     )
-    
+
     query.createdAt = {
       $gte: startMonth,
       $lt: NextMonth
@@ -911,6 +911,7 @@ exports.OrderToExcel = async (req, res) => {
     statusArray = ['pending'] // default
   }
   // ,'approved','completed'
+  console.log(statusArray)
   if (!date || date === 'null') {
     const today = new Date()
     const year = today.getFullYear()
@@ -947,23 +948,35 @@ exports.OrderToExcel = async (req, res) => {
     )}T23:59:59.999+07:00`
   )
 
-  // แปลงเป็น UTC เพื่อไปเทียบกับ createdAt (ซึ่งเก็บเป็น UTC)
-  const startUTC = new Date(startTH.getTime() - 7 * 60 * 60 * 1000)
-  const endUTC = new Date(endTH.getTime() - 7 * 60 * 60 * 1000)
-
-  // ใช้ $match ครั้งเดียว ให้ใช้ index ได้
-  const commonMatch = {
-    createdAt: { $gte: startUTC, $lte: endUTC }
-  }
+  // console.log(startTH, endTH)
 
   const modelOrder = await Order.aggregate([
     {
       $match: {
-        ...commonMatch,
+        createdAt: {
+          $gte: startTH,
+          $lte: endTH
+        }
+      }
+    },
+    {
+      $match: {
         status: { $nin: ['canceled'] },
         status: { $in: statusArray },
         type: { $in: ['sale'] },
-        'store.area': { $ne: 'IT211' }
+        'store.area': { $ne: 'IT211' },
+        // 'store.area': 'NE211'
+      }
+    },
+    {
+      $addFields: {
+        createdAtThai: {
+          $dateAdd: {
+            startDate: '$createdAt',
+            unit: 'hour',
+            amount: 7
+          }
+        }
       }
     },
     {
@@ -1013,6 +1026,7 @@ exports.OrderToExcel = async (req, res) => {
       $match: {
         status: { $nin: ['canceled'] },
         'store.area': { $ne: 'IT211' },
+        // 'store.area': 'NE211',
         status: { $in: statusArray },
         type: { $in: ['change'] }
       }
@@ -1030,9 +1044,9 @@ exports.OrderToExcel = async (req, res) => {
     },
     {
       $match: {
-        createdAtThai: {
-          $gte: start,
-          $lte: end
+        createdAt: {
+          $gte: startTH,
+          $lte: endTH
         }
       }
     }
@@ -1043,7 +1057,8 @@ exports.OrderToExcel = async (req, res) => {
       $match: {
         status: { $nin: ['canceled'] },
         status: { $in: statusArray },
-        'store.area': { $ne: 'IT211' }
+        'store.area': { $ne: 'IT211' },
+        // 'store.area': 'NE211'
       }
     },
     {
@@ -1059,9 +1074,9 @@ exports.OrderToExcel = async (req, res) => {
     },
     {
       $match: {
-        createdAtThai: {
-          $gte: start,
-          $lte: end
+        createdAt: {
+          $gte: startTH,
+          $lte: endTH
         }
       }
     }
@@ -1071,7 +1086,7 @@ exports.OrderToExcel = async (req, res) => {
     let counterOrder = 0
     function formatDateToThaiYYYYMMDD(date) {
       const d = new Date(date)
-      d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
+      // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
       const yyyy = d.getFullYear()
       const mm = String(d.getMonth() + 1).padStart(2, '0')
@@ -1079,7 +1094,7 @@ exports.OrderToExcel = async (req, res) => {
 
       return `${yyyy}${mm}${dd}`
     }
-
+    // console.log(order.createdAtThai)
     // ใช้งาน
     const RLDT = formatDateToThaiYYYYMMDD(order.createdAt)
 
@@ -1375,7 +1390,7 @@ exports.OrderToExcel = async (req, res) => {
               subtotal: p.subtotal,
               discount: p.discount,
               netTotal: p.netTotal,
-              lotNo: lotMap.get(p.id) || ''
+              // lotNo: lotMap.get(p.id) || ''
               // lotNo: lotData?.lot || null
             }
           })
@@ -1476,6 +1491,13 @@ exports.OrderToExcel = async (req, res) => {
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
     fs.unlink(tempPath, () => { })
   })
+
+  // res.status(200).json({
+  //   status:200,
+  //   OBSAPR:sum(OBSAPR)
+  // })
+
+
 }
 
 exports.getAllOrder = async (req, res) => {
