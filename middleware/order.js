@@ -703,11 +703,15 @@ function calculateStockSummary(productDetail, listUnitStock) {
   const totalStockChangePCS = sumPCS('change');
   const totalStockAdjustPCS = sumPCS('adjust');
   const totalStockGivePCS = sumPCS('give');
+  const totalStockCartPCS = sumPCS('cart');
+  const totalStockChangePendingPCS = sumPCS('changePending');
+
+
 
   const inPCS = totalStockWithdrawPCS + totalStockGoodPCS;
   const outPCS = totalStockSalePCS + totalStockPromotionPCS + totalStockChangePCS + totalStockAdjustPCS + totalStockGivePCS;
   const stockWithInPCS = totalStockPCS + inPCS;
-  const balancePCS = stockWithInPCS - outPCS;
+  const balancePCS = stockWithInPCS - outPCS - totalStockCartPCS - totalStockChangePendingPCS;
 
   // ผลลัพธ์หน่วย PCS
   const resultPCS = {
@@ -717,8 +721,10 @@ function calculateStockSummary(productDetail, listUnitStock) {
     good: totalStockGoodPCS,
     damaged: totalStockDamagedPCS,
     sale: totalStockSalePCS,
+    cart: totalStockCartPCS,
     promotion: totalStockPromotionPCS,
     change: totalStockChangePCS,
+    changePending : totalStockChangePendingPCS,
     adjust: totalStockAdjustPCS,
     give: totalStockGivePCS,
     in: inPCS,
@@ -739,8 +745,10 @@ function calculateStockSummary(productDetail, listUnitStock) {
     good: toCTN(totalStockGoodPCS),
     damaged: toCTN(totalStockDamagedPCS),
     sale: toCTN(totalStockSalePCS),
+    cart:toCTN(totalStockCartPCS),
     promotion: toCTN(totalStockPromotionPCS),
     change: toCTN(totalStockChangePCS),
+    changePending : toCTN(totalStockChangePendingPCS),
     adjust: toCTN(totalStockAdjustPCS),
     give: toCTN(totalStockGivePCS),
     in: toCTN(inPCS),
