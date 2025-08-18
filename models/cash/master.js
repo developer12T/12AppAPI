@@ -732,6 +732,182 @@ const ItemLotM3 = sequelize.define(
   }
 )
 
+const Promotion = sequelize.define(
+  'OPROHM',
+  {
+    coNo: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FZCONO'
+    },
+    proId: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FZPIDE'
+    },
+    proName: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FZTX15'
+    }
+  },
+  {
+    freezeTableName: true,
+    timestamps: false,
+    createdAt: false,
+    updatedAt: false,
+    primaryKey: false
+  }
+)
+
+const PromotionStore = sequelize.define(
+  'OPROMC',
+  {
+    coNo: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBCONO'
+    },
+    proId: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBPIDE'
+    },
+    FBCUTP: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBCUTP'
+    },
+    customerChannel: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBCUCL'
+    },
+    saleCode: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBSMCD'
+    },
+    orderType: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBORTP'
+    },
+    warehouse: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBWHLO'
+    },
+    zone: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBSDST'
+    },
+    FBCSCD: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBCSCD'
+    },
+    FBPYNO: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBPYNO'
+    },
+    posccode: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBPONO'
+    },
+    area: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBCFC1'
+    },
+    FBCFC3: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBCFC3'
+    },
+    FBCFC6: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBCFC6'
+    },
+    FBFVDT: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBFVDT'
+    },
+    FBLVDT: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBLVDT'
+    },
+    FBRGDT: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBRGDT'
+    },
+    FBRGTM: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBRGTM'
+    },
+    FBLMDT: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBLMDT'
+    },
+    FBCHNO: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBCHNO'
+    },
+    FBCHID: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBCHID'
+    },
+    FBPRI2: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBPRI2'
+    }
+  },
+  {
+    freezeTableName: true,
+    timestamps: false,
+    createdAt: false,
+    updatedAt: false,
+    primaryKey: false
+  }
+)
+
 module.exports = {
   // ItemFac,
   // ItemMaster,
@@ -748,7 +924,8 @@ module.exports = {
   DisributionM3,
   NumberSeries,
   OOTYPE,
-  Customer
+  Customer,
+  PromotionStore
   // MGTYPE,
   // OODFLT
 }

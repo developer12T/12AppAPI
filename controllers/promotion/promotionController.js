@@ -3,16 +3,19 @@ const { getRewardProduct } = require('./calculate')
 // const { Promotion } = require('../../models/cash/promotion')
 // const { Cart } = require('../../models/cash/cart')
 // const { Product } = require('../../models/cash/product')
-const promotionModel = require('../../models/cash/promotion');
+const promotionModel = require('../../models/cash/promotion')
 const CartModel = require('../../models/cash/cart')
 const productModel = require('../../models/cash/product')
+const stockModel = require('../../models/cash/stock')
+const storeModel = require('../../models/cash/store')
+const { period } = require('../../utilities/datetime')
 const { getSocket } = require('../../socket')
 const { getModelsByChannel } = require('../../middleware/channel')
 
 exports.addPromotion = async (req, res) => {
   try {
-    const channel = req.headers['x-channel'];
-    const { Promotion } = getModelsByChannel(channel, res, promotionModel);
+    const channel = req.headers['x-channel']
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel)
     const {
       name,
       description,
@@ -60,7 +63,7 @@ exports.addPromotion = async (req, res) => {
       status: 201,
       message: 'Promotion created successfully!',
       data: newPromotion
-    });
+    })
 
     res.status(201).json({
       status: 201,
@@ -73,10 +76,46 @@ exports.addPromotion = async (req, res) => {
   }
 }
 
+exports.addPromotionM3 = async (req, res) => {
+  try {
+    const { period } = req.query
+    const channel = req.headers['x-channel']
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const users = await User.find({ role: 'sale' })
+      .select('area saleCode warehouse')
+      .lean()
+
+    for (const user of users) {
+      const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
+      const startDate = range.startDate
+      const endDate = range.endDate
+      const stores = await Store.find({
+        area: user.area,
+        createdAt: { $gte: startDate, $lte: endDate }
+      }).select('')
+      for (const store of stores) {
+        const promotions = await Promotion.find({
+          proId: { $regex: `PRO-${period}`, $options: 'i' }
+        })
+
+        for (const promotion of promotions) {
+          
+        }
+      }
+    }
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
 exports.updatePromotion = async (req, res) => {
   try {
-    const channel = req.headers['x-channel'];
-    const { Promotion } = getModelsByChannel(channel, res, promotionModel);
+    const channel = req.headers['x-channel']
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel)
     const {
       proId,
       name,
@@ -97,19 +136,19 @@ exports.updatePromotion = async (req, res) => {
       return res.status(400).json({ status: 400, message: 'Missing proId!' })
     }
 
-    const updateFields = {};
-    if (name !== undefined) updateFields.name = name;
-    if (description !== undefined) updateFields.description = description;
-    if (proType !== undefined) updateFields.proType = proType;
-    if (proCode !== undefined) updateFields.proCode = proCode;
-    if (coupon !== undefined) updateFields.coupon = coupon;
-    if (applicableTo !== undefined) updateFields.applicableTo = applicableTo;
-    if (except !== undefined) updateFields.except = except;
-    if (conditions !== undefined) updateFields.conditions = conditions;
-    if (rewards !== undefined) updateFields.rewards = rewards;
-    if (discounts !== undefined) updateFields.discounts = discounts;
-    if (validFrom !== undefined) updateFields.validFrom = validFrom;
-    if (validTo !== undefined) updateFields.validTo = validTo;
+    const updateFields = {}
+    if (name !== undefined) updateFields.name = name
+    if (description !== undefined) updateFields.description = description
+    if (proType !== undefined) updateFields.proType = proType
+    if (proCode !== undefined) updateFields.proCode = proCode
+    if (coupon !== undefined) updateFields.coupon = coupon
+    if (applicableTo !== undefined) updateFields.applicableTo = applicableTo
+    if (except !== undefined) updateFields.except = except
+    if (conditions !== undefined) updateFields.conditions = conditions
+    if (rewards !== undefined) updateFields.rewards = rewards
+    if (discounts !== undefined) updateFields.discounts = discounts
+    if (validFrom !== undefined) updateFields.validFrom = validFrom
+    if (validTo !== undefined) updateFields.validTo = validTo
     // updateFields.status = 'active';
 
     const updatedPromotion = await Promotion.findOneAndUpdate(
@@ -123,7 +162,7 @@ exports.updatePromotion = async (req, res) => {
       status: 201,
       message: 'Promotion updated successfully!',
       data: updatedPromotion
-    });
+    })
 
     res.status(201).json({
       status: 201,
@@ -136,33 +175,31 @@ exports.updatePromotion = async (req, res) => {
   }
 }
 
-
 exports.getPromotionProduct = async (req, res) => {
   try {
     const { type, storeId, proId } = req.body
 
     const channel = req.headers['x-channel']; // 'credit' or 'cash'
     const { Cart } = getModelsByChannel(channel, res, CartModel);
+    const { Store } = getModelsByChannel(channel, res, storeModel);
+    const { Product } = getModelsByChannel(channel, res, productModel);
+    const { Stock  } = getModelsByChannel(channel, res, stockModel);
 
 
     if (!type || !storeId || !proId) {
-      return res
-        .status(400)
-        .json({
-          status: 400,
-          message: 'type, storeId, and proId are required!'
-        })
+      return res.status(400).json({
+        status: 400,
+        message: 'type, storeId, and proId are required!'
+      })
     }
 
     const cart = await Cart.findOne({ type, storeId }).lean()
     // console.log(cart)
     if (!cart || !cart.listPromotion.length) {
-      return res
-        .status(404)
-        .json({
-          status: 404,
-          message: 'No applicable promotions found in the cart!'
-        })
+      return res.status(404).json({
+        status: 404,
+        message: 'No applicable promotions found in the cart!'
+      })
     }
 
     const promotion = cart.listPromotion.find(promo => promo.proId === proId)
@@ -173,7 +210,88 @@ exports.getPromotionProduct = async (req, res) => {
         .json({ status: 404, message: 'Promotion not found in the cart!' })
     }
 
-    const rewardProducts = await getRewardProduct(proId, channel, res)
+    const rewardProducts = await getRewardProduct(proId, channel, res);
+
+    // ถ้า item.id เป็นสตริง ใช้ map ก็พอ; ถ้าเป็น array ใช้ flatMap
+    const productIds = [...new Set(
+      (rewardProducts || []).map(it => String(it.id)).filter(Boolean)
+    )];
+
+    const store = await Store.findOne({ storeId }).select('area').lean();
+
+    const proQty = Number(promotion.proQty ?? 0);
+
+    const [productStock] = await Stock.aggregate([
+      {
+        $match: {
+          period: period(),
+          area: store.area,
+          'listProduct.productId': { $in: productIds }
+        }
+      },
+      {
+        $project: {
+          listProduct: {
+            $map: {
+              input: {
+                $filter: {
+                  input: '$listProduct',
+                  as: 'p',
+                  cond: { $in: ['$$p.productId', productIds] }
+                }
+              },
+              as: 'p',
+              in: {
+                productId: '$$p.productId',
+                balancePcs: '$$p.balancePcs',
+                enough: { $gte: [{ $ifNull: ['$$p.balancePcs', 0] }, promotion.proQty] }
+              }
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          // เก็บเฉพาะ product ที่ enough == true
+          listProduct: {
+            $filter: {
+              input: '$listProduct',
+              as: 'p',
+              cond: { $eq: ['$$p.enough', true] }
+            }
+          }
+        }
+      }
+    ]);
+
+    // 1) กรองเฉพาะรายการที่พอ
+    const enoughProducts = (productStock?.listProduct ?? []).filter(p => p.enough);
+
+    // 2) ดึงเฉพาะ productId และจัดการ trim + unique
+    const enoughProductIds = [...new Set(
+      enoughProducts
+        .map(it => String(it.productId).trim())
+        .filter(Boolean)
+    )];
+
+    // 3) ถ้าไม่มีอะไรพอ ก็จบเร็ว
+    if (enoughProductIds.length === 0) {
+      console.log('no enough products');
+      return [];
+    }
+
+    // 4) ดึงข้อมูลสินค้า
+    const productDetail = await Product.find(
+      { id: { $in: enoughProductIds } },           // เปลี่ยนเป็น { productId: { $in: ... } } ถ้า schema ใช้ชื่อ field อื่น
+      { _id: 0 }                                   // เลือก fields เท่าที่ต้องใช้ เช่น { id:1, name:1, price:1 }
+    ).lean();
+
+    // (ออปชัน) เรียงผลลัพธ์ตามลำดับ ids ที่ส่งเข้าไป
+    const order = new Map(enoughProductIds.map((id, i) => [id, i]));
+    productDetail.sort((a, b) => (order.get(String(a.id)) ?? 1e9) - (order.get(String(b.id)) ?? 1e9));
+
+    // console.log(productDetail);
+
 
     if (!rewardProducts.length) {
       return res
@@ -181,11 +299,10 @@ exports.getPromotionProduct = async (req, res) => {
         .json({ status: 404, message: 'No reward products found!' })
     }
 
-    // console.log(rewardProducts)
 
     const groupedProducts = {}
 
-    rewardProducts.forEach(product => {
+    productDetail.forEach(product => {
       const key = `${product.group}|${product.size}`
 
       if (!groupedProducts[key]) {
@@ -245,8 +362,8 @@ exports.updateCartPromotion = async (req, res) => {
         .status(400)
         .json({ status: 400, message: 'Missing required fields!' })
     }
-    const channel = req.headers['x-channel']; // 'credit' or 'cash'
-    const { Cart } = getModelsByChannel(channel, res, CartModel);
+    const channel = req.headers['x-channel'] // 'credit' or 'cash'
+    const { Cart } = getModelsByChannel(channel, res, CartModel)
 
     let cart = await Cart.findOne({ type, area, storeId })
     if (!cart) {
@@ -260,8 +377,7 @@ exports.updateCartPromotion = async (req, res) => {
         .json({ status: 404, message: 'Promotion not found!' })
     }
 
-    const { Product } = getModelsByChannel(channel, res, productModel);
-
+    const { Product } = getModelsByChannel(channel, res, productModel)
 
     const product = await Product.findOne({ id: productId }).lean()
     if (!product) {
@@ -281,12 +397,10 @@ exports.updateCartPromotion = async (req, res) => {
       unit => unit.unit === promoProduct.unit
     )
     if (!matchingUnit) {
-      return res
-        .status(400)
-        .json({
-          status: 400,
-          message: `Unit '${promoProduct.unit}' not found for this product!`
-        })
+      return res.status(400).json({
+        status: 400,
+        message: `Unit '${promoProduct.unit}' not found for this product!`
+      })
     }
 
     if (qty > promotion.proQty) {
@@ -302,9 +416,6 @@ exports.updateCartPromotion = async (req, res) => {
 
     await cart.save()
 
-
-
-
     res.status(200).json({
       status: 200,
       message: 'Promotion updated successfully!',
@@ -318,15 +429,15 @@ exports.updateCartPromotion = async (req, res) => {
 
 exports.getPromotionDetail = async (req, res) => {
   const { proId } = req.query
-  const channel = req.headers['x-channel'];
-  const { Promotion } = getModelsByChannel(channel, res, promotionModel);
+  const channel = req.headers['x-channel']
+  const { Promotion } = getModelsByChannel(channel, res, promotionModel)
 
   const data = await Promotion.findOne({ proId: proId })
 
   if (data.length == 0) {
     return res.status(404).json({
       status: 200,
-      message: "Not Found Promotion"
+      message: 'Not Found Promotion'
     })
   }
 
@@ -338,16 +449,11 @@ exports.getPromotionDetail = async (req, res) => {
     message: 'sucess',
     data: data
   })
-
 }
 
-
-
-
 exports.getPromotion = async (req, res) => {
-
-  const channel = req.headers['x-channel']; // 'credit' or 'cash'
-  const { Promotion } = getModelsByChannel(channel, res, promotionModel);
+  const channel = req.headers['x-channel'] // 'credit' or 'cash'
+  const { Promotion } = getModelsByChannel(channel, res, promotionModel)
 
   const data = await Promotion.find({ status: 'active' })
     .sort({ proId: 1});
@@ -355,11 +461,9 @@ exports.getPromotion = async (req, res) => {
   if (data.length == 0) {
     return res.status(404).json({
       status: 200,
-      message: "Not Found Promotion"
+      message: 'Not Found Promotion'
     })
   }
-
-
 
   res.status(200).json({
     status: 200,
@@ -369,9 +473,8 @@ exports.getPromotion = async (req, res) => {
 }
 
 exports.addPromotionLimit = async (req, res) => {
-
-  const channel = req.headers['x-channel'];
-  const { PromotionLimit } = getModelsByChannel(channel, res, promotionModel);
+  const channel = req.headers['x-channel']
+  const { PromotionLimit } = getModelsByChannel(channel, res, promotionModel)
   const {
     name,
     description,
@@ -414,22 +517,18 @@ exports.addPromotionLimit = async (req, res) => {
   await newPromotionLimit.save()
 
   const io = getSocket()
-  io.emit('promotion/addPromotionLimit', {});
-
+  io.emit('promotion/addPromotionLimit', {})
 
   res.status(201).json({
     status: 201,
     message: 'Promotion created successfully!',
     data: newPromotionLimit
   })
-
 }
 
-
 exports.updatePromotionLimit = async (req, res) => {
-
-  const channel = req.headers['x-channel'];
-  const { PromotionLimit } = getModelsByChannel(channel, res, promotionModel);
+  const channel = req.headers['x-channel']
+  const { PromotionLimit } = getModelsByChannel(channel, res, promotionModel)
   const {
     proId,
     name,
@@ -446,10 +545,10 @@ exports.updatePromotionLimit = async (req, res) => {
     status
   } = req.body
 
-  const existing = await PromotionLimit.findOne({ proId });
+  const existing = await PromotionLimit.findOne({ proId })
 
   if (!existing) {
-    return res.status(404).json({ status: 404, message: 'Promotion not found' });
+    return res.status(404).json({ status: 404, message: 'Promotion not found' })
   }
 
   await PromotionLimit.updateOne(
@@ -470,22 +569,30 @@ exports.updatePromotionLimit = async (req, res) => {
         status
       }
     }
-  );
+  )
 
   const io = getSocket()
-  io.emit('promotion/updatePromotionLimit', {});
+  io.emit('promotion/updatePromotionLimit', {})
 
-  return res.status(200).json({ status: 200, message: 'Updated successfully' });
+  return res.status(200).json({ status: 200, message: 'Updated successfully' })
 }
 
 exports.addQuota = async (req, res) => {
-
-  const { quotaId, detail, proCode, quota, applicableTo, conditions, rewards, discounts, validFrom, validTo
+  const {
+    quotaId,
+    detail,
+    proCode,
+    quota,
+    applicableTo,
+    conditions,
+    rewards,
+    discounts,
+    validFrom,
+    validTo
   } = req.body
 
-
-  const channel = req.headers['x-channel'];
-  const { Quota } = getModelsByChannel(channel, res, promotionModel);
+  const channel = req.headers['x-channel']
+  const { Quota } = getModelsByChannel(channel, res, promotionModel)
 
   const exitQuota = await Quota.findOne({ quotaId: quotaId })
   if (exitQuota) {
@@ -509,26 +616,33 @@ exports.addQuota = async (req, res) => {
   })
 
   const io = getSocket()
-  io.emit('promotion/addQuota', {});
+  io.emit('promotion/addQuota', {})
 
   res.status(200).json({
     status: 200,
     message: 'sucess',
     data: data
   })
-
 }
 
-
 exports.updateQuota = async (req, res) => {
-
-  const { quotaId, detail, proCode, id, quotaGroup, quotaWeight,
-    quota, quotaUse, rewards, area, zone, ExpDate
+  const {
+    quotaId,
+    detail,
+    proCode,
+    id,
+    quotaGroup,
+    quotaWeight,
+    quota,
+    quotaUse,
+    rewards,
+    area,
+    zone,
+    ExpDate
   } = req.body
 
-
-  const channel = req.headers['x-channel'];
-  const { Quota } = getModelsByChannel(channel, res, promotionModel);
+  const channel = req.headers['x-channel']
+  const { Quota } = getModelsByChannel(channel, res, promotionModel)
 
   const exitQuota = await Quota.findOne({ quotaId: quotaId })
   if (!exitQuota) {
@@ -537,8 +651,6 @@ exports.updateQuota = async (req, res) => {
       message: 'This quotaId not found'
     })
   }
-
-
 
   const data = await Quota.updateOne(
     { quotaId: quotaId },
@@ -557,33 +669,32 @@ exports.updateQuota = async (req, res) => {
         ExpDate: ExpDate
       }
     }
-
   )
 
   const io = getSocket()
-  io.emit('promotion/updateQuota', {});
+  io.emit('promotion/updateQuota', {})
 
   res.status(200).json({
     status: 200,
-    message: 'sucess',
+    message: 'sucess'
   })
-
 }
 
-
 exports.addPromotionShelf = async (req, res) => {
-
   const { proShelfId, period, storeId, price } = req.body
 
-  const channel = req.headers['x-channel'];
-  const { PromotionShelf } = getModelsByChannel(channel, res, promotionModel);
+  const channel = req.headers['x-channel']
+  const { PromotionShelf } = getModelsByChannel(channel, res, promotionModel)
 
-  const dataExist = await PromotionShelf.findOne({ proShelfId: proShelfId, storeId: storeId, period: period })
+  const dataExist = await PromotionShelf.findOne({
+    proShelfId: proShelfId,
+    storeId: storeId,
+    period: period
+  })
   if (dataExist) {
-
     return res.status(400).json({
       status: 400,
-      message: 'already in database',
+      message: 'already in database'
     })
   }
   const data = await PromotionShelf.create({
@@ -594,7 +705,7 @@ exports.addPromotionShelf = async (req, res) => {
   })
 
   const io = getSocket()
-  io.emit('promotion/addPromotionShelf', {});
+  io.emit('promotion/addPromotionShelf', {})
 
   res.status(200).json({
     status: 200,
@@ -602,8 +713,6 @@ exports.addPromotionShelf = async (req, res) => {
     data: data
   })
 }
-
-
 
 exports.deletePromotion = async (req, res) => {
   try {
