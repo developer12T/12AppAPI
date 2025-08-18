@@ -29,7 +29,8 @@ const {
   deleteStore,
   updateStoreStatusNoNewId,
   fixStatusStore,
-  insertStoreToM3
+  insertStoreToM3,
+  storeToExcel
   // test
 } = require('../../controllers/store/storeController')
 
@@ -45,7 +46,7 @@ const {
 } = require('../../controllers/store/callCardController')
 
 const router = express.Router()
-
+router.get('/storeToExcel', storeToExcel)
 router.get('/getStore', getStore)
 router.get('/getTypeStore', getTypeStore)
 router.get('/check/:storeId', checkSimilarStores)
@@ -76,6 +77,7 @@ router.post('/editShippingInStore', editShippingInStore)
 router.post('/deleteStore', deleteStore)
 router.post('/updateStoreStatusNoNewId', updateStoreStatusNoNewId)
 router.post('/fixStatusStore', fixStatusStore)
+
 // router.get('/test', test)
 
 router.post('/addCallCard', addCallCard)

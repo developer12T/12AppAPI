@@ -1678,7 +1678,7 @@ exports.getRouteEffective = async (req, res) => {
               .map(product => {
                 const flatOrderQty = orderQty.flat()
                 const qty = flatOrderQty.find(q => q.id === product.id)
-                console.log(qty)
+                // console.log(qty)
                 return qty
               })
               .filter(Boolean)
