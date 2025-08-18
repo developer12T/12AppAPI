@@ -12,6 +12,9 @@ const addUpload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages'
 )
 
+const xlsx = require('xlsx')
+
+
 const sql = require('mssql')
 const {
   storeQuery,
@@ -1987,6 +1990,95 @@ exports.fixStatusStore = async (req, res) => {
       .json({ status: 200, message: 'Success', updatedCount })
   } catch (err) {
     await t.rollback()
+    return res.status(500).json({ status: 500, message: err.message })
+  }
+}
+
+exports.storeToExcel = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    // รับ date ในรูปแบบ MMYYYY เช่น '072025'
+    let dateStr = (req.query.date || '').trim()
+
+    // ถ้าไม่ถูกฟอร์แมต ให้ใช้เดือนปัจจุบัน “ตามเวลาไทย”
+    if (!/^\d{6}$/.test(dateStr)) {
+      const nowTH = new Date(
+        new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })
+      )
+      const y = nowTH.getFullYear()
+      const m = String(nowTH.getMonth() + 1).padStart(2, '0')
+      dateStr = `${m}${y}` // MMYYYY
+    }
+
+    // console.log(startTH)
+
+    const mm = dateStr.slice(0, 2)      // '07'
+    const yyyy = dateStr.slice(2, 6)    // '2025'
+
+    // ช่วงเดือน “ตามเวลาไทย” แล้วใช้เป็น boundary ใน UTC ได้เลย
+    const startTH = new Date(`${yyyy}-${mm}-01T00:00:00+07:00`) // inclusive
+
+    const nextMonth = Number(mm) === 12 ? '01' : String(Number(mm) + 1).padStart(2, '0')
+    const nextYear = Number(mm) === 12 ? String(Number(yyyy) + 1) : yyyy
+    const endTHExclusive = new Date(`${nextYear}-${nextMonth}-01T00:00:00+07:00`) // exclusive
+
+
+    // คิวรีตามช่วงเดือนไทย (เอกสาร createdAt เก็บเป็น Date/UTC)
+    const store = await Store.find({
+      createdAt: { $gte: startTH, $lt: endTHExclusive }
+    }).lean()
+
+
+    const toThaiTime = d => new Date(new Date(d).getTime() + 7 * 60 * 60 * 1000);
+
+    const storeTran = store.map(item => ({
+      storeId: item.storeId,
+      name: item.name,
+      taxId: item.taxId,
+      tel: item.tel,
+      route: item.route,
+      type: item.type,
+      typeName: item.typeName,
+      zone: item.zone,
+      area: item.area,
+      latitude: item.latitude,
+      longtitude: item.longtitude,
+      lineId: item.lineId,
+      status: item.status,
+      createdAt: toThaiTime(item.createdAt) // ✅ บวก 7 ชั่วโมง (เวลาไทย)
+    }));
+
+
+
+    // return res.status(200).json({ status: 200, count: store.length, data: store })
+
+
+    const wb = xlsx.utils.book_new()
+    const ws = xlsx.utils.json_to_sheet(storeTran)
+    xlsx.utils.book_append_sheet(wb, ws, `Store${dateStr}`)
+
+    const tempPath = path.join(os.tmpdir(), `Store${dateStr}.xlsx`)
+    xlsx.writeFile(wb, tempPath)
+
+    res.download(tempPath, `Store${dateStr}.xlsx`, err => {
+      if (err) {
+        console.error('❌ Download error:', err)
+        // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+        if (!res.headersSent) {
+          res.status(500).send('Download failed')
+        }
+      }
+
+      // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+      fs.unlink(tempPath, () => { })
+    })
+
+
+
+  } catch (err) {
+    console.error(err)
     return res.status(500).json({ status: 500, message: err.message })
   }
 }
