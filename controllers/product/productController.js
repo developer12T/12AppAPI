@@ -80,7 +80,7 @@ exports.getProductSwitch = async (req, res) => {
 }
 exports.getProduct = async (req, res) => {
   try {
-    const { type, group, area, orderId, period, brand, size, flavour } = req.body
+    const { type, group, area, orderId, period, brand, size, flavour, limit } = req.body
     const channel = req.headers['x-channel']
 
     const { Product } = getModelsByChannel(channel, res, productModel)
@@ -162,59 +162,83 @@ exports.getProduct = async (req, res) => {
 
       products = await Product.find(filter).lean()
 
-      stock = await Stock.aggregate([
-        {
-          $match: {
-            period: period,
-            area: area
+      if (limit === true) {
+        stock = await Stock.aggregate([
+          { $match: { period, area } },
+          { $project: { listProduct: 1, _id: 0 } },       // ลด payload
+          { $unwind: '$listProduct' },
+          {
+            $group: {
+              _id: { $trim: { input: '$listProduct.productId' } },
+              balanceCtn: { $sum: { $toDouble: '$listProduct.balanceCtn' } },
+              balancePcs: { $sum: { $toDouble: '$listProduct.balancePcs' } }
+            }
+          },
+          { $sort: { balancePcs: -1 } },                  // ถูกต้อง: จัดอันดับก่อน
+          { $limit: 20 },                                 // ได้ Top 20 จริง
+          { $project: { _id: 0, productId: '$_id', balanceCtn: 1, balancePcs: 1 } }
+        ], { allowDiskUse: true });
+
+      } else {
+
+        stock = await Stock.aggregate([
+          {
+            $match: {
+              period: period,
+              area: area
+            }
+          },
+          { $unwind: '$listProduct' },
+          {
+            $group: {
+              _id: '$listProduct.productId',
+              balanceCtn: { $sum: '$listProduct.balanceCtn' },
+              balancePcs: { $sum: '$listProduct.balancePcs' }
+            }
           }
-        },
-        { $unwind: '$listProduct' },
-        {
-          $group: {
-            _id: '$listProduct.productId',
-            balanceCtn: { $sum: '$listProduct.balanceCtn' },
-            balancePcs: { $sum: '$listProduct.balancePcs' }
-          }
-        }
-      ])
+        ])
+      }
     }
+
+
+
+
 
     if (!products.length) {
       return res.status(404).json({ status: '404', message: 'No products found!' })
     }
 
-const data = products
-  // .filter(product => {
-  //   if (type === 'withdraw') {
-  //     return product.listUnit?.some(u => u.unit === 'CTN') // ✅ เฉพาะที่มี CTN
-  //   }
-  //   return true // แสดงทุกตัวถ้าไม่ใช่ withdraw
-  // })
-  .map(product => {
-    const stockMatch = stock.find(s => s._id === product.id) || {}
-    let listUnit = product.listUnit || []
+    const data = products
+      // .filter(product => {
+      //   if (type === 'withdraw') {
+      //     return product.listUnit?.some(u => u.unit === 'CTN') // ✅ เฉพาะที่มี CTN
+      //   }
+      //   return true // แสดงทุกตัวถ้าไม่ใช่ withdraw
+      // })
+      .map(product => {
+        const stockMatch = stock.find(s => s._id === product.id) || {}
+        let listUnit = product.listUnit || []
 
-    if (type === 'sale') {
-      listUnit = listUnit.map(u => ({ ...u, price: u.price?.sale }))
-    } else if (type === 'refund') {
-      listUnit = listUnit.map(u => ({ ...u, price: u.price?.refund }))
-    } else if (type === 'withdraw') {
-      listUnit = listUnit
-        // .filter(u => u.unit === 'CTN') // ✅ เฉพาะ CTN
-        .map(u => ({
-          ...u,
-          price: u.price?.sale
-        }))
-    }
+        if (type === 'sale') {
+          listUnit = listUnit.map(u => ({ ...u, price: u.price?.sale }))
+        } else if (type === 'refund') {
+          listUnit = listUnit.map(u => ({ ...u, price: u.price?.refund }))
+        } else if (type === 'withdraw') {
+          listUnit = listUnit
+            // .filter(u => u.unit === 'CTN') // ✅ เฉพาะ CTN
+            .map(u => ({
+              ...u,
+              price: u.price?.sale
+            }))
+        }
 
-    return {
-      ...product,
-      listUnit,
-      qtyCtn: stockMatch.balanceCtn || 0,
-      qtyPcs: stockMatch.balancePcs || 0
-    }
-  })
+        return {
+          ...product,
+          listUnit,
+          qtyCtn: stockMatch.balanceCtn || 0,
+          qtyPcs: stockMatch.balancePcs || 0
+        }
+      })
       .sort((a, b) => {
         if (a.groupCode < b.groupCode) return -1
         if (a.groupCode > b.groupCode) return 1
