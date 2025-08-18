@@ -152,7 +152,7 @@ exports.checkout = async (req, res) => {
       sale.warehouse,
       channel,
       res,
-      newtrip 
+      newtrip
     )
 
     //  const orderId = await generateDistributionId(
@@ -1258,3 +1258,161 @@ exports.saleConfirmWithdraw = async (req, res) => {
 
 
 
+
+exports.getReceiveQty = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+
+    const { orderId } = req.body
+
+    // ✅ ตรวจสอบ input
+    if (!orderId) {
+      return res.status(400).json({
+        status: 400,
+        message: 'Invalid request: orderId are required.'
+      })
+    }
+
+    const distributionTran = await Distribution.findOne({
+      orderId,
+      type: 'withdraw'
+    })
+
+    if (!distributionTran) {
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Withdraw transaction not found.' })
+    }
+
+    if (
+      !Array.isArray(distributionTran.listProduct) ||
+      distributionTran.listProduct.length === 0
+    ) {
+      return res.status(400).json({
+        status: 400,
+        message: 'No products found in withdrawal transaction.'
+      })
+    }
+
+    const row = await DisributionM3.findOne({ where: { coNo: orderId } });
+    if (!row) return res.status(404).json({ status: 404, message: `${orderId} not found in M3` });
+
+    const toNum = v => Number(String(v ?? '').trim()); // แปลง NVARCHAR -> Number, ตัดช่องว่าง
+    const MGTRSL = toNum(row.MGTRSL);
+    const MGTRSH = toNum(row.MGTRSH);
+
+    // ถ้าต้องการให้ "ทั้งสองค่า" ต้องเป็น 99 ถึงจะผ่าน
+    if (MGTRSL !== 99 && MGTRSH !== 99) {
+      return res.status(400).json({
+        status: 400,
+        message: `Sucess`,
+        data: {
+          orderId: orderId,
+          lowStatus: row.MGTRSL,
+          highStatus: row.MGTRSH
+        }
+      });
+    }
+
+    // const listProductId = distributionTran.listProduct
+    //   .map(i => i.id)
+    //   .filter(Boolean)
+    // const productDetail = await Product.find({ id: { $in: listProductId } })
+
+
+    // // ✅ ดึงข้อมูลรับสินค้าจากระบบ ERP
+    // const Receive = await MHDISL.findAll({
+    //   where: { coNo: orderId },
+    //   raw: true
+    // })
+    // const ReceiveWeight = await MHDISH.findAll({
+    //   where: { coNo: orderId },
+    //   raw: true
+    // })
+
+
+    // const ReceiveQty = Object.values(
+    //   Receive.reduce((acc, cur) => {
+    //     // ใช้ key จาก coNo + withdrawUnit + productId (ถ้าอยากแยกตาม productId ด้วย)
+    //     const key = `${cur.coNo}_${cur.withdrawUnit}_${cur.productId.trim()}`;
+    //     if (!acc[key]) {
+    //       acc[key] = { ...cur };
+    //     } else {
+    //       acc[key].qtyPcs += cur.qtyPcs;
+    //       acc[key].weightGross += cur.weightGross;
+    //       acc[key].weightNet += cur.weightNet;
+    //     }
+    //     return acc;
+    //   }, {})
+    // );
+
+    // // console.log('merged', merged)
+    // let receivetotalQty = 0
+    // let receivetotal = 0
+
+    // for (const i of distributionTran.listProduct) {
+    //   const productIdTrimmed = String(i.id || '').trim()
+    //   const match = ReceiveQty.find(
+    //     r => String(r.productId || '').trim() === productIdTrimmed
+    //   )
+    //   if (match) {
+    //     const product = productDetail.find(
+    //       u => String(u.id || '').trim() === productIdTrimmed
+    //     )
+    //     i.receiveUnit = match.withdrawUnit || ''
+
+    //     if (!product || !Array.isArray(product.listUnit)) {
+    //       i.receiveQty = 0
+    //       continue
+    //     }
+
+    //     const unitFactor = product.listUnit.find(
+    //       u =>
+    //         String(u.unit || '').trim() ===
+    //         String(match.withdrawUnit || '').trim()
+    //     )
+
+    //     if (!unitFactor || !unitFactor.factor || unitFactor.factor === 0) {
+    //       i.receiveQty = 0
+    //       continue
+    //     }
+
+    //     const qty = match.qtyPcs / unitFactor.factor
+    //     receivetotalQty += qty
+    //     receivetotal += qty * (unitFactor?.price?.sale || 0)
+
+    //     i.receiveQty = qty
+    //   } else {
+    //     i.receiveUnit = ''
+    //     i.receiveQty = 0
+    //   }
+    // }
+
+
+    // await Distribution.updateOne(
+    //   { _id: distributionTran._id },
+    //   { $set: { listProduct: distributionTran.listProduct } }
+    // )
+
+
+
+    res.status(200).json({
+      status: 200,
+      message: `Sucess`,
+      data: {
+        orderId: orderId,
+        lowStatus: row.MGTRSL,
+        highStatus: row.MGTRSH
+      }
+    })
+
+  } catch (error) {
+    console.error('[❌ saleConfirmWithdraw ERROR]', error)
+    return res.status(500).json({
+      status: 500,
+      message: error.message || 'Internal server error'
+    })
+  }
+}
