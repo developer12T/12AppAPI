@@ -695,10 +695,48 @@ const NumberSeries = sequelize.define(
   }
 )
 
+const ItemLotM3 = sequelize.define(
+  'MILOMA',
+  {
+    coNo: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      primaryKey: true,
+      field: 'LMCONO'
+    },
+    itemCode: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'LMITNO'
+    },
+    lot: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'LMBANO'
+    },
+    expireDate: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'LMRGDT'
+    }
+  },
+  {
+    freezeTableName: true,
+    timestamps: false,
+    createdAt: false,
+    updatedAt: false,
+    primaryKey: false
+  }
+)
+
 module.exports = {
   // ItemFac,
   // ItemMaster,
   // ItemUnit,
+  ItemLotM3,
   MHDISH,
   MHDISL,
   Item,
