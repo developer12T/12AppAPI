@@ -30,7 +30,7 @@ const product = require('../../models/cash/product')
 exports.checkout = async (req, res) => {
   const transaction = await sequelize.transaction()
   try {
-    const { type, area, shippingId, withdrawType, sendDate, note, period } =
+    const { type, area, shippingId, withdrawType, sendDate, note, period, newtrip } =
       req.body
 
     const channel = req.headers['x-channel']
@@ -151,7 +151,8 @@ exports.checkout = async (req, res) => {
       area,
       sale.warehouse,
       channel,
-      res
+      res,
+      newtrip 
     )
 
     //  const orderId = await generateDistributionId(
@@ -228,90 +229,6 @@ exports.checkout = async (req, res) => {
         statusMovement: 'OUT'
       }
     })
-
-    // for (const item of productQty) {
-
-    //   const updateResult = await updateStockMongo(
-    //     item,
-    //     area,
-    //     period,
-    //     'withdraw',
-    //     channel,
-    //     res
-    //   )
-    //   if (updateResult) return
-
-    // }
-
-    // const sendDateFormat = new Date(newOrder.sendDate)
-    // const formattedDate = sendDateFormat
-    //   .toISOString()
-    //   .slice(0, 10)
-    //   .replace(/-/g, '')
-    // const MGNUGL = newOrder.listProduct.map(i => i.id)
-    // const uniqueCount = new Set(MGNUGL).size
-    // let data = []
-    // dataTran = {
-    //   Hcase: 1,
-    //   orderNo: newOrder.orderId,
-    //   statusLow: '22',
-    //   statusHigh: '22',
-    //   orderType: newOrder.orderType,
-    //   tranferDate: formattedDate,
-    //   warehouse: newOrder.fromWarehouse,
-    //   towarehouse: newOrder.toWarehouse,
-    //   routeCode: newOrder.shippingRoute,
-    //   addressCode: newOrder.shippingId,
-    //   location: '',
-    //   MGNUGL: uniqueCount,
-    //   MGDEPT: '',
-    //   remark: '',
-    //   items: newOrder.listProduct.map(u => ({
-    //     itemCode: u.id,
-    //     itemStatus: '22',
-    //     MRWHLO: newOrder.fromWarehouse,
-    //     itemQty: u.qty,
-    //     itemUnit: u.unit,
-    //     toLocation: '',
-    //     itemLot: '',
-    //     location: '',
-    //     itemLocation: ''
-    //   }))
-    // }
-    // data.push(dataTran)
-
-    // // 2. ส่งไป External API (ถ้า fail -> return error)
-    // let response;
-    // try {
-    //   response = await axios.post(
-    //     `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
-    //     data
-    //   );
-    // } catch (err) {
-    //   if (err.response) {
-    //     console.log('API error response:', err.response.data);
-    //     console.log('Status:', err.response.status);
-    //     return res.status(500).json({
-    //       status: 500,
-    //       message: 'External API failed',
-    //       error: err.response.data    // <-- error ที่มาจากปลายทางจริง
-    //     });
-    //   } else if (err.request) {
-    //     console.log('No response from API:', err.message);
-    //     return res.status(500).json({
-    //       status: 500,
-    //       message: 'External API unreachable',
-    //       error: err.message
-    //     });
-    //   } else {
-    //     console.log('Other error:', err.message);
-    //     return res.status(500).json({
-    //       status: 500,
-    //       message: 'External API error',
-    //       error: err.message
-    //     });
-    //   }
-    // }
 
     const calStock = {
       // storeId: refundOrder.store.storeId,

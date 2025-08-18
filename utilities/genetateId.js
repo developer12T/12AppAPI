@@ -137,11 +137,17 @@ const generateRefundId = async (area, warehouse, channel, res) => {
     .padStart(4, '0')}`
 }
 
-const generateDistributionId = async (area, warehouse, channel, res) => {
+const generateDistributionId = async (area, warehouse, channel, res,newtrip) => {
   const now = new Date()
   const currentYear = now.getFullYear() + 543
-  const currentMonth = (now.getMonth() + 1).toString().padStart(2, '0')
 
+  let currentMonth = ''
+  if (newtrip === true) {
+    currentMonth = (now.getMonth() + 2).toString().padStart(2, '0')
+  } else {
+    currentMonth = (now.getMonth() + 1).toString().padStart(2, '0')
+  }
+  
   const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
   // สร้าง prefix เช่น "W680852221"
@@ -188,6 +194,8 @@ const generateDistributionId = async (area, warehouse, channel, res) => {
   }
 
   const newOrderId = `${prefix}${runningNumber.toString().padStart(2, '0')}`
+
+  // console.log(newOrderId)
   return newOrderId
 }
 
