@@ -3940,6 +3940,7 @@ exports.addStockAllWithInOut = async (req, res) => {
     const { Order } = getModelsByChannel(channel, res, orderModel)
     const { Giveaway } = getModelsByChannel(channel, res, giveModel)
     const { User } = getModelsByChannel(channel, res, userModel)
+    const { Cart } = getModelsByChannel(channel, res, cartModel)
 
     if (!period) {
       return res
@@ -4041,7 +4042,7 @@ exports.addStockAllWithInOut = async (req, res) => {
 
       const dataChange = await Order.aggregate([
         { $addFields: { zone: { $substrBytes: ['$area', 0, 2] } } },
-        { $match: { type: 'change', status: { $ne: 'canceled' } } },
+        { $match: { type: 'change', status: 'approved' } },
         { $match: matchQueryRefund },
         { $project: { listProduct: 1, _id: 0 } }
       ])
@@ -4060,6 +4061,26 @@ exports.addStockAllWithInOut = async (req, res) => {
         { $project: { listProduct: 1, _id: 0 } }
       ])
 
+      const dataCart = await Cart.aggregate([
+        {
+          $match: {
+            type: { $in: ['give', 'refund', 'sale'] },
+            area: area,
+          }
+        },
+        { $project: { listProduct: 1, _id: 0, zone: 1 } }
+      ]);
+
+
+      const dataChangePending = await Order.aggregate([
+        { $addFields: { zone: { $substrBytes: ['$area', 0, 2] } } },
+        { $match: { type: 'change', status: 'pending' } },
+        { $match: matchQueryRefund },
+        { $project: { listProduct: 1, _id: 0 } }
+      ])
+
+
+
       const allWithdrawProducts = dataWithdraw.flatMap(
         doc => doc.listProduct || []
       )
@@ -4071,6 +4092,9 @@ exports.addStockAllWithInOut = async (req, res) => {
       const allChangeProducts = dataChange.flatMap(doc => doc.listProduct || [])
       const allAdjustProducts = dataAdjust.flatMap(doc => doc.listProduct || [])
       const allGiveProducts = dataGive.flatMap(doc => doc.listProduct || [])
+      const allCartProducts = dataCart.flatMap(doc => doc.listProduct || [])
+      const allChangePendingProducts = dataChangePending.flatMap(doc => doc.listProduct || [])
+
 
       const dataStock = await Stock.aggregate([
         { $addFields: { zone: { $substrBytes: ['$area', 0, 2] } } },
@@ -4196,6 +4220,38 @@ exports.addStockAllWithInOut = async (req, res) => {
         }, {})
       )
 
+      const cartProductArray = Object.values(
+        allCartProducts.reduce((acc, curr) => {
+          const key = `${curr.id}_${curr.unit}`
+          if (acc[key]) {
+            acc[key] = {
+              ...curr,
+              qty: (acc[key].qty || 0) + (curr.qty || 0),
+              qtyPcs: (acc[key].qtyPcs || 0) + (curr.qtyPcs || 0)
+            }
+          } else acc[key] = { ...curr }
+          return acc
+        }, {})
+      )
+
+      const changePendingProductArray = Object.values(
+        allChangePendingProducts.reduce((acc, curr) => {
+          const key = `${curr.id}_${curr.unit}`
+          if (acc[key]) {
+            acc[key] = {
+              ...curr,
+              qty: (acc[key].qty || 0) + (curr.qty || 0),
+              qtyPcs: (acc[key].qtyPcs || 0) + (curr.qtyPcs || 0)
+            }
+          } else acc[key] = { ...curr }
+          return acc
+        }, {})
+      )
+
+
+
+
+
       const dataStockTran = dataStock
       const productIdListStock = dataStockTran.flatMap(item =>
         item.listProduct.map(u => u.productId)
@@ -4211,6 +4267,10 @@ exports.addStockAllWithInOut = async (req, res) => {
       const productIdListChange = changeProductArray.flatMap(item => item.id)
       const productIdListAdjust = adjustProductArray.flatMap(item => item.id)
       const productIdListGive = giveProductArray.flatMap(item => item.id)
+      const productIdListCart = cartProductArray.flatMap(item => item.id)
+      const productIdListChangePending = changePendingProductArray.flatMap(item => item.id)
+
+
 
       const uniqueProductId = [
         ...new Set([
@@ -4221,7 +4281,9 @@ exports.addStockAllWithInOut = async (req, res) => {
           ...productIdListPromotion,
           ...productIdListChange,
           ...productIdListAdjust,
-          ...productIdListGive
+          ...productIdListGive,
+          ...productIdListCart,
+          ...productIdListChangePending
         ])
       ]
 
@@ -4304,6 +4366,14 @@ exports.addStockAllWithInOut = async (req, res) => {
           u => u.id == stockItem.id
         )
 
+        const productDetailCart = cartProductArray.filter(
+          u => u.id == stockItem.id
+        )
+
+        const productDetailChangePending = changePendingProductArray.filter(
+          u => u.id == stockItem.id
+        )
+
         if (!productDetail) continue
 
         const pcsMain = stockItem.stockPcs
@@ -4333,6 +4403,11 @@ exports.addStockAllWithInOut = async (req, res) => {
             productDetailAdjust.find(i => i.unit === u.unit)?.qty ?? 0
           const giveQty =
             productDetailGive.find(i => i.unit === u.unit)?.qty ?? 0
+          const cartQty =
+            productDetailCart.find(i => i.unit === u.unit)?.qty ?? 0
+          const changePendingQty =
+            productDetailChangePending.find(i => i.unit === u.unit)?.qty ?? 0
+
 
           const goodSale = u.price?.refund ?? 0
           const damagedSale = u.price?.refundDmg ?? 0
@@ -4365,7 +4440,9 @@ exports.addStockAllWithInOut = async (req, res) => {
             good: goodQty,
             damaged: damagedQty,
             sale: saleQty,
+            cart: cartQty,
             promotion: promoQty,
+            changePending:changePendingQty,
             change: changeQty,
             adjust: adjustQty,
             give: giveQty,
@@ -4420,29 +4497,29 @@ exports.addStockAllWithInOut = async (req, res) => {
 
     for (item of results) {
       for (i of item.data) {
-        await Stock.findOneAndUpdate(
-          {
-            area: item.area,
-            period: period,
-            'listProduct.productId': i.productId
-          },
-          {
-            $set: {
-              // 'listProduct.$[elem].stockPcs': i.summaryQty.PCS.stock,
-              'listProduct.$[elem].stockInPcs': i.summaryQty.PCS.in,
-              'listProduct.$[elem].stockOutPcs': i.summaryQty.PCS.out,
-              'listProduct.$[elem].balancePcs': i.summaryQty.PCS.balance,
-              // 'listProduct.$[elem].stockCtn': i.summaryQty.CTN.stock,
-              'listProduct.$[elem].stockInCtn': i.summaryQty.CTN.in,
-              'listProduct.$[elem].stockOutCtn': i.summaryQty.CTN.out,
-              'listProduct.$[elem].balanceCtn': i.summaryQty.CTN.balance
-            }
-          },
-          {
-            arrayFilters: [{ 'elem.productId': i.productId }],
-            new: true
-          }
-        )
+        // await Stock.findOneAndUpdate(
+        //   {
+        //     area: item.area,
+        //     period: period,
+        //     'listProduct.productId': i.productId
+        //   },
+        //   {
+        //     $set: {
+        //       // 'listProduct.$[elem].stockPcs': i.summaryQty.PCS.stock,
+        //       'listProduct.$[elem].stockInPcs': i.summaryQty.PCS.in,
+        //       'listProduct.$[elem].stockOutPcs': i.summaryQty.PCS.out,
+        //       'listProduct.$[elem].balancePcs': i.summaryQty.PCS.balance,
+        //       // 'listProduct.$[elem].stockCtn': i.summaryQty.CTN.stock,
+        //       'listProduct.$[elem].stockInCtn': i.summaryQty.CTN.in,
+        //       'listProduct.$[elem].stockOutCtn': i.summaryQty.CTN.out,
+        //       'listProduct.$[elem].balanceCtn': i.summaryQty.CTN.balance
+        //     }
+        //   },
+        //   {
+        //     arrayFilters: [{ 'elem.productId': i.productId }],
+        //     new: true
+        //   }
+        // )
       }
     }
 
