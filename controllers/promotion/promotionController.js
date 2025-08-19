@@ -12,6 +12,7 @@ const userModel = require('../../models/cash/user')
 const storeModel = require('../../models/cash/store')
 const stockModel = require('../../models/cash/stock')
 const {
+  period,
   rangeDate,
   formatDate,
   getCurrentTimeFormatted
