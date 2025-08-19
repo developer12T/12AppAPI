@@ -1,13 +1,25 @@
 const { generatePromotionId } = require('../../utilities/genetateId')
 const { getRewardProduct } = require('./calculate')
+const { sequelize } = require('../../config/m3db')
+
 // const { Promotion } = require('../../models/cash/promotion')
 // const { Cart } = require('../../models/cash/cart')
 // const { Product } = require('../../models/cash/product')
 const promotionModel = require('../../models/cash/promotion')
 const CartModel = require('../../models/cash/cart')
 const productModel = require('../../models/cash/product')
+const userModel = require('../../models/cash/user')
+const storeModel = require('../../models/cash/store')
+const {
+  rangeDate,
+  formatDate,
+  getCurrentTimeFormatted
+} = require('../../utilities/datetime')
+
 const { getSocket } = require('../../socket')
 const { getModelsByChannel } = require('../../middleware/channel')
+const { OP } = require('../../models/cash/master')
+const { PromotionStore } = require('../../models/cash/master')
 
 exports.addPromotion = async (req, res) => {
   try {
@@ -75,33 +87,148 @@ exports.addPromotion = async (req, res) => {
 
 exports.addPromotionM3 = async (req, res) => {
   try {
-    const { period } = req.query
+    const { period } = req.body
     const channel = req.headers['x-channel']
     const { Promotion } = getModelsByChannel(channel, res, promotionModel)
     const { User } = getModelsByChannel(channel, res, userModel)
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
+    function firstDateToInt () {
+      const now = new Date()
+      const y = now.getFullYear() - 2
+      const m = String(now.getMonth() + 1).padStart(2, '0') // month is 0-based
+      const d = String(now.getDate()).padStart(2, '0')
+      return parseInt(`${y}${m}${d}`, 10)
+    }
+
+    function nowDateToInt () {
+      const now = new Date()
+      const y = now.getFullYear()
+      const m = String(now.getMonth() + 1).padStart(2, '0') // month is 0-based
+      const d = String(now.getDate()).padStart(2, '0')
+      return parseInt(`${y}${m}${d}`, 10)
+    }
+
+    function lastDateToInt () {
+      const now = new Date()
+      const y = now.getFullYear() + 5
+      const m = String(now.getMonth() + 1).padStart(2, '0') // month is 0-based
+      const d = String(now.getDate()).padStart(2, '0')
+      return parseInt(`${y}${m}${d}`, 10)
+    }
+
     const users = await User.find({ role: 'sale' })
-      .select('area saleCode warehouse')
+      .select('area saleCode warehouse zone salePayer')
       .lean()
-
     for (const user of users) {
-      const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
-      const startDate = range.startDate
-      const endDate = range.endDate
-      const stores = await Store.find({
-        area: user.area,
-        createdAt: { $gte: startDate, $lte: endDate }
-      }).select('')
-      for (const store of stores) {
-        const promotions = await Promotion.find({
-          proId: { $regex: `PRO-${period}`, $options: 'i' }
-        })
+      const t = await sequelize.transaction()
+      try {
+        const { startDate, endDate } = rangeDate(period)
+        console.log(user)
+        // 1) fetch once per user
+        const stores = await Store.find(
+          {
+            area: user.area,
+            status: '20',
+            area: { $nin: ['IT211'] },
+            createdAt: { $gte: startDate, $lte: endDate }
+          }
+          // { projection: { storeId: 1, route: 1, shippingAddress: 1 } }
+        ).lean()
 
-        for (const promotion of promotions) {
-          
+        // 2) fetch promotions once per period (regex uses the passed period)
+        const promotions = await Promotion.find(
+          { proId: { $regex: `^PRO-${period}`, $options: 'i' } } // anchor to start for stricter match
+          // { projection: { proCode: 1 } }
+        ).lean()
+
+        if (!stores.length || !promotions.length) {
+          await t.commit()
+          continue
+        }
+
+        // 3) iterate and find-or-create to avoid "duplicate key" on OPROMC00
+        const seen = new Set()
+        for (const store of stores) {
+          // Choose FBCUNO from ERP/customer/storeId
+          const FBCUNO = (store.storeId || '').toString().trim()
+
+          // ✅ skip if missing or too long
+          if (!FBCUNO || FBCUNO.length > 10) {
+            console.warn('[OPROMC] skip store: invalid FBCUNO →', FBCUNO)
+            continue
+          }
+
+          const postCode = store?.shippingAddress?.[0]?.postCode
+            ? String(store.shippingAddress[0].postCode).trim()
+            : null
+
+          for (const promotion of promotions) {
+            const pro = promotion.proCode.toString().trim()
+            if (!pro) {
+              console.warn('[OPROMC] skip promotion: missing proId/proCode')
+              continue
+            }
+
+            const coNo = 410
+            const FBDIVI = 'OTT'
+            const key = `${coNo}|${FBDIVI}|${pro}|${FBCUNO}`
+
+            if (seen.has(key)) continue
+            seen.add(key)
+
+            const where = { coNo, FBDIVI, proId: pro, FBCUNO }
+
+            const existing = await PromotionStore.findOne({
+              where,
+              transaction: t
+            })
+            if (existing) continue
+
+            // payload for new row
+            const payload = {
+              ...where,
+              FBCUTP: 0,
+              customerChannel: '103',
+              saleCode: user.saleCode,
+              orderType: '021',
+              warehouse: user.warehouse,
+              zone: user.zone,
+              FBCSCD: 'TH',
+              FBPYNO: user.salePayer, // remove duplicate key
+              posccode: postCode,
+              FBFRE1: postCode,
+              area: user.area,
+              FBCFC3: store.route,
+              FBECAR: '10',
+              FBCFC6: '',
+              FBFVDT: firstDateToInt(),
+              FBLVDT: lastDateToInt(),
+              FBRGDT: nowDateToInt(),
+              FBRGTM: getCurrentTimeFormatted(),
+              FBLMDT: nowDateToInt(),
+              FBCHNO: '1',
+              FBCHID: 'MVXSECOFR',
+              FBPRI2: '5'
+            }
+
+            await PromotionStore.create(payload, { transaction: t })
+          }
+        }
+
+        await t.commit()
+      } catch (err) {
+        await t.rollback()
+
+        // Swallow specific duplicate error (2601) just in case a race slipped through,
+        // but rethrow others so you don't hide real problems.
+        if (err?.number === 2601 /* EREQUEST duplicate */) {
+          console.warn('Duplicate OPROMC row skipped:', err?.message)
+        } else {
+          throw err
         }
       }
+      res.status(200).json({ status: '200', message: 'successful' })
     }
   } catch (error) {
     console.error(error)

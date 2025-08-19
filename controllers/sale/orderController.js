@@ -658,12 +658,10 @@ exports.getDetail = async (req, res) => {
     }
 
     if (!doc) {
-      return res
-        .status(404)
-        .json({
-          status: 404,
-          message: `Not found ${orderId} in Order or Refund`
-        })
+      return res.status(404).json({
+        status: 404,
+        message: `Not found ${orderId} in Order or Refund`
+      })
     }
 
     const toThai = d =>
@@ -971,7 +969,7 @@ exports.OrderToExcel = async (req, res) => {
         status: { $nin: ['canceled'] },
         status: { $in: statusArray },
         type: { $in: ['sale'] },
-        'store.area': { $ne: 'IT211' },
+        'store.area': { $ne: 'IT211' }
         // 'store.area': 'NE211'
       }
     },
@@ -1035,7 +1033,7 @@ exports.OrderToExcel = async (req, res) => {
       $match: {
         status: { $nin: ['canceled'] },
         status: { $in: statusArray },
-        'store.area': { $ne: 'IT211' },
+        'store.area': { $ne: 'IT211' }
         // 'store.area': 'NE211'
       }
     },
@@ -1275,7 +1273,7 @@ exports.OrderToExcel = async (req, res) => {
 
   // รวบรวม itemCode ทั้งหมดจาก refund
   const refundItems = modelRefund.flatMap(o => o.listProduct.map(p => p.id))
-  console.log(refundItems);
+  console.log(refundItems)
   const uniqueCodes = [...new Set(refundItems)]
 
   // ปีที่ยอมรับ
@@ -3600,7 +3598,7 @@ exports.saleReport = async (req, res) => {
         message: 'Not found Order'
       })
     }
-    const data = [...dataOrder, ...dataRefund].map(item => {
+    const data = [...dataOrder].map(item => {
       let paymentMethodTH = ''
       if (item.paymentMethod === 'cash') {
         paymentMethodTH = 'เงินสด'
@@ -3660,7 +3658,7 @@ exports.saleReport = async (req, res) => {
 
     res.status(200).json({
       status: 200,
-      sendMoneyData
+      // sendMoneyData
     })
   }
 }

@@ -290,52 +290,52 @@ const Customer = sequelize.define(
     },
     OKALCU: {
       type: DataTypes.INTEGER,
-      allowNull: true,
+
       field: 'OKALCU'
     },
     OKCSCD: {
       type: DataTypes.INTEGER,
-      allowNull: true,
+
       field: 'OKCSCD'
     },
     OKECAR: {
       type: DataTypes.INTEGER,
-      allowNull: true,
+
       field: 'OKECAR'
     },
     OKFACI: {
       type: DataTypes.INTEGER,
-      allowNull: true,
+
       field: 'OKFACI'
     },
     OKINRC: {
       type: DataTypes.INTEGER,
-      allowNull: true,
+
       field: 'OKINRC'
     },
     OKCUCD: {
       type: DataTypes.INTEGER,
-      allowNull: true,
+
       field: 'OKCUCD'
     },
     OKPYCD: {
       type: DataTypes.INTEGER,
-      allowNull: true,
+
       field: 'OKPYCD'
     },
     OKMODL: {
       type: DataTypes.INTEGER,
-      allowNull: true,
+
       field: 'OKMODL'
     },
     OKTEDL: {
       type: DataTypes.INTEGER,
-      allowNull: true,
+
       field: 'OKTEDL'
     },
     OKFRE1: {
       type: DataTypes.INTEGER,
-      allowNull: true,
+
       field: 'OKFRE1'
     }
   },
@@ -778,6 +778,18 @@ const PromotionStore = sequelize.define(
       primaryKey: true,
       field: 'FBPIDE'
     },
+    FBCUNO: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBCUNO'
+    },
+    FBDIVI: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBDIVI'
+    },
     FBCUTP: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -897,7 +909,19 @@ const PromotionStore = sequelize.define(
       allowNull: false,
       primaryKey: true,
       field: 'FBPRI2'
-    }
+    },
+    FBFRE1: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBFRE1'
+    },
+    FBECAR: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'FBECAR'
+    },
   },
   {
     freezeTableName: true,
@@ -925,6 +949,7 @@ module.exports = {
   NumberSeries,
   OOTYPE,
   Customer,
+
   PromotionStore
   // MGTYPE,
   // OODFLT
