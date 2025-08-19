@@ -1,7 +1,6 @@
 const { generatePromotionId } = require('../../utilities/genetateId')
 const { getRewardProduct } = require('./calculate')
 const { sequelize } = require('../../config/m3db')
-const { period, previousPeriod } = require('../../utilities/datetime')
 
 // const { Promotion } = require('../../models/cash/promotion')
 // const { Cart } = require('../../models/cash/cart')
@@ -13,6 +12,7 @@ const userModel = require('../../models/cash/user')
 const storeModel = require('../../models/cash/store')
 const stockModel = require('../../models/cash/store')
 const {
+  period,
   rangeDate,
   formatDate,
   getCurrentTimeFormatted
