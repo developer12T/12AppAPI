@@ -194,8 +194,8 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-          .map(item => item.price)
-          .reduce((sum, price) => sum + price, 0)
+        .map(item => item.price)
+        .reduce((sum, price) => sum + price, 0)
       : 0
     const total = subtotal - discountProduct
     const newOrder = new Order({
@@ -785,7 +785,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -1060,7 +1060,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD (date) {
+    function formatDateToThaiYYYYMMDD(date) {
       const d = new Date(date)
       // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1171,7 +1171,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromChange = modelChange.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD (date) {
+    function formatDateToThaiYYYYMMDD(date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1434,7 +1434,7 @@ exports.OrderToExcel = async (req, res) => {
       message: 'Not Found Order'
     })
   }
-  function yyyymmddToDdMmYyyy (dateString) {
+  function yyyymmddToDdMmYyyy(dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -1466,7 +1466,7 @@ exports.OrderToExcel = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => {})
+    fs.unlink(tempPath, () => { })
   })
 
   // res.status(200).json({
@@ -3598,32 +3598,66 @@ exports.saleReport = async (req, res) => {
         message: 'Not found Order'
       })
     }
-    const data = [...dataOrder].map(item => {
-      let paymentMethodTH = ''
-      if (item.paymentMethod === 'cash') {
-        paymentMethodTH = 'เงินสด'
-      } else if (item.paymentMethod === 'qr') {
-        paymentMethodTH = 'QR Payment'
-      } else {
-        paymentMethodTH = item.paymentMethod
-      }
 
-      // เช็คว่าเป็น refund หรือไม่
-      const isRefund = item.type === 'refund'
-      const totalWithSign = isRefund ? -Math.abs(item.total) : item.total
+    if (type === 'sale') {
 
-      return {
-        type: item.type,
-        orderId: item.orderId,
-        saleCode: item.sale.saleCode,
-        saleName: item.sale.name,
-        storeId: item.store.storeId,
-        storeName: item.store.name,
-        storeTaxId: item.store.taxId,
-        total: totalWithSign,
-        paymentMethod: paymentMethodTH
-      }
-    })
+      data = [...dataOrder].map(item => {
+        let paymentMethodTH = ''
+        if (item.paymentMethod === 'cash') {
+          paymentMethodTH = 'เงินสด'
+        } else if (item.paymentMethod === 'qr') {
+          paymentMethodTH = 'QR Payment'
+        } else {
+          paymentMethodTH = item.paymentMethod
+        }
+
+        // เช็คว่าเป็น refund หรือไม่
+        const isRefund = item.type === 'refund'
+        const totalWithSign = isRefund ? -Math.abs(item.total) : item.total
+
+        return {
+          type: item.type,
+          orderId: item.orderId,
+          saleCode: item.sale.saleCode,
+          saleName: item.sale.name,
+          storeId: item.store.storeId,
+          storeName: item.store.name,
+          storeTaxId: item.store.taxId,
+          total: totalWithSign,
+          paymentMethod: paymentMethodTH
+        }
+      })
+
+    } else if (type === 'refund') {
+
+      data = [...dataRefund].map(item => {
+        let paymentMethodTH = ''
+        if (item.paymentMethod === 'cash') {
+          paymentMethodTH = 'เงินสด'
+        } else if (item.paymentMethod === 'qr') {
+          paymentMethodTH = 'QR Payment'
+        } else { 
+          paymentMethodTH = item.paymentMethod
+        }
+
+        // เช็คว่าเป็น refund หรือไม่
+        const isRefund = item.type === 'refund'
+        const totalWithSign = isRefund ? -Math.abs(item.total) : item.total
+
+        return {
+          type: item.type,
+          orderId: item.orderId,
+          saleCode: item.sale.saleCode,
+          saleName: item.sale.name,
+          storeId: item.store.storeId,
+          storeName: item.store.name,
+          storeTaxId: item.store.taxId,
+          total: totalWithSign,
+          paymentMethod: paymentMethodTH
+        }
+      })
+    }
+
     res.status(200).json({
       status: 200,
       message: 'sucess',

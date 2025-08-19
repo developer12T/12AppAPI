@@ -303,8 +303,12 @@ exports.getPromotionProduct = async (req, res) => {
   try {
     const { type, storeId, proId } = req.body
 
-    const channel = req.headers['x-channel'] // 'credit' or 'cash'
-    const { Cart } = getModelsByChannel(channel, res, CartModel)
+    const channel = req.headers['x-channel']; // 'credit' or 'cash'
+    const { Cart } = getModelsByChannel(channel, res, CartModel);
+    const { Store } = getModelsByChannel(channel, res, storeModel);
+    const { Product } = getModelsByChannel(channel, res, productModel);
+    const { Stock  } = getModelsByChannel(channel, res, stockModel);
+
 
     if (!type || !storeId || !proId) {
       return res.status(400).json({
@@ -330,7 +334,88 @@ exports.getPromotionProduct = async (req, res) => {
         .json({ status: 404, message: 'Promotion not found in the cart!' })
     }
 
-    const rewardProducts = await getRewardProduct(proId, channel, res)
+    const rewardProducts = await getRewardProduct(proId, channel, res);
+
+    // ถ้า item.id เป็นสตริง ใช้ map ก็พอ; ถ้าเป็น array ใช้ flatMap
+    const productIds = [...new Set(
+      (rewardProducts || []).map(it => String(it.id)).filter(Boolean)
+    )];
+
+    const store = await Store.findOne({ storeId }).select('area').lean();
+
+    const proQty = Number(promotion.proQty ?? 0);
+
+    const [productStock] = await Stock.aggregate([
+      {
+        $match: {
+          period: period(),
+          area: store.area,
+          'listProduct.productId': { $in: productIds }
+        }
+      },
+      {
+        $project: {
+          listProduct: {
+            $map: {
+              input: {
+                $filter: {
+                  input: '$listProduct',
+                  as: 'p',
+                  cond: { $in: ['$$p.productId', productIds] }
+                }
+              },
+              as: 'p',
+              in: {
+                productId: '$$p.productId',
+                balancePcs: '$$p.balancePcs',
+                enough: { $gte: [{ $ifNull: ['$$p.balancePcs', 0] }, promotion.proQty] }
+              }
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          // เก็บเฉพาะ product ที่ enough == true
+          listProduct: {
+            $filter: {
+              input: '$listProduct',
+              as: 'p',
+              cond: { $eq: ['$$p.enough', true] }
+            }
+          }
+        }
+      }
+    ]);
+
+    // 1) กรองเฉพาะรายการที่พอ
+    const enoughProducts = (productStock?.listProduct ?? []).filter(p => p.enough);
+
+    // 2) ดึงเฉพาะ productId และจัดการ trim + unique
+    const enoughProductIds = [...new Set(
+      enoughProducts
+        .map(it => String(it.productId).trim())
+        .filter(Boolean)
+    )];
+
+    // 3) ถ้าไม่มีอะไรพอ ก็จบเร็ว
+    if (enoughProductIds.length === 0) {
+      console.log('no enough products');
+      return [];
+    }
+
+    // 4) ดึงข้อมูลสินค้า
+    const productDetail = await Product.find(
+      { id: { $in: enoughProductIds } },           // เปลี่ยนเป็น { productId: { $in: ... } } ถ้า schema ใช้ชื่อ field อื่น
+      { _id: 0 }                                   // เลือก fields เท่าที่ต้องใช้ เช่น { id:1, name:1, price:1 }
+    ).lean();
+
+    // (ออปชัน) เรียงผลลัพธ์ตามลำดับ ids ที่ส่งเข้าไป
+    const order = new Map(enoughProductIds.map((id, i) => [id, i]));
+    productDetail.sort((a, b) => (order.get(String(a.id)) ?? 1e9) - (order.get(String(b.id)) ?? 1e9));
+
+    // console.log(productDetail);
+
 
     if (!rewardProducts.length) {
       return res
@@ -338,11 +423,10 @@ exports.getPromotionProduct = async (req, res) => {
         .json({ status: 404, message: 'No reward products found!' })
     }
 
-    // console.log(rewardProducts)
 
     const groupedProducts = {}
 
-    rewardProducts.forEach(product => {
+    productDetail.forEach(product => {
       const key = `${product.group}|${product.size}`
 
       if (!groupedProducts[key]) {
@@ -495,7 +579,8 @@ exports.getPromotion = async (req, res) => {
   const channel = req.headers['x-channel'] // 'credit' or 'cash'
   const { Promotion } = getModelsByChannel(channel, res, promotionModel)
 
-  const data = await Promotion.find({ status: 'active' }).sort({ proId: 1 })
+  const data = await Promotion.find({ status: 'active' })
+    .sort({ proId: 1});
 
   if (data.length == 0) {
     return res.status(404).json({

@@ -80,7 +80,7 @@ exports.getProductSwitch = async (req, res) => {
 }
 exports.getProduct = async (req, res) => {
   try {
-    const { type, group, area, orderId, period, brand, size, flavour } = req.body
+    const { type, group, area, orderId, period, brand, size, flavour, limit } = req.body
     const channel = req.headers['x-channel']
 
     const { Product } = getModelsByChannel(channel, res, productModel)
@@ -135,6 +135,7 @@ exports.getProduct = async (req, res) => {
         }
       ])
     } else {
+
       if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
         return res.status(400).json({
           status: '400',
@@ -160,61 +161,115 @@ exports.getProduct = async (req, res) => {
       if (flavourArray.length) andConditions.push({ flavour: { $in: flavourArray } })
       if (andConditions.length) filter.$and = andConditions
 
-      products = await Product.find(filter).lean()
+      if (limit === true) {
+        const TOP_N = 20;
 
-      stock = await Stock.aggregate([
-        {
-          $match: {
-            period: period,
-            area: area
+        products = await Product.find(filter)
+          .select('id name group groupCode size brand flavour listUnit statusSale statusRefund statusWithdraw')
+          .limit(TOP_N)
+          .lean();
+        const productsId = products.flatMap(item => item.id)
+
+        const ids = [...new Set(
+          (productsId || []).map(x => String(x).trim()).filter(Boolean)
+        )];
+
+        stock = await Stock.aggregate([
+          // ตัดเอกสารตามช่วงที่สนใจก่อน
+          { $match: { period, area, 'listProduct.productId': { $in: ids } } },
+
+          // เอาเฉพาะ array ที่ใช้
+          { $project: { _id: 0, listProduct: 1 } },
+          { $unwind: '$listProduct' },
+
+          // เตรียมฟิลด์ให้เทียบตรงและเป็นตัวเลข
+          {
+            $set: {
+              productId: { $trim: { input: '$listProduct.productId' } },
+              balancePcs: { $toDouble: { $ifNull: ['$listProduct.balancePcs', 0] } },
+              balanceCtn: { $toDouble: { $ifNull: ['$listProduct.balanceCtn', 0] } },
+            }
+          },
+
+          // กรองเฉพาะ product ที่อยู่ใน ids (หลัง trim)
+          { $match: { productId: { $in: ids } } },
+
+          // รวบยอดต่อ productId
+          {
+            $group: {
+              _id: '$productId',
+              balancePcs: { $sum: '$balancePcs' },
+              balanceCtn: { $sum: '$balanceCtn' }
+            }
+          },
+
+          // รูปแบบผลลัพธ์
+          { $project: { _id: '$_id', balancePcs: 1, balanceCtn: 1 } }
+        ], { allowDiskUse: true });
+
+      } else {
+        products = await Product.find(filter).lean()
+
+        stock = await Stock.aggregate([
+          {
+            $match: {
+              period: period,
+              area: area
+            }
+          },
+          { $unwind: '$listProduct' },
+          {
+            $group: {
+              _id: '$listProduct.productId',
+              balanceCtn: { $sum: '$listProduct.balanceCtn' },
+              balancePcs: { $sum: '$listProduct.balancePcs' }
+            }
           }
-        },
-        { $unwind: '$listProduct' },
-        {
-          $group: {
-            _id: '$listProduct.productId',
-            balanceCtn: { $sum: '$listProduct.balanceCtn' },
-            balancePcs: { $sum: '$listProduct.balancePcs' }
-          }
-        }
-      ])
+        ])
+      }
+
     }
+
+
 
     if (!products.length) {
       return res.status(404).json({ status: '404', message: 'No products found!' })
     }
+    // console.log(products)
+    // console.log(stock)
+    const data = products
+      // .filter(product => {
+      //   if (type === 'withdraw') {
+      //     return product.listUnit?.some(u => u.unit === 'CTN') // ✅ เฉพาะที่มี CTN
+      //   }
+      //   return true // แสดงทุกตัวถ้าไม่ใช่ withdraw
+      // })
+    // console.log(stock)
 
-const data = products
-  // .filter(product => {
-  //   if (type === 'withdraw') {
-  //     return product.listUnit?.some(u => u.unit === 'CTN') // ✅ เฉพาะที่มี CTN
-  //   }
-  //   return true // แสดงทุกตัวถ้าไม่ใช่ withdraw
-  // })
-  .map(product => {
-    const stockMatch = stock.find(s => s._id === product.id) || {}
-    let listUnit = product.listUnit || []
+      .map(product => {
+        const stockMatch = stock.find(s => s._id === product.id) || {}
+        let listUnit = product.listUnit || []
+        // console.log(stockMatch)
+        if (type === 'sale') {
+          listUnit = listUnit.map(u => ({ ...u, price: u.price?.sale }))
+        } else if (type === 'refund') {
+          listUnit = listUnit.map(u => ({ ...u, price: u.price?.refund }))
+        } else if (type === 'withdraw') {
+          listUnit = listUnit
+            // .filter(u => u.unit === 'CTN') // ✅ เฉพาะ CTN
+            .map(u => ({
+              ...u,
+              price: u.price?.sale
+            }))
+        }
 
-    if (type === 'sale') {
-      listUnit = listUnit.map(u => ({ ...u, price: u.price?.sale }))
-    } else if (type === 'refund') {
-      listUnit = listUnit.map(u => ({ ...u, price: u.price?.refund }))
-    } else if (type === 'withdraw') {
-      listUnit = listUnit
-        // .filter(u => u.unit === 'CTN') // ✅ เฉพาะ CTN
-        .map(u => ({
-          ...u,
-          price: u.price?.sale
-        }))
-    }
-
-    return {
-      ...product,
-      listUnit,
-      qtyCtn: stockMatch.balanceCtn || 0,
-      qtyPcs: stockMatch.balancePcs || 0
-    }
-  })
+        return {
+          ...product,
+          listUnit,
+          qtyCtn: stockMatch.balanceCtn || 0,
+          qtyPcs: stockMatch.balancePcs || 0
+        }
+      })
       .sort((a, b) => {
         if (a.groupCode < b.groupCode) return -1
         if (a.groupCode > b.groupCode) return 1
