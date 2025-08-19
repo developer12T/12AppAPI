@@ -4493,33 +4493,36 @@ exports.addStockAllWithInOut = async (req, res) => {
     for (const area of uniqueAreas) {
       const r = await buildAreaStock(area)
       results.push(r)
+      // console.log(area)
     }
 
     for (item of results) {
       for (i of item.data) {
-        // await Stock.findOneAndUpdate(
-        //   {
-        //     area: item.area,
-        //     period: period,
-        //     'listProduct.productId': i.productId
-        //   },
-        //   {
-        //     $set: {
-        //       // 'listProduct.$[elem].stockPcs': i.summaryQty.PCS.stock,
-        //       'listProduct.$[elem].stockInPcs': i.summaryQty.PCS.in,
-        //       'listProduct.$[elem].stockOutPcs': i.summaryQty.PCS.out,
-        //       'listProduct.$[elem].balancePcs': i.summaryQty.PCS.balance,
-        //       // 'listProduct.$[elem].stockCtn': i.summaryQty.CTN.stock,
-        //       'listProduct.$[elem].stockInCtn': i.summaryQty.CTN.in,
-        //       'listProduct.$[elem].stockOutCtn': i.summaryQty.CTN.out,
-        //       'listProduct.$[elem].balanceCtn': i.summaryQty.CTN.balance
-        //     }
-        //   },
-        //   {
-        //     arrayFilters: [{ 'elem.productId': i.productId }],
-        //     new: true
-        //   }
-        // )
+              // console.log(item.area)
+
+        await Stock.findOneAndUpdate(
+          {
+            area: item.area,
+            period: period,
+            'listProduct.productId': i.productId
+          },
+          {
+            $set: {
+              // 'listProduct.$[elem].stockPcs': i.summaryQty.PCS.stock,
+              'listProduct.$[elem].stockInPcs': i.summaryQty.PCS.in,
+              'listProduct.$[elem].stockOutPcs': i.summaryQty.PCS.out,
+              'listProduct.$[elem].balancePcs': i.summaryQty.PCS.balance,
+              // 'listProduct.$[elem].stockCtn': i.summaryQty.CTN.stock,
+              'listProduct.$[elem].stockInCtn': i.summaryQty.CTN.in,
+              'listProduct.$[elem].stockOutCtn': i.summaryQty.CTN.out,
+              'listProduct.$[elem].balanceCtn': i.summaryQty.CTN.balance
+            }
+          },
+          {
+            arrayFilters: [{ 'elem.productId': i.productId }],
+            new: true
+          }
+        )
       }
     }
 

@@ -1,12 +1,24 @@
 const express = require('express')
-const { addPromotion, getPromotionProduct,getPromotion,addPromotionLimit,updatePromotionLimit,addQuota,
-    updateQuota,addPromotionShelf,updatePromotion,getPromotionDetail,deletePromotion
- } = require('../../controllers/promotion/promotionController')
+const {
+  addPromotion,
+  getPromotionProduct,
+  getPromotion,
+  addPromotionLimit,
+  updatePromotionLimit,
+  addQuota,
+  updateQuota,
+  addPromotionShelf,
+  updatePromotion,
+  getPromotionDetail,
+  deletePromotion,
+  addPromotionM3
+} = require('../../controllers/promotion/promotionController')
 
 const router = express.Router()
 
 router.post('/add', addPromotion)
 router.post('/updatePromotion', updatePromotion)
+router.post('/addPromotionM3', addPromotionM3)
 
 router.post('/changeProduct', getPromotionProduct)
 router.get('/getPromotion', getPromotion)
