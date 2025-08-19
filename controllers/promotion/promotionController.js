@@ -10,6 +10,7 @@ const CartModel = require('../../models/cash/cart')
 const productModel = require('../../models/cash/product')
 const userModel = require('../../models/cash/user')
 const storeModel = require('../../models/cash/store')
+const stockModel = require('../../models/cash/stock')
 const {
   rangeDate,
   formatDate,
