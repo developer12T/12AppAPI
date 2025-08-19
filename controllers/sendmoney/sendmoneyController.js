@@ -360,7 +360,7 @@ exports.getSendMoneyForAcc = async (req, res) => {
     const totalUserCountArr = await User.aggregate([
       {
         $match: {
-          area: { $nin: [null, ''] }
+          area: { $nin: [null, '', 'IT211'] }
         }
       },
       {
