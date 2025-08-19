@@ -395,8 +395,25 @@ exports.getSendMoneyForAcc = async (req, res) => {
           SALE: { $concat: ['$user.firstName', ' ', '$user.surName'] },
           STATUS: 'OK',
           TRANSFER_DATE: date,
+          WAREHOUSE: '$user.warehouse',
           VALUES: '$sendmoney',
-          ZONE: { $substrBytes: ['$area', 0, 2] }
+          ZONE: { $substrBytes: ['$area', 0, 2] },
+          IMAGE: {
+            $concat: [
+              'https://apps.onetwotrading.co.th/images/sendmoney/',
+              { $ifNull: ['$user.area', ''] },
+              '/',
+              {
+                $trim: {
+                  // trims the trailing comma you have in the sample
+                  input: {
+                    $ifNull: [{ $arrayElemAt: ['$imageList.name', 0] }, '']
+                  },
+                  chars: ','
+                }
+              }
+            ]
+          }
         }
       },
       {
@@ -406,7 +423,9 @@ exports.getSendMoneyForAcc = async (req, res) => {
             SALE: '$SALE',
             STATUS: '$STATUS',
             TRANSFER_DATE: '$TRANSFER_DATE',
-            ZONE: '$ZONE'
+            ZONE: '$ZONE',
+            IMAGE: '$IMAGE',
+            WAREHOUSE: '$WAREHOUSE'
           },
           VALUES: { $sum: '$VALUES' },
           COUNT: { $sum: 1 }
@@ -427,7 +446,9 @@ exports.getSendMoneyForAcc = async (req, res) => {
               { $toString: { $round: ['$VALUES', 2] } }
             ]
           },
-          ZONE: '$_id.ZONE'
+          ZONE: '$_id.ZONE',
+          IMAGE: '$_id.IMAGE',
+          WAREHOUSE: '$_id.WAREHOUSE'
         }
       }
     ])
