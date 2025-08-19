@@ -109,7 +109,7 @@ exports.getStore = async (req, res) => {
     )
 
     let query = {}
-    query.route = { $nin: ['DEL', 'R'] }
+    query.route = { $nin: ['DEL'] }
 
     // Priority: ใช้ month/year filter ก่อน type
     if (month && year) {
