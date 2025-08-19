@@ -135,6 +135,7 @@ exports.getProduct = async (req, res) => {
         }
       ])
     } else {
+
       if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
         return res.status(400).json({
           status: '400',
@@ -160,26 +161,54 @@ exports.getProduct = async (req, res) => {
       if (flavourArray.length) andConditions.push({ flavour: { $in: flavourArray } })
       if (andConditions.length) filter.$and = andConditions
 
-      products = await Product.find(filter).lean()
-
       if (limit === true) {
+        const TOP_N = 20;
+
+        products = await Product.find(filter)
+          .select('id name group groupCode size brand flavour listUnit statusSale statusRefund statusWithdraw')
+          .limit(TOP_N)
+          .lean();
+        const productsId = products.flatMap(item => item.id)
+
+        const ids = [...new Set(
+          (productsId || []).map(x => String(x).trim()).filter(Boolean)
+        )];
+
         stock = await Stock.aggregate([
-          { $match: { period, area } },
-          { $project: { listProduct: 1, _id: 0 } },       // ลด payload
+          // ตัดเอกสารตามช่วงที่สนใจก่อน
+          { $match: { period, area, 'listProduct.productId': { $in: ids } } },
+
+          // เอาเฉพาะ array ที่ใช้
+          { $project: { _id: 0, listProduct: 1 } },
           { $unwind: '$listProduct' },
+
+          // เตรียมฟิลด์ให้เทียบตรงและเป็นตัวเลข
           {
-            $group: {
-              _id: { $trim: { input: '$listProduct.productId' } },
-              balanceCtn: { $sum: { $toDouble: '$listProduct.balanceCtn' } },
-              balancePcs: { $sum: { $toDouble: '$listProduct.balancePcs' } }
+            $set: {
+              productId: { $trim: { input: '$listProduct.productId' } },
+              balancePcs: { $toDouble: { $ifNull: ['$listProduct.balancePcs', 0] } },
+              balanceCtn: { $toDouble: { $ifNull: ['$listProduct.balanceCtn', 0] } },
             }
           },
-          { $sort: { balancePcs: -1 } },                  // ถูกต้อง: จัดอันดับก่อน
-          { $limit: 20 },                                 // ได้ Top 20 จริง
-          { $project: { _id: 0, productId: '$_id', balanceCtn: 1, balancePcs: 1 } }
+
+          // กรองเฉพาะ product ที่อยู่ใน ids (หลัง trim)
+          { $match: { productId: { $in: ids } } },
+
+          // รวบยอดต่อ productId
+          {
+            $group: {
+              _id: '$productId',
+              balancePcs: { $sum: '$balancePcs' },
+              balanceCtn: { $sum: '$balanceCtn' }
+            }
+          },
+
+          // รูปแบบผลลัพธ์
+          { $project: { _id: '$_id', balancePcs: 1, balanceCtn: 1 } }
         ], { allowDiskUse: true });
 
       } else {
+        products = await Product.find(filter).lean()
 
         stock = await Stock.aggregate([
           {
@@ -198,16 +227,16 @@ exports.getProduct = async (req, res) => {
           }
         ])
       }
+
     }
-
-
 
 
 
     if (!products.length) {
       return res.status(404).json({ status: '404', message: 'No products found!' })
     }
-
+    // console.log(products)
+    // console.log(stock)
     const data = products
       // .filter(product => {
       //   if (type === 'withdraw') {
@@ -215,10 +244,12 @@ exports.getProduct = async (req, res) => {
       //   }
       //   return true // แสดงทุกตัวถ้าไม่ใช่ withdraw
       // })
+    // console.log(stock)
+
       .map(product => {
         const stockMatch = stock.find(s => s._id === product.id) || {}
         let listUnit = product.listUnit || []
-
+        // console.log(stockMatch)
         if (type === 'sale') {
           listUnit = listUnit.map(u => ({ ...u, price: u.price?.sale }))
         } else if (type === 'refund') {
