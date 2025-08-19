@@ -438,6 +438,45 @@ const DisributionM3 = sequelize.define(
   }
 )
 
+const MGLINE = sequelize.define(
+  'MGLINE',
+  {
+    MRCONO: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      primaryKey: true,
+      field: 'MRCONO'
+    },
+    MRTRNR: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      primaryKey: true,
+      field: 'MRTRNR'
+    },
+    MRTRSH: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'MRTRSH'
+    },
+    MRITNO: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'MRITNO'
+    }
+  },
+  {
+    freezeTableName: true,
+    timestamps: false,
+    createdAt: false,
+    updatedAt: false,
+    primaryKey: false
+  }
+)
+
+
+
+
+
 const MHDISL = sequelize.define(
   'MHDISL',
   {
@@ -456,7 +495,7 @@ const MHDISL = sequelize.define(
     qtyPcs: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      field: 'URTRQT'
+      field: 'URPLQT'
     },
     withdrawUnit: {
       type: DataTypes.STRING,
@@ -949,7 +988,7 @@ module.exports = {
   NumberSeries,
   OOTYPE,
   Customer,
-
+  MGLINE,
   PromotionStore
   // MGTYPE,
   // OODFLT

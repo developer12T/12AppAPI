@@ -2,7 +2,7 @@
 // const { User } = require('../../models/cash/user')
 // const { Product } = require('../../models/cash/product')
 // const { Distribution, Place } = require('../../models/cash/distribution')
-const { MHDISL, MHDISH, DisributionM3 } = require('../../models/cash/master')
+const { MHDISL, MHDISH, DisributionM3, MGLINE } = require('../../models/cash/master')
 const { sequelize, DataTypes } = require('../../config/m3db')
 const { getSeries, updateRunningNumber } = require('../../middleware/order')
 const axios = require('axios')
@@ -21,7 +21,7 @@ const { query } = require('mssql')
 const { exists } = require('fs')
 const DistributionModel = require('../../models/cash/distribution')
 require('dotenv').config()
-
+const { Op } = require('sequelize');
 const { formatDateTimeToThai } = require('../../middleware/order')
 const { to2, updateStockMongo } = require('../../middleware/order')
 const { getSocket } = require('../../socket')
@@ -389,9 +389,9 @@ exports.getOrder = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-                fullname: `${userData.firstName} ${userData.surName}`,
-                tel: `${userData.tel}`
-              }
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
             : null,
           orderId: o.orderId,
           orderType: o.orderType,
@@ -975,12 +975,10 @@ exports.approveWithdraw = async (req, res) => {
       <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
       <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
       <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName}<br>
-      <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
-          '-' + wereHouseName?.wh_name || ''
-        }<br>
-      <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
-          distributionTran.shippingName
-        }<br>
+      <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
+          }<br>
+      <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
+          }<br>
       <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
       <strong>เขต:</strong> ${distributionTran.area}<br>
       <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -1091,7 +1089,7 @@ exports.saleConfirmWithdraw = async (req, res) => {
       const MGTRSH = toNum(row.MGTRSH)
 
       // ถ้าต้องการให้ "ทั้งสองค่า" ต้องเป็น 90 ถึงจะผ่าน
-      if (MGTRSL !== 99 && MGTRSH !== 99) {
+      if (MGTRSL !== 99 || MGTRSH !== 99) {
         return res.status(400).json({
           status: 400,
           message: `${orderId} is not 99 (MGTRSL=${row.MGTRSL}, MGTRSH=${row.MGTRSH})`
@@ -1104,16 +1102,29 @@ exports.saleConfirmWithdraw = async (req, res) => {
         .filter(Boolean)
       const productDetail = await Product.find({ id: { $in: listProductId } })
 
+      const checkStatus = await MGLINE.findAll({
+        where: {
+          MRCONO: 410,
+          MRTRNR: orderId,
+          MRTRSH: '99'
+        },
+        raw: true
+      })
+      const productIds = checkStatus.flatMap(item => item.MRITNO)
+
       // ✅ ดึงข้อมูลรับสินค้าจากระบบ ERP
       const Receive = await MHDISL.findAll({
-        where: { coNo: orderId },
+        where: {
+          coNo: orderId,
+          productId: { [Op.in]: productIds }
+        },
         raw: true
       })
       const ReceiveWeight = await MHDISH.findAll({
         where: { coNo: orderId },
         raw: true
       })
-
+      // console.log(Receive.length)
       const ReceiveQty = Object.values(
         Receive.reduce((acc, cur) => {
           // ใช้ key จาก coNo + withdrawUnit + productId (ถ้าอยากแยกตาม productId ด้วย)
@@ -1315,7 +1326,7 @@ exports.getReceiveQty = async (req, res) => {
     const MGTRSH = toNum(row.MGTRSH)
 
     // ถ้าต้องการให้ "ทั้งสองค่า" ต้องเป็น 99 ถึงจะผ่าน
-    if (MGTRSL !== 99 && MGTRSH !== 99) {
+    if (MGTRSL !== 99 || MGTRSH !== 99) {
       return res.status(400).json({
         status: 400,
         message: `Sucess`,
@@ -1333,8 +1344,22 @@ exports.getReceiveQty = async (req, res) => {
     const productDetail = await Product.find({ id: { $in: listProductId } })
 
     // ✅ ดึงข้อมูลรับสินค้าจากระบบ ERP
+    const checkStatus = await MGLINE.findAll({
+      where: {
+        MRCONO: 410,
+        MRTRNR: orderId,
+        MRTRSH: '99'
+      },
+      raw: true
+    })
+    const productIds = checkStatus.flatMap(item => item.MRITNO)
+
+    // ✅ ดึงข้อมูลรับสินค้าจากระบบ ERP
     const Receive = await MHDISL.findAll({
-      where: { coNo: orderId },
+      where: {
+        coNo: orderId,
+        productId: { [Op.in]: productIds }
+      },
       raw: true
     })
     const ReceiveWeight = await MHDISH.findAll({
