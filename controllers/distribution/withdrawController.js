@@ -1086,17 +1086,17 @@ exports.saleConfirmWithdraw = async (req, res) => {
           .status(404)
           .json({ status: 404, message: `${orderId} not found` })
 
-      const toNum = v => Number(String(v ?? '').trim()) // แปลง NVARCHAR -> Number, ตัดช่องว่าง
-      const MGTRSL = toNum(row.MGTRSL)
-      const MGTRSH = toNum(row.MGTRSH)
+      // const toNum = v => Number(String(v ?? '').trim()) // แปลง NVARCHAR -> Number, ตัดช่องว่าง
+      // const MGTRSL = toNum(row.MGTRSL)
+      // const MGTRSH = toNum(row.MGTRSH)
 
-      // ถ้าต้องการให้ "ทั้งสองค่า" ต้องเป็น 90 ถึงจะผ่าน
-      if (MGTRSL !== 99 || MGTRSH !== 99) {
-        return res.status(400).json({
-          status: 400,
-          message: `${orderId} is not 99 (MGTRSL=${row.MGTRSL}, MGTRSH=${row.MGTRSH})`
-        })
-      }
+      // // ถ้าต้องการให้ "ทั้งสองค่า" ต้องเป็น 90 ถึงจะผ่าน
+      // if (MGTRSL !== 99 || MGTRSH !== 99) {
+      //   return res.status(400).json({
+      //     status: 400,
+      //     message: `${orderId} is not 99 (MGTRSL=${row.MGTRSL}, MGTRSH=${row.MGTRSH})`
+      //   })
+      // }
 
       // ✅ ดึงข้อมูลสินค้าที่เกี่ยวข้อง
       const listProductId = distributionTran.listProduct
@@ -1323,22 +1323,22 @@ exports.getReceiveQty = async (req, res) => {
         .status(404)
         .json({ status: 404, message: `${orderId} not found in M3` })
 
-    const toNum = v => Number(String(v ?? '').trim()) // แปลง NVARCHAR -> Number, ตัดช่องว่าง
-    const MGTRSL = toNum(row.MGTRSL)
-    const MGTRSH = toNum(row.MGTRSH)
+    // const toNum = v => Number(String(v ?? '').trim()) // แปลง NVARCHAR -> Number, ตัดช่องว่าง
+    // const MGTRSL = toNum(row.MGTRSL)
+    // const MGTRSH = toNum(row.MGTRSH)
 
-    // ถ้าต้องการให้ "ทั้งสองค่า" ต้องเป็น 99 ถึงจะผ่าน
-    if (MGTRSL !== 99 || MGTRSH !== 99) {
-      return res.status(400).json({
-        status: 400,
-        message: `Sucess`,
-        data: {
-          orderId: orderId,
-          lowStatus: row.MGTRSL,
-          highStatus: row.MGTRSH
-        }
-      })
-    }
+    // // ถ้าต้องการให้ "ทั้งสองค่า" ต้องเป็น 99 ถึงจะผ่าน
+    // if (MGTRSL !== 99 || MGTRSH !== 99) {
+    //   return res.status(400).json({
+    //     status: 400,
+    //     message: `Sucess`,
+    //     data: {
+    //       orderId: orderId,
+    //       lowStatus: row.MGTRSL,
+    //       highStatus: row.MGTRSH
+    //     }
+    //   })
+    // }
 
     const listProductId = distributionTran.listProduct
       .map(i => i.id)
