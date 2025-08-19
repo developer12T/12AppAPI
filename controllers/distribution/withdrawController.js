@@ -910,10 +910,12 @@ exports.approveWithdraw = async (req, res) => {
 
       let response
       try {
-        response = await axios.post(
-          `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
-          data
-        )
+        if (distributionTran.withdrawType != 'credit') {
+          response = await axios.post(
+            `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
+            data
+          )
+        }
       } catch (err) {
         if (err.response) {
           console.log('API error response:', err.response.data)
