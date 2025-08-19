@@ -194,8 +194,8 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-        .map(item => item.price)
-        .reduce((sum, price) => sum + price, 0)
+          .map(item => item.price)
+          .reduce((sum, price) => sum + price, 0)
       : 0
     const total = subtotal - discountProduct
     const newOrder = new Order({
@@ -785,7 +785,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -1060,7 +1060,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1171,7 +1171,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromChange = modelChange.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1434,7 +1434,7 @@ exports.OrderToExcel = async (req, res) => {
       message: 'Not Found Order'
     })
   }
-  function yyyymmddToDdMmYyyy(dateString) {
+  function yyyymmddToDdMmYyyy (dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -1466,7 +1466,7 @@ exports.OrderToExcel = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => { })
+    fs.unlink(tempPath, () => {})
   })
 
   // res.status(200).json({
@@ -3547,23 +3547,12 @@ exports.saleReport = async (req, res) => {
   const { Order } = getModelsByChannel(channel, res, orderModel)
   const { Refund } = getModelsByChannel(channel, res, refundModel)
 
-  // const dataRefund = await Refund.find({
-  //   // ...filterArea,
-  //   // ...filterCreatedAt,
-  //   // status: { $ne: "canceled" }
-  // })
-
-  // console.log(dataRefund)
 
   if (role == 'sale' || role == '' || !role) {
     let filterCreatedAt = {}
     let filterArea = {}
-    let filterType = {}
     if (area) {
       filterArea = { 'store.area': area }
-    }
-    if (type) {
-      filterType = { type: type }
     }
     if (date) {
       const year = Number(date.substring(0, 4))
@@ -3580,6 +3569,7 @@ exports.saleReport = async (req, res) => {
         }
       }
     }
+
     const dataOrder = await Order.find({
       ...filterArea,
       ...filterCreatedAt,
@@ -3601,7 +3591,7 @@ exports.saleReport = async (req, res) => {
 
     if (type === 'sale') {
 
-      data = [...dataOrder].map(item => {
+      data = [...dataOrder, ...dataRefund].map(item => {
         let paymentMethodTH = ''
         if (item.paymentMethod === 'cash') {
           paymentMethodTH = 'เงินสด'
@@ -3627,16 +3617,14 @@ exports.saleReport = async (req, res) => {
           paymentMethod: paymentMethodTH
         }
       })
-
     } else if (type === 'refund') {
-
       data = [...dataRefund].map(item => {
         let paymentMethodTH = ''
         if (item.paymentMethod === 'cash') {
           paymentMethodTH = 'เงินสด'
         } else if (item.paymentMethod === 'qr') {
           paymentMethodTH = 'QR Payment'
-        } else { 
+        } else {
           paymentMethodTH = item.paymentMethod
         }
 
@@ -3691,7 +3679,7 @@ exports.saleReport = async (req, res) => {
     // io.emit('order/saleReport', {});
 
     res.status(200).json({
-      status: 200,
+      status: 200
       // sendMoneyData
     })
   }
