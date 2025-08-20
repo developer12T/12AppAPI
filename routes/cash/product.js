@@ -17,13 +17,15 @@ const {
   sizeByFilter,
   brandByFilter,
   unitByFilter,
-  addProductimage
+  addProductimage,
+  addProduct
 } = require('../../controllers/product/productController')
 
 const router = express.Router()
 
 router.get('/all', getProductAll)
 router.post('/get', getProduct)
+router.post('/add', addProduct)
 router.get('/getProductSwitch', getProductSwitch)
 router.get('/search', searchProduct)
 router.post('/filter', getFilters)

@@ -115,39 +115,219 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
         })
     );
 
-
+    // console.log(multiplier)
     if (!eligibleProducts.length) return []
 
     return rewards.map(r => {
-        const product = eligibleProducts.find(p =>
-            (!r.productGroup || p.group === r.productGroup) &&
-            (!r.productFlavour || p.flavour === r.productFlavour) &&
-            (!r.productBrand || p.brand === r.productBrand) &&
-            (!r.productSize || p.size === r.productSize)
-        )
-        // console.log("test",product)
-        if (!product) return null
+        const productQty = r.limitType === 'limited' ? r.productQty : r.productQty * multiplier;
 
-        const unitData = product.listUnit.find(unit => unit.unit === r.productUnit)
-        const factor = parseInt(unitData?.factor, 10) || 1
-        const productQty = r.limitType === 'limited' ? r.productQty : r.productQty * multiplier
-        const productQtyPcs = productQty * factor
-        // console.log(r.productUnit)
+        let picked = null;
+        let unitData = null;
+        let factor = 1;
+        let productQtyPcs = 0;
+
+        for (const p of eligibleProducts) {
+            // 1) match คุณสมบัติสินค้า
+            if (r.productGroup && p.group !== r.productGroup) continue;
+            if (r.productFlavour && p.flavour !== r.productFlavour) continue;
+            if (r.productBrand && p.brand !== r.productBrand) continue;
+            if (r.productSize && p.size !== r.productSize) continue;
+
+            // 2) หา unit และ factor ของสินค้านี้
+            const u = p.listUnit.find(u => u.unit === r.productUnit);
+            if (!u) continue; // ไม่รองรับ unit ที่ขอ
+
+            const f = Number(u.factor) || 1;
+            const needPcs = productQty * f;
+
+            // 3) เช็คสต็อกของสินค้านี้พอไหม (ต่อไปเรื่อยๆ จนกว่าจะเจอ)
+            if ((Number(p.balancePcs) || 0) >= needPcs) {
+                picked = p;
+                unitData = u;
+                factor = f;
+                productQtyPcs = needPcs;
+                break; // เจอแล้วหยุด
+            }
+        }
+
+        if (!picked) return null;
 
         return {
-            productId: product.id,
-            productName: product.name,
-            productGroup: product.group,
-            productFlavour: product.flavour,
-            productBrand: product.brand,
-            productSize: product.size,
+            productId: picked.id,
+            productName: picked.name,
+            productGroup: picked.group,
+            productFlavour: picked.flavour,
+            productBrand: picked.brand,
+            productSize: picked.size,
             productUnit: r.productUnit,
             productUnitName: unitData?.name || '',
             productQty,
             productQtyPcs
-        }
-    }).filter(Boolean)
+        };
+    }).filter(Boolean);
 }
+
+
+async function rewardProductCheckStock(rewards, area, multiplier, channel, res) {
+    if (!rewards || rewards.length === 0) return []
+    const { Product } = getModelsByChannel(channel, res, productModel);
+    const { Stock } = getModelsByChannel(channel, res, stockModel);
+    const rewardFilters = rewards.map(r => ({
+        ...(r.productId ? { id: r.productId } : {}),
+        ...(r.productGroup ? { group: r.productGroup } : {}),
+        ...(r.productFlavour ? { flavour: r.productFlavour } : {}),
+        ...(r.productBrand ? { brand: r.productBrand } : {}),
+        // ...(r.productUnit ? { unit: r.productUnit } : {}),
+        // ...(r.productQty: ? { balancePcs: r.productQty: } : {}),
+    }))
+
+    // 1. ดึง stock + รายละเอียด product ออกมาครบจบใน aggregate แล้ว
+    const stockList = await Stock.aggregate([
+        {
+            $match: {
+                area: area,
+                period: period()
+            }
+        },
+        { $unwind: '$listProduct' },
+        {
+            $lookup: {
+                from: 'products',
+                localField: 'listProduct.productId',
+                foreignField: 'id',
+                as: 'productDetail'
+            }
+        },
+        { $unwind: '$productDetail' },
+        {
+            $match: {
+                'productDetail.statusSale': 'Y'
+            }
+        },
+        {
+            $replaceRoot: {
+                newRoot: {
+                    $mergeObjects: ['$listProduct', '$productDetail']
+                }
+            }
+        }
+    ]);
+
+    // console.log(stockList)
+
+    // 2. Filter เฉพาะที่ match กับ rewardFilters
+    function matchFilter(obj, filter) {
+        return Object.keys(filter).every(key => obj[key] === filter[key]);
+    }
+
+    const filteredStock = stockList.filter(item =>
+        rewardFilters.some(filter => matchFilter(item, filter))
+    );
+
+    // console.log(filteredStock)
+    // 3. แปลง reward ให้เป็นโครงสร้างที่ต้องใช้
+    const rewardQty = rewards.map(item => ({
+        unit: item.productUnit,
+        qty: item.productQty
+    }));
+
+    // console.log(rewardQty)
+
+    // 4. สร้าง productStock พร้อม unitList ที่ตรงกับ reward
+    const productStock = filteredStock.map(item => ({
+        id: item.productId,
+        unitList: item.listUnit, // จาก productDetail
+        balancePcs: item.balancePcs
+    }));
+
+    // 5. ตรวจสอบว่า stock พอสำหรับ reward มั้ย
+    const checkList = productStock.map(stock => {
+        // const rewardPcs = rewardQty.reduce((sum, reward) => {
+        //     const u = stock.unitList.find(u => u.unit === reward.unit);
+        //     const factor = u ? u.factor : 1;
+        //     return sum + (reward.qty * factor);
+        // }, 0);
+        // console.log(rewardQty)
+        // const rewardPcs = reward.qty
+        return {
+            id: stock.id,
+            totalRewardPcs: rewardQty[0].qty,
+            totalStockPcs: stock.balancePcs,
+            enough: stock.balancePcs >= rewardQty[0].qty
+        };
+    });
+
+    // console.log(checkList)
+    const enoughList = checkList.filter(item => item.enough);
+    // console.log(enoughList)
+    // 6. ดึงรายละเอียดสินค้าแบบรวดเดียว (Promise.all)
+    const eligibleProducts = await Promise.all(
+        enoughList.map(async item => {
+            const dataProduct = await Product.findOne({ id: item.id }).lean();
+            return {
+                ...dataProduct,
+                balancePcs: item.totalStockPcs
+            };
+        })
+    );
+
+    // console.log(multiplier)
+    if (!eligibleProducts.length) return []
+
+    return rewards.map(r => {
+        const productQty = r.limitType === 'limited' ? r.productQty : r.productQty * multiplier;
+
+        let picked = null;
+        let unitData = null;
+        let factor = 1;
+        let productQtyPcs = 0;
+
+        for (const p of eligibleProducts) {
+            // 1) match คุณสมบัติสินค้า
+            if (r.productGroup && p.group !== r.productGroup) continue;
+            if (r.productFlavour && p.flavour !== r.productFlavour) continue;
+            if (r.productBrand && p.brand !== r.productBrand) continue;
+            if (r.productSize && p.size !== r.productSize) continue;
+
+            // 2) หา unit และ factor ของสินค้านี้
+            const u = p.listUnit.find(u => u.unit === r.productUnit);
+            if (!u) continue; // ไม่รองรับ unit ที่ขอ
+
+            const f = Number(u.factor) || 1;
+            const needPcs = productQty * f;
+            // console.log(p)
+            // 3) เช็คสต็อกของสินค้านี้พอไหม (ต่อไปเรื่อยๆ จนกว่าจะเจอ)
+            if ((Number(p.balancePcs) || 0) >= needPcs) {
+                picked = p;
+                unitData = u;
+                factor = f;
+                productQtyPcs = needPcs;
+                break; // เจอแล้วหยุด
+            }
+        }
+
+        if (!picked) return null;
+
+        return {
+            productId: picked.id,
+            productName: picked.name,
+            productGroup: picked.group,
+            productFlavour: picked.flavour,
+            productBrand: picked.brand,
+            productSize: picked.size,
+            productUnit: r.productUnit,
+            productUnitName: unitData?.name || '',
+            productQty,
+            productQtyPcs
+        };
+    }).filter(Boolean);
+}
+
+
+
+
+
+
 
 async function applyPromotion(order, channel, res) {
 
@@ -482,4 +662,4 @@ async function applyPromotionUsage(storeId, promotion, channel, res) {
 
 
 
-module.exports = { applyPromotion, rewardProduct, getRewardProduct, applyPromotionUsage, applyQuota }
+module.exports = { applyPromotion, rewardProduct, getRewardProduct, applyPromotionUsage, applyQuota,rewardProductCheckStock }

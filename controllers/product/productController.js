@@ -36,7 +36,6 @@ exports.getProductAll = async (req, res) => {
       return modifiedProduct
     })
 
-
     // const io = getSocket()
     // io.emit('product/all', {});
 
@@ -80,7 +79,8 @@ exports.getProductSwitch = async (req, res) => {
 }
 exports.getProduct = async (req, res) => {
   try {
-    const { type, group, area, orderId, period, brand, size, flavour, limit } = req.body
+    const { type, group, area, orderId, period, brand, size, flavour, limit } =
+      req.body
     const channel = req.headers['x-channel']
 
     const { Product } = getModelsByChannel(channel, res, productModel)
@@ -135,7 +135,6 @@ exports.getProduct = async (req, res) => {
         }
       ])
     } else {
-
       if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
         return res.status(400).json({
           status: '400',
@@ -158,55 +157,66 @@ exports.getProduct = async (req, res) => {
       if (groupArray.length) andConditions.push({ group: { $in: groupArray } })
       if (brandArray.length) andConditions.push({ brand: { $in: brandArray } })
       if (sizeArray.length) andConditions.push({ size: { $in: sizeArray } })
-      if (flavourArray.length) andConditions.push({ flavour: { $in: flavourArray } })
+      if (flavourArray.length)
+        andConditions.push({ flavour: { $in: flavourArray } })
       if (andConditions.length) filter.$and = andConditions
 
       if (limit === true) {
-        const TOP_N = 20;
+        const TOP_N = 20
 
         products = await Product.find(filter)
-          .select('id name group groupCode size brand flavour listUnit statusSale statusRefund statusWithdraw')
+          .select(
+            'id name group groupCode size brand flavour listUnit statusSale statusRefund statusWithdraw'
+          )
           .limit(TOP_N)
-          .lean();
+          .lean()
         const productsId = products.flatMap(item => item.id)
 
-        const ids = [...new Set(
-          (productsId || []).map(x => String(x).trim()).filter(Boolean)
-        )];
+        const ids = [
+          ...new Set(
+            (productsId || []).map(x => String(x).trim()).filter(Boolean)
+          )
+        ]
 
-        stock = await Stock.aggregate([
-          // ตัดเอกสารตามช่วงที่สนใจก่อน
-          { $match: { period, area, 'listProduct.productId': { $in: ids } } },
+        stock = await Stock.aggregate(
+          [
+            // ตัดเอกสารตามช่วงที่สนใจก่อน
+            { $match: { period, area, 'listProduct.productId': { $in: ids } } },
 
-          // เอาเฉพาะ array ที่ใช้
-          { $project: { _id: 0, listProduct: 1 } },
-          { $unwind: '$listProduct' },
+            // เอาเฉพาะ array ที่ใช้
+            { $project: { _id: 0, listProduct: 1 } },
+            { $unwind: '$listProduct' },
 
-          // เตรียมฟิลด์ให้เทียบตรงและเป็นตัวเลข
-          {
-            $set: {
-              productId: { $trim: { input: '$listProduct.productId' } },
-              balancePcs: { $toDouble: { $ifNull: ['$listProduct.balancePcs', 0] } },
-              balanceCtn: { $toDouble: { $ifNull: ['$listProduct.balanceCtn', 0] } },
-            }
-          },
+            // เตรียมฟิลด์ให้เทียบตรงและเป็นตัวเลข
+            {
+              $set: {
+                productId: { $trim: { input: '$listProduct.productId' } },
+                balancePcs: {
+                  $toDouble: { $ifNull: ['$listProduct.balancePcs', 0] }
+                },
+                balanceCtn: {
+                  $toDouble: { $ifNull: ['$listProduct.balanceCtn', 0] }
+                }
+              }
+            },
 
-          // กรองเฉพาะ product ที่อยู่ใน ids (หลัง trim)
-          { $match: { productId: { $in: ids } } },
+            // กรองเฉพาะ product ที่อยู่ใน ids (หลัง trim)
+            { $match: { productId: { $in: ids } } },
 
-          // รวบยอดต่อ productId
-          {
-            $group: {
-              _id: '$productId',
-              balancePcs: { $sum: '$balancePcs' },
-              balanceCtn: { $sum: '$balanceCtn' }
-            }
-          },
+            // รวบยอดต่อ productId
+            {
+              $group: {
+                _id: '$productId',
+                balancePcs: { $sum: '$balancePcs' },
+                balanceCtn: { $sum: '$balanceCtn' }
+              }
+            },
 
-          // รูปแบบผลลัพธ์
-          { $project: { _id: '$_id', balancePcs: 1, balanceCtn: 1 } }
-        ], { allowDiskUse: true });
-
+            // รูปแบบผลลัพธ์
+            { $project: { _id: '$_id', balancePcs: 1, balanceCtn: 1 } }
+          ],
+          { allowDiskUse: true }
+        )
       } else {
         products = await Product.find(filter).lean()
 
@@ -227,13 +237,12 @@ exports.getProduct = async (req, res) => {
           }
         ])
       }
-
     }
 
-
-
     if (!products.length) {
-      return res.status(404).json({ status: '404', message: 'No products found!' })
+      return res
+        .status(404)
+        .json({ status: '404', message: 'No products found!' })
     }
     // console.log(products)
     // console.log(stock)
@@ -244,7 +253,7 @@ exports.getProduct = async (req, res) => {
       //   }
       //   return true // แสดงทุกตัวถ้าไม่ใช่ withdraw
       // })
-    // console.log(stock)
+      // console.log(stock)
 
       .map(product => {
         const stockMatch = stock.find(s => s._id === product.id) || {}
@@ -287,7 +296,6 @@ exports.getProduct = async (req, res) => {
   }
 }
 
-
 exports.getFilters = async (req, res) => {
   try {
     let { group, brand, size, flavour } = req.body
@@ -308,9 +316,7 @@ exports.getFilters = async (req, res) => {
       { $group: { _id: '$group' } },
       { $project: { _id: 0, group: '$_id' } },
       { $sort: { group: 1 } }
-    ]);
-
-
+    ])
 
     if (isEmptyRequest) {
       return res.status(200).json({
@@ -325,19 +331,19 @@ exports.getFilters = async (req, res) => {
       })
     }
 
-    let matchCondition = {};
+    let matchCondition = {}
 
     if (Array.isArray(group) && group.length > 0) {
-      matchCondition.group = { $in: group };
+      matchCondition.group = { $in: group }
     }
     if (Array.isArray(brand) && brand.length > 0) {
-      matchCondition.brand = { $in: brand };
+      matchCondition.brand = { $in: brand }
     }
     if (Array.isArray(size) && size.length > 0) {
-      matchCondition.size = { $in: size };
+      matchCondition.size = { $in: size }
     }
     if (Array.isArray(flavour) && flavour.length > 0) {
-      matchCondition.flavour = { $in: flavour };
+      matchCondition.flavour = { $in: flavour }
     }
 
     const attributes = await Product.aggregate([
@@ -351,14 +357,13 @@ exports.getFilters = async (req, res) => {
         }
       },
       { $project: { _id: 0, brand: 1, size: 1, flavour: 1 } }
-    ]);
+    ])
 
     // ✅ กรอง null ออกจากผลลัพธ์สุดท้ายด้วย
     const clean = arr => (arr || []).filter(item => item !== null)
 
     // const io = getSocket()
     // io.emit('product/filter', {});
-
 
     res.status(200).json({
       status: '200',
@@ -467,7 +472,7 @@ exports.updateStatus = async (req, res) => {
     io.emit('product/onOff', {
       status: '200',
       message: 'Updated status successfully!'
-    });
+    })
 
     res.status(200).json({
       status: '200',
@@ -480,171 +485,60 @@ exports.updateStatus = async (req, res) => {
 }
 
 exports.addProduct = async (req, res) => {
-  upload(req, res, async err => {
-    if (err) {
-      return res.status(400).json({ status: '400', message: err.message })
-    }
-    try {
-      if (!req.body.store) {
-        return res.status(400).json({
-          status: '400',
-          message: 'Store data is required'
-        })
-      }
-
-      const files = req.files
-      const store = JSON.parse(req.body.store)
-      const types = req.body.types ? req.body.types.split(',') : []
-
-      if (!store.name || !store.address) {
-        return res.status(400).json({
-          status: '400',
-          message: 'Required fields are missing: name, address'
-        })
-      }
-
-      if (files.length !== types.length) {
-        return res.status(400).json({
-          status: '400',
-          message: 'Number of files and types do not match'
-        })
-      }
-
-      const existingStores = await Store.find(
-        {},
-        { _id: 0, __v: 0, idIndex: 0 }
-      )
-      const fieldsToCheck = [
-        'name',
-        'taxId',
-        'tel',
-        'address',
-        'district',
-        'subDistrict',
-        'province',
-        'postCode',
-        'latitude',
-        'longtitude'
-      ]
-
-      const similarStores = existingStores
-        .map(existingStore => {
-          let totalSimilarity = 0
-          fieldsToCheck.forEach(field => {
-            const similarity = calculateSimilarity(
-              store[field]?.toString() || '',
-              existingStore[field]?.toString() || ''
-            )
-            totalSimilarity += similarity
-          })
-
-          const averageSimilarity = totalSimilarity / fieldsToCheck.length
-          return {
-            store: existingStore,
-            similarity: averageSimilarity
-          }
-        })
-        .filter(result => result.similarity > 50)
-        .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, 3)
-
-      if (similarStores.length > 0) {
-        const sanitizedStores = similarStores.map(item => ({
-          store: Object.fromEntries(
-            Object.entries(item.store._doc || item.store).filter(
-              ([key]) => key !== '_id'
-            )
-          ),
-          similarity: item.similarity.toFixed(2)
-        }))
-        return res.status(200).json({
-          status: '200',
-          message: 'similar store',
-          data: sanitizedStores
-        })
-      }
-
-      const uploadedFiles = []
-      for (let i = 0; i < files.length; i++) {
-        const uploadedFile = await uploadFiles(
-          [files[i]],
-          path.join(__dirname, '../../public/images/stores'),
-          store.area,
-          types[i]
-        )
-        uploadedFiles.push({
-          name: uploadedFile[0].name,
-          path: uploadedFile[0].fullPath,
-          type: types[i]
-        })
-      }
-
-      const imageList = uploadedFiles
-
-      const policyAgree = {
-        status: store.policyConsent?.status || ''
-      }
-      const approve = {
-        status: '19'
-      }
-
-      const shippingAddress = Array.isArray(store.shippingAddress)
-        ? store.shippingAddress
-        : []
-      const shipping = shippingAddress.map(ship => ({
-        default: ship.default || '',
-        address: ship.address || '',
-        district: ship.district || '',
-        subDistrict: ship.subDistrict || '',
-        provinceCode: ship.provinceCode || '',
-        postCode: ship.postCode || '',
-        latitude: ship.latitude || '',
-        longtitude: ship.longtitude || ''
-      }))
-
-      const checkIn = {}
-
-      const productData = new Product({
-        storeId: '',
-        name: store.name,
-        taxId: store.taxId,
-        tel: store.tel,
-        route: store.route,
-        type: store.type,
-        typeName: store.typeName,
-        address: store.address,
-        district: store.district,
-        subDistrict: store.subDistrict,
-        province: store.province,
-        provinceCode: store.provinceCode,
-        postCode: store.postCode,
-        zone: store.zone,
-        area: store.area,
-        latitude: store.latitude,
-        longtitude: store.longtitude,
-        lineId: store.lineId,
-        note: store.note,
-        status: store.status,
-        approve: approve,
-        policyConsent: policyAgree,
-        imageList: imageList,
-        shippingAddress: shipping,
-        checkIn: checkIn
-      })
-
-      await storeData.save()
-
-
-
-      res.status(200).json({
-        status: '200',
-        message: 'Store added successfully'
-      })
-    } catch (error) {
-      console.error('Error saving store to MongoDB:', error)
-      res.status(500).json({ status: '500', message: 'Server Error' })
-    }
-  })
+  try {
+    const {
+      id,
+      name,
+      group,
+      groupCode,
+      groupCodeM3,
+      groupM3,
+      brand,
+      brandCode,
+      size,
+      flavour,
+      flavourCode,
+      type,
+      image,
+      weightGross,
+      weightNet,
+      statusSale,
+      statusWithdraw,
+      statusRefund,
+      listUnit
+    } = req.body
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const newProduct = new Product({
+      id,
+      name,
+      group,
+      groupCode,
+      groupCodeM3,
+      groupM3,
+      brand,
+      brandCode,
+      size,
+      flavour,
+      flavourCode,
+      type,
+      image,
+      weightGross,
+      weightNet,
+      statusSale,
+      statusWithdraw,
+      statusRefund,
+      listUnit
+    })
+    await newProduct.save()
+    res.status(200).json({
+      status: 200,
+      message: 'Add Product successful!'
+    })
+  } catch (error) {
+    console.error('Error updating store:', error)
+    res.status(500).json({ status: '500', message: 'Server error' })
+  }
 }
 
 exports.addFromERP = async (req, res) => {
@@ -825,8 +719,7 @@ exports.addFromERPnew = async (req, res) => {
   }
 
   const io = getSocket()
-  io.emit('product/addFromERPnew', {});
-
+  io.emit('product/addFromERPnew', {})
 
   res.status(200).json({
     status: 200,
@@ -856,8 +749,6 @@ exports.groupProductId = async (req, res) => {
     }
   ])
 
-
-
   res.status(200).json({
     status: 200,
     message: 'sucess',
@@ -886,8 +777,6 @@ exports.groupBrandId = async (req, res) => {
     }
   ])
 
-
-
   res.status(200).json({
     status: 200,
     message: 'sucess',
@@ -913,8 +802,6 @@ exports.groupSize = async (req, res) => {
       }
     }
   ])
-
-
 
   res.status(200).json({
     status: 200,
@@ -943,8 +830,6 @@ exports.groupFlavourId = async (req, res) => {
       }
     }
   ])
-
-
 
   res.status(200).json({
     status: 200,
@@ -996,8 +881,6 @@ exports.groupByFilter = async (req, res) => {
     })
   }
 
-
-
   res.status(200).json({
     status: 200,
     message: 'sucess',
@@ -1048,8 +931,6 @@ exports.flavourByFilter = async (req, res) => {
     })
   }
 
-
-
   res.status(200).json({
     status: 200,
     message: 'sucess',
@@ -1099,8 +980,6 @@ exports.sizeByFilter = async (req, res) => {
       message: 'Not found size'
     })
   }
-
-
 
   res.status(200).json({
     status: 200,
@@ -1229,7 +1108,7 @@ exports.addProductimage = async (req, res) => {
   }
 
   const io = getSocket()
-  io.emit('product/addProductimage', {});
+  io.emit('product/addProductimage', {})
 
   res.status(200).json({
     status: 200,

@@ -1693,7 +1693,7 @@ exports.getStockQtyNew = async (req, res) => {
 
   const dataProduct = await Product.find({
     id: { $in: uniqueProductId }
-  }).select('id name listUnit group')
+  }).select('id name listUnit group groupCode')
 
   let data = []
   let summaryStock = 0
@@ -1792,7 +1792,8 @@ exports.getStockQtyNew = async (req, res) => {
         const factor = u.factor
         const stockQty = Math.floor(stock / factor) || 0
         const balanceQty = Math.floor(balance / factor) || 0
-        // console.log(goodQty)
+
+        // console.log(productDetail)
 
         stock -= stockQty * factor
         balance -= balanceQty * factor
@@ -1839,6 +1840,7 @@ exports.getStockQtyNew = async (req, res) => {
         productId: stockItem.id,
         productName: productDetail.name,
         productGroup: productDetail.group,
+        productGroupCode: productDetail.groupCode,
         pcsMain: pcsMain,
         listUnit: listUnitStock,
         summaryQty: summaryQty
@@ -1847,7 +1849,12 @@ exports.getStockQtyNew = async (req, res) => {
     }
   }
 
-  data.sort((a, b) => b.pcsMain - a.pcsMain)
+  data.sort((a, b) => {
+    const numA = parseInt(a.productGroupCode.replace(/\D/g, ''), 10);
+    const numB = parseInt(b.productGroupCode.replace(/\D/g, ''), 10);
+    return numA - numB; // จากน้อยไปมาก
+  });
+
   data.forEach(item => {
     delete item.pcsMain
   })
@@ -4442,7 +4449,7 @@ exports.addStockAllWithInOut = async (req, res) => {
             sale: saleQty,
             cart: cartQty,
             promotion: promoQty,
-            changePending:changePendingQty,
+            changePending: changePendingQty,
             change: changeQty,
             adjust: adjustQty,
             give: giveQty,
@@ -4498,7 +4505,7 @@ exports.addStockAllWithInOut = async (req, res) => {
 
     for (item of results) {
       for (i of item.data) {
-              // console.log(item.area)
+        // console.log(item.area)
 
         // await Stock.findOneAndUpdate(
         //   {

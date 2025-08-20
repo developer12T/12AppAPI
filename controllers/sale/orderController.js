@@ -607,7 +607,7 @@ exports.getOrder = async (req, res) => {
       .map(o => ({
         orderId: o.orderId,
         area: o.store.area,
-        storeId: o.store?.store || '',
+        storeId: o.store?.storeId || '',
         storeName: o.store?.name || '',
         storeAddress: o.store?.address || '',
         createAt: o.createdAt,
