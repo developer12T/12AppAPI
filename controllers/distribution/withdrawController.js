@@ -13,6 +13,7 @@ const cartModel = require('../../models/cash/cart')
 const productModel = require('../../models/cash/product')
 const distributionModel = require('../../models/cash/distribution')
 const userModel = require('../../models/cash/user')
+const npdModel = require('../../models/cash/npd')
 const stockModel = require('../../models/cash/stock')
 const optionsModel = require('../../models/cash/option')
 const { withdrawQuery } = require('../../controllers/queryFromM3/querySctipt')
@@ -47,6 +48,7 @@ exports.checkout = async (req, res) => {
     const { Place } = getModelsByChannel(channel, res, distributionModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+    const { Npd } = getModelsByChannel(channel, res, npdModel)
     const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
       channel,
       res,
@@ -227,6 +229,40 @@ exports.checkout = async (req, res) => {
       createdBy: sale.username,
       period: period
     })
+
+    if (newtrip === true) {
+      const productNew = await Product.findOne({ type: 'new' })
+      if (productNew) {
+        const npd = await Npd.findOne({ period: period })
+
+        factor = productNew.listUnit.find(item => item.unit === npd.unit)
+        qtyPcs = npd.qty * factor.factor
+
+        npdProduct = {
+          id: productNew.id,
+          lot: "",
+          name: productNew.name,
+          group: productNew.group,
+          brand: productNew.brand,
+          size: productNew.size,
+          flavour: productNew.flavour,
+          qty: npd.qty,
+          unit: npd.unit,
+          qtyPcs: qtyPcs,
+          price: factor.price.sale,
+          total: factor.price.sale * npd.qty,
+          weightGross: parseFloat(productNew.weightGross.toFixed(2)),
+          weightNet: parseFloat(productNew.weightNet.toFixed(2))
+        }
+
+        newOrder.listProduct.push(npdProduct)
+      }
+    }
+
+
+
+
+
 
     const productQty = newOrder.listProduct.map(u => {
       return {

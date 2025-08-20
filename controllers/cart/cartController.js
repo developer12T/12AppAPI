@@ -243,7 +243,7 @@ exports.getCart = async (req, res) => {
           if (!proDetail) {
             proDetail = await Promotion.findOne({ proId }).lean();
             if (proDetail) promotionCache.set(proId, proDetail);
-            console.log(proDetail)
+            // console.log(proDetail)
 
           }
 
