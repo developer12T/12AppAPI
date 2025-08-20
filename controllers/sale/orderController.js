@@ -3547,7 +3547,6 @@ exports.saleReport = async (req, res) => {
   const { Order } = getModelsByChannel(channel, res, orderModel)
   const { Refund } = getModelsByChannel(channel, res, refundModel)
 
-
   if (role == 'sale' || role == '' || !role) {
     let filterCreatedAt = {}
     let filterArea = {}
@@ -3588,35 +3587,37 @@ exports.saleReport = async (req, res) => {
         message: 'Not found Order'
       })
     }
+    const order = ['sale', 'change', 'refund']
 
     if (type === 'sale') {
+      data = [...dataOrder, ...dataRefund]
+        .map(item => {
+          let paymentMethodTH = ''
+          if (item.paymentMethod === 'cash') {
+            paymentMethodTH = 'เงินสด'
+          } else if (item.paymentMethod === 'qr') {
+            paymentMethodTH = 'QR Payment'
+          } else {
+            paymentMethodTH = item.paymentMethod
+          }
 
-      data = [...dataOrder, ...dataRefund].map(item => {
-        let paymentMethodTH = ''
-        if (item.paymentMethod === 'cash') {
-          paymentMethodTH = 'เงินสด'
-        } else if (item.paymentMethod === 'qr') {
-          paymentMethodTH = 'QR Payment'
-        } else {
-          paymentMethodTH = item.paymentMethod
-        }
+          // เช็คว่าเป็น refund หรือไม่
+          const isRefund = item.type === 'refund'
+          const totalWithSign = isRefund ? -Math.abs(item.total) : item.total
 
-        // เช็คว่าเป็น refund หรือไม่
-        const isRefund = item.type === 'refund'
-        const totalWithSign = isRefund ? -Math.abs(item.total) : item.total
-
-        return {
-          type: item.type,
-          orderId: item.orderId,
-          saleCode: item.sale.saleCode,
-          saleName: item.sale.name,
-          storeId: item.store.storeId,
-          storeName: item.store.name,
-          storeTaxId: item.store.taxId,
-          total: totalWithSign,
-          paymentMethod: paymentMethodTH
-        }
-      })
+          return {
+            type: item.type,
+            orderId: item.orderId,
+            saleCode: item.sale.saleCode,
+            saleName: item.sale.name,
+            storeId: item.store.storeId,
+            storeName: item.store.name,
+            storeTaxId: item.store.taxId,
+            total: totalWithSign,
+            paymentMethod: paymentMethodTH ? paymentMethodTH : item.reference
+          }
+        })
+        .sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type))
     } else if (type === 'refund') {
       data = [...dataRefund].map(item => {
         let paymentMethodTH = ''
@@ -3645,11 +3646,25 @@ exports.saleReport = async (req, res) => {
         }
       })
     }
+    // summary ตาม type
+    const summary = data.reduce((acc, cur) => {
+      if (!acc[cur.type]) {
+        acc[cur.type] = { count: 0, total: 0 }
+      }
+      acc[cur.type].count += 1
+      acc[cur.type].total += cur.total
+      return acc
+    }, {})
+
+    // รวมทั้งหมด
+    const grandTotal = data.reduce((sum, cur) => sum + cur.total, 0)
 
     res.status(200).json({
       status: 200,
       message: 'sucess',
-      data: data
+      data: data,
+      grandTotal: grandTotal,
+      summary: summary
     })
   } else if (role == 'supervisor') {
     const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
