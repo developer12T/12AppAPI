@@ -1116,111 +1116,121 @@ exports.saleConfirmWithdraw = async (req, res) => {
         })
       }
 
-      const row = await DisributionM3.findOne({ where: { coNo: orderId } })
-      if (!row)
-        return res
-          .status(404)
-          .json({ status: 404, message: `${orderId} not found` })
+      if (distributionTran.withdrawType === 'credit') {
 
-      // const toNum = v => Number(String(v ?? '').trim()) // แปลง NVARCHAR -> Number, ตัดช่องว่าง
-      // const MGTRSL = toNum(row.MGTRSL)
-      // const MGTRSH = toNum(row.MGTRSH)
+        distributionTran.listProduct.forEach(item => {
+          item.receiveQty = item.qty // เพิ่มหรือทับ field ใน object เดิม
+          item.receiveUnit = item.unit
+        });
 
-      // // ถ้าต้องการให้ "ทั้งสองค่า" ต้องเป็น 90 ถึงจะผ่าน
-      // if (MGTRSL !== 99 || MGTRSH !== 99) {
-      //   return res.status(400).json({
-      //     status: 400,
-      //     message: `${orderId} is not 99 (MGTRSL=${row.MGTRSL}, MGTRSH=${row.MGTRSH})`
-      //   })
-      // }
+        receivetotal = distributionTran.total
+        receivetotalQty = distributionTran.totalQty
+        receivetotalWeightGross = distributionTran.totalWeightGross
+        receivetotalWeightNet = distributionTran.totalWeightNet
 
-      // ✅ ดึงข้อมูลสินค้าที่เกี่ยวข้อง
-      const listProductId = distributionTran.listProduct
-        .map(i => i.id)
-        .filter(Boolean)
-      const productDetail = await Product.find({ id: { $in: listProductId } })
+        // console.log(distributionTran.listProduct)
+      } else {
+        const row = await DisributionM3.findOne({ where: { coNo: orderId } })
+        if (!row)
+          return res
+            .status(404)
+            .json({ status: 404, message: `${orderId} not found` })
 
-      const checkStatus = await MGLINE.findAll({
-        where: {
-          MRCONO: 410,
-          MRTRNR: orderId,
-          MRTRSH: '99'
-        },
-        raw: true
-      })
-      const productIds = checkStatus.flatMap(item => item.MRITNO)
+        // ✅ ดึงข้อมูลสินค้าที่เกี่ยวข้อง
+        const listProductId = distributionTran.listProduct
+          .map(i => i.id)
+          .filter(Boolean)
+        const productDetail = await Product.find({ id: { $in: listProductId } })
 
-      // ✅ ดึงข้อมูลรับสินค้าจากระบบ ERP
-      const Receive = await MHDISL.findAll({
-        where: {
-          coNo: orderId,
-          productId: { [Op.in]: productIds }
-        },
-        raw: true
-      })
-      const ReceiveWeight = await MHDISH.findAll({
-        where: { coNo: orderId },
-        raw: true
-      })
-      // console.log(Receive.length)
-      const ReceiveQty = Object.values(
-        Receive.reduce((acc, cur) => {
-          // ใช้ key จาก coNo + withdrawUnit + productId (ถ้าอยากแยกตาม productId ด้วย)
-          const key = `${cur.coNo}_${cur.withdrawUnit}_${cur.productId.trim()}`
-          if (!acc[key]) {
-            acc[key] = { ...cur }
-          } else {
-            acc[key].qtyPcs += cur.qtyPcs
-            acc[key].weightGross += cur.weightGross
-            acc[key].weightNet += cur.weightNet
-          }
-          return acc
-        }, {})
-      )
+        const checkStatus = await MGLINE.findAll({
+          where: {
+            MRCONO: 410,
+            MRTRNR: orderId,
+            MRTRSH: '99'
+          },
+          raw: true
+        })
+        const productIds = checkStatus.flatMap(item => item.MRITNO)
 
-      // console.log('merged', merged)
-      let receivetotalQty = 0
-      let receivetotal = 0
-
-      for (const i of distributionTran.listProduct) {
-        const productIdTrimmed = String(i.id || '').trim()
-        const match = ReceiveQty.find(
-          r => String(r.productId || '').trim() === productIdTrimmed
+        // ✅ ดึงข้อมูลรับสินค้าจากระบบ ERP
+        const Receive = await MHDISL.findAll({
+          where: {
+            coNo: orderId,
+            productId: { [Op.in]: productIds }
+          },
+          raw: true
+        })
+        const ReceiveWeight = await MHDISH.findAll({
+          where: { coNo: orderId },
+          raw: true
+        })
+        // console.log(Receive.length)
+        const ReceiveQty = Object.values(
+          Receive.reduce((acc, cur) => {
+            // ใช้ key จาก coNo + withdrawUnit + productId (ถ้าอยากแยกตาม productId ด้วย)
+            const key = `${cur.coNo}_${cur.withdrawUnit}_${cur.productId.trim()}`
+            if (!acc[key]) {
+              acc[key] = { ...cur }
+            } else {
+              acc[key].qtyPcs += cur.qtyPcs
+              acc[key].weightGross += cur.weightGross
+              acc[key].weightNet += cur.weightNet
+            }
+            return acc
+          }, {})
         )
-        if (match) {
-          const product = productDetail.find(
-            u => String(u.id || '').trim() === productIdTrimmed
+
+        // console.log('merged', merged)
+        receivetotalQty = 0
+        receivetotal = 0
+
+        for (const i of distributionTran.listProduct) {
+          const productIdTrimmed = String(i.id || '').trim()
+          const match = ReceiveQty.find(
+            r => String(r.productId || '').trim() === productIdTrimmed
           )
-          i.receiveUnit = match.withdrawUnit || ''
+          if (match) {
+            const product = productDetail.find(
+              u => String(u.id || '').trim() === productIdTrimmed
+            )
+            i.receiveUnit = match.withdrawUnit || ''
 
-          if (!product || !Array.isArray(product.listUnit)) {
+            if (!product || !Array.isArray(product.listUnit)) {
+              i.receiveQty = 0
+              continue
+            }
+
+            const unitFactor = product.listUnit.find(
+              u =>
+                String(u.unit || '').trim() ===
+                String(match.withdrawUnit || '').trim()
+            )
+
+            if (!unitFactor || !unitFactor.factor || unitFactor.factor === 0) {
+              i.receiveQty = 0
+              continue
+            }
+
+            const qty = match.qtyPcs / unitFactor.factor
+            receivetotalQty += qty
+            receivetotal += qty * (unitFactor?.price?.sale || 0)
+
+            i.receiveQty = qty
+          } else {
+            i.receiveUnit = ''
             i.receiveQty = 0
-            continue
           }
-
-          const unitFactor = product.listUnit.find(
-            u =>
-              String(u.unit || '').trim() ===
-              String(match.withdrawUnit || '').trim()
-          )
-
-          if (!unitFactor || !unitFactor.factor || unitFactor.factor === 0) {
-            i.receiveQty = 0
-            continue
-          }
-
-          const qty = match.qtyPcs / unitFactor.factor
-          receivetotalQty += qty
-          receivetotal += qty * (unitFactor?.price?.sale || 0)
-
-          i.receiveQty = qty
-        } else {
-          i.receiveUnit = ''
-          i.receiveQty = 0
         }
+
+
+
+        // receivetotal = receivetotal
+        // receivetotalQty = receivetotalQty
+        receivetotalWeightGross = ReceiveWeight?.[0]?.weightGross || 0
+        receivetotalWeightNet = ReceiveWeight?.[0]?.weightNet || 0
+
       }
 
-      // console.log(distributionTran.listProduct)
 
       // ✅ อัปเดตข้อมูลถ้า status เป็น approved
       if (distributionTran.status === 'approved') {
@@ -1238,8 +1248,8 @@ exports.saleConfirmWithdraw = async (req, res) => {
               status: 'confirm',
               receivetotal: receivetotal,
               receivetotalQty: receivetotalQty,
-              receivetotalWeightGross: ReceiveWeight?.[0]?.weightGross || 0,
-              receivetotalWeightNet: ReceiveWeight?.[0]?.weightNet || 0
+              receivetotalWeightGross: receivetotalWeightGross,
+              receivetotalWeightNet: receivetotalWeightNet
             }
           },
           { new: true }
