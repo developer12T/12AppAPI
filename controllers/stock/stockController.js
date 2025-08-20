@@ -2189,7 +2189,7 @@ exports.getStockQtyDetail = async (req, res) => {
           'store.area': area,
           period,
           type: 'change',
-          status: { $ne: 'canceled' }
+          status: 'approved'
         }
       },
       {
