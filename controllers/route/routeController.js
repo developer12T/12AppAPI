@@ -49,6 +49,8 @@ exports.getRoute = async (req, res) => {
       'storeId name address typeName taxId tel'
     )
 
+    // console.log(routes)
+
     const filteredRoutes = routes
       .map(route => {
         const filteredListStore = route.listStore.filter(store => {
@@ -67,7 +69,7 @@ exports.getRoute = async (req, res) => {
 
           return matchDistrict && matchProvince && matchStoreId
         })
-
+        // console.log(route)
         return {
           ...route.toObject(),
           listStore: filteredListStore
@@ -87,14 +89,14 @@ exports.getRoute = async (req, res) => {
 
     const storeTypeMap = new Map(storeTypes.map(s => [s.storeId, s.type]))
 
-    const enrichedRoutes = filteredRoutes.map(route => {
+    enrichedRoutes = filteredRoutes.map(route => {
       const enrichedListStore = route.listStore.map(itemRaw => {
         const item = itemRaw.toObject ? itemRaw.toObject() : itemRaw
         const storeInfo = item.storeInfo?.toObject
           ? item.storeInfo.toObject()
           : item.storeInfo || {}
         const type = storeTypeMap.get(storeInfo.storeId)
-
+        // console.log(item)
         return {
           ...item,
           storeInfo,
@@ -108,6 +110,14 @@ exports.getRoute = async (req, res) => {
       }
     })
 
+    // console.log(enrichedRoutes)
+
+    if (area && period) {
+       enrichedRoutes = enrichedRoutes.map(({ listStore, ...rest }) => rest);
+    }
+
+
+    // }
     // const io = getSocket()
     // io.emit('route/getRoute', {});
 
@@ -2069,7 +2079,7 @@ exports.checkRouteStore = async (req, res) => {
       areaMap[area].del = storeCountMap[area]?.del || 0
     }
 
-    function sortKeys (obj) {
+    function sortKeys(obj) {
       const { area, R, del, ...days } = obj
       const sortedDays = Object.keys(days)
         .filter(k => /^R\d+$/.test(k))
