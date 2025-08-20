@@ -1400,7 +1400,7 @@ exports.getStockQtyNew = async (req, res) => {
         zone: { $substrBytes: ['$area', 0, 2] }
       }
     },
-    { $match: { type: 'change', status: { $ne: 'canceled' } } },
+    { $match: { type: 'change', status: 'approved' } },
     { $match: matchQueryRefund },
     {
       $project: {
@@ -3953,8 +3953,8 @@ exports.addStockAllWithInOut = async (req, res) => {
     const rawAreas = userData
       .flatMap(u => (Array.isArray(u.area) ? u.area : [u.area]))
       .filter(Boolean)
-    const uniqueAreas = [...new Set(rawAreas)]
-    // uniqueAreas = ['CT226','BE222']
+    // const uniqueAreas = [...new Set(rawAreas)]
+    uniqueAreas = ['CT226']
     // 2) ฟังก์ชันย่อย: ประมวลผลต่อ 1 area
     const buildAreaStock = async area => {
       // สร้าง match สำหรับ collections ต่าง ๆ
@@ -4500,29 +4500,29 @@ exports.addStockAllWithInOut = async (req, res) => {
       for (i of item.data) {
               // console.log(item.area)
 
-        await Stock.findOneAndUpdate(
-          {
-            area: item.area,
-            period: period,
-            'listProduct.productId': i.productId
-          },
-          {
-            $set: {
-              // 'listProduct.$[elem].stockPcs': i.summaryQty.PCS.stock,
-              'listProduct.$[elem].stockInPcs': i.summaryQty.PCS.in,
-              'listProduct.$[elem].stockOutPcs': i.summaryQty.PCS.out,
-              'listProduct.$[elem].balancePcs': i.summaryQty.PCS.balance,
-              // 'listProduct.$[elem].stockCtn': i.summaryQty.CTN.stock,
-              'listProduct.$[elem].stockInCtn': i.summaryQty.CTN.in,
-              'listProduct.$[elem].stockOutCtn': i.summaryQty.CTN.out,
-              'listProduct.$[elem].balanceCtn': i.summaryQty.CTN.balance
-            }
-          },
-          {
-            arrayFilters: [{ 'elem.productId': i.productId }],
-            new: true
-          }
-        )
+        // await Stock.findOneAndUpdate(
+        //   {
+        //     area: item.area,
+        //     period: period,
+        //     'listProduct.productId': i.productId
+        //   },
+        //   {
+        //     $set: {
+        //       // 'listProduct.$[elem].stockPcs': i.summaryQty.PCS.stock,
+        //       'listProduct.$[elem].stockInPcs': i.summaryQty.PCS.in,
+        //       'listProduct.$[elem].stockOutPcs': i.summaryQty.PCS.out,
+        //       'listProduct.$[elem].balancePcs': i.summaryQty.PCS.balance,
+        //       // 'listProduct.$[elem].stockCtn': i.summaryQty.CTN.stock,
+        //       'listProduct.$[elem].stockInCtn': i.summaryQty.CTN.in,
+        //       'listProduct.$[elem].stockOutCtn': i.summaryQty.CTN.out,
+        //       'listProduct.$[elem].balanceCtn': i.summaryQty.CTN.balance
+        //     }
+        //   },
+        //   {
+        //     arrayFilters: [{ 'elem.productId': i.productId }],
+        //     new: true
+        //   }
+        // )
       }
     }
 
