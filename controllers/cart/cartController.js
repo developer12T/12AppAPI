@@ -157,17 +157,17 @@ exports.getCart = async (req, res) => {
 
       summary = await summaryOrder(cart, channel, res)
 
-      const newCartHashProduct = crypto
-        .createHash('md5')
-        .update(JSON.stringify(cart.listProduct))
-        .digest('hex')
-      const newCartHashPromotion = crypto
-        .createHash('md5')
-        .update(JSON.stringify(cart.listPromotion))
-        .digest('hex')
+      // const newCartHashProduct = crypto
+      //   .createHash('md5')
+      //   .update(JSON.stringify(cart.listProduct))
+      //   .digest('hex')
+      // const newCartHashPromotion = crypto
+      //   .createHash('md5')
+      //   .update(JSON.stringify(cart.listPromotion))
+      //   .digest('hex')
 
-      let shouldRecalculatePromotion =
-        cart.cartHashProduct !== newCartHashProduct
+      // let shouldRecalculatePromotion =
+      //   cart.cartHashProduct !== newCartHashProduct
       // if (shouldRecalculatePromotion) {
       const promotion = await applyPromotion(summary, channel, res)
 
@@ -176,8 +176,8 @@ exports.getCart = async (req, res) => {
       const quota = await applyQuota(summary, channel, res)
       cart.listQuota = quota.appliedPromotions
       cart.listPromotion = promotion.appliedPromotions
-      cart.cartHashProduct = newCartHashProduct
-      cart.cartHashPromotion = newCartHashPromotion
+      // cart.cartHashProduct = newCartHashProduct
+      // cart.cartHashPromotion = newCartHashPromotion
       summary.listPromotion = cart.listPromotion
       summary.listQuota = quota.appliedPromotions
       await cart.save()
