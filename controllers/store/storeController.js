@@ -891,7 +891,7 @@ exports.insertStoreToM3 = async (req, res) => {
     })
   }
 
-  console.log(dataTran)
+  // console.log(dataTran)
 
   if (item.area != 'IT211') {
     try {
@@ -1144,7 +1144,8 @@ exports.updateStoreStatusNoNewId = async (req, res) => {
         status,
         updatedDate: Date(),
         'approve.dateAction': new Date(),
-        'approve.appPerson': user
+        'approve.appPerson': user,
+        route:'R25'
       },
       { new: true }
     )
@@ -1163,6 +1164,10 @@ exports.updateStoreStatusNoNewId = async (req, res) => {
         }
       }
     )
+
+
+
+
 
     return res.status(200).json({
       status: 200,
