@@ -1295,7 +1295,7 @@ exports.getStockQtyNew = async (req, res) => {
     {
       $match: {
         ...matchQueryRefund,
-        status: { $ne: 'canceled' }
+        status: { $in: ['approved', 'completed'] }
       }
     },
     {
@@ -1420,7 +1420,7 @@ exports.getStockQtyNew = async (req, res) => {
         zone: { $substrBytes: ['$area', 0, 2] }
       }
     },
-    { $match: { type: 'adjuststock', status: 'approved' } },
+    { $match: { type: 'adjuststock', status: { $in: ['approved', 'completed'] } } },
     { $match: matchQuery },
     {
       $project: {
@@ -1797,7 +1797,6 @@ exports.getStockQtyNew = async (req, res) => {
         const stockQty = Math.floor(stock / factor) || 0
         const balanceQty = Math.floor(balance / factor) || 0
 
-        // console.log(productDetail)
 
         stock -= stockQty * factor
         balance -= balanceQty * factor
@@ -1812,12 +1811,12 @@ exports.getStockQtyNew = async (req, res) => {
         summaryChange += (changeQty || 0) * changeSale
         summaryAdjust += (adjustQty || 0) * sale
         summaryGive += (giveQty || 0) * sale
-
+        // console.log(withdrawQty)
         return {
           unit: u.unit,
           unitName: u.name,
           stock: stockQty,
-          withdraw: withdrawQty,
+          withdraw: Number.isFinite(+withdrawQty) ? Math.floor(+withdrawQty) : 0,
           good: goodQty,
           damaged: damagedQty,
           sale: saleQty,
@@ -1836,6 +1835,7 @@ exports.getStockQtyNew = async (req, res) => {
           return unitData.good !== 0 || unitData.damaged !== 0
         return true
       })
+
 
     const summaryQty = calculateStockSummary(productDetail, listUnitStock)
 
@@ -2064,7 +2064,7 @@ exports.getStockQtyDetail = async (req, res) => {
 
     const adjustStockDocs = await AdjustStock.aggregate([
       { $match: { area, period } },
-      { $match: { status: 'approved' } },
+      { $match: { status: { $in: ['approved', 'completed'] } } },
       { $unwind: '$listProduct' },
       { $match: { 'listProduct.id': productId } },
       { $addFields: { createdAtTH: convertToTHTime('$createdAt') } }
@@ -2092,7 +2092,7 @@ exports.getStockQtyDetail = async (req, res) => {
         $match: {
           'store.area': area,
           period,
-          status: { $ne: 'canceled' }
+          status: { $in: ['approved', 'completed'] }
         }
       },
       {
@@ -2120,7 +2120,7 @@ exports.getStockQtyDetail = async (req, res) => {
         const change = await Order.findOne({
           reference: refund.orderId,
           type: 'change',
-          status: { $ne: 'canceled' }
+          status: { $in: ['approved', 'completed'] }
         })
           .select('total')
           .lean()
@@ -2332,6 +2332,7 @@ exports.getStockQtyDetail = async (req, res) => {
     // console.log(totalStockInPcs)
     // console.log(totalStockOutPcs)
 
+
     res.status(200).json({
       status: 200,
       message: 'successfully!',
@@ -2389,6 +2390,11 @@ exports.getStockQtyDetail = async (req, res) => {
         summary: summaryStockBalancePrice
       }
     })
+
+
+
+
+
   } catch (error) {
     console.error(error)
     res.status(500).json({ message: 'Internal Server Error', error })
@@ -3054,7 +3060,7 @@ exports.stockToExcelNew = async (req, res) => {
       dataGive,
       warehouseDoc
     ] = await Promise.all([
-      Refund.find({ 'store.area': area, period, status: 'approved', type: 'refund' }).lean(),
+      Refund.find({ 'store.area': area, period, status: { $in: ['pending', 'completed'] }, type: 'refund' }).lean(),
       Order.find({ 'store.area': area, period, type: 'sale', status: { $in: ['pending', 'completed'] } }).lean(),
       Order.find({ 'store.area': area, period, type: 'change', status: { $in: ['approved', 'completed'] } }).lean(),
       Distribution.find({ area, period, status: { $in: ['confirm'] }, type: 'withdraw' }).lean(),
@@ -3965,7 +3971,7 @@ exports.addStockAllWithInOut = async (req, res) => {
       .flatMap(u => (Array.isArray(u.area) ? u.area : [u.area]))
       .filter(Boolean)
     // const uniqueAreas = [...new Set(rawAreas)]
-    uniqueAreas = ['CT226']
+    uniqueAreas = ['NS212']
     // 2) ฟังก์ชันย่อย: ประมวลผลต่อ 1 area
     const buildAreaStock = async area => {
       // สร้าง match สำหรับ collections ต่าง ๆ
@@ -4053,14 +4059,14 @@ exports.addStockAllWithInOut = async (req, res) => {
 
       const dataChange = await Order.aggregate([
         { $addFields: { zone: { $substrBytes: ['$area', 0, 2] } } },
-        { $match: { type: 'change', status: { $in: ['approved', 'completed'] } }},
+        { $match: { type: 'change', status: { $in: ['approved', 'completed'] } } },
         { $match: matchQueryRefund },
         { $project: { listProduct: 1, _id: 0 } }
       ])
 
       const dataAdjust = await AdjustStock.aggregate([
         { $addFields: { zone: { $substrBytes: ['$area', 0, 2] } } },
-        { $match: { type: 'adjuststock', status: 'approved' } },
+        { $match: { type: 'adjuststock', status: { $in: ['approved', 'completed'] } } },
         { $match: matchQuery },
         { $project: { listProduct: 1, _id: 0 } }
       ])
