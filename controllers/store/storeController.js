@@ -2006,6 +2006,7 @@ exports.storeToExcel = async (req, res) => {
 
     // รับ date ในรูปแบบ MMYYYY เช่น '072025'
     let dateStr = (req.query.date || '').trim()
+    // console.log(req.query.date);
 
     // ถ้าไม่ถูกฟอร์แมต ให้ใช้เดือนปัจจุบัน “ตามเวลาไทย”
     if (!/^\d{6}$/.test(dateStr)) {
@@ -2055,10 +2056,7 @@ exports.storeToExcel = async (req, res) => {
       createdAt: toThaiTime(item.createdAt) // ✅ บวก 7 ชั่วโมง (เวลาไทย)
     }));
 
-
-
     // return res.status(200).json({ status: 200, count: store.length, data: store })
-
 
     const wb = xlsx.utils.book_new()
     const ws = xlsx.utils.json_to_sheet(storeTran)
