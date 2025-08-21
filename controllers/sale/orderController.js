@@ -194,8 +194,8 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-          .map(item => item.price)
-          .reduce((sum, price) => sum + price, 0)
+        .map(item => item.price)
+        .reduce((sum, price) => sum + price, 0)
       : 0
     const total = subtotal - discountProduct
     const newOrder = new Order({
@@ -785,7 +785,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -1069,7 +1069,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD (date) {
+    function formatDateToThaiYYYYMMDD(date) {
       const d = new Date(date)
       // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1180,7 +1180,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromChange = modelChange.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD (date) {
+    function formatDateToThaiYYYYMMDD(date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1443,7 +1443,7 @@ exports.OrderToExcel = async (req, res) => {
       message: 'Not Found Order'
     })
   }
-  function yyyymmddToDdMmYyyy (dateString) {
+  function yyyymmddToDdMmYyyy(dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -1475,7 +1475,7 @@ exports.OrderToExcel = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => {})
+    fs.unlink(tempPath, () => { })
   })
 
   // res.status(200).json({
@@ -3595,7 +3595,7 @@ exports.saleReport = async (req, res) => {
       }
     }
 
-   
+
 
     const dataOrder = await Order.find({
       ...filterArea,
@@ -3971,3 +3971,52 @@ exports.reportCheckin = async (req, res) => {
     data: newDataOrder
   })
 }
+
+
+exports.OrderZeroDiff = async (req, res) => {
+  const { area, period } = req.body
+  const channel = req.headers['x-channel']
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+  const { Product } = getModelsByChannel(channel, res, productModel)
+  const { Stock } = getModelsByChannel(channel, res, stockModel)
+
+  const stockData = await Stock.findOne({
+    area: area, period: period,
+    'listProduct.balancePcs': { $lt: 0 }
+  })
+
+    // console.log(stockData)
+
+  const negProductIds = (stockData.listProduct ?? [])
+    .filter(it => Number(it.balancePcs) < 0)
+    .map(it => it.productId ?? it.id)
+    .filter(Boolean);
+
+  console.log(negProductIds)
+
+  const orderData = await Order.find(
+    { 'store.area': area, period, 'listPromotions.listProduct.id': { $in: negProductIds } },
+    { orderId: 1, area: 1, period: 1, listProduct: 1, _id: 0 } // projection (ถ้าต้องการ)
+  ).lean();
+  // console.log(orderData)
+  // const orderDiff = []
+
+  // for (i of negProductIds){
+  //   const data = orderData.map(item => item.listProduct.find(u => u.id === i))
+
+  //   console.log(data)
+
+  // }
+
+
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'Sucess',
+    data: negProductIds
+  })
+
+}
+

@@ -2332,63 +2332,69 @@ exports.getStockQtyDetail = async (req, res) => {
     // console.log(totalStockInPcs)
     // console.log(totalStockOutPcs)
 
-    res.status(200).json({
-      status: 200,
-      message: 'successfully!',
-      data: {
-        productId: productData.id,
-        productName: productData.name,
-        // group: productData.group,
-        STOCK,
-        IN: {
-          stock: STOCK,
-          withdrawStock,
-          withdraw,
-          refundStock,
-          refund: newRefund,
-          summaryStock: calculateQtyByUnit(productData.listUnit, [
-            ...refundStock,
-            ...withdrawStock,
-            ...STOCK.stock
-          ]),
-          summaryStockIn
-        },
-        OUT: {
-          order: orderDetail,
-          orderStock,
-          orderSum: calculateTotalPrice(
-            productData.listUnit,
+
+      res.status(200).json({
+        status: 200,
+        message: 'successfully!',
+        data: {
+          productId: productData.id,
+          productName: productData.name,
+          // group: productData.group,
+          STOCK,
+          IN: {
+            stock: STOCK,
+            withdrawStock,
+            withdraw,
+            refundStock,
+            refund: newRefund,
+            summaryStock: calculateQtyByUnit(productData.listUnit, [
+              ...refundStock,
+              ...withdrawStock,
+              ...STOCK.stock
+            ]),
+            summaryStockIn
+          },
+          OUT: {
+            order: orderDetail,
             orderStock,
-            'sale'
-          ),
-          adjustStock,
-          adjustDetail: adjust,
-          promotionStock,
-          promotionSum: calculateTotalPrice(
-            productData.listUnit,
+            orderSum: calculateTotalPrice(
+              productData.listUnit,
+              orderStock,
+              'sale'
+            ),
+            adjustStock,
+            adjustDetail: adjust,
             promotionStock,
-            'sale'
-          ),
-          changeDetail: changeDetail,
-          change: changeStock,
-          changeSum: calculateTotalPrice(
-            productData.listUnit,
-            changeStock,
-            'sale'
-          ),
-          giveDetail: giveDetail,
-          give: giveStock,
-          giveSum: calculateTotalPrice(productData.listUnit, giveStock, 'sale'),
-          summaryStock: summaryStockOut,
-          summaryStockInOut: summaryStockOutPrice
-        },
-        totalStockInPcs: totalStockInPcs,
-        totalStockOutPcs: totalStockOutPcs,
-        BALANCE: BALANCE.stock,
-        // summaryQtyPcs:,
-        summary: summaryStockBalancePrice
-      }
-    })
+            promotionSum: calculateTotalPrice(
+              productData.listUnit,
+              promotionStock,
+              'sale'
+            ),
+            changeDetail: changeDetail,
+            change: changeStock,
+            changeSum: calculateTotalPrice(
+              productData.listUnit,
+              changeStock,
+              'sale'
+            ),
+            giveDetail: giveDetail,
+            give: giveStock,
+            giveSum: calculateTotalPrice(productData.listUnit, giveStock, 'sale'),
+            summaryStock: summaryStockOut,
+            summaryStockInOut: summaryStockOutPrice
+          },
+          totalStockInPcs: totalStockInPcs,
+          totalStockOutPcs: totalStockOutPcs,
+          BALANCE: BALANCE.stock,
+          // summaryQtyPcs:,
+          summary: summaryStockBalancePrice
+        }
+      })
+
+    
+
+
+
   } catch (error) {
     console.error(error)
     res.status(500).json({ message: 'Internal Server Error', error })
@@ -4053,7 +4059,7 @@ exports.addStockAllWithInOut = async (req, res) => {
 
       const dataChange = await Order.aggregate([
         { $addFields: { zone: { $substrBytes: ['$area', 0, 2] } } },
-        { $match: { type: 'change', status: { $in: ['approved', 'completed'] } }},
+        { $match: { type: 'change', status: { $in: ['approved', 'completed'] } } },
         { $match: matchQueryRefund },
         { $project: { listProduct: 1, _id: 0 } }
       ])
