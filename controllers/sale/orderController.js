@@ -3993,13 +3993,15 @@ exports.OrderZeroDiff = async (req, res) => {
     .map(it => it.productId ?? it.id)
     .filter(Boolean);
 
-  console.log(negProductIds)
+  // console.log(negProductIds)
 
   const orderData = await Order.find(
-    { 'store.area': area, period, 'listPromotions.listProduct.id': { $in: negProductIds } },
-    { orderId: 1, area: 1, period: 1, listProduct: 1, _id: 0 } // projection (ถ้าต้องการ)
+    { 'store.area': area, period:period},
   ).lean();
-  // console.log(orderData)
+
+  // proDiff = orderData.map()
+
+  
   // const orderDiff = []
 
   // for (i of negProductIds){
