@@ -1115,7 +1115,16 @@ exports.saleConfirmWithdraw = async (req, res) => {
           message: 'No products found in withdrawal transaction.'
         })
       }
+      const receiveQtyZero = []
 
+      for (item of distributionTran.listProduct) {
+
+        if (item.receiveQty === 0 && item.receiveUnit == '') {
+          receiveQtyZero.push(item.id)
+        }
+      }
+
+      // console.log(receiveQtyZero)
       if (distributionTran.withdrawType === 'credit') {
 
         distributionTran.listProduct.forEach(item => {
@@ -1233,7 +1242,7 @@ exports.saleConfirmWithdraw = async (req, res) => {
 
 
       // ✅ อัปเดตข้อมูลถ้า status เป็น approved
-      if (distributionTran.status === 'approved') {
+      // if (distributionTran.status === 'approved') {
         // // บันทึก listProduct ที่แก้ไขแล้ว
         await Distribution.updateOne(
           { _id: distributionTran._id },
@@ -1270,14 +1279,37 @@ exports.saleConfirmWithdraw = async (req, res) => {
         }
 
         // ✅ อัปเดตสต๊อก
-        const qtyproduct = distributionTran.listProduct
-          .filter(u => u?.id && u?.receiveUnit && u?.receiveQty > 0)
-          .map(u => ({
-            id: u.id,
-            unit: u.receiveUnit,
-            qty: u.receiveQty
-            // statusMovement: 'OUT'
-          }))
+        // const qtyproduct = [];
+
+        // for (const u of (distributionTran.listProduct ?? [])) {
+        //   if (!u || !u.id) continue;
+
+        //   const unit = (u.receiveUnit ?? '').trim();
+        //   const qty = Number(u.receiveQty);
+
+        //   if (!unit || !Number.isFinite(qty) || qty <= 0) continue;
+
+        //   qtyproduct.push({ id: u.id, unit, qty });
+        // }
+
+        // console.log(qtyproduct);
+
+        // console.log(distributionTran.listProduct)
+
+        const qtyproduct = [];
+
+        for (const i of (receiveQtyZero ?? [])) {
+
+          const productQty = distributionTran.listProduct.find(item => item.id === i)
+
+          const unit = (productQty.receiveUnit ?? '').trim();
+          const qty = Number(productQty.receiveQty);
+
+          qtyproduct.push({ id: productQty.id, unit, qty });
+        }
+
+        // console.log(qtyproduct)
+
 
         for (const item of qtyproduct) {
           const updateResult = await updateStockMongo(
@@ -1302,12 +1334,12 @@ exports.saleConfirmWithdraw = async (req, res) => {
           status: 200,
           message: 'Confirm withdraw success'
         })
-      } else {
-        return res.status(409).json({
-          status: 409,
-          message: 'Status withdraw is pending'
-        })
-      }
+      // } else {
+      //   return res.status(409).json({
+      //     status: 409,
+      //     message: 'Status withdraw is pending'
+      //   })
+      // }
     }
 
     // ✅ กรณี status === false
