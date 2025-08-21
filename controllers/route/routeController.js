@@ -112,9 +112,9 @@ exports.getRoute = async (req, res) => {
 
     // console.log(enrichedRoutes)
 
-    // if (area && period) {
-    //    enrichedRoutes = enrichedRoutes.map(({ listStore, ...rest }) => rest);
-    // }
+    if (area && period && !routeId && !storeId) {
+       enrichedRoutes = enrichedRoutes.map(({ listStore, ...rest }) => rest);
+    }
 
 
     // }
