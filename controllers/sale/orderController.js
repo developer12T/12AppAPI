@@ -994,6 +994,9 @@ exports.OrderToExcel = async (req, res) => {
         listProduct: 1,
         listPromotions: 1
       }
+    },
+    {
+      $sort: { orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
     }
   ])
 
@@ -1025,6 +1028,9 @@ exports.OrderToExcel = async (req, res) => {
           $lte: endTH
         }
       }
+    },
+    {
+      $sort: { orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
     }
   ])
 
@@ -1055,6 +1061,9 @@ exports.OrderToExcel = async (req, res) => {
           $lte: endTH
         }
       }
+    },
+    {
+      $sort: { orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
     }
   ])
 

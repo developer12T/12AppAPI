@@ -21,12 +21,15 @@ const cartModel = require('../../models/cash/cart')
 const orderModel = require('../../models/cash/sale')
 const stockModel = require('../../models/cash/stock')
 const productModel = require('../../models/cash/product')
+const refundModel = require('../../models/cash/refund')
+
 const { getModelsByChannel } = require('../../middleware/channel')
 const { create } = require('lodash')
 
-async function erpApiCheckOrderJob(channel = 'cash') {
+async function erpApiCheckOrderJob (channel = 'cash') {
   try {
     const { Order } = getModelsByChannel(channel, null, orderModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
 
     // 1. Get sale order numbers (OAORNO) ที่มีใน Sale
     const modelSale = await Sale.findAll({
@@ -40,13 +43,21 @@ async function erpApiCheckOrderJob(channel = 'cash') {
 
     // 2. Get pending orderIds ใน MongoDB
     const inMongo = await Order.find({ status: 'pending' }).select('orderId')
+    const inMongoRefund = await Refund.find({ status: 'pending' }).select(
+      'orderId'
+    )
+
     const orderIdsInMongo = inMongo.map(item => item.orderId.toString())
+    const refundIdsInMongo = inMongoRefund.map(item => item.orderId.toString())
 
     // 3. filter ให้เหลือเฉพาะที่อยู่ทั้งสองฝั่ง
     const matchedIds = orderIdsInMongo.filter(id => saleIds.includes(id))
+    const matchedIdsRefund = inMongoRefund.filter(id => saleIds.includes(id))
 
     // 4. อัปเดตทุกตัวที่ match (วนทีละตัว)
     let updatedCount = 0
+    let updatedCountReufund = 0
+
     for (const orderId of matchedIds) {
       try {
         const result = await Order.updateOne(
@@ -64,24 +75,45 @@ async function erpApiCheckOrderJob(channel = 'cash') {
         console.error(`Error update orderId: ${orderId}`, err)
       }
     }
+    
+
+    for (const orderId of matchedIdsRefund) {
+      try {
+        const result = await Refund.updateOne(
+          { orderId },
+          {
+            $set: {
+              status: 'completed',
+              statusTH: 'สำเร็จ',
+              updatedAt: new Date()
+            }
+          }
+        )
+        if (result.modifiedCount > 0) updatedCountReufund++
+      } catch (err) {
+        console.error(`Error update Refund orderId: ${orderId}`, err)
+      }
+    }
+
+    const summaryCount = updatedCount + updatedCountReufund
 
     const io = getSocket()
     io.emit('order/statusOrderUpdated', {
-      updatedCount,
+      summaryCount,
       updatedAt: new Date()
     })
 
     // });
 
-    console.log(`Total updated Order: ${updatedCount}`)
-    return updatedCount
+    console.log(`Total updated Order: ${summaryCount}`)
+    return summaryCount
   } catch (error) {
     console.error('❌ Error in erpApiCheckOrderJob:', error)
     return { error: true, message: error.message }
   }
 }
 
-async function erpApiCheckDisributionM3Job(channel = 'cash') {
+async function erpApiCheckDisributionM3Job (channel = 'cash') {
   try {
     const { Distribution } = getModelsByChannel(channel, null, disributionModel)
 
@@ -163,7 +195,7 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
   }
 }
 
-async function DeleteCartDaily(channel = 'cash') {
+async function DeleteCartDaily (channel = 'cash') {
   // เปิด session สำหรับ transaction
   // const session = await mongoose.startSession();
   // session.startTransaction();
