@@ -994,6 +994,9 @@ exports.OrderToExcel = async (req, res) => {
         listProduct: 1,
         listPromotions: 1
       }
+    },
+    {
+      $sort: { orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
     }
   ])
 
@@ -1025,6 +1028,9 @@ exports.OrderToExcel = async (req, res) => {
           $lte: endTH
         }
       }
+    },
+    {
+      $sort: { orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
     }
   ])
 
@@ -1055,6 +1061,9 @@ exports.OrderToExcel = async (req, res) => {
           $lte: endTH
         }
       }
+    },
+    {
+      $sort: { orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
     }
   ])
 
@@ -3553,21 +3562,40 @@ exports.saleReport = async (req, res) => {
     if (area) {
       filterArea = { 'store.area': area }
     }
+
     if (date) {
       const year = Number(date.substring(0, 4))
       const month = Number(date.substring(4, 6)) - 1
       const day = Number(date.substring(6, 8))
-
       // เวลาตาม timezone ไทย
       const startDateUTC = new Date(Date.UTC(year, month, day, 0, 0, 0)) // 2025-08-01T17:00:00Z
       const endDateUTC = new Date(Date.UTC(year, month, day + 1, 0, 0, 0) - 1) // 2025-08-02T16:59:59.999Z
+      // เทียบโดย "เพิ่ม +7 ชั่วโมงที่ createdAt" ก่อน แล้วค่อยเทียบกับช่วงเวลาไทย
       filterCreatedAt = {
-        createdAt: {
-          $gte: startDateUTC,
-          $lt: endDateUTC
+        $expr: {
+          $and: [
+            {
+              $gte: [
+                {
+                  $dateAdd: { startDate: '$createdAt', unit: 'hour', amount: 7 }
+                },
+                startDateUTC
+              ]
+            },
+            {
+              $lt: [
+                {
+                  $dateAdd: { startDate: '$createdAt', unit: 'hour', amount: 7 }
+                },
+                endDateUTC
+              ]
+            }
+          ]
         }
       }
     }
+
+   
 
     const dataOrder = await Order.find({
       ...filterArea,
