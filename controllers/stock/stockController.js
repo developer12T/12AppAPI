@@ -1400,7 +1400,7 @@ exports.getStockQtyNew = async (req, res) => {
         zone: { $substrBytes: ['$area', 0, 2] }
       }
     },
-    { $match: { type: 'change', status: 'approved' } },
+    { $match: { type: 'change', status: { $in: ['approved', 'completed'] } } },
     { $match: matchQueryRefund },
     {
       $project: {
@@ -1409,6 +1409,10 @@ exports.getStockQtyNew = async (req, res) => {
       }
     }
   ])
+
+  // console.log(JSON.stringify(dataChange, null, 2));
+
+
 
   const dataAdjust = await AdjustStock.aggregate([
     {
@@ -2196,7 +2200,7 @@ exports.getStockQtyDetail = async (req, res) => {
           'store.area': area,
           period,
           type: 'change',
-          status: 'approved'
+          status: { $in: ['approved', 'completed'] }
         }
       },
       {
@@ -4049,7 +4053,7 @@ exports.addStockAllWithInOut = async (req, res) => {
 
       const dataChange = await Order.aggregate([
         { $addFields: { zone: { $substrBytes: ['$area', 0, 2] } } },
-        { $match: { type: 'change', status: 'approved' } },
+        { $match: { type: 'change', status: { $in: ['approved', 'completed'] } }},
         { $match: matchQueryRefund },
         { $project: { listProduct: 1, _id: 0 } }
       ])
@@ -4507,29 +4511,29 @@ exports.addStockAllWithInOut = async (req, res) => {
       for (i of item.data) {
         // console.log(item.area)
 
-        // await Stock.findOneAndUpdate(
-        //   {
-        //     area: item.area,
-        //     period: period,
-        //     'listProduct.productId': i.productId
-        //   },
-        //   {
-        //     $set: {
-        //       // 'listProduct.$[elem].stockPcs': i.summaryQty.PCS.stock,
-        //       'listProduct.$[elem].stockInPcs': i.summaryQty.PCS.in,
-        //       'listProduct.$[elem].stockOutPcs': i.summaryQty.PCS.out,
-        //       'listProduct.$[elem].balancePcs': i.summaryQty.PCS.balance,
-        //       // 'listProduct.$[elem].stockCtn': i.summaryQty.CTN.stock,
-        //       'listProduct.$[elem].stockInCtn': i.summaryQty.CTN.in,
-        //       'listProduct.$[elem].stockOutCtn': i.summaryQty.CTN.out,
-        //       'listProduct.$[elem].balanceCtn': i.summaryQty.CTN.balance
-        //     }
-        //   },
-        //   {
-        //     arrayFilters: [{ 'elem.productId': i.productId }],
-        //     new: true
-        //   }
-        // )
+        await Stock.findOneAndUpdate(
+          {
+            area: item.area,
+            period: period,
+            'listProduct.productId': i.productId
+          },
+          {
+            $set: {
+              // 'listProduct.$[elem].stockPcs': i.summaryQty.PCS.stock,
+              'listProduct.$[elem].stockInPcs': i.summaryQty.PCS.in,
+              'listProduct.$[elem].stockOutPcs': i.summaryQty.PCS.out,
+              'listProduct.$[elem].balancePcs': i.summaryQty.PCS.balance,
+              // 'listProduct.$[elem].stockCtn': i.summaryQty.CTN.stock,
+              'listProduct.$[elem].stockInCtn': i.summaryQty.CTN.in,
+              'listProduct.$[elem].stockOutCtn': i.summaryQty.CTN.out,
+              'listProduct.$[elem].balanceCtn': i.summaryQty.CTN.balance
+            }
+          },
+          {
+            arrayFilters: [{ 'elem.productId': i.productId }],
+            new: true
+          }
+        )
       }
     }
 
