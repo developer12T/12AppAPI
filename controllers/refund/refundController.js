@@ -822,7 +822,7 @@ exports.updateStatus = async (req, res) => {
         newOrderId = `${changeOrder.orderId}CC${counter++}`;
       }
 
-      console.log(productChange)
+      // console.log(productChange)
       for (const item of productChange) {
         const updateResult = await updateStockMongo(
           item,
