@@ -669,8 +669,8 @@ exports.getDetail = async (req, res) => {
 
     const data = {
       ...doc.toObject(),
-      createdAt: toThai(doc.createdAt),
-      updatedAt: toThai(doc.updatedAt),
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt,
       _source: source // บอกว่าได้มาจากไหน (order/refund)
     }
 
