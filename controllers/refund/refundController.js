@@ -815,14 +815,14 @@ exports.updateStatus = async (req, res) => {
       )
       // console.log(orderId)
 
-    } else if (status === 'rejected') {
+    } else if (status === 'reject') {
       statusTH = 'ถูกปฏิเสธ'
       if (!changeOrder.orderId.endsWith('CC')) {
         let counter = 1;
         newOrderId = `${changeOrder.orderId}CC${counter++}`;
       }
 
-      console.log(productChange)
+      // console.log(productChange)
       for (const item of productChange) {
         const updateResult = await updateStockMongo(
           item,

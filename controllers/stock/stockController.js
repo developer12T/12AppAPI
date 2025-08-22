@@ -3060,12 +3060,12 @@ exports.stockToExcelNew = async (req, res) => {
       dataGive,
       warehouseDoc
     ] = await Promise.all([
-      Refund.find({ 'store.area': area, period, status: { $in: ['pending', 'completed'] }, type: 'refund' }).lean(),
+      Refund.find({ 'store.area': area, period, status: { $in: ['completed'] }, type: 'refund' }).lean(),
       Order.find({ 'store.area': area, period, type: 'sale', status: { $in: ['pending', 'completed'] } }).lean(),
       Order.find({ 'store.area': area, period, type: 'change', status: { $in: ['approved', 'completed'] } }).lean(),
       Distribution.find({ area, period, status: { $in: ['confirm'] }, type: 'withdraw' }).lean(),
       Stock.find({ area, period }).select('listProduct').lean(),
-      Giveaway.find({ 'store.area': area, period, status: { $in: ['pending', 'completed'] }, type: 'give' }).lean(),
+      Giveaway.find({ 'store.area': area, period, status: { $in: ['pending','approved','completed'] }, type: 'give' }).lean(),
       Stock.findOne({ area, period }).select('warehouse').lean()
     ]);
 
@@ -3675,7 +3675,7 @@ exports.checkStockWithdraw = async (req, res) => {
 
   // --- Query ข้อมูล ---
   const dataRefund = await Refund.aggregate([
-    { $match: { ...matchQueryRefund, status: { $ne: 'canceled' } } },
+    { $match: { ...matchQueryRefund, status: { $nin: ['canceled', 'reject'] } } },
     { $project: { listProduct: 1, _id: 0 } }
   ])
 
@@ -3749,14 +3749,14 @@ exports.checkStockWithdraw = async (req, res) => {
 
   const dataOrder = await Order.aggregate([
     { $addFields: { zone: { $substrBytes: ['$area', 0, 2] } } },
-    { $match: { type: 'sale', status: { $ne: 'canceled' } } },
+    { $match: { type: 'sale', status: { $nin: ['canceled', 'reject'] } } },
     { $match: matchQueryRefund },
     { $project: { listProduct: 1, listPromotions: 1, _id: 0 } }
   ])
 
   const dataChange = await Order.aggregate([
     { $addFields: { zone: { $substrBytes: ['$area', 0, 2] } } },
-    { $match: { type: 'change', status: { $ne: 'canceled' } } },
+    { $match: { type: 'change', status: { $nin: ['canceled', 'reject'] } } },
     { $match: matchQueryRefund },
     { $project: { listProduct: 1, _id: 0 } }
   ])
@@ -3770,7 +3770,7 @@ exports.checkStockWithdraw = async (req, res) => {
 
   const dataGive = await Giveaway.aggregate([
     { $addFields: { zone: { $substrBytes: ['$area', 0, 2] } } },
-    { $match: { type: 'give', status: { $ne: 'canceled' } } },
+    { $match: { type: 'give', status: { $nin: ['canceled', 'reject'] } } },
     { $match: matchQueryRefund },
     { $project: { listProduct: 1, _id: 0 } }
   ])
@@ -4064,7 +4064,12 @@ exports.addStockAllWithInOut = async (req, res) => {
       const matchQueryRefund = { ...areaQueryRefund, period }
 
       const dataRefund = await Refund.aggregate([
-        { $match: { ...matchQueryRefund, status: { $ne: 'canceled' } } },
+        {
+          $match: {
+            ...matchQueryRefund,
+            status: { $nin: ['canceled', 'reject'] }
+          }
+        },
         { $project: { listProduct: 1, _id: 0 } }
       ])
 
@@ -4146,7 +4151,7 @@ exports.addStockAllWithInOut = async (req, res) => {
 
       const dataGive = await Giveaway.aggregate([
         { $addFields: { zone: { $substrBytes: ['$area', 0, 2] } } },
-        { $match: { type: 'give', status: { $ne: 'canceled' } } },
+        { $match: { type: 'give', status: { $nin: ['canceled', 'reject'] } } },
         { $match: matchQueryRefund },
         { $project: { listProduct: 1, _id: 0 } }
       ])
