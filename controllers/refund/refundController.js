@@ -821,6 +821,8 @@ exports.updateStatus = async (req, res) => {
         let counter = 1;
         newOrderId = `${changeOrder.orderId}CC${counter++}`;
       }
+
+      console.log(productChange)
       for (const item of productChange) {
         const updateResult = await updateStockMongo(
           item,
