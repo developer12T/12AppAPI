@@ -23,6 +23,14 @@ const path = require('path')
 const multer = require('multer')
 const upload = multer({ storage: multer.memoryStorage() }).single('image')
 const { uploadFiles } = require('../../utilities/upload')
+const xlsx = require('xlsx')
+const os = require('os')
+const fs = require('fs')
+
+
+
+
+
 exports.addGiveType = async (req, res) => {
   try {
     const {
@@ -770,4 +778,174 @@ exports.updateStatus = async (req, res) => {
       error: error.message
     })
   }
+}
+
+
+exports.giveToExcel = async (req, res) => {
+  const { channel, date } = req.query
+
+  // console.log(channel, date)
+  let statusArray = (req.query.status || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+
+  if (statusArray.length === 0) {
+    statusArray = ['pending'] // default
+  }
+  // ,'approved','completed'
+  if (!date || date === 'null') {
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = String(today.getMonth() + 1).padStart(2, '0') // เดือนเริ่มที่ 0
+    const day = String(today.getDate()).padStart(2, '0')
+
+    date = `${year}${month}${day}`
+    // console.log('📅 date:', date)
+  }
+
+  const start = new Date(
+    `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00`
+  )
+  const end = new Date(
+    `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T23:59:59.999`
+  )
+
+  // const channel = 'cash';
+  const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel)
+
+  // const modelOrder = await Order.find({
+  //   orderId: { $not: /CC/ },
+  // })
+
+  // ช่วงเวลา "ไทย" ที่ผู้ใช้เลือก
+  const startTH = new Date(
+    `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00+07:00`
+  )
+  const endTH = new Date(
+    `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(
+      6,
+      8
+    )}T23:59:59.999+07:00`
+  )
+
+  // console.log(startTH, endTH)
+
+  const giveOrder = await Giveaway.aggregate([
+    {
+      $match: {
+        createdAt: {
+          $gte: startTH,
+          $lte: endTH
+        }
+      }
+    },
+    {
+      $match: {
+        status: { $nin: ['canceled'] },
+        status: { $in: statusArray },
+        type: { $in: ['give'] },
+        'store.area': { $ne: 'IT211' }
+        // 'store.area': 'NE211'
+      }
+    },
+    {
+      $addFields: {
+        createdAtThai: {
+          $dateAdd: {
+            startDate: '$createdAt',
+            unit: 'hour',
+            amount: 7
+          }
+        }
+      }
+    },
+    {
+      $sort: { orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
+    }
+  ])
+
+  function formatDateToThaiYYYYMMDD(date) {
+    const d = new Date(date)
+    // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
+
+    const yyyy = d.getFullYear()
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+
+    return `${yyyy}${mm}${dd}`
+  }
+
+  const dataTran = giveOrder.map(item => {
+    const TRDT = formatDateToThaiYYYYMMDD(item.createdAt)
+    const TRTM = new Date(item.createdAt).getTime()
+
+
+    const listProduct = item.listProduct.map(o => {
+      return {
+        CONO: "",
+        WHLO: item.sale.warehouse,
+        TWLO: item.sale.warehouse,
+        ADID: item.store.area,
+        WHSL: "",
+        RIDN: "",
+        TRTP: item.giveInfo.type,
+        RORC: "0",
+        RORN: item.orderId,
+        DEPT: item.giveInfo.dept,
+        TRDT: TRDT,
+        TRTM: `${TRTM}`,
+        RIDT: "",
+        RITM: "",
+        REMK: item.giveInfo.remark,
+        RPDT: "",
+        RPTM: "",
+        RESP: "AC04",
+        ITNO: o.id,
+        TRQT: o.qtyPcs,
+        TWSL: "",
+        BANO: "",
+        RSCD: "",
+        TRPR: "0",
+        BREF: "",
+        BRE2: "",
+        REFE: "",
+        ROUT: "",
+      }
+
+    })
+    return [...listProduct]
+
+  })
+
+  const data = dataTran.flatMap(item => item)
+
+
+
+  // const wb = xlsx.utils.book_new()
+  // const ws = xlsx.utils.json_to_sheet(data)
+  // xlsx.utils.book_append_sheet(wb, ws, `ESP${formatDateToThaiYYYYMMDD(date)}`)
+
+  // const tempPath = path.join(os.tmpdir(), `${formatDateToThaiYYYYMMDD(date)}.xlsx`)
+  // xlsx.writeFile(wb, tempPath)
+
+  // res.download(tempPath, `CA_.xlsx`, err => {
+  //   if (err) {
+  //     console.error('❌ Download error:', err)
+  //     // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+  //     if (!res.headersSent) {
+  //       res.status(500).send('Download failed')
+  //     }
+  //   }
+
+  //   // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+  //   fs.unlink(tempPath, () => { })
+  // })
+
+
+  return res.status(200).json({
+    status: 200,
+    message: `Sucess`,
+    data: data
+  })
 }
