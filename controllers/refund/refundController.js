@@ -815,7 +815,7 @@ exports.updateStatus = async (req, res) => {
       )
       // console.log(orderId)
 
-    } else if (status === 'rejected') {
+    } else if (status === 'reject') {
       statusTH = 'ถูกปฏิเสธ'
       if (!changeOrder.orderId.endsWith('CC')) {
         let counter = 1;
