@@ -393,7 +393,7 @@ exports.getSendMoneyForAcc = async (req, res) => {
           _id: 0,
           area: '$area',
           SALE: { $concat: ['$user.firstName', ' ', '$user.surName'] },
-          STATUS: 'OK',
+          // STATUS: 'OK',
           TRANSFER_DATE: date,
           WAREHOUSE: '$user.warehouse',
           VALUES: '$sendmoney',
@@ -421,7 +421,7 @@ exports.getSendMoneyForAcc = async (req, res) => {
           _id: {
             area: '$area',
             SALE: '$SALE',
-            STATUS: '$STATUS',
+            // STATUS: '$STATUS',
             TRANSFER_DATE: '$TRANSFER_DATE',
             ZONE: '$ZONE',
             IMAGE: '$IMAGE',
@@ -437,7 +437,7 @@ exports.getSendMoneyForAcc = async (req, res) => {
           AREA: '$_id.area',
           COUNT: { $toString: '$COUNT' },
           SALE: '$_id.SALE',
-          STATUS: '$_id.STATUS',
+          STATUS: { $cond: [{ $eq: ['$VALUES', 0] }, 'NOT OK', 'OK'] },
           TRANSFER_DATE: '$_id.TRANSFER_DATE',
           VALUES: {
             $cond: [

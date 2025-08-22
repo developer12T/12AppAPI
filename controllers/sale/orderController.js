@@ -916,7 +916,7 @@ exports.OrderToExcel = async (req, res) => {
     statusArray = ['pending'] // default
   }
   // ,'approved','completed'
-  console.log(statusArray)
+  // console.log(statusArray)
   if (!date || date === 'null') {
     const today = new Date()
     const year = today.getFullYear()
@@ -1282,7 +1282,7 @@ exports.OrderToExcel = async (req, res) => {
 
   // รวบรวม itemCode ทั้งหมดจาก refund
   const refundItems = modelRefund.flatMap(o => o.listProduct.map(p => p.id))
-  console.log(refundItems)
+  // console.log(refundItems)
   const uniqueCodes = [...new Set(refundItems)]
 
   // ปีที่ยอมรับ
