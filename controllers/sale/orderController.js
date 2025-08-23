@@ -1037,7 +1037,7 @@ exports.OrderToExcel = async (req, res) => {
   const modelRefund = await Refund.aggregate([
     {
       $match: {
-        status: { $nin: ['canceled'] },
+        status: { $nin: ['canceled','reject'] },
         status: { $in: statusArray },
         'store.area': { $ne: 'IT211' }
         // 'store.area': 'NE211'
@@ -2549,7 +2549,7 @@ exports.getSummarybyChoice = async (req, res) => {
 
     let matchStage = {
       'store.area': area,
-      status: { $nin: ['canceled'] },
+      status: { $nin: ['canceled','reject'] },
       createdAt: { $gte: start, $lte: end }
     }
     if (storeId) {
@@ -3240,7 +3240,7 @@ exports.summaryDaily = async (req, res) => {
           period: periodStr,
           createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
           type: 'refund',
-          status: { $nin: ['canceled', 'delete'] }
+          status: { $nin: ['canceled', 'reject'] }
         }),
         Order.find({
           'store.area': area,
@@ -3254,7 +3254,7 @@ exports.summaryDaily = async (req, res) => {
           period: periodStr,
           createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
           type: 'change',
-          status: { $nin: ['canceled'] }
+          status: { $nin: ['canceled','reject'] }
         })
       ])
 
@@ -3466,7 +3466,7 @@ exports.summaryMonthlyByZone = async (req, res) => {
             period: periodStr,
             createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
             type: 'refund',
-            status: { $nin: ['canceled', 'delete'] }
+            status: { $nin: ['canceled', 'reject'] }
           }),
           Order.find({
             'store.area': area,
@@ -3606,7 +3606,7 @@ exports.saleReport = async (req, res) => {
     const dataRefund = await Refund.find({
       ...filterArea,
       ...filterCreatedAt,
-      status: { $ne: 'canceled' }
+      status: { $nin: ['canceled', 'reject'] }
     })
 
     if (dataOrder.length === 0) {
