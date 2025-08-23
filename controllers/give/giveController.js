@@ -482,7 +482,7 @@ exports.getOrder = async (req, res) => {
         storeAddress: o.store?.address || '',
         createAt: o.createdAt,
         total: o.total,
-        listProduct:o.listProduct.length,
+        listProduct: o.listProduct.length,
         status: o.status
       }))
     // console.log(response)
@@ -778,7 +778,7 @@ exports.updateStatus = async (req, res) => {
 }
 
 exports.giveToExcel = async (req, res) => {
-  const { channel, date } = req.query
+  const { channel, startDate, endDate } = req.query
 
   // console.log(channel, date)
   let statusArray = (req.query.status || '')
@@ -790,22 +790,22 @@ exports.giveToExcel = async (req, res) => {
     statusArray = ['pending'] // default
   }
   // ,'approved','completed'
-  if (!date || date === 'null') {
-    const today = new Date()
-    const year = today.getFullYear()
-    const month = String(today.getMonth() + 1).padStart(2, '0') // เดือนเริ่มที่ 0
-    const day = String(today.getDate()).padStart(2, '0')
+  // if (!date || date === 'null') {
+  //   const today = new Date()
+  //   const year = today.getFullYear()
+  //   const month = String(today.getMonth() + 1).padStart(2, '0') // เดือนเริ่มที่ 0
+  //   const day = String(today.getDate()).padStart(2, '0')
 
-    date = `${year}${month}${day}`
-    // console.log('📅 date:', date)
-  }
+  //   date = `${year}${month}${day}`
+  //   // console.log('📅 date:', date)
+  // }
 
-  const start = new Date(
-    `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00`
-  )
-  const end = new Date(
-    `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T23:59:59.999`
-  )
+  // const start = new Date(
+  //   `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00`
+  // )
+  // const end = new Date(
+  //   `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T23:59:59.999`
+  // )
 
   // const channel = 'cash';
   const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel)
@@ -816,10 +816,13 @@ exports.giveToExcel = async (req, res) => {
 
   // ช่วงเวลา "ไทย" ที่ผู้ใช้เลือก
   const startTH = new Date(
-    `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00+07:00`
+    `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
+      6,
+      8
+    )}T00:00:00+07:00`
   )
   const endTH = new Date(
-    `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(
+    `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(
       6,
       8
     )}T23:59:59.999+07:00`
@@ -857,7 +860,7 @@ exports.giveToExcel = async (req, res) => {
       }
     },
     {
-      $sort: { orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
+      $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
     }
   ])
 
@@ -923,9 +926,12 @@ exports.giveToExcel = async (req, res) => {
 
   const wb = xlsx.utils.book_new()
   const ws = xlsx.utils.json_to_sheet(data)
-  xlsx.utils.book_append_sheet(wb, ws, `ESP${yyyymmddToDdMmYyyy(date)}`)
+  xlsx.utils.book_append_sheet(wb, ws, `ESP${yyyymmddToDdMmYyyy(startDate)}`)
 
-  const tempPath = path.join(os.tmpdir(), `${yyyymmddToDdMmYyyy(date)}.xlsx`)
+  const tempPath = path.join(
+    os.tmpdir(),
+    `${yyyymmddToDdMmYyyy(startDate)}.xlsx`
+  )
   // xlsx.writeFile(wb, tempPath)
 
   xlsx.writeFile(wb, tempPath, {
@@ -940,18 +946,22 @@ exports.giveToExcel = async (req, res) => {
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   )
 
-  res.download(tempPath, `CA_GIVE_${yyyymmddToDdMmYyyy(date)}.xlsx`, err => {
-    if (err) {
-      console.error('❌ Download error:', err)
-      // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
-      if (!res.headersSent) {
-        res.status(500).send('Download failed')
+  res.download(
+    tempPath,
+    `CA_GIVE_${yyyymmddToDdMmYyyy(startDate)}.xlsx`,
+    err => {
+      if (err) {
+        console.error('❌ Download error:', err)
+        // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+        if (!res.headersSent) {
+          res.status(500).send('Download failed')
+        }
       }
-    }
 
-    // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => {})
-  })
+      // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+      fs.unlink(tempPath, () => {})
+    }
+  )
 
   // return res.status(200).json({
   //   status: 200,
