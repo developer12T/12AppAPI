@@ -482,6 +482,7 @@ exports.getOrder = async (req, res) => {
         storeAddress: o.store?.address || '',
         createAt: o.createdAt,
         total: o.total,
+        listProduct:o.listProduct.length,
         status: o.status
       }))
     // console.log(response)
@@ -924,11 +925,20 @@ exports.giveToExcel = async (req, res) => {
   const ws = xlsx.utils.json_to_sheet(data)
   xlsx.utils.book_append_sheet(wb, ws, `ESP${yyyymmddToDdMmYyyy(date)}`)
 
-  const tempPath = path.join(
-    os.tmpdir(),
-    `${yyyymmddToDdMmYyyy(date)}.xlsx`
+  const tempPath = path.join(os.tmpdir(), `${yyyymmddToDdMmYyyy(date)}.xlsx`)
+  // xlsx.writeFile(wb, tempPath)
+
+  xlsx.writeFile(wb, tempPath, {
+    bookType: 'xlsx', // Excel 2007+
+    bookSST: true, // shared strings table (helps older 2007)
+    compression: true // smaller file, widely supported
+  })
+
+  // proper MIME for xlsx (Excel 2007+)
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   )
-  xlsx.writeFile(wb, tempPath)
 
   res.download(tempPath, `CA_GIVE_${yyyymmddToDdMmYyyy(date)}.xlsx`, err => {
     if (err) {
