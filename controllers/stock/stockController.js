@@ -2009,6 +2009,37 @@ exports.getStockQtyDetail = async (req, res) => {
         .AdjustStock
     }
 
+
+    function rollupUnits(summaryByUnit, listUnit) {
+      // ต้องมี factor = จำนวนชิ้นเล็กสุดต่อ 1 หน่วยนั้น
+      // เช่น CTN=80, BAG=10, PCS=1
+      const meta = Object.fromEntries(listUnit.map(u => [u.unit, { name: u.name, factor: u.factor }]));
+
+      // รวมเป็นหน่วยฐาน
+      const totalBase = summaryByUnit.reduce((s, x) => s + (x.qty || 0) * (meta[x.unit]?.factor ?? 1), 0);
+
+      // แจกแจงจากใหญ่ไปเล็ก
+      const unitsDesc = [...listUnit].sort((a, b) => b.factor - a.factor);
+      let remain = totalBase;
+      const out = [];
+
+      for (const u of unitsDesc) {
+        const q = Math.floor(remain / u.factor);
+        if (q > 0) out.push({ unit: u.unit, unitName: u.name, qty: q });
+        remain -= q * u.factor;
+      }
+
+      // ถ้ายังเหลือเศษ (เพราะหน่วยเล็กสุด factor > 1) ให้ใส่เป็นหน่วยเล็กสุด
+      if (remain > 0) {
+        const smallest = unitsDesc[unitsDesc.length - 1];
+        out.push({ unit: smallest.unit, unitName: smallest.name, qty: remain });
+      }
+      return out;
+    }
+
+
+
+
     const filterProduct = (list = []) => list.filter(p => p.id === productId)
 
     const productData = await Product.findOne({ id: productId }).select(
@@ -2276,6 +2307,11 @@ exports.getStockQtyDetail = async (req, res) => {
       orderGiveDocs.flatMap(o => o.listProduct)
     )
 
+
+
+
+
+
     const summaryStockIn = calculateTotalPrice(
       productData.listUnit,
       [...withdrawStock, ...refundStock],
@@ -2290,10 +2326,22 @@ exports.getStockQtyDetail = async (req, res) => {
       ...adjustStock
     ])
 
+    const normalizedStockOut = rollupUnits(summaryStockOut, productData.listUnit);
+
+
+    // console.log(normalized)
+
+
     const summaryStockInQty = calculateQtyByUnit(productData.listUnit, [
+      ...refundStock,
       ...withdrawStock,
-      ...refundStock
+      ...STOCK.stock
     ])
+
+
+    const normalizedStockIn = rollupUnits(summaryStockInQty, productData.listUnit);
+
+    // console.log(normalizedStockIn)
 
     const summaryStockOutQty = calculateQtyByUnit(productData.listUnit, [
       ...orderStock,
@@ -2347,11 +2395,7 @@ exports.getStockQtyDetail = async (req, res) => {
           withdraw,
           refundStock,
           refund: newRefund,
-          summaryStock: calculateQtyByUnit(productData.listUnit, [
-            ...refundStock,
-            ...withdrawStock,
-            ...STOCK.stock
-          ]),
+          summaryStock: normalizedStockIn,
           summaryStockIn
         },
         OUT: {
@@ -2380,7 +2424,7 @@ exports.getStockQtyDetail = async (req, res) => {
           giveDetail: giveDetail,
           give: giveStock,
           giveSum: calculateTotalPrice(productData.listUnit, giveStock, 'sale'),
-          summaryStock: summaryStockOut,
+          summaryStock: normalizedStockOut,
           summaryStockInOut: summaryStockOutPrice
         },
         totalStockInPcs: totalStockInPcs,
@@ -3060,12 +3104,12 @@ exports.stockToExcelNew = async (req, res) => {
       dataGive,
       warehouseDoc
     ] = await Promise.all([
-      Refund.find({ 'store.area': area, period, status: { $in: ['completed','approved'] }, type: 'refund' }).lean(),
+      Refund.find({ 'store.area': area, period, status: { $in: ['completed', 'approved'] }, type: 'refund' }).lean(),
       Order.find({ 'store.area': area, period, type: 'sale', status: { $in: ['pending', 'completed'] } }).lean(),
       Order.find({ 'store.area': area, period, type: 'change', status: { $in: ['approved', 'completed'] } }).lean(),
       Distribution.find({ area, period, status: { $in: ['confirm'] }, type: 'withdraw' }).lean(),
       Stock.find({ area, period }).select('listProduct').lean(),
-      Giveaway.find({ 'store.area': area, period, status: { $in: ['pending','approved','completed'] }, type: 'give' }).lean(),
+      Giveaway.find({ 'store.area': area, period, status: { $in: ['pending', 'approved', 'completed'] }, type: 'give' }).lean(),
       Stock.findOne({ area, period }).select('warehouse').lean()
     ]);
 
@@ -3675,7 +3719,7 @@ exports.checkStockWithdraw = async (req, res) => {
 
   // --- Query ข้อมูล ---
   const dataRefund = await Refund.aggregate([
-    { $match: { ...matchQueryRefund, status: { $in: ['completed','approved'] } } },
+    { $match: { ...matchQueryRefund, status: { $in: ['completed', 'approved'] } } },
     { $project: { listProduct: 1, _id: 0 } }
   ])
 
@@ -4067,7 +4111,7 @@ exports.addStockAllWithInOut = async (req, res) => {
         {
           $match: {
             ...matchQueryRefund,
-            status: { $in: ['completed','approved'] }
+            status: { $in: ['completed', 'approved'] }
           }
         },
         { $project: { listProduct: 1, _id: 0 } }
