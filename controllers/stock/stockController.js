@@ -3060,7 +3060,7 @@ exports.stockToExcelNew = async (req, res) => {
       dataGive,
       warehouseDoc
     ] = await Promise.all([
-      Refund.find({ 'store.area': area, period, status: { $in: ['completed'] }, type: 'refund' }).lean(),
+      Refund.find({ 'store.area': area, period, status: { $in: ['completed','approved'] }, type: 'refund' }).lean(),
       Order.find({ 'store.area': area, period, type: 'sale', status: { $in: ['pending', 'completed'] } }).lean(),
       Order.find({ 'store.area': area, period, type: 'change', status: { $in: ['approved', 'completed'] } }).lean(),
       Distribution.find({ area, period, status: { $in: ['confirm'] }, type: 'withdraw' }).lean(),
@@ -3675,7 +3675,7 @@ exports.checkStockWithdraw = async (req, res) => {
 
   // --- Query ข้อมูล ---
   const dataRefund = await Refund.aggregate([
-    { $match: { ...matchQueryRefund, status: { $nin: ['canceled', 'reject'] } } },
+    { $match: { ...matchQueryRefund, status: { $in: ['completed','approved'] } } },
     { $project: { listProduct: 1, _id: 0 } }
   ])
 
@@ -4067,7 +4067,7 @@ exports.addStockAllWithInOut = async (req, res) => {
         {
           $match: {
             ...matchQueryRefund,
-            status: { $nin: ['canceled', 'reject'] }
+            status: { $in: ['completed','approved'] }
           }
         },
         { $project: { listProduct: 1, _id: 0 } }
