@@ -11,7 +11,8 @@ const { getOrder, getDetail, updateStatus, checkout, addSlip, OrderToExcel, getA
     getSummary18SKU,
     reportCheckin,
     reflashOrder,
-    OrderZeroDiff
+    OrderZeroDiff,
+    checkOrderCancelM3
  } = require('../../controllers/sale/orderController')
 
 const router = express.Router()
@@ -47,4 +48,5 @@ router.get('/getSummary18SKU', getSummary18SKU)
 router.post('/reportCheckin', reportCheckin)
 
 router.post('/OrderZeroDiff', OrderZeroDiff)
+router.post('/checkOrderCancelM3', checkOrderCancelM3)
 module.exports = router

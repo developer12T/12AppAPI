@@ -971,6 +971,31 @@ const PromotionStore = sequelize.define(
   }
 )
 
+
+const OOHEAD = sequelize.define(
+  'OOHEAD',
+  {
+    OACUOR: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OACUOR',
+      primaryKey: true
+    },
+  },
+  {
+    freezeTableName: true,
+    timestamps: false,
+    createdAt: false,
+    updatedAt: false,
+    
+  }
+)
+
+
+
+
+
+
 module.exports = {
   // ItemFac,
   // ItemMaster,
@@ -989,7 +1014,8 @@ module.exports = {
   OOTYPE,
   Customer,
   MGLINE,
-  PromotionStore
+  PromotionStore,
   // MGTYPE,
   // OODFLT
+  OOHEAD
 }

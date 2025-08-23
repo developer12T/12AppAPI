@@ -8,7 +8,7 @@ const axios = require('axios')
 const dayjs = require('dayjs')
 const { getSeries, updateRunningNumber } = require('../../middleware/order')
 const { Item } = require('../../models/item/itemlot')
-const { Sale, ItemLotM3 } = require('../../models/cash/master')
+const { Sale, ItemLotM3, OOHEAD } = require('../../models/cash/master')
 const { Op, fn, col, where, literal } = require('sequelize')
 const { generateOrderId } = require('../../utilities/genetateId')
 const {
@@ -1037,7 +1037,7 @@ exports.OrderToExcel = async (req, res) => {
   const modelRefund = await Refund.aggregate([
     {
       $match: {
-        status: { $nin: ['canceled'] },
+        status: { $nin: ['canceled','reject'] },
         status: { $in: statusArray },
         'store.area': { $ne: 'IT211' }
         // 'store.area': 'NE211'
@@ -2549,7 +2549,7 @@ exports.getSummarybyChoice = async (req, res) => {
 
     let matchStage = {
       'store.area': area,
-      status: { $nin: ['canceled'] },
+      status: { $nin: ['canceled','reject'] },
       createdAt: { $gte: start, $lte: end }
     }
     if (storeId) {
@@ -3240,7 +3240,7 @@ exports.summaryDaily = async (req, res) => {
           period: periodStr,
           createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
           type: 'refund',
-          status: { $nin: ['canceled', 'delete'] }
+          status: { $nin: ['canceled', 'reject'] }
         }),
         Order.find({
           'store.area': area,
@@ -3254,7 +3254,7 @@ exports.summaryDaily = async (req, res) => {
           period: periodStr,
           createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
           type: 'change',
-          status: { $nin: ['canceled'] }
+          status: { $nin: ['canceled','reject'] }
         })
       ])
 
@@ -3466,7 +3466,7 @@ exports.summaryMonthlyByZone = async (req, res) => {
             period: periodStr,
             createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
             type: 'refund',
-            status: { $nin: ['canceled', 'delete'] }
+            status: { $nin: ['canceled', 'reject'] }
           }),
           Order.find({
             'store.area': area,
@@ -3606,7 +3606,7 @@ exports.saleReport = async (req, res) => {
     const dataRefund = await Refund.find({
       ...filterArea,
       ...filterCreatedAt,
-      status: { $ne: 'canceled' }
+      status: { $nin: ['canceled', 'reject'] }
     })
 
     if (dataOrder.length === 0) {
@@ -3986,7 +3986,7 @@ exports.OrderZeroDiff = async (req, res) => {
     'listProduct.balancePcs': { $lt: 0 }
   })
 
-    // console.log(stockData)
+  // console.log(stockData)
 
   const negProductIds = (stockData.listProduct ?? [])
     .filter(it => Number(it.balancePcs) < 0)
@@ -3996,12 +3996,12 @@ exports.OrderZeroDiff = async (req, res) => {
   // console.log(negProductIds)
 
   const orderData = await Order.find(
-    { 'store.area': area, period:period},
+    { 'store.area': area, period: period },
   ).lean();
 
   // proDiff = orderData.map()
 
-  
+
   // const orderDiff = []
 
   // for (i of negProductIds){
@@ -4022,3 +4022,108 @@ exports.OrderZeroDiff = async (req, res) => {
 
 }
 
+exports.checkOrderCancelM3 = async (req, res) => {
+
+  const { period } = req.body
+  const channel = req.headers['x-channel']
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+  const { Refund } = getModelsByChannel(channel, res, refundModel)
+  const { Product } = getModelsByChannel(channel, res, productModel)
+  const { Stock } = getModelsByChannel(channel, res, stockModel)
+
+  const orderCC = await Order.aggregate([
+    { $match: { period, type: 'sale', status: 'canceled', 'store.area': { $ne: 'IT211' } } },
+    {
+      $project: {
+        _id: 0,
+        status: 1, // << เพิ่ม
+        orderId: {
+          $cond: [
+            { $eq: [{ $strLenCP: "$orderId" }, 16] },
+            { $substrCP: ["$orderId", 0, { $subtract: [{ $strLenCP: "$orderId" }, 3] }] },
+            "$orderId"
+          ]
+        }
+      }
+    }
+  ]);
+
+  const refundCC = await Refund.aggregate([
+    { $match: { period, type: 'refund', status: { $in: ['canceled', 'reject'] }, 'store.area': { $ne: 'IT211' } } },
+    { $project: { _id: 0, orderId: 1, reference: 1, status: 1 } } // << ส่ง status ด้วย
+  ]);
+
+
+  const refundIdCCs = refundCC.map(x => String(x.orderId).trim());
+  const changeIdCCS = refundCC.map(x => String(x.reference).trim());
+  const orderIdCCs = orderCC.map(x => String(x.orderId).trim());
+
+  const saleSet = new Set(orderIdCCs);
+  const refundSet = new Set(refundIdCCs);
+  const changeSet = new Set(changeIdCCS);
+
+  // map: id -> status (จาก Mongo)
+  const saleStatusMap = new Map(orderCC.map(x => [String(x.orderId).trim(), x.status || '']));
+  const refundStatusMap = new Map(refundCC.map(x => [String(x.orderId).trim(), x.status || '']));
+  // ถ้ามี collection ของ change เอง ค่อยเติม changeStatusMap ภายหลัง
+  const changeStatusMap = new Map();
+
+  const allCC = [...new Set([...refundIdCCs, ...orderIdCCs, ...changeIdCCS])];
+
+  const orderM3 = await OOHEAD.findAll({
+    where: { OACUOR: { [Op.in]: allCC } },
+    attributes: { exclude: ['id'] },
+    raw: true,
+  });
+
+  const data = (orderM3 ?? []).map(item => {
+    const id = String(item.OACUOR).trim();
+
+    const type = saleSet.has(id) ? 'Sale'
+      : refundSet.has(id) ? 'Refund'
+        : changeSet.has(id) ? 'Change'
+          : '';
+
+    const typeId = type === 'Sale' ? 'A31'
+      : type === 'Refund' ? 'A34'
+        : type === 'Change' ? 'B31'
+          : '';
+
+    const statusTablet = type === 'Sale' ? (saleStatusMap.get(id) ?? '')
+      : type === 'Refund' ? (refundStatusMap.get(id) ?? '')
+        : type === 'Change' ? (changeStatusMap.get(id) ?? '')
+          : '';
+
+    return { orderId: id, type, typeId, statusTablet };
+  });
+
+
+
+
+  const wb = xlsx.utils.book_new()
+  const ws = xlsx.utils.json_to_sheet(data)
+  xlsx.utils.book_append_sheet(wb, ws, `orderM3CC${period}`)
+
+  const tempPath = path.join(os.tmpdir(), `orderM3CC${period}.xlsx`)
+  xlsx.writeFile(wb, tempPath)
+
+  res.download(tempPath, `orderM3CC${period}.xlsx`, err => {
+    if (err) {
+      console.error('❌ Download error:', err)
+      // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+      if (!res.headersSent) {
+        res.status(500).send('Download failed')
+      }
+    }
+
+    // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+    fs.unlink(tempPath, () => { })
+  })
+
+  // res.status(200).json({
+  //   status: 200,
+  //   message: 'Sucess',
+  //   data: data
+  // })
+}
