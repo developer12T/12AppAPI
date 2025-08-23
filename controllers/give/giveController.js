@@ -27,10 +27,6 @@ const xlsx = require('xlsx')
 const os = require('os')
 const fs = require('fs')
 
-
-
-
-
 exports.addGiveType = async (req, res) => {
   try {
     const {
@@ -486,6 +482,7 @@ exports.getOrder = async (req, res) => {
         storeAddress: o.store?.address || '',
         createAt: o.createdAt,
         total: o.total,
+        listProduct:o.listProduct.length,
         status: o.status
       }))
     // console.log(response)
@@ -780,7 +777,6 @@ exports.updateStatus = async (req, res) => {
   }
 }
 
-
 exports.giveToExcel = async (req, res) => {
   const { channel, date } = req.query
 
@@ -842,7 +838,7 @@ exports.giveToExcel = async (req, res) => {
     },
     {
       $match: {
-        status: { $nin: ['canceled'] },
+        status: { $nin: ['canceled', 'competed'] },
         status: { $in: statusArray },
         type: { $in: ['give'] },
         'store.area': { $ne: 'IT211' }
@@ -865,7 +861,7 @@ exports.giveToExcel = async (req, res) => {
     }
   ])
 
-  function formatDateToThaiYYYYMMDD(date) {
+  function formatDateToThaiYYYYMMDD (date) {
     const d = new Date(date)
     // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -880,72 +876,86 @@ exports.giveToExcel = async (req, res) => {
     const TRDT = formatDateToThaiYYYYMMDD(item.createdAt)
     const TRTM = new Date(item.createdAt).getTime()
 
-
     const listProduct = item.listProduct.map(o => {
       return {
-        CONO: "",
+        CONO: '',
         WHLO: item.sale.warehouse,
         TWLO: item.sale.warehouse,
         ADID: item.store.area,
-        WHSL: "",
-        RIDN: "",
+        WHSL: '',
+        RIDN: '',
         TRTP: item.giveInfo.type,
-        RORC: "0",
-        RORN: item.orderId,
+        RORC: '0',
+        RORN: item.orderId.slice(1),
         DEPT: item.giveInfo.dept,
-        TRDT: TRDT,
+        TRDT: `${TRDT}`,
         TRTM: `${TRTM}`,
-        RIDT: "",
-        RITM: "",
+        RIDT: '',
+        RITM: '',
         REMK: item.giveInfo.remark,
-        RPDT: "",
-        RPTM: "",
-        RESP: "AC04",
-        ITNO: o.id,
-        TRQT: o.qtyPcs,
-        TWSL: "",
-        BANO: "",
-        RSCD: "",
-        TRPR: "0",
-        BREF: "",
-        BRE2: "",
-        REFE: "",
-        ROUT: "",
+        RPDT: '',
+        RPTM: '',
+        RESP: 'MVXSECOFR',
+        ITNO: `${o.id}`,
+        TRQT: `${o.qtyPcs}`,
+        TWSL: '',
+        BANO: '',
+        RSCD: '',
+        TRPR: '0',
+        BREF: '',
+        BRE2: '',
+        REFE: '',
+        ROUT: ''
       }
-
     })
     return [...listProduct]
-
   })
 
   const data = dataTran.flatMap(item => item)
 
+  function yyyymmddToDdMmYyyy (dateString) {
+    // สมมติ dateString คือ '20250804'
+    const year = dateString.slice(0, 4)
+    const month = dateString.slice(4, 6)
+    const day = dateString.slice(6, 8)
+    return `${day}${month}${year}`
+  }
 
+  const wb = xlsx.utils.book_new()
+  const ws = xlsx.utils.json_to_sheet(data)
+  xlsx.utils.book_append_sheet(wb, ws, `ESP${yyyymmddToDdMmYyyy(date)}`)
 
-  // const wb = xlsx.utils.book_new()
-  // const ws = xlsx.utils.json_to_sheet(data)
-  // xlsx.utils.book_append_sheet(wb, ws, `ESP${formatDateToThaiYYYYMMDD(date)}`)
-
-  // const tempPath = path.join(os.tmpdir(), `${formatDateToThaiYYYYMMDD(date)}.xlsx`)
+  const tempPath = path.join(os.tmpdir(), `${yyyymmddToDdMmYyyy(date)}.xlsx`)
   // xlsx.writeFile(wb, tempPath)
 
-  // res.download(tempPath, `CA_.xlsx`, err => {
-  //   if (err) {
-  //     console.error('❌ Download error:', err)
-  //     // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
-  //     if (!res.headersSent) {
-  //       res.status(500).send('Download failed')
-  //     }
-  //   }
-
-  //   // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-  //   fs.unlink(tempPath, () => { })
-  // })
-
-
-  return res.status(200).json({
-    status: 200,
-    message: `Sucess`,
-    data: data
+  xlsx.writeFile(wb, tempPath, {
+    bookType: 'xlsx', // Excel 2007+
+    bookSST: true, // shared strings table (helps older 2007)
+    compression: true // smaller file, widely supported
   })
+
+  // proper MIME for xlsx (Excel 2007+)
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  )
+
+  res.download(tempPath, `CA_GIVE_${yyyymmddToDdMmYyyy(date)}.xlsx`, err => {
+    if (err) {
+      console.error('❌ Download error:', err)
+      // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+      if (!res.headersSent) {
+        res.status(500).send('Download failed')
+      }
+    }
+
+    // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+    fs.unlink(tempPath, () => {})
+  })
+
+  // return res.status(200).json({
+  //   status: 200,
+  //   message: `Sucess`,
+  //   data: data
+  // })
 }
