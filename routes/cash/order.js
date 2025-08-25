@@ -1,19 +1,34 @@
 const express = require('express')
-const { getOrder, getDetail, updateStatus, checkout, addSlip, OrderToExcel, getAllOrder, getSummaryItem, getSummarybyRoute, 
-    getSummarybyMonth, getSummarybyArea,getSummarybyGroup,erpApiCheck,getSummarybyChoice,getSaleSummaryByStore,getGroup,
-    getSummaryProduct, getProductLimit, 
-    // erpApiCheckOrder, 
-    // erpApiCheckDisributionM3,
-    summaryAllProduct,
-    summaryDaily,
-    summaryMonthlyByZone,
-    saleReport,
-    getSummary18SKU,
-    reportCheckin,
-    reflashOrder,
-    OrderZeroDiff,
-    checkOrderCancelM3
- } = require('../../controllers/sale/orderController')
+const {
+  getOrder,
+  getDetail,
+  updateStatus,
+  checkout,
+  addSlip,
+  OrderToExcel,
+  getAllOrder,
+  getSummaryItem,
+  getSummarybyRoute,
+  getSummarybyMonth,
+  getSummarybyArea,
+  getSummarybyGroup,
+  getSummarybyChoice,
+  getSaleSummaryByStore,
+  getGroup,
+  getSummaryProduct,
+  getProductLimit,
+  erpApiCheckOrder,
+  // erpApiCheckDisributionM3,
+  summaryAllProduct,
+  summaryDaily,
+  summaryMonthlyByZone,
+  saleReport,
+  getSummary18SKU,
+  reportCheckin,
+  reflashOrder,
+  OrderZeroDiff,
+  checkOrderCancelM3
+} = require('../../controllers/sale/orderController')
 
 const router = express.Router()
 
@@ -25,14 +40,14 @@ router.post('/addSlip', addSlip)
 router.get('/reflashOrder', reflashOrder)
 
 router.post('/addSlip', addSlip)
-router.get('/ordertoexcel', OrderToExcel);
+router.get('/ordertoexcel', OrderToExcel)
 router.get('/getAllOrder', getAllOrder)
 router.post('/getSummaryItem', getSummaryItem)
 router.get('/getSummarybyRoute', getSummarybyRoute)
 router.get('/getSummarybyMonth', getSummarybyMonth)
 router.get('/getSummarybyArea', getSummarybyArea)
 router.post('/getSummarybyGroup', getSummarybyGroup)
-// router.get('/erpApiCheck', erpApiCheckOrder)
+router.get('/erpApiCheck', erpApiCheckOrder)
 // router.get('/erpApiCheckDisributionM3', erpApiCheckDisributionM3)
 
 router.post('/getSummarybyChoice', getSummarybyChoice)

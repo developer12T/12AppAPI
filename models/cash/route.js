@@ -65,7 +65,7 @@ RouteSchema.virtual('percentVisit').get(function () {
 })
 RouteSchema.virtual('percentEffective').get(function () {
   if (this.storeSell === 0) return 0
-  return parseFloat(((this.storeSell / this.storeTotal) * 100).toFixed(2))
+  return parseFloat(((this.storeSell / this.storeAll) * 100).toFixed(2))
 })
 RouteSchema.set('toJSON', { virtuals: true })
 RouteSchema.set('toObject', { virtuals: true })
