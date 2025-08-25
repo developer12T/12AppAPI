@@ -3348,6 +3348,8 @@ exports.stockToExcelNew = async (req, res) => {
     }, new Map()).values()].map(x => ({ ...x, summary: to2(x.summary) }));
 
 
+
+
     const prodByIds = new Map((productDetail ?? []).map(p => [String(p.id).trim(), p]));
     const stockByPid = new Map((stockQty ?? []).map(s => [String(s.productId).trim(), s]));
 
@@ -3442,21 +3444,43 @@ exports.stockToExcelNew = async (req, res) => {
     // (3) ประกอบ balance ต่อสินค้าใน stock
     const balance = allListProduct.map(item => {
       const pid = String(item?.productId || '').trim();
+      const productDetailItem = productDetail.find(u => u.id == pid);
+      const productDetailUnit = productDetailItem?.listUnit || [];
+
       const prod = prodById.get(pid);
-      const balancePcs = Number(item?.balancePcs) || 0;
+      const balanceGood = Number(item?.balancePcs) || 0;
       const salePrice = getSalePrice(pid);
       const balanceM3 = Number(m3ByPid.get(pid)) || 0;
       const balanceDamaged = Number(damagedById.get(pid)) || 0;
 
+      // ฟังก์ชันแปลงจำนวน pcs → รายหน่วย
+      const convertToUnits = (totalPcs, units) => {
+        let remaining = totalPcs;
+        return units.map(u => {
+          const qty = Math.floor(remaining / u.factor);
+          remaining = remaining % u.factor;
+          return {
+            unit: u.unit,
+            unitName: u.name,
+            qty
+          };
+        });
+      };
+
       return {
         productId: pid,
         productName: prod?.name || '',
-        balanceGood: balancePcs,
+        balanceGood,
+        balanceGoodByUnit: convertToUnits(balanceGood, productDetailUnit),
         balanceM3,
+        balanceM3ByUnit: convertToUnits(balanceM3, productDetailUnit),
         balanceDamaged,
-        summary: to2(balancePcs * salePrice)
+        balanceDamagedByUnit: convertToUnits(balanceDamaged, productDetailUnit),
+        summary: to2(balanceGood * salePrice)
       };
     });
+
+
 
     // รวมยอด balance
     const totals = balance.reduce(
@@ -3540,20 +3564,56 @@ exports.stockToExcelNew = async (req, res) => {
         มูลค่าแจกสินค้า: item.valGive
       }));
 
+      const q = (arr, ...aliases) => {
+        if (!arr?.length) return 0;
+        const wanted = new Set(aliases.map(u => String(u).toUpperCase()));
+        return arr.reduce((sum, x) =>
+          wanted.has(String(x.unit).toUpperCase()) ? sum + (Number(x.qty) || 0) : sum
+          , 0);
+      };
+
       // Sheet: balance
-      const balanceThai = [...balance, balanceSummaryRow].map(item => ({
-        รหัส: item.productId,
-        ชื่อสินค้า: item.productName,
-        จำนวนคงเหลือดี: item.balanceGood,
-        จำนวนคงจากM3: item.balanceM3,
-        จำนวนคงเหลือเสีย: item.balanceDamaged,
-        มูลค่าคงเหลือ: item.summary
-      }));
+      const balanceRows = [
+        ['รหัส', 'ชื่อสินค้า', 'หีบ', 'จำนวนคงเหลือดี', '', 'หีบ', 'จำนวนคงจากM3', '', 'หีบ', 'จำนวนคงเหลือเสีย', '', 'มูลค่าคงเหลือ'],
+        ['รหัส', 'ชื่อสินค้า', 'หีบ', 'แพค/ถุง', 'ซอง/ขวด', 'หีบ', 'แพค/ถุง', 'ซอง/ขวด', 'หีบ', 'แพค/ถุง', 'ซอง/ขวด', 'มูลค่าคงเหลือ'],
+        ...[...balance, balanceSummaryRow].map(it => ([
+          it.productId, it.productName,
+          q(it.balanceGoodByUnit, 'CTN'), q(it.balanceGoodByUnit, 'BAG', 'PAC'), q(it.balanceGoodByUnit, 'PCS', 'BOT'),
+          q(it.balanceM3ByUnit, 'CTN'), q(it.balanceM3ByUnit, 'BAG', 'PAC'), q(it.balanceM3ByUnit, 'PCS', 'BOT'),
+          q(it.balanceDamagedByUnit, 'CTN'), q(it.balanceDamagedByUnit, 'BAG', 'PAC'), q(it.balanceDamagedByUnit, 'PCS', 'BOT'),
+          it.summaryNumeric ?? it.summary
+        ]))
+      ];
+
+      const wsBalance = xlsx.utils.aoa_to_sheet(balanceRows);
+      wsBalance['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }, // A1:A2 รหัส
+        { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } }, // B1:B2 ชื่อสินค้า
+        { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } }, // C1:C2 หีบ (ดี)
+        { s: { r: 0, c: 5 }, e: { r: 1, c: 5 } }, // F1:F2 หีบ (M3)
+        { s: { r: 0, c: 8 }, e: { r: 1, c: 8 } }, // I1:I2 หีบ (เสีย)
+        { s: { r: 0, c: 11 }, e: { r: 1, c: 11 } },// L1:L2 มูลค่า
+        { s: { r: 0, c: 3 }, e: { r: 0, c: 4 } }, // D1:E1 จำนวนคงเหลือดี
+        { s: { r: 0, c: 6 }, e: { r: 0, c: 7 } }, // G1:H1 จำนวนคงจากM3
+        { s: { r: 0, c: 9 }, e: { r: 0, c: 10 } },// J1:K1 จำนวนคงเหลือเสีย
+      ];
+
+      // ปรับความกว้างคอลัมน์นิดหน่อย (ไม่ใส่ก็ได้)
+      wsBalance['!cols'] = [
+        { wch: 14 }, { wch: 40 }, { wch: 10 },
+        { wch: 8 }, { wch: 10 }, { wch: 10 },
+        { wch: 8 }, { wch: 10 }, { wch: 10 },
+        { wch: 8 }, { wch: 10 }, { wch: 10 },
+        { wch: 16 },
+      ];
+
+
+
 
       const wb = xlsx.utils.book_new();
       xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(stockInThai), 'stockIn');
       xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(stockOutThai), 'stockOut');
-      xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(balanceThai), 'balance');
+      xlsx.utils.book_append_sheet(wb, wsBalance, 'balance');
 
       const tempPath = path.join(os.tmpdir(), `Stock_${area}.xlsx`);
       xlsx.writeFile(wb, tempPath);
