@@ -194,8 +194,8 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-        .map(item => item.price)
-        .reduce((sum, price) => sum + price, 0)
+          .map(item => item.price)
+          .reduce((sum, price) => sum + price, 0)
       : 0
     const total = subtotal - discountProduct
     const newOrder = new Order({
@@ -785,7 +785,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -1037,7 +1037,7 @@ exports.OrderToExcel = async (req, res) => {
   const modelRefund = await Refund.aggregate([
     {
       $match: {
-        status: { $nin: ['canceled','reject'] },
+        status: { $nin: ['canceled', 'reject'] },
         status: { $in: statusArray },
         'store.area': { $ne: 'IT211' }
         // 'store.area': 'NE211'
@@ -1069,7 +1069,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1180,7 +1180,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromChange = modelChange.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1443,7 +1443,7 @@ exports.OrderToExcel = async (req, res) => {
       message: 'Not Found Order'
     })
   }
-  function yyyymmddToDdMmYyyy(dateString) {
+  function yyyymmddToDdMmYyyy (dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -1475,7 +1475,7 @@ exports.OrderToExcel = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => { })
+    fs.unlink(tempPath, () => {})
   })
 
   // res.status(200).json({
@@ -2366,75 +2366,92 @@ exports.getSummarybyGroup = async (req, res) => {
   }
 }
 
-// exports.erpApiCheckOrder = async (req, res) => {
-//   try {
-//     const channel = 'cash';
-//     const { Order } = getModelsByChannel(channel, res, orderModel);
+exports.erpApiCheckOrder = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { Order } = getModelsByChannel(channel, null, orderModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
 
-//     // 1. ดึง OAORNO ทั้งหมดจาก Sale
-//     const modelSale = await Sale.findAll({
-//       attributes: [
-//         'OAORNO',
-//         [sequelize.fn('COUNT', sequelize.col('OAORNO')), 'count']
-//       ],
-//       group: ['OAORNO']
-//     });
+    // 1. Get sale order numbers (OAORNO) ที่มีใน Sale
+    const modelSale = await Sale.findAll({
+      attributes: [
+        'OACUOR',
+        [sequelize.fn('COUNT', sequelize.col('OACUOR')), 'count']
+      ],
+      group: ['OACUOR']
+    })
+    const saleIds = modelSale.map(row => row.get('OACUOR').toString())
 
-//     const saleId = modelSale.map(row => row.get('OAORNO'));
+    // 2. Get pending orderIds ใน MongoDB
+    const inMongo = await Order.find({ status: 'pending' }).select('orderId')
+    const inMongoRefund = await Refund.find({ status: 'pending' }).select(
+      'orderId'
+    )
 
-//     // 2. หาว่ามี order ไหนไม่อยู่ใน sale (optional ใช้ต่อได้ถ้าต้อง log/เก็บ)
-//     const notInModelOrder = await Order.find({
-//       orderId: { $nin: saleId }
-//     }).select('orderId');
+    const orderIdsInMongo = inMongo.map(item => item.orderId.toString())
+    const refundIdsInMongo = inMongoRefund.map(item => item.orderId.toString())
 
-//     // 3. อัปเดตสถานะ success ให้ order ที่อยู่ใน saleId
-//     const updateResult = await Order.updateMany(
-//       { orderId: { $in: saleId } },
-//       { $set: { status: 'success' } }
-//     );
+    // 3. filter ให้เหลือเฉพาะที่อยู่ทั้งสองฝั่ง
+    const matchedIds = orderIdsInMongo.filter(id => saleIds.includes(id))
+    const matchedIdsRefund = inMongoRefund.filter(id => saleIds.includes(id))
 
-//     if (updateResult.modifiedCount === 0) {
-//       console.log('No new order found in the M3 system');
-//       return res.status(200).json({
-//         message: 'No new order found in the M3 system'
-//       });
-//     }
+    // 4. อัปเดตทุกตัวที่ match (วนทีละตัว)
+    let updatedCount = 0
+    let updatedCountReufund = 0
 
-//     // console.log('✅ Updated orderIds:', saleId);
+    for (const orderId of matchedIds) {
+      try {
+        const result = await Order.updateOne(
+          { orderId },
+          {
+            $set: {
+              status: 'completed',
+              statusTH: 'สำเร็จ',
+              updatedAt: new Date()
+            }
+          }
+        )
+        if (result.modifiedCount > 0) updatedCount++
+      } catch (err) {
+        console.error(`Error update orderId: ${orderId}`, err)
+      }
+    }
 
-//     // // 4. Broadcast ไปยังทุก event ที่ต้องการ
-//     // const io = getSocket();
-//     // const events = [
-//     //   'sale_getSummarybyArea',
-//     //   'sale_getSummarybyMonth',
-//     //   'sale_getSummarybyRoute',
-//     //   'sale_getSummaryItem',
-//     //   'sale_getSummarybyGroup',
-//     //   'sale_getRouteCheckinAll',
-//     //   'sale_getTimelineCheckin',
-//     //   'sale_routeTimeline'
-//     // ];
+    for (const orderId of matchedIdsRefund) {
+      try {
+        const result = await Refund.updateOne(
+          { orderId },
+          {
+            $set: {
+              status: 'completed',
+              statusTH: 'สำเร็จ',
+              updatedAt: new Date()
+            }
+          }
+        )
+        if (result.modifiedCount > 0) updatedCountReufund++
+      } catch (err) {
+        console.error(`Error update Refund orderId: ${orderId}`, err)
+      }
+    }
 
-//     // events.forEach(event => {
-//     //   io.emit(event, {
-//     //     status: 200,
-//     //     message: 'New Update Data',
-//     //     updatedCount: updateResult.modifiedCount
-//     //   });
-//     // });
+    const summaryCount = updatedCount + updatedCountReufund
 
-//     // 5. ตอบกลับสำเร็จ
-//     res.status(200).json({
-//       status: 200,
-//       message: 'Update status success',
-//       updatedCount: updateResult.modifiedCount
-//     });
+    const io = getSocket()
+    io.emit('order/statusOrderUpdated', {
+      summaryCount,
+      updatedAt: new Date()
+    })
 
-//   } catch (error) {
-//     console.error(error);
-//     // res.status(500).json({ message: 'Internal server error.' });
-//   }
-// };
+    // });
+
+    console.log(`Total updated Order: ${summaryCount}`)
+    return summaryCount
+  } catch (error) {
+    console.error('❌ Error in erpApiCheckOrderJob:', error)
+    return { error: true, message: error.message }
+  }
+}
 
 // exports.erpApiCheckDisributionM3 = async (req, res) => {
 //   try {
@@ -2549,7 +2566,7 @@ exports.getSummarybyChoice = async (req, res) => {
 
     let matchStage = {
       'store.area': area,
-      status: { $nin: ['canceled','reject'] },
+      status: { $nin: ['canceled', 'reject'] },
       createdAt: { $gte: start, $lte: end }
     }
     if (storeId) {
@@ -3254,7 +3271,7 @@ exports.summaryDaily = async (req, res) => {
           period: periodStr,
           createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
           type: 'change',
-          status: { $nin: ['canceled','reject'] }
+          status: { $nin: ['canceled', 'reject'] }
         })
       ])
 
@@ -3594,8 +3611,6 @@ exports.saleReport = async (req, res) => {
         }
       }
     }
-
-
 
     const dataOrder = await Order.find({
       ...filterArea,
@@ -3972,7 +3987,6 @@ exports.reportCheckin = async (req, res) => {
   })
 }
 
-
 exports.OrderZeroDiff = async (req, res) => {
   const { area, period } = req.body
   const channel = req.headers['x-channel']
@@ -3982,7 +3996,8 @@ exports.OrderZeroDiff = async (req, res) => {
   const { Stock } = getModelsByChannel(channel, res, stockModel)
 
   const stockData = await Stock.findOne({
-    area: area, period: period,
+    area: area,
+    period: period,
     'listProduct.balancePcs': { $lt: 0 }
   })
 
@@ -3991,16 +4006,16 @@ exports.OrderZeroDiff = async (req, res) => {
   const negProductIds = (stockData.listProduct ?? [])
     .filter(it => Number(it.balancePcs) < 0)
     .map(it => it.productId ?? it.id)
-    .filter(Boolean);
+    .filter(Boolean)
 
   // console.log(negProductIds)
 
-  const orderData = await Order.find(
-    { 'store.area': area, period: period },
-  ).lean();
+  const orderData = await Order.find({
+    'store.area': area,
+    period: period
+  }).lean()
 
   // proDiff = orderData.map()
-
 
   // const orderDiff = []
 
@@ -4011,19 +4026,14 @@ exports.OrderZeroDiff = async (req, res) => {
 
   // }
 
-
-
-
   res.status(200).json({
     status: 200,
     message: 'Sucess',
     data: negProductIds
   })
-
 }
 
 exports.checkOrderCancelM3 = async (req, res) => {
-
   const { period } = req.body
   const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
@@ -4033,73 +4043,104 @@ exports.checkOrderCancelM3 = async (req, res) => {
   const { Stock } = getModelsByChannel(channel, res, stockModel)
 
   const orderCC = await Order.aggregate([
-    { $match: { period, type: 'sale', status: 'canceled', 'store.area': { $ne: 'IT211' } } },
+    {
+      $match: {
+        period,
+        type: 'sale',
+        status: 'canceled',
+        'store.area': { $ne: 'IT211' }
+      }
+    },
     {
       $project: {
         _id: 0,
         status: 1, // << เพิ่ม
         orderId: {
           $cond: [
-            { $eq: [{ $strLenCP: "$orderId" }, 16] },
-            { $substrCP: ["$orderId", 0, { $subtract: [{ $strLenCP: "$orderId" }, 3] }] },
-            "$orderId"
+            { $eq: [{ $strLenCP: '$orderId' }, 16] },
+            {
+              $substrCP: [
+                '$orderId',
+                0,
+                { $subtract: [{ $strLenCP: '$orderId' }, 3] }
+              ]
+            },
+            '$orderId'
           ]
         }
       }
     }
-  ]);
+  ])
 
   const refundCC = await Refund.aggregate([
-    { $match: { period, type: 'refund', status: { $in: ['canceled', 'reject'] }, 'store.area': { $ne: 'IT211' } } },
+    {
+      $match: {
+        period,
+        type: 'refund',
+        status: { $in: ['canceled', 'reject'] },
+        'store.area': { $ne: 'IT211' }
+      }
+    },
     { $project: { _id: 0, orderId: 1, reference: 1, status: 1 } } // << ส่ง status ด้วย
-  ]);
+  ])
 
+  const refundIdCCs = refundCC.map(x => String(x.orderId).trim())
+  const changeIdCCS = refundCC.map(x => String(x.reference).trim())
+  const orderIdCCs = orderCC.map(x => String(x.orderId).trim())
 
-  const refundIdCCs = refundCC.map(x => String(x.orderId).trim());
-  const changeIdCCS = refundCC.map(x => String(x.reference).trim());
-  const orderIdCCs = orderCC.map(x => String(x.orderId).trim());
-
-  const saleSet = new Set(orderIdCCs);
-  const refundSet = new Set(refundIdCCs);
-  const changeSet = new Set(changeIdCCS);
+  const saleSet = new Set(orderIdCCs)
+  const refundSet = new Set(refundIdCCs)
+  const changeSet = new Set(changeIdCCS)
 
   // map: id -> status (จาก Mongo)
-  const saleStatusMap = new Map(orderCC.map(x => [String(x.orderId).trim(), x.status || '']));
-  const refundStatusMap = new Map(refundCC.map(x => [String(x.orderId).trim(), x.status || '']));
+  const saleStatusMap = new Map(
+    orderCC.map(x => [String(x.orderId).trim(), x.status || ''])
+  )
+  const refundStatusMap = new Map(
+    refundCC.map(x => [String(x.orderId).trim(), x.status || ''])
+  )
   // ถ้ามี collection ของ change เอง ค่อยเติม changeStatusMap ภายหลัง
-  const changeStatusMap = new Map();
+  const changeStatusMap = new Map()
 
-  const allCC = [...new Set([...refundIdCCs, ...orderIdCCs, ...changeIdCCS])];
+  const allCC = [...new Set([...refundIdCCs, ...orderIdCCs, ...changeIdCCS])]
 
   const orderM3 = await OOHEAD.findAll({
     where: { OACUOR: { [Op.in]: allCC } },
     attributes: { exclude: ['id'] },
-    raw: true,
-  });
+    raw: true
+  })
 
   const data = (orderM3 ?? []).map(item => {
-    const id = String(item.OACUOR).trim();
+    const id = String(item.OACUOR).trim()
 
-    const type = saleSet.has(id) ? 'Sale'
-      : refundSet.has(id) ? 'Refund'
-        : changeSet.has(id) ? 'Change'
-          : '';
+    const type = saleSet.has(id)
+      ? 'Sale'
+      : refundSet.has(id)
+      ? 'Refund'
+      : changeSet.has(id)
+      ? 'Change'
+      : ''
 
-    const typeId = type === 'Sale' ? 'A31'
-      : type === 'Refund' ? 'A34'
-        : type === 'Change' ? 'B31'
-          : '';
+    const typeId =
+      type === 'Sale'
+        ? 'A31'
+        : type === 'Refund'
+        ? 'A34'
+        : type === 'Change'
+        ? 'B31'
+        : ''
 
-    const statusTablet = type === 'Sale' ? (saleStatusMap.get(id) ?? '')
-      : type === 'Refund' ? (refundStatusMap.get(id) ?? '')
-        : type === 'Change' ? (changeStatusMap.get(id) ?? '')
-          : '';
+    const statusTablet =
+      type === 'Sale'
+        ? saleStatusMap.get(id) ?? ''
+        : type === 'Refund'
+        ? refundStatusMap.get(id) ?? ''
+        : type === 'Change'
+        ? changeStatusMap.get(id) ?? ''
+        : ''
 
-    return { orderId: id, type, typeId, statusTablet };
-  });
-
-
-
+    return { orderId: id, type, typeId, statusTablet }
+  })
 
   const wb = xlsx.utils.book_new()
   const ws = xlsx.utils.json_to_sheet(data)
@@ -4118,7 +4159,7 @@ exports.checkOrderCancelM3 = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => { })
+    fs.unlink(tempPath, () => {})
   })
 
   // res.status(200).json({

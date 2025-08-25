@@ -1268,7 +1268,7 @@ exports.getStockQtyNew = async (req, res) => {
   const { Distribution } = getModelsByChannel(channel, res, distributionModel)
   const { Order } = getModelsByChannel(channel, res, orderModel)
   const { Giveaway } = getModelsByChannel(channel, res, giveModel)
-
+  let listUnitPcs = [];
   let areaQuery = {}
   if (area) {
     if (area.length == 2) {
@@ -1837,6 +1837,7 @@ exports.getStockQtyNew = async (req, res) => {
       })
 
 
+    // console.log(listUnitPcs)
     const summaryQty = calculateStockSummary(productDetail, listUnitStock)
 
     if (listUnitStock.length > 0) {
@@ -1863,13 +1864,49 @@ exports.getStockQtyNew = async (req, res) => {
     delete item.pcsMain
   })
 
+
+
+  for (const i of data) {
+
+    // console.log(i.productId)
+    const productMeta = dataProduct.find(u => String(u.id) === String(i.productId));
+    const units = (productMeta?.listUnit || [{ unit: 'PCS', name: 'ชิ้น', factor: 1 }])
+      .sort((a, b) => (b.factor || 1) - (a.factor || 1)); // หน่วยใหญ่ก่อน
+
+    const productPcs = (i.summaryQty || []).find(x => String(x.unit).toUpperCase() === 'PCS') || {};
+
+    // --------- เปลี่ยนแค่บล็อคนี้ แทนของเดิมที่ .map(productPcs) ----------
+    const FIELDS = ['stock', 'withdraw', 'good', 'damaged', 'sale', 'promotion', 'change', 'adjust', 'give', 'balance'];
+    const rem = Object.fromEntries(FIELDS.map(f => [f, Number(productPcs[f]) || 0]));
+
+    const listUnit = units.map(u => {
+      const factor = Number(u.factor) || 1;
+      const row = { unit: u.unit, unitName: u.name || u.unit, factor };
+      FIELDS.forEach(f => { row[f] = Math.floor(rem[f] / factor); rem[f] %= factor; });
+      return row;
+    });
+    // ------------------------------------------------------------------------
+
+    const pcsData = {
+      productId: i.productId,
+      productName: i.productName,
+      productGroup: i.productGroup,
+      listUnit
+    };
+
+    listUnitPcs.push(pcsData);   // <— อย่าลืม push
+    // console.log(pcsData)
+  }
+
+
   // const io = getSocket()
   // io.emit('stock/getStockQtyNew', {});
 
   res.status(200).json({
     status: 200,
     message: 'suceesful',
-    data: data,
+    data: listUnitPcs,
+    // data: data,
     summaryStock: Number(summaryStock.toFixed(2)),
     summaryStockBal: Number(summaryStockBal.toFixed(2)),
     summaryWithdraw: Number(summaryWithdraw.toFixed(2)),
@@ -2329,7 +2366,7 @@ exports.getStockQtyDetail = async (req, res) => {
     const normalizedStockOut = rollupUnits(summaryStockOut, productData.listUnit);
 
 
-    // console.log(normalized)
+    console.log(productData.listUnit)
 
 
     const summaryStockInQty = calculateQtyByUnit(productData.listUnit, [
@@ -3348,6 +3385,8 @@ exports.stockToExcelNew = async (req, res) => {
     }, new Map()).values()].map(x => ({ ...x, summary: to2(x.summary) }));
 
 
+
+
     const prodByIds = new Map((productDetail ?? []).map(p => [String(p.id).trim(), p]));
     const stockByPid = new Map((stockQty ?? []).map(s => [String(s.productId).trim(), s]));
 
@@ -3442,21 +3481,43 @@ exports.stockToExcelNew = async (req, res) => {
     // (3) ประกอบ balance ต่อสินค้าใน stock
     const balance = allListProduct.map(item => {
       const pid = String(item?.productId || '').trim();
+      const productDetailItem = productDetail.find(u => u.id == pid);
+      const productDetailUnit = productDetailItem?.listUnit || [];
+
       const prod = prodById.get(pid);
-      const balancePcs = Number(item?.balancePcs) || 0;
+      const balanceGood = Number(item?.balancePcs) || 0;
       const salePrice = getSalePrice(pid);
       const balanceM3 = Number(m3ByPid.get(pid)) || 0;
       const balanceDamaged = Number(damagedById.get(pid)) || 0;
 
+      // ฟังก์ชันแปลงจำนวน pcs → รายหน่วย
+      const convertToUnits = (totalPcs, units) => {
+        let remaining = totalPcs;
+        return units.map(u => {
+          const qty = Math.floor(remaining / u.factor);
+          remaining = remaining % u.factor;
+          return {
+            unit: u.unit,
+            unitName: u.name,
+            qty
+          };
+        });
+      };
+
       return {
         productId: pid,
         productName: prod?.name || '',
-        balanceGood: balancePcs,
+        balanceGood,
+        balanceGoodByUnit: convertToUnits(balanceGood, productDetailUnit),
         balanceM3,
+        balanceM3ByUnit: convertToUnits(balanceM3, productDetailUnit),
         balanceDamaged,
-        summary: to2(balancePcs * salePrice)
+        balanceDamagedByUnit: convertToUnits(balanceDamaged, productDetailUnit),
+        summary: to2(balanceGood * salePrice)
       };
     });
+
+
 
     // รวมยอด balance
     const totals = balance.reduce(
@@ -3476,14 +3537,14 @@ exports.stockToExcelNew = async (req, res) => {
     const sumBalancesummary = to2(totals.sumBalancesummary);
 
     // แถวสรุป (สำหรับแสดง/Excel)
-    const balanceSummaryRow = {
-      productId: 'รวมทั้งหมด',
-      productName: '',
-      balanceGood: sumBalanceGood,
-      balanceM3: sumBalanceM3,
-      balanceDamaged: sumBalanceDamaged,
-      summary: sumBalancesummary
-    };
+    // const balanceSummaryRow = {
+    //   productId: 'รวมทั้งหมด',
+    //   productName: '',
+    //   balanceGood: sumBalanceGood,
+    //   balanceM3: sumBalanceM3,
+    //   balanceDamaged: sumBalanceDamaged,
+    //   summary: sumBalancesummary
+    // };
 
     // ---------- Export / JSON ----------
     if (excel === true) {
@@ -3540,20 +3601,68 @@ exports.stockToExcelNew = async (req, res) => {
         มูลค่าแจกสินค้า: item.valGive
       }));
 
+      const q = (arr, ...aliases) => {
+        if (!arr?.length) return 0;
+        const wanted = new Set(aliases.map(u => String(u).toUpperCase()));
+        return arr.reduce((sum, x) =>
+          wanted.has(String(x.unit).toUpperCase()) ? sum + (Number(x.qty) || 0) : sum
+          , 0);
+      };
+
       // Sheet: balance
-      const balanceThai = [...balance, balanceSummaryRow].map(item => ({
-        รหัส: item.productId,
-        ชื่อสินค้า: item.productName,
-        จำนวนคงเหลือดี: item.balanceGood,
-        จำนวนคงจากM3: item.balanceM3,
-        จำนวนคงเหลือเสีย: item.balanceDamaged,
-        มูลค่าคงเหลือ: item.summary
-      }));
+      const balanceRows = [
+        // แถว 1: ชื่อกลุ่ม (กิน 3 คอลัมน์)
+        ['รหัส', 'ชื่อสินค้า',
+          'จำนวนคงเหลือดี', '', '',
+          'จำนวนคงจากM3', '', '',
+          'จำนวนคงเหลือเสีย', '', '',
+          // 'มูลค่าคงเหลือ'
+        ],
+        // แถว 2: หน่วยย่อย
+        ['รหัส', 'ชื่อสินค้า',
+          'หีบ', 'แพค/ถุง', 'ซอง/ขวด',
+          'หีบ', 'แพค/ถุง', 'ซอง/ขวด',
+          'หีบ', 'แพค/ถุง', 'ซอง/ขวด',
+          // 'มูลค่าคงเหลือ'
+        ],
+        ...[...balance
+          // , balanceSummaryRow
+        ].map(it => ([
+          it.productId, it.productName,
+          q(it.balanceGoodByUnit, 'CTN'), q(it.balanceGoodByUnit, 'BAG', 'PAC'), q(it.balanceGoodByUnit, 'PCS', 'BOT'),
+          q(it.balanceM3ByUnit, 'CTN'), q(it.balanceM3ByUnit, 'BAG', 'PAC'), q(it.balanceM3ByUnit, 'PCS', 'BOT'),
+          q(it.balanceDamagedByUnit, 'CTN'), q(it.balanceDamagedByUnit, 'BAG', 'PAC'), q(it.balanceDamagedByUnit, 'PCS', 'BOT'),
+          // it.summaryNumeric ?? it.summary
+        ]))
+      ];
+
+      // สร้างชีทก่อน แล้วค่อย merge + ตั้งความกว้าง
+      const wsBalance = xlsx.utils.aoa_to_sheet(balanceRows);
+
+      wsBalance['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },   // A1:A2 รหัส
+        { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },   // B1:B2 ชื่อสินค้า
+        { s: { r: 0, c: 2 }, e: { r: 0, c: 4 } },   // C1:E1 จำนวนคงเหลือดี
+        { s: { r: 0, c: 5 }, e: { r: 0, c: 7 } },   // F1:H1 จำนวนคงจากM3
+        { s: { r: 0, c: 8 }, e: { r: 0, c: 10 } },  // I1:K1 จำนวนคงเหลือเสีย
+        { s: { r: 0, c: 11 }, e: { r: 1, c: 11 } },  // L1:L2 มูลค่าคงเหลือ
+      ];
+
+      wsBalance['!cols'] = [
+        { wch: 14 }, { wch: 40 },           // A,B
+        { wch: 8 }, { wch: 10 }, { wch: 10 },   // C,D,E
+        { wch: 8 }, { wch: 10 }, { wch: 10 },   // F,G,H
+        { wch: 8 }, { wch: 10 }, { wch: 10 },   // I,J,K
+        { wch: 16 },                    // L
+      ];
+
+
+
 
       const wb = xlsx.utils.book_new();
       xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(stockInThai), 'stockIn');
       xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(stockOutThai), 'stockOut');
-      xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(balanceThai), 'balance');
+      xlsx.utils.book_append_sheet(wb, wsBalance, 'balance');
 
       const tempPath = path.join(os.tmpdir(), `Stock_${area}.xlsx`);
       xlsx.writeFile(wb, tempPath);
@@ -4088,7 +4197,7 @@ exports.addStockAllWithInOut = async (req, res) => {
       .flatMap(u => (Array.isArray(u.area) ? u.area : [u.area]))
       .filter(Boolean)
     const uniqueAreas = [...new Set(rawAreas)]
-    // uniqueAreas = ['NS212']
+    // uniqueAreas = ['CT224']
     // 2) ฟังก์ชันย่อย: ประมวลผลต่อ 1 area
     const buildAreaStock = async area => {
       // สร้าง match สำหรับ collections ต่าง ๆ

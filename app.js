@@ -4,12 +4,16 @@ const morgan = require('morgan')
 const cors = require('cors')
 const routeIndex = require('./routes/index')
 const app = express()
-const { startCronJobErpApiCheck,startCronJobErpApiCheckDisribution,startCronJobDeleteCartDaily } = require('../12AppAPI/controllers/sale/conJob');
+const { startCronJobErpApiCheck,
+    startCronJobErpApiCheckDisribution,
+    startCronJobDeleteCartDaily,
+    startCronJobreStoreStockDaily } = require('../12AppAPI/controllers/sale/conJob');
 
-startCronJobErpApiCheck()    
+startCronJobErpApiCheck()
 // startCronJobErpApiCheckDisribution()
 // startCronJobDeleteCartDaily()
 // startCronJobOrderToExcel()
+startCronJobreStoreStockDaily()
 
 app.use(bodyParser.json({ limit: '50mb' }))
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }))

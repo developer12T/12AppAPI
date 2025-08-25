@@ -234,7 +234,6 @@ exports.getSendMoney = async (req, res) => {
     // console.log(saleSum, changeSum, refundSum)
 
     const totalToSend = saleSum + (changeSum - refundSum)
-
     const alreadySentDocs = await SendMoney.aggregate([
       {
         $match: {
@@ -242,13 +241,23 @@ exports.getSendMoney = async (req, res) => {
           dateAt: { $gte: startOfDayUTC, $lte: endOfDayUTC }
         }
       },
+      { $unwind: '$imageList' }, // ดึงแต่ละรูปออกมา
       {
         $group: {
-          _id: null,
-          totalSent: { $sum: '$sendmoney' }
+          _id: '$imageList.path',      // ✅ ใช้ path เป็น _id
+          totalSent: { $sum: '$sendmoney' },
+          count: { $sum: 1 }           // นับจำนวนรูป/เอกสารต่อ path (เผื่ออยากดู)
         }
+      },
+      { $project: { _id: 0, path: '$_id', totalSent: 1, count: 1 } }, // แปลงให้อ่านง่าย
+      { $sort: { path: 1 } }
+    ]);
+
+    const image = alreadySentDocs.map(item => {
+      return {
+        path:item.path
       }
-    ])
+    })
 
     const alreadySent =
       alreadySentDocs.length > 0 ? alreadySentDocs[0].totalSent : 0
@@ -275,7 +284,8 @@ exports.getSendMoney = async (req, res) => {
       dateRangeThai: {
         start: startOfDayUTC,
         end: endOfDayUTC
-      }
+      },
+      image:image
     })
   } catch (err) {
     console.error('[getSendMoney Error]', err)
