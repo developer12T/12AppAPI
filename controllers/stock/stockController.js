@@ -4088,7 +4088,7 @@ exports.addStockAllWithInOut = async (req, res) => {
       .flatMap(u => (Array.isArray(u.area) ? u.area : [u.area]))
       .filter(Boolean)
     const uniqueAreas = [...new Set(rawAreas)]
-    // uniqueAreas = ['NS212']
+    // uniqueAreas = ['CT224']
     // 2) ฟังก์ชันย่อย: ประมวลผลต่อ 1 area
     const buildAreaStock = async area => {
       // สร้าง match สำหรับ collections ต่าง ๆ
