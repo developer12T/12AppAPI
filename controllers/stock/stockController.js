@@ -1268,7 +1268,7 @@ exports.getStockQtyNew = async (req, res) => {
   const { Distribution } = getModelsByChannel(channel, res, distributionModel)
   const { Order } = getModelsByChannel(channel, res, orderModel)
   const { Giveaway } = getModelsByChannel(channel, res, giveModel)
-
+  let listUnitPcs = [];
   let areaQuery = {}
   if (area) {
     if (area.length == 2) {
@@ -1837,6 +1837,7 @@ exports.getStockQtyNew = async (req, res) => {
       })
 
 
+    // console.log(listUnitPcs)
     const summaryQty = calculateStockSummary(productDetail, listUnitStock)
 
     if (listUnitStock.length > 0) {
@@ -1863,13 +1864,49 @@ exports.getStockQtyNew = async (req, res) => {
     delete item.pcsMain
   })
 
+
+
+  for (const i of data) {
+
+    // console.log(i.productId)
+    const productMeta = dataProduct.find(u => String(u.id) === String(i.productId));
+    const units = (productMeta?.listUnit || [{ unit: 'PCS', name: 'ชิ้น', factor: 1 }])
+      .sort((a, b) => (b.factor || 1) - (a.factor || 1)); // หน่วยใหญ่ก่อน
+
+    const productPcs = (i.summaryQty || []).find(x => String(x.unit).toUpperCase() === 'PCS') || {};
+
+    // --------- เปลี่ยนแค่บล็อคนี้ แทนของเดิมที่ .map(productPcs) ----------
+    const FIELDS = ['stock', 'withdraw', 'good', 'damaged', 'sale', 'promotion', 'change', 'adjust', 'give', 'balance'];
+    const rem = Object.fromEntries(FIELDS.map(f => [f, Number(productPcs[f]) || 0]));
+
+    const listUnit = units.map(u => {
+      const factor = Number(u.factor) || 1;
+      const row = { unit: u.unit, unitName: u.name || u.unit, factor };
+      FIELDS.forEach(f => { row[f] = Math.floor(rem[f] / factor); rem[f] %= factor; });
+      return row;
+    });
+    // ------------------------------------------------------------------------
+
+    const pcsData = {
+      productId: i.productId,
+      productName: i.productName,
+      productGroup: i.productGroup,
+      listUnit
+    };
+
+    listUnitPcs.push(pcsData);   // <— อย่าลืม push
+    // console.log(pcsData)
+  }
+
+
   // const io = getSocket()
   // io.emit('stock/getStockQtyNew', {});
 
   res.status(200).json({
     status: 200,
     message: 'suceesful',
-    data: data,
+    data: listUnitPcs,
+    // data: data,
     summaryStock: Number(summaryStock.toFixed(2)),
     summaryStockBal: Number(summaryStockBal.toFixed(2)),
     summaryWithdraw: Number(summaryWithdraw.toFixed(2)),
@@ -2329,7 +2366,7 @@ exports.getStockQtyDetail = async (req, res) => {
     const normalizedStockOut = rollupUnits(summaryStockOut, productData.listUnit);
 
 
-    // console.log(normalized)
+    console.log(productData.listUnit)
 
 
     const summaryStockInQty = calculateQtyByUnit(productData.listUnit, [
