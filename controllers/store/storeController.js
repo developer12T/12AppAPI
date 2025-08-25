@@ -14,7 +14,6 @@ const addUpload = multer({ storage: multer.memoryStorage() }).array(
 
 const xlsx = require('xlsx')
 
-
 const sql = require('mssql')
 const {
   storeQuery,
@@ -59,6 +58,7 @@ const {
   bueatyStoreQuery
 } = require('../../controllers/queryFromM3/querySctipt')
 const store = require('../../models/cash/store')
+const { trace } = require('console')
 
 exports.getDetailStore = async (req, res) => {
   try {
@@ -468,7 +468,7 @@ exports.checkSimilarStores = async (req, res) => {
     {
       zone: store.zone,
       storeId: { $ne: storeId },
-      $expr: { $lte: [{ $strLenCP: '$storeId' }, 12] }  // ≤ 12 ตัวอักษร
+      $expr: { $lte: [{ $strLenCP: '$storeId' }, 12] } // ≤ 12 ตัวอักษร
     },
     { _id: 0, __v: 0, idIndex: 0 }
   )
@@ -816,6 +816,34 @@ exports.checkInStore = async (req, res) => {
     res.status(500).json({ status: '500', message: 'Server error' })
   }
 }
+exports.reLatLong = async (req, res) => {
+  try {
+    const { storeId } = req.body
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const stores = await Store.updateOne(
+      { storeId: storeId },
+      {
+        $set: {
+          latitude: '0.0000',
+          longtitude: '0.0000',
+          'shippingAddress.0.latitude': '0.0000',
+          'shippingAddress.0.longtitude': '0.0000'
+        }
+      }
+    )
+    res.status(200).json({
+      status: '200',
+      message: 'Update Successfully',
+      data: {
+        stores
+      }
+    })
+  } catch (error) {
+    console.error('Error updating store:', error)
+    res.status(500).json({ status: '500', message: 'Server error' })
+  }
+}
 
 exports.insertStoreToM3 = async (req, res) => {
   const { storeId } = req.body
@@ -843,24 +871,24 @@ exports.insertStoreToM3 = async (req, res) => {
     customerCoType: item.type ?? '',
     customerAddress1: (
       item.address +
-      item.subDistrict +
-      item.subDistrict +
-      item.province +
-      item.postCode ?? ''
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
     ).substring(0, 35),
     customerAddress2: (
       item.address +
-      item.subDistrict +
-      item.subDistrict +
-      item.province +
-      item.postCode ?? ''
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
     ).substring(35, 70),
     customerAddress3: (
       item.address +
-      item.subDistrict +
-      item.subDistrict +
-      item.province +
-      item.postCode ?? ''
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
     ).substring(70, 105),
     customerAddress4: '',
     customerPoscode: (item.postCode ?? '').substring(0, 35),
@@ -991,24 +1019,24 @@ exports.updateStoreStatus = async (req, res) => {
       customerCoType: item.type ?? '',
       customerAddress1: (
         item.address +
-        item.subDistrict +
-        item.subDistrict +
-        item.province +
-        item.postCode ?? ''
+          item.subDistrict +
+          item.subDistrict +
+          item.province +
+          item.postCode ?? ''
       ).substring(0, 35),
       customerAddress2: (
         item.address +
-        item.subDistrict +
-        item.subDistrict +
-        item.province +
-        item.postCode ?? ''
+          item.subDistrict +
+          item.subDistrict +
+          item.province +
+          item.postCode ?? ''
       ).substring(35, 70),
       customerAddress3: (
         item.address +
-        item.subDistrict +
-        item.subDistrict +
-        item.province +
-        item.postCode ?? ''
+          item.subDistrict +
+          item.subDistrict +
+          item.province +
+          item.postCode ?? ''
       ).substring(70, 105),
       customerAddress4: '',
       customerPoscode: (item.postCode ?? '').substring(0, 35),
@@ -1145,7 +1173,7 @@ exports.updateStoreStatusNoNewId = async (req, res) => {
         updatedDate: Date(),
         'approve.dateAction': new Date(),
         'approve.appPerson': user,
-        route:'R25'
+        route: 'R25'
       },
       { new: true }
     )
@@ -1164,10 +1192,6 @@ exports.updateStoreStatusNoNewId = async (req, res) => {
         }
       }
     )
-
-
-
-
 
     return res.status(200).json({
       status: 200,
@@ -2020,24 +2044,25 @@ exports.storeToExcel = async (req, res) => {
 
     // console.log(startTH)
 
-    const mm = dateStr.slice(0, 2)      // '07'
-    const yyyy = dateStr.slice(2, 6)    // '2025'
+    const mm = dateStr.slice(0, 2) // '07'
+    const yyyy = dateStr.slice(2, 6) // '2025'
 
     // ช่วงเดือน “ตามเวลาไทย” แล้วใช้เป็น boundary ใน UTC ได้เลย
     const startTH = new Date(`${yyyy}-${mm}-01T00:00:00+07:00`) // inclusive
 
-    const nextMonth = Number(mm) === 12 ? '01' : String(Number(mm) + 1).padStart(2, '0')
+    const nextMonth =
+      Number(mm) === 12 ? '01' : String(Number(mm) + 1).padStart(2, '0')
     const nextYear = Number(mm) === 12 ? String(Number(yyyy) + 1) : yyyy
-    const endTHExclusive = new Date(`${nextYear}-${nextMonth}-01T00:00:00+07:00`) // exclusive
-
+    const endTHExclusive = new Date(
+      `${nextYear}-${nextMonth}-01T00:00:00+07:00`
+    ) // exclusive
 
     // คิวรีตามช่วงเดือนไทย (เอกสาร createdAt เก็บเป็น Date/UTC)
     const store = await Store.find({
       createdAt: { $gte: startTH, $lt: endTHExclusive }
     }).lean()
 
-
-    const toThaiTime = d => new Date(new Date(d).getTime() + 7 * 60 * 60 * 1000);
+    const toThaiTime = d => new Date(new Date(d).getTime() + 7 * 60 * 60 * 1000)
 
     const storeTran = store.map(item => ({
       storeId: item.storeId,
@@ -2054,7 +2079,7 @@ exports.storeToExcel = async (req, res) => {
       lineId: item.lineId,
       status: item.status,
       createdAt: toThaiTime(item.createdAt) // ✅ บวก 7 ชั่วโมง (เวลาไทย)
-    }));
+    }))
 
     // return res.status(200).json({ status: 200, count: store.length, data: store })
 
@@ -2075,11 +2100,8 @@ exports.storeToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
-
-
-
   } catch (err) {
     console.error(err)
     return res.status(500).json({ status: 500, message: err.message })
