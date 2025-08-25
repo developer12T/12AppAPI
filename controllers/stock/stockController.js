@@ -3500,14 +3500,14 @@ exports.stockToExcelNew = async (req, res) => {
     const sumBalancesummary = to2(totals.sumBalancesummary);
 
     // แถวสรุป (สำหรับแสดง/Excel)
-    const balanceSummaryRow = {
-      productId: 'รวมทั้งหมด',
-      productName: '',
-      balanceGood: sumBalanceGood,
-      balanceM3: sumBalanceM3,
-      balanceDamaged: sumBalanceDamaged,
-      summary: sumBalancesummary
-    };
+    // const balanceSummaryRow = {
+    //   productId: 'รวมทั้งหมด',
+    //   productName: '',
+    //   balanceGood: sumBalanceGood,
+    //   balanceM3: sumBalanceM3,
+    //   balanceDamaged: sumBalanceDamaged,
+    //   summary: sumBalancesummary
+    // };
 
     // ---------- Export / JSON ----------
     if (excel === true) {
@@ -3574,37 +3574,49 @@ exports.stockToExcelNew = async (req, res) => {
 
       // Sheet: balance
       const balanceRows = [
-        ['รหัส', 'ชื่อสินค้า', 'หีบ', 'จำนวนคงเหลือดี', '', 'หีบ', 'จำนวนคงจากM3', '', 'หีบ', 'จำนวนคงเหลือเสีย', '', 'มูลค่าคงเหลือ'],
-        ['รหัส', 'ชื่อสินค้า', 'หีบ', 'แพค/ถุง', 'ซอง/ขวด', 'หีบ', 'แพค/ถุง', 'ซอง/ขวด', 'หีบ', 'แพค/ถุง', 'ซอง/ขวด', 'มูลค่าคงเหลือ'],
-        ...[...balance, balanceSummaryRow].map(it => ([
+        // แถว 1: ชื่อกลุ่ม (กิน 3 คอลัมน์)
+        ['รหัส', 'ชื่อสินค้า',
+          'จำนวนคงเหลือดี', '', '',
+          'จำนวนคงจากM3', '', '',
+          'จำนวนคงเหลือเสีย', '', '',
+          // 'มูลค่าคงเหลือ'
+        ],
+        // แถว 2: หน่วยย่อย
+        ['รหัส', 'ชื่อสินค้า',
+          'หีบ', 'แพค/ถุง', 'ซอง/ขวด',
+          'หีบ', 'แพค/ถุง', 'ซอง/ขวด',
+          'หีบ', 'แพค/ถุง', 'ซอง/ขวด',
+          // 'มูลค่าคงเหลือ'
+        ],
+        ...[...balance
+          // , balanceSummaryRow
+        ].map(it => ([
           it.productId, it.productName,
           q(it.balanceGoodByUnit, 'CTN'), q(it.balanceGoodByUnit, 'BAG', 'PAC'), q(it.balanceGoodByUnit, 'PCS', 'BOT'),
           q(it.balanceM3ByUnit, 'CTN'), q(it.balanceM3ByUnit, 'BAG', 'PAC'), q(it.balanceM3ByUnit, 'PCS', 'BOT'),
           q(it.balanceDamagedByUnit, 'CTN'), q(it.balanceDamagedByUnit, 'BAG', 'PAC'), q(it.balanceDamagedByUnit, 'PCS', 'BOT'),
-          it.summaryNumeric ?? it.summary
+          // it.summaryNumeric ?? it.summary
         ]))
       ];
 
+      // สร้างชีทก่อน แล้วค่อย merge + ตั้งความกว้าง
       const wsBalance = xlsx.utils.aoa_to_sheet(balanceRows);
+
       wsBalance['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }, // A1:A2 รหัส
-        { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } }, // B1:B2 ชื่อสินค้า
-        { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } }, // C1:C2 หีบ (ดี)
-        { s: { r: 0, c: 5 }, e: { r: 1, c: 5 } }, // F1:F2 หีบ (M3)
-        { s: { r: 0, c: 8 }, e: { r: 1, c: 8 } }, // I1:I2 หีบ (เสีย)
-        { s: { r: 0, c: 11 }, e: { r: 1, c: 11 } },// L1:L2 มูลค่า
-        { s: { r: 0, c: 3 }, e: { r: 0, c: 4 } }, // D1:E1 จำนวนคงเหลือดี
-        { s: { r: 0, c: 6 }, e: { r: 0, c: 7 } }, // G1:H1 จำนวนคงจากM3
-        { s: { r: 0, c: 9 }, e: { r: 0, c: 10 } },// J1:K1 จำนวนคงเหลือเสีย
+        { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },   // A1:A2 รหัส
+        { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },   // B1:B2 ชื่อสินค้า
+        { s: { r: 0, c: 2 }, e: { r: 0, c: 4 } },   // C1:E1 จำนวนคงเหลือดี
+        { s: { r: 0, c: 5 }, e: { r: 0, c: 7 } },   // F1:H1 จำนวนคงจากM3
+        { s: { r: 0, c: 8 }, e: { r: 0, c: 10 } },  // I1:K1 จำนวนคงเหลือเสีย
+        { s: { r: 0, c: 11 }, e: { r: 1, c: 11 } },  // L1:L2 มูลค่าคงเหลือ
       ];
 
-      // ปรับความกว้างคอลัมน์นิดหน่อย (ไม่ใส่ก็ได้)
       wsBalance['!cols'] = [
-        { wch: 14 }, { wch: 40 }, { wch: 10 },
-        { wch: 8 }, { wch: 10 }, { wch: 10 },
-        { wch: 8 }, { wch: 10 }, { wch: 10 },
-        { wch: 8 }, { wch: 10 }, { wch: 10 },
-        { wch: 16 },
+        { wch: 14 }, { wch: 40 },           // A,B
+        { wch: 8 }, { wch: 10 }, { wch: 10 },   // C,D,E
+        { wch: 8 }, { wch: 10 }, { wch: 10 },   // F,G,H
+        { wch: 8 }, { wch: 10 }, { wch: 10 },   // I,J,K
+        { wch: 16 },                    // L
       ];
 
 
