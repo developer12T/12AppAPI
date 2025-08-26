@@ -36,7 +36,7 @@ const { create } = require('lodash')
 async function erpApiCheckOrderJob(channel = 'cash') {
   try {
     const { Order } = getModelsByChannel(channel, null, orderModel)
-    const { Refund } = getModelsByChannel(channel, res, refundModel)
+    const { Refund } = getModelsByChannel(channel, null, refundModel)
 
     // 1. Get sale order numbers (OAORNO) ที่มีใน Sale
     const modelSale = await Sale.findAll({

@@ -18,7 +18,7 @@ const { Op } = require('sequelize')
 
 const { DisributionM3 } = require('../models/cash/master')
 
-async function generateCampaignId (channel, res) {
+async function generateCampaignId(channel, res) {
   const { Campaign } = getModelsByChannel(channel, res, campaignModel)
   const now = new Date()
   const yyyy = now.getFullYear()
@@ -74,8 +74,8 @@ const generateStockId = async (area, warehouse, channel, res) => {
   return `S${currentYear
     .toString()
     .slice(2, 4)}${currentMonth}13${warehouse}${runningNumber
-    .toString()
-    .padStart(4, '0')}`
+      .toString()
+      .padStart(4, '0')}`
 }
 
 const generateOrderId = async (area, warehouse, channel, res) => {
@@ -104,8 +104,8 @@ const generateOrderId = async (area, warehouse, channel, res) => {
   return `${currentYear
     .toString()
     .slice(2, 4)}${currentMonth}13${warehouse}${runningNumber
-    .toString()
-    .padStart(4, '0')}`
+      .toString()
+      .padStart(4, '0')}`
 }
 const generateRefundId = async (area, warehouse, channel, res) => {
   const currentYear = new Date().getFullYear() + 543
@@ -133,71 +133,60 @@ const generateRefundId = async (area, warehouse, channel, res) => {
   return `${currentYear
     .toString()
     .slice(2, 4)}${currentMonth}93${warehouse}${runningNumber
-    .toString()
-    .padStart(4, '0')}`
+      .toString()
+      .padStart(4, '0')}`
 }
 
-const generateDistributionId = async (area, warehouse, channel, res,newtrip) => {
-  const now = new Date()
-  const currentYear = now.getFullYear() + 543
-
-  let currentMonth = ''
-  if (newtrip === true) {
-    currentMonth = (now.getMonth() + 2).toString().padStart(2, '0')
-  } else {
-    currentMonth = (now.getMonth() + 1).toString().padStart(2, '0')
-  }
-  
+const generateDistributionId = async (area, warehouse, channel, res, newtrip = false) => {
+  // โหลดโมเดลก่อนใช้งาน
   const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
-  // สร้าง prefix เช่น "W680852221"
-  const prefix = `W${currentYear
-    .toString()
-    .slice(2, 4)}${currentMonth}${warehouse}`
+  const now = new Date()
 
-  // หาเลขล่าสุดใน DisributionM3 ที่ขึ้นต้นด้วย prefix
-  const lastM3 = await DisributionM3.findOne({
-    attributes: ['MGTRNR'],
-    where: {
-      MGTRNR: {
-        [Op.like]: `${prefix}%`
-      }
-    },
-    order: [['MGTRNR', 'DESC']],
-    raw: true
-  })
-  // console.log("lastM3", lastM3)
-  // หาเลขล่าสุดใน Distribution ปกติ (optional ตามโค้ดเดิม)
+  // คำนวณ "เดือนเป้าหมาย" (ถ้า newtrip ให้เลื่อนไปเดือนถัดไป และข้ามปีได้)
+  const target = new Date(now)
+  if (newtrip) target.setMonth(target.getMonth() + 1) // auto handle Dec -> Jan
+
+  const targetYearAD = target.getFullYear()        // ค.ศ.
+  const targetMonth = target.getMonth() + 1        // 1..12
+  const mm = String(targetMonth).padStart(2, '0')
+
+  // ปี พ.ศ. 2 หลักท้าย
+  const buddhistYear = targetYearAD + 543
+  const yy = String(buddhistYear).slice(-2)
+
+  // prefix: W + (ปี พ.ศ. 2 หลัก) + (เดือน 2 หลัก) + warehouse
+  const prefix = `W${yy}${mm}${warehouse}`
+
+  // สร้างช่วงวันที่ของ "เดือนเป้าหมาย" แบบเวลาไทย (UTC+7)
+  const startTH = new Date(`${targetYearAD}-${mm}-01T00:00:00+07:00`)
+  const nextMonth = new Date(startTH); nextMonth.setMonth(nextMonth.getMonth() + 1)
+  const endTHExclusive = new Date(`${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01T00:00:00+07:00`)
+
+  console.log(startTH, endTHExclusive)
+
+  // หาเลขรันล่าสุดจาก order ที่ขึ้นต้นด้วย prefix นี้ ใน area เดียวกันและภายในเดือนเป้าหมาย
   const latestOrder = await Distribution.findOne({
     area,
-    createdAt: {
-      $gte: new Date(`${new Date().getFullYear()}-${currentMonth}-01`),
-      $lt: new Date(
-        `${new Date().getFullYear()}-${parseInt(currentMonth) + 1}-01`
-      )
-    }
+    orderId: { $regex: `^${prefix}` }   // เช่น ^W6809{warehouse}
   })
     .sort({ orderId: -1 })
-    .select('orderId')
-  // console.log("latestOrder", latestOrder)
-  // เช็คเลขรันล่าสุดจาก M3
-  let runningNumber = 0
-  // if (lastM3 && lastM3.MGTRNR) {
-  // if (lastM3 && lastM3.MGTRNR) {
-  //   // ดึง 2 หลักสุดท้าย (หรือจะปรับให้มากกว่านี้ก็ได้)
-  //   const lastNum = parseInt(lastM3.MGTRNR.slice(-2))
-  //   runningNumber = isNaN(lastNum) ? 0 : lastNum + 1
-  //   console.log("sssssssssssss")
-  // } else if (latestOrder) {
-  if (latestOrder) {
-    runningNumber = parseInt(latestOrder.orderId.slice(-2)) + 1
+    .select('orderId');
+
+  // ตัดเอาเฉพาะส่วนเลขรันท้าย แล้ว +1 (ไม่ fix ความยาว เพื่อรองรับ >99)
+  let runningNumber = 1
+  if (latestOrder?.orderId?.startsWith(prefix)) {
+    const tail = latestOrder.orderId.slice(prefix.length) // ตัวเลขรันล้วนๆ
+    const lastNum = parseInt(tail || '0', 10)
+    runningNumber = (isNaN(lastNum) ? 0 : lastNum) + 1
   }
 
-  const newOrderId = `${prefix}${runningNumber.toString().padStart(2, '0')}`
-
-  // console.log(newOrderId)
+  // กำหนดความยาวเลขรัน (แนะนำ 3 หลักขึ้นไป ป้องกันทะลุ 99)
+  const newOrderId = `${prefix}${String(runningNumber).padStart(3, '0')}`
+  // console.log(latestOrder)
   return newOrderId
 }
+
 
 const generateGiveawaysId = async (area, warehouse, channel, res) => {
   const currentYear = new Date().getFullYear() + 543
@@ -224,8 +213,8 @@ const generateGiveawaysId = async (area, warehouse, channel, res) => {
   return `P${currentYear
     .toString()
     .slice(2, 4)}${currentMonth}${warehouse}${runningNumber
-    .toString()
-    .padStart(2, '0')}`
+      .toString()
+      .padStart(2, '0')}`
 }
 
 const generateGivetypeId = async (channel, res) => {
