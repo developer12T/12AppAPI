@@ -1000,13 +1000,16 @@ exports.OrderToExcel = async (req, res) => {
     }
   ])
 
+
+  
   const modelChange = await Order.aggregate([
     {
       $match: {
-        status: { $nin: ['canceled'] },
+        
         'store.area': { $ne: 'IT211' },
         // 'store.area': 'NE211',
         status: { $in: statusArray },
+        status: { $nin: ['canceled','pending'] },
         type: { $in: ['change'] }
       }
     },
