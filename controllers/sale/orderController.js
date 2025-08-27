@@ -904,7 +904,7 @@ exports.addSlip = async (req, res) => {
 }
 
 exports.OrderToExcel = async (req, res) => {
-  const { channel, date } = req.query
+  const { channel, startDate, endDate } = req.query
 
   // console.log(channel, date)
   let statusArray = (req.query.status || '')
@@ -917,22 +917,15 @@ exports.OrderToExcel = async (req, res) => {
   }
   // ,'approved','completed'
   // console.log(statusArray)
-  if (!date || date === 'null') {
-    const today = new Date()
-    const year = today.getFullYear()
-    const month = String(today.getMonth() + 1).padStart(2, '0') // เดือนเริ่มที่ 0
-    const day = String(today.getDate()).padStart(2, '0')
+  // if (!date || date === 'null') {
+  //   const today = new Date()
+  //   const year = today.getFullYear()
+  //   const month = String(today.getMonth() + 1).padStart(2, '0') // เดือนเริ่มที่ 0
+  //   const day = String(today.getDate()).padStart(2, '0')
 
-    date = `${year}${month}${day}`
-    // console.log('📅 date:', date)
-  }
-
-  const start = new Date(
-    `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00`
-  )
-  const end = new Date(
-    `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T23:59:59.999`
-  )
+  //   date = `${year}${month}${day}`
+  //   // console.log('📅 date:', date)
+  // }
 
   // const channel = 'cash';
   const { Order } = getModelsByChannel(channel, res, orderModel)
@@ -944,10 +937,10 @@ exports.OrderToExcel = async (req, res) => {
 
   // ช่วงเวลา "ไทย" ที่ผู้ใช้เลือก
   const startTH = new Date(
-    `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00+07:00`
+    `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(6, 8)}T00:00:00+07:00`
   )
   const endTH = new Date(
-    `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(
+    `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(
       6,
       8
     )}T23:59:59.999+07:00`
@@ -1000,13 +993,16 @@ exports.OrderToExcel = async (req, res) => {
     }
   ])
 
+
+  
   const modelChange = await Order.aggregate([
     {
       $match: {
-        status: { $nin: ['canceled'] },
+        
         'store.area': { $ne: 'IT211' },
         // 'store.area': 'NE211',
         status: { $in: statusArray },
+        status: { $nin: ['canceled','pending'] },
         type: { $in: ['change'] }
       }
     },
@@ -1460,12 +1456,12 @@ exports.OrderToExcel = async (req, res) => {
 
   const wb = xlsx.utils.book_new()
   const ws = xlsx.utils.json_to_sheet(allTransactions)
-  xlsx.utils.book_append_sheet(wb, ws, `ESP${yyyymmddToDdMmYyyy(date)}`)
+  xlsx.utils.book_append_sheet(wb, ws, `ESP${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}`)
 
-  const tempPath = path.join(os.tmpdir(), `${yyyymmddToDdMmYyyy(date)}.xlsx`)
+  const tempPath = path.join(os.tmpdir(), `CA_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}.xlsx`)
   xlsx.writeFile(wb, tempPath)
 
-  res.download(tempPath, `CA_${yyyymmddToDdMmYyyy(date)}.xlsx`, err => {
+  res.download(tempPath, `CA_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}.xlsx`, err => {
     if (err) {
       console.error('❌ Download error:', err)
       // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว

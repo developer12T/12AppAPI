@@ -197,7 +197,7 @@ exports.getCart = async (req, res) => {
         ? promotion.appliedPromotions
         : []
 
-      console.log(promotion)
+      // console.log(promotion)
 
       const dataPromotion = appliedList.flatMap(item =>
         Array.isArray(item?.listProduct)
@@ -209,7 +209,7 @@ exports.getCart = async (req, res) => {
             }))
           : []
       )
-      console.log(dataPromotion)
+      // console.log(dataPromotion)
 
       // // ✅ เผื่อกรณีหา stock ไม่เจอ และกันข้อมูลผิดรูป
       const stockDoc = await Stock.findOne({ area, period: period() }).lean()
@@ -309,7 +309,7 @@ exports.getCart = async (req, res) => {
                 }
               ]
             }
-            console.log('newPromotion', newPromotion)
+            // console.log('newPromotion', newPromotion)
 
             // // 🔄 แทนที่ของเดิมถ้ามี proId ซ้ำ มิฉะนั้น push
             if (!Array.isArray(cart?.listPromotion)) cart.listPromotion = []

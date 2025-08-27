@@ -3123,6 +3123,23 @@ exports.stockToExcelNew = async (req, res) => {
       return res.status(400).json({ status: 400, message: 'area, period are required' });
     }
 
+
+    // ฟังก์ชันแปลงจำนวน pcs → รายหน่วย
+    const convertToUnits = (totalPcs, units) => {
+      let remaining = totalPcs;
+      return units.map(u => {
+        const qty = Math.floor(remaining / u.factor);
+        remaining = remaining % u.factor;
+        return {
+          unit: u.unit,
+          unitName: u.name,
+          qty
+        };
+      });
+    };
+
+
+
     // ---------- Models ----------
     const { Stock } = getModelsByChannel(channel, res, stockModel);
     const { Distribution } = getModelsByChannel(channel, res, distributionModel);
@@ -3303,6 +3320,37 @@ exports.stockToExcelNew = async (req, res) => {
 
     const stockOutData = mergeDuplicateRows(stockOutDataRaw);
 
+
+    // (3) ประกอบ balance ต่อสินค้าใน stock
+    const stockOutDataFinal = stockOutData.map(item => {
+      const pid = String(item?.productId || '').trim();
+      const productDetailItem = productDetail.find(u => u.id == pid);
+      const productDetailUnit = productDetailItem?.listUnit || [];
+
+      const prod = prodById.get(pid);
+      // const balanceGood = Number(item?.balancePcs) || 0;
+      // const salePrice = getSalePrice(pid);
+      // const balanceM3 = Number(m3ByPid.get(pid)) || 0;
+      // const balanceDamaged = Number(damagedById.get(pid)) || 0;
+
+      return {
+        customerCode: item.customerCode,
+        customerName: item.customerName,
+        inv: item.inv,
+        productId: pid,
+        productName: prod?.name || '',
+        salePcs: item.qtySale,
+        saleUnit: convertToUnits(item.qtySale, productDetailUnit),
+        promoPcs: item.qtyPromo,
+        promoUnit: convertToUnits(item.qtyPromo, productDetailUnit),
+        changePcs: item.qtyChange,
+        changeUnit: convertToUnits(item.qtyChange, productDetailUnit),
+        givePcs: item.qtyGive,
+        giveUnit: convertToUnits(item.qtyGive, productDetailUnit),
+        // summary: to2(balanceGood * salePrice)
+      };
+    });
+
     // รวมยอด OUT (รวมก่อน ค่อยปัดทศนิยม)
     const sumStockOutSale = stockOutData.reduce((a, r) => a + (Number(r.qtySale) || 0), 0);
     const sumStockOutPromotion = stockOutData.reduce((a, r) => a + (Number(r.qtyPromo) || 0), 0);
@@ -3330,8 +3378,15 @@ exports.stockToExcelNew = async (req, res) => {
     let sumStockInsumStock = 0;
     let sumStockInsummary = 0;
 
-    const stockIn = [...dataRefund, ...dataWithdraw].flatMap(item =>
+    // console.log(dataWithdraw)
+    const stockIn = [...dataRefund,
+    ...dataWithdraw
+    ].flatMap(item =>
       (item.listProduct || []).map(i => {
+
+        if (i.condition === 'damaged') {
+          return null
+        }
 
         const pid = String(i?.id || '').trim();
         const product = productDetail.find(p => String(p.id).trim() === pid);
@@ -3347,10 +3402,10 @@ exports.stockToExcelNew = async (req, res) => {
         const inStock = stockQty.find(u => String(u.productId).trim() === pid);
         let qtyPcsGood = 0, qtyPcsDamaged = 0, qtyWithdraw = 0;
 
-        if (String(i?.condition || '').toLowerCase() === 'good') qtyPcsGood = qtyPCS;
-        else if (String(i?.condition || '').toLowerCase() === 'damaged') qtyPcsDamaged = qtyPCS;
+        if (String(i?.condition || '') === 'good') qtyPcsGood = i.qtyPcs;
+        // else if (String(i?.condition || '') === 'damaged') qtyPcsDamaged = i.qtyPcs;
         else qtyWithdraw = qtyPCS; // สำหรับ withdraw
-
+        // console.log(qtyPcsGood)
         const summary = (qtyWithdraw + qtyPcsGood) * productDetailPricePCS
 
         sumStockIn += qtyPCS;
@@ -3371,6 +3426,7 @@ exports.stockToExcelNew = async (req, res) => {
         };
       })
     );
+    // console.log(stockIn)
 
     const stockInSummed = [...(stockIn ?? []).reduce((m, r) => {
       const pid = String(r?.productId ?? '').trim();
@@ -3385,6 +3441,31 @@ exports.stockToExcelNew = async (req, res) => {
     }, new Map()).values()].map(x => ({ ...x, summary: to2(x.summary) }));
 
 
+    // (3) ประกอบ balance ต่อสินค้าใน stock
+    const stockInSummedFinal = stockInSummed.map(item => {
+      const pid = String(item?.productId || '').trim();
+      const productDetailItem = productDetail.find(u => u.id == pid);
+      const productDetailUnit = productDetailItem?.listUnit || [];
+
+      const prod = prodById.get(pid);
+      // const balanceGood = Number(item?.balancePcs) || 0;
+      // const salePrice = getSalePrice(pid);
+      // const balanceM3 = Number(m3ByPid.get(pid)) || 0;
+      // const balanceDamaged = Number(damagedById.get(pid)) || 0;
+
+
+      return {
+        productId: pid,
+        productName: prod?.name || '',
+        withdraw: item.withdraw,
+        withdrawByUnit: convertToUnits(item.withdraw, productDetailUnit),
+        good: item.good,
+        goodByUnit: convertToUnits(item.good, productDetailUnit),
+        sumStock: item.sumStock,
+        sumStockByUnit: convertToUnits(item.sumStock, productDetailUnit),
+        // summary: to2(balanceGood * salePrice)
+      };
+    });
 
 
     const prodByIds = new Map((productDetail ?? []).map(p => [String(p.id).trim(), p]));
@@ -3490,19 +3571,6 @@ exports.stockToExcelNew = async (req, res) => {
       const balanceM3 = Number(m3ByPid.get(pid)) || 0;
       const balanceDamaged = Number(damagedById.get(pid)) || 0;
 
-      // ฟังก์ชันแปลงจำนวน pcs → รายหน่วย
-      const convertToUnits = (totalPcs, units) => {
-        let remaining = totalPcs;
-        return units.map(u => {
-          const qty = Math.floor(remaining / u.factor);
-          remaining = remaining % u.factor;
-          return {
-            unit: u.unit,
-            unitName: u.name,
-            qty
-          };
-        });
-      };
 
       return {
         productId: pid,
@@ -3536,78 +3604,135 @@ exports.stockToExcelNew = async (req, res) => {
     const sumBalanceDamaged = totals.sumBalanceDamaged;
     const sumBalancesummary = to2(totals.sumBalancesummary);
 
-    // แถวสรุป (สำหรับแสดง/Excel)
-    // const balanceSummaryRow = {
-    //   productId: 'รวมทั้งหมด',
-    //   productName: '',
-    //   balanceGood: sumBalanceGood,
-    //   balanceM3: sumBalanceM3,
-    //   balanceDamaged: sumBalanceDamaged,
-    //   summary: sumBalancesummary
-    // };
-
+    const q = (arr, ...aliases) => {
+      if (!arr?.length) return 0;
+      const wanted = new Set(aliases.map(u => String(u).toUpperCase()));
+      return arr.reduce((sum, x) =>
+        wanted.has(String(x.unit).toUpperCase()) ? sum + (Number(x.qty) || 0) : sum
+        , 0);
+    };
     // ---------- Export / JSON ----------
     if (excel === true) {
       // Sheet: stockIn
-      const stockInWithSum = [
-        ...stockInSummed,
-        {
-          productId: '',
-          name: 'รวมทั้งหมด',
-          withdraw: sumStockInWithdraw,
-          good: sumStockInGood,
-          sumStock: sumStockInsumStock,
-          summary: sumStockInsummary
-        }
+      const inRows = [
+        // แถว 1: ชื่อกลุ่ม (กิน 3 คอลัมน์)
+        ['รหัส', 'ชื่อสินค้า',
+          'เบิกระหว่างทริป', '', '',
+          'รับคืนดี', '', '',
+          'รวมจำนวนทั้งหมด', '', '',
+          // 'มูลค่าคงเหลือ'
+        ],
+        // แถว 2: หน่วยย่อย
+        ['รหัส', 'ชื่อสินค้า',
+          'หีบ', 'แพค/ถุง', 'ซอง/ขวด',
+          'หีบ', 'แพค/ถุง', 'ซอง/ขวด',
+          'หีบ', 'แพค/ถุง', 'ซอง/ขวด',
+          // 'มูลค่าคงเหลือ'
+        ],
+        ...[...stockInSummedFinal
+          // , balanceSummaryRow
+        ].map(it => ([
+          it.productId, it.productName,
+          q(it.withdrawByUnit, 'CTN'), q(it.withdrawByUnit, 'BAG', 'PAC'), q(it.withdrawByUnit, 'PCS', 'BOT'),
+          q(it.goodByUnit, 'CTN'), q(it.goodByUnit, 'BAG', 'PAC'), q(it.goodByUnit, 'PCS', 'BOT'),
+          q(it.sumStockByUnit, 'CTN'), q(it.sumStockByUnit, 'BAG', 'PAC'), q(it.sumStockByUnit, 'PCS', 'BOT'),
+          // it.summaryNumeric ?? it.summary
+        ]))
       ];
-      const stockInThai = stockInWithSum.map(item => ({
-        รหัส: item.productId,
-        ชื่อสินค้า: item.name,
-        เบิกระหว่างทริป: item.withdraw,
-        รับคืนดี: item.good,
-        รวมจำนวน: item.sumStock,
-        มูลค่า: item.summary
-      }));
 
-      // Sheet: stockOut
-      const stockOutSummaryRow = {
-        customerCode: '',
-        customerName: 'รวมทั้งหมด',
-        inv: '',
-        productId: '',
-        productName: '',
-        qtySale: sumStockOutSale,
-        valSale: sumStockOutSummarySale,
-        qtyPromo: sumStockOutPromotion,
-        valPromo: sumStockOutSummaryPromotion,
-        qtyChange: sumStockOutChange,
-        valChange: sumStockOutSummaryChange,
-        qtyGive: sumStockOutGive,
-        valGive: sumStockOutSummaryGive
-      };
-      const stockOutThai = [...stockOutData, stockOutSummaryRow].map(item => ({
-        customerCode: item.customerCode,
-        customerName: item.customerName,
-        Inv: item.inv,
-        รหัส: item.productId,
-        ชื่อสินค้า: item.productName,
-        จำนวนขาย: item.qtySale,
-        มูลค่าขาย: item.valSale,
-        จำนวนแถม: item.qtyPromo,
-        มูลค่าแถม: item.valPromo,
-        จำนวนที่เปลี่ยน: item.qtyChange,
-        มูลค่าเปลี่ยน: item.valChange,
-        จำนวนแจกสินค้า: item.qtyGive,
-        มูลค่าแจกสินค้า: item.valGive
-      }));
+      // สร้างชีทก่อน แล้วค่อย merge + ตั้งความกว้าง
+      const wsIn = xlsx.utils.aoa_to_sheet(inRows);
 
-      const q = (arr, ...aliases) => {
-        if (!arr?.length) return 0;
-        const wanted = new Set(aliases.map(u => String(u).toUpperCase()));
-        return arr.reduce((sum, x) =>
-          wanted.has(String(x.unit).toUpperCase()) ? sum + (Number(x.qty) || 0) : sum
-          , 0);
-      };
+      wsIn['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },   // A1:A2 รหัส
+        { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },   // B1:B2 ชื่อสินค้า
+        { s: { r: 0, c: 2 }, e: { r: 0, c: 4 } },   // C1:E1 จำนวนคงเหลือดี
+        { s: { r: 0, c: 5 }, e: { r: 0, c: 7 } },   // F1:H1 จำนวนคงจากM3
+        { s: { r: 0, c: 8 }, e: { r: 0, c: 10 } },  // I1:K1 จำนวนคงเหลือเสีย
+        { s: { r: 0, c: 11 }, e: { r: 1, c: 11 } },  // L1:L2 มูลค่าคงเหลือ
+      ];
+
+      wsIn['!cols'] = [
+        { wch: 14 }, { wch: 40 },           // A,B
+        { wch: 8 }, { wch: 10 }, { wch: 10 },   // C,D,E
+        { wch: 8 }, { wch: 10 }, { wch: 10 },   // F,G,H
+        { wch: 8 }, { wch: 10 }, { wch: 10 },   // I,J,K
+        { wch: 16 },                    // L
+      ];
+
+
+
+
+      const OutRows = [
+        // แถว 1: หัวตารางใหญ่
+        [
+          'customerCode', 'customerName', 'Inv',
+          'รหัส', 'ชื่อสินค้า',
+          'จำนวนขาย', '', '',
+          'จำนวนแถม', '', '',
+          'จำนวนที่เปลี่ยน', '', '',
+          'จำนวนแจกสินค้า', '', '',
+          // 'มูลค่าคงเหลือ'
+        ],
+        // แถว 2: หน่วยย่อย (ต้องเว้น 3 ช่องแรกให้ตรง A,B,C)
+        [
+          '', '', '',                  // <-- สำหรับ customerCode, customerName, Inv (จะ merge ลงมา)
+          'รหัส', 'ชื่อสินค้า',       // <-- D,E จะ merge ลงมาเช่นกัน
+          'หีบ', 'แพค/ถุง', 'ซอง/ขวด', // F,G,H
+          'หีบ', 'แพค/ถุง', 'ซอง/ขวด', // I,J,K
+          'หีบ', 'แพค/ถุง', 'ซอง/ขวด', // L,M,N
+          'หีบ', 'แพค/ถุง', 'ซอง/ขวด', // O,P,Q
+          // 'มูลค่าคงเหลือ'
+        ],
+        ...stockOutDataFinal.map(it => ([
+          it.customerCode, it.customerName, it.inv,
+          it.productId, it.productName,
+          q(it.saleUnit, 'CTN'), q(it.saleUnit, 'BAG', 'PAC'), q(it.saleUnit, 'PCS', 'BOT'),
+          q(it.promoUnit, 'CTN'), q(it.promoUnit, 'BAG', 'PAC'), q(it.promoUnit, 'PCS', 'BOT'),
+          q(it.changeUnit, 'CTN'), q(it.changeUnit, 'BAG', 'PAC'), q(it.changeUnit, 'PCS', 'BOT'),
+          q(it.giveUnit, 'CTN'), q(it.giveUnit, 'BAG', 'PAC'), q(it.giveUnit, 'PCS', 'BOT'),
+          // it.summaryNumeric ?? it.summary
+        ]))
+      ];
+
+      // สร้างชีท
+      const wsOut = xlsx.utils.aoa_to_sheet(OutRows);
+
+      // Merge header ให้ตรงกับตำแหน่งคอลัมน์จริง:
+      // A  B  C  D  E  F  G  H  I  J  K  L  M  N  O  P  Q
+      // 0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16
+      wsOut['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }, // A1:A2 customerCode
+        { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } }, // B1:B2 customerName
+        { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } }, // C1:C2 Inv
+
+        { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } }, // D1:D2 รหัส (สินค้า)
+        { s: { r: 0, c: 4 }, e: { r: 1, c: 4 } }, // E1:E2 ชื่อสินค้า
+
+        { s: { r: 0, c: 5 }, e: { r: 0, c: 7 } },   // F1:H1 จำนวนขาย
+        { s: { r: 0, c: 8 }, e: { r: 0, c: 10 } },  // I1:K1 จำนวนแถม
+        { s: { r: 0, c: 11 }, e: { r: 0, c: 13 } }, // L1:N1 จำนวนที่เปลี่ยน
+        { s: { r: 0, c: 14 }, e: { r: 0, c: 16 } }, // O1:Q1 จำนวนแจกสินค้า
+
+        // ถ้ามี "มูลค่าคงเหลือ" เพิ่มคอลัมน์ R แล้ว merge: { s:{r:0,c:17}, e:{r:1,c:17} }
+      ];
+
+      // ตั้งความกว้างคอลัมน์ (เผื่ออ่านง่ายขึ้น)
+      wsOut['!cols'] = [
+        { wch: 14 }, // A customerCode
+        { wch: 28 }, // B customerName
+        { wch: 10 }, // C Inv
+        { wch: 14 }, // D รหัสสินค้า
+        { wch: 40 }, // E ชื่อสินค้า
+
+        { wch: 8 }, { wch: 10 }, { wch: 10 },  // F,G,H   จำนวนขาย
+        { wch: 8 }, { wch: 10 }, { wch: 10 },  // I,J,K   จำนวนแถม
+        { wch: 8 }, { wch: 10 }, { wch: 10 },  // L,M,N   จำนวนที่เปลี่ยน
+        { wch: 8 }, { wch: 10 }, { wch: 10 },  // O,P,Q   จำนวนแจกสินค้า
+
+        // { wch: 16 }, // R ถ้ามีมูลค่าคงเหลือ
+      ];
+
 
       // Sheet: balance
       const balanceRows = [
@@ -3660,8 +3785,10 @@ exports.stockToExcelNew = async (req, res) => {
 
 
       const wb = xlsx.utils.book_new();
-      xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(stockInThai), 'stockIn');
-      xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(stockOutThai), 'stockOut');
+      xlsx.utils.book_append_sheet(wb, wsIn, 'stockIn');
+      // xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(stockInThai), 'stockIn');
+      // xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(stockOutThai), 'stockOut');
+      xlsx.utils.book_append_sheet(wb, wsOut, 'stockOut');
       xlsx.utils.book_append_sheet(wb, wsBalance, 'balance');
 
       const tempPath = path.join(os.tmpdir(), `Stock_${area}.xlsx`);
@@ -3681,7 +3808,7 @@ exports.stockToExcelNew = async (req, res) => {
       message: 'successfully',
       data: {
         // stock in
-        stockInSummed,
+        stockInSummedFinal,
         sumStockIn,
         sumStockInGood,
         sumStockInDamaged,
@@ -3690,7 +3817,7 @@ exports.stockToExcelNew = async (req, res) => {
         sumStockInsummary,
 
         // stock out (merge แล้ว)
-        stockOut: stockOutData,
+        stockOut: stockOutDataFinal,
         sumStockOutSale,
         sumStockOutSummarySale,
         sumStockOutPromotion,

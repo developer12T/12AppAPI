@@ -95,7 +95,7 @@ exports.addPromotionM3 = async (req, res) => {
     const { User } = getModelsByChannel(channel, res, userModel)
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
-    function firstDateToInt () {
+    function firstDateToInt() {
       const now = new Date()
       const y = now.getFullYear() - 2
       const m = String(now.getMonth() + 1).padStart(2, '0') // month is 0-based
@@ -103,7 +103,7 @@ exports.addPromotionM3 = async (req, res) => {
       return parseInt(`${y}${m}${d}`, 10)
     }
 
-    function nowDateToInt () {
+    function nowDateToInt() {
       const now = new Date()
       const y = now.getFullYear()
       const m = String(now.getMonth() + 1).padStart(2, '0') // month is 0-based
@@ -111,7 +111,7 @@ exports.addPromotionM3 = async (req, res) => {
       return parseInt(`${y}${m}${d}`, 10)
     }
 
-    function lastDateToInt () {
+    function lastDateToInt() {
       const now = new Date()
       const y = now.getFullYear() + 5
       const m = String(now.getMonth() + 1).padStart(2, '0') // month is 0-based
@@ -309,7 +309,7 @@ exports.getPromotionProduct = async (req, res) => {
     const { Cart } = getModelsByChannel(channel, res, CartModel);
     const { Store } = getModelsByChannel(channel, res, storeModel);
     const { Product } = getModelsByChannel(channel, res, productModel);
-    const { Stock  } = getModelsByChannel(channel, res, stockModel);
+    const { Stock } = getModelsByChannel(channel, res, stockModel);
 
 
     if (!type || !storeId || !proId) {
@@ -345,8 +345,6 @@ exports.getPromotionProduct = async (req, res) => {
 
     const store = await Store.findOne({ storeId }).select('area').lean();
 
-    const proQty = Number(promotion.proQty ?? 0);
-
     const [productStock] = await Stock.aggregate([
       {
         $match: {
@@ -370,7 +368,7 @@ exports.getPromotionProduct = async (req, res) => {
               in: {
                 productId: '$$p.productId',
                 balancePcs: '$$p.balancePcs',
-                enough: { $gte: [{ $ifNull: ['$$p.balancePcs', 0] }, promotion.proQty] }
+                enough: { $gte: [{ $ifNull: ['$$p.balancePcs', 0] }, 1] }
               }
             }
           }
@@ -390,8 +388,12 @@ exports.getPromotionProduct = async (req, res) => {
       }
     ]);
 
+    // console.log(productStock)
+
     // 1) กรองเฉพาะรายการที่พอ
     const enoughProducts = (productStock?.listProduct ?? []).filter(p => p.enough);
+
+    // console.log(enoughProducts)
 
     // 2) ดึงเฉพาะ productId และจัดการ trim + unique
     const enoughProductIds = [...new Set(
@@ -426,17 +428,24 @@ exports.getPromotionProduct = async (req, res) => {
     }
 
 
-    const groupedProducts = {}
+    const groupedProducts = {};
+
+    let remaining = Math.max(0, Number(promotion?.proQty ?? 0)); // proQty ทั้งหมดที่ต้องแจก
 
     productDetail.forEach(product => {
-      const key = `${product.group}|${product.size}`
+      const key = `${product.group}|${product.size}`;
+
+      const found = (enoughProducts || []).find(
+        item => String(item.productId) === String(product.id)
+      );
+      const qtyBal = Number(found?.balancePcs ?? 0);
+
+      // แจกให้สินค้าตัวนี้ = จำนวนน้อยสุดระหว่างที่เหลือกับของคงเหลือ
+      const qty = Math.min(qtyBal, remaining);
+      remaining -= qty; // หักยอดที่แจกไป
 
       if (!groupedProducts[key]) {
-        groupedProducts[key] = {
-          group: product.group,
-          size: product.size,
-          product: []
-        }
+        groupedProducts[key] = { group: product.group, size: product.size, product: [] };
       }
 
       groupedProducts[key].product.push({
@@ -446,10 +455,13 @@ exports.getPromotionProduct = async (req, res) => {
         brand: product.brand,
         size: product.size,
         unit: product.unit,
-        qty: 1,
+        qty,         // ← ได้ตามที่คำนวณ (เช่น 1 สำหรับตัวแรกถ้ามีของแค่ 1)
+        qtyBal,
         name: product.name
-      })
-    })
+      });
+    });
+
+
 
     const response = {
       proId: promotion.proId,
@@ -457,6 +469,7 @@ exports.getPromotionProduct = async (req, res) => {
       qty: promotion.proQty,
       listProduct: Object.values(groupedProducts)
     }
+
 
     // const io = getSocket()
     // io.emit('promotion/getPromotionProduct', {});
@@ -582,7 +595,7 @@ exports.getPromotion = async (req, res) => {
   const { Promotion } = getModelsByChannel(channel, res, promotionModel)
 
   const data = await Promotion.find({ status: 'active' })
-    .sort({ proId: 1});
+    .sort({ proId: 1 });
 
   if (data.length == 0) {
     return res.status(404).json({
