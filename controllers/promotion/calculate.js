@@ -57,7 +57,6 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
         }
     ]);
 
-    // console.log(stockList)
 
     // 2. Filter เฉพาะที่ match กับ rewardFilters
     function matchFilter(obj, filter) {
@@ -118,13 +117,15 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
     // console.log(multiplier)
     if (!eligibleProducts.length) return []
 
-    return rewards.map(r => {
-        const productQty = r.limitType === 'limited' ? r.productQty : r.productQty * multiplier;
+    return rewards.flatMap(r => {
+        // จำนวนที่ต้องการใน "หน่วยที่ขอ" (เช่น CTN/BAG/PCS)
+        const baseQty = Number(r?.productQty) || 0;
+        const productQty = r?.limitType === 'limited'
+            ? baseQty
+            : baseQty * (Number(multiplier) || 1);
 
-        let picked = null;
-        let unitData = null;
-        let factor = 1;
-        let productQtyPcs = 0;
+        let remainingUnits = Math.max(0, productQty); // เหลือให้ต้องการ (หน่วยที่ขอ)
+        const allocations = []; // เก็บรายการกระจายจากหลายสินค้า
 
         for (const p of eligibleProducts) {
             // 1) match คุณสมบัติสินค้า
@@ -133,38 +134,46 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
             if (r.productBrand && p.brand !== r.productBrand) continue;
             if (r.productSize && p.size !== r.productSize) continue;
 
-            // 2) หา unit และ factor ของสินค้านี้
-            const u = p.listUnit.find(u => u.unit === r.productUnit);
-            if (!u) continue; // ไม่รองรับ unit ที่ขอ
+            // 2) หา unit ที่รองรับ + factor (เทียบแบบไม่แคสเซนซิทีฟ)
+            const u = (p.listUnit || []).find(
+                uu => String(uu.unit).toUpperCase() === String(r.productUnit).toUpperCase()
+            );
+            if (!u) continue;
 
-            const f = Number(u.factor) || 1;
-            const needPcs = productQty * f;
+            const f = Number(u.factor) || 1;               // PCS ต่อ 1 หน่วยที่ขอ
+            const stockPCS = Number(p?.balancePcs) || 0;  // สต๊อกเป็น PCS
+            const stockUnits = Math.floor(stockPCS / f);   // สต๊อกแปลงเป็น "หน่วยที่ขอ"
 
-            // 3) เช็คสต็อกของสินค้านี้พอไหม (ต่อไปเรื่อยๆ จนกว่าจะเจอ)
-            if ((Number(p.balancePcs) || 0) >= needPcs) {
-                picked = p;
-                unitData = u;
-                factor = f;
-                productQtyPcs = needPcs;
-                break; // เจอแล้วหยุด
-            }
+            if (stockUnits <= 0) continue;
+
+            // 3) หยิบเท่าที่ทำได้จากตัวนี้ (ไม่เกินที่ยังต้องการ)
+            const takeUnits = Math.min(stockUnits, remainingUnits);
+            if (takeUnits <= 0) continue;
+
+            allocations.push({
+                // ระบุ product ที่หยิบได้ (หลายตัวก็หลายแถว)
+                productId: p.id,
+                productName: p.name,
+                productGroup: p.group,
+                productFlavour: p.flavour,
+                productBrand: p.brand,
+                productSize: p.size,
+                productUnit: u.unit,
+                productUnitName: u.name || '',
+                productQty: takeUnits,        // จำนวนที่หยิบ (หน่วยที่ขอ)
+                productQtyPcs: takeUnits * f, // แปลงเป็น PCS
+                // (ถ้าต้องการแนบข้อมูล reward ด้วย ก็เพิ่มฟิลด์จาก r ได้)
+                // rewardId: r.id, requestedQty: productQty, ...
+            });
+
+            remainingUnits -= takeUnits;    // หักที่หยิบไป
+            if (remainingUnits <= 0) break; // ครบแล้วหยุด
         }
 
-        if (!picked) return null;
+        // ถ้าไม่มีของให้หยิบเลย ไม่คืนอะไร (ไม่เพิ่มแถว)
+        return allocations;
+    });
 
-        return {
-            productId: picked.id,
-            productName: picked.name,
-            productGroup: picked.group,
-            productFlavour: picked.flavour,
-            productBrand: picked.brand,
-            productSize: picked.size,
-            productUnit: r.productUnit,
-            productUnitName: unitData?.name || '',
-            productQty,
-            productQtyPcs
-        };
-    }).filter(Boolean);
 }
 
 
@@ -469,36 +478,51 @@ async function applyPromotion(order, channel, res) {
                 break
         }
 
+        const qtyInPromo = (freeProducts ?? []).reduce(
+            (sum, item) => sum + (Number(item?.productQty) || 0),
+            0
+        );
+
+        // console.log(freeProducts)
+
+        // ถ้าแจกได้น้อยกว่าหรือเท่ากับ multiplier → ส่งกลับเป็น array ว่าง
+        if (qtyInPromo < (Number(multiplier) || 0)) {
+            return { appliedPromotions: [] };
+        }
+
 
 
         if (promoApplied) {
-            // console.log(freeProducts)
-            let selectedProduct = freeProducts.length > 0 ? freeProducts[0] : {}
-            // console.log(selectedProduct)
+            const items = (freeProducts || []).map(sp => ({
+                proId: promo.proId,
+                id: sp.productId,
+                name: sp.productName,
+                group: sp.productGroup,
+                flavour: sp.productFlavour,
+                brand: sp.productBrand,
+                size: sp.productSize,
+                qty: Number(sp.productQty) || 0,          // จำนวนตามหน่วยที่ขอ (เช่น CTN/BAG/PCS)
+                unit: sp.productUnit,
+                unitName: sp.productUnitName || '',
+                qtyPcs: Number(sp.productQtyPcs) || 0     // จำนวนคิดเป็น PCS
+            }));
+
+            // รวมยอดทั้งหมดของของแถมในโปรนี้
+            const proQtySum = items.reduce((s, x) => s + x.qty, 0);
+            const proQtyPcsSum = items.reduce((s, x) => s + x.qtyPcs, 0);
+
             appliedPromotions.push({
                 proId: promo.proId,
                 proCode: promo.proCode,
                 proName: promo.name,
                 proType: promo.proType,
-                proQty: selectedProduct.productQty || 0,
+                proQty: proQtySum,         // เดิมใช้ตัวเดียว; ตอนนี้ใช้ยอดรวมของทุกตัว
+                proQtyPcs: proQtyPcsSum,   // (ถ้าต้องการเก็บเป็น PCS รวมด้วย)
                 discount: promoDiscount,
-                test: "dawd",
-                listProduct: [{
-                    proId: promo.proId,
-                    id: selectedProduct.productId,
-                    name: selectedProduct.productName,
-                    group: selectedProduct.productGroup,
-                    flavour: selectedProduct.productFlavour,
-                    brand: selectedProduct.productBrand,
-                    size: selectedProduct.productSize,
-                    qty: selectedProduct.productQty,
-                    unit: selectedProduct.productUnit,
-                    unitName: selectedProduct.productUnitName,
-                    qtyPcs: selectedProduct.productQtyPcs
-                }]
-            })
+                listProduct: items
+            });
 
-            discountTotal += promoDiscount
+            discountTotal += promoDiscount;
         }
         // console.log(appliedPromotions)
     }
@@ -662,4 +686,4 @@ async function applyPromotionUsage(storeId, promotion, channel, res) {
 
 
 
-module.exports = { applyPromotion, rewardProduct, getRewardProduct, applyPromotionUsage, applyQuota,rewardProductCheckStock }
+module.exports = { applyPromotion, rewardProduct, getRewardProduct, applyPromotionUsage, applyQuota, rewardProductCheckStock }
