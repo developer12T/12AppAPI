@@ -278,7 +278,7 @@ exports.getCart = async (req, res) => {
           )
           // console.log(selectedProduct)
           if (!selectedProduct) {
-            console.warn(`⚠️ โปร ${proId} ไม่พบสินค้า reward ที่เลือกได้`)
+            // console.warn(`⚠️ โปร ${proId} ไม่พบสินค้า reward ที่เลือกได้`)
             summary.listPromotion = cart.listPromotion.filter(
               p => p.proId != proId
             )

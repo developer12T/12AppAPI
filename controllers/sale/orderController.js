@@ -612,6 +612,8 @@ exports.getOrder = async (req, res) => {
         storeAddress: o.store?.address || '',
         createAt: o.createdAt,
         total: to2(o.total),
+        paymentMethod: o.paymentMethod,
+        paymentStatus: o.paymentStatus,
         status: o.status,
         statusTH: o.statusTH,
         createdAt: o.createdAt,
@@ -937,7 +939,10 @@ exports.OrderToExcel = async (req, res) => {
 
   // ช่วงเวลา "ไทย" ที่ผู้ใช้เลือก
   const startTH = new Date(
-    `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(6, 8)}T00:00:00+07:00`
+    `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
+      6,
+      8
+    )}T00:00:00+07:00`
   )
   const endTH = new Date(
     `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(
@@ -993,16 +998,13 @@ exports.OrderToExcel = async (req, res) => {
     }
   ])
 
-
-  
   const modelChange = await Order.aggregate([
     {
       $match: {
-        
         'store.area': { $ne: 'IT211' },
         // 'store.area': 'NE211',
         status: { $in: statusArray },
-        status: { $nin: ['canceled','pending'] },
+        status: { $nin: ['canceled', 'pending'] },
         type: { $in: ['change'] }
       }
     },
@@ -1456,23 +1458,34 @@ exports.OrderToExcel = async (req, res) => {
 
   const wb = xlsx.utils.book_new()
   const ws = xlsx.utils.json_to_sheet(allTransactions)
-  xlsx.utils.book_append_sheet(wb, ws, `ESP${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}`)
+  xlsx.utils.book_append_sheet(
+    wb,
+    ws,
+    `ESP${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}`
+  )
 
-  const tempPath = path.join(os.tmpdir(), `CA_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}.xlsx`)
+  const tempPath = path.join(
+    os.tmpdir(),
+    `CA_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}.xlsx`
+  )
   xlsx.writeFile(wb, tempPath)
 
-  res.download(tempPath, `CA_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}.xlsx`, err => {
-    if (err) {
-      console.error('❌ Download error:', err)
-      // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
-      if (!res.headersSent) {
-        res.status(500).send('Download failed')
+  res.download(
+    tempPath,
+    `CA_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}.xlsx`,
+    err => {
+      if (err) {
+        console.error('❌ Download error:', err)
+        // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+        if (!res.headersSent) {
+          res.status(500).send('Download failed')
+        }
       }
-    }
 
-    // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => {})
-  })
+      // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+      fs.unlink(tempPath, () => {})
+    }
+  )
 
   // res.status(200).json({
   //   status:200,
