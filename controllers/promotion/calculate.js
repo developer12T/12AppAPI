@@ -1,1131 +1,665 @@
-const crypto = require('crypto')
-const { Cart } = require('../../models/cash/cart')
+const { Promotion } = require('../../models/cash/promotion')
 const { Product } = require('../../models/cash/product')
-const { Stock } = require('../../models/cash/stock')
-const {
-  applyPromotion,
-  applyQuota,
-  rewardProduct,
-  rewardProductCheckStock
-} = require('../promotion/calculate')
-const {
-  to2,
-  getQty,
-  updateStockMongo,
-  getPeriodFromDate
-} = require('../../middleware/order')
-const {
-  summaryOrder,
-  summaryWithdraw,
-  summaryRefund,
-  summaryGive,
-  summaryAjustStock
-} = require('../../utilities/summary')
-const { forEach, chain, forIn } = require('lodash')
-const { error } = require('console')
-const cartModel = require('../../models/cash/cart')
-const productModel = require('../../models/cash/product')
-const stockModel = require('../../models/cash/stock')
 const promotionModel = require('../../models/cash/promotion')
-
+const productModel = require('../../models/cash/product')
 const { getModelsByChannel } = require('../../middleware/channel')
-const { getSocket } = require('../../socket')
-const { period } = require('../../utilities/datetime')
+const promotionLimitModel = require('../../models/cash/promotion');
+const storeModel = require('../../models/cash/store')
+const stockModel = require('../../models/cash/stock')
+const { each, forEach } = require('lodash')
+const { period, previousPeriod } = require('../../utilities/datetime')
+const stock = require('../../models/cash/stock')
 
-exports.getCartAll = async (req, res) => {
-  try {
-    const channel = req.headers['x-channel']
-    const { Cart } = getModelsByChannel(channel, res, cartModel)
-    const { area } = req.query
-    const cartQuery = { area, type: { $nin: ['withdraw'] } }
 
-    const cartData = await Cart.find(cartQuery)
-    if (!cartData) {
-      return res.status(404).json({ status: 404, message: 'Cart not found!' })
-    }
 
-    res.status(200).json({
-      status: '200',
-      message: 'success',
-      data: cartData
-    })
-  } catch (error) {
-    console.error(error)
-    res.status(500).json({ status: '500', message: error.message })
-  }
-}
+async function rewardProduct(rewards, order, multiplier, channel, res) {
+    if (!rewards || rewards.length === 0) return []
+    const { Product } = getModelsByChannel(channel, res, productModel);
+    const { Stock } = getModelsByChannel(channel, res, stockModel);
+    const rewardFilters = rewards.map(r => ({
+        ...(r.productId ? { id: r.productId } : {}),
+        ...(r.productGroup ? { group: r.productGroup } : {}),
+        ...(r.productFlavour ? { flavour: r.productFlavour } : {}),
+        ...(r.productBrand ? { brand: r.productBrand } : {}),
+        // ...(r.productUnit ? { unit: r.productUnit } : {}),
+        // ...(r.productQty: ? { balancePcs: r.productQty: } : {}),
+    }))
 
-exports.clearCartAll = async (req, res) => {
-  try {
-    const channel = req.headers['x-channel']
-    const { period, cartAll } = req.body || {}
-    const { Cart } = getModelsByChannel(channel, res, cartModel)
-
-    if (!Array.isArray(cartAll) || cartAll.length === 0) {
-      return res.status(404).json({ status: 404, message: 'Cart not found!' })
-    }
-
-    const toDeleteIds = []
-    const updateErrors = []
-
-    for (const cart of cartAll) {
-      if (!cart || !cart._id) continue
-
-      // keep your condition: only update stock for non-withdraw / non-adjuststock
-      if (cart.type !== 'withdraw' && cart.type !== 'adjuststock') {
-        const products = Array.isArray(cart.listProduct) ? cart.listProduct : []
-        for (const prod of products) {
-          try {
-            if (!prod.condition && !prod.expire) {
-              // If updateStockMongo expects an ID instead of the whole object, use prod.id
-              await updateStockMongo(
-                prod, // or prod.id
-                cart.area,
-                period, // period is provided at body root
-                'deleteCart',
-                channel,
-                res
-              )
+    // 1. ดึง stock + รายละเอียด product ออกมาครบจบใน aggregate แล้ว
+    const stockList = await Stock.aggregate([
+        {
+            $match: {
+                area: order.store.area,
+                period: period()
             }
-          } catch (e) {
-            updateErrors.push({
-              cartId: cart._id,
-              product: prod?.id || prod,
-              error: e?.message
-            })
-            // keep going; don't block deletion
-          }
-        }
-      }
-
-      toDeleteIds.push(cart._id)
-    }
-
-    // delete all carts referenced in the request body by _id
-    const { acknowledged, deletedCount } = await Cart.deleteMany({
-      _id: { $in: toDeleteIds }
-    })
-
-    return res.status(200).json({
-      status: 200,
-      message: 'Clear cart successfully!',
-      acknowledged,
-      requested: toDeleteIds.length,
-      deleted: deletedCount || 0,
-      stockUpdateErrors: updateErrors // useful for debugging if any updates failed
-    })
-  } catch (error) {
-    console.error(error)
-    return res.status(500).json({ status: 500, message: error.message })
-  }
-}
-exports.getCart = async (req, res) => {
-  // const session = await require('mongoose').startSession();
-  try {
-    const channel = req.headers['x-channel']
-    const { Cart } = getModelsByChannel(channel, res, cartModel)
-    const { Stock } = getModelsByChannel(channel, res, stockModel)
-    const { Promotion } = getModelsByChannel(channel, res, promotionModel)
-    const { type, area, storeId, withdrawId } = req.query
-
-    if (!type || !area) {
-      return res.status(400).json({
-        status: 400,
-        message: 'type, area are required!'
-      })
-    }
-
-    if ((type === 'sale' || type === 'refund' || type === 'give') && !storeId) {
-      return res.status(400).json({
-        status: 400,
-        message: 'storeId is required for sale or refund or give!'
-      })
-    }
-    // const cartQuery = { type, area, withdrawId }
-
-    const cartQuery =
-      type === 'withdraw'
-        ? { type, area }
-        : type === 'adjuststock'
-        ? { type, area, withdrawId }
-        : { type, area, storeId }
-
-    // ใช้ session ใน findOne เฉพาะกรณีที่ต้อง update ข้อมูล (กัน dirty read ใน replica set)
-    let cart = await Cart.findOne(cartQuery)
-    // .session(session);
-
-    if (!cart) {
-      return res.status(404).json({ status: 404, message: 'Cart not found!' })
-    }
-
-    let summary = {}
-
-    if (type === 'sale') {
-      // เปิด transaction
-      // session.startTransaction();
-      let proCheck = false
-      summary = await summaryOrder(cart, channel, res)
-
-      // const newCartHashProduct = crypto
-      //   .createHash('md5')
-      //   .update(JSON.stringify(cart.listProduct))
-      //   .digest('hex')
-      // const newCartHashPromotion = crypto
-      //   .createHash('md5')
-      //   .update(JSON.stringify(cart.listPromotion))
-      //   .digest('hex')
-
-      // let shouldRecalculatePromotion =
-      //   cart.cartHashProduct !== newCartHashProduct
-      // if (shouldRecalculatePromotion) {
-      const promotion = await applyPromotion(summary, channel, res)
-
-      // console.log('promotion', promotion)
-
-      const quota = await applyQuota(summary, channel, res)
-      cart.listQuota = quota.appliedPromotions
-      cart.listPromotion = promotion.appliedPromotions
-      // cart.cartHashProduct = newCartHashProduct
-      // cart.cartHashPromotion = newCartHashPromotion
-      summary.listPromotion = cart.listPromotion
-      summary.listQuota = quota.appliedPromotions
-
-      // console.log(promotion.appliedPromotions)
-
-      // ✅ กัน null/undefined และทำให้โค้ดอ่านง่ายขึ้น
-      const appliedList = Array.isArray(promotion?.appliedPromotions)
-        ? promotion.appliedPromotions
-        : []
-
-      console.log(promotion)
-
-      const dataPromotion = appliedList.flatMap(item =>
-        Array.isArray(item?.listProduct)
-          ? item.listProduct.map(u => ({
-              proId: item.proId,
-              id: String(u.id ?? '').trim(),
-              qty: Number(u.qty ?? 0) || 0,
-              unit: u.unit
-            }))
-          : []
-      )
-      console.log(dataPromotion)
-
-      // // ✅ เผื่อกรณีหา stock ไม่เจอ และกันข้อมูลผิดรูป
-      const stockDoc = await Stock.findOne({ area, period: period() }).lean()
-      const listProduct = Array.isArray(stockDoc?.listProduct)
-        ? stockDoc.listProduct
-        : []
-
-      const stockBalanceMap = new Map(
-        listProduct.map(p => [
-          String(p?.productId ?? '').trim(),
-          Number(p?.balancePcs ?? 0) || 0
-        ])
-      )
-
-  
-      const promotionCache = new Map()
-
-      for (const i of dataPromotion) {
-        const { proId, id, qty } = i
-        const pid = String(id ?? '').trim()
-        const needQty = Number(qty ?? 0) || 0
-
-        if (!proId || !pid || needQty <= 0) {
-          console.warn(
-            `⚠️ ข้ามรายการไม่สมบูรณ์ proId=${proId}, pid=${pid}, needQty=${needQty}`
-          )
-          continue
-        }
-
-        const currentBal = stockBalanceMap.get(pid) ?? 0
-        // console.log(currentBal)
-        if (currentBal < needQty) {
-          // ✅ ใช้ cache ก่อน query
-          let proDetail = promotionCache.get(proId)
-
-          if (!proDetail) {
-            proDetail = await Promotion.findOne({ proId }).lean()
-            if (proDetail) promotionCache.set(proId, proDetail)
-            // console.log(proDetail)
-          }
-
-          if (!proDetail) {
-            console.warn(`⚠️ ไม่เจอ Promotion ${proId}`)
-            continue
-          }
-          // console.log(needQty)
-          const rewardProductNew = await rewardProductCheckStock(
-            proDetail.rewards,
-            area,
-            needQty,
-            channel,
-            res
-          )
-
-          // console.log(rewardProductNew)
-          if (
-            !Array.isArray(rewardProductNew) ||
-            rewardProductNew.length === 0
-          ) {
-            console.warn(`⚠️ โปร ${proId} ไม่มีสินค้า reward ที่พอ`)
-            continue
-          }
-
-          const selectedProduct = rewardProductNew.find(
-            item => item.productId != pid
-          )
-          // console.log(selectedProduct)
-          if (!selectedProduct) {
-            console.warn(`⚠️ โปร ${proId} ไม่พบสินค้า reward ที่เลือกได้`)
-            summary.listPromotion = cart.listPromotion.filter(
-              p => p.proId != proId
-            )
-
-            // console.log(cart.listPromotion)
-            continue
-          } else {
-            const newPromotion = {
-              proId: proDetail.proId,
-              proCode: proDetail.proCode,
-              proName: proDetail.name,
-              proType: proDetail.proType,
-              proQty: Number(selectedProduct.productQty ?? 0) || 0,
-              discount: 0,
-              listProduct: [
-                {
-                  proId: proDetail.proId,
-                  id: selectedProduct.productId,
-                  name: selectedProduct.productName,
-                  group: selectedProduct.productGroup,
-                  flavour: selectedProduct.productFlavour,
-                  brand: selectedProduct.productBrand,
-                  size: selectedProduct.productSize,
-                  qty: selectedProduct.productQty,
-                  unit: selectedProduct.productUnit,
-                  unitName: selectedProduct.productUnitName,
-                  qtyPcs: selectedProduct.productQtyPcs
+        },
+        { $unwind: '$listProduct' },
+        {
+            $lookup: {
+                from: 'products',
+                localField: 'listProduct.productId',
+                foreignField: 'id',
+                as: 'productDetail'
+            }
+        },
+        { $unwind: '$productDetail' },
+        {
+            $match: {
+                'productDetail.statusSale': 'Y'
+            }
+        },
+        {
+            $replaceRoot: {
+                newRoot: {
+                    $mergeObjects: ['$listProduct', '$productDetail']
                 }
-              ]
             }
-            console.log('newPromotion', newPromotion)
-
-            // // 🔄 แทนที่ของเดิมถ้ามี proId ซ้ำ มิฉะนั้น push
-            if (!Array.isArray(cart?.listPromotion)) cart.listPromotion = []
-            const index = cart.listPromotion.findIndex(
-              p => p?.proId === newPromotion.proId
-            )
-            if (index !== -1) {
-              // console.log("newPromotion",newPromotion)
-              cart.listPromotion[index] = newPromotion
-            } else {
-              cart.listPromotion.push(newPromotion)
-            }
-
-            console.log(
-              `❌ โปร ${proId} → สินค้า ${pid} คลังมี ${currentBal} แต่ต้องใช้ ${needQty} (ไม่พอ)`
-            )
-          }
-        } else {
-          // ✅ หัก stock ในแผนที่ และ log
-  
-          stockBalanceMap.set(pid, currentBal - needQty)
-
-          // console.log(
-          // `✅ โปร ${proId} → สินค้า ${pid} ใช้ ${needQty} เหลือในคลัง ${currentBal - needQty}`
-          // );
         }
-      }
- 
+    ]);
 
-      // console.log(summary)
+    // console.log(stockList)
 
-      await cart.save()
-
-      // await session.commitTransaction();
+    // 2. Filter เฉพาะที่ match กับ rewardFilters
+    function matchFilter(obj, filter) {
+        return Object.keys(filter).every(key => obj[key] === filter[key]);
     }
 
-    if (type === 'withdraw') {
-      summary = await summaryWithdraw(cart, channel, res)
-    }
+    const filteredStock = stockList.filter(item =>
+        rewardFilters.some(filter => matchFilter(item, filter))
+    );
 
-    if (type === 'adjuststock') {
-      summary = await summaryAjustStock(cart, channel, res)
-    }
+    // console.log(filteredStock)
+    // 3. แปลง reward ให้เป็นโครงสร้างที่ต้องใช้
+    const rewardQty = rewards.map(item => ({
+        unit: item.productUnit,
+        qty: item.productQty
+    }));
 
-    if (type === 'refund') {
-      summary = await summaryRefund(cart, channel, res)
-    }
+    // console.log(rewardQty)
 
-    if (type === 'give') {
-      summary = await summaryGive(cart, channel, res)
-    }
+    // 4. สร้าง productStock พร้อม unitList ที่ตรงกับ reward
+    const productStock = filteredStock.map(item => ({
+        id: item.productId,
+        unitList: item.listUnit, // จาก productDetail
+        balancePcs: item.balancePcs
+    }));
 
-    // session.endSession();
+    // 5. ตรวจสอบว่า stock พอสำหรับ reward มั้ย
+    const checkList = productStock.map(stock => {
+        // const rewardPcs = rewardQty.reduce((sum, reward) => {
+        //     const u = stock.unitList.find(u => u.unit === reward.unit);
+        //     const factor = u ? u.factor : 1;
+        //     return sum + (reward.qty * factor);
+        // }, 0);
+        // console.log(rewardQty)
+        // const rewardPcs = reward.qty
+        return {
+            id: stock.id,
+            totalRewardPcs: rewardQty[0].qty,
+            totalStockPcs: stock.balancePcs,
+            enough: stock.balancePcs >= rewardQty[0].qty
+        };
+    });
 
-    // const io = getSocket()
-    // io.emit('cart/get', {})
+    // console.log(checkList)
+    const enoughList = checkList.filter(item => item.enough);
+    // console.log(enoughList)
+    // 6. ดึงรายละเอียดสินค้าแบบรวดเดียว (Promise.all)
+    const eligibleProducts = await Promise.all(
+        enoughList.map(async item => {
+            const dataProduct = await Product.findOne({ id: item.id }).lean();
+            return {
+                ...dataProduct,
+                balancePcs: item.totalStockPcs
+            };
+        })
+    );
 
-    res.status(200).json({
-      status: '200',
-      message: 'success',
-      data: [summary]
-    })
-  } catch (error) {
-    // await session.abortTransaction().catch(() => { });
-    // session.endSession();
-    console.error(error)
-    res.status(500).json({ status: '500', message: error.message })
-  }
+    // console.log(multiplier)
+    if (!eligibleProducts.length) return []
+
+    return rewards.map(r => {
+        const productQty = r.limitType === 'limited' ? r.productQty : r.productQty * multiplier;
+
+        let picked = null;
+        let unitData = null;
+        let factor = 1;
+        let productQtyPcs = 0;
+
+        for (const p of eligibleProducts) {
+            // 1) match คุณสมบัติสินค้า
+            if (r.productGroup && p.group !== r.productGroup) continue;
+            if (r.productFlavour && p.flavour !== r.productFlavour) continue;
+            if (r.productBrand && p.brand !== r.productBrand) continue;
+            if (r.productSize && p.size !== r.productSize) continue;
+
+            // 2) หา unit และ factor ของสินค้านี้
+            const u = p.listUnit.find(u => u.unit === r.productUnit);
+            if (!u) continue; // ไม่รองรับ unit ที่ขอ
+
+            const f = Number(u.factor) || 1;
+            const needPcs = productQty * f;
+
+            // 3) เช็คสต็อกของสินค้านี้พอไหม (ต่อไปเรื่อยๆ จนกว่าจะเจอ)
+            if ((Number(p.balancePcs) || 0) >= needPcs) {
+                picked = p;
+                unitData = u;
+                factor = f;
+                productQtyPcs = needPcs;
+                break; // เจอแล้วหยุด
+            }
+        }
+
+        if (!picked) return null;
+
+        return {
+            productId: picked.id,
+            productName: picked.name,
+            productGroup: picked.group,
+            productFlavour: picked.flavour,
+            productBrand: picked.brand,
+            productSize: picked.size,
+            productUnit: r.productUnit,
+            productUnitName: unitData?.name || '',
+            productQty,
+            productQtyPcs
+        };
+    }).filter(Boolean);
 }
 
-exports.addProduct = async (req, res) => {
-  try {
-    const {
-      type,
-      area,
-      storeId,
-      id,
-      qty,
-      unit,
-      condition,
-      action,
-      expire,
-      typeref,
-      withdrawId
-    } = req.body
 
-    const channel = req.headers['x-channel']
-    const { Product } = getModelsByChannel(channel, res, productModel)
-    const { Stock } = getModelsByChannel(channel, res, stockModel)
+async function rewardProductCheckStock(rewards, area, multiplier, channel, res) {
+    if (!rewards || rewards.length === 0) return []
+    const { Product } = getModelsByChannel(channel, res, productModel);
+    const { Stock } = getModelsByChannel(channel, res, stockModel);
+    const rewardFilters = rewards.map(r => ({
+        ...(r.productId ? { id: r.productId } : {}),
+        ...(r.productGroup ? { group: r.productGroup } : {}),
+        ...(r.productFlavour ? { flavour: r.productFlavour } : {}),
+        ...(r.productBrand ? { brand: r.productBrand } : {}),
+        // ...(r.productUnit ? { unit: r.productUnit } : {}),
+        // ...(r.productQty: ? { balancePcs: r.productQty: } : {}),
+    }))
 
-    if (!type || !area || !id || !qty || !unit) {
-      return res.status(400).json({
-        status: 400,
-        message: 'type, area, id, qty, and unit are required!'
-      })
+    // 1. ดึง stock + รายละเอียด product ออกมาครบจบใน aggregate แล้ว
+    const stockList = await Stock.aggregate([
+        {
+            $match: {
+                area: area,
+                period: period()
+            }
+        },
+        { $unwind: '$listProduct' },
+        {
+            $lookup: {
+                from: 'products',
+                localField: 'listProduct.productId',
+                foreignField: 'id',
+                as: 'productDetail'
+            }
+        },
+        { $unwind: '$productDetail' },
+        {
+            $match: {
+                'productDetail.statusSale': 'Y'
+            }
+        },
+        {
+            $replaceRoot: {
+                newRoot: {
+                    $mergeObjects: ['$listProduct', '$productDetail']
+                }
+            }
+        }
+    ]);
+
+    // console.log(stockList)
+
+    // 2. Filter เฉพาะที่ match กับ rewardFilters
+    function matchFilter(obj, filter) {
+        return Object.keys(filter).every(key => obj[key] === filter[key]);
     }
 
-    if ((type === 'sale' || type === 'refund' || type === 'give') && !storeId) {
-      return res.status(400).json({
-        status: 400,
-        message:
-          'storeId is required for sale or refund or give or adjuststock!'
-      })
+    const filteredStock = stockList.filter(item =>
+        rewardFilters.some(filter => matchFilter(item, filter))
+    );
+
+    // console.log(filteredStock)
+    // 3. แปลง reward ให้เป็นโครงสร้างที่ต้องใช้
+    const rewardQty = rewards.map(item => ({
+        unit: item.productUnit,
+        qty: item.productQty
+    }));
+
+    // console.log(rewardQty)
+
+    // 4. สร้าง productStock พร้อม unitList ที่ตรงกับ reward
+    const productStock = filteredStock.map(item => ({
+        id: item.productId,
+        unitList: item.listUnit, // จาก productDetail
+        balancePcs: item.balancePcs
+    }));
+
+    // 5. ตรวจสอบว่า stock พอสำหรับ reward มั้ย
+    const checkList = productStock.map(stock => {
+        // const rewardPcs = rewardQty.reduce((sum, reward) => {
+        //     const u = stock.unitList.find(u => u.unit === reward.unit);
+        //     const factor = u ? u.factor : 1;
+        //     return sum + (reward.qty * factor);
+        // }, 0);
+        // console.log(rewardQty)
+        // const rewardPcs = reward.qty
+        return {
+            id: stock.id,
+            totalRewardPcs: rewardQty[0].qty,
+            totalStockPcs: stock.balancePcs,
+            enough: stock.balancePcs >= rewardQty[0].qty
+        };
+    });
+
+    // console.log(checkList)
+    const enoughList = checkList.filter(item => item.enough);
+    // console.log(enoughList)
+    // 6. ดึงรายละเอียดสินค้าแบบรวดเดียว (Promise.all)
+    const eligibleProducts = await Promise.all(
+        enoughList.map(async item => {
+            const dataProduct = await Product.findOne({ id: item.id }).lean();
+            return {
+                ...dataProduct,
+                balancePcs: item.totalStockPcs
+            };
+        })
+    );
+
+    // console.log(multiplier)
+    if (!eligibleProducts.length) return []
+
+    return rewards.map(r => {
+        const productQty = r.limitType === 'limited' ? r.productQty : r.productQty * multiplier;
+
+        let picked = null;
+        let unitData = null;
+        let factor = 1;
+        let productQtyPcs = 0;
+
+        for (const p of eligibleProducts) {
+            // 1) match คุณสมบัติสินค้า
+            if (r.productGroup && p.group !== r.productGroup) continue;
+            if (r.productFlavour && p.flavour !== r.productFlavour) continue;
+            if (r.productBrand && p.brand !== r.productBrand) continue;
+            if (r.productSize && p.size !== r.productSize) continue;
+
+            // 2) หา unit และ factor ของสินค้านี้
+            const u = p.listUnit.find(u => u.unit === r.productUnit);
+            if (!u) continue; // ไม่รองรับ unit ที่ขอ
+
+            const f = Number(u.factor) || 1;
+            const needPcs = productQty * f;
+            // console.log(p)
+            // 3) เช็คสต็อกของสินค้านี้พอไหม (ต่อไปเรื่อยๆ จนกว่าจะเจอ)
+            if ((Number(p.balancePcs) || 0) >= needPcs) {
+                picked = p;
+                unitData = u;
+                factor = f;
+                productQtyPcs = needPcs;
+                break; // เจอแล้วหยุด
+            }
+        }
+
+        if (!picked) return null;
+
+        return {
+            productId: picked.id,
+            productName: picked.name,
+            productGroup: picked.group,
+            productFlavour: picked.flavour,
+            productBrand: picked.brand,
+            productSize: picked.size,
+            productUnit: r.productUnit,
+            productUnitName: unitData?.name || '',
+            productQty,
+            productQtyPcs
+        };
+    }).filter(Boolean);
+}
+
+
+
+
+
+
+
+async function applyPromotion(order, channel, res) {
+
+    // console.log(order)
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel);
+    const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel);
+    const periodStr = period()
+    // const periodStr = "202508"
+    const year = parseInt(periodStr.slice(0, 4));
+    const month = parseInt(periodStr.slice(4, 6));
+
+    const startMonth = new Date(year, month - 1, 1);
+    const nextMonth = new Date(year, month, 1);
+
+    // console.log("startMonth",startMonth)
+    // console.log("nextMonth",nextMonth)
+    let discountTotal = 0
+    let appliedPromotions = []
+
+    let query = {}
+    query.createdAt = {
+        $gte: startMonth,
+        $lt: nextMonth
     }
 
-    // if (type === 'adjuststock' && !action ) {
-    //   return res.status(400).json({
-    //     status: 400,
-    //     message: 'action,period is required for adjuststock!'
-    //   })
+    const promotions = await Promotion.find({ status: 'active' })
+
+    const dataStore = await Store.aggregate([
+        { $match: query },
+        {
+            $match: {
+                storeId: order.store?.storeId
+            }
+        }])
+    const newStore = dataStore[0]
+    // console.log(order.store.storeId)
+    const beautyStore = await TypeStore.findOne({
+        storeId: order.store.storeId,
+        type: { $in: ["beauty"] }
+    });
+
+
+
+    for (const promo of promotions) {
+        let promoApplied = false
+        let promoDiscount = 0
+        let freeProducts = []
+
+        if (promo.applicableTo?.store?.length > 0 && !promo.applicableTo.store.includes(order.store?.storeId)) continue;
+        if (promo.applicableTo?.typeStore?.length > 0 && !promo.applicableTo.typeStore.includes(order.store?.storeType)) continue;
+        if (promo.applicableTo?.zone?.length > 0 && !promo.applicableTo.zone.includes(order.store?.zone)) continue;
+        if (promo.applicableTo?.area?.length > 0 && !promo.applicableTo.area.includes(order.store?.area)) continue;
+
+        // beauty store check
+        const isInCompleteBeauty = promo.applicableTo?.completeStoreBeauty?.includes(order.store?.storeId) === true;
+        if (promo.applicableTo?.isbeauty === true) {
+            if (
+                isInCompleteBeauty === false &&
+                beautyStore
+            ) {
+            } else {
+                continue;
+            }
+        }
+        // if (promo.applicableTo?.isbeauty === true && !beautyStore) continue;
+
+
+        const isInCompleteNew = promo.applicableTo?.completeStoreNew?.includes(order.store?.storeId) === true;
+        if (promo.applicableTo?.isNewStore === true) {
+            if (
+                isInCompleteNew === false &&
+                newStore
+            ) {
+            } else {
+                continue;
+            }
+        }
+
+
+        let matchedProducts = order.listProduct.filter((product) =>
+            promo.conditions.some((condition) =>
+                (condition.productId.length === 0 || condition.productId.includes(product.id)) &&
+                (condition.productGroup.length === 0 || condition.productGroup.includes(product.group)) &&
+                (condition.productBrand.length === 0 || condition.productBrand.includes(product.brand)) &&
+                (condition.productFlavour.length === 0 || condition.productFlavour.includes(product.flavour)) &&
+                (condition.productSize.length === 0 || condition.productSize.includes(product.size)) &&
+                (condition.productUnit.length === 0 || condition.productUnit.includes(product.unit))
+            )
+        )
+        // console.log("promo.conditions",promo.conditions)
+
+        if (matchedProducts.length === 0) continue
+
+        let totalAmount = matchedProducts.reduce((sum, p) => sum + (p.qty * p.price), 0)
+        let totalQty = matchedProducts.reduce((sum, p) => sum + p.qty, 0)
+
+        let meetsCondition = promo.conditions.some(condition =>
+            (promo.proType === 'free' && condition.productQty >= 0 && totalQty >= condition.productQty) ||
+            (promo.proType === 'amount' && condition.productAmount >= 0 && totalAmount >= condition.productAmount)
+
+        )
+
+        if (!meetsCondition) continue
+
+        let multiplier = 1
+        if (promo.rewards[0]?.limitType === 'unlimited') {
+            multiplier = promo.conditions.reduce((multiplier, condition) => {
+                if (promo.proType === 'free' && condition.productQty > 0) {
+                    return Math.floor(totalQty / condition.productQty)
+                }
+                if (promo.proType === 'amount' && condition.productAmount > 0) {
+                    return Math.floor(totalAmount / condition.productAmount)
+                }
+                return multiplier
+            }, 1)
+            // console.log(multiplier)
+        }
+        // console.log(promo.rewards)
+        switch (promo.proType) {
+            case 'amount':
+                freeProducts = await rewardProduct(promo.rewards, order, multiplier, channel, res)
+                promoApplied = true
+                break
+            case 'free':
+                freeProducts = await rewardProduct(promo.rewards, order, multiplier, channel, res)
+                promoApplied = true
+
+                break
+
+            case 'discount':
+                promoDiscount = promo.discounts.reduce((discount, d) => {
+                    if (totalAmount >= d.minOrderAmount) {
+                        let discountMultiplier = d.limitType === 'unlimited' ? Math.floor(totalAmount / d.minOrderAmount) : 1
+                        return d.discountType === 'percent' ? ((totalAmount * d.discountValue) / 100) * discountMultiplier : d.discountValue * discountMultiplier
+                    }
+                    return discount
+                }, 0)
+                promoApplied = true
+                break
+        }
+
+
+
+        if (promoApplied) {
+            // console.log(freeProducts)
+            let selectedProduct = freeProducts.length > 0 ? freeProducts[0] : {}
+            // console.log(selectedProduct)
+            appliedPromotions.push({
+                proId: promo.proId,
+                proCode: promo.proCode,
+                proName: promo.name,
+                proType: promo.proType,
+                proQty: selectedProduct.productQty || 0,
+                discount: promoDiscount,
+                test: "dawd",
+                listProduct: [{
+                    proId: promo.proId,
+                    id: selectedProduct.productId,
+                    name: selectedProduct.productName,
+                    group: selectedProduct.productGroup,
+                    flavour: selectedProduct.productFlavour,
+                    brand: selectedProduct.productBrand,
+                    size: selectedProduct.productSize,
+                    qty: selectedProduct.productQty,
+                    unit: selectedProduct.productUnit,
+                    unitName: selectedProduct.productUnitName,
+                    qtyPcs: selectedProduct.productQtyPcs
+                }]
+            })
+
+            discountTotal += promoDiscount
+        }
+        // console.log(appliedPromotions)
+    }
+
+    const seenProIds = new Set();
+    appliedPromotions = appliedPromotions.filter(promo => {
+        if (promo.proQty === 0) return false;        // ❌ ตัดถ้า proQty = 0
+        if (seenProIds.has(promo.proId)) return false; // ❌ ตัดถ้า proId ซ้ำ
+        seenProIds.add(promo.proId);
+        return true;
+    });
+    // console.log(appliedPromotions)
+
+    return { appliedPromotions }
+}
+
+
+async function applyQuota(order, channel, res) {
+
+
+    const { Quota } = getModelsByChannel(channel, res, promotionModel);
+    let discountTotal = 0
+    let appliedPromotions = []
+
+    const quota = await Quota.find()
+
+    const validPromos = [];
+    let multiplier = 1
+    // console.log(order)
+    for (const promo of quota) {
+        if (promo.applicableTo?.store?.length > 0 && !promo.applicableTo.store.includes(order.store?.storeId)) continue;
+        if (promo.applicableTo?.typeStore?.length > 0 && !promo.applicableTo.typeStore.includes(order.store?.storeType)) continue;
+        if (promo.applicableTo?.zone?.length > 0 && !promo.applicableTo.zone.includes(order.store?.zone)) continue;
+        if (promo.applicableTo?.area?.length > 0 && !promo.applicableTo.area.includes(order.store?.area)) continue;
+
+        // let matchedProducts = order.listProduct.filter((product) =>
+        //     promo.conditions.some((condition) =>
+        //         (condition.productId.length === 0 || condition.productId.includes(product.id)) &&
+        //         (condition.productGroup.length === 0 || condition.productGroup.includes(product.group)) &&
+        //         (condition.productBrand.length === 0 || condition.productBrand.includes(product.brand)) &&
+        //         (condition.productFlavour.length === 0 || condition.productFlavour.includes(product.flavour)) &&
+        //         (condition.productSize.length === 0 || condition.productSize.includes(product.size)) &&
+        //         (condition.productUnit.length === 0 || condition.productUnit.includes(product.unit))
+        //     )
+        // )
+        freeProducts = await rewardProduct(promo.rewards, multiplier, channel, res)
+
+        if (freeProducts) {
+            let selectedProduct = freeProducts.length > 0 ? freeProducts[Math.floor(Math.random() * freeProducts.length)] : {}
+
+            appliedPromotions.push({
+                quotaId: promo.quotaId,
+                detail: promo.detail,
+                proCode: promo.proCode,
+                quota: 1,
+                listProduct: [{
+                    id: selectedProduct.productId,
+                    name: selectedProduct.productName,
+                    lot: selectedProduct.lot,
+                    group: selectedProduct.productGroup,
+                    flavour: selectedProduct.productFlavour,
+                    brand: selectedProduct.productBrand,
+                    size: selectedProduct.productSize,
+                    qty: selectedProduct.productQty,
+                    unit: selectedProduct.productUnit,
+                    unitName: selectedProduct.productUnitName,
+                    qtyPcs: selectedProduct.productQtyPcs
+                }]
+            })
+            // console.log(JSON.stringify(appliedPromotions, null, 2));
+        }
+    }
+
+
+    return { appliedPromotions }
+}
+
+
+
+
+
+
+
+async function getRewardProduct(proId, channel, res) {
+
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel);
+    const { Product } = getModelsByChannel(channel, res, productModel);
+
+    const promotion = await Promotion.findOne({ proId, status: 'active' }).lean()
+    if (!promotion || !promotion.rewards || promotion.rewards.length === 0) {
+        return []
+    }
+
+    let productQuery = { $or: [] }
+
+    promotion.rewards.forEach(reward => {
+        let condition = {}
+        if (reward.productId) condition.id = reward.productId
+        if (reward.productGroup) condition.group = reward.productGroup
+        if (reward.productFlavour) condition.flavour = reward.productFlavour
+        if (reward.productBrand) condition.brand = reward.productBrand
+        if (reward.productSize) condition.size = reward.productSize
+        condition.statusSale = "Y"  // <== ใส่แบบนี้ถูกต้อง
+        productQuery.$or.push(condition)
+    })
+
+    const products = await Product.find(productQuery).lean()
+    if (!products.length) return []
+
+    return products.map(product => ({
+        proId: promotion.proId,
+        productId: product.id,
+        id: product.id,
+        name: product.name,
+        group: product.group,
+        brand: product.brand,
+        size: product.size,
+        flavour: product.flavour,
+        type: product.type,
+    }))
+}
+
+async function applyPromotionUsage(storeId, promotion, channel, res) {
+
+    // const { Promotion } = getModelsByChannel(channel,res,promotionModel); 
+    const { PromotionLimit } = getModelsByChannel(channel, res, promotionLimitModel);
+
+
+    const proIds = promotion.map(u => u.proId)
+    const promotionData = await PromotionLimit.find({ proId: { $in: proIds } })
+    // console.log(JSON.stringify(promotion, null, 2));
+
+    // const data = promotionData.map(u => {
+    //     console.log(u)
+    //     const productPromo = promotion.find(p => p.proId === u.proId);
+    //     return {
+    //         proId: u.proId,
+    //         // qty: productPromo.proQty
+    //         listProduct:u.listProduct.map(item => {
+    //             return {
+    //                 id:item.id,
+    //                 qty:item.qty
+    //             }
+    //         }
+
+    //         )
+    //     }
+    // })
+    //     console.log(data)
+    // for (const item  of data) {
+    //     const promoqty = await PromotionLimit.findOne({ proId:item.proId })
+    //     console.log(promoqty)
+    //     const divqty = promoqty.qty - item.qty
+    //     // console.log(divqty)
     // }
 
-    const product = await Product.findOne({ id }).lean()
-    if (!product) {
-      return res
-        .status(404)
-        .json({ status: 404, message: 'Product not found!' })
-    }
 
-    const unitData = product.listUnit.find(u => u.unit === unit)
-    if (!unitData) {
-      return res.status(400).json({
-        status: 400,
-        message: `Unit '${unit}' not found for this product!`
-      })
-    }
 
-    const priceField = type === 'refund' ? 'refund' : 'sale'
-    const price = parseFloat(unitData.price[priceField])
 
-    const cartQuery =
-      type === 'withdraw'
-        ? { type, area }
-        : type === 'adjuststock'
-        ? { type, area, withdrawId }
-        : { type, area, storeId }
-    const { Cart } = getModelsByChannel(channel, res, cartModel)
-
-    let cart = await Cart.findOne(cartQuery)
-
-    if (!cart) {
-      cart = await Cart.create([
-        {
-          type,
-          withdrawId,
-          area,
-          ...(type === 'withdraw' ? {} : { storeId }),
-          total: 0,
-          listProduct: [],
-          listRefund: []
-        }
-      ])
-      cart = cart[0]
-    }
-
-    // ----- ด้านล่างนี้เหมือนเดิม -----
-    if (type === 'refund') {
-      if (condition && expire) {
-        const existingRefund = cart.listRefund.find(
-          p =>
-            p.id === id &&
-            p.unit === unit &&
-            p.condition === condition &&
-            p.expireDate === expire
-        )
-        if (existingRefund && existingRefund.unit === unit) {
-          existingRefund.qty += qty
-        } else {
-          cart.listRefund.push({
-            id,
-            name: product.name,
-            qty,
-            unit,
-            price,
-            condition,
-            expireDate: expire
-          })
-        }
-      } else {
-        const existingProduct = cart.listProduct.find(
-          p => p.id === id && p.unit === unit
-        )
-        if (existingProduct && existingProduct.unit === unit) {
-          existingProduct.qty += qty
-        } else {
-          cart.listProduct.push({
-            id,
-            name: product.name,
-
-            qty,
-            unit,
-            price
-          })
-        }
-      }
-
-      const totalRefund = cart.listRefund.reduce(
-        (sum, p) => sum + p.qty * p.price,
-        0
-      )
-      const totalProduct = cart.listProduct.reduce(
-        (sum, p) => sum + p.qty * p.price,
-        0
-      )
-      cart.total = totalProduct - totalRefund
-      cart.total = to2(cart.total)
-    } else if (type === 'adjuststock') {
-      const existingProduct = cart.listProduct.find(
-        p => p.id === id && p.unit === unit && p.action === action
-      )
-      if (existingProduct && existingProduct.unit === unit) {
-        existingProduct.qty += qty
-      } else {
-        cart.listProduct.push({
-          id,
-          name: product.name,
-          qty,
-          unit,
-          price,
-          action
-        })
-      }
-
-      cart.total = cart.listProduct.reduce((sum, p) => sum + p.qty * p.price, 0)
-      cart.total = to2(cart.total)
-    } else {
-      const existingProduct = cart.listProduct.find(
-        p => p.id === id && p.unit === unit
-      )
-      if (existingProduct && existingProduct.unit === unit) {
-        existingProduct.qty += qty
-      } else {
-        cart.listProduct.push({
-          id,
-          name: product.name,
-          qty,
-          unit,
-          price,
-          condition
-        })
-      }
-
-      cart.total = cart.listProduct.reduce((sum, p) => sum + p.qty * p.price, 0)
-      cart.total = to2(cart.total)
-    }
-    cart.createdAt = new Date()
-
-    // ---------- ส่วนสำคัญที่ต้องแก้ไข ------------
-    const qtyProduct = { id: id, qty: qty, unit: unit, condition }
-    const period = getPeriodFromDate(cart.createdAt)
-
-    // =========== NEW LOGIC เลือก stockType ให้ updateStockMongo ===========
-
-    let stockType = ''
-    if (type === 'sale' || type === 'give' || typeref === 'change') {
-      stockType = 'OUT' // เพิ่มใน cart คือลดของใน stock จริง
-    } else if (type === 'adjuststock') {
-      // สมมติ action มีค่าเป็น 'IN' หรือ 'OUT'
-      stockType = action || '' // กำหนดตาม action ที่รับเข้ามา
-    } else {
-      stockType = 'OUT' // default เป็น OUT (กรณี add ใน cart)
-    }
-    if (typeref === 'change') {
-      const updateResult = await updateStockMongo(
-        qtyProduct,
-        area,
-        period,
-        'addproduct',
-        channel,
-        stockType, // ส่ง stockType เข้าไปด้วย!
-        res
-      )
-      if (updateResult) return
-    }
-
-    if (type !== 'withdraw' && type !== 'refund' && type != 'adjuststock') {
-      const updateResult = await updateStockMongo(
-        qtyProduct,
-        area,
-        period,
-        'addproduct',
-        channel,
-        stockType, // ส่ง stockType เข้าไปด้วย!
-        res
-      )
-      if (updateResult) return
-    }
-
-    await cart.save()
-
-    // const io = getSocket()
-    // io.emit('cart/add', {})
-
-    res.status(200).json({
-      status: 200,
-      message: 'Product added successfully!',
-      data: cart
-    })
-  } catch (error) {
-    console.error(error)
-    res.status(500).json({ status: '500', message: error.message })
-  }
 }
 
-exports.adjustProduct = async (req, res) => {
-  try {
-    const {
-      type,
-      area,
-      storeId,
-      id,
-      unit,
-      qty,
-      condition,
-      expire,
-      stockType,
-      withdrawId
-    } = req.body
-    const channel = req.headers['x-channel']
-    const { Cart } = getModelsByChannel(channel, res, cartModel)
 
-    // Validation
-    if (!type || !area || !id || !unit || qty === undefined) {
-      return res.status(400).json({
-        status: 400,
-        message: 'type, area, id, unit, and qty are required!'
-      })
-    }
-    if ((type === 'sale' || type === 'refund' || type === 'give') && !storeId) {
-      return res.status(400).json({
-        status: 400,
-        message: 'storeId is required for sale, refund, or give!'
-      })
-    }
 
-    // Find Cart
-    const cartQuery =
-      type === 'withdraw'
-        ? { type, area }
-        : type === 'adjuststock'
-        ? { type, area, withdrawId }
-        : { type, area, storeId }
-
-    let cart = await Cart.findOne(cartQuery)
-    if (!cart) {
-      return res.status(404).json({ status: 404, message: 'Cart not found!' })
-    }
-    const period = getPeriodFromDate(cart.createdAt)
-
-    // --- STEP 1: หาค่า qty เดิมใน cart
-
-    if (condition) {
-      idx = cart.listRefund.findIndex(
-        p => p.id === id && p.unit === unit && p.condition === condition
-      )
-      if (idx === -1) {
-        return res
-          .status(404)
-          .json({ status: 404, message: 'Product not found in cart refund!' })
-      }
-      oldQty = cart.listRefund[idx].qty
-    } else {
-      idx = cart.listProduct.findIndex(p => p.id === id && p.unit === unit)
-      if (idx === -1) {
-        return res
-          .status(404)
-          .json({ status: 404, message: 'Product not found in cart!' })
-      }
-      oldQty = cart.listProduct[idx].qty
-    }
-
-    // --- STEP 2: คำนวณ delta ระหว่าง qty ใหม่ (user ส่งมา) กับ qty เดิม (ที่อยู่ใน cart)
-    const delta = qty - oldQty
-
-    // console.log(delta)
-    // --- STEP 3: ถ้าไม่มีการเปลี่ยนแปลง
-    if (delta === 0) {
-      return res
-        .status(200)
-        .json({ status: 200, message: 'No changes made', data: cart })
-    }
-
-    // --- STEP 4: อัพเดต stock ตาม delta
-    let updateResult = null
-    if (type === 'sale' || type === 'give') {
-      if (delta !== 0) {
-        const qtyProductStock = { id, qty: Math.abs(delta), unit }
-        // เพิ่มใน cart (OUT = หักจาก stock) | ลดใน cart (IN = คืนเข้า stock)
-        const adjStockType = delta > 0 ? 'OUT' : 'IN'
-        updateResult = await updateStockMongo(
-          qtyProductStock,
-          area,
-          period,
-          'adjust',
-          channel,
-          adjStockType,
-          res
-        )
-        if (updateResult) return // (กรณี stock ไม่พอ)
-      }
-    } else if (type === 'refund') {
-      if (!condition && !expire) {
-        if (stockType == 'OUT') {
-          if (delta !== 0) {
-            const qtyProductStock = { id, qty: Math.abs(delta), unit }
-            updateResult = await updateStockMongo(
-              qtyProductStock,
-              area,
-              period,
-              'adjust',
-              channel,
-              stockType,
-              res
-            )
-            if (updateResult) return
-          }
-        }
-        if (stockType == 'IN') {
-          if (delta !== 0) {
-            const qtyProductStock = { id, qty: Math.abs(delta), unit }
-            updateResult = await updateStockMongo(
-              qtyProductStock,
-              area,
-              period,
-              'adjust',
-              channel,
-              stockType,
-              res
-            )
-            if (updateResult) return
-          }
-        }
-      }
-    } else if (type === 'withdraw') {
-    }
-
-    // --- STEP 5: อัพเดตจำนวนใน cart ให้ตรงกับ qty ล่าสุด
-
-    if (condition) {
-      if (qty === 0) {
-        cart.listRefund.splice(idx, 1) // Remove item
-      } else {
-        cart.listRefund[idx].qty = qty
-      }
-
-      cart.total = cart.listRefund.reduce(
-        (sum, item) => sum + item.qty * item.price,
-        0
-      )
-    } else {
-      if (qty === 0) {
-        cart.listProduct.splice(idx, 1) // Remove item
-      } else {
-        cart.listProduct[idx].qty = qty
-      }
-
-      cart.total = cart.listProduct.reduce(
-        (sum, item) => sum + item.qty * item.price,
-        0
-      )
-    }
-    await cart.save()
-
-    // --- STEP 7: Emit socket & return
-    const io = getSocket()
-    io.emit('cart/adjust', {})
-
-    return res.status(200).json({
-      status: 200,
-      message: 'Cart updated successfully!',
-      data: cart
-    })
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message })
-  }
-}
-
-exports.deleteProduct = async (req, res) => {
-  // const session = await require('mongoose').startSession();
-  // session.startTransaction();
-  try {
-    const { type, area, storeId, id, unit, condition, expire } = req.body
-    const channel = req.headers['x-channel']
-
-    if (!type || !area || !id || !unit) {
-      // await session.abortTransaction();
-      // session.endSession();
-      return res.status(400).json({
-        status: 400,
-        message: 'type, area, id, and unit are required!'
-      })
-    }
-
-    if ((type === 'sale' || type === 'refund' || type === 'give') && !storeId) {
-      // await session.abortTransaction();
-      // session.endSession();
-      return res.status(400).json({
-        status: 400,
-        message: 'storeId is required for sale or refund or give!'
-      })
-    }
-
-    const cartQuery =
-      type === 'withdraw' ? { type, area } : { type, area, storeId }
-    const { Cart } = getModelsByChannel(channel, res, cartModel)
-
-    let cart = await Cart.findOne(cartQuery)
-    console.log(cart)
-    // .session(session);
-    if (!cart) {
-      // await session.abortTransaction();
-      // session.endSession();
-      return res.status(404).json({ status: 404, message: 'Cart not found!' })
-    }
-
-    let updated = false
-    // console.log(type,condition)
-    if ((type === 'refund' && condition) || expire) {
-      const refundIndex = cart.listRefund.findIndex(
-        p =>
-          p.id === id &&
-          p.unit === unit &&
-          p.condition === condition &&
-          p.expireDate === expire
-      )
-      if (refundIndex === -1) {
-        // await session.abortTransaction();
-        // session.endSession();
-        return res
-          .status(404)
-          .json({ status: 404, message: 'Product not found in refund list!' })
-      }
-
-      const refundProduct = cart.listRefund[refundIndex]
-      cart.listRefund.splice(refundIndex, 1)
-      cart.total -= refundProduct.qty * refundProduct.price
-      updated = true
-    } else if (type === 'refund' && !condition && !expire) {
-      const productIndex = cart.listProduct.findIndex(
-        p => p.id === id && p.unit === unit
-      )
-      if (productIndex === -1) {
-        // await session.abortTransaction();
-        // session.endSession();
-        return res
-          .status(404)
-          .json({ status: 404, message: 'Product not found in cart!' })
-      }
-
-      product = cart.listProduct[productIndex]
-      cart.listProduct.splice(productIndex, 1)
-      cart.total += product.qty * product.price
-      updated = true
-    } else {
-      const productIndex = cart.listProduct.findIndex(
-        p => p.id === id && p.unit === unit
-      )
-      if (productIndex === -1) {
-        // await session.abortTransaction();
-        // session.endSession();
-        return res
-          .status(404)
-          .json({ status: 404, message: 'Product not found in cart!' })
-      }
-
-      product = cart.listProduct[productIndex]
-      cart.listProduct.splice(productIndex, 1)
-      cart.total -= product.qty * product.price
-      updated = true
-
-      // console.log(product)
-    }
-
-    const period = getPeriodFromDate(cart.createdAt)
-    if (type != 'withdraw' && type != 'adjuststock') {
-      // await updateStockMongo(product, area, period, 'deleteCart', channel)
-      // console.log(type)
-      if (!condition && !expire) {
-        const updateResult = await updateStockMongo(
-          product,
-          area,
-          period,
-          'deleteCart',
-          channel,
-          res
-        )
-        if (updateResult) return
-      }
-    }
-
-    if (cart.listProduct.length === 0 && cart.listRefund.length === 0) {
-      await Cart.deleteOne(cartQuery)
-      // await session.commitTransaction();
-      // session.endSession();
-      return res.status(200).json({
-        status: 200,
-        message: 'Cart deleted successfully!'
-      })
-    }
-
-    if (updated) {
-      await cart.save()
-    }
-
-    // await session.commitTransaction();
-    // session.endSession();
-
-    const io = getSocket()
-    io.emit('cart/delete', {})
-
-    res.status(200).json({
-      status: 200,
-      message: 'Product removed successfully!',
-      data: cart
-    })
-  } catch (error) {
-    // await session.abortTransaction().catch(() => { });
-    // session.endSession();
-    console.error(error)
-    res.status(500).json({ status: 500, message: error.message })
-  }
-}
-
-exports.updateCartPromotion = async (req, res) => {
-  // ยังไม่เป็นว่าเคยใช้
-  // const session = await require('mongoose').startSession();
-  // session.startTransaction();
-  try {
-    const { type, area, storeId, proId, productId, qty } = req.body
-    const channel = req.headers['x-channel']
-
-    const { Cart } = getModelsByChannel(channel, res, cartModel)
-
-    let cart = await Cart.findOne({ type, area, storeId })
-    // .session(session);
-
-    if (!cart) {
-      // await session.abortTransaction();
-      // session.endSession();
-      return res.status(404).json({ status: 404, message: 'Cart not found!' })
-    }
-
-    let promotion = cart.listPromotion.find(promo => promo.proId === proId)
-
-    if (!promotion) {
-      // await session.abortTransaction();
-      // session.endSession();
-      return res
-        .status(404)
-        .json({ status: 404, message: 'Promotion not found!' })
-    }
-
-    const { Product } = getModelsByChannel(channel, res, productModel)
-
-    const product = await Product.findOne({ id: productId }).lean()
-
-    if (!product) {
-      // await session.abortTransaction();
-      // session.endSession();
-      return res
-        .status(404)
-        .json({ status: 404, message: 'Product not found!' })
-    }
-
-    const matchingUnit = product.listUnit.find(
-      unit => unit.unit === promotion.unit
-    )
-
-    if (!matchingUnit) {
-      // await session.abortTransaction();
-      // session.endSession();
-      return res.status(400).json({
-        status: 400,
-        message: `Unit '${promotion.unit}' not found for this product!`
-      })
-    }
-
-    // อัปเดตข้อมูลใน promotion
-    promotion.id = product.id
-    promotion.group = product.group
-    promotion.flavour = product.flavour
-    promotion.brand = product.brand
-    promotion.size = product.size
-    promotion.unit = matchingUnit.unit
-    promotion.qty = promotion.qty // ดูเหมือนจะไม่เปลี่ยนค่า แต่ถ้าต้องการให้รับจาก req.body ให้เปลี่ยนเป็น qty
-
-    await cart.save()
-
-    // await session.commitTransaction();
-    // session.endSession();
-
-    const io = getSocket()
-    io.emit('cart/updateStock', {})
-
-    res.status(200).json({
-      status: '200',
-      message: 'Promotion updated successfully!',
-      data: cart.listPromotion
-    })
-  } catch (error) {
-    // await session.abortTransaction().catch(() => { });
-    // session.endSession();
-    console.error(error)
-    res.status(500).json({ status: '500', message: error.message })
-  }
-}
-
-exports.updateStock = async (req, res) => {
-  // const session = await require('mongoose').startSession();
-  // session.startTransaction();
-  try {
-    const { area, productId, period, unit, type } = req.body
-    let { qty } = req.body
-    const channel = req.headers['x-channel']
-
-    const { Stock } = getModelsByChannel(channel, res, stockModel)
-    const { Product } = getModelsByChannel(channel, res, productModel)
-
-    const stockDoc = await Stock.findOne({
-      area: area,
-      period: period
-    })
-    // .session(session);
-
-    if (!stockDoc) {
-      // await session.abortTransaction();
-      // session.endSession();
-      return res.status(404).json({
-        status: 404,
-        message: 'Stock document not found for this area and period'
-      })
-    }
-
-    const productStock = stockDoc.listProduct.find(
-      p => p.productId === productId
-    )
-
-    if (!productStock) {
-      // await session.abortTransaction();
-      // session.endSession();
-      return res.status(404).json({
-        status: 404,
-        message: 'Product not found in stock'
-      })
-    }
-
-    const modelProduct = await Product.findOne({ id: productId })
-    // .session(session);
-
-    if (!modelProduct) {
-      // await session.abortTransaction();
-      // session.endSession();
-      return res.status(404).json({
-        status: 404,
-        message: 'Product not found'
-      })
-    }
-
-    // Convert to PCS if needed
-    if (unit !== 'PCS') {
-      const unitData = modelProduct.listUnit.find(u => u.unit === unit)
-      if (!unitData) {
-        // await session.abortTransaction();
-        // session.endSession();
-        return res.status(400).json({
-          status: 400,
-          message: 'Invalid unit for this product'
-        })
-      }
-      qty = parseInt(unitData.factor) * qty
-    }
-    // Update based on IN or OUT
-    if (type === 'IN') {
-      productStock.stockInPcs += qty
-      productStock.balancePcs += qty
-    } else if (type === 'OUT') {
-      productStock.stockOutPcs += qty
-      productStock.balancePcs -= qty
-    } else {
-      // await session.abortTransaction();
-      // session.endSession();
-      return res.status(400).json({
-        status: 400,
-        message: 'Invalid type. Must be IN or OUT'
-      })
-    }
-
-    // Calculate CTN values from PCS using factor
-    const ctnUnit = modelProduct.listUnit.find(u => u.unit === 'CTN')
-    const factor = ctnUnit ? parseInt(ctnUnit.factor) : null
-
-    if (factor) {
-      productStock.stockInCtn = Math.floor(productStock.stockInPcs / factor)
-      productStock.stockOutCtn = Math.floor(productStock.stockOutPcs / factor)
-      productStock.balanceCtn = Math.floor(productStock.balancePcs / factor)
-    }
-
-    // console.log(productStock)
-    // Save updated document
-    await stockDoc.save()
-
-    // await session.commitTransaction();
-    // session.endSession();
-
-    const io = getSocket()
-    io.emit('cart/updateStock', {})
-
-    res.status(200).json({
-      status: 200,
-      message: 'Stock updated successfully',
-      data: productStock
-    })
-  } catch (error) {
-    // await session.abortTransaction().catch(() => { });
-    // session.endSession();
-    console.error('[updateStock Error]', error)
-    res.status(500).json({ status: 500, message: error.message })
-  }
-}
+module.exports = { applyPromotion, rewardProduct, getRewardProduct, applyPromotionUsage, applyQuota,rewardProductCheckStock }
