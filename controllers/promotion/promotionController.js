@@ -370,7 +370,7 @@ exports.getPromotionProduct = async (req, res) => {
               in: {
                 productId: '$$p.productId',
                 balancePcs: '$$p.balancePcs',
-                enough: { $gte: [{ $ifNull: ['$$p.balancePcs', 0] }, promotion.proQty] }
+                enough: { $gte: [{ $ifNull: ['$$p.balancePcs', 0] }, 1] }
               }
             }
           }
@@ -390,9 +390,13 @@ exports.getPromotionProduct = async (req, res) => {
       }
     ]);
 
+    // console.log(productStock)
+
     // 1) กรองเฉพาะรายการที่พอ
     const enoughProducts = (productStock?.listProduct ?? []).filter(p => p.enough);
 
+
+    
     // 2) ดึงเฉพาะ productId และจัดการ trim + unique
     const enoughProductIds = [...new Set(
       enoughProducts
@@ -430,6 +434,7 @@ exports.getPromotionProduct = async (req, res) => {
 
     productDetail.forEach(product => {
       const key = `${product.group}|${product.size}`
+      const qtyBal = enoughProducts.find(item => item.productId === product.id).balancePcs
 
       if (!groupedProducts[key]) {
         groupedProducts[key] = {
@@ -447,6 +452,7 @@ exports.getPromotionProduct = async (req, res) => {
         size: product.size,
         unit: product.unit,
         qty: 1,
+        qtyBal:qtyBal,
         name: product.name
       })
     })
