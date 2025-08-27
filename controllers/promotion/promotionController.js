@@ -428,38 +428,38 @@ exports.getPromotionProduct = async (req, res) => {
     }
 
 
-    const groupedProducts = {};
+const groupedProducts = {};
 
-    let remaining = Math.max(0, Number(promotion?.proQty ?? 0)); // proQty ทั้งหมดที่ต้องแจก
+let remaining = Math.max(0, Number(promotion?.proQty ?? 0)); // proQty ทั้งหมดที่ต้องแจก
 
-    productDetail.forEach(product => {
-      const key = `${product.group}|${product.size}`;
+productDetail.forEach(product => {
+  const key = `${product.group}|${product.size}`;
 
-      const found = (enoughProducts || []).find(
-        item => String(item.productId) === String(product.id)
-      );
-      const qtyBal = Number(found?.balancePcs ?? 0);
+  const found = (enoughProducts || []).find(
+    item => String(item.productId) === String(product.id)
+  );
+  const qtyBal = Number(found?.balancePcs ?? 0);
 
-      // แจกให้สินค้าตัวนี้ = จำนวนน้อยสุดระหว่างที่เหลือกับของคงเหลือ
-      const qty = Math.min(qtyBal, remaining);
-      remaining -= qty; // หักยอดที่แจกไป
+  // แจกให้สินค้าตัวนี้ = จำนวนน้อยสุดระหว่างที่เหลือกับของคงเหลือ
+  const qty = Math.min(qtyBal, remaining);
+  remaining -= qty; // หักยอดที่แจกไป
 
-      if (!groupedProducts[key]) {
-        groupedProducts[key] = { group: product.group, size: product.size, product: [] };
-      }
+  if (!groupedProducts[key]) {
+    groupedProducts[key] = { group: product.group, size: product.size, product: [] };
+  }
 
-      groupedProducts[key].product.push({
-        id: product.id,
-        group: product.group,
-        flavour: product.flavour,
-        brand: product.brand,
-        size: product.size,
-        unit: product.unit,
-        qty,         // ← ได้ตามที่คำนวณ (เช่น 1 สำหรับตัวแรกถ้ามีของแค่ 1)
-        qtyBal,
-        name: product.name
-      });
-    });
+  groupedProducts[key].product.push({
+    id: product.id,
+    group: product.group,
+    flavour: product.flavour,
+    brand: product.brand,
+    size: product.size,
+    unit: product.unit,
+    qty,         // ← ได้ตามที่คำนวณ (เช่น 1 สำหรับตัวแรกถ้ามีของแค่ 1)
+    qtyBal,
+    name: product.name
+  });
+});
 
 
 
