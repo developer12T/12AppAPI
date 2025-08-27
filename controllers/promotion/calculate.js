@@ -404,23 +404,27 @@ async function applyPromotion(order, channel, res) {
                 (condition.productGroup.length === 0 || condition.productGroup.includes(product.group)) &&
                 (condition.productBrand.length === 0 || condition.productBrand.includes(product.brand)) &&
                 (condition.productFlavour.length === 0 || condition.productFlavour.includes(product.flavour)) &&
-                (condition.productSize.length === 0 || condition.productSize.includes(product.size)) &&
-                (condition.productUnit.length === 0 || condition.productUnit.includes(product.unit))
+                (condition.productSize.length === 0 || condition.productSize.includes(product.size)) 
+                // &&
+                // (condition.productUnit.length === 0 || condition.productUnit.includes(product.unit))
             )
         )
-        // console.log("promo.conditions",promo.conditions)
+
 
         if (matchedProducts.length === 0) continue
 
         let totalAmount = matchedProducts.reduce((sum, p) => sum + (p.qty * p.price), 0)
-        let totalQty = matchedProducts.reduce((sum, p) => sum + p.qty, 0)
+        let totalQty = matchedProducts.reduce((sum, p) => sum + p.qtyPcs, 0)
 
+
+        // const totalQtyPcs = 
+        // console.log(promo.conditions)
         let meetsCondition = promo.conditions.some(condition =>
             (promo.proType === 'free' && condition.productQty >= 0 && totalQty >= condition.productQty) ||
             (promo.proType === 'amount' && condition.productAmount >= 0 && totalAmount >= condition.productAmount)
 
         )
-
+        // console.log(meetsCondition)
         if (!meetsCondition) continue
 
         let multiplier = 1
@@ -461,14 +465,12 @@ async function applyPromotion(order, channel, res) {
         }
 
         // console.log(freeProducts)
-
+        // console.log("promo",promo.proId)
 
         const qtyInPromo = (freeProducts ?? []).reduce(
             (sum, item) => sum + (Number(item?.productQty) || 0),
             0
         );
-
-        // console.log(multiplier,qtyInPromo)
 
         // ถ้าแจกได้น้อยกว่าหรือเท่ากับ multiplier → ส่งกลับเป็น array ว่าง
         if (qtyInPromo < (Number(multiplier) || 0)) {
