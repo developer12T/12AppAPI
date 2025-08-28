@@ -1035,8 +1035,8 @@ exports.OrderToExcel = async (req, res) => {
   const modelRefund = await Refund.aggregate([
     {
       $match: {
-        status: { $nin: ['canceled', 'reject'] },
         status: { $in: statusArray },
+        status: { $nin: ['canceled', 'reject', 'pending'] },
         'store.area': { $ne: 'IT211' }
         // 'store.area': 'NE211'
       }
@@ -2597,6 +2597,7 @@ exports.getSummarybyChoice = async (req, res) => {
     const modelChange = await Order.aggregate([
       { $match: { type: 'change' } }, // ✅ syntax ถูกต้อง
       { $match: matchStage },
+      { $match: { status: { $nin: ['pending'] } } },
       {
         $group: {
           _id: null,
@@ -2609,6 +2610,7 @@ exports.getSummarybyChoice = async (req, res) => {
     const modelRefund = await Refund.aggregate([
       { $match: { type: 'refund' } }, // ✅ syntax ถูกต้อง
       { $match: matchStage },
+      { $match: { status: { $nin: ['pending'] } } },
       {
         $group: {
           _id: null,
@@ -3266,21 +3268,21 @@ exports.summaryDaily = async (req, res) => {
           period: periodStr,
           createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
           type: 'refund',
-          status: { $nin: ['canceled', 'reject'] }
+          status: { $nin: ['pending', 'canceled', 'reject'] }
         }),
         Order.find({
           'store.area': area,
           period: periodStr,
           createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
           type: 'sale',
-          status: { $nin: ['canceled'] }
+          status: { $nin: ['canceled', 'reject'] }
         }),
         Order.find({
           'store.area': area,
           period: periodStr,
           createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
           type: 'change',
-          status: { $nin: ['canceled', 'reject'] }
+          status: { $nin: ['pending', 'canceled', 'reject'] }
         })
       ])
 
@@ -3492,21 +3494,21 @@ exports.summaryMonthlyByZone = async (req, res) => {
             period: periodStr,
             createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
             type: 'refund',
-            status: { $nin: ['canceled', 'reject'] }
+            status: { $nin: ['pending', 'canceled', 'reject'] }
           }),
           Order.find({
             'store.area': area,
             period: periodStr,
             createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
             type: 'sale',
-            status: { $nin: ['canceled'] }
+            status: { $nin: ['canceled', 'reject'] }
           }),
           Order.find({
             'store.area': area,
             period: periodStr,
             createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
             type: 'change',
-            status: { $nin: ['canceled'] }
+            status: { $nin: ['pending', 'canceled', 'reject'] }
           })
         ])
 
@@ -3630,7 +3632,7 @@ exports.saleReport = async (req, res) => {
     const dataRefund = await Refund.find({
       ...filterArea,
       ...filterCreatedAt,
-      status: { $nin: ['canceled', 'reject'] }
+      status: { $nin: ['pending', 'canceled', 'reject'] }
     })
 
     if (dataOrder.length === 0) {
@@ -4180,20 +4182,109 @@ exports.checkOrderCancelM3 = async (req, res) => {
 
 exports.getTarget = async (req, res) => {
 
-  const { period } = req.body
+  const { period, area } = req.query
   const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const { Order } = getModelsByChannel(channel, res, orderModel)
   const { Refund } = getModelsByChannel(channel, res, refundModel)
   const { Product } = getModelsByChannel(channel, res, productModel)
   const { Stock } = getModelsByChannel(channel, res, stockModel)
+  const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+  const periodStr = period
+  const year = Number(periodStr.substring(0, 4))
+  const month = Number(periodStr.substring(4, 6))
 
+  // หาช่วงเวลา UTC ของเดือนที่ต้องการ (แปลงจากเวลาไทย)
+  const thOffset = 7 * 60 * 60 * 1000
+  const startOfMonthTH = new Date(year, month - 1, 1, 0, 0, 0, 0)
+  const endOfMonthTH = new Date(year, month, 0, 23, 59, 59, 999)
+  const startOfMonthUTC = new Date(startOfMonthTH.getTime() - thOffset)
+  const endOfMonthUTC = new Date(endOfMonthTH.getTime() - thOffset)
+
+  const [dataSendmoney, dataRefund, dataOrderSale, dataOrderChange] =
+    await Promise.all([
+      // SendMoney.find({
+      //   area: area,
+      //   dateAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+      // }),
+      SendMoney.aggregate([
+        {
+          $match: {
+            area: area,
+            dateAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC }
+          }
+        },
+        {
+          $addFields: {
+            createdAt: '$dateAt'
+          }
+        }
+      ]),
+      Refund.find({
+        'store.area': area,
+        period: periodStr,
+        createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+        type: 'refund',
+        status: { $nin: ['pending', 'canceled', 'reject'] }
+      }),
+      Order.find({
+        'store.area': area,
+        period: periodStr,
+        createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+        type: 'sale',
+        status: { $nin: ['canceled'] }
+      }),
+      Order.find({
+        'store.area': area,
+        period: periodStr,
+        createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+        type: 'change',
+        status: { $nin: ['pending', 'canceled', 'reject'] }
+      })
+    ])
+
+  // const refundGood = dataRefund.filter(item => item.condition === 'good').reduce((sum, item) => sum + (Number(item?.total) || 0), 0);
+
+  const refundDamagedTotal = (dataRefund ?? [])
+    .reduce((sum, d) => sum + (d.listProduct ?? [])
+      .reduce((s, p) => s + (String(p?.condition).toLowerCase() === 'damaged' ? Number(p?.total) || 0 : 0), 0), 0);
+
+  const refundGoodTotal = (dataRefund ?? [])
+    .reduce((sum, d) => sum + (d.listProduct ?? [])
+      .reduce((s, p) => s + (String(p?.condition).toLowerCase() === 'good' ? Number(p?.total) || 0 : 0), 0), 0);
+
+  const totalSendmoney = (dataSendmoney ?? [])
+    .reduce((sum, item) => sum + (Number(item?.sendmoney) || 0), 0);
+
+
+
+  const saleTotal =
+    (dataOrderSale ?? [])
+      .flatMap(o => o.listProduct ?? [])
+      .reduce((s, p) => s + (+p.netTotal || 0), 0);
+
+
+  const changeTotal =
+    (dataOrderChange ?? [])
+      .flatMap(o => o.listProduct ?? [])
+      .reduce((s, p) => s + (+p.netTotal || 0), 0);
+
+  const diffChange = to2(changeTotal - refundDamagedTotal - refundGoodTotal)
+
+  const final = to2(saleTotal + diffChange)
+
+  const target = 1000000
+  const remaining = target - final
+  const remainingPercent = (remaining / target) * 100
 
 
   res.status(200).json({
     status: 200,
     message: 'Sucess',
-    data: negProductIds
+    target:target,
+    sale:final,
+    remaining: to2(remaining),
+    remainingPercent : to2(remainingPercent)
   })
 
 }
