@@ -1716,6 +1716,8 @@ exports.getStockQtyNew = async (req, res) => {
   // let summaryStockOutPcs = 0
   let summaryStockBalPcs = 0
 
+  // console.log(changeProductArray)
+
   for (const stockItem of productSum) {
     const productDetail = dataProduct.find(u => u.id == stockItem.id)
     const productDetailRufund = refundProductArray.filter(
@@ -1808,7 +1810,7 @@ exports.getStockQtyNew = async (req, res) => {
         summaryDamaged += (damagedQty || 0) * damagedSale
         summarySale += (saleQty || 0) * sale
         summaryPromotion += (promoQty || 0) * sale
-        summaryChange += (changeQty || 0) * changeSale
+        summaryChange += (changeQty || 0) * sale
         summaryAdjust += (adjustQty || 0) * sale
         summaryGive += (giveQty || 0) * sale
         // console.log(withdrawQty)
@@ -1865,6 +1867,61 @@ exports.getStockQtyNew = async (req, res) => {
   })
 
 
+  let StockTotalCtn = 0
+  let withdrawTotalCtn = 0
+  let goodTotalCtn = 0
+  let damagedTotalCtn = 0
+  let saleTotalCtn = 0
+  let promotionTotalCtn = 0
+  let changeTotalCtn = 0
+  let adjustTotalCtn = 0
+  let giveTotalCtn = 0
+  let balTotalCtn = 0
+
+  // console.log(data[0].summaryQty[0])
+
+  const ctn = data.map(item => {
+
+    const factorCtn = dataProduct.find(i => i.id === item.productId).listUnit.find(i => i.unit === 'CTN')?.factor ?? 0
+    const pcs = item.summaryQty[0]
+
+    const stockPcs = Math.floor((pcs.stock || 0) / (factorCtn || 1))
+    const withdrawPcs = Math.floor((pcs.withdraw || 0) / (factorCtn || 1))
+    const goodPcs = Math.floor((pcs.good || 0) / (factorCtn || 1))
+    const damagedPcs = Math.floor((pcs.damagedPcs || 0) / (factorCtn || 1))
+    const salePcs = Math.floor((pcs.sale || 0) / (factorCtn || 1))
+    const promotionPcs = Math.floor((pcs.promotion || 0) / (factorCtn || 1))
+    const changePcs = Math.floor((pcs.change || 0) / (factorCtn || 1))
+    const adjustPcs = Math.floor((pcs.adjust || 0) / (factorCtn || 1))
+    const givePcs = Math.floor((pcs.give || 0) / (factorCtn || 1))
+    const balPcs = Math.floor((pcs.balance || 0) / (factorCtn || 1))
+
+
+
+    StockTotalCtn += stockPcs
+    withdrawTotalCtn += withdrawPcs
+    goodTotalCtn += goodPcs
+    damagedTotalCtn += damagedPcs
+    saleTotalCtn += salePcs
+    promotionTotalCtn += promotionPcs
+    changeTotalCtn += changePcs
+    adjustTotalCtn += adjustPcs
+    giveTotalCtn += givePcs
+    balTotalCtn += balPcs
+  })
+  // console.log(pcs)
+
+
+
+
+
+
+
+
+
+
+
+
 
   for (const i of data) {
 
@@ -1908,17 +1965,25 @@ exports.getStockQtyNew = async (req, res) => {
     data: listUnitPcs,
     // data: data,
     summaryStock: Number(summaryStock.toFixed(2)),
-    summaryStockBal: Number(summaryStockBal.toFixed(2)),
+    StockTotalCtn,
     summaryWithdraw: Number(summaryWithdraw.toFixed(2)),
+    withdrawTotalCtn,
     summaryGood: Number(summaryGood.toFixed(2)),
+    goodTotalCtn,
     summaryDamaged: Number(summaryDamaged.toFixed(2)),
+    damagedTotalCtn,
     summarySale: Number(summarySale.toFixed(2)),
+    saleTotalCtn,
     summaryPromotion: Number(summaryPromotion.toFixed(2)),
+    promotionTotalCtn,
     summaryChange: Number(summaryChange.toFixed(2)),
+    changeTotalCtn,
     summaryAdjust: Number(summaryAdjust.toFixed(2)),
+    adjustTotalCtn,
     summaryGive: Number(summaryGive.toFixed(2)),
-    summaryStockPcs: Number(summaryStockPcs.toFixed(2)),
-    summaryStockBalPcs: Number(summaryStockBalPcs.toFixed(2))
+    giveTotalCtn,
+    summaryStockBal: Number(summaryStockBal.toFixed(2)),
+    balTotalCtn
   })
 }
 

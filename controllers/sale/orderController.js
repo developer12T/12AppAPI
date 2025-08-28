@@ -4182,7 +4182,7 @@ exports.checkOrderCancelM3 = async (req, res) => {
 
 exports.getTarget = async (req, res) => {
 
-  const { period, area } = req.query
+  const { area, startDate, endDate } = req.query
   const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const { Order } = getModelsByChannel(channel, res, orderModel)
@@ -4190,16 +4190,23 @@ exports.getTarget = async (req, res) => {
   const { Product } = getModelsByChannel(channel, res, productModel)
   const { Stock } = getModelsByChannel(channel, res, stockModel)
   const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
-  const periodStr = period
-  const year = Number(periodStr.substring(0, 4))
-  const month = Number(periodStr.substring(4, 6))
 
-  // หาช่วงเวลา UTC ของเดือนที่ต้องการ (แปลงจากเวลาไทย)
-  const thOffset = 7 * 60 * 60 * 1000
-  const startOfMonthTH = new Date(year, month - 1, 1, 0, 0, 0, 0)
-  const endOfMonthTH = new Date(year, month, 0, 23, 59, 59, 999)
-  const startOfMonthUTC = new Date(startOfMonthTH.getTime() - thOffset)
-  const endOfMonthUTC = new Date(endOfMonthTH.getTime() - thOffset)
+
+  const product = await Product.find()
+
+
+  const startTH = new Date(
+    `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
+      6,
+      8
+    )}T00:00:00+07:00`
+  )
+  const endTH = new Date(
+    `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(
+      6,
+      8
+    )}T23:59:59.999+07:00`
+  )
 
   const [dataSendmoney, dataRefund, dataOrderSale, dataOrderChange] =
     await Promise.all([
@@ -4211,7 +4218,7 @@ exports.getTarget = async (req, res) => {
         {
           $match: {
             area: area,
-            dateAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC }
+            dateAt: { $gte: startTH, $lte: endTH }
           }
         },
         {
@@ -4222,39 +4229,54 @@ exports.getTarget = async (req, res) => {
       ]),
       Refund.find({
         'store.area': area,
-        period: periodStr,
-        createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+        createdAt: { $gte: startTH, $lte: endTH },
         type: 'refund',
         status: { $nin: ['pending', 'canceled', 'reject'] }
       }),
       Order.find({
         'store.area': area,
-        period: periodStr,
-        createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+        createdAt: { $gte: startTH, $lte: endTH },
         type: 'sale',
         status: { $nin: ['canceled'] }
       }),
       Order.find({
         'store.area': area,
-        period: periodStr,
-        createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+        createdAt: { $gte: startTH, $lte: endTH },
         type: 'change',
         status: { $nin: ['pending', 'canceled', 'reject'] }
       })
     ])
 
-  // const refundGood = dataRefund.filter(item => item.condition === 'good').reduce((sum, item) => sum + (Number(item?.total) || 0), 0);
+  const totalSendmoney = (dataSendmoney ?? [])
+    .reduce((sum, item) => sum + (Number(item?.sendmoney) || 0), 0);
+
+  // const refundDamagedCtn = dataRefund.map(item => item.)
+
+
+
 
   const refundDamagedTotal = (dataRefund ?? [])
     .reduce((sum, d) => sum + (d.listProduct ?? [])
       .reduce((s, p) => s + (String(p?.condition).toLowerCase() === 'damaged' ? Number(p?.total) || 0 : 0), 0), 0);
-
+  const refundDamagedPcs = (dataRefund ?? [])
+    .reduce((sum, d) => sum + (d.listProduct ?? [])
+      .reduce((s, p) => s + (String(p?.condition).toLowerCase() === 'damaged' ? Number(p?.qtyPcs) || 0 : 0), 0), 0);
   const refundGoodTotal = (dataRefund ?? [])
     .reduce((sum, d) => sum + (d.listProduct ?? [])
       .reduce((s, p) => s + (String(p?.condition).toLowerCase() === 'good' ? Number(p?.total) || 0 : 0), 0), 0);
+  const refundGoodPcs = (dataRefund ?? [])
+    .reduce((sum, d) => sum + (d.listProduct ?? [])
+      .reduce((s, p) => s + (String(p?.condition).toLowerCase() === 'good' ? Number(p?.qtyPcs) || 0 : 0), 0), 0);
 
-  const totalSendmoney = (dataSendmoney ?? [])
-    .reduce((sum, item) => sum + (Number(item?.sendmoney) || 0), 0);
+  const salePcs = dataOrderSale.map(item => item.listProduct.map(i => {
+    const productDetail = product.find(u => u.id === i.id)
+
+    return 
+  })
+  )
+
+
+
 
 
 
@@ -4281,10 +4303,19 @@ exports.getTarget = async (req, res) => {
   res.status(200).json({
     status: 200,
     message: 'Sucess',
-    target:target,
-    sale:final,
-    remaining: to2(remaining),
-    remainingPercent : to2(remainingPercent)
+    saleQty: final,
+    good: final,
+    goodQty: to2(remaining),
+    damaged: to2(remainingPercent),
+    damagedQty: to2(remainingPercent),
+    refund: to2(remainingPercent),
+    refundQty: to2(remainingPercent),
+    give: to2(remainingPercent),
+    giveQty: to2(remainingPercent),
+    withdraw: to2(remainingPercent),
+    withdrawQty: to2(remainingPercent),
+    recieve: to2(remainingPercent),
+    recieveQty: to2(remainingPercent)
   })
 
 }
