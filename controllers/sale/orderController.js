@@ -4249,18 +4249,42 @@ exports.getTarget = async (req, res) => {
     .reduce((sum, d) => sum + (d.listProduct ?? [])
       .reduce((s, p) => s + (String(p?.condition).toLowerCase() === 'damaged' ? Number(p?.total) || 0 : 0), 0), 0);
 
+  const refundGoodTotal = (dataRefund ?? [])
+    .reduce((sum, d) => sum + (d.listProduct ?? [])
+      .reduce((s, p) => s + (String(p?.condition).toLowerCase() === 'good' ? Number(p?.total) || 0 : 0), 0), 0);
 
-  console.log(refundDamagedTotal)
+  const totalSendmoney = (dataSendmoney ?? [])
+    .reduce((sum, item) => sum + (Number(item?.sendmoney) || 0), 0);
 
-  // const target = {
 
-  // }
+
+  const saleTotal =
+    (dataOrderSale ?? [])
+      .flatMap(o => o.listProduct ?? [])
+      .reduce((s, p) => s + (+p.netTotal || 0), 0);
+
+
+  const changeTotal =
+    (dataOrderChange ?? [])
+      .flatMap(o => o.listProduct ?? [])
+      .reduce((s, p) => s + (+p.netTotal || 0), 0);
+
+  const diffChange = to2(changeTotal - refundDamagedTotal - refundGoodTotal)
+
+  const final = to2(saleTotal + diffChange)
+
+  const target = 1000000
+  const remaining = target - final
+  const remainingPercent = (remaining / target) * 100
 
 
   res.status(200).json({
     status: 200,
     message: 'Sucess',
-    data: dataRefund
+    target:target,
+    sale:final,
+    remaining: to2(remaining),
+    remainingPercent : to2(remainingPercent)
   })
 
 }
