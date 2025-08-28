@@ -113,9 +113,8 @@ exports.getRoute = async (req, res) => {
     // console.log(enrichedRoutes)
 
     if (area && period && !routeId && !storeId) {
-       enrichedRoutes = enrichedRoutes.map(({ listStore, ...rest }) => rest);
+      enrichedRoutes = enrichedRoutes.map(({ listStore, ...rest }) => rest)
     }
-
 
     // }
     // const io = getSocket()
@@ -2079,7 +2078,7 @@ exports.checkRouteStore = async (req, res) => {
       areaMap[area].del = storeCountMap[area]?.del || 0
     }
 
-    function sortKeys(obj) {
+    function sortKeys (obj) {
       const { area, R, del, ...days } = obj
       const sortedDays = Object.keys(days)
         .filter(k => /^R\d+$/.test(k))
@@ -2109,12 +2108,45 @@ exports.checkRouteStore = async (req, res) => {
 
 exports.polylineRoute = async (req, res) => {
   try {
-    const { area, period } = req.query
+    const { area, period, startDate, endDate } = req.query
     const channel = req.headers['x-channel']
     const { Route } = getModelsByChannel(channel, res, routeModel)
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
-    const dataRoute = await Route.find({ area, period })
+    const pipeline = [
+      {
+        $match: {
+          area: area,
+          period: period
+        }
+      }
+    ]
+
+    if (startDate && endDate) {
+      const startTH = new Date(
+        `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
+          6,
+          8
+        )}T00:00:00+07:00`
+      )
+      const endTH = new Date(
+        `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(
+          6,
+          8
+        )}T23:59:59.999+07:00`
+      )
+      pipeline.push({
+        $match: {
+          "listStore.date": {
+            $gte: startTH,
+            $lte: endTH
+          }
+        }
+      })
+    }
+
+    // const dataRoute = await Route.find({ area, period })
+    const dataRoute = await Route.aggregate(pipeline)
 
     const storeId = dataRoute.flatMap(item =>
       item.listStore.map(i => i.storeInfo)
