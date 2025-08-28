@@ -42,6 +42,7 @@ const cartModel = require('../../models/cash/cart')
 const userModel = require('../../models/cash/user')
 const productModel = require('../../models/cash/product')
 const routeModel = require('../../models/cash/route')
+const giveModel = require('../../models/cash/give')
 const promotionModel = require('../../models/cash/promotion')
 const distributionModel = require('../../models/cash/distribution')
 const refundModel = require('../../models/cash/refund')
@@ -4188,10 +4189,14 @@ exports.getTarget = async (req, res) => {
   const { Order } = getModelsByChannel(channel, res, orderModel)
   const { Refund } = getModelsByChannel(channel, res, refundModel)
   const { Product } = getModelsByChannel(channel, res, productModel)
-  const { Stock } = getModelsByChannel(channel, res, stockModel)
+  const { Stock, AdjustStock } = getModelsByChannel(channel, res, stockModel)
   const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
-
-
+  const { Giveaway } = getModelsByChannel(channel, res, giveModel)
+  const { Distribution, WereHouse } = getModelsByChannel(
+    channel,
+    res,
+    distributionModel
+  )
   const product = await Product.find()
 
 
@@ -4208,7 +4213,7 @@ exports.getTarget = async (req, res) => {
     )}T23:59:59.999+07:00`
   )
 
-  const [dataSendmoney, dataRefund, dataOrderSale, dataOrderChange] =
+  const [dataSendmoney, dataRefund, dataOrderSale, dataOrderChange, dataGive, datawithdraw, dataAdjustStock] =
     await Promise.all([
       // SendMoney.find({
       //   area: area,
@@ -4244,78 +4249,370 @@ exports.getTarget = async (req, res) => {
         createdAt: { $gte: startTH, $lte: endTH },
         type: 'change',
         status: { $nin: ['pending', 'canceled', 'reject'] }
+      }),
+      Giveaway.find({
+        'store.area': area,
+        createdAt: { $gte: startTH, $lte: endTH },
+        type: 'give',
+        status: { $nin: ['canceled', 'reject'] }
+      }),
+      Distribution.find({
+        area: area,
+        createdAt: { $gte: startTH, $lte: endTH },
+        type: 'withdraw',
+        status: { $nin: ['pending', 'canceled', 'reject'] }
+      }),
+      AdjustStock.find({
+        area: area,
+        createdAt: { $gte: startTH, $lte: endTH },
+        type: 'adjuststock',
+        status: { $nin: ['pending', 'canceled', 'reject'] }
       })
     ])
+
+
 
   const totalSendmoney = (dataSendmoney ?? [])
     .reduce((sum, item) => sum + (Number(item?.sendmoney) || 0), 0);
 
-  // const refundDamagedCtn = dataRefund.map(item => item.)
 
+  const salePcs = Object.values(
+    (dataOrderSale || []).flatMap(order =>
+      (order.listProduct || []).map(i => {
+        const factor = product.find(u => u.id === i.id)
+          ?.listUnit.find(u => u.unit === i.unit)?.factor ?? 1
 
+        return {
+          id: i.id,
+          qtyPcs: (i.qty || 0) * factor,
+          sale: i.netTotal || 0
+        }
+      })
+    ).reduce((acc, cur) => {
+      if (!acc[cur.id]) acc[cur.id] = { id: cur.id, qtyPcs: 0, sale: 0 }
+      acc[cur.id].qtyPcs += cur.qtyPcs
+      acc[cur.id].sale += cur.sale
+      return acc
+    }, {})
+  )
+  let sale = 0
+  let saleQty = 0
 
+  for (const item of salePcs) {
+    const factorCtn = product.find(u => u.id === item.id)
+      ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
 
-  const refundDamagedTotal = (dataRefund ?? [])
-    .reduce((sum, d) => sum + (d.listProduct ?? [])
-      .reduce((s, p) => s + (String(p?.condition).toLowerCase() === 'damaged' ? Number(p?.total) || 0 : 0), 0), 0);
-  const refundDamagedPcs = (dataRefund ?? [])
-    .reduce((sum, d) => sum + (d.listProduct ?? [])
-      .reduce((s, p) => s + (String(p?.condition).toLowerCase() === 'damaged' ? Number(p?.qtyPcs) || 0 : 0), 0), 0);
-  const refundGoodTotal = (dataRefund ?? [])
-    .reduce((sum, d) => sum + (d.listProduct ?? [])
-      .reduce((s, p) => s + (String(p?.condition).toLowerCase() === 'good' ? Number(p?.total) || 0 : 0), 0), 0);
-  const refundGoodPcs = (dataRefund ?? [])
-    .reduce((sum, d) => sum + (d.listProduct ?? [])
-      .reduce((s, p) => s + (String(p?.condition).toLowerCase() === 'good' ? Number(p?.qtyPcs) || 0 : 0), 0), 0);
+    const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
+    saleQty += saleCtn
+    sale += item.sale
 
-  const salePcs = dataOrderSale.map(item => item.listProduct.map(i => {
-    const productDetail = product.find(u => u.id === i.id)
+  }
 
-    return 
-  })
+  const goodPcs = Object.values(
+    (dataRefund || [])
+      .flatMap(o => o.listProduct || [])
+      .filter(i => i.condition === 'good') // เลือกเฉพาะ good
+      .map(i => {
+        const meta = (product || []).find(u => String(u.id) === String(i.id))
+        const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
+        return {
+          id: i.id,
+          qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
+          sale: Number(i.total) || 0
+        }
+      })
+      .reduce((acc, cur) => {
+        (acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 })
+        acc[cur.id].qtyPcs += cur.qtyPcs
+        acc[cur.id].sale += cur.sale
+        return acc
+      }, {})
   )
 
+  let good = 0
+  let goodQty = 0
+
+  for (const item of goodPcs) {
+    const factorCtn = product.find(u => u.id === item.id)
+      ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
+
+    const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
+    goodQty += saleCtn
+    good += item.sale
+
+  }
 
 
+  const damagedPcs = Object.values(
+    (dataRefund || [])
+      .flatMap(o => o.listProduct || [])
+      .filter(i => i.condition === 'damaged') // เลือกเฉพาะ good
+      .map(i => {
+        const meta = (product || []).find(u => String(u.id) === String(i.id))
+        const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
+        return {
+          id: i.id,
+          qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
+          sale: Number(i.total) || 0
+        }
+      })
+      .reduce((acc, cur) => {
+        (acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 })
+        acc[cur.id].qtyPcs += cur.qtyPcs
+        acc[cur.id].sale += cur.sale
+        return acc
+      }, {})
+  )
+
+  let damaged = 0
+  let damagedQty = 0
+
+  for (const item of damagedPcs) {
+    const factorCtn = product.find(u => u.id === item.id)
+      ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
+
+    const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
+    damagedQty += saleCtn
+    damaged += item.sale
+
+  }
 
 
+  const refundPcs = Object.values(
+    (dataRefund || [])
+      .flatMap(o => o.listProduct || [])
+      .map(i => {
+        const meta = (product || []).find(u => String(u.id) === String(i.id))
+        const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
+        return {
+          id: i.id,
+          qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
+          sale: Number(i.total) || 0
+        }
+      })
+      .reduce((acc, cur) => {
+        (acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 })
+        acc[cur.id].qtyPcs += cur.qtyPcs
+        acc[cur.id].sale += cur.sale
+        return acc
+      }, {})
+  )
 
-  const saleTotal =
-    (dataOrderSale ?? [])
-      .flatMap(o => o.listProduct ?? [])
-      .reduce((s, p) => s + (+p.netTotal || 0), 0);
+  let refund = 0
+  let refundQty = 0
+
+  for (const item of refundPcs) {
+    const factorCtn = product.find(u => u.id === item.id)
+      ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
+
+    const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
+    refundQty += saleCtn
+    refund += item.sale
+
+  }
 
 
-  const changeTotal =
-    (dataOrderChange ?? [])
-      .flatMap(o => o.listProduct ?? [])
-      .reduce((s, p) => s + (+p.netTotal || 0), 0);
+  const changePcs = Object.values(
+    (dataOrderChange || [])
+      .flatMap(o => o.listProduct || [])
+      .map(i => {
+        const meta = (product || []).find(u => String(u.id) === String(i.id))
+        const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
+        return {
+          id: i.id,
+          qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
+          sale: Number(i.netTotal) || 0
+        }
+      })
+      .reduce((acc, cur) => {
+        (acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 })
+        acc[cur.id].qtyPcs += cur.qtyPcs
+        acc[cur.id].sale += cur.sale
+        return acc
+      }, {})
+  )
 
-  const diffChange = to2(changeTotal - refundDamagedTotal - refundGoodTotal)
+  let change = 0
+  let changeQty = 0
 
-  const final = to2(saleTotal + diffChange)
+  for (const item of changePcs) {
+    const factorCtn = product.find(u => u.id === item.id)
+      ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
 
-  const target = 1000000
-  const remaining = target - final
-  const remainingPercent = (remaining / target) * 100
+    const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
+    changeQty += saleCtn
+    change += item.sale
+
+  }
+
+
+  const givePcs = Object.values(
+    (dataGive || [])
+      .flatMap(o => o.listProduct || [])
+      .map(i => {
+        const meta = (product || []).find(u => String(u.id) === String(i.id))
+        const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
+        return {
+          id: i.id,
+          qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
+          sale: Number(i.total) || 0
+        }
+      })
+      .reduce((acc, cur) => {
+        (acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 })
+        acc[cur.id].qtyPcs += cur.qtyPcs
+        acc[cur.id].sale += cur.sale
+        return acc
+      }, {})
+  )
+
+  let give = 0
+  let giveQty = 0
+
+  for (const item of givePcs) {
+    const factorCtn = product.find(u => u.id === item.id)
+      ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
+
+    const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
+    giveQty += saleCtn
+    give += item.sale
+
+  }
+
+  const withdrawPcs = Object.values(
+    (datawithdraw || [])
+      .flatMap(o => o.listProduct || [])
+      .map(i => {
+        const meta = (product || []).find(u => String(u.id) === String(i.id))
+        const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
+        return {
+          id: i.id,
+          qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
+          sale: Number(i.total) || 0
+
+        }
+      })
+      .reduce((acc, cur) => {
+        (acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 })
+        acc[cur.id].qtyPcs += cur.qtyPcs
+        acc[cur.id].sale += cur.sale
+        return acc
+      }, {})
+  )
+
+  let withdraw = 0
+  let withdrawQty = 0
+
+  for (const item of withdrawPcs) {
+    const factorCtn = product.find(u => u.id === item.id)
+      ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
+
+    const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
+    withdrawQty += saleCtn
+    withdraw += item.sale
+
+  }
+
+  const recievePcs = Object.values(
+    (datawithdraw || [])
+      .flatMap(o => o.listProduct || [])
+      .map(i => {
+        const meta = (product || []).find(u => String(u.id) === String(i.id))
+        const factor = meta?.listUnit?.find(u => u.unit === 'CTN')?.factor ?? 1
+        // const salePrice = meta?.listUnit?.find(u => u.unit ===  'BOT'||'PCS').price.sale
+        // console.log(i.receiveQty)
+        return {
+          id: i.id,
+          qtyPcs: (Number(i.receiveQty) || 0) * (Number(factor) || 1),
+          // sale: Number(i.receiveQty) * salePrice || 0
+
+        }
+      })
+      .reduce((acc, cur) => {
+        (acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 })
+        acc[cur.id].qtyPcs += cur.qtyPcs
+        // acc[cur.id].sale += cur.sale
+        return acc
+      }, {})
+  )
+
+  let recieve = 0
+  let recieveQty = 0
+
+  for (const item of recievePcs) {
+    const factorCtn = product.find(u => u.id === item.id)
+      ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
+
+    const sale =  product.find(u => u.id === item.id)
+      ?.listUnit.find(u => u.unit === 'CTN')?.price.sale ?? 0
+
+    const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
+
+    const priceCtn = saleCtn * sale
+
+
+    recieveQty += saleCtn
+    recieve += priceCtn
+
+  }
+
+  const adjustPcs = Object.values(
+    (dataAdjustStock || [])
+      .flatMap(o => o.listProduct || [])
+      .map(i => {
+        const meta = (product || []).find(u => String(u.id) === String(i.id))
+        const factor = meta?.listUnit?.find(u => u.unit === i.receiveUnit)?.factor ?? 1
+
+        return {
+          id: i.id,
+          qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
+          sale: Number(i.price) || 0
+
+        }
+      })
+      .reduce((acc, cur) => {
+        (acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 })
+        acc[cur.id].qtyPcs += cur.qtyPcs
+        acc[cur.id].sale += cur.sale
+        return acc
+      }, {})
+  )
+
+  let adjustStock = 0
+  let adjustStockQty = 0
+
+  for (const item of adjustPcs) {
+    const factorCtn = product.find(u => u.id === item.id)
+      ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
+
+    const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
+    adjustStockQty += saleCtn
+    adjustStock += item.sale
+
+  }
 
 
   res.status(200).json({
     status: 200,
     message: 'Sucess',
-    saleQty: final,
-    good: final,
-    goodQty: to2(remaining),
-    damaged: to2(remainingPercent),
-    damagedQty: to2(remainingPercent),
-    refund: to2(remainingPercent),
-    refundQty: to2(remainingPercent),
-    give: to2(remainingPercent),
-    giveQty: to2(remainingPercent),
-    withdraw: to2(remainingPercent),
-    withdrawQty: to2(remainingPercent),
-    recieve: to2(remainingPercent),
-    recieveQty: to2(remainingPercent)
+    sale: to2(sale),
+    saleQty: saleQty,
+    good: to2(good),
+    goodQty: goodQty,
+    damaged: to2(damaged),
+    damagedQty: damagedQty,
+    refund: to2(refund),
+    refundQty: refundQty,
+    change: to2(change),
+    changeQty: changeQty,
+    give: to2(give),
+    giveQty: giveQty,
+    withdraw: to2(withdraw),
+    withdrawQty: withdrawQty,
+    recieve: to2(recieve),
+    recieveQty: recieveQty,
+    adjustStock:to2(adjustStock),
+    adjustStockQty:adjustStockQty
   })
 
 }
