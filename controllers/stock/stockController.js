@@ -3194,11 +3194,14 @@ exports.stockToExcelNew = async (req, res) => {
       let remaining = totalPcs;
       return units.map(u => {
         const qty = Math.floor(remaining / u.factor);
+
+        const price = u.price.sale
         remaining = remaining % u.factor;
         return {
           unit: u.unit,
           unitName: u.name,
-          qty
+          qty,
+          price: qty * price
         };
       });
     };
@@ -3385,18 +3388,24 @@ exports.stockToExcelNew = async (req, res) => {
 
     const stockOutData = mergeDuplicateRows(stockOutDataRaw);
 
-
     // (3) ประกอบ balance ต่อสินค้าใน stock
     const stockOutDataFinal = stockOutData.map(item => {
+
+
       const pid = String(item?.productId || '').trim();
       const productDetailItem = productDetail.find(u => u.id == pid);
       const productDetailUnit = productDetailItem?.listUnit || [];
 
       const prod = prodById.get(pid);
-      // const balanceGood = Number(item?.balancePcs) || 0;
-      // const salePrice = getSalePrice(pid);
-      // const balanceM3 = Number(m3ByPid.get(pid)) || 0;
-      // const balanceDamaged = Number(damagedById.get(pid)) || 0;
+      const sumOutUnit = (item.qtySale || 0)
+        + (item.qtyPromo || 0)
+        + (item.qtyChange || 0)
+        + (item.qtyGive || 0);
+
+
+      const outUnit = convertToUnits(sumOutUnit, productDetailUnit) 
+        const totalPrice = outUnit.reduce((sum, u) => sum + (Number(u.price) || 0), 0);
+
 
       return {
         customerCode: item.customerCode,
@@ -3412,9 +3421,14 @@ exports.stockToExcelNew = async (req, res) => {
         changeUnit: convertToUnits(item.qtyChange, productDetailUnit),
         givePcs: item.qtyGive,
         giveUnit: convertToUnits(item.qtyGive, productDetailUnit),
-        // summary: to2(balanceGood * salePrice)
+        sumOut: sumOutUnit,
+        outUnit: outUnit,
+        totalPrice:totalPrice
       };
     });
+
+    // console.log(stockOutDataFinal)
+
 
     // รวมยอด OUT (รวมก่อน ค่อยปัดทศนิยม)
     const sumStockOutSale = stockOutData.reduce((a, r) => a + (Number(r.qtySale) || 0), 0);
@@ -3506,6 +3520,9 @@ exports.stockToExcelNew = async (req, res) => {
     }, new Map()).values()].map(x => ({ ...x, summary: to2(x.summary) }));
 
 
+
+    let stockInPrice = 0
+
     // (3) ประกอบ balance ต่อสินค้าใน stock
     const stockInSummedFinal = stockInSummed.map(item => {
       const pid = String(item?.productId || '').trim();
@@ -3513,24 +3530,28 @@ exports.stockToExcelNew = async (req, res) => {
       const productDetailUnit = productDetailItem?.listUnit || [];
 
       const prod = prodById.get(pid);
-      // const balanceGood = Number(item?.balancePcs) || 0;
-      // const salePrice = getSalePrice(pid);
-      // const balanceM3 = Number(m3ByPid.get(pid)) || 0;
-      // const balanceDamaged = Number(damagedById.get(pid)) || 0;
 
+      // แปลงเป็นแต่ละ unit
+      const withdrawByUnit = convertToUnits(item.withdraw, productDetailUnit);
+      const goodByUnit = convertToUnits(item.good, productDetailUnit);
+      const sumStockByUnit = convertToUnits(item.sumStock, productDetailUnit);
+
+      // รวมราคาเฉพาะ product นี้
+      const totalPrice = sumStockByUnit.reduce((sum, u) => sum + (Number(u.price) || 0), 0);
 
       return {
         productId: pid,
         productName: prod?.name || '',
         withdraw: item.withdraw,
-        withdrawByUnit: convertToUnits(item.withdraw, productDetailUnit),
+        withdrawByUnit,
         good: item.good,
-        goodByUnit: convertToUnits(item.good, productDetailUnit),
+        goodByUnit,
         sumStock: item.sumStock,
-        sumStockByUnit: convertToUnits(item.sumStock, productDetailUnit),
-        // summary: to2(balanceGood * salePrice)
+        sumStockByUnit,
+        totalPrice
       };
     });
+
 
 
     const prodByIds = new Map((productDetail ?? []).map(p => [String(p.id).trim(), p]));
@@ -3635,18 +3656,19 @@ exports.stockToExcelNew = async (req, res) => {
       const salePrice = getSalePrice(pid);
       const balanceM3 = Number(m3ByPid.get(pid)) || 0;
       const balanceDamaged = Number(damagedById.get(pid)) || 0;
-
-
+      const balanceGoodByUnit = convertToUnits(balanceGood, productDetailUnit)
+      const totalPrice = balanceGoodByUnit.reduce((sum, u) => sum + (Number(u.price) || 0), 0);
       return {
         productId: pid,
         productName: prod?.name || '',
         balanceGood,
-        balanceGoodByUnit: convertToUnits(balanceGood, productDetailUnit),
+        balanceGoodByUnit: balanceGoodByUnit,
         balanceM3,
         balanceM3ByUnit: convertToUnits(balanceM3, productDetailUnit),
         balanceDamaged,
         balanceDamagedByUnit: convertToUnits(balanceDamaged, productDetailUnit),
-        summary: to2(balanceGood * salePrice)
+        // summary: to2(balanceGood * salePrice)
+        totalPrice
       };
     });
 
@@ -3685,6 +3707,7 @@ exports.stockToExcelNew = async (req, res) => {
           'เบิกระหว่างทริป', '', '',
           'รับคืนดี', '', '',
           'รวมจำนวนทั้งหมด', '', '',
+          'มูลค่าทั้งหมด'
           // 'มูลค่าคงเหลือ'
         ],
         // แถว 2: หน่วยย่อย
@@ -3701,6 +3724,7 @@ exports.stockToExcelNew = async (req, res) => {
           q(it.withdrawByUnit, 'CTN'), q(it.withdrawByUnit, 'BAG', 'PAC'), q(it.withdrawByUnit, 'PCS', 'BOT'),
           q(it.goodByUnit, 'CTN'), q(it.goodByUnit, 'BAG', 'PAC'), q(it.goodByUnit, 'PCS', 'BOT'),
           q(it.sumStockByUnit, 'CTN'), q(it.sumStockByUnit, 'BAG', 'PAC'), q(it.sumStockByUnit, 'PCS', 'BOT'),
+          it.totalPrice
           // it.summaryNumeric ?? it.summary
         ]))
       ];
@@ -3737,6 +3761,8 @@ exports.stockToExcelNew = async (req, res) => {
           'จำนวนแถม', '', '',
           'จำนวนที่เปลี่ยน', '', '',
           'จำนวนแจกสินค้า', '', '',
+          'รวมจำนวนทั้งหมด', '', '',
+          'มูลค่าทั้งหมด'
           // 'มูลค่าคงเหลือ'
         ],
         // แถว 2: หน่วยย่อย (ต้องเว้น 3 ช่องแรกให้ตรง A,B,C)
@@ -3747,6 +3773,7 @@ exports.stockToExcelNew = async (req, res) => {
           'หีบ', 'แพค/ถุง', 'ซอง/ขวด', // I,J,K
           'หีบ', 'แพค/ถุง', 'ซอง/ขวด', // L,M,N
           'หีบ', 'แพค/ถุง', 'ซอง/ขวด', // O,P,Q
+          'หีบ', 'แพค/ถุง', 'ซอง/ขวด',
           // 'มูลค่าคงเหลือ'
         ],
         ...stockOutDataFinal.map(it => ([
@@ -3756,6 +3783,8 @@ exports.stockToExcelNew = async (req, res) => {
           q(it.promoUnit, 'CTN'), q(it.promoUnit, 'BAG', 'PAC'), q(it.promoUnit, 'PCS', 'BOT'),
           q(it.changeUnit, 'CTN'), q(it.changeUnit, 'BAG', 'PAC'), q(it.changeUnit, 'PCS', 'BOT'),
           q(it.giveUnit, 'CTN'), q(it.giveUnit, 'BAG', 'PAC'), q(it.giveUnit, 'PCS', 'BOT'),
+          q(it.outUnit, 'CTN'), q(it.outUnit, 'BAG', 'PAC'), q(it.outUnit, 'PCS', 'BOT'),
+          it.totalPrice 
           // it.summaryNumeric ?? it.summary
         ]))
       ];
@@ -3778,6 +3807,7 @@ exports.stockToExcelNew = async (req, res) => {
         { s: { r: 0, c: 8 }, e: { r: 0, c: 10 } },  // I1:K1 จำนวนแถม
         { s: { r: 0, c: 11 }, e: { r: 0, c: 13 } }, // L1:N1 จำนวนที่เปลี่ยน
         { s: { r: 0, c: 14 }, e: { r: 0, c: 16 } }, // O1:Q1 จำนวนแจกสินค้า
+        { s: { r: 0, c: 17 }, e: { r: 0, c: 19 } },
 
         // ถ้ามี "มูลค่าคงเหลือ" เพิ่มคอลัมน์ R แล้ว merge: { s:{r:0,c:17}, e:{r:1,c:17} }
       ];
@@ -3806,7 +3836,7 @@ exports.stockToExcelNew = async (req, res) => {
           'จำนวนคงเหลือดี', '', '',
           'จำนวนคงจากM3', '', '',
           'จำนวนคงเหลือเสีย', '', '',
-          // 'มูลค่าคงเหลือ'
+          'มูลค่าคงเหลือดี'
         ],
         // แถว 2: หน่วยย่อย
         ['รหัส', 'ชื่อสินค้า',
@@ -3822,7 +3852,7 @@ exports.stockToExcelNew = async (req, res) => {
           q(it.balanceGoodByUnit, 'CTN'), q(it.balanceGoodByUnit, 'BAG', 'PAC'), q(it.balanceGoodByUnit, 'PCS', 'BOT'),
           q(it.balanceM3ByUnit, 'CTN'), q(it.balanceM3ByUnit, 'BAG', 'PAC'), q(it.balanceM3ByUnit, 'PCS', 'BOT'),
           q(it.balanceDamagedByUnit, 'CTN'), q(it.balanceDamagedByUnit, 'BAG', 'PAC'), q(it.balanceDamagedByUnit, 'PCS', 'BOT'),
-          // it.summaryNumeric ?? it.summary
+          it.totalPrice
         ]))
       ];
 
