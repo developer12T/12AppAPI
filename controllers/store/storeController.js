@@ -866,7 +866,7 @@ exports.insertStoreToM3 = async (req, res) => {
     Hcase: 1,
     customerNo: item.storeId,
     customerStatus: item.status ?? '',
-    customerName: item.name ?? '',
+    customerName: item.name.substring(0, 35) ?? '',
     customerChannel: '103',
     customerCoType: item.type ?? '',
     customerAddress1: (
@@ -890,7 +890,7 @@ exports.insertStoreToM3 = async (req, res) => {
         item.province +
         item.postCode ?? ''
     ).substring(70, 105),
-    customerAddress4: '',
+    customerAddress4: item.name.substring(35, 70),
     customerPoscode: (item.postCode ?? '').substring(0, 35),
     customerPhone: item.tel ?? '',
     warehouse: dataUser.warehouse ?? '',
@@ -906,9 +906,18 @@ exports.insertStoreToM3 = async (req, res) => {
     saleZone: dataUser.zone ?? '',
     shippings: item.shippingAddress.map(u => {
       return {
-        shippingAddress1: (u.address ?? '').substring(0, 35),
-        shippingAddress2: u.district ?? '',
-        shippingAddress3: u.subDistrict ?? '',
+        shippingAddress1: (
+          u.address + u.subDistrict + u.subDistrict + u.province + u.postCode ??
+          ''
+        ).substring(0, 35),
+        shippingAddress2: (
+          u.address + u.subDistrict + u.subDistrict + u.province + u.postCode ??
+          ''
+        ).substring(35, 70),
+        shippingAddress3: (
+          u.address + u.subDistrict + u.subDistrict + u.province + u.postCode ??
+          ''
+        ).substring(70, 105),
         shippingAddress4: u.province ?? '',
         shippingPoscode: u.postCode ?? '',
         shippingPhone: item.tel ?? '',
