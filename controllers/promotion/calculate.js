@@ -21,7 +21,7 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
         ...(r.productGroup ? { group: r.productGroup } : {}),
         ...(r.productFlavour ? { flavour: r.productFlavour } : {}),
         ...(r.productBrand ? { brand: r.productBrand } : {}),
-        // ...(r.productUnit ? { unit: r.productUnit } : {}),
+        ...(r.productSize ? { size: r.productSize } : {}),
         // ...(r.productQty: ? { balancePcs: r.productQty: } : {}),
     }))
     // console.log(rewardFilters)
