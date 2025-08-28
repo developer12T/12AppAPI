@@ -2135,14 +2135,25 @@ exports.polylineRoute = async (req, res) => {
           8
         )}T23:59:59.999+07:00`
       )
-      pipeline.push({
-        $match: {
-          "listStore.date": {
-            $gte: startTH,
-            $lte: endTH
+     pipeline.push(
+    {
+      $addFields: {
+        listStore: {
+          $filter: {
+            input: "$listStore",
+            as: "s",
+            cond: {
+              $and: [
+                { $gte: ["$$s.date", startTH] },
+                { $lt:  ["$$s.date", endExclusiveTH] }
+              ]
+            }
           }
         }
-      })
+      }
+    },
+    { $match: { "listStore.0": { $exists: true } } }
+  );
     }
 
     // const dataRoute = await Route.find({ area, period })

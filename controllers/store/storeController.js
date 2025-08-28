@@ -46,7 +46,6 @@ const refundModel = require('../../models/cash/refund')
 const DistributionModel = require('../../models/cash/distribution')
 const promotionModel = require('../../models/cash/promotion')
 const { getModelsByChannel } = require('../../middleware/channel')
-const sharp = require('sharp')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
@@ -363,12 +362,6 @@ exports.addStore = async (req, res) => {
 
         const originalPath = uploadedFile[0].fullPath // เช่น .../public/images/stores/xxx.jpg
         const webpPath = originalPath.replace(/\.[a-zA-Z]+$/, '.webp') // แปลงชื่อไฟล์นามสกุล .webp
-
-        await sharp(originalPath)
-          .rotate()
-          .resize(800)
-          .webp({ quality: 80 })
-          .toFile(webpPath)
 
         fs.unlinkSync(originalPath)
         uploadedFiles.push({
@@ -866,7 +859,7 @@ exports.insertStoreToM3 = async (req, res) => {
     Hcase: 1,
     customerNo: item.storeId,
     customerStatus: item.status ?? '',
-    customerName: item.name ?? '',
+    customerName: item.name.substring(0, 35) ?? '',
     customerChannel: '103',
     customerCoType: item.type ?? '',
     customerAddress1: (
@@ -890,7 +883,7 @@ exports.insertStoreToM3 = async (req, res) => {
         item.province +
         item.postCode ?? ''
     ).substring(70, 105),
-    customerAddress4: '',
+    customerAddress4: item.name.substring(35, 70),
     customerPoscode: (item.postCode ?? '').substring(0, 35),
     customerPhone: item.tel ?? '',
     warehouse: dataUser.warehouse ?? '',
@@ -906,9 +899,18 @@ exports.insertStoreToM3 = async (req, res) => {
     saleZone: dataUser.zone ?? '',
     shippings: item.shippingAddress.map(u => {
       return {
-        shippingAddress1: (u.address ?? '').substring(0, 35),
-        shippingAddress2: u.district ?? '',
-        shippingAddress3: u.subDistrict ?? '',
+        shippingAddress1: (
+          u.address + u.subDistrict + u.subDistrict + u.province + u.postCode ??
+          ''
+        ).substring(0, 35),
+        shippingAddress2: (
+          u.address + u.subDistrict + u.subDistrict + u.province + u.postCode ??
+          ''
+        ).substring(35, 70),
+        shippingAddress3: (
+          u.address + u.subDistrict + u.subDistrict + u.province + u.postCode ??
+          ''
+        ).substring(70, 105),
         shippingAddress4: u.province ?? '',
         shippingPoscode: u.postCode ?? '',
         shippingPhone: item.tel ?? '',

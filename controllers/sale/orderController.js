@@ -195,8 +195,8 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-        .map(item => item.price)
-        .reduce((sum, price) => sum + price, 0)
+          .map(item => item.price)
+          .reduce((sum, price) => sum + price, 0)
       : 0
     const total = subtotal - discountProduct
     const newOrder = new Order({
@@ -788,7 +788,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -907,7 +907,8 @@ exports.addSlip = async (req, res) => {
 }
 
 exports.OrderToExcel = async (req, res) => {
-  const { channel, startDate, endDate } = req.query
+  const { channel } = req.query
+  let { startDate, endDate } = req.query
 
   // console.log(channel, date)
   let statusArray = (req.query.status || '')
@@ -939,6 +940,17 @@ exports.OrderToExcel = async (req, res) => {
   // })
 
   // ช่วงเวลา "ไทย" ที่ผู้ใช้เลือก
+
+  if (!/^\d{8}$/.test(startDate)) {
+    const nowTH = new Date(
+      new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })
+    )
+    const y = nowTH.getFullYear()
+    const m = String(nowTH.getMonth() + 1).padStart(2, '0')
+    const d = String(nowTH.getDate()).padStart(2, '0') // ← ใช้ getDate() ไม่ใช่ getDay()
+    startDate = `${y}${m}${d}` // YYYYMMDD
+    endDate = `${y}${m}${d}` // YYYYMMDD
+  }
   const startTH = new Date(
     `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
       6,
@@ -1068,7 +1080,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1179,7 +1191,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromChange = modelChange.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1442,7 +1454,7 @@ exports.OrderToExcel = async (req, res) => {
       message: 'Not Found Order'
     })
   }
-  function yyyymmddToDdMmYyyy(dateString) {
+  function yyyymmddToDdMmYyyy (dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -1484,7 +1496,7 @@ exports.OrderToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     }
   )
 
@@ -4128,28 +4140,28 @@ exports.checkOrderCancelM3 = async (req, res) => {
     const type = saleSet.has(id)
       ? 'Sale'
       : refundSet.has(id)
-        ? 'Refund'
-        : changeSet.has(id)
-          ? 'Change'
-          : ''
+      ? 'Refund'
+      : changeSet.has(id)
+      ? 'Change'
+      : ''
 
     const typeId =
       type === 'Sale'
         ? 'A31'
         : type === 'Refund'
-          ? 'A34'
-          : type === 'Change'
-            ? 'B31'
-            : ''
+        ? 'A34'
+        : type === 'Change'
+        ? 'B31'
+        : ''
 
     const statusTablet =
       type === 'Sale'
         ? saleStatusMap.get(id) ?? ''
         : type === 'Refund'
-          ? refundStatusMap.get(id) ?? ''
-          : type === 'Change'
-            ? changeStatusMap.get(id) ?? ''
-            : ''
+        ? refundStatusMap.get(id) ?? ''
+        : type === 'Change'
+        ? changeStatusMap.get(id) ?? ''
+        : ''
 
     return { orderId: id, type, typeId, statusTablet }
   })
@@ -4171,7 +4183,7 @@ exports.checkOrderCancelM3 = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => { })
+    fs.unlink(tempPath, () => {})
   })
 
   // res.status(200).json({
