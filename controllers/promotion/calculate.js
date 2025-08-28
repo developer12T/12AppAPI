@@ -24,7 +24,7 @@ async function rewardProduct(rewards, order, multiplier, channel, res) {
         // ...(r.productUnit ? { unit: r.productUnit } : {}),
         // ...(r.productQty: ? { balancePcs: r.productQty: } : {}),
     }))
-
+    // console.log(rewardFilters)
     // 1. ดึง stock + รายละเอียด product ออกมาครบจบใน aggregate แล้ว
     const stockList = await Stock.aggregate([
         {
@@ -346,6 +346,7 @@ async function applyPromotion(order, channel, res) {
 
     const promotions = await Promotion.find({ status: 'active' })
 
+
     const dataStore = await Store.aggregate([
         { $match: query },
         {
@@ -362,11 +363,13 @@ async function applyPromotion(order, channel, res) {
 
 
 
+
     for (const promo of promotions) {
+        // console.log(promo.proId)
+
         let promoApplied = false
         let promoDiscount = 0
         let freeProducts = []
-
         if (promo.applicableTo?.store?.length > 0 && !promo.applicableTo.store.includes(order.store?.storeId)) continue;
         if (promo.applicableTo?.typeStore?.length > 0 && !promo.applicableTo.typeStore.includes(order.store?.storeType)) continue;
         if (promo.applicableTo?.zone?.length > 0 && !promo.applicableTo.zone.includes(order.store?.zone)) continue;
@@ -398,18 +401,19 @@ async function applyPromotion(order, channel, res) {
         }
 
 
+
         let matchedProducts = order.listProduct.filter((product) =>
             promo.conditions.some((condition) =>
                 (condition.productId.length === 0 || condition.productId.includes(product.id)) &&
                 (condition.productGroup.length === 0 || condition.productGroup.includes(product.group)) &&
                 (condition.productBrand.length === 0 || condition.productBrand.includes(product.brand)) &&
                 (condition.productFlavour.length === 0 || condition.productFlavour.includes(product.flavour)) &&
-                (condition.productSize.length === 0 || condition.productSize.includes(product.size)) 
+                (condition.productSize.length === 0 || condition.productSize.includes(product.size))
                 // &&
                 // (condition.productUnit.length === 0 || condition.productUnit.includes(product.unit))
+
             )
         )
-
 
         if (matchedProducts.length === 0) continue
 
@@ -417,16 +421,16 @@ async function applyPromotion(order, channel, res) {
         let totalQty = matchedProducts.reduce((sum, p) => sum + p.qtyPcs, 0)
 
 
+
         // const totalQtyPcs = 
-        // console.log(promo.conditions)
         let meetsCondition = promo.conditions.some(condition =>
             (promo.proType === 'free' && condition.productQty >= 0 && totalQty >= condition.productQty) ||
             (promo.proType === 'amount' && condition.productAmount >= 0 && totalAmount >= condition.productAmount)
 
         )
-        // console.log(meetsCondition)
+        // console.log(promo.proId)        
         if (!meetsCondition) continue
-
+        // console.log(promo.proId)
         let multiplier = 1
         if (promo.rewards[0]?.limitType === 'unlimited') {
             multiplier = promo.conditions.reduce((multiplier, condition) => {
@@ -440,7 +444,7 @@ async function applyPromotion(order, channel, res) {
             }, 1)
             // console.log(multiplier)
         }
-        // console.log(promo.rewards)
+        // console.log(promo.proId)
         switch (promo.proType) {
             case 'amount':
                 freeProducts = await rewardProduct(promo.rewards, order, multiplier, channel, res)
@@ -474,7 +478,7 @@ async function applyPromotion(order, channel, res) {
 
         // ถ้าแจกได้น้อยกว่าหรือเท่ากับ multiplier → ส่งกลับเป็น array ว่าง
         if (qtyInPromo < (Number(multiplier) || 0)) {
-            return { appliedPromotions: [] };
+            continue;
         }
 
 
