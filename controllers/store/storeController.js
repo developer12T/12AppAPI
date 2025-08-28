@@ -46,7 +46,6 @@ const refundModel = require('../../models/cash/refund')
 const DistributionModel = require('../../models/cash/distribution')
 const promotionModel = require('../../models/cash/promotion')
 const { getModelsByChannel } = require('../../middleware/channel')
-const sharp = require('sharp')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
@@ -363,12 +362,6 @@ exports.addStore = async (req, res) => {
 
         const originalPath = uploadedFile[0].fullPath // เช่น .../public/images/stores/xxx.jpg
         const webpPath = originalPath.replace(/\.[a-zA-Z]+$/, '.webp') // แปลงชื่อไฟล์นามสกุล .webp
-
-        await sharp(originalPath)
-          .rotate()
-          .resize(800)
-          .webp({ quality: 80 })
-          .toFile(webpPath)
 
         fs.unlinkSync(originalPath)
         uploadedFiles.push({
