@@ -378,36 +378,6 @@ const Warehouse = sequelize.define(
   }
 )
 
-const Sale = sequelize.define(
-  'OOHEAD',
-  {
-    coNo: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      primaryKey: true,
-      field: 'OAORNO'
-    }
-    // warehouse: {
-    //   type: DataTypes.INTEGER,
-    //   allowNull: false,
-    //   primaryKey: true,
-    //   field: 'MWWHLO'
-    // },
-    // warehouseName: {
-    //   type: DataTypes.STRING,
-    //   allowNull: false,
-    //   field: 'MWWHNM'
-    // }
-  },
-  {
-    freezeTableName: true,
-    timestamps: false,
-    createdAt: false,
-    updatedAt: false,
-    primaryKey: false
-  }
-)
-
 const DisributionM3 = sequelize.define(
   'MGHEAD',
   {
@@ -472,10 +442,6 @@ const MGLINE = sequelize.define(
     primaryKey: false
   }
 )
-
-
-
-
 
 const MHDISL = sequelize.define(
   'MHDISL',
@@ -960,7 +926,7 @@ const PromotionStore = sequelize.define(
       allowNull: false,
       primaryKey: true,
       field: 'FBECAR'
-    },
+    }
   },
   {
     freezeTableName: true,
@@ -971,30 +937,46 @@ const PromotionStore = sequelize.define(
   }
 )
 
-
 const OOHEAD = sequelize.define(
   'OOHEAD',
   {
-    OACUOR: {
+    OAORNO: {
       type: DataTypes.STRING,
+      field: 'OAORNO',
       allowNull: false,
-      field: 'OACUOR',
       primaryKey: true
     },
+    OACUOR: { type: DataTypes.STRING, field: 'OACUOR' },
+    OAORST: { type: DataTypes.STRING, field: 'OAORST' },
+    OAORSL: { type: DataTypes.STRING, field: 'OAORSL' }
   },
   {
-    freezeTableName: true,
-    timestamps: false,
-    createdAt: false,
-    updatedAt: false,
-    
+    tableName: 'OOHEAD',
+    schema: 'MVXJDTA', // ✅ ระบุ schema
+    freezeTableName: true, // ✅ กันเติม s
+    timestamps: false
   }
 )
 
-
-
-
-
+const OOLINE = sequelize.define(
+  'OOLINE',
+  {
+    OBORNO: {
+      type: DataTypes.STRING,
+      field: 'OAORNO',
+      allowNull: false
+    },
+    OBCUOR: { type: DataTypes.STRING, field: 'OBCUOR' },
+    OBORST: { type: DataTypes.STRING, field: 'OBORST' },
+    OBORSL: { type: DataTypes.STRING, field: 'OBORSL' }
+  },
+  {
+    tableName: 'OOLINE',
+    schema: 'MVXJDTA', // ✅ ระบุ schema
+    freezeTableName: true, // ✅ กันเติม s
+    timestamps: false
+  }
+)
 
 module.exports = {
   // ItemFac,
@@ -1008,12 +990,13 @@ module.exports = {
   Warehouse,
   Locate,
   Balance,
-  Sale,
+  // Sale,
   DisributionM3,
   NumberSeries,
   OOTYPE,
   Customer,
   MGLINE,
+  OOLINE,
   PromotionStore,
   // MGTYPE,
   // OODFLT
