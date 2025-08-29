@@ -544,6 +544,7 @@ exports.getOrder = async (req, res) => {
 
     // ✅ คำนวณช่วงวัน
     let startDate, endDate
+
     if (start && end) {
       startDate = new Date(start)
       endDate = new Date(end)
@@ -4194,8 +4195,8 @@ exports.checkOrderCancelM3 = async (req, res) => {
 }
 
 exports.getTarget = async (req, res) => {
-
-  const { area, startDate, endDate } = req.query
+  const { area } = req.query
+  let { startDate,endDate } = req.query
   const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const { Order } = getModelsByChannel(channel, res, orderModel)
@@ -4211,6 +4212,16 @@ exports.getTarget = async (req, res) => {
   )
   const product = await Product.find()
 
+  if (!/^\d{8}$/.test(startDate)) {
+    const nowTH = new Date(
+      new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })
+    )
+    const y = nowTH.getFullYear()
+    const m = String(nowTH.getMonth() + 1).padStart(2, '0')
+    const d = String(nowTH.getDate()).padStart(2, '0') // ← ใช้ getDate() ไม่ใช่ getDay()
+    startDate = `${y}${m}${d}` // YYYYMMDD
+    endDate = `${y}${m}${d}` // YYYYMMDD
+  }
 
   const startTH = new Date(
     `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
@@ -4225,99 +4236,111 @@ exports.getTarget = async (req, res) => {
     )}T23:59:59.999+07:00`
   )
 
-  const [dataSendmoney, dataRefund, dataOrderSale, dataOrderChange, dataGive, datawithdraw, dataAdjustStock] =
-    await Promise.all([
-      // SendMoney.find({
-      //   area: area,
-      //   dateAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
-      // }),
-      SendMoney.aggregate([
-        {
-          $match: {
-            area: area,
-            dateAt: { $gte: startTH, $lte: endTH }
-          }
-        },
-        {
-          $addFields: {
-            createdAt: '$dateAt'
-          }
+  const [
+    dataSendmoney,
+    dataRefund,
+    dataOrderSale,
+    dataOrderChange,
+    dataGive,
+    datawithdraw,
+    dataAdjustStock
+  ] = await Promise.all([
+    // SendMoney.find({
+    //   area: area,
+    //   dateAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+    // }),
+    SendMoney.aggregate([
+      {
+        $match: {
+          area: area,
+          dateAt: { $gte: startTH, $lte: endTH }
         }
-      ]),
-      Refund.find({
-        'store.area': area,
-        createdAt: { $gte: startTH, $lte: endTH },
-        type: 'refund',
-        status: { $nin: ['pending', 'canceled', 'reject'] }
-      }),
-      Order.find({
-        'store.area': area,
-        createdAt: { $gte: startTH, $lte: endTH },
-        type: 'sale',
-        status: { $nin: ['canceled'] }
-      }),
-      Order.find({
-        'store.area': area,
-        createdAt: { $gte: startTH, $lte: endTH },
-        type: 'change',
-        status: { $nin: ['pending', 'canceled', 'reject'] }
-      }),
-      Giveaway.find({
-        'store.area': area,
-        createdAt: { $gte: startTH, $lte: endTH },
-        type: 'give',
-        status: { $nin: ['canceled', 'reject'] }
-      }),
-      Distribution.find({
-        area: area,
-        createdAt: { $gte: startTH, $lte: endTH },
-        type: 'withdraw',
-        status: { $nin: ['pending', 'canceled', 'reject'] }
-      }),
-      AdjustStock.find({
-        area: area,
-        createdAt: { $gte: startTH, $lte: endTH },
-        type: 'adjuststock',
-        status: { $nin: ['pending', 'canceled', 'reject'] }
-      })
-    ])
+      },
+      {
+        $addFields: {
+          createdAt: '$dateAt'
+        }
+      }
+    ]),
 
+    Refund.find({
+      'store.area': area,
+      createdAt: { $gte: startTH, $lte: endTH },
+      type: 'refund',
+      status: { $nin: ['pending', 'canceled', 'reject'] }
+    }),
 
+    Order.find({
+      'store.area': area,
+      createdAt: { $gte: startTH, $lte: endTH },
+      type: 'sale',
+      status: { $nin: ['canceled'] }
+    }),
+    Order.find({
+      'store.area': area,
+      createdAt: { $gte: startTH, $lte: endTH },
+      type: 'change',
+      status: { $nin: ['pending', 'canceled', 'reject'] }
+    }),
+    Giveaway.find({
+      'store.area': area,
+      createdAt: { $gte: startTH, $lte: endTH },
+      type: 'give',
+      status: { $nin: ['canceled', 'reject'] }
+    }),
+    Distribution.find({
+      area: area,
+      createdAt: { $gte: startTH, $lte: endTH },
+      type: 'withdraw',
+      status: { $nin: ['pending', 'canceled', 'reject'] }
+    }),
+    AdjustStock.find({
+      area: area,
+      createdAt: { $gte: startTH, $lte: endTH },
+      type: 'adjuststock',
+      status: { $nin: ['pending', 'canceled', 'reject'] }
+    })
+  ])
 
-  const totalSendmoney = (dataSendmoney ?? [])
-    .reduce((sum, item) => sum + (Number(item?.sendmoney) || 0), 0);
-
+  const totalSendmoney = (dataSendmoney ?? []).reduce(
+    (sum, item) => sum + (Number(item?.sendmoney) || 0),
+    0
+  )
 
   const salePcs = Object.values(
-    (dataOrderSale || []).flatMap(order =>
-      (order.listProduct || []).map(i => {
-        const factor = product.find(u => u.id === i.id)
-          ?.listUnit.find(u => u.unit === i.unit)?.factor ?? 1
+    (dataOrderSale || [])
+      .flatMap(order =>
+        (order.listProduct || []).map(i => {
+          const factor =
+            product
+              .find(u => u.id === i.id)
+              ?.listUnit.find(u => u.unit === i.unit)?.factor ?? 1
 
-        return {
-          id: i.id,
-          qtyPcs: (i.qty || 0) * factor,
-          sale: i.netTotal || 0
-        }
-      })
-    ).reduce((acc, cur) => {
-      if (!acc[cur.id]) acc[cur.id] = { id: cur.id, qtyPcs: 0, sale: 0 }
-      acc[cur.id].qtyPcs += cur.qtyPcs
-      acc[cur.id].sale += cur.sale
-      return acc
-    }, {})
+          return {
+            id: i.id,
+            qtyPcs: (i.qty || 0) * factor,
+            sale: i.netTotal || 0
+          }
+        })
+      )
+      .reduce((acc, cur) => {
+        if (!acc[cur.id]) acc[cur.id] = { id: cur.id, qtyPcs: 0, sale: 0 }
+        acc[cur.id].qtyPcs += cur.qtyPcs
+        acc[cur.id].sale += cur.sale
+        return acc
+      }, {})
   )
   let sale = 0
   let saleQty = 0
 
   for (const item of salePcs) {
-    const factorCtn = product.find(u => u.id === item.id)
-      ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
+    const factorCtn =
+      product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
+        ?.factor ?? 1
 
     const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
     saleQty += saleCtn
     sale += item.sale
-
   }
 
   const goodPcs = Object.values(
@@ -4334,7 +4357,7 @@ exports.getTarget = async (req, res) => {
         }
       })
       .reduce((acc, cur) => {
-        (acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 })
+        acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
         acc[cur.id].qtyPcs += cur.qtyPcs
         acc[cur.id].sale += cur.sale
         return acc
@@ -4345,15 +4368,14 @@ exports.getTarget = async (req, res) => {
   let goodQty = 0
 
   for (const item of goodPcs) {
-    const factorCtn = product.find(u => u.id === item.id)
-      ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
+    const factorCtn =
+      product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
+        ?.factor ?? 1
 
     const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
     goodQty += saleCtn
     good += item.sale
-
   }
-
 
   const damagedPcs = Object.values(
     (dataRefund || [])
@@ -4369,7 +4391,7 @@ exports.getTarget = async (req, res) => {
         }
       })
       .reduce((acc, cur) => {
-        (acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 })
+        acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
         acc[cur.id].qtyPcs += cur.qtyPcs
         acc[cur.id].sale += cur.sale
         return acc
@@ -4380,15 +4402,14 @@ exports.getTarget = async (req, res) => {
   let damagedQty = 0
 
   for (const item of damagedPcs) {
-    const factorCtn = product.find(u => u.id === item.id)
-      ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
+    const factorCtn =
+      product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
+        ?.factor ?? 1
 
     const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
     damagedQty += saleCtn
     damaged += item.sale
-
   }
-
 
   const refundPcs = Object.values(
     (dataRefund || [])
@@ -4403,7 +4424,7 @@ exports.getTarget = async (req, res) => {
         }
       })
       .reduce((acc, cur) => {
-        (acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 })
+        acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
         acc[cur.id].qtyPcs += cur.qtyPcs
         acc[cur.id].sale += cur.sale
         return acc
@@ -4414,15 +4435,14 @@ exports.getTarget = async (req, res) => {
   let refundQty = 0
 
   for (const item of refundPcs) {
-    const factorCtn = product.find(u => u.id === item.id)
-      ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
+    const factorCtn =
+      product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
+        ?.factor ?? 1
 
     const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
     refundQty += saleCtn
     refund += item.sale
-
   }
-
 
   const changePcs = Object.values(
     (dataOrderChange || [])
@@ -4437,7 +4457,7 @@ exports.getTarget = async (req, res) => {
         }
       })
       .reduce((acc, cur) => {
-        (acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 })
+        acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
         acc[cur.id].qtyPcs += cur.qtyPcs
         acc[cur.id].sale += cur.sale
         return acc
@@ -4448,15 +4468,14 @@ exports.getTarget = async (req, res) => {
   let changeQty = 0
 
   for (const item of changePcs) {
-    const factorCtn = product.find(u => u.id === item.id)
-      ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
+    const factorCtn =
+      product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
+        ?.factor ?? 1
 
     const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
     changeQty += saleCtn
     change += item.sale
-
   }
-
 
   const givePcs = Object.values(
     (dataGive || [])
@@ -4471,7 +4490,7 @@ exports.getTarget = async (req, res) => {
         }
       })
       .reduce((acc, cur) => {
-        (acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 })
+        acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
         acc[cur.id].qtyPcs += cur.qtyPcs
         acc[cur.id].sale += cur.sale
         return acc
@@ -4482,13 +4501,13 @@ exports.getTarget = async (req, res) => {
   let giveQty = 0
 
   for (const item of givePcs) {
-    const factorCtn = product.find(u => u.id === item.id)
-      ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
+    const factorCtn =
+      product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
+        ?.factor ?? 1
 
     const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
     giveQty += saleCtn
     give += item.sale
-
   }
 
   const withdrawPcs = Object.values(
@@ -4501,11 +4520,10 @@ exports.getTarget = async (req, res) => {
           id: i.id,
           qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
           sale: Number(i.total) || 0
-
         }
       })
       .reduce((acc, cur) => {
-        (acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 })
+        acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
         acc[cur.id].qtyPcs += cur.qtyPcs
         acc[cur.id].sale += cur.sale
         return acc
@@ -4516,13 +4534,13 @@ exports.getTarget = async (req, res) => {
   let withdrawQty = 0
 
   for (const item of withdrawPcs) {
-    const factorCtn = product.find(u => u.id === item.id)
-      ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
+    const factorCtn =
+      product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
+        ?.factor ?? 1
 
     const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
     withdrawQty += saleCtn
     withdraw += item.sale
-
   }
 
   const recievePcs = Object.values(
@@ -4535,13 +4553,12 @@ exports.getTarget = async (req, res) => {
         // console.log(i.receiveQty)
         return {
           id: i.id,
-          qtyPcs: (Number(i.receiveQty) || 0) * (Number(factor) || 1),
+          qtyPcs: (Number(i.receiveQty) || 0) * (Number(factor) || 1)
           // sale: Number(i.receiveQty) * salePrice || 0
-
         }
       })
       .reduce((acc, cur) => {
-        (acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 })
+        acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
         acc[cur.id].qtyPcs += cur.qtyPcs
         // acc[cur.id].sale += cur.sale
         return acc
@@ -4552,20 +4569,20 @@ exports.getTarget = async (req, res) => {
   let recieveQty = 0
 
   for (const item of recievePcs) {
-    const factorCtn = product.find(u => u.id === item.id)
-      ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
+    const factorCtn =
+      product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
+        ?.factor ?? 1
 
-    const sale =  product.find(u => u.id === item.id)
-      ?.listUnit.find(u => u.unit === 'CTN')?.price.sale ?? 0
+    const sale =
+      product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
+        ?.price.sale ?? 0
 
     const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
 
     const priceCtn = saleCtn * sale
 
-
     recieveQty += saleCtn
     recieve += priceCtn
-
   }
 
   const adjustPcs = Object.values(
@@ -4573,17 +4590,17 @@ exports.getTarget = async (req, res) => {
       .flatMap(o => o.listProduct || [])
       .map(i => {
         const meta = (product || []).find(u => String(u.id) === String(i.id))
-        const factor = meta?.listUnit?.find(u => u.unit === i.receiveUnit)?.factor ?? 1
+        const factor =
+          meta?.listUnit?.find(u => u.unit === i.receiveUnit)?.factor ?? 1
 
         return {
           id: i.id,
           qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
           sale: Number(i.price) || 0
-
         }
       })
       .reduce((acc, cur) => {
-        (acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 })
+        acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
         acc[cur.id].qtyPcs += cur.qtyPcs
         acc[cur.id].sale += cur.sale
         return acc
@@ -4594,15 +4611,14 @@ exports.getTarget = async (req, res) => {
   let adjustStockQty = 0
 
   for (const item of adjustPcs) {
-    const factorCtn = product.find(u => u.id === item.id)
-      ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
+    const factorCtn =
+      product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
+        ?.factor ?? 1
 
     const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
     adjustStockQty += saleCtn
     adjustStock += item.sale
-
   }
-
 
   res.status(200).json({
     status: 200,
@@ -4623,9 +4639,7 @@ exports.getTarget = async (req, res) => {
     withdrawQty: withdrawQty,
     recieve: to2(recieve),
     recieveQty: recieveQty,
-    adjustStock:to2(adjustStock),
-    adjustStockQty:adjustStockQty
+    adjustStock: to2(adjustStock),
+    adjustStockQty: adjustStockQty
   })
-
 }
-
