@@ -2145,7 +2145,7 @@ exports.polylineRoute = async (req, res) => {
             cond: {
               $and: [
                 { $gte: ["$$s.date", startTH] },
-                { $lt:  ["$$s.date", endExclusiveTH] }
+                { $lt:  ["$$s.date", endTH] }
               ]
             }
           }
