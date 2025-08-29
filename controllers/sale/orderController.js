@@ -4827,7 +4827,8 @@ exports.getTarget = async (req, res) => {
     recieveQty: recieveQty,
     adjustStock: to2(adjustStock),
     adjustStockQty: adjustStockQty,
-    target: parseFloat(dataTarget.TG_AMOUNT) ?? 0,
-    targetPercent: to2((sale * 100) / parseFloat(dataTarget.TG_AMOUNT)) ?? 0
+    target: parseFloat(dataTarget?.TG_AMOUNT ?? 0),
+    targetPercent:
+      to2((sale * 100) / parseFloat(dataTarget?.TG_AMOUNT ?? 0) ?? 0) ?? 0
   })
 }
