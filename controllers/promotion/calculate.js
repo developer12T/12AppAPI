@@ -324,6 +324,7 @@ async function applyPromotion(order, channel, res) {
 
     // console.log(order)
     const { Promotion } = getModelsByChannel(channel, res, promotionModel);
+    const { Product } = getModelsByChannel(channel, res, productModel);
     const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel);
     const periodStr = period()
     // const periodStr = "202508"
@@ -335,6 +336,12 @@ async function applyPromotion(order, channel, res) {
 
     // console.log("startMonth",startMonth)
     // console.log("nextMonth",nextMonth)
+
+    const productIds = order.listProduct.flatMap(item => item.id)
+
+    const productAll = await Product.find({ id: { $in: productIds } });
+
+
     let discountTotal = 0
     let appliedPromotions = []
 
@@ -401,36 +408,97 @@ async function applyPromotion(order, channel, res) {
         }
 
 
+        const sumOrder = Object.values(
+            (order.listProduct || []).reduce((acc, product) => {
 
-        let matchedProducts = order.listProduct.filter((product) =>
-            promo.conditions.some((condition) =>
-                (condition.productId.length === 0 || condition.productId.includes(product.id)) &&
-                (condition.productGroup.length === 0 || condition.productGroup.includes(product.group)) &&
-                (condition.productBrand.length === 0 || condition.productBrand.includes(product.brand)) &&
-                (condition.productFlavour.length === 0 || condition.productFlavour.includes(product.flavour)) &&
-                (condition.productSize.length === 0 || condition.productSize.includes(product.size))
-                // &&
-                // (condition.productUnit.length === 0 || condition.productUnit.includes(product.unit))
+                const factorPromoPcs = productAll.find(p => p.id === product.id)
+                    ?.listUnit.find(i => i.unit === 'BOT' || i.unit === 'PCS').price.sale
+                if (!acc[product.id]) {
 
-            )
-        )
+                    acc[product.id] = {
+                        id: product.id,
+                        name: product.name,
+                        groupCode: product.groupCode,
+                        group: product.group,
+                        brandCode: product.brandCode,
+                        brand: product.brand,
+                        size: product.size,
+                        flavourCode: product.flavourCode,
+                        flavour: product.flavour,
+                        qtyPcs: product.qtyPcs,
+                        qty: 0,
+                        unit: product.unit,
+                        price: product.price,
+                        total: 0,
+                        qtyPromo: 0,
+                        unitPromo: '',
+                        pricePcs: factorPromoPcs
+                    };
+                }
+
+                // รวมค่า
+                acc[product.id].qty += product.qtyPcs || 0;
+                acc[product.id].total += product.total || 0;
+
+                return acc;
+            }, {})
+        );
+
+        sumOrder.forEach(item => {
+            promo.conditions.some(condition => {
+                if (condition.productUnit) {
+
+                    // ✅ ต้องหา productAll ที่ id ตรงกับ item.id
+                    const factorPromo = productAll.find(p => p.id === item.id)
+                        ?.listUnit.find(i => i.unit === condition.productUnit[0]);
+
+
+
+                    const factor = factorPromo?.factor || 0;
+                    const qtyPromo = factor > 0 ? Math.floor((item.qty || 0) / factor) : 0;
+                    if (qtyPromo > 0) {
+                        item.qtyPromo = qtyPromo;               // อัปเดตกลับเข้า object
+                        item.unitPromo = condition.productUnit[0];
+                        return true; // หยุดที่ condition นี้พอ
+                    }
+                }
+                return false;
+            });
+        });
+
+        // console.log(sumOrder)
+
+        let matchedProducts = sumOrder.filter(product =>
+            promo.conditions.some(condition => {
+                return (
+                    (condition.productId.length === 0 || condition.productId.includes(product.id)) &&
+                    (condition.productGroup.length === 0 || condition.productGroup.includes(product.group)) &&
+                    (condition.productBrand.length === 0 || condition.productBrand.includes(product.brand)) &&
+                    (condition.productFlavour.length === 0 || condition.productFlavour.includes(product.flavour)) &&
+                    (condition.productSize.length === 0 || condition.productSize.includes(product.size))
+                    &&
+                    (condition.productUnit.length === 0 || condition.productUnit.includes(product.unitPromo))
+                )
+            })
+        );
 
         if (matchedProducts.length === 0) continue
 
-        let totalAmount = matchedProducts.reduce((sum, p) => sum + (p.qty * p.price), 0)
-        let totalQty = matchedProducts.reduce((sum, p) => sum + p.qtyPcs, 0)
 
 
+        let totalAmount = matchedProducts.reduce((sum, p) => sum + (p.qtyPcs * p.pricePcs), 0)
+        let totalQty = matchedProducts.reduce((sum, p) => sum + p.qtyPromo, 0)
 
-        // const totalQtyPcs = 
+
         let meetsCondition = promo.conditions.some(condition =>
             (promo.proType === 'free' && condition.productQty >= 0 && totalQty >= condition.productQty) ||
             (promo.proType === 'amount' && condition.productAmount >= 0 && totalAmount >= condition.productAmount)
 
+
         )
-        // console.log(promo.proId)        
+
         if (!meetsCondition) continue
-        // console.log(promo.proId)
+
         let multiplier = 1
         if (promo.rewards[0]?.limitType === 'unlimited') {
             multiplier = promo.conditions.reduce((multiplier, condition) => {
