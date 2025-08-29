@@ -8,8 +8,8 @@ const {
   Warehouse,
   Locate,
   Balance,
-  Sale,
-  DisributionM3
+  DisributionM3,
+  OOHEAD
 } = require('../../models/cash/master')
 const fs = require('fs')
 
@@ -26,30 +26,56 @@ const cartModel = require('../../models/cash/cart')
 const refundModel = require('../../models/cash/refund')
 const adjustStockModel = require('../../models/cash/stock')
 
-
-
-
-
 const { getModelsByChannel } = require('../../middleware/channel')
 const { create } = require('lodash')
 
-async function erpApiCheckOrderJob(channel = 'cash') {
+async function erpApiCheckOrderJob (channel = 'cash') {
   try {
     const { Order } = getModelsByChannel(channel, null, orderModel)
     const { Refund } = getModelsByChannel(channel, null, refundModel)
 
-    // 1. Get sale order numbers (OAORNO) ที่มีใน Sale
-    const modelSale = await Sale.findAll({
+    // // 1. Get sale order numbers (OAORNO) ที่มีใน Sale
+    // const modelSale = await OOHEAD.findAll({
+    //   attributes: [
+    //     'OACUOR',
+    //     [sequelize.fn('COUNT', sequelize.col('OACUOR')), 'count']
+    //   ],
+    //   group: ['OACUOR']
+    // })
+    // const saleIds = modelSale.map(row => row.get('OACUOR').toString())
+
+    // 1) ดึงยอดจากตาราง Sale (SQL)
+    const sales = await OOHEAD.findAll({
       attributes: [
         'OACUOR',
-        [sequelize.fn('COUNT', sequelize.col('OACUOR')), 'count']
+        'OAORNO',
+        'OAORST',
+        'OAORSL',
+        [(sequelize.fn('COUNT', sequelize.col('*')), 'count')]
       ],
-      group: ['OACUOR']
+      group: ['OACUOR'],
+      where: {
+        OACUOR: '6808133120225'
+      },
+      raw: true // จะได้ object ปกติ เช่น { OACUOR: '6808134360150', count: '3' }
     })
-    const saleIds = modelSale.map(row => row.get('OACUOR').toString())
+
+    // 2) ทำ map เพื่ออ้างอิงข้อมูลรายรายการ
+    const saleById = new Map(
+      sales.map(r => [
+        String(r.OACUOR),
+        {
+          count: Number(r.count),
+          lowStatus: String(r.OAORSL),
+          heightStatus: String(r.OAORST),
+          orderNo: String(r.OAORNO)
+        }
+      ])
+    )
 
     // 2. Get pending orderIds ใน MongoDB
-    const inMongo = await Order.find({ status: 'pending' }).select('orderId')
+    // const inMongo = await Order.find({ status: 'pending' }).select('orderId')
+    const inMongo = await Order.find({ orderId: '6808133120225' }).select('orderId')
     const inMongoRefund = await Refund.find({ status: 'pending' }).select(
       'orderId'
     )
@@ -58,31 +84,58 @@ async function erpApiCheckOrderJob(channel = 'cash') {
     const refundIdsInMongo = inMongoRefund.map(item => item.orderId.toString())
 
     // 3. filter ให้เหลือเฉพาะที่อยู่ทั้งสองฝั่ง
-    const matchedIds = orderIdsInMongo.filter(id => saleIds.includes(id))
-    const matchedIdsRefund = inMongoRefund.filter(id => saleIds.includes(id))
+    // const matchedIds = orderIdsInMongo.filter(id => saleIds.includes(id))
+    // const matchedIdsRefund = inMongoRefund.filter(id => saleIds.includes(id))
+    const matchedIds = orderIdsInMongo.filter(id => saleIdSet.has(id))
 
     // 4. อัปเดตทุกตัวที่ match (วนทีละตัว)
     let updatedCount = 0
     let updatedCountReufund = 0
 
-    for (const orderId of matchedIds) {
-      try {
-        const result = await Order.updateOne(
-          { orderId },
-          {
+    // for (const orderId of matchedIds) {
+    //   try {
+    //     const result = await Order.updateOne(
+    //       { orderId },
+    //       {
+    //         $set: {
+    //           status: 'completed',
+    //           statusTH: 'สำเร็จ',
+    //           updatedAt: new Date()
+    //         }
+    //       }
+    //     )
+    //     if (result.modifiedCount > 0) updatedCount++
+    //   } catch (err) {
+    //     console.error(`Error update orderId: ${orderId}`, err)
+    //   }
+    // }
+
+    // 4) อัปเดต Mongo ทีเดียวด้วย bulkWrite (ใส่ OACUOR และข้อมูลจาก Sale)
+    if (matchedIds.length) {
+      const ops = matchedIds.map(orderId => ({
+        updateOne: {
+          filter: { orderId },
+          update: {
             $set: {
               status: 'completed',
               statusTH: 'สำเร็จ',
-              updatedAt: new Date()
+              updatedAt: new Date(),
+              // เก็บ OACUOR ไว้ในเอกสารด้วย (ถ้าต้องการ)
+              oacuor: orderId,
+              // ใส่ข้อมูลประกอบจากฝั่ง Sale (เช่นจำนวนแถวที่เจอ)
+              lowStatus: saleById.get(orderId)?.lowStatus ?? '',
+              heightStatus: saleById.get(orderId)?.heightStatus ?? '',
+              orderNo: saleById.get(orderId)?.orderNo ?? ''
             }
           }
-        )
-        if (result.modifiedCount > 0) updatedCount++
-      } catch (err) {
-        console.error(`Error update orderId: ${orderId}`, err)
-      }
+        }
+      }))
+
+      const res = await Order.bulkWrite(ops, { ordered: false })
+      console.log('Order updated:', res.modifiedCount)
     }
 
+    // 4) อัปเดต Mongo ทีเดียวด้วย bulkWrite (ใส่ OACUOR และข้อมูลจาก Sale)
 
     for (const orderId of matchedIdsRefund) {
       try {
@@ -120,7 +173,7 @@ async function erpApiCheckOrderJob(channel = 'cash') {
   }
 }
 
-async function erpApiCheckDisributionM3Job(channel = 'cash') {
+async function erpApiCheckDisributionM3Job (channel = 'cash') {
   try {
     const { Distribution } = getModelsByChannel(channel, null, disributionModel)
 
@@ -202,7 +255,7 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
   }
 }
 
-async function DeleteCartDaily(channel = 'cash') {
+async function DeleteCartDaily (channel = 'cash') {
   // เปิด session สำหรับ transaction
   // const session = await mongoose.startSession();
   // session.startTransaction();
@@ -342,19 +395,22 @@ async function DeleteCartDaily(channel = 'cash') {
   }
 }
 
-async function reStoreStock(channel = 'cash') {
+async function reStoreStock (channel = 'cash') {
   try {
     const periodstr = period()
     const { Stock } = getModelsByChannel(channel, null, stockModel)
     const { Product } = getModelsByChannel(channel, null, productModel)
     const { Refund } = getModelsByChannel(channel, null, refundModel)
     const { AdjustStock } = getModelsByChannel(channel, null, adjustStockModel)
-    const { Distribution } = getModelsByChannel(channel, null, distributionModel)
+    const { Distribution } = getModelsByChannel(
+      channel,
+      null,
+      distributionModel
+    )
     const { Order } = getModelsByChannel(channel, null, orderModel)
     const { Giveaway } = getModelsByChannel(channel, null, giveModel)
     const { User } = getModelsByChannel(channel, null, userModel)
     const { Cart } = getModelsByChannel(channel, null, cartModel)
-
 
     // 1) เตรียม unique areas
     const userData = await User.find({ role: 'sale' }).select('area')
@@ -455,14 +511,21 @@ async function reStoreStock(channel = 'cash') {
 
       const dataChange = await Order.aggregate([
         { $addFields: { zone: { $substrBytes: ['$area', 0, 2] } } },
-        { $match: { type: 'change', status: { $in: ['approved', 'completed'] } } },
+        {
+          $match: { type: 'change', status: { $in: ['approved', 'completed'] } }
+        },
         { $match: matchQueryRefund },
         { $project: { listProduct: 1, _id: 0 } }
       ])
 
       const dataAdjust = await AdjustStock.aggregate([
         { $addFields: { zone: { $substrBytes: ['$area', 0, 2] } } },
-        { $match: { type: 'adjuststock', status: { $in: ['approved', 'completed'] } } },
+        {
+          $match: {
+            type: 'adjuststock',
+            status: { $in: ['approved', 'completed'] }
+          }
+        },
         { $match: matchQuery },
         { $project: { listProduct: 1, _id: 0 } }
       ])
@@ -478,12 +541,11 @@ async function reStoreStock(channel = 'cash') {
         {
           $match: {
             type: { $in: ['give', 'refund', 'sale'] },
-            area: area,
+            area: area
           }
         },
         { $project: { listProduct: 1, _id: 0, zone: 1 } }
-      ]);
-
+      ])
 
       const dataChangePending = await Order.aggregate([
         { $addFields: { zone: { $substrBytes: ['$area', 0, 2] } } },
@@ -491,8 +553,6 @@ async function reStoreStock(channel = 'cash') {
         { $match: matchQueryRefund },
         { $project: { listProduct: 1, _id: 0 } }
       ])
-
-
 
       const allWithdrawProducts = dataWithdraw.flatMap(
         doc => doc.listProduct || []
@@ -506,8 +566,9 @@ async function reStoreStock(channel = 'cash') {
       const allAdjustProducts = dataAdjust.flatMap(doc => doc.listProduct || [])
       const allGiveProducts = dataGive.flatMap(doc => doc.listProduct || [])
       const allCartProducts = dataCart.flatMap(doc => doc.listProduct || [])
-      const allChangePendingProducts = dataChangePending.flatMap(doc => doc.listProduct || [])
-
+      const allChangePendingProducts = dataChangePending.flatMap(
+        doc => doc.listProduct || []
+      )
 
       const dataStock = await Stock.aggregate([
         { $addFields: { zone: { $substrBytes: ['$area', 0, 2] } } },
@@ -542,26 +603,26 @@ async function reStoreStock(channel = 'cash') {
       const withdrawProductArray = Object.values(
         allWithdrawProducts.reduce((acc, curr) => {
           // สร้าง key สำหรับ group
-          const key = `${curr.id}_${curr.unit}`;
+          const key = `${curr.id}_${curr.unit}`
 
           // ลบ qty เดิมออกก่อน
-          const { qty, ...rest } = curr;
+          const { qty, ...rest } = curr
 
           if (acc[key]) {
             // ถ้ามีอยู่แล้ว ให้เพิ่มจากค่าใหม่
-            acc[key].qty += curr.receiveQty || 0;
-            acc[key].qtyPcs += curr.qtyPcs || 0;
+            acc[key].qty += curr.receiveQty || 0
+            acc[key].qtyPcs += curr.qtyPcs || 0
           } else {
             // ถ้ายังไม่มี ให้สร้างใหม่ พร้อม qty จาก receiveQty
             acc[key] = {
               ...rest,
               qty: curr.receiveQty || 0,
               qtyPcs: curr.qtyPcs || 0
-            };
+            }
           }
-          return acc;
+          return acc
         }, {})
-      );
+      )
 
       const orderProductArray = Object.values(
         allOrderProducts.reduce((acc, curr) => {
@@ -578,7 +639,7 @@ async function reStoreStock(channel = 'cash') {
       )
 
       const mergedProductPromotions = allOrderPromotion.reduce((acc, promo) => {
-        ; (promo.listProduct || []).forEach(prod => {
+        ;(promo.listProduct || []).forEach(prod => {
           const key = `${prod.id}_${prod.unit}`
           if (acc[key]) {
             acc[key].qty += prod.qty || 0
@@ -661,10 +722,6 @@ async function reStoreStock(channel = 'cash') {
         }, {})
       )
 
-
-
-
-
       const dataStockTran = dataStock
       const productIdListStock = dataStockTran.flatMap(item =>
         item.listProduct.map(u => u.productId)
@@ -681,9 +738,9 @@ async function reStoreStock(channel = 'cash') {
       const productIdListAdjust = adjustProductArray.flatMap(item => item.id)
       const productIdListGive = giveProductArray.flatMap(item => item.id)
       const productIdListCart = cartProductArray.flatMap(item => item.id)
-      const productIdListChangePending = changePendingProductArray.flatMap(item => item.id)
-
-
+      const productIdListChangePending = changePendingProductArray.flatMap(
+        item => item.id
+      )
 
       const uniqueProductId = [
         ...new Set([
@@ -821,7 +878,6 @@ async function reStoreStock(channel = 'cash') {
           const changePendingQty =
             productDetailChangePending.find(i => i.unit === u.unit)?.qty ?? 0
 
-
           const goodSale = u.price?.refund ?? 0
           const damagedSale = u.price?.refundDmg ?? 0
           const changeSale = u.price?.change ?? 0
@@ -938,31 +994,11 @@ async function reStoreStock(channel = 'cash') {
         )
       }
     }
-
-
   } catch (err) {
     console.error(err)
     // return res.status(500).json({ status: 500, message: err.message })
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const startCronJobErpApiCheck = () => {
   cron.schedule('0 5 * * *', async () => {
@@ -1007,7 +1043,7 @@ const startCronJobDeleteCartDaily = () => {
 
 const startCronJobreStoreStockDaily = () => {
   cron.schedule(
-    '0 21 * * *',   // รันเวลา 21:00 ของทุกวัน
+    '0 21 * * *', // รันเวลา 21:00 ของทุกวัน
     async () => {
       console.log('Running cron job reStoreStock at 21:00 (Asia/Bangkok)')
       await reStoreStock()
@@ -1017,9 +1053,6 @@ const startCronJobreStoreStockDaily = () => {
     }
   )
 }
-
-
-
 
 module.exports = {
   startCronJobErpApiCheck,

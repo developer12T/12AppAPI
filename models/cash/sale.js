@@ -94,15 +94,15 @@ const listQuotaSchema = new mongoose.Schema({
 })
 
 const orderShipingSchema = new mongoose.Schema({
-  default: { type: String,  },
-  shippingId: { type: String,  },
-  address: { type: String,  },
-  district: { type: String, },
-  subDistrict: { type: String, },
-  province: { type: String, },
-  postCode: { type: String, },
-  latitude: { type: String, },
-  longtitude: { type: String, }
+  default: { type: String },
+  shippingId: { type: String },
+  address: { type: String },
+  district: { type: String },
+  subDistrict: { type: String },
+  province: { type: String },
+  postCode: { type: String },
+  latitude: { type: String },
+  longtitude: { type: String }
 })
 
 const orderImageSchema = mongoose.Schema({
@@ -115,6 +115,10 @@ const orderSchema = new mongoose.Schema(
   {
     type: { type: String, require: true, enum: ['sale', 'change', 'withdraw'] },
     orderId: { type: String, require: true, unique: true },
+    orderNo: { type: String },
+    lowStatus: { type: String },
+    heightStatus: { type: String },
+    lineM3: { type: String },
     routeId: { type: String },
     sale: orderSaleSchema,
     store: orderStoreSchema,
