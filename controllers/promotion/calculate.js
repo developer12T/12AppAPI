@@ -407,7 +407,7 @@ async function applyPromotion(order, channel, res) {
             }
         }
 
-
+        // console.log("sumOrder")
         const sumOrder = Object.values(
             (order.listProduct || []).reduce((acc, product) => {
 
@@ -425,7 +425,7 @@ async function applyPromotion(order, channel, res) {
                         size: product.size,
                         flavourCode: product.flavourCode,
                         flavour: product.flavour,
-                        qtyPcs: product.qtyPcs,
+                        qtyPcs: 0,
                         qty: 0,
                         unit: product.unit,
                         price: product.price,
@@ -435,11 +435,11 @@ async function applyPromotion(order, channel, res) {
                         pricePcs: factorPromoPcs
                     };
                 }
-
+                // console.log(product.qtyPcs)
                 // รวมค่า
                 acc[product.id].qty += product.qtyPcs || 0;
                 acc[product.id].total += product.total || 0;
-
+                acc[product.id].qtyPcs += product.qtyPcs || 0;
                 return acc;
             }, {})
         );
@@ -466,7 +466,7 @@ async function applyPromotion(order, channel, res) {
             });
         });
 
-        // console.log(sumOrder)
+        // console.log('sumOrder',sumOrder)
 
         let matchedProducts = sumOrder.filter(product =>
             promo.conditions.some(condition => {
@@ -489,7 +489,7 @@ async function applyPromotion(order, channel, res) {
         let totalAmount = matchedProducts.reduce((sum, p) => sum + (p.qtyPcs * p.pricePcs), 0)
         let totalQty = matchedProducts.reduce((sum, p) => sum + p.qtyPromo, 0)
 
-
+        // console.log("matchedProducts",matchedProducts)
         let meetsCondition = promo.conditions.some(condition =>
             (promo.proType === 'free' && condition.productQty >= 0 && totalQty >= condition.productQty) ||
             (promo.proType === 'amount' && condition.productAmount >= 0 && totalAmount >= condition.productAmount)
