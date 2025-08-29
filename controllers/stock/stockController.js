@@ -3886,9 +3886,9 @@ exports.stockToExcelNew = async (req, res) => {
       xlsx.utils.book_append_sheet(wb, wsOut, 'stockOut');
       xlsx.utils.book_append_sheet(wb, wsBalance, 'balance');
 
-      const tempPath = path.join(os.tmpdir(), `Stock_${area}.xlsx`);
+      const tempPath = path.join(os.tmpdir(), `Stock_${area}_${period}.xlsx`);
       xlsx.writeFile(wb, tempPath);
-      return res.download(tempPath, `Stock_${area}.xlsx`, err => {
+      return res.download(tempPath, `Stock_${area}_${period}.xlsx`, err => {
         if (err) {
           console.error('❌ Download error:', err);
           if (!res.headersSent) res.status(500).send('Download failed');
