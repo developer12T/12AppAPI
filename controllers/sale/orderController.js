@@ -1097,7 +1097,7 @@ exports.OrderToExcel = async (req, res) => {
       }
     },
     {
-      $sort: { orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
+      $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
     }
   ])
 
@@ -1131,7 +1131,7 @@ exports.OrderToExcel = async (req, res) => {
       }
     },
     {
-      $sort: { orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
+      $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
     }
   ])
 
@@ -1164,7 +1164,7 @@ exports.OrderToExcel = async (req, res) => {
       }
     },
     {
-      $sort: { orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
+      $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
     }
   ])
 
