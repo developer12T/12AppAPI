@@ -74,7 +74,7 @@ exports.checkout = async (req, res) => {
       shipping,
       payment,
       changePromotionStatus,
-      listPromotion = []
+      listPromotion 
     } = req.body
 
     const channel = req.headers['x-channel']
@@ -140,7 +140,7 @@ exports.checkout = async (req, res) => {
     //   // res.json(summary); // return ตรงนี้เลย
     // }
     // console.log(summary)
-
+    console.log(listPromotion)
     let promotion = []
     if (changePromotionStatus === 1) {
       promotion = listPromotion
