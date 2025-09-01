@@ -362,29 +362,79 @@ exports.getFilters = async (req, res) => {
     // ✅ กรอง null ออกจากผลลัพธ์สุดท้ายด้วย
     const clean = arr => (arr || []).filter(item => item !== null)
 
-    // const io = getSocket()
-    // io.emit('product/filter', {});
+    const PLACEHOLDER = ['เลือกกลุ่มสินค้า'];
+    const collatorTH = new Intl.Collator('th-TH', { numeric: true, sensitivity: 'base' });
+
+    function cleanList(list) {
+      const arr = Array.isArray(list) ? list : [];
+      const filtered = arr
+        .map(v => (typeof v === 'string' ? v.trim() : v))
+        .filter(v => v !== undefined && v !== null && v !== '' && v !== 'null');
+      if (!filtered.length) return PLACEHOLDER;
+      const unique = [...new Set(filtered)];
+      return unique.sort(collatorTH.compare);
+    }
+
+    const firstAttr = attributes[0] ?? {}; // ปลอดภัยกว่า attributes.length เช็คทีเดียว
+
+    function sortSizesAscGFirst(list) {
+      const UNIT_PRIORITY = { G: 0, KG: 1, L: 2 }; // อยากให้ L ไปท้ายสุดกว่าก็ปรับเลขได้
+      const coll = new Intl.Collator('th-TH', { numeric: true, sensitivity: 'base' });
+
+      const parse = (s) => {
+        const up = String(s || '').toUpperCase().trim();
+
+        // ดึงเลขตัวหน้า (รองรับทศนิยม)
+        const m = up.match(/^(\d+(?:\.\d+)?)/);
+        const num = m ? Number(m[1]) : NaN;
+
+        // หา unit (กัน KG ไปชน G)
+        const isKG = /\bKG\b/.test(up);
+        const isG = !isKG && /\bG\b/.test(up);
+        const isL = /\bL\b/.test(up);
+
+        const unit = isKG ? 'KG' : isG ? 'G' : isL ? 'L' : 'OTHER';
+        const priority = UNIT_PRIORITY[unit] ?? 3;
+
+        // แปลงเป็นฐานเดียวเพื่อเทียบขนาด (G และ L→mL)
+        let normalized = Number.POSITIVE_INFINITY;
+        if (Number.isFinite(num)) {
+          if (unit === 'G') normalized = num;           // g
+          else if (unit === 'KG') normalized = num * 1000; // kg → g
+          else if (unit === 'L') normalized = num * 1000;  // L → mL (ถ้าอยากแยกกลุ่มน้ำ/ของแข็ง ก็พอแยกด้วย priority อยู่แล้ว)
+        }
+
+        return { s, unit, priority, normalized };
+      };
+
+      // คืน array ใหม่ (ไม่แก้ต้นฉบับ)
+      return [...list].sort((a, b) => {
+        const A = parse(a);
+        const B = parse(b);
+        return (
+          A.priority - B.priority ||                 // G ก่อน → KG → L → อื่น ๆ
+          A.normalized - B.normalized ||             // จากน้อยไปมากภายในหน่วย
+          coll.compare(A.s, B.s)                     // tie-break ตามตัวอักษร
+        );
+      });
+    }
 
 
 
-    // console.log(allGroups)
+    const data = {
+      group: cleanList(allGroups.map(g => g?.group)),
+      brand: cleanList(firstAttr.brand),
+      size: sortSizesAscGFirst(cleanList(firstAttr.size)),
+      flavour: cleanList(firstAttr.flavour).sort(
+        (a, b) => String(a).localeCompare(String(b), 'th-TH', { numeric: true, sensitivity: 'base' })
+      )
+    };
 
     res.status(200).json({
-      status: '200',
+      status: 200,
       message: 'Filters fetched successfully!',
-      data: {
-        group: clean(allGroups.map(g => g.group)),
-        brand: attributes.length
-          ? clean(attributes[0].brand)
-          : ['เลือกกลุ่มสินค้า'],
-        size: attributes.length
-          ? clean(attributes[0].size)
-          : ['เลือกกลุ่มสินค้า'],
-        flavour: attributes.length
-          ? clean(attributes[0].flavour)
-          : ['เลือกกลุ่มสินค้า']
-      }
-    })
+      data
+    });
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
@@ -834,8 +884,8 @@ exports.groupSize = async (req, res) => {
             $switch: {
               branches: [
                 { case: { $eq: ['$unit', 'KG'] }, then: { $multiply: ['$_num', 1000] } }, // KG -> g
-                { case: { $eq: ['$unit', 'G'] },  then: '$_num' },                         // G  -> g
-                { case: { $eq: ['$unit', 'L'] },  then: { $multiply: ['$_num', 1000] } }  // L  -> mL
+                { case: { $eq: ['$unit', 'G'] }, then: '$_num' },                         // G  -> g
+                { case: { $eq: ['$unit', 'L'] }, then: { $multiply: ['$_num', 1000] } }  // L  -> mL
               ],
               default: null
             }
@@ -843,9 +893,9 @@ exports.groupSize = async (req, res) => {
           unitPriority: {
             $switch: {
               branches: [
-                { case: { $eq: ['$unit', 'G'] },  then: 0 },
+                { case: { $eq: ['$unit', 'G'] }, then: 0 },
                 { case: { $eq: ['$unit', 'KG'] }, then: 1 },
-                { case: { $eq: ['$unit', 'L'] },  then: 2 }
+                { case: { $eq: ['$unit', 'L'] }, then: 2 }
               ],
               default: 3
             }
@@ -890,9 +940,11 @@ exports.groupFlavourId = async (req, res) => {
         flavourName: '$_id.name'
       }
     },
-    {$sort:{
-      flavourName:1
-    }}
+    {
+      $sort: {
+        flavourName: 1
+      }
+    }
   ])
 
   res.status(200).json({
