@@ -785,30 +785,87 @@ exports.groupBrandId = async (req, res) => {
 }
 
 exports.groupSize = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { Product } = getModelsByChannel(channel, res, productModel)
-  const data = await Product.aggregate([
-    {
-      $group: {
-        _id: {
-          id: '$size'
-        }
-      }
-    },
-    {
-      $project: {
-        _id: 0,
-        size: '$_id.id'
-      }
-    }
-  ])
+  try {
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
 
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: data
-  })
+    const regexNumber = new RegExp('^(\\d+(?:\\.\\d+)?)')
+
+    const data = await Product.aggregate([
+      { $group: { _id: { id: '$size' } } },
+      { $project: { _id: 0, size: '$_id.id' } },
+
+      // 1) เตรียม string + หาเลข
+      {
+        $addFields: {
+          _sizeStr: { $ifNull: ['$size', ''] },
+          _upper: { $toUpper: { $ifNull: ['$size', ''] } },
+          _trimmed: { $trim: { input: { $ifNull: ['$size', ''] } } },
+          _match: { $regexFind: { input: { $trim: { input: { $ifNull: ['$size', ''] } } }, regex: regexNumber } }
+        }
+      },
+      // 2) แปลงเลข + หา unit (ทำใน stage แยก)
+      {
+        $addFields: {
+          _num: {
+            $convert: { input: '$_match.match', to: 'double', onError: null, onNull: null }
+          },
+          unit: {
+            $switch: {
+              branches: [
+                { case: { $regexMatch: { input: '$_upper', regex: /KG/ } }, then: 'KG' },
+                { case: { $regexMatch: { input: '$_upper', regex: / G/ } }, then: 'G' },
+                { case: { $regexMatch: { input: '$_upper', regex: / L/ } }, then: 'L' }
+              ],
+              default: null
+            }
+          },
+          hasNumber: { $cond: [{ $ne: ['$_match', null] }, 1, 0] }
+        }
+      },
+      // 3) คำนวณ normalizedSize + unitPriority (อ้าง unit ได้ชัวร์)
+      {
+        $addFields: {
+          normalizedSize: {
+            $switch: {
+              branches: [
+                { case: { $eq: ['$unit', 'KG'] }, then: { $multiply: ['$_num', 1000] } }, // KG -> g
+                { case: { $eq: ['$unit', 'G'] },  then: '$_num' },                         // G  -> g
+                { case: { $eq: ['$unit', 'L'] },  then: { $multiply: ['$_num', 1000] } }  // L  -> mL
+              ],
+              default: null
+            }
+          },
+          unitPriority: {
+            $switch: {
+              branches: [
+                { case: { $eq: ['$unit', 'G'] },  then: 0 },
+                { case: { $eq: ['$unit', 'KG'] }, then: 1 },
+                { case: { $eq: ['$unit', 'L'] },  then: 2 }
+              ],
+              default: 3
+            }
+          }
+        }
+      },
+
+      // 4) เรียง: มีตัวเลขก่อน → G ก่อน KG ก่อน L → ค่าตาม normalized → แล้วค่อยชื่อ
+      { $sort: { hasNumber: -1, unitPriority: 1, normalizedSize: 1, size: 1 } },
+
+      // 5) ส่งออก
+      { $project: { size: 1 } }
+    ])
+
+    res.status(200).json({ status: 200, message: 'success', data })
+  } catch (error) {
+    res.status(500).json({ status: 500, message: error.message })
+  }
 }
+
+
+
+
+
 
 exports.groupFlavourId = async (req, res) => {
   const channel = req.headers['x-channel']
