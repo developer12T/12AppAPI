@@ -142,7 +142,7 @@ exports.checkout = async (req, res) => {
     // console.log(summary)
 
     let promotion = []
-    if (listPromotion.length > 1) {
+    if (changePromotionStatus = 1) {
       promotion = listPromotion
     } else {
       promotion = cart.listPromotion
