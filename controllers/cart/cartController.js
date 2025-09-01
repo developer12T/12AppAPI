@@ -39,9 +39,9 @@ exports.getCartAll = async (req, res) => {
     const { area,period } = req.query
     const cartQuery = { area, type: { $nin: ['withdraw'] } }
 
-    const { startDate, endDate } = rangeDate(period)
+    // const { startDate, endDate } = rangeDate(period)
     
-    cartQuery.createdAt = { $gte: startDate, $lte: endDate };
+    // cartQuery.createdAt = { $gte: startDate, $lte: endDate };
 
 
     const cartData = await Cart.find(cartQuery)
@@ -195,7 +195,7 @@ exports.getCart = async (req, res) => {
       summary.listPromotion = cart.listPromotion
       summary.listQuota = quota.appliedPromotions
 
-      console.log(promotion.appliedPromotions)
+      // console.log(promotion.appliedPromotions)
 
 
       const qtyproductPro = summary.listPromotion.flatMap(u => {
