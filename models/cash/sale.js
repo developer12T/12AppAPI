@@ -152,7 +152,7 @@ const orderSchema = new mongoose.Schema(
     vat: { type: Number, default: 0 },
     totalExVat: { type: Number, default: 0 },
     total: { type: Number, require: true },
-    paymentMethod: { type: String, default: 'cash' },
+    paymentMethod: { type: String, require: true },
     paymentStatus: { type: String, default: 'unpaid' },
     // route: { type: String, default: 'out' },
     listImage: [orderImageSchema],

@@ -419,19 +419,40 @@ exports.checkout = async (req, res) => {
 
 exports.getOrder = async (req, res) => {
   try {
-    const { type, area, store, period } = req.query
+    const { type, area, store, period, start, end } = req.query
     let response = []
 
     const channel = req.headers['x-channel']
     const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel)
 
-    if (!type || !period) {
-      return res
-        .status(400)
-        .json({ status: 400, message: 'type,  period are required!' })
+    if (!type) {
+      return res.status(400).json({ status: 400, message: 'type is required!' })
     }
 
-    const { startDate, endDate } = rangeDate(period)
+    let startDate, endDate
+
+    if (start && end) {
+      // ตัด string แล้ว parse เป็น Date
+      startDate = new Date(
+        start.substring(0, 4), // year: 2025
+        parseInt(start.substring(4, 6), 10) - 1, // month: 08 → index 7
+        start.substring(6, 8) // day: 01
+      )
+
+      endDate = new Date(
+        end.substring(0, 4), // year: 2025
+        parseInt(end.substring(4, 6), 10) - 1, // month: 08 → index 7
+        end.substring(6, 8) // day: 01
+      )
+    } else if (period) {
+      const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
+      startDate = range.startDate
+      endDate = range.endDate
+    } else {
+      return res
+        .status(400)
+        .json({ status: 400, message: 'period or start/end are required!' })
+    }
 
     let areaQuery = {}
     if (area) {
@@ -441,12 +462,14 @@ exports.getOrder = async (req, res) => {
         areaQuery['store.area'] = area
       }
     }
+
     let query = {
       type,
       ...areaQuery,
       // 'store.area': area,
       // createdAt: { $gte: startDate, $lt: endDate }
-      period: period
+      period: period,
+      createdAt: { $gte: startDate, $lte: endDate }
     }
 
     if (store) {

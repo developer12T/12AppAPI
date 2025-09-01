@@ -243,8 +243,8 @@ exports.checkout = async (req, res) => {
       totalExVat: parseFloat((total / 1.07).toFixed(2)),
       total: total,
       shipping: shipping,
-      paymentMethod: 'cash',
-      paymentStatus: 'paid',
+      paymentMethod: payment,
+      paymentStatus: 'unpaid',
       createdBy: sale.username,
       period: period
     })
@@ -538,18 +538,26 @@ exports.getOrder = async (req, res) => {
 
     let response = []
 
-    if (!type || !period) {
-      return res
-        .status(400)
-        .json({ status: 400, message: 'type,  period are required!' })
+    if (!type) {
+      return res.status(400).json({ status: 400, message: 'type is required!' })
     }
 
     // ✅ คำนวณช่วงวัน
     let startDate, endDate
 
     if (start && end) {
-      startDate = new Date(start)
-      endDate = new Date(end)
+      // ตัด string แล้ว parse เป็น Date
+      startDate = new Date(
+        start.substring(0, 4), // year: 2025
+        parseInt(start.substring(4, 6), 10) - 1, // month: 08 → index 7
+        start.substring(6, 8) // day: 01
+      )
+
+      endDate = new Date(
+        end.substring(0, 4), // year: 2025
+        parseInt(end.substring(4, 6), 10) - 1, // month: 08 → index 7
+        end.substring(6, 8) // day: 01
+      )
     } else if (period) {
       const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
       startDate = range.startDate
@@ -568,6 +576,7 @@ exports.getOrder = async (req, res) => {
         areaQuery['store.area'] = area
       }
     }
+
     let query = {
       type,
       ...areaQuery,
@@ -588,6 +597,8 @@ exports.getOrder = async (req, res) => {
       ...(period ? { period } : {}),
       createdAt: { $gte: startDate, $lt: endDate }
     }
+
+    console.log(matchQuery)
 
     // const order = await Order.aggregate([
     //   {
