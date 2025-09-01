@@ -74,7 +74,7 @@ exports.checkout = async (req, res) => {
       shipping,
       payment,
       changePromotionStatus,
-      listPromotion 
+      listPromotion
     } = req.body
 
     const channel = req.headers['x-channel']
@@ -139,7 +139,7 @@ exports.checkout = async (req, res) => {
     //   )
     //   // res.json(summary); // return ตรงนี้เลย
     // }
-    console.log("changePromotionStatus",changePromotionStatus)
+    // console.log("changePromotionStatus",changePromotionStatus)
     // console.log(listPromotion)
     let promotion = []
     if (changePromotionStatus === 1) {
@@ -147,7 +147,7 @@ exports.checkout = async (req, res) => {
     } else {
       promotion = cart.listPromotion
     }
-
+    // console.log("promotion",promotion)
     const productIds = cart.listProduct.map(p => p.id)
     const products = await Product.find({ id: { $in: productIds } }).select(
       'id name groupCode group brandCode brand size flavourCode flavour listUnit'
@@ -210,6 +210,10 @@ exports.checkout = async (req, res) => {
         .map(item => item.price)
         .reduce((sum, price) => sum + price, 0)
       : 0
+
+
+      
+
     const total = subtotal - discountProduct
     const newOrder = new Order({
       orderId,
@@ -280,32 +284,6 @@ exports.checkout = async (req, res) => {
       channel,
       res
     )
-
-
-
-    const uniquePromotions = []
-    const seen = new Set()
-
-    for (const item of cart.listPromotion) {
-      if (!seen.has(item.proId)) {
-        seen.add(item.proId)
-        uniquePromotions.push(item)
-      }
-    }
-
-    newOrder.listPromotions = uniquePromotions
-
-    newOrder.listPromotions.forEach(item => {
-      const promo = cart.listPromotion.find(
-        u => u.proId === item.proId
-      )
-
-      if (!promo) return
-
-      if (promo.proQty - item.proQty < 0) {
-        item.proQty = promo.proQty
-      }
-    })
 
 
     for (const item of newOrder.listQuota) {
