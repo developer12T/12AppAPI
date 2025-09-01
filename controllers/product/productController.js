@@ -365,6 +365,10 @@ exports.getFilters = async (req, res) => {
     // const io = getSocket()
     // io.emit('product/filter', {});
 
+
+
+    // console.log(allGroups)
+
     res.status(200).json({
       status: '200',
       message: 'Filters fetched successfully!',
@@ -940,6 +944,8 @@ exports.groupByFilter = async (req, res) => {
       message: 'Not found group'
     })
   }
+
+  // console.log(dataProduct)
 
   res.status(200).json({
     status: 200,

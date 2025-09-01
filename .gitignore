@@ -3,3 +3,5 @@
 /public/images/sendmoney
 /node_modules
 .env
+.area_status
+.Order
