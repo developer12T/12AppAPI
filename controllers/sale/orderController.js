@@ -127,18 +127,18 @@ exports.checkout = async (req, res) => {
         .json({ status: 404, message: 'Sale user not found!' })
     }
 
-    let summary = ''
-    if (changePromotionStatus == 0) {
-      summary = await summaryOrder(cart, channel, res)
-    } else if (changePromotionStatus == 1) {
-      summary = await summaryOrderProStatusOne(
-        cart,
-        listPromotion,
-        channel,
-        res
-      )
-      // res.json(summary); // return ตรงนี้เลย
-    }
+    // let summary = ''
+    // if (changePromotionStatus == 0) {
+    //   summary = await summaryOrder(cart, channel, res)
+    // } else if (changePromotionStatus == 1) {
+    //   summary = await summaryOrderProStatusOne(
+    //     cart,
+    //     listPromotion,
+    //     channel,
+    //     res
+    //   )
+    //   // res.json(summary); // return ตรงนี้เลย
+    // }
     // console.log(summary)
     const productIds = cart.listProduct.map(p => p.id)
     const products = await Product.find({ id: { $in: productIds } }).select(
@@ -184,10 +184,12 @@ exports.checkout = async (req, res) => {
     if (listProduct.includes(null)) return
 
     const orderId = await generateOrderId(area, sale.warehouse, channel, res)
-    // console.log(orderId)
-    // if () {
 
-    // }
+    const storeData =
+      (await Store.findOne({
+        storeId: cart.storeId,
+        area: cart.area
+      }).lean()) || {}
 
     const promotionshelf =
       (await PromotionShelf.find({
@@ -215,15 +217,15 @@ exports.checkout = async (req, res) => {
         warehouse: sale.warehouse
       },
       store: {
-        storeId: summary.store.storeId,
-        name: summary.store.name,
-        type: summary.store.type,
-        address: summary.store.address,
-        taxId: summary.store.taxId,
-        tel: summary.store.tel,
-        area: summary.store.area,
-        zone: summary.store.zone,
-        isBeauty: summary.store.isBeauty
+        storeId: storeData.storeId,
+        name: storeData.name,
+        type: storeData.type,
+        address: storeData.address,
+        taxId: storeData.taxId,
+        tel: storeData.tel,
+        area: storeData.area,
+        zone: storeData.zone,
+        // isBeauty: summary.store.isBeauty
       },
       // shipping,
       // address,
@@ -231,8 +233,8 @@ exports.checkout = async (req, res) => {
       latitude,
       longitude,
       listProduct,
-      listPromotions: summary.listPromotion,
-      listQuota: summary.listQuota,
+      listPromotions: cart.listPromotion,
+      // listQuota: summary.listQuota,
       subtotal,
       discount: 0,
       discountProductId: promotionshelf.map(item => ({
@@ -276,9 +278,9 @@ exports.checkout = async (req, res) => {
     //   })
     // }
 
-    const promotion = await applyPromotion(summary, channel, res)
+    // const promotion = await applyPromotion(summary, channel, res)
 
-    console.log(JSON.stringify(cart, null, 2));
+    // console.log(JSON.stringify(cart, null, 2));
 
     // ลบโปรโมชั่นซ้ำโดยเช็คจาก proId
     // const seenProIds = new Set();
@@ -295,8 +297,8 @@ exports.checkout = async (req, res) => {
     // console.log(promotion)
 
 
-  // console.log("promotion",promotion)
-  // console.log("newOrder.listProduct",newOrder.listProduct)
+    // console.log("promotion",promotion)
+    // console.log("newOrder.listProduct",newOrder.listProduct)
 
     const uniquePromotions = []
     const seen = new Set()
@@ -322,7 +324,7 @@ exports.checkout = async (req, res) => {
       }
     })
 
-    console.log("newOrder.listPromotions", newOrder.listPromotions)
+    // console.log("newOrder.listPromotions", newOrder.listPromotions)
 
     for (const item of newOrder.listQuota) {
       await Quota.findOneAndUpdate(
@@ -400,7 +402,7 @@ exports.checkout = async (req, res) => {
     // console.log(i)
 
     for (const item of qtyproductPro) {
-        // console.log(item)
+      // console.log(item)
       const updateResult = await updateStockMongo(
         item,
         area,
