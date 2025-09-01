@@ -278,7 +278,7 @@ exports.checkout = async (req, res) => {
 
     const promotion = await applyPromotion(summary, channel, res)
 
-    console.log(JSON.stringify(cart.listPromotion, null, 2));
+    console.log(JSON.stringify(cart, null, 2));
 
     // ลบโปรโมชั่นซ้ำโดยเช็คจาก proId
     // const seenProIds = new Set();
