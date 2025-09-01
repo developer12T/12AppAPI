@@ -700,7 +700,7 @@ exports.deleteProduct = async (req, res) => {
     const { Cart } = getModelsByChannel(channel, res, cartModel)
 
     let cart = await Cart.findOne(cartQuery)
-    console.log(cart)
+    // console.log(cart)
     // .session(session);
     if (!cart) {
       // await session.abortTransaction();
