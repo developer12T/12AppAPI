@@ -140,6 +140,14 @@ exports.checkout = async (req, res) => {
     //   // res.json(summary); // return ตรงนี้เลย
     // }
     // console.log(summary)
+
+    let promotion = []
+    if (listPromotion.length > 1) {
+      promotion = listPromotion
+    } else {
+      promotion = cart.listPromotion
+    }
+
     const productIds = cart.listProduct.map(p => p.id)
     const products = await Product.find({ id: { $in: productIds } }).select(
       'id name groupCode group brandCode brand size flavourCode flavour listUnit'
@@ -233,7 +241,9 @@ exports.checkout = async (req, res) => {
       latitude,
       longitude,
       listProduct,
-      listPromotions: cart.listPromotion,
+
+
+      listPromotions: promotion,
       // listQuota: summary.listQuota,
       subtotal,
       discount: 0,
@@ -271,34 +281,7 @@ exports.checkout = async (req, res) => {
       res
     )
 
-    // if (checkIn.status === 409) {
-    //   return res.status(409).json({
-    //     status: 409,
-    //     message: 'Duplicate Store on this day'
-    //   })
-    // }
 
-    // const promotion = await applyPromotion(summary, channel, res)
-
-    // console.log(JSON.stringify(cart, null, 2));
-
-    // ลบโปรโมชั่นซ้ำโดยเช็คจาก proId
-    // const seenProIds = new Set();
-    // cart.listPromotion = promotion.appliedPromotions.filter(promo => {
-    //   // ❌ ตัดโปรที่จำนวนเป็น 0 ออก
-    //   if (promo.proQty === 0) return false;
-
-    //   // ❌ ตัดโปรที่ซ้ำ proId
-    //   if (seenProIds.has(promo.proId)) return false;
-
-    //   seenProIds.add(promo.proId);
-    //   return true;
-    // });
-    // console.log(promotion)
-
-
-    // console.log("promotion",promotion)
-    // console.log("newOrder.listProduct",newOrder.listProduct)
 
     const uniquePromotions = []
     const seen = new Set()
@@ -324,7 +307,6 @@ exports.checkout = async (req, res) => {
       }
     })
 
-    // console.log("newOrder.listPromotions", newOrder.listPromotions)
 
     for (const item of newOrder.listQuota) {
       await Quota.findOneAndUpdate(
@@ -357,22 +339,6 @@ exports.checkout = async (req, res) => {
         }))
       return promoDetail
     })
-
-
-    // for (const item of qtyproductPro) {
-    //   const updateResult = await updateStockMongo(
-    //     item,
-    //     area,
-    //     period,
-    //     'deleteCart',
-    //     channel,
-    //     res
-    //   )
-    //   if (updateResult) return
-    // }
-
-
-
 
     const productQty = Object.values(
       [...qtyproductPro, ...qtyproduct].reduce((acc, cur) => {
@@ -441,7 +407,7 @@ exports.checkout = async (req, res) => {
       { proShelfId: promotionshelf.proShelfId },
       { $set: { qty: 0 } }
     )
-    await Cart.deleteOne({ type, area, storeId })
+    // await Cart.deleteOne({ type, area, storeId })
     const currentDate = new Date()
     let query = {}
     const promoIds = newOrder.listPromotions.map(u => u.proId)
