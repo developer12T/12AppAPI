@@ -278,7 +278,7 @@ exports.checkout = async (req, res) => {
 
     // const promotion = await applyPromotion(summary, channel, res)
 
-    console.log(cart)
+    console.log(cart.listPromotion)
 
     // ลบโปรโมชั่นซ้ำโดยเช็คจาก proId
     // const seenProIds = new Set();
@@ -301,7 +301,7 @@ exports.checkout = async (req, res) => {
     const uniquePromotions = []
     const seen = new Set()
 
-    for (const item of newOrder.listPromotions) {
+    for (const item of cart.listPromotion) {
       if (!seen.has(item.proId)) {
         seen.add(item.proId)
         uniquePromotions.push(item)
@@ -311,7 +311,7 @@ exports.checkout = async (req, res) => {
     newOrder.listPromotions = uniquePromotions
 
     newOrder.listPromotions.forEach(item => {
-      const promo = promotion.appliedPromotions.find(
+      const promo = cart.listPromotion.find(
         u => u.proId === item.proId
       )
 
@@ -322,7 +322,7 @@ exports.checkout = async (req, res) => {
       }
     })
 
-    // console.log("newOrder.listPromotions", newOrder.listPromotions)
+    console.log("newOrder.listPromotions", newOrder.listPromotions)
 
     for (const item of newOrder.listQuota) {
       await Quota.findOneAndUpdate(
