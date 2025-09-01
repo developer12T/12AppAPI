@@ -2431,7 +2431,7 @@ exports.getStockQtyDetail = async (req, res) => {
     const normalizedStockOut = rollupUnits(summaryStockOut, productData.listUnit);
 
 
-    console.log(productData.listUnit)
+    // console.log(productData.listUnit)
 
 
     const summaryStockInQty = calculateQtyByUnit(productData.listUnit, [
@@ -3403,8 +3403,8 @@ exports.stockToExcelNew = async (req, res) => {
         + (item.qtyGive || 0);
 
 
-      const outUnit = convertToUnits(sumOutUnit, productDetailUnit) 
-        const totalPrice = outUnit.reduce((sum, u) => sum + (Number(u.price) || 0), 0);
+      const outUnit = convertToUnits(sumOutUnit, productDetailUnit)
+      const totalPrice = outUnit.reduce((sum, u) => sum + (Number(u.price) || 0), 0);
 
 
       return {
@@ -3423,7 +3423,7 @@ exports.stockToExcelNew = async (req, res) => {
         giveUnit: convertToUnits(item.qtyGive, productDetailUnit),
         sumOut: sumOutUnit,
         outUnit: outUnit,
-        totalPrice:totalPrice
+        totalPrice: totalPrice
       };
     });
 
@@ -3784,7 +3784,7 @@ exports.stockToExcelNew = async (req, res) => {
           q(it.changeUnit, 'CTN'), q(it.changeUnit, 'BAG', 'PAC'), q(it.changeUnit, 'PCS', 'BOT'),
           q(it.giveUnit, 'CTN'), q(it.giveUnit, 'BAG', 'PAC'), q(it.giveUnit, 'PCS', 'BOT'),
           q(it.outUnit, 'CTN'), q(it.outUnit, 'BAG', 'PAC'), q(it.outUnit, 'PCS', 'BOT'),
-          it.totalPrice 
+          it.totalPrice
           // it.summaryNumeric ?? it.summary
         ]))
       ];
@@ -5009,3 +5009,89 @@ exports.addStockAllWithInOut = async (req, res) => {
 }
 
 
+exports.addStockIt = async (req, res) => {
+  const { period } = req.body
+  const channel = req.headers['x-channel']
+  const { Product } = getModelsByChannel(channel, res, productModel)
+  const { Stock } = getModelsByChannel(channel, res, stockModel)
+  const productData = await Product.find({ statusSale: 'Y' })
+
+
+  const productId = productData.flatMap(item => item.id)
+
+  const factorCtn = await Product.aggregate([
+    {
+      $match: {
+        id: { $in: productId }
+      }
+    },
+    {
+      $project: {
+        id: 1,
+        listUnit: {
+          $arrayElemAt: [
+            {
+              $filter: {
+                input: '$listUnit',
+                as: 'unit',
+                cond: { $eq: ['$$unit.unit', 'CTN'] }
+              }
+            },
+            0
+          ]
+        }
+      }
+    }
+  ])
+
+
+
+
+  const dataIt = {
+    area: 'IT211',
+    saleCode: '99999',
+    period: period,
+    warehouse: '191',
+    listProduct: productData.map(item => {
+
+      const stockPcs = 350
+
+      const ctn = factorCtn.find(i => i.id === item.id) || {}
+      const factor = Number(ctn?.listUnit?.factor)
+      const qtyCtn = factor > 0 ? Math.floor(stockPcs / factor) : 0
+
+      return {
+        productId: item.id,
+        stockPcs: stockPcs,
+        stockInPcs: 0,
+        stockOutPcs: 0,
+        balancePcs: stockPcs,
+        stockCtn: qtyCtn,
+        stockInCtn: 0,
+        stockOutCtn: 0,
+        balanceCtn: qtyCtn
+      }
+    })
+  }
+
+  const existStock = await Stock.findOne({ area: 'IT211', period: period })
+  if (existStock) {
+    
+    return res.status(200).json({
+      status: 209,
+      message: `already have IT211 ${period} `,
+
+    })
+  }
+
+
+  await Stock.create(dataIt)
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: dataIt
+
+  })
+}
