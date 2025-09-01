@@ -248,12 +248,12 @@ exports.checkout = async (req, res) => {
       createdBy: sale.username,
       period: period
     })
-    applyPromotionUsage(
-      newOrder.store.storeId,
-      newOrder.listPromotions,
-      channel,
-      res
-    )
+    // applyPromotionUsage(
+    //   newOrder.store.storeId,
+    //   newOrder.listPromotions,
+    //   channel,
+    //   res
+    // )
 
     const checkIn = await checkInRoute(
       {
@@ -276,9 +276,9 @@ exports.checkout = async (req, res) => {
     //   })
     // }
 
-    // const promotion = await applyPromotion(summary, channel, res)
+    const promotion = await applyPromotion(summary, channel, res)
 
-    console.log(cart.listPromotion)
+    console.log(JSON.stringify(cart.listPromotion, null, 2));
 
     // ลบโปรโมชั่นซ้ำโดยเช็คจาก proId
     // const seenProIds = new Set();
