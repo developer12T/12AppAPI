@@ -278,6 +278,8 @@ exports.checkout = async (req, res) => {
 
     const promotion = await applyPromotion(summary, channel, res)
 
+    console.log(cart)
+
     // ลบโปรโมชั่นซ้ำโดยเช็คจาก proId
     // const seenProIds = new Set();
     // cart.listPromotion = promotion.appliedPromotions.filter(promo => {
