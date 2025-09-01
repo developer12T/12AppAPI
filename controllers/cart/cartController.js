@@ -147,8 +147,8 @@ exports.getCart = async (req, res) => {
       type === 'withdraw'
         ? { type, area }
         : type === 'adjuststock'
-        ? { type, area, withdrawId }
-        : { type, area, storeId }
+          ? { type, area, withdrawId }
+          : { type, area, storeId }
 
     // ใช้ session ใน findOne เฉพาะกรณีที่ต้อง update ข้อมูล (กัน dirty read ใน replica set)
     let cart = await Cart.findOne(cartQuery)
@@ -192,154 +192,32 @@ exports.getCart = async (req, res) => {
 
       // console.log(promotion.appliedPromotions)
 
-      // ✅ กัน null/undefined และทำให้โค้ดอ่านง่ายขึ้น
-      const appliedList = Array.isArray(promotion?.appliedPromotions)
-        ? promotion.appliedPromotions
-        : []
 
-      // console.log(promotion)
+      const qtyproductPro = summary.listPromotion.flatMap(u => {
+        const promoDetail = u.listProduct
+          .filter(item => item?.id && item?.unit && item?.qty > 0)
+          .map(item => ({
+            id: item.id,
+            unit: item.unit,
+            qty: item.qty,
+            statusMovement: 'OUT'
+          }))
+        return promoDetail
+      })
 
-      const dataPromotion = appliedList.flatMap(item =>
-        Array.isArray(item?.listProduct)
-          ? item.listProduct.map(u => ({
-              proId: item.proId,
-              id: String(u.id ?? '').trim(),
-              qty: Number(u.qty ?? 0) || 0,
-              unit: u.unit
-            }))
-          : []
-      )
-      // console.log(dataPromotion)
-
-      // // ✅ เผื่อกรณีหา stock ไม่เจอ และกันข้อมูลผิดรูป
-      const stockDoc = await Stock.findOne({ area, period: period() }).lean()
-      const listProduct = Array.isArray(stockDoc?.listProduct)
-        ? stockDoc.listProduct
-        : []
-
-      const stockBalanceMap = new Map(
-        listProduct.map(p => [
-          String(p?.productId ?? '').trim(),
-          Number(p?.balancePcs ?? 0) || 0
-        ])
-      )
-
-  
-      const promotionCache = new Map()
-
-      for (const i of dataPromotion) {
-        const { proId, id, qty } = i
-        const pid = String(id ?? '').trim()
-        const needQty = Number(qty ?? 0) || 0
-
-        if (!proId || !pid || needQty <= 0) {
-          console.warn(
-            `⚠️ ข้ามรายการไม่สมบูรณ์ proId=${proId}, pid=${pid}, needQty=${needQty}`
-          )
-          continue
-        }
-
-        const currentBal = stockBalanceMap.get(pid) ?? 0
-        // console.log(currentBal)
-        if (currentBal < needQty) {
-          // ✅ ใช้ cache ก่อน query
-          let proDetail = promotionCache.get(proId)
-
-          if (!proDetail) {
-            proDetail = await Promotion.findOne({ proId }).lean()
-            if (proDetail) promotionCache.set(proId, proDetail)
-            // console.log(proDetail)
-          }
-
-          if (!proDetail) {
-            console.warn(`⚠️ ไม่เจอ Promotion ${proId}`)
-            continue
-          }
-          // console.log(needQty)
-          const rewardProductNew = await rewardProductCheckStock(
-            proDetail.rewards,
-            area,
-            needQty,
-            channel,
-            res
-          )
-
-          // console.log(rewardProductNew)
-          if (
-            !Array.isArray(rewardProductNew) ||
-            rewardProductNew.length === 0
-          ) {
-            console.warn(`⚠️ โปร ${proId} ไม่มีสินค้า reward ที่พอ`)
-            continue
-          }
-
-          const selectedProduct = rewardProductNew.find(
-            item => item.productId != pid
-          )
-          // console.log(selectedProduct)
-          if (!selectedProduct) {
-            // console.warn(`⚠️ โปร ${proId} ไม่พบสินค้า reward ที่เลือกได้`)
-            summary.listPromotion = cart.listPromotion.filter(
-              p => p.proId != proId
-            )
-
-            // console.log(cart.listPromotion)
-            continue
-          } else {
-            const newPromotion = {
-              proId: proDetail.proId,
-              proCode: proDetail.proCode,
-              proName: proDetail.name,
-              proType: proDetail.proType,
-              proQty: Number(selectedProduct.productQty ?? 0) || 0,
-              discount: 0,
-              listProduct: [
-                {
-                  proId: proDetail.proId,
-                  id: selectedProduct.productId,
-                  name: selectedProduct.productName,
-                  group: selectedProduct.productGroup,
-                  flavour: selectedProduct.productFlavour,
-                  brand: selectedProduct.productBrand,
-                  size: selectedProduct.productSize,
-                  qty: selectedProduct.productQty,
-                  unit: selectedProduct.productUnit,
-                  unitName: selectedProduct.productUnitName,
-                  qtyPcs: selectedProduct.productQtyPcs
-                }
-              ]
-            }
-            // console.log('newPromotion', newPromotion)
-
-            // // 🔄 แทนที่ของเดิมถ้ามี proId ซ้ำ มิฉะนั้น push
-            if (!Array.isArray(cart?.listPromotion)) cart.listPromotion = []
-            const index = cart.listPromotion.findIndex(
-              p => p?.proId === newPromotion.proId
-            )
-            if (index !== -1) {
-              // console.log("newPromotion",newPromotion)
-              cart.listPromotion[index] = newPromotion
-            } else {
-              cart.listPromotion.push(newPromotion)
-            }
-
-            console.log(
-              `❌ โปร ${proId} → สินค้า ${pid} คลังมี ${currentBal} แต่ต้องใช้ ${needQty} (ไม่พอ)`
-            )
-          }
-        } else {
-          // ✅ หัก stock ในแผนที่ และ log
-  
-          stockBalanceMap.set(pid, currentBal - needQty)
-
-          // console.log(
-          // `✅ โปร ${proId} → สินค้า ${pid} ใช้ ${needQty} เหลือในคลัง ${currentBal - needQty}`
-          // );
-        }
+      for (i of qtyproductPro) {
+        const updateResult = await updateStockMongo(
+          i,
+          area,
+          period(),
+          'deleteCart',
+          channel,
+          res
+        )
+        if (updateResult) return
       }
- 
 
-      // console.log(summary)
+
 
       await cart.save()
 
@@ -444,8 +322,8 @@ exports.addProduct = async (req, res) => {
       type === 'withdraw'
         ? { type, area }
         : type === 'adjuststock'
-        ? { type, area, withdrawId }
-        : { type, area, storeId }
+          ? { type, area, withdrawId }
+          : { type, area, storeId }
     const { Cart } = getModelsByChannel(channel, res, cartModel)
 
     let cart = await Cart.findOne(cartQuery)
@@ -650,8 +528,8 @@ exports.adjustProduct = async (req, res) => {
       type === 'withdraw'
         ? { type, area }
         : type === 'adjuststock'
-        ? { type, area, withdrawId }
-        : { type, area, storeId }
+          ? { type, area, withdrawId }
+          : { type, area, storeId }
 
     let cart = await Cart.findOne(cartQuery)
     if (!cart) {

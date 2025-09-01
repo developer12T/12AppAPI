@@ -159,6 +159,8 @@ module.exports.updateStockMongo = async function (
   const { Stock } = getModelsByChannel(channel, '', stockModel)
   const { Product } = getModelsByChannel(channel, '', productModel)
 
+
+  // console.log(id,unit,area,period)
   if (!id || !unit || !area || !period) {
     throw new Error('Missing product data (id/unit/qty/area/period)')
   }
