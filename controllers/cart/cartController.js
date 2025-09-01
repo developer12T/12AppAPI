@@ -30,14 +30,19 @@ const promotionModel = require('../../models/cash/promotion')
 
 const { getModelsByChannel } = require('../../middleware/channel')
 const { getSocket } = require('../../socket')
-const { period } = require('../../utilities/datetime')
+const { period,rangeDate } = require('../../utilities/datetime')
 
 exports.getCartAll = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
     const { Cart } = getModelsByChannel(channel, res, cartModel)
-    const { area } = req.query
+    const { area,period } = req.query
     const cartQuery = { area, type: { $nin: ['withdraw'] } }
+
+    const { startDate, endDate } = rangeDate(period)
+    
+    cartQuery.createdAt = { $gte: startDate, $lte: endDate };
+
 
     const cartData = await Cart.find(cartQuery)
     if (!cartData) {
@@ -190,7 +195,7 @@ exports.getCart = async (req, res) => {
       summary.listPromotion = cart.listPromotion
       summary.listQuota = quota.appliedPromotions
 
-      // console.log(promotion.appliedPromotions)
+      console.log(promotion.appliedPromotions)
 
 
       const qtyproductPro = summary.listPromotion.flatMap(u => {
