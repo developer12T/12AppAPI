@@ -31,7 +31,7 @@ SELECT
     SUBSTRING(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') + 1, LEN(DA.Col_NameTH)) AS surName,
     SUBSTRING(
     REPLACE(CONVERT(VARCHAR(40), NEWID()), '-', ''),
-    1, 4
+    1, 6
 ) AS password,
     SALE_MOBILE AS tel,
     DA.ZONE AS zone,

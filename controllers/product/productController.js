@@ -885,7 +885,10 @@ exports.groupFlavourId = async (req, res) => {
         flavourId: '$_id.id',
         flavourName: '$_id.name'
       }
-    }
+    },
+    {$sort:{
+      flavourName:1
+    }}
   ])
 
   res.status(200).json({
