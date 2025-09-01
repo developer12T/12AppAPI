@@ -276,7 +276,7 @@ exports.checkout = async (req, res) => {
     //   })
     // }
 
-    const promotion = await applyPromotion(summary, channel, res)
+    // const promotion = await applyPromotion(summary, channel, res)
 
     console.log(cart)
 
@@ -357,17 +357,17 @@ exports.checkout = async (req, res) => {
     })
 
 
-    for (const item of qtyproductPro) {
-      const updateResult = await updateStockMongo(
-        item,
-        area,
-        period,
-        'deleteCart',
-        channel,
-        res
-      )
-      if (updateResult) return
-    }
+    // for (const item of qtyproductPro) {
+    //   const updateResult = await updateStockMongo(
+    //     item,
+    //     area,
+    //     period,
+    //     'deleteCart',
+    //     channel,
+    //     res
+    //   )
+    //   if (updateResult) return
+    // }
 
 
 
