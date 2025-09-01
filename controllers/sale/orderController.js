@@ -139,8 +139,8 @@ exports.checkout = async (req, res) => {
     //   )
     //   // res.json(summary); // return ตรงนี้เลย
     // }
-    // console.log(summary)
-    console.log(listPromotion)
+    console.log("changePromotionStatus",changePromotionStatus)
+    // console.log(listPromotion)
     let promotion = []
     if (changePromotionStatus === 1) {
       promotion = listPromotion
