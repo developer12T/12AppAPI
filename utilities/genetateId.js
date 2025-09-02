@@ -182,7 +182,7 @@ const generateDistributionId = async (area, warehouse, channel, res, newtrip = f
   }
 
   // กำหนดความยาวเลขรัน (แนะนำ 3 หลักขึ้นไป ป้องกันทะลุ 99)
-  const newOrderId = `${prefix}${String(runningNumber).padStart(3, '0')}`
+  const newOrderId = `${prefix}${String(runningNumber).padStart(2, '0')}`
   // console.log(latestOrder)
   return newOrderId
 }
