@@ -163,7 +163,7 @@ const generateDistributionId = async (area, warehouse, channel, res, newtrip = f
   const nextMonth = new Date(startTH); nextMonth.setMonth(nextMonth.getMonth() + 1)
   const endTHExclusive = new Date(`${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01T00:00:00+07:00`)
 
-  console.log(startTH, endTHExclusive)
+  // console.log(startTH, endTHExclusive)
 
   // หาเลขรันล่าสุดจาก order ที่ขึ้นต้นด้วย prefix นี้ ใน area เดียวกันและภายในเดือนเป้าหมาย
   const latestOrder = await Distribution.findOne({
@@ -182,7 +182,7 @@ const generateDistributionId = async (area, warehouse, channel, res, newtrip = f
   }
 
   // กำหนดความยาวเลขรัน (แนะนำ 3 หลักขึ้นไป ป้องกันทะลุ 99)
-  const newOrderId = `${prefix}${String(runningNumber).padStart(3, '0')}`
+  const newOrderId = `${prefix}${String(runningNumber).padStart(2, '0')}`
   // console.log(latestOrder)
   return newOrderId
 }

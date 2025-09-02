@@ -92,6 +92,9 @@ exports.getRoute = async (req, res) => {
     enrichedRoutes = filteredRoutes.map(route => {
       const enrichedListStore = route.listStore.map(itemRaw => {
         const item = itemRaw.toObject ? itemRaw.toObject() : itemRaw
+
+        // console.log(item)
+
         const storeInfo = item.storeInfo?.toObject
           ? item.storeInfo.toObject()
           : item.storeInfo || {}
