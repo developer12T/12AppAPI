@@ -238,7 +238,8 @@ exports.checkout = async (req, res) => {
       totalWeightGross: parseFloat(totalWeightGross.toFixed(2)),
       totalWeightNet: parseFloat(totalWeightNet.toFixed(2)),
       createdBy: sale.username,
-      period: period
+      period: period,
+      newTrip:'false'
     })
 
     if (newtrip === true) {
@@ -249,7 +250,7 @@ exports.checkout = async (req, res) => {
         factor = productNew.listUnit.find(item => item.unit === npd.unit)
         qtyPcs = npd.qty * factor.factor
 
-        npdProduct = {
+        const npdProduct = {
           id: productNew.id,
           lot: '',
           name: productNew.name,
@@ -267,6 +268,7 @@ exports.checkout = async (req, res) => {
         }
 
         newOrder.listProduct.push(npdProduct)
+        newOrder.newTrip = 'true' 
       }
     }
 
