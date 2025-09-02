@@ -20,7 +20,8 @@ const {
   addFromERPnew,
   addFromERPOne,
   checkRouteStore,
-  polylineRoute
+  polylineRoute,
+  addRouteIt
 } = require('../../controllers/route/routeController')
 
 const router = express.Router()
@@ -47,6 +48,6 @@ router.post('/addFromERPOne', addFromERPOne)
 router.get('/checkRouteStore', checkRouteStore)
 router.get('/polylineRoute', polylineRoute)
 
-
+router.post('/addRouteIt', addRouteIt)
 
 module.exports = router
