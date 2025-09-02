@@ -246,7 +246,7 @@ const generatePromotionId = async (channel, res) => {
 
   const lastPromotion = await Promotion.findOne()
     .sort({ orderId: -1 })
-    .select('orderId');
+    .select('proId');
 
   let runningNumber = 1
   if (lastPromotion && lastPromotion.proId.startsWith(`PRO-${year}${month}`)) {

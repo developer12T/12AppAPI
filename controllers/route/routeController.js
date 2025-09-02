@@ -2216,3 +2216,53 @@ exports.polylineRoute = async (req, res) => {
     res.status(500).json({ status: 500, message: 'Internal server error' })
   }
 }
+
+
+exports.addRouteIt = async (req, res) => {
+
+  const { period } = req.body
+  const channel = req.headers['x-channel']
+  const { Route } = getModelsByChannel(channel, res, routeModel)
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+
+  const dataStore = await Store.find({ area: "IT211", status: { $ne: '90' } })
+
+
+  let route = []
+
+  for (let i = 1; i <= 25; i++) {
+    const idx2 = String(i).padStart(2, '0'); // "01".."25"
+    const data = {
+      id: `${period}IT211R${idx2}`,
+      period: period,
+      area: 'IT211',
+      day: i,
+      listStore: dataStore.map(item => {
+        return {
+          storeInfo: item._id,
+          note: '',
+          image: '',
+          latitude: '',
+          longtitude: '',
+          status: 0,
+          statusText: 'รอเยี่ยม',
+          listOrder: [],
+          date: ''
+        }
+      })
+
+        // route.push(data)
+
+    };
+
+  }
+
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: route
+  })
+
+}
