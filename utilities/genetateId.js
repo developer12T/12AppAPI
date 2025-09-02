@@ -245,7 +245,7 @@ const generatePromotionId = async (channel, res) => {
   const { Promotion } = getModelsByChannel(channel, res, promotionModel)
 
   const lastPromotion = await Promotion.findOne()
-    .sort({ orderId: -1 })
+    .sort({ proId: -1 })
     .select('proId');
 
   let runningNumber = 1
