@@ -210,9 +210,12 @@ exports.getCart = async (req, res) => {
         return promoDetail
       })
 
-      for (i of qtyproductPro) {
+      
+
+
+      for (item of qtyproductPro) {
         const updateResult = await updateStockMongo(
-          i,
+          item,
           area,
           period(),
           'deleteCart',
