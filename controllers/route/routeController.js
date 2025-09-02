@@ -2250,14 +2250,11 @@ exports.addRouteIt = async (req, res) => {
           date: ''
         }
       })
-
-        // route.push(data)
-
     };
-
+        route.push(data)
   }
 
-
+  Route.create(route)
 
   res.status(200).json({
     status: 200,

@@ -961,9 +961,10 @@ exports.routeQueryOne = async function (channel, RouteId) {
 
 exports.stockQuery = async function (channel, period) {
 
-  const keyword = `%${period}%`;
-  const formatted = keyword.replace(/%/g, '').replace(/^(\d{4})(\d{2})$/, '$1-$2');
-
+  const year = period.slice(0, 4);   // "2025"
+  const month = period.slice(4, 6);  // "09"
+  const formatted = `%${year}-${month}%`;
+  // console.log(formatted)
   const config = {
     user: process.env.MS_SQL_USER,
     password: process.env.MS_SQL_PASSWORD,
@@ -985,7 +986,7 @@ exports.stockQuery = async function (channel, period) {
   ITEM_CODE, 
   SUM(ITEM_QTY) AS ITEM_QTY
   FROM [dbo].[data_stock_van]
-  WHERE Stock_Date LIKE '%2025-08%'
+  WHERE Stock_Date LIKE ${formatted}
   GROUP BY WH, ITEM_CODE
 `;
   }
