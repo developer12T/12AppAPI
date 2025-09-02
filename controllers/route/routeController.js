@@ -2251,7 +2251,7 @@ exports.addRouteIt = async (req, res) => {
         }
       })
 
-        route.push(data)
+        // route.push(data)
 
     };
 
