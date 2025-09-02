@@ -123,6 +123,7 @@ const distributionSchema = mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
     period: { type: String, require: true },
+    newTrip:{ type: String },
 }, {
     timestamps: true
 })
