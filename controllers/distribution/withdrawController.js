@@ -2,7 +2,12 @@
 // const { User } = require('../../models/cash/user')
 // const { Product } = require('../../models/cash/product')
 // const { Distribution, Place } = require('../../models/cash/distribution')
-const { MHDISL, MHDISH, DisributionM3, MGLINE } = require('../../models/cash/master')
+const {
+  MHDISL,
+  MHDISH,
+  DisributionM3,
+  MGLINE
+} = require('../../models/cash/master')
 const { sequelize, DataTypes } = require('../../config/m3db')
 const { getSeries, updateRunningNumber } = require('../../middleware/order')
 const axios = require('axios')
@@ -22,12 +27,18 @@ const { query } = require('mssql')
 const { exists } = require('fs')
 const DistributionModel = require('../../models/cash/distribution')
 require('dotenv').config()
-const { Op } = require('sequelize');
+const { Op } = require('sequelize')
 const { formatDateTimeToThai } = require('../../middleware/order')
 const { to2, updateStockMongo } = require('../../middleware/order')
 const { getSocket } = require('../../socket')
 const { sendEmail } = require('../../middleware/order')
 const product = require('../../models/cash/product')
+
+const xlsx = require('xlsx')
+const path = require('path')
+const os = require('os')
+const fs = require('fs')
+
 exports.checkout = async (req, res) => {
   const transaction = await sequelize.transaction()
   try {
@@ -240,7 +251,7 @@ exports.checkout = async (req, res) => {
 
         npdProduct = {
           id: productNew.id,
-          lot: "",
+          lot: '',
           name: productNew.name,
           group: productNew.group,
           brand: productNew.brand,
@@ -258,11 +269,6 @@ exports.checkout = async (req, res) => {
         newOrder.listProduct.push(npdProduct)
       }
     }
-
-
-
-
-
 
     const productQty = newOrder.listProduct.map(u => {
       return {
@@ -328,20 +334,43 @@ exports.checkout = async (req, res) => {
 
 exports.getOrder = async (req, res) => {
   try {
-    const { type, area, period, zone, team, year, month } = req.query
+    const { type, area, period, zone, team, year, month, start, end } =
+      req.query
     const channel = req.headers['x-channel']
 
     const { Distribution } = getModelsByChannel(channel, res, distributionModel)
     const { User } = getModelsByChannel(channel, res, userModel)
 
     // let response = []
-    if (!type || !period) {
-      return res
-        .status(400)
-        .json({ status: 400, message: 'type,  period are required!' })
+    if (!type) {
+      return res.status(400).json({ status: 400, message: 'type is required!' })
     }
 
-    const { startDate, endDate } = rangeDate(period)
+    let startDate, endDate
+
+    if (start && end) {
+      // ตัด string แล้ว parse เป็น Date
+      startDate = new Date(
+        start.substring(0, 4), // year: 2025
+        parseInt(start.substring(4, 6), 10) - 1, // month: 08 → index 7
+        start.substring(6, 8) // day: 01
+      )
+
+      endDate = new Date(
+        end.substring(0, 4), // year: 2025
+        parseInt(end.substring(4, 6), 10) - 1, // month: 08 → index 7
+        end.substring(6, 8) // day: 01
+      )
+    } else if (period) {
+      const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
+      startDate = range.startDate
+      endDate = range.endDate
+    } else {
+      return res
+        .status(400)
+        .json({ status: 400, message: 'period or start/end are required!' })
+    }
+
     let statusQuery = {}
     if (type === 'pending') {
       statusQuery.status = { $in: ['pending', 'approved', 'rejected'] }
@@ -362,9 +391,12 @@ exports.getOrder = async (req, res) => {
 
     let query = {
       ...areaQuery,
-      // ...statusQuery,
-      period: period
+      ...(period ? { period } : {}),
+      createdAt: { $gte: startDate, $lt: endDate },
+      ...statusQuery,
     }
+
+    console.log(query)
 
     const pipeline = [
       {
@@ -425,9 +457,9 @@ exports.getOrder = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           orderType: o.orderType,
@@ -488,7 +520,7 @@ exports.getDetail = async (req, res) => {
         shippingId: u.shippingId,
         shippingRoute: u.shippingRoute,
         shippingName: u.shippingName,
-        withdrawType:u.withdrawType,
+        withdrawType: u.withdrawType,
         sendAddress: u.sendAddress,
         sendDate: u.sendDate,
         remark: u.remark,
@@ -1014,10 +1046,12 @@ exports.approveWithdraw = async (req, res) => {
       <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
       <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
       <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName}<br>
-      <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
-          }<br>
-      <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
-          }<br>
+      <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
+          '-' + wereHouseName?.wh_name || ''
+        }<br>
+      <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
+          distributionTran.shippingName
+        }<br>
       <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
       <strong>เขต:</strong> ${distributionTran.area}<br>
       <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -1119,7 +1153,6 @@ exports.saleConfirmWithdraw = async (req, res) => {
       const receiveQtyZero = []
 
       for (item of distributionTran.listProduct) {
-
         if (item.receiveQty === 0 && item.receiveUnit == '') {
           receiveQtyZero.push(item.id)
         }
@@ -1127,11 +1160,10 @@ exports.saleConfirmWithdraw = async (req, res) => {
 
       // console.log(receiveQtyZero)
       if (distributionTran.withdrawType === 'credit') {
-
         distributionTran.listProduct.forEach(item => {
           item.receiveQty = item.qty // เพิ่มหรือทับ field ใน object เดิม
           item.receiveUnit = item.unit
-        });
+        })
 
         receivetotal = distributionTran.total
         receivetotalQty = distributionTran.totalQty
@@ -1178,7 +1210,9 @@ exports.saleConfirmWithdraw = async (req, res) => {
         const ReceiveQty = Object.values(
           Receive.reduce((acc, cur) => {
             // ใช้ key จาก coNo + withdrawUnit + productId (ถ้าอยากแยกตาม productId ด้วย)
-            const key = `${cur.coNo}_${cur.withdrawUnit}_${cur.productId.trim()}`
+            const key = `${cur.coNo}_${
+              cur.withdrawUnit
+            }_${cur.productId.trim()}`
             if (!acc[key]) {
               acc[key] = { ...cur }
             } else {
@@ -1232,109 +1266,105 @@ exports.saleConfirmWithdraw = async (req, res) => {
           }
         }
 
-
-
         // receivetotal = receivetotal
         // receivetotalQty = receivetotalQty
         receivetotalWeightGross = ReceiveWeight?.[0]?.weightGross || 0
         receivetotalWeightNet = ReceiveWeight?.[0]?.weightNet || 0
-
       }
-
 
       // ✅ อัปเดตข้อมูลถ้า status เป็น approved
       // if (distributionTran.status === 'approved') {
-        // // บันทึก listProduct ที่แก้ไขแล้ว
-        await Distribution.updateOne(
-          { _id: distributionTran._id },
-          { $set: { listProduct: distributionTran.listProduct } }
+      // // บันทึก listProduct ที่แก้ไขแล้ว
+      await Distribution.updateOne(
+        { _id: distributionTran._id },
+        { $set: { listProduct: distributionTran.listProduct } }
+      )
+
+      const distributionData = await Distribution.findOneAndUpdate(
+        { orderId, type: 'withdraw' },
+        {
+          $set: {
+            statusTH: 'ยืนยันรับของ',
+            status: 'confirm',
+            receivetotal: receivetotal,
+            receivetotalQty: receivetotalQty,
+            receivetotalWeightGross: receivetotalWeightGross,
+            receivetotalWeightNet: receivetotalWeightNet
+          }
+        },
+        { new: true }
+      )
+
+      if (!distributionData) {
+        return res.status(404).json({
+          status: 404,
+          message: 'Withdraw transaction not found for update.'
+        })
+      }
+
+      if (!distributionTran.period) {
+        return res.status(400).json({
+          status: 400,
+          message: 'Period is missing in withdrawal transaction.'
+        })
+      }
+
+      // ✅ อัปเดตสต๊อก
+      // const qtyproduct = [];
+
+      // for (const u of (distributionTran.listProduct ?? [])) {
+      //   if (!u || !u.id) continue;
+
+      //   const unit = (u.receiveUnit ?? '').trim();
+      //   const qty = Number(u.receiveQty);
+
+      //   if (!unit || !Number.isFinite(qty) || qty <= 0) continue;
+
+      //   qtyproduct.push({ id: u.id, unit, qty });
+      // }
+
+      // console.log(qtyproduct);
+
+      // console.log(distributionTran.listProduct)
+
+      const qtyproduct = []
+
+      for (const i of receiveQtyZero ?? []) {
+        const productQty = distributionTran.listProduct.find(
+          item => item.id === i
         )
 
-        const distributionData = await Distribution.findOneAndUpdate(
-          { orderId, type: 'withdraw' },
-          {
-            $set: {
-              statusTH: 'ยืนยันรับของ',
-              status: 'confirm',
-              receivetotal: receivetotal,
-              receivetotalQty: receivetotalQty,
-              receivetotalWeightGross: receivetotalWeightGross,
-              receivetotalWeightNet: receivetotalWeightNet
-            }
-          },
-          { new: true }
+        const unit = (productQty.receiveUnit ?? '').trim()
+        const qty = Number(productQty.receiveQty)
+
+        qtyproduct.push({ id: productQty.id, unit, qty })
+      }
+
+      // console.log(qtyproduct)
+
+      for (const item of qtyproduct) {
+        const updateResult = await updateStockMongo(
+          item,
+          distributionTran.area,
+          distributionTran.period,
+          'withdraw',
+          channel,
+          res
         )
+        if (updateResult) return
+      }
 
-        if (!distributionData) {
-          return res.status(404).json({
-            status: 404,
-            message: 'Withdraw transaction not found for update.'
-          })
-        }
+      // ✅ ส่ง socket แจ้งผล
+      const io = getSocket()
+      io.emit('distribution/saleConfirmWithdraw', {
+        status: 200,
+        message: 'Confirm withdraw success'
+      })
 
-        if (!distributionTran.period) {
-          return res.status(400).json({
-            status: 400,
-            message: 'Period is missing in withdrawal transaction.'
-          })
-        }
-
-        // ✅ อัปเดตสต๊อก
-        // const qtyproduct = [];
-
-        // for (const u of (distributionTran.listProduct ?? [])) {
-        //   if (!u || !u.id) continue;
-
-        //   const unit = (u.receiveUnit ?? '').trim();
-        //   const qty = Number(u.receiveQty);
-
-        //   if (!unit || !Number.isFinite(qty) || qty <= 0) continue;
-
-        //   qtyproduct.push({ id: u.id, unit, qty });
-        // }
-
-        // console.log(qtyproduct);
-
-        // console.log(distributionTran.listProduct)
-
-        const qtyproduct = [];
-
-        for (const i of (receiveQtyZero ?? [])) {
-
-          const productQty = distributionTran.listProduct.find(item => item.id === i)
-
-          const unit = (productQty.receiveUnit ?? '').trim();
-          const qty = Number(productQty.receiveQty);
-
-          qtyproduct.push({ id: productQty.id, unit, qty });
-        }
-
-        // console.log(qtyproduct)
-
-
-        for (const item of qtyproduct) {
-          const updateResult = await updateStockMongo(
-            item,
-            distributionTran.area,
-            distributionTran.period,
-            'withdraw',
-            channel,
-            res
-          )
-          if (updateResult) return
-        }
-
-        // ✅ ส่ง socket แจ้งผล
-        const io = getSocket()
-        io.emit('distribution/saleConfirmWithdraw', {
-          status: 200,
-          message: 'Confirm withdraw success'
-        })
-
-        return res.status(200).json({
-          status: 200,
-          message: 'Confirm withdraw success'
-        })
+      return res.status(200).json({
+        status: 200,
+        message: 'Confirm withdraw success'
+      })
       // } else {
       //   return res.status(409).json({
       //     status: 409,
@@ -1526,5 +1556,188 @@ exports.getReceiveQty = async (req, res) => {
       status: 500,
       message: error.message || 'Internal server error'
     })
+  }
+}
+
+exports.withdrawToExcel = async (req, res) => {
+  try {
+    const { channel } = req.query
+    let { startDate, endDate } = req.query
+    let statusArray = (req.query.status || '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+
+    if (statusArray.length === 0) {
+      statusArray = ['pending'] // default
+    }
+    const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
+    if (!/^\d{8}$/.test(startDate)) {
+      const nowTH = new Date(
+        new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })
+      )
+      const y = nowTH.getFullYear()
+      const m = String(nowTH.getMonth() + 1).padStart(2, '0')
+      const d = String(nowTH.getDate()).padStart(2, '0') // ← ใช้ getDate() ไม่ใช่ getDay()
+      startDate = `${y}${m}${d}` // YYYYMMDD
+      endDate = `${y}${m}${d}` // YYYYMMDD
+    }
+    const startTH = new Date(
+      `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
+        6,
+        8
+      )}T00:00:00+07:00`
+    )
+    const endTH = new Date(
+      `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(
+        6,
+        8
+      )}T23:59:59.999+07:00`
+    )
+    const modelWithdraw = await Withdraw.aggregate([
+      {
+        $match: {
+          createdAt: {
+            $gte: startTH,
+            $lte: endTH
+          }
+        }
+      },
+      {
+        $match: {
+          status: { $nin: ['canceled'] },
+          status: { $in: statusArray },
+          type: { $in: ['withdraw'] },
+          'store.area': { $ne: 'IT211' }
+          // 'store.area': 'NE211'
+        }
+      },
+      {
+        $addFields: {
+          createdAtThai: {
+            $dateAdd: {
+              startDate: '$createdAt',
+              unit: 'hour',
+              amount: 7
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          // ดึงเฉพาะที่ต้องใช้
+          createdAt: 1,
+          orderId: 1,
+          sale: 1,
+          store: 1,
+          listProduct: 1,
+          listPromotions: 1
+        }
+      },
+      {
+        $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
+      }
+    ])
+
+    const tranFromOrder = modelWithdraw.flatMap(order => {
+      let counterOrder = 0
+      function formatDateToThaiYYYYMMDD (date) {
+        const d = new Date(date)
+        // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
+
+        const yyyy = d.getFullYear()
+        const mm = String(d.getMonth() + 1).padStart(2, '0')
+        const dd = String(d.getDate()).padStart(2, '0')
+
+        return `${yyyy}${mm}${dd}`
+      }
+      // console.log(order.createdAtThai)
+      // ใช้งาน
+      const RLDT = formatDateToThaiYYYYMMDD(order.createdAt)
+
+      const listProduct = order.listProduct.map(product => {
+        return {
+          proCode: '',
+          id: product.id,
+          name: product.name,
+          group: product.group,
+          brand: product.brand,
+          size: product.size,
+          flavour: product.flavour,
+          qty: product.qty,
+          unit: product.unit,
+          unitName: product.unitName,
+          price: product.price,
+          weightGross: product.weightGross,
+          weightNet: product.weightNet,
+          receiveQty: product.receiveQty
+        }
+      })
+
+      const productIDS = [...listProduct].flat()
+
+      // console.log("productIDS",productIDS)
+      return productIDS.map(product => {
+        counterOrder++
+
+        // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
+
+        return {
+          order: order.orderId,
+          type: order.orderType,
+          itemNo: product.id,
+          name: product.name,
+          withdraw: order.store.storeId,
+          receiveQty: order.store.storeId,
+          toWarehouse: order.store.storeId,
+          warehouse: order.store.storeId,
+          gross: order.store.storeId,
+          net: order.store.storeId,
+          OBSPUN: product.unit,
+          remark: order.store.storeId
+        }
+      })
+    })
+    const allTransactions = [...tranFromOrder]
+
+    const wb = xlsx.utils.book_new()
+    const ws = xlsx.utils.json_to_sheet(allTransactions)
+    xlsx.utils.book_append_sheet(
+      wb,
+      ws,
+      `ESP${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}`
+    )
+
+    const tempPath = path.join(
+      os.tmpdir(),
+      `WITHDRAW_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(
+        endDate
+      )}.xlsx`
+    )
+    xlsx.writeFile(wb, tempPath)
+
+    res.download(
+      tempPath,
+      `WITHDRAW_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(
+        endDate
+      )}.xlsx`,
+      err => {
+        if (err) {
+          console.error('❌ Download error:', err)
+          // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+          if (!res.headersSent) {
+            res.status(500).send('Download failed')
+          }
+        }
+
+        // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+        fs.unlink(tempPath, () => {})
+      }
+    )
+  } catch (error) {
+    console.error('Error uploading images:', error)
+    res
+      .status(500)
+      .json({ status: 500, message: 'Server error', error: error.message })
   }
 }
