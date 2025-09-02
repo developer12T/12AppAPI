@@ -113,7 +113,10 @@ exports.getRoute = async (req, res) => {
     // console.log(enrichedRoutes)
 
     if (area && period && !routeId && !storeId) {
-      enrichedRoutes = enrichedRoutes.map(({ listStore, ...rest }) => rest)
+      enrichedRoutes = (enrichedRoutes || []).map(item => ({
+        ...item,
+        listStore: []
+      }));
     }
 
     // }
@@ -2078,7 +2081,7 @@ exports.checkRouteStore = async (req, res) => {
       areaMap[area].del = storeCountMap[area]?.del || 0
     }
 
-    function sortKeys (obj) {
+    function sortKeys(obj) {
       const { area, R, del, ...days } = obj
       const sortedDays = Object.keys(days)
         .filter(k => /^R\d+$/.test(k))
@@ -2135,25 +2138,25 @@ exports.polylineRoute = async (req, res) => {
           8
         )}T23:59:59.999+07:00`
       )
-     pipeline.push(
-    {
-      $addFields: {
-        listStore: {
-          $filter: {
-            input: "$listStore",
-            as: "s",
-            cond: {
-              $and: [
-                { $gte: ["$$s.date", startTH] },
-                { $lt:  ["$$s.date", endTH] }
-              ]
+      pipeline.push(
+        {
+          $addFields: {
+            listStore: {
+              $filter: {
+                input: "$listStore",
+                as: "s",
+                cond: {
+                  $and: [
+                    { $gte: ["$$s.date", startTH] },
+                    { $lt: ["$$s.date", endTH] }
+                  ]
+                }
+              }
             }
           }
-        }
-      }
-    },
-    { $match: { "listStore.0": { $exists: true } } }
-  );
+        },
+        { $match: { "listStore.0": { $exists: true } } }
+      );
     }
 
     // const dataRoute = await Route.find({ area, period })

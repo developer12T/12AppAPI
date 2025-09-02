@@ -570,7 +570,7 @@ exports.getOrder = async (req, res) => {
       createdAt: { $gte: startDate, $lt: endDate }
     }
 
-    console.log(matchQuery)
+    // console.log(matchQuery)
 
     // const order = await Order.aggregate([
     //   {
