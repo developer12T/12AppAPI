@@ -697,7 +697,7 @@ exports.approveGive = async (req, res) => {
           channel,
           res
         )
-        console.log(item)
+        // console.log(item)
         if (updateResult) return
       }
     }

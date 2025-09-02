@@ -570,7 +570,7 @@ exports.getOrder = async (req, res) => {
       createdAt: { $gte: startDate, $lt: endDate }
     }
 
-    console.log(matchQuery)
+    // console.log(matchQuery)
 
     // const order = await Order.aggregate([
     //   {
@@ -4397,6 +4397,11 @@ exports.getTarget = async (req, res) => {
     )}T23:59:59.999+07:00`
   )
 
+  const period = `${startDate.slice(0, 4)}${startDate.slice(4, 6)}`
+
+
+
+
   const [
     dataSendmoney,
     dataRefund,
@@ -4463,13 +4468,13 @@ exports.getTarget = async (req, res) => {
       status: { $nin: ['pending', 'canceled', 'reject'] }
     }),
     Target.findOne({
-      TG_AREA: area
-      // period: period,
-      // createdAt: { $gte: startTH, $lte: endTH },
+      TG_AREA: area,
+      TG_PERIOD: period,
+      // createdAt: { $gte:startTH, $lte: endTH },
     })
   ])
 
-  console.log(dataTarget)
+  // console.log(dataTarget)
 
   const totalSendmoney = (dataSendmoney ?? []).reduce(
     (sum, item) => sum + (Number(item?.sendmoney) || 0),
