@@ -530,8 +530,7 @@ async function applyPromotion(order, channel, res) {
             });
         });
 
-        // console.log(sumOrder)
-
+        
         let matchedProducts = sumOrder.filter(product =>
             promo.conditions.some(condition => {
                 return (
@@ -545,15 +544,16 @@ async function applyPromotion(order, channel, res) {
                 )
             })
         );
-
+        
         if (matchedProducts.length === 0) continue
+        
 
 
-
-        let totalAmount = matchedProducts.reduce((sum, p) => sum + (p.qtyPcs * p.pricePcs), 0)
+        // let totalAmount = matchedProducts.reduce((sum, p) => sum + (p.qtyPcs * p.pricePcs), 0)
+        let totalAmount = matchedProducts.reduce((sum, p) => sum + (p.price), 0)
         let totalQty = matchedProducts.reduce((sum, p) => sum + p.qtyPromo, 0)
 
-
+        // console.log(sumOrder)
         let meetsCondition = promo.conditions.some(condition =>
             (promo.proType === 'free' && condition.productQty >= 0 && totalQty >= condition.productQty) ||
             (promo.proType === 'amount' && condition.productAmount >= 0 && totalAmount >= condition.productAmount)
@@ -576,7 +576,7 @@ async function applyPromotion(order, channel, res) {
             }, 1)
             // console.log(multiplier)
         }
-        // console.log(promo.proId)
+
         switch (promo.proType) {
             case 'amount':
                 freeProducts = await rewardProduct(promo.rewards, order, multiplier, channel, res)
