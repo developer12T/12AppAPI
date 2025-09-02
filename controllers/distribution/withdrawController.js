@@ -344,9 +344,9 @@ exports.getOrder = async (req, res) => {
     const { User } = getModelsByChannel(channel, res, userModel)
 
     // let response = []
-    if (!type) {
-      return res.status(400).json({ status: 400, message: 'type is required!' })
-    }
+    // if (!type) {
+    //   return res.status(400).json({ status: 400, message: 'type is required!' })
+    // }
 
     let startDate, endDate
 
