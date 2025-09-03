@@ -11,7 +11,7 @@ const { getSocket } = require('../../socket')
 const addUpload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages'
 )
-// const sharp = require('sharp')
+const sharp = require('sharp')
 const xlsx = require('xlsx')
 
 const sql = require('mssql')
@@ -403,11 +403,11 @@ exports.addStore = async (req, res) => {
         const originalPath = uploadedFile[0].fullPath // เช่น .../public/images/stores/xxx.jpg
         const webpPath = originalPath.replace(/\.[a-zA-Z]+$/, '.webp') // แปลงชื่อไฟล์นามสกุล .webp
 
-        // await sharp(originalPath)
-        //   .rotate()
-        //   .resize(800)
-        //   .webp({ quality: 80 })
-        //   .toFile(webpPath)
+        await sharp(originalPath)
+          .rotate()
+          .resize(800)
+          .webp({ quality: 80 })
+          .toFile(webpPath)
 
         fs.unlinkSync(originalPath)
         uploadedFiles.push({
