@@ -1227,10 +1227,9 @@ exports.saleConfirmWithdraw = async (req, res) => {
           }, {})
         )
 
-        // console.log('merged', merged)
         receivetotalQty = 0
         receivetotal = 0
-
+        
         for (const i of distributionTran.listProduct) {
           const productIdTrimmed = String(i.id || '').trim()
           const match = ReceiveQty.find(
@@ -1346,6 +1345,8 @@ exports.saleConfirmWithdraw = async (req, res) => {
       // console.log(qtyproduct)
 
       for (const item of qtyproduct) {
+
+        // console.log(item)
         const updateResult = await updateStockMongo(
           item,
           distributionTran.area,

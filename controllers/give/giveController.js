@@ -115,8 +115,15 @@ exports.getGiveType = async (req, res) => {
 
 exports.getGiveProductFilter = async (req, res) => {
   try {
-    const { area, giveId, group, brand, size, flavour } = req.body
+    const { area,period, giveId, } = req.body
     const channel = req.headers['x-channel']
+
+    const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
+      channel,
+      res,
+      stockModel
+    )
+
 
     if (!giveId) {
       return res.status(400).json({
@@ -126,6 +133,17 @@ exports.getGiveProductFilter = async (req, res) => {
     }
 
     const products = await getProductGive(giveId, area, channel, res)
+    const productIds = products.flatMap(item => item.id)
+    const stock = await Stock.findOne({period:period,area:area})
+
+
+    for (item of products) {
+
+      console.log(item.id)
+
+
+    }
+
 
     if (!products.length) {
       return res.status(404).json({
@@ -135,71 +153,11 @@ exports.getGiveProductFilter = async (req, res) => {
       })
     }
 
-    const isEmptyArray = arr => Array.isArray(arr) && arr.length === 0
-
-    if (
-      isEmptyArray(group) &&
-      isEmptyArray(brand) &&
-      isEmptyArray(size) &&
-      isEmptyArray(flavour)
-    ) {
-      const uniqueGroups = [...new Set(products.map(p => p.group))]
-      const uniqueBrands = [...new Set(products.map(p => p.brand))]
-      const uniqueSizes = [...new Set(products.map(p => p.size))]
-      const uniqueflavours = [...new Set(products.map(p => p.flavour))]
-
-      return res.status(200).json({
-        status: 200,
-        message: 'Successfully fetched product groups!',
-        data: {
-          group: uniqueGroups,
-          brand: uniqueBrands,
-          size: uniqueSizes,
-          flavour: uniqueflavours
-        }
-      })
-    }
-
-    let filteredProducts = products
-
-    if (!isEmptyArray(group)) {
-      filteredProducts = filteredProducts.filter(p => group.includes(p.group))
-    }
-    if (!isEmptyArray(brand)) {
-      filteredProducts = filteredProducts.filter(p => brand.includes(p.brand))
-    }
-    if (!isEmptyArray(size)) {
-      filteredProducts = filteredProducts.filter(p => size.includes(p.size))
-    }
-    if (!isEmptyArray(flavour)) {
-      filteredProducts = filteredProducts.filter(p =>
-        flavour.includes(p.flavour)
-      )
-    }
-
-    if (!filteredProducts.length) {
-      return res.status(404).json({
-        status: 404,
-        message: 'No products match the given filters',
-        data: []
-      })
-    }
-    const groupedData = {
-      group: [...new Set(filteredProducts.map(p => p.group))],
-      brand: [...new Set(filteredProducts.map(p => p.brand))].filter(Boolean),
-      size: [...new Set(filteredProducts.map(p => p.size))].filter(Boolean),
-      flavour: [...new Set(filteredProducts.map(p => p.flavour))].filter(
-        Boolean
-      )
-    }
-
-    // const io = getSocket()
-    // io.emit('give/getGiveProductFilter', {});
 
     res.status(200).json({
       status: 200,
       message: 'Successfully fetched give product filters!',
-      data: groupedData
+      data: products
     })
   } catch (error) {
     console.error(error)
@@ -887,7 +845,7 @@ exports.giveToExcel = async (req, res) => {
     }
   ])
 
-  function formatDateToThaiYYYYMMDD (date) {
+  function formatDateToThaiYYYYMMDD(date) {
     const d = new Date(date)
     // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -939,7 +897,7 @@ exports.giveToExcel = async (req, res) => {
 
   const data = dataTran.flatMap(item => item)
 
-  function yyyymmddToDdMmYyyy (dateString) {
+  function yyyymmddToDdMmYyyy(dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -982,7 +940,7 @@ exports.giveToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
+      fs.unlink(tempPath, () => { })
     }
   )
 
