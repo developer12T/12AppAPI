@@ -11,7 +11,7 @@ const { getSocket } = require('../../socket')
 const addUpload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages'
 )
-const sharp = require('sharp')
+// const sharp = require('sharp')
 const xlsx = require('xlsx')
 
 const sql = require('mssql')
@@ -22,13 +22,13 @@ const {
 } = require('../../controllers/queryFromM3/querySctipt')
 
 // ===== helper: สร้างไดเรกทอรี + เซฟไฟล์ buffer เป็น .webp =====
-async function saveImageBufferToWebp({ buffer, destDir, baseName }) {
-  await fsp.mkdir(destDir, { recursive: true })
-  const fileName = `${baseName}.webp`
-  const fullDiskPath = path.join(destDir, fileName)
-  await sharp(buffer).webp({ quality: 80 }).toFile(fullDiskPath)
-  return { fileName, fullDiskPath }
-}
+// async function saveImageBufferToWebp({ buffer, destDir, baseName }) {
+//   await fsp.mkdir(destDir, { recursive: true })
+//   const fileName = `${baseName}.webp`
+//   const fullDiskPath = path.join(destDir, fileName)
+//   await sharp(buffer).webp({ quality: 80 }).toFile(fullDiskPath)
+//   return { fileName, fullDiskPath }
+// }
 
 const getUploadMiddleware = channel => {
   const storage = multer.memoryStorage()
@@ -344,13 +344,13 @@ exports.updateImage = async (req, res) => {
 
 
 // ===== helper: สร้างไดเรกทอรี + เซฟไฟล์ buffer เป็น .webp =====
-async function saveImageBufferToWebp({ buffer, destDir, baseName }) {
-  await fsp.mkdir(destDir, { recursive: true })
-  const fileName = `${baseName}.webp`
-  const fullDiskPath = path.join(destDir, fileName)
-  await sharp(buffer).webp({ quality: 80 }).toFile(fullDiskPath)
-  return { fileName, fullDiskPath }
-}
+// async function saveImageBufferToWebp({ buffer, destDir, baseName }) {
+//   await fsp.mkdir(destDir, { recursive: true })
+//   const fileName = `${baseName}.webp`
+//   const fullDiskPath = path.join(destDir, fileName)
+//   await sharp(buffer).webp({ quality: 80 }).toFile(fullDiskPath)
+//   return { fileName, fullDiskPath }
+// }
 
 exports.addStore = async (req, res) => {
   const channel = req.headers['x-channel'] // 'credit' or 'cash'
@@ -403,11 +403,11 @@ exports.addStore = async (req, res) => {
         const originalPath = uploadedFile[0].fullPath // เช่น .../public/images/stores/xxx.jpg
         const webpPath = originalPath.replace(/\.[a-zA-Z]+$/, '.webp') // แปลงชื่อไฟล์นามสกุล .webp
 
-        await sharp(originalPath)
-          .rotate()
-          .resize(800)
-          .webp({ quality: 80 })
-          .toFile(webpPath)
+        // await sharp(originalPath)
+        //   .rotate()
+        //   .resize(800)
+        //   .webp({ quality: 80 })
+        //   .toFile(webpPath)
 
         fs.unlinkSync(originalPath)
         uploadedFiles.push({
