@@ -243,6 +243,7 @@ exports.checkout = async (req, res) => {
     })
 
     if (newtrip === true) {
+      newOrder.newTrip = 'true' 
       const productNew = await Product.findOne({ type: 'new' })
       if (productNew) {
         const npd = await Npd.findOne({ period: period })
@@ -268,7 +269,7 @@ exports.checkout = async (req, res) => {
         }
 
         newOrder.listProduct.push(npdProduct)
-        newOrder.newTrip = 'true' 
+        
       }
     }
 
