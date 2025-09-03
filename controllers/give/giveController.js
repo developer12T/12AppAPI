@@ -115,7 +115,7 @@ exports.getGiveType = async (req, res) => {
 
 exports.getGiveProductFilter = async (req, res) => {
   try {
-    const { area,period, giveId, } = req.body
+    const { area, period, giveId, } = req.body
     const channel = req.headers['x-channel']
 
     const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
@@ -133,15 +133,29 @@ exports.getGiveProductFilter = async (req, res) => {
     }
 
     const products = await getProductGive(giveId, area, channel, res)
-    const productIds = products.flatMap(item => item.id)
-    const stock = await Stock.findOne({period:period,area:area})
+    const stock = await Stock.findOne({ period: period, area: area })
 
+
+
+    let data = []
 
     for (item of products) {
+      const factor = item.listUnit[0].factor
+      const stockProduct = stock.listProduct.find(i => i.productId === item.id)
 
-      console.log(item.id)
+      if (!stockProduct || !stockProduct.balancePcs || stockProduct.balancePcs <= 0) {
+        continue;
+      }
 
 
+      const dataTran = {
+        ...item,
+        qtyPcs: stockProduct.balancePcs,
+        qty: Math.floor(stockProduct.balancePcs / factor),
+        unit: item.listUnit[0].unit
+      }
+
+      data.push(dataTran)
     }
 
 
@@ -157,7 +171,7 @@ exports.getGiveProductFilter = async (req, res) => {
     res.status(200).json({
       status: 200,
       message: 'Successfully fetched give product filters!',
-      data: products
+      data: data
     })
   } catch (error) {
     console.error(error)

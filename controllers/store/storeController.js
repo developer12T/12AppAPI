@@ -22,13 +22,13 @@ const {
 } = require('../../controllers/queryFromM3/querySctipt')
 
 // ===== helper: สร้างไดเรกทอรี + เซฟไฟล์ buffer เป็น .webp =====
-async function saveImageBufferToWebp({ buffer, destDir, baseName }) {
-  await fsp.mkdir(destDir, { recursive: true })
-  const fileName = `${baseName}.webp`
-  const fullDiskPath = path.join(destDir, fileName)
-  await sharp(buffer).webp({ quality: 80 }).toFile(fullDiskPath)
-  return { fileName, fullDiskPath }
-}
+// async function saveImageBufferToWebp({ buffer, destDir, baseName }) {
+//   await fsp.mkdir(destDir, { recursive: true })
+//   const fileName = `${baseName}.webp`
+//   const fullDiskPath = path.join(destDir, fileName)
+//   await sharp(buffer).webp({ quality: 80 }).toFile(fullDiskPath)
+//   return { fileName, fullDiskPath }
+// }
 
 const getUploadMiddleware = channel => {
   const storage = multer.memoryStorage()
@@ -344,13 +344,13 @@ exports.updateImage = async (req, res) => {
 
 
 // ===== helper: สร้างไดเรกทอรี + เซฟไฟล์ buffer เป็น .webp =====
-async function saveImageBufferToWebp({ buffer, destDir, baseName }) {
-  await fsp.mkdir(destDir, { recursive: true })
-  const fileName = `${baseName}.webp`
-  const fullDiskPath = path.join(destDir, fileName)
-  await sharp(buffer).webp({ quality: 80 }).toFile(fullDiskPath)
-  return { fileName, fullDiskPath }
-}
+// async function saveImageBufferToWebp({ buffer, destDir, baseName }) {
+//   await fsp.mkdir(destDir, { recursive: true })
+//   const fileName = `${baseName}.webp`
+//   const fullDiskPath = path.join(destDir, fileName)
+//   await sharp(buffer).webp({ quality: 80 }).toFile(fullDiskPath)
+//   return { fileName, fullDiskPath }
+// }
 
 exports.addStore = async (req, res) => {
   const channel = req.headers['x-channel'] // 'credit' or 'cash'
