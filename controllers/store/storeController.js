@@ -315,10 +315,9 @@ exports.updateImage = async (req, res) => {
 }
 
 exports.addStore = async (req, res) => {
+
   const channel = req.headers['x-channel'] // 'credit' or 'cash'
-
   const { Store } = getModelsByChannel(channel, res, storeModel)
-
   const upload = getUploadMiddleware(channel)
 
   upload(req, res, async err => {
@@ -359,6 +358,7 @@ exports.addStore = async (req, res) => {
           store.area,
           types[i]
         )
+        console.log(__dirname, '../../public/images/stores')
 
         const originalPath = uploadedFile[0].fullPath // เช่น .../public/images/stores/xxx.jpg
         const webpPath = originalPath.replace(/\.[a-zA-Z]+$/, '.webp') // แปลงชื่อไฟล์นามสกุล .webp
