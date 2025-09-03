@@ -4407,6 +4407,9 @@ exports.addStockAllWithInOut = async (req, res) => {
     const { User } = getModelsByChannel(channel, res, userModel)
     const { Cart } = getModelsByChannel(channel, res, cartModel)
 
+    const { startDate, endDate } = rangeDate(period)
+
+
     if (!period) {
       return res
         .status(400)
@@ -4419,7 +4422,7 @@ exports.addStockAllWithInOut = async (req, res) => {
       .flatMap(u => (Array.isArray(u.area) ? u.area : [u.area]))
       .filter(Boolean)
     const uniqueAreas = [...new Set(rawAreas)]
-    // uniqueAreas = ['CT224']
+    // uniqueAreas = ['NE214']
     // 2) ฟังก์ชันย่อย: ประมวลผลต่อ 1 area
     const buildAreaStock = async area => {
       // สร้าง match สำหรับ collections ต่าง ๆ
@@ -4535,7 +4538,8 @@ exports.addStockAllWithInOut = async (req, res) => {
         {
           $match: {
             type: { $in: ['give', 'refund', 'sale'] },
-            area: area,
+            area,
+            createdAtDate: { $gte: startDate, $lte: endDate }
           }
         },
         { $project: { listProduct: 1, _id: 0, zone: 1 } }
@@ -5076,7 +5080,7 @@ exports.addStockIt = async (req, res) => {
 
   const existStock = await Stock.findOne({ area: 'IT211', period: period })
   if (existStock) {
-    
+
     return res.status(200).json({
       status: 209,
       message: `already have IT211 ${period} `,
