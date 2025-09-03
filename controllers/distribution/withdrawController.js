@@ -49,9 +49,10 @@ exports.checkout = async (req, res) => {
       withdrawType,
       sendDate,
       note,
-      period,
-      newtrip
+      period
+      // newtrip = false
     } = req.body
+    const newtrip = false
 
     const channel = req.headers['x-channel']
     const { Cart } = getModelsByChannel(channel, res, cartModel)
@@ -239,11 +240,11 @@ exports.checkout = async (req, res) => {
       totalWeightNet: parseFloat(totalWeightNet.toFixed(2)),
       createdBy: sale.username,
       period: period,
-      newTrip:'false'
+      newTrip: 'false'
     })
 
     if (newtrip === true) {
-      newOrder.newTrip = 'true' 
+      newOrder.newTrip = 'true'
       const productNew = await Product.findOne({ type: 'new' })
       if (productNew) {
         const npd = await Npd.findOne({ period: period })
@@ -269,7 +270,6 @@ exports.checkout = async (req, res) => {
         }
 
         newOrder.listProduct.push(npdProduct)
-        
       }
     }
 
@@ -396,7 +396,7 @@ exports.getOrder = async (req, res) => {
       ...areaQuery,
       ...(period ? { period } : {}),
       createdAt: { $gte: startDate, $lt: endDate },
-      ...statusQuery,
+      ...statusQuery
     }
 
     console.log(query)
@@ -467,6 +467,8 @@ exports.getOrder = async (req, res) => {
           orderId: o.orderId,
           orderType: o.orderType,
           orderTypeName: o.orderTypeName,
+          totalWeightGross: o.totalWeightGross,
+          totalWeightNet: o.totalWeightNet,
           sendDate: o.sendDate,
           total: o.totalQty || 0,
           status: o.status,
