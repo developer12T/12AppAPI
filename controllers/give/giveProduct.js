@@ -36,7 +36,15 @@ async function getProductGive(giveId, area, channel, res) {
 
         productQuery.id = { $in: condition.productId }
 
-        const dataProduct = await Product.find(productQuery).lean()
+        const dataProduct = await Product.aggregate([{ $match: productQuery },
+        {
+          $set: {
+            listUnit: {
+              $filter:
+                { input: '$listUnit', as: 'u', cond: { $in: ['$$u.unit', condition.productUnit] } }
+            }
+          }
+        }]).exec()
         products.push(...dataProduct)
 
         continue
@@ -65,20 +73,15 @@ async function getProductGive(giveId, area, channel, res) {
 
 
 
-      const dataProduct = await Product.aggregate([
-        { $match: productQuery },
-        {
-          $set: {
-            listUnit: {
-              $filter: {
-                input: '$listUnit',
-                as: 'u',
-                cond: { $in: ['$$u.unit', condition.productUnit] }
-              }
-            }
+      const dataProduct = await Product.aggregate([{ $match: productQuery },
+      {
+        $set: {
+          listUnit: {
+            $filter:
+              { input: '$listUnit', as: 'u', cond: { $in: ['$$u.unit', condition.productUnit] } }
           }
         }
-      ]).exec()
+      }]).exec()
       products.push(...dataProduct) // กัน nested array
     }
 

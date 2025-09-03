@@ -143,24 +143,16 @@ exports.getGiveProductFilter = async (req, res) => {
       const factor = item.listUnit[0].factor
       const stockProduct = stock.listProduct.find(i => i.productId === item.id)
 
+      if (!stockProduct || !stockProduct.balancePcs || stockProduct.balancePcs <= 0) {
+        continue;
+      }
+
+
       const dataTran = {
-        id:item.id,
-        name:item.name,
-        groupCode:item.groupCode,
-        group:item.group,
-        groupCodeM3:item.groupCodeM3,
-        groupM3:item.groupM3,
-        brandCode:item.brandCode,
-        brand:item.brand,
-        size:item.size,
-        flavourCode:item.flavourCode,
-        flavour:item.flavour,
-        type:item.type,
-        weightGross:item.weightGross,
-        weightNet:item.weightNet,
-        statusSale:item.statusSale,
-        qty:Math.floor(stockProduct.balancePcs / factor),
-        unit:item.listUnit[0].unit
+        ...item,
+        qtyPcs: stockProduct.balancePcs,
+        qty: Math.floor(stockProduct.balancePcs / factor),
+        unit: item.listUnit[0].unit
       }
 
       data.push(dataTran)
