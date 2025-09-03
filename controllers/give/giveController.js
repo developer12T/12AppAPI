@@ -115,7 +115,7 @@ exports.getGiveType = async (req, res) => {
 
 exports.getGiveProductFilter = async (req, res) => {
   try {
-    const { area, period, giveId, } = req.body
+    const { area,period, giveId, } = req.body
     const channel = req.headers['x-channel']
 
     const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
@@ -133,29 +133,15 @@ exports.getGiveProductFilter = async (req, res) => {
     }
 
     const products = await getProductGive(giveId, area, channel, res)
-    const stock = await Stock.findOne({ period: period, area: area })
+    const productIds = products.flatMap(item => item.id)
+    const stock = await Stock.findOne({period:period,area:area})
 
-
-
-    let data = []
 
     for (item of products) {
-      const factor = item.listUnit[0].factor
-      const stockProduct = stock.listProduct.find(i => i.productId === item.id)
 
-      if (!stockProduct || !stockProduct.balancePcs || stockProduct.balancePcs <= 0) {
-        continue;
-      }
+      console.log(item.id)
 
 
-      const dataTran = {
-        ...item,
-        qtyPcs: stockProduct.balancePcs,
-        qty: Math.floor(stockProduct.balancePcs / factor),
-        unit: item.listUnit[0].unit
-      }
-
-      data.push(dataTran)
     }
 
 
@@ -171,7 +157,7 @@ exports.getGiveProductFilter = async (req, res) => {
     res.status(200).json({
       status: 200,
       message: 'Successfully fetched give product filters!',
-      data: data
+      data: products
     })
   } catch (error) {
     console.error(error)
@@ -180,23 +166,78 @@ exports.getGiveProductFilter = async (req, res) => {
 }
 
 exports.getGiveStoreFilter = async (req, res) => {
-  try {
-    const { area, giveId } = req.query
-    const channel = req.headers['x-channel']
-    const store = await getStoreGive(giveId, area, channel, res)
+    try {
+        const { area, giveId, group, brand, size, flavour } = req.body
+        const channel = req.headers['x-channel']; 
 
-    // const io = getSocket()
-    // io.emit('give/getGiveStoreFilter', {});
+        if (!giveId || !area) {
+            return res.status(400).json({
+                status: 400,
+                message: 'area and giveId are required!'
+            })
+        }
 
-    res.status(200).json({
-      status: 200,
-      message: 'Successfully fetched give store filters!',
-      data: store
-    })
-  } catch (error) {
-    console.error(error)
-    res.status(500).json({ status: '500', message: error.message })
-  }
+        const products = await getProductGive(giveId, area,channel,res)
+
+        if (!products.length) {
+            return res.status(404).json({
+                status: 404,
+                message: 'No products found for the given giveId and area',
+                data: []
+            })
+        }
+
+        const isEmptyArray = (arr) => Array.isArray(arr) && arr.length === 0
+
+        if (isEmptyArray(group) && isEmptyArray(brand) && isEmptyArray(size) && isEmptyArray(flavour)) {
+            const uniqueGroups = [...new Set(products.map(p => p.group))]
+            return res.status(200).json({
+                status: 200,
+                message: 'Successfully fetched product groups!',
+                data: { group: uniqueGroups, brand: [], size: [], flavour: [] }
+            })
+        }
+
+        let filteredProducts = products
+
+        if (!isEmptyArray(group)) {
+            filteredProducts = filteredProducts.filter(p => group.includes(p.group))
+        }
+        if (!isEmptyArray(brand)) {
+            filteredProducts = filteredProducts.filter(p => brand.includes(p.brand))
+        }
+        if (!isEmptyArray(size)) {
+            filteredProducts = filteredProducts.filter(p => size.includes(p.size))
+        }
+        if (!isEmptyArray(flavour)) {
+            filteredProducts = filteredProducts.filter(p => flavour.includes(p.flavour))
+        }
+
+        if (!filteredProducts.length) {
+            return res.status(404).json({
+                status: 404,
+                message: 'No products match the given filters',
+                data: []
+            })
+        }
+
+        const groupedData = {
+            group: [...new Set(filteredProducts.map(p => p.group))],
+            brand: [...new Set(filteredProducts.map(p => p.brand))].filter(Boolean),
+            size: [...new Set(filteredProducts.map(p => p.size))].filter(Boolean),
+            flavour: [...new Set(filteredProducts.map(p => p.flavour))].filter(Boolean)
+        }
+
+        res.status(200).json({
+            status: 200,
+            message: 'Successfully fetched give product filters!',
+            data: groupedData
+        })
+
+    } catch (error) {
+        console.error(error)
+        res.status(500).json({ status: '500', message: error.message })
+    }
 }
 const orderTimestamps = {}
 exports.checkout = async (req, res) => {
