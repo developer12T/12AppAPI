@@ -4409,7 +4409,7 @@ exports.addStockAllWithInOut = async (req, res) => {
 
     const { startDate, endDate } = rangeDate(period)
 
-
+    console.log(startDate,endDate)
     if (!period) {
       return res
         .status(400)
@@ -4539,7 +4539,7 @@ exports.addStockAllWithInOut = async (req, res) => {
           $match: {
             type: { $in: ['give', 'refund', 'sale'] },
             area,
-            createdAtDate: { $gte: startDate, $lte: endDate }
+            createdAt: { $gte: startDate, $lte: endDate }
           }
         },
         { $project: { listProduct: 1, _id: 0, zone: 1 } }
