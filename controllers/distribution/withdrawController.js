@@ -50,9 +50,9 @@ exports.checkout = async (req, res) => {
       sendDate,
       note,
       period,
-      newtrip
+      // newtrip
     } = req.body
-
+    const newtrip = false
     const channel = req.headers['x-channel']
     const { Cart } = getModelsByChannel(channel, res, cartModel)
     const { User } = getModelsByChannel(channel, res, userModel)
