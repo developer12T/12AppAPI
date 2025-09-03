@@ -11,7 +11,7 @@ const { getSocket } = require('../../socket')
 const addUpload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages'
 )
-
+const sharp = require('sharp')
 const xlsx = require('xlsx')
 
 const sql = require('mssql')
@@ -20,22 +20,50 @@ const {
   storeQueryFilter,
   groupStoreType
 } = require('../../controllers/queryFromM3/querySctipt')
+
+// ===== helper: สร้างไดเรกทอรี + เซฟไฟล์ buffer เป็น .webp =====
+async function saveImageBufferToWebp({ buffer, destDir, baseName }) {
+  await fsp.mkdir(destDir, { recursive: true })
+  const fileName = `${baseName}.webp`
+  const fullDiskPath = path.join(destDir, fileName)
+  await sharp(buffer).webp({ quality: 80 }).toFile(fullDiskPath)
+  return { fileName, fullDiskPath }
+}
+
 const getUploadMiddleware = channel => {
   const storage = multer.memoryStorage()
-  let limits = {}
-
-  if (channel == 'cash') {
-    limits = {
-      files: 3
+  const maxFiles = channel === 'cash' ? 3 : 6
+  return multer({
+    storage,
+    limits: {
+      files: maxFiles,
+      fileSize: 20 * 1024 * 1024 // 20MB/ไฟล์
+    },
+    fileFilter: (req, file, cb) => {
+      if (!/^image\/(png|jpe?g|webp|gif)$/i.test(file.mimetype)) {
+        return cb(new Error('Only image files are allowed'))
+      }
+      cb(null, true)
     }
-  } else if (channel == 'credit') {
-    limits = {
-      files: 6
-    }
-  }
-
-  return multer({ storage, limits }).array('storeImages')
+  }).array('storeImages')
 }
+
+// const getUploadMiddleware = channel => {
+//   const storage = multer.memoryStorage()
+//   let limits = {}
+
+//   if (channel == 'cash') {
+//     limits = {
+//       files: 3
+//     }
+//   } else if (channel == 'credit') {
+//     limits = {
+//       files: 6
+//     }
+//   }
+
+//   return multer({ storage, limits }).array('storeImages')
+// }
 
 const orderModel = require('../../models/cash/sale')
 const storeModel = require('../../models/cash/store')
@@ -314,41 +342,53 @@ exports.updateImage = async (req, res) => {
   })
 }
 
+
+// ===== helper: สร้างไดเรกทอรี + เซฟไฟล์ buffer เป็น .webp =====
+async function saveImageBufferToWebp({ buffer, destDir, baseName }) {
+  await fsp.mkdir(destDir, { recursive: true })
+  const fileName = `${baseName}.webp`
+  const fullDiskPath = path.join(destDir, fileName)
+  await sharp(buffer).webp({ quality: 80 }).toFile(fullDiskPath)
+  return { fileName, fullDiskPath }
+}
+
 exports.addStore = async (req, res) => {
   const channel = req.headers['x-channel'] // 'credit' or 'cash'
-
   const { Store } = getModelsByChannel(channel, res, storeModel)
-
   const upload = getUploadMiddleware(channel)
 
   upload(req, res, async err => {
     if (err) {
       return res.status(400).json({ status: '400', message: err.message })
     }
+
     try {
       if (!req.body.store) {
-        return res.status(400).json({
-          status: '400',
-          message: 'Store data is required'
-        })
+        return res
+          .status(400)
+          .json({ status: '400', message: 'Store data is required' })
       }
 
-      const files = req.files
+      const files = req.files || []
       const store = JSON.parse(req.body.store)
       const types = req.body.types ? req.body.types.split(',') : []
 
       if (!store.name || !store.address) {
-        return res.status(400).json({
-          status: '400',
-          message: 'Required fields are missing: name, address'
-        })
+        return res
+          .status(400)
+          .json({
+            status: '400',
+            message: 'Required fields are missing: name, address'
+          })
       }
 
       if (files.length !== types.length) {
-        return res.status(400).json({
-          status: '400',
-          message: 'Number of files and types do not match'
-        })
+        return res
+          .status(400)
+          .json({
+            status: '400',
+            message: 'Number of files and types do not match'
+          })
       }
 
       const uploadedFiles = []
@@ -363,6 +403,12 @@ exports.addStore = async (req, res) => {
         const originalPath = uploadedFile[0].fullPath // เช่น .../public/images/stores/xxx.jpg
         const webpPath = originalPath.replace(/\.[a-zA-Z]+$/, '.webp') // แปลงชื่อไฟล์นามสกุล .webp
 
+        await sharp(originalPath)
+          .rotate()
+          .resize(800)
+          .webp({ quality: 80 })
+          .toFile(webpPath)
+
         fs.unlinkSync(originalPath)
         uploadedFiles.push({
           name: path.basename(webpPath),
@@ -373,12 +419,8 @@ exports.addStore = async (req, res) => {
 
       const imageList = uploadedFiles
 
-      const policyAgree = {
-        status: store.policyConsent?.status || ''
-      }
-      const approve = {
-        status: '19'
-      }
+      const policyAgree = { status: store.policyConsent?.status || '' }
+      const approve = { status: '19' }
 
       const shippingAddress = Array.isArray(store.shippingAddress)
         ? store.shippingAddress
@@ -393,8 +435,6 @@ exports.addStore = async (req, res) => {
         latitude: ship.latitude || '',
         longtitude: ship.longtitude || ''
       }))
-
-      const checkIn = {}
 
       const storeData = new Store({
         storeId: uuidv4(),
@@ -417,15 +457,14 @@ exports.addStore = async (req, res) => {
         lineId: store.lineId,
         note: store.note,
         status: '10',
-        approve: approve,
+        approve,
         policyConsent: policyAgree,
-        imageList: imageList,
+        imageList,
         shippingAddress: shipping,
-        checkIn: checkIn
+        checkIn: {}
       })
 
       await storeData.save()
-      // console.log(storeData)
 
       const io = getSocket()
       io.emit('store/addStore', {
@@ -433,17 +472,152 @@ exports.addStore = async (req, res) => {
         message: 'Store added successfully'
       })
 
-      res.status(200).json({
+      return res.status(200).json({
         status: '200',
-        message: 'Store added successfully'
-        // data:storeData
+        message: 'Store added successfully',
+        data: {
+          storeId: storeData.storeId,
+          imageList // คืนให้ client ใช้แสดงรูปต่อได้ทันที
+        }
       })
     } catch (error) {
       console.error('Error saving store to MongoDB:', error)
-      res.status(500).json({ status: '500', message: 'Server Error' })
+      return res
+        .status(500)
+        .json({ status: '500', message: 'Server Error', debug: error.message })
     }
   })
 }
+
+// exports.addStore = async (req, res) => {
+//   const channel = req.headers['x-channel'] // 'credit' or 'cash'
+//   const { Store } = getModelsByChannel(channel, res, storeModel)
+//   const upload = getUploadMiddleware(channel)
+
+//   upload(req, res, async err => {
+//     if (err) {
+//       return res.status(400).json({ status: '400', message: err.message })
+//     }
+//     try {
+//       if (!req.body.store) {
+//         return res.status(400).json({
+//           status: '400',
+//           message: 'Store data is required'
+//         })
+//       }
+
+//       const files = req.files
+//       const store = JSON.parse(req.body.store)
+//       const types = req.body.types ? req.body.types.split(',') : []
+
+//       if (!store.name || !store.address) {
+//         return res.status(400).json({
+//           status: '400',
+//           message: 'Required fields are missing: name, address'
+//         })
+//       }
+
+//       if (files.length !== types.length) {
+//         return res.status(400).json({
+//           status: '400',
+//           message: 'Number of files and types do not match'
+//         })
+//       }
+
+//       const uploadedFiles = []
+//       for (let i = 0; i < files.length; i++) {
+//         const uploadedFile = await uploadFiles(
+//           [files[i]],
+//           path.join(__dirname, '../../public/images/stores'),
+//           store.area,
+//           types[i]
+//         )
+//         console.log(__dirname, '../../public/images/stores')
+
+//         const originalPath = uploadedFile[0].fullPath // เช่น .../public/images/stores/xxx.jpg
+//         const webpPath = originalPath.replace(/\.[a-zA-Z]+$/, '.webp') // แปลงชื่อไฟล์นามสกุล .webp
+
+//         fs.unlinkSync(originalPath)
+//         uploadedFiles.push({
+//           name: path.basename(webpPath),
+//           path: webpPath,
+//           type: types[i]
+//         })
+//       }
+
+//       const imageList = uploadedFiles
+
+//       const policyAgree = {
+//         status: store.policyConsent?.status || ''
+//       }
+//       const approve = {
+//         status: '19'
+//       }
+
+//       const shippingAddress = Array.isArray(store.shippingAddress)
+//         ? store.shippingAddress
+//         : []
+//       const shipping = shippingAddress.map(ship => ({
+//         default: ship.default || '',
+//         address: ship.address || '',
+//         district: ship.district || '',
+//         subDistrict: ship.subDistrict || '',
+//         province: ship.provinceCode || '',
+//         postCode: ship.postCode || '',
+//         latitude: ship.latitude || '',
+//         longtitude: ship.longtitude || ''
+//       }))
+
+//       const checkIn = {}
+
+//       const storeData = new Store({
+//         storeId: uuidv4(),
+//         name: store.name,
+//         taxId: store.taxId,
+//         tel: store.tel,
+//         route: store.route,
+//         type: store.type,
+//         typeName: store.typeName,
+//         address: store.address,
+//         district: store.district,
+//         subDistrict: store.subDistrict,
+//         province: store.province,
+//         provinceCode: store.provinceCode,
+//         postCode: store.postCode,
+//         zone: store.zone,
+//         area: store.area,
+//         latitude: store.latitude,
+//         longtitude: store.longtitude,
+//         lineId: store.lineId,
+//         note: store.note,
+//         status: '10',
+//         approve: approve,
+//         policyConsent: policyAgree,
+//         imageList: imageList,
+//         shippingAddress: shipping,
+//         checkIn: checkIn
+//       })
+
+//       await storeData.save()
+//       // console.log(storeData)
+
+//       const io = getSocket()
+//       io.emit('store/addStore', {
+//         status: '200',
+//         message: 'Store added successfully'
+//       })
+
+//       res.status(200).json({
+//         status: '200',
+//         message: 'Store added successfully'
+//         // data:storeData
+//       })
+//     } catch (error) {
+//       console.error('Error saving store to MongoDB:', error)
+//       res.status(500).json({ status: '500', message: 'Server Error' })
+//     }
+//   })
+// }
 
 exports.checkSimilarStores = async (req, res) => {
   const { storeId } = req.params
@@ -864,24 +1038,24 @@ exports.insertStoreToM3 = async (req, res) => {
     customerCoType: item.type ?? '',
     customerAddress1: (
       item.address +
-        item.subDistrict +
-        item.subDistrict +
-        item.province +
-        item.postCode ?? ''
+      item.subDistrict +
+      item.subDistrict +
+      item.province +
+      item.postCode ?? ''
     ).substring(0, 35),
     customerAddress2: (
       item.address +
-        item.subDistrict +
-        item.subDistrict +
-        item.province +
-        item.postCode ?? ''
+      item.subDistrict +
+      item.subDistrict +
+      item.province +
+      item.postCode ?? ''
     ).substring(35, 70),
     customerAddress3: (
       item.address +
-        item.subDistrict +
-        item.subDistrict +
-        item.province +
-        item.postCode ?? ''
+      item.subDistrict +
+      item.subDistrict +
+      item.province +
+      item.postCode ?? ''
     ).substring(70, 105),
     customerAddress4: item.name.substring(35, 70),
     customerPoscode: (item.postCode ?? '').substring(0, 35),
@@ -1021,24 +1195,24 @@ exports.updateStoreStatus = async (req, res) => {
       customerCoType: item.type ?? '',
       customerAddress1: (
         item.address +
-          item.subDistrict +
-          item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
       ).substring(0, 35),
       customerAddress2: (
         item.address +
-          item.subDistrict +
-          item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
       ).substring(35, 70),
       customerAddress3: (
         item.address +
-          item.subDistrict +
-          item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
       ).substring(70, 105),
       customerAddress4: '',
       customerPoscode: (item.postCode ?? '').substring(0, 35),
@@ -2102,7 +2276,7 @@ exports.storeToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
+      fs.unlink(tempPath, () => { })
     })
   } catch (err) {
     console.error(err)
