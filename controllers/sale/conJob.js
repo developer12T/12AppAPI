@@ -29,7 +29,7 @@ const adjustStockModel = require('../../models/cash/stock')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { create } = require('lodash')
 
-async function erpApiCheckOrderJob (channel = 'cash') {
+async function erpApiCheckOrderJob(channel = 'cash') {
   try {
     const { Order } = getModelsByChannel(channel, null, orderModel)
     const { Refund } = getModelsByChannel(channel, null, refundModel)
@@ -173,7 +173,7 @@ async function erpApiCheckOrderJob (channel = 'cash') {
   }
 }
 
-async function erpApiCheckDisributionM3Job (channel = 'cash') {
+async function erpApiCheckDisributionM3Job(channel = 'cash') {
   try {
     const { Distribution } = getModelsByChannel(channel, null, disributionModel)
 
@@ -255,7 +255,7 @@ async function erpApiCheckDisributionM3Job (channel = 'cash') {
   }
 }
 
-async function DeleteCartDaily (channel = 'cash') {
+async function DeleteCartDaily(channel = 'cash') {
   // เปิด session สำหรับ transaction
   // const session = await mongoose.startSession();
   // session.startTransaction();
@@ -395,7 +395,7 @@ async function DeleteCartDaily (channel = 'cash') {
   }
 }
 
-async function reStoreStock (channel = 'cash') {
+async function reStoreStock(channel = 'cash') {
   try {
     const periodstr = period()
     const { Stock } = getModelsByChannel(channel, null, stockModel)
@@ -639,7 +639,7 @@ async function reStoreStock (channel = 'cash') {
       )
 
       const mergedProductPromotions = allOrderPromotion.reduce((acc, promo) => {
-        ;(promo.listProduct || []).forEach(prod => {
+        ; (promo.listProduct || []).forEach(prod => {
           const key = `${prod.id}_${prod.unit}`
           if (acc[key]) {
             acc[key].qty += prod.qty || 0
@@ -1043,16 +1043,20 @@ const startCronJobDeleteCartDaily = () => {
 
 const startCronJobreStoreStockDaily = () => {
   cron.schedule(
-    '0 21 * * *', // รันเวลา 21:00 ของทุกวัน
+    '0 21 * * *', // 21:00
     async () => {
-      console.log('Running cron job reStoreStock at 21:00 (Asia/Bangkok)')
+      console.log(
+        'Running cron job reStoreStock at 21:00 Bangkok time. Now:',
+        new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+      )
       await reStoreStock()
     },
     {
-      timezone: 'Asia/Bangkok' // เวลาตีความตามไทย
+      timezone: 'Asia/Bangkok' // 👈 สำคัญ
     }
   )
 }
+
 
 module.exports = {
   startCronJobErpApiCheck,
