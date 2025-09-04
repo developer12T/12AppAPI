@@ -1236,9 +1236,18 @@ exports.updateStatus = async (req, res) => {
     let newOrderId = orderId
     if (status === 'canceled') {
       statusTH = 'ยกเลิก'
-      if (!changeOrder.orderId.endsWith('CC')) {
+      if (!/CC\d+$/.test(changeOrder.orderId)) {
+        const baseId = changeOrder.orderId // ล็อกฐานไว้ อย่าไปแก้ค่านี้
         let counter = 1
-        newOrderId = `${changeOrder.orderId}CC${counter++}`
+        newOrderId = `${baseId}CC${counter}`
+
+        // ใช้ exists() เร็วกว่า findOne เมื่อเช็คมี/ไม่มี
+        while (await Order.exists({ orderId: newOrderId })) {
+          counter += 1
+          newOrderId = `${baseId}CC${counter}` // ต่อกับ baseId เสมอ
+        }
+
+
       }
       for (const item of productChange) {
         const updateResult = await updateStockMongo(
@@ -1251,7 +1260,7 @@ exports.updateStatus = async (req, res) => {
         )
         if (updateResult) return
       }
-
+      // console.log(newOrderId)
       const updatedOrder = await Order.findOneAndUpdate(
         { reference: orderId },
         { $set: { status, statusTH, orderId: newOrderId } },
@@ -1260,9 +1269,18 @@ exports.updateStatus = async (req, res) => {
       // console.log(orderId)
     } else if (status === 'reject') {
       statusTH = 'ถูกปฏิเสธ'
-      if (!changeOrder.orderId.endsWith('CC')) {
+      if (!/CC\d+$/.test(changeOrder.orderId)) {
+        const baseId = changeOrder.orderId // ล็อกฐานไว้ อย่าไปแก้ค่านี้
         let counter = 1
-        newOrderId = `${changeOrder.orderId}CC${counter++}`
+        newOrderId = `${baseId}CC${counter}`
+
+        // ใช้ exists() เร็วกว่า findOne เมื่อเช็คมี/ไม่มี
+        while (await Order.exists({ orderId: newOrderId })) {
+          counter += 1
+          newOrderId = `${baseId}CC${counter}` // ต่อกับ baseId เสมอ
+        }
+
+
       }
 
       // console.log(productChange)
