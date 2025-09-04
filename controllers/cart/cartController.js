@@ -327,7 +327,10 @@ exports.addProduct = async (req, res) => {
         ? { type, area }
         : type === 'adjuststock'
         ? { type, area, withdrawId }
+        : type === 'give'
+        ? { type, area, storeId, proId }
         : { type, area, storeId }
+        
     const { Cart } = getModelsByChannel(channel, res, cartModel)
 
     let cart = await Cart.findOne(cartQuery)
