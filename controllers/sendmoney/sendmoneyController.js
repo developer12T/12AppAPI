@@ -218,6 +218,21 @@ exports.getSendMoney = async (req, res) => {
           $match: {
             type,
             'store.area': area,
+            status: { $nin: ['canceled', 'delete'] },
+            createdAt: { $gte: startOfDayUTC, $lte: endOfDayUTC }
+          }
+        },
+        { $group: { _id: null, sendmoney: { $sum: '$total' } } }
+      ])
+      return result.length > 0 ? result[0].sendmoney : 0
+    }
+
+    const sumByTypeChangeRefund = async (Model, type) => {
+      const result = await Model.aggregate([
+        {
+          $match: {
+            type,
+            'store.area': area,
             status: { $nin: ['pending','canceled', 'delete'] },
             createdAt: { $gte: startOfDayUTC, $lte: endOfDayUTC }
           }
@@ -227,9 +242,12 @@ exports.getSendMoney = async (req, res) => {
       return result.length > 0 ? result[0].sendmoney : 0
     }
 
+
+
+
     const saleSum = await sumByType(Order, 'sale')
-    const changeSum = await sumByType(Order, 'change')
-    const refundSum = await sumByType(Refund, 'refund')
+    const changeSum = await sumByTypeChangeRefund(Order, 'change')
+    const refundSum = await sumByTypeChangeRefund(Refund, 'refund')
 
     // console.log(saleSum, changeSum, refundSum)
 
