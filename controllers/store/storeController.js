@@ -30,22 +30,69 @@ const {
 //   return { fileName, fullDiskPath }
 // }
 
+// const getUploadMiddleware = channel => {
+//   const storage = multer.memoryStorage()
+//   const maxFiles = channel === 'cash' ? 3 : 6
+//   return multer({
+//     storage,
+//     limits: {
+//       files: maxFiles,
+//       fileSize: 20 * 1024 * 1024 // 20MB/ไฟล์
+//     },
+//     fileFilter: (req, file, cb) => {
+//       if (!/^image\/(png|jpe?g|webp|gif)$/i.test(file.mimetype)) {
+//         return cb(new Error('Only image files are allowed'))
+//       }
+//       cb(null, true)
+//     }
+//   }).array('storeImages')
+//   // console.log(fileFilter)
+// }
+
 const getUploadMiddleware = channel => {
+  console.log('[getUploadMiddleware] channel =', channel) // เรียกใช้แน่นอน
+
   const storage = multer.memoryStorage()
   const maxFiles = channel === 'cash' ? 3 : 6
-  return multer({
+
+  const m = multer({
     storage,
-    limits: {
-      files: maxFiles,
-      fileSize: 20 * 1024 * 1024 // 20MB/ไฟล์
-    },
+    limits: { files: maxFiles, fileSize: 20 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
-      if (!/^image\/(png|jpe?g|webp|gif)$/i.test(file.mimetype)) {
-        return cb(new Error('Only image files are allowed'))
-      }
+      console.log(
+        '[fileFilter] field=%s name=%s mime=%s',
+        file.fieldname,
+        file.originalname,
+        file.mimetype
+      )
+
+      // if (!/^image\/(png|jpe?g|webp|gif)$/i.test(file.mimetype)) {
+      //   console.warn('[fileFilter] reject:', file.originalname, file.mimetype)
+      //   return cb(new Error('Only image files are allowed'))
+      // }
       cb(null, true)
     }
   }).array('storeImages')
+
+  // หุ้มอีกชั้นเพื่อ log ก่อน/หลังอัปโหลด
+  return (req, res, next) => {
+    console.log('[upload:start] content-type =', req.headers['content-type'])
+    m(req, res, err => {
+      if (err) {
+        console.error('[upload:error]', err.message)
+        return next(err)
+      }
+      const files = (req.files || []).map(f => ({
+        field: f.fieldname,
+        name: f.originalname,
+        mime: f.mimetype,
+        size: f.size
+      }))
+      console.log('[upload:done] files =', files)
+      console.log('[upload:done] fields =', req.body)
+      next()
+    })
+  }
 }
 
 // const getUploadMiddleware = channel => {
@@ -355,7 +402,7 @@ exports.addStore = async (req, res) => {
   const channel = req.headers['x-channel'] // 'credit' or 'cash'
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const upload = getUploadMiddleware(channel)
-  console.log(channel)
+  console.log(upload)
 
   upload(req, res, async err => {
     // if (err) {
