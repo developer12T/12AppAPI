@@ -131,7 +131,7 @@ exports.addSendMoneyImage = async (req, res) => {
           $addFields: {
             thaiDate: {
               $dateAdd: {
-                startDate: '$createdAt',
+                startDate: '$dateAt',
                 unit: 'hour',
                 amount: 7
               }
@@ -270,6 +270,9 @@ exports.getSendMoney = async (req, res) => {
       { $project: { _id: 0, path: '$_id', totalSent: 1, count: 1 } }, // แปลงให้อ่านง่าย
       { $sort: { path: 1 } }
     ]);
+
+    // console.log(alreadySentDocs)
+
 
     const image = alreadySentDocs.map(item => {
       return {
