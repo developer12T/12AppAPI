@@ -218,7 +218,7 @@ exports.getSendMoney = async (req, res) => {
           $match: {
             type,
             'store.area': area,
-            status: { $nin: ['canceled', 'delete'] },
+            status: { $nin: ['pending','canceled', 'delete'] },
             createdAt: { $gte: startOfDayUTC, $lte: endOfDayUTC }
           }
         },
