@@ -5,7 +5,7 @@ const {
   generateGiveawaysId,
   generateGivetypeId
 } = require('../../utilities/genetateId')
-const { getProductGive, getStoreGive } = require('./giveProduct')
+const { getProductGive, getStoreGive,getProductGiveNew } = require('./giveProduct')
 const { summaryGive } = require('../../utilities/summary')
 const { rangeDate } = require('../../utilities/datetime')
 const { period, previousPeriod } = require('../../utilities/datetime')
@@ -115,8 +115,15 @@ exports.getGiveType = async (req, res) => {
 
 exports.getGiveProductFilter = async (req, res) => {
   try {
-    const { area, giveId, group, brand, size, flavour } = req.body
+    const { area, period, giveId, } = req.body
     const channel = req.headers['x-channel']
+
+    const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
+      channel,
+      res,
+      stockModel
+    )
+
 
     if (!giveId) {
       return res.status(400).json({
@@ -125,7 +132,32 @@ exports.getGiveProductFilter = async (req, res) => {
       })
     }
 
-    const products = await getProductGive(giveId, area, channel, res)
+    const products = await getProductGiveNew(giveId, area, channel, res)
+    const stock = await Stock.findOne({ period: period, area: area })
+
+
+
+    let data = []
+
+    for (item of products) {
+      const factor = item.listUnit[0].factor
+      const stockProduct = stock.listProduct.find(i => i.productId === item.id)
+
+      if (!stockProduct || !stockProduct.balancePcs || stockProduct.balancePcs <= 0) {
+        continue;
+      }
+
+
+      const dataTran = {
+        ...item,
+        qtyPcs: stockProduct.balancePcs,
+        qty: Math.floor(stockProduct.balancePcs / factor),
+        unit: item.listUnit[0].unit
+      }
+
+      data.push(dataTran)
+    }
+
 
     if (!products.length) {
       return res.status(404).json({
@@ -135,76 +167,11 @@ exports.getGiveProductFilter = async (req, res) => {
       })
     }
 
-    const isEmptyArray = arr => Array.isArray(arr) && arr.length === 0
-
-    // if (
-    //   isEmptyArray(group) &&
-    //   isEmptyArray(brand) &&
-    //   isEmptyArray(size) &&
-    //   isEmptyArray(flavour)
-    // ) {
-      const uniqueGroups = [...new Set(products.map(p => p.group))]
-      const uniqueBrands = [...new Set(products.map(p => p.brand))]
-      const uniqueSizes = [...new Set(products.map(p => p.size))]
-      const uniqueflavours = [...new Set(products.map(p => p.flavour))]
-
-      return res.status(200).json({
-        status: 200,
-        message: 'Successfully fetched product groups!',
-        data: {
-          group: uniqueGroups,
-          brand: uniqueBrands,
-          size: uniqueSizes,
-          flavour: uniqueflavours
-        }
-      })
-    // }
-
-    // let filteredProducts = products
-
-    // if (!isEmptyArray(group)) {
-    //   filteredProducts = filteredProducts.filter(p => group.includes(p.group))
-    // }
-    // if (!isEmptyArray(brand)) {
-    //   filteredProducts = filteredProducts.filter(p => brand.includes(p.brand))
-    // }
-    // if (!isEmptyArray(size)) {
-    //   filteredProducts = filteredProducts.filter(p => size.includes(p.size))
-    // }
-    // if (!isEmptyArray(flavour)) {
-    //   filteredProducts = filteredProducts.filter(p =>
-    //     flavour.includes(p.flavour)
-    //   )
-    // }
-
-    // if (!filteredProducts.length) {
-    //   return res.status(404).json({
-    //     status: 404,
-    //     message: 'No products match the given filters',
-    //     data: []
-    //   })
-    // }
-    // const groupedData = {
-    //   group: [...new Set(filteredProducts.map(p => p.group))],
-    //   brand: [...new Set(filteredProducts.map(p => p.brand))].filter(Boolean),
-    //   size: [...new Set(filteredProducts.map(p => p.size))].filter(Boolean),
-    //   flavour: [...new Set(filteredProducts.map(p => p.flavour))].filter(
-    //     Boolean
-    //   )
-    // }
-
-    // const io = getSocket()
-    // io.emit('give/getGiveProductFilter', {});
 
     res.status(200).json({
       status: 200,
       message: 'Successfully fetched give product filters!',
-      data: {
-          group: uniqueGroups,
-          brand: uniqueBrands,
-          size: uniqueSizes,
-          flavour: uniqueflavours
-        }
+      data: data
     })
   } catch (error) {
     console.error(error)
