@@ -30,19 +30,18 @@ const promotionModel = require('../../models/cash/promotion')
 
 const { getModelsByChannel } = require('../../middleware/channel')
 const { getSocket } = require('../../socket')
-const { period,rangeDate } = require('../../utilities/datetime')
+const { period, rangeDate } = require('../../utilities/datetime')
 
 exports.getCartAll = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
     const { Cart } = getModelsByChannel(channel, res, cartModel)
-    const { area,period } = req.query
+    const { area, period } = req.query
     const cartQuery = { area, type: { $nin: ['withdraw'] } }
 
     // const { startDate, endDate } = rangeDate(period)
-    
-    // cartQuery.createdAt = { $gte: startDate, $lte: endDate };
 
+    // cartQuery.createdAt = { $gte: startDate, $lte: endDate };
 
     const cartData = await Cart.find(cartQuery)
     if (!cartData) {
@@ -131,7 +130,7 @@ exports.getCart = async (req, res) => {
     const { Cart } = getModelsByChannel(channel, res, cartModel)
     const { Stock } = getModelsByChannel(channel, res, stockModel)
     const { Promotion } = getModelsByChannel(channel, res, promotionModel)
-    const { type, area, storeId, withdrawId } = req.query
+    const { type, area, storeId, withdrawId, proId } = req.query
 
     if (!type || !area) {
       return res.status(400).json({
@@ -152,8 +151,10 @@ exports.getCart = async (req, res) => {
       type === 'withdraw'
         ? { type, area }
         : type === 'adjuststock'
-          ? { type, area, withdrawId }
-          : { type, area, storeId }
+        ? { type, area, withdrawId }
+        : type === 'give'
+        ? { type, area, storeId, proId }
+        : { type, area, storeId }
 
     // ใช้ session ใน findOne เฉพาะกรณีที่ต้อง update ข้อมูล (กัน dirty read ใน replica set)
     let cart = await Cart.findOne(cartQuery)
@@ -197,7 +198,6 @@ exports.getCart = async (req, res) => {
 
       // console.log(promotion.appliedPromotions)
 
-
       const qtyproductPro = summary.listPromotion.flatMap(u => {
         const promoDetail = u.listProduct
           .filter(item => item?.id && item?.unit && item?.qty > 0)
@@ -210,9 +210,6 @@ exports.getCart = async (req, res) => {
         return promoDetail
       })
 
-      
-
-
       for (item of qtyproductPro) {
         const updateResult = await updateStockMongo(
           item,
@@ -224,8 +221,6 @@ exports.getCart = async (req, res) => {
         )
         if (updateResult) return
       }
-
-
 
       await cart.save()
 
@@ -279,7 +274,8 @@ exports.addProduct = async (req, res) => {
       action,
       expire,
       typeref,
-      withdrawId
+      withdrawId,
+      proId
     } = req.body
 
     const channel = req.headers['x-channel']
@@ -330,8 +326,8 @@ exports.addProduct = async (req, res) => {
       type === 'withdraw'
         ? { type, area }
         : type === 'adjuststock'
-          ? { type, area, withdrawId }
-          : { type, area, storeId }
+        ? { type, area, withdrawId }
+        : { type, area, storeId }
     const { Cart } = getModelsByChannel(channel, res, cartModel)
 
     let cart = await Cart.findOne(cartQuery)
@@ -349,6 +345,9 @@ exports.addProduct = async (req, res) => {
         }
       ])
       cart = cart[0]
+    }
+    if (type === 'give') {
+      cart.proId = proId
     }
 
     // ----- ด้านล่างนี้เหมือนเดิม -----
@@ -536,8 +535,8 @@ exports.adjustProduct = async (req, res) => {
       type === 'withdraw'
         ? { type, area }
         : type === 'adjuststock'
-          ? { type, area, withdrawId }
-          : { type, area, storeId }
+        ? { type, area, withdrawId }
+        : { type, area, storeId }
 
     let cart = await Cart.findOne(cartQuery)
     if (!cart) {

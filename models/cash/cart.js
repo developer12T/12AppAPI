@@ -43,9 +43,8 @@ const listCartProduct = mongoose.Schema({
   qty: { type: Number, require: true, default: 0 },
   unit: { type: String, require: true, default: '' },
   price: { type: Number, require: true, default: 0 },
-  condition: { type: String,  },
-  action: { type: String,  },
-
+  condition: { type: String },
+  action: { type: String }
 })
 
 const listQuotaSchema = new mongoose.Schema({
@@ -73,29 +72,33 @@ const listQuotaSchema = new mongoose.Schema({
   ]
 })
 
-const cartSchema = mongoose.Schema({
-  type: { type: String, require: true },
-  area: { type: String, require: true },
-  storeId: { type: String },
-  withdrawId: { type: String },
-  shippingId: { type: String },
-  total: { type: Number, require: true, default: 0 },
-  listProduct: [listCartProduct],
-  listPromotion: [listCartPromotion],
-  listRefund: [listCartRefund],
-  listQuota: [listQuotaSchema],
-  cartHashProduct: { type: String, default: '' },
-  cartHashPromotion: { type: String, default: '' },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
-}, {
-  timestamps: true
-})
+const cartSchema = mongoose.Schema(
+  {
+    type: { type: String, require: true },
+    area: { type: String, require: true },
+    proId: { type: String },
+    storeId: { type: String },
+    withdrawId: { type: String },
+    shippingId: { type: String },
+    total: { type: Number, require: true, default: 0 },
+    listProduct: [listCartProduct],
+    listPromotion: [listCartPromotion],
+    listRefund: [listCartRefund],
+    listQuota: [listQuotaSchema],
+    cartHashProduct: { type: String, default: '' },
+    cartHashPromotion: { type: String, default: '' },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+  },
+  {
+    timestamps: true
+  }
+)
 
 // const Cart = dbCA.model('Cart', cartSchema)
 // module.exports = { Cart }
-module.exports = (conn) => {
+module.exports = conn => {
   return {
-    Cart: conn.model('Cart', cartSchema),
-  };
-};
+    Cart: conn.model('Cart', cartSchema)
+  }
+}
