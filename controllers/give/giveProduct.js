@@ -50,7 +50,7 @@ async function getProductGive (giveId, area, channel, res) {
     })
 
     const products = await Product.find(productQuery).lean()
-    console.log('productQuery',productQuery)
+    // console.log('products',products)
     if (!products.length) {
       return []
     }
