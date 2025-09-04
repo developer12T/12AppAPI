@@ -137,12 +137,12 @@ exports.getGiveProductFilter = async (req, res) => {
 
     const isEmptyArray = arr => Array.isArray(arr) && arr.length === 0
 
-    if (
-      isEmptyArray(group) &&
-      isEmptyArray(brand) &&
-      isEmptyArray(size) &&
-      isEmptyArray(flavour)
-    ) {
+    // if (
+    //   isEmptyArray(group) &&
+    //   isEmptyArray(brand) &&
+    //   isEmptyArray(size) &&
+    //   isEmptyArray(flavour)
+    // ) {
       const uniqueGroups = [...new Set(products.map(p => p.group))]
       const uniqueBrands = [...new Set(products.map(p => p.brand))]
       const uniqueSizes = [...new Set(products.map(p => p.size))]
@@ -158,40 +158,40 @@ exports.getGiveProductFilter = async (req, res) => {
           flavour: uniqueflavours
         }
       })
-    }
+    // }
 
-    let filteredProducts = products
+    // let filteredProducts = products
 
-    if (!isEmptyArray(group)) {
-      filteredProducts = filteredProducts.filter(p => group.includes(p.group))
-    }
-    if (!isEmptyArray(brand)) {
-      filteredProducts = filteredProducts.filter(p => brand.includes(p.brand))
-    }
-    if (!isEmptyArray(size)) {
-      filteredProducts = filteredProducts.filter(p => size.includes(p.size))
-    }
-    if (!isEmptyArray(flavour)) {
-      filteredProducts = filteredProducts.filter(p =>
-        flavour.includes(p.flavour)
-      )
-    }
+    // if (!isEmptyArray(group)) {
+    //   filteredProducts = filteredProducts.filter(p => group.includes(p.group))
+    // }
+    // if (!isEmptyArray(brand)) {
+    //   filteredProducts = filteredProducts.filter(p => brand.includes(p.brand))
+    // }
+    // if (!isEmptyArray(size)) {
+    //   filteredProducts = filteredProducts.filter(p => size.includes(p.size))
+    // }
+    // if (!isEmptyArray(flavour)) {
+    //   filteredProducts = filteredProducts.filter(p =>
+    //     flavour.includes(p.flavour)
+    //   )
+    // }
 
-    if (!filteredProducts.length) {
-      return res.status(404).json({
-        status: 404,
-        message: 'No products match the given filters',
-        data: []
-      })
-    }
-    const groupedData = {
-      group: [...new Set(filteredProducts.map(p => p.group))],
-      brand: [...new Set(filteredProducts.map(p => p.brand))].filter(Boolean),
-      size: [...new Set(filteredProducts.map(p => p.size))].filter(Boolean),
-      flavour: [...new Set(filteredProducts.map(p => p.flavour))].filter(
-        Boolean
-      )
-    }
+    // if (!filteredProducts.length) {
+    //   return res.status(404).json({
+    //     status: 404,
+    //     message: 'No products match the given filters',
+    //     data: []
+    //   })
+    // }
+    // const groupedData = {
+    //   group: [...new Set(filteredProducts.map(p => p.group))],
+    //   brand: [...new Set(filteredProducts.map(p => p.brand))].filter(Boolean),
+    //   size: [...new Set(filteredProducts.map(p => p.size))].filter(Boolean),
+    //   flavour: [...new Set(filteredProducts.map(p => p.flavour))].filter(
+    //     Boolean
+    //   )
+    // }
 
     // const io = getSocket()
     // io.emit('give/getGiveProductFilter', {});
@@ -199,7 +199,12 @@ exports.getGiveProductFilter = async (req, res) => {
     res.status(200).json({
       status: 200,
       message: 'Successfully fetched give product filters!',
-      data: groupedData
+      data: {
+          group: uniqueGroups,
+          brand: uniqueBrands,
+          size: uniqueSizes,
+          flavour: uniqueflavours
+        }
     })
   } catch (error) {
     console.error(error)
