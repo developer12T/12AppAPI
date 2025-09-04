@@ -135,7 +135,8 @@ async function getProductGiveNew(giveId, area, channel, res) {
               $filter:
                 { input: '$listUnit', as: 'u', cond: { $in: ['$$u.unit', condition.productUnit] } }
             },
-            qtyPro: condition.productQty
+            qtyPro: condition.productQty,
+            limitType:condition.limitType
           }
         }]).exec()
         products.push(...dataProduct)
@@ -173,7 +174,8 @@ async function getProductGiveNew(giveId, area, channel, res) {
             $filter:
               { input: '$listUnit', as: 'u', cond: { $in: ['$$u.unit', condition.productUnit] } }
           },
-          qtyPro: condition.productQty
+          qtyPro: condition.productQty,
+          limitType:condition.limitType
         }
       }]).exec()
       products.push(...dataProduct) // กัน nested array
