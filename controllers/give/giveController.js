@@ -5,7 +5,7 @@ const {
   generateGiveawaysId,
   generateGivetypeId
 } = require('../../utilities/genetateId')
-const { getProductGive, getStoreGive,getProductGiveNew } = require('./giveProduct')
+const { getProductGive, getStoreGive, getProductGiveNew } = require('./giveProduct')
 const { summaryGive } = require('../../utilities/summary')
 const { rangeDate } = require('../../utilities/datetime')
 const { period, previousPeriod } = require('../../utilities/datetime')
@@ -704,6 +704,8 @@ exports.approveGive = async (req, res) => {
   }
 }
 
+const orderUpdateTimestamps = {}
+
 exports.updateStatus = async (req, res) => {
   try {
     const { orderId, status } = req.body
@@ -717,6 +719,22 @@ exports.updateStatus = async (req, res) => {
         message: 'orderId and status are required.'
       })
     }
+
+    // ===== debounce ตรงนี้ =====
+    const now = Date.now()
+    const lastUpdate = orderUpdateTimestamps[orderId] || 0
+    const ONE_MINUTE = 60 * 1000
+
+    if (now - lastUpdate < ONE_MINUTE) {
+      return res.status(429).json({
+        status: 429,
+        message:
+          'This order was updated less than 1 minute ago. Please try again later!'
+      })
+    }
+    orderUpdateTimestamps[orderId] = now
+    // ===== end debounce =====
+
 
     // ✅ Set Thai status name
     const statusTH = status === 'canceled' ? 'ยกเลิก' : 'ไม่ระบุสถานะ'
@@ -859,7 +877,7 @@ exports.giveToExcel = async (req, res) => {
     }
   ])
 
-  function formatDateToThaiYYYYMMDD (date) {
+  function formatDateToThaiYYYYMMDD(date) {
     const d = new Date(date)
     // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -911,7 +929,7 @@ exports.giveToExcel = async (req, res) => {
 
   const data = dataTran.flatMap(item => item)
 
-  function yyyymmddToDdMmYyyy (dateString) {
+  function yyyymmddToDdMmYyyy(dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -954,7 +972,7 @@ exports.giveToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
+      fs.unlink(tempPath, () => { })
     }
   )
 
