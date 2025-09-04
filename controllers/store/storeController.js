@@ -342,7 +342,6 @@ exports.updateImage = async (req, res) => {
   })
 }
 
-
 // ===== helper: สร้างไดเรกทอรี + เซฟไฟล์ buffer เป็น .webp =====
 // async function saveImageBufferToWebp({ buffer, destDir, baseName }) {
 //   await fsp.mkdir(destDir, { recursive: true })
@@ -356,40 +355,38 @@ exports.addStore = async (req, res) => {
   const channel = req.headers['x-channel'] // 'credit' or 'cash'
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const upload = getUploadMiddleware(channel)
+  console.log(channel)
 
   upload(req, res, async err => {
-    if (err) {
-      return res.status(400).json({ status: '400', message: err.message })
-    }
+    // if (err) {
+    //   return res.status(400).json({ status: '400', message: err.message })
+    // }
+    console.log(req.body)
 
     try {
-      if (!req.body.store) {
-        return res
-          .status(400)
-          .json({ status: '400', message: 'Store data is required' })
-      }
+      // if (!req.body.store) {
+      //   return res
+      //     .status(400)
+      //     .json({ status: '400', message: 'Store data is required' })
+      // }
 
       const files = req.files || []
       const store = JSON.parse(req.body.store)
       const types = req.body.types ? req.body.types.split(',') : []
 
-      if (!store.name || !store.address) {
-        return res
-          .status(400)
-          .json({
-            status: '400',
-            message: 'Required fields are missing: name, address'
-          })
-      }
+      // if (!store.name || !store.address) {
+      //   return res.status(400).json({
+      //     status: '400',
+      //     message: 'Required fields are missing: name, address'
+      //   })
+      // }
 
-      if (files.length !== types.length) {
-        return res
-          .status(400)
-          .json({
-            status: '400',
-            message: 'Number of files and types do not match'
-          })
-      }
+      // if (files.length !== types.length) {
+      //   return res.status(400).json({
+      //     status: '400',
+      //     message: 'Number of files and types do not match'
+      //   })
+      // }
 
       const uploadedFiles = []
       for (let i = 0; i < files.length; i++) {
@@ -1038,24 +1035,24 @@ exports.insertStoreToM3 = async (req, res) => {
     customerCoType: item.type ?? '',
     customerAddress1: (
       item.address +
-      item.subDistrict +
-      item.subDistrict +
-      item.province +
-      item.postCode ?? ''
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
     ).substring(0, 35),
     customerAddress2: (
       item.address +
-      item.subDistrict +
-      item.subDistrict +
-      item.province +
-      item.postCode ?? ''
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
     ).substring(35, 70),
     customerAddress3: (
       item.address +
-      item.subDistrict +
-      item.subDistrict +
-      item.province +
-      item.postCode ?? ''
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
     ).substring(70, 105),
     customerAddress4: item.name.substring(35, 70),
     customerPoscode: (item.postCode ?? '').substring(0, 35),
@@ -1195,24 +1192,24 @@ exports.updateStoreStatus = async (req, res) => {
       customerCoType: item.type ?? '',
       customerAddress1: (
         item.address +
-        item.subDistrict +
-        item.subDistrict +
-        item.province +
-        item.postCode ?? ''
+          item.subDistrict +
+          item.subDistrict +
+          item.province +
+          item.postCode ?? ''
       ).substring(0, 35),
       customerAddress2: (
         item.address +
-        item.subDistrict +
-        item.subDistrict +
-        item.province +
-        item.postCode ?? ''
+          item.subDistrict +
+          item.subDistrict +
+          item.province +
+          item.postCode ?? ''
       ).substring(35, 70),
       customerAddress3: (
         item.address +
-        item.subDistrict +
-        item.subDistrict +
-        item.province +
-        item.postCode ?? ''
+          item.subDistrict +
+          item.subDistrict +
+          item.province +
+          item.postCode ?? ''
       ).substring(70, 105),
       customerAddress4: '',
       customerPoscode: (item.postCode ?? '').substring(0, 35),
@@ -2276,7 +2273,7 @@ exports.storeToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
   } catch (err) {
     console.error(err)
