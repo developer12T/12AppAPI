@@ -38,6 +38,7 @@ const xlsx = require('xlsx')
 const path = require('path')
 const os = require('os')
 const fs = require('fs')
+const { orderBy } = require('lodash')
 
 exports.checkout = async (req, res) => {
   const transaction = await sequelize.transaction()
@@ -49,7 +50,7 @@ exports.checkout = async (req, res) => {
       withdrawType,
       sendDate,
       note,
-      period,
+      period
       // newtrip
     } = req.body
     const newtrip = false
@@ -269,7 +270,6 @@ exports.checkout = async (req, res) => {
         }
 
         newOrder.listProduct.push(npdProduct)
-
       }
     }
 
@@ -396,7 +396,7 @@ exports.getOrder = async (req, res) => {
       ...areaQuery,
       ...(period ? { period } : {}),
       createdAt: { $gte: startDate, $lt: endDate },
-      ...statusQuery,
+      ...statusQuery
     }
 
     console.log(query)
@@ -460,9 +460,9 @@ exports.getOrder = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           orderType: o.orderType,
@@ -1050,11 +1050,15 @@ exports.approveWithdraw = async (req, res) => {
           <p>
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName}<br>
-            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
+            <strong>ประเภทการจัดส่ง:</strong> ${
+              distributionTran.orderTypeName
             }<br>
-            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
-            }<br>
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
+            '-' + wereHouseName?.wh_name || ''
+          }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
+            distributionTran.shippingName
+          }<br>
             <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
             <strong>เขต:</strong> ${distributionTran.area}<br>
             <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -1063,13 +1067,7 @@ exports.approveWithdraw = async (req, res) => {
           </p>
         `
         })
-
-
       }
-
-
-
-
 
       const io = getSocket()
       io.emit('distribution/approveWithdraw', {
@@ -1203,6 +1201,7 @@ exports.saleConfirmWithdraw = async (req, res) => {
           },
           raw: true
         })
+
         const productIds = checkStatus.flatMap(item => item.MRITNO)
 
         // ✅ ดึงข้อมูลรับสินค้าจากระบบ ERP
@@ -1221,8 +1220,9 @@ exports.saleConfirmWithdraw = async (req, res) => {
         const ReceiveQty = Object.values(
           Receive.reduce((acc, cur) => {
             // ใช้ key จาก coNo + withdrawUnit + productId (ถ้าอยากแยกตาม productId ด้วย)
-            const key = `${cur.coNo}_${cur.withdrawUnit
-              }_${cur.productId.trim()}`
+            const key = `${cur.coNo}_${
+              cur.withdrawUnit
+            }_${cur.productId.trim()}`
             if (!acc[key]) {
               acc[key] = { ...cur }
             } else {
@@ -1285,8 +1285,6 @@ exports.saleConfirmWithdraw = async (req, res) => {
       // if (distributionTran.status === 'approved') {
       // // บันทึก listProduct ที่แก้ไขแล้ว
 
-
-
       // ✅ อัปเดตสต๊อก
       // const qtyproduct = [];
 
@@ -1321,10 +1319,7 @@ exports.saleConfirmWithdraw = async (req, res) => {
         qtyproduct.push({ id: productQty.id, unit, qty })
       }
 
-
-
       for (const item of qtyproduct) {
-
         // console.log(item)
         const updateResult = await updateStockMongo(
           item,
@@ -1363,9 +1358,6 @@ exports.saleConfirmWithdraw = async (req, res) => {
         status: 200,
         message: 'Confirm withdraw success'
       })
-
-
-
 
       return res.status(200).json({
         status: 200,
@@ -1479,6 +1471,7 @@ exports.getReceiveQty = async (req, res) => {
       },
       raw: true
     })
+
     const ReceiveWeight = await MHDISH.findAll({
       where: { coNo: orderId },
       raw: true
@@ -1647,7 +1640,7 @@ exports.withdrawToExcel = async (req, res) => {
 
     const tranFromOrder = modelWithdraw.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD(date) {
+      function formatDateToThaiYYYYMMDD (date) {
         const d = new Date(date)
         // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1737,7 +1730,7 @@ exports.withdrawToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       }
     )
   } catch (error) {
@@ -1748,36 +1741,147 @@ exports.withdrawToExcel = async (req, res) => {
   }
 }
 
+exports.updateReciveFix = async (req, res) => {
+  try {
+    const { period, orderId } = req.body
+    const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const channel = req.headers['x-channel']
+
+    const withdrawFix = Withdraw.findAll({ period, orderId })
+    for (const order of withdrawFix) {
+      // const distributionTran = await Distribution.findOne({
+      //   orderId: order.orderId,
+      //   type: 'withdraw'
+      // })
+
+      const checkStatus = await MGLINE.findAll({
+        where: {
+          MRCONO: 410,
+          MRTRNR: order.orderId,
+          MRTRSH: '99'
+        },
+        raw: true
+      })
+      const productIds = checkStatus.flatMap(item => item.MRITNO)
+
+      // ✅ ดึงข้อมูลรับสินค้าจากระบบ ERP
+      const Receive = await MHDISL.findAll({
+        where: {
+          coNo: order.orderId,
+          productId: { [Op.in]: productIds }
+        },
+        raw: true
+      })
+
+      const ReceiveWeight = await MHDISH.findAll({
+        where: { coNo: orderId },
+        raw: true
+      })
+
+      const ReceiveQty = Object.values(
+        Receive.reduce((acc, cur) => {
+          // ใช้ key จาก coNo + withdrawUnit + productId (ถ้าอยากแยกตาม productId ด้วย)
+          const key = `${cur.coNo}_${cur.withdrawUnit}_${cur.productId.trim()}`
+          if (!acc[key]) {
+            acc[key] = { ...cur }
+          } else {
+            acc[key].qtyPcs += cur.qtyPcs
+            acc[key].weightGross += cur.weightGross
+            acc[key].weightNet += cur.weightNet
+          }
+          return acc
+        }, {})
+      )
+
+      // console.log('merged', merged)
+      let receivetotalQty = 0
+      let receivetotal = 0
+
+      for (const i of order.listProduct) {
+        const productIdTrimmed = String(i.id || '').trim()
+        const match = ReceiveQty.find(
+          r => String(r.productId || '').trim() === productIdTrimmed
+        )
+        if (match) {
+          const listProductId = order.listProduct.map(i => i.id).filter(Boolean)
+
+          const productDetail = await Product.find({
+            id: { $in: listProductId }
+          })
+
+          const product = productDetail.find(
+            u => String(u.id || '').trim() === productIdTrimmed
+          )
+          i.receiveUnit = match.withdrawUnit || ''
+
+          if (!product || !Array.isArray(product.listUnit)) {
+            i.receiveQty = 0
+            continue
+          }
+
+          const unitFactor = product.listUnit.find(
+            u =>
+              String(u.unit || '').trim() ===
+              String(match.withdrawUnit || '').trim()
+          )
+
+          if (!unitFactor || !unitFactor.factor || unitFactor.factor === 0) {
+            i.receiveQty = 0
+            continue
+          }
+
+          const qty = match.qtyPcs / unitFactor.factor
+          receivetotalQty += qty
+          receivetotal += qty * (unitFactor?.price?.sale || 0)
+
+          i.receiveQty = qty
+        } else {
+          i.receiveUnit = ''
+          i.receiveQty = 0
+        }
+      }
+      receivetotalWeightGross = ReceiveWeight?.[0]?.weightGross || 0
+      receivetotalWeightNet = ReceiveWeight?.[0]?.weightNet || 0
+    }
+  } catch (error) {
+    console.error('Error uploading images:', error)
+    res
+      .status(500)
+      .json({ status: 500, message: 'Server error', error: error.message })
+  }
+}
 
 exports.withdrawBackOrderToExcel = async (req, res) => {
-
-  const { excel,period } = req.query
+  const { excel, period } = req.query
 
   const channel = req.headers['x-channel']
   const { Distribution } = getModelsByChannel(channel, res, distributionModel)
-  
-  const dataDist = await Distribution.find({ status: 'confirm', area: { $ne: 'IT211' } ,period:period}).sort({ createdAt: 1 })
 
+  const dataDist = await Distribution.find({
+    status: 'confirm',
+    area: { $ne: 'IT211' },
+    period: period
+  }).sort({ createdAt: 1 })
 
   let dataExcel = []
   for (const item of dataDist) {
     for (const product of item.listProduct) {
       if (product.qty != product.receiveQty) {
-
         const diff = product.qty - product.receiveQty
         // แปลง createdAt เป็น UTC+7 และ format วันที่ไทย
-        const createdAtUtc = new Date(item.createdAt);
-        createdAtUtc.setHours(createdAtUtc.getHours() + 7);
-        const createdthaiDay = createdAtUtc.getDate();
-        const createdthaiMonth = createdAtUtc.getMonth() + 1;
-        const createdthaiYear = createdAtUtc.getFullYear() + 543;
-        const createdAtThai = `${createdthaiDay}/${createdthaiMonth}/${createdthaiYear}`;
+        const createdAtUtc = new Date(item.createdAt)
+        createdAtUtc.setHours(createdAtUtc.getHours() + 7)
+        const createdthaiDay = createdAtUtc.getDate()
+        const createdthaiMonth = createdAtUtc.getMonth() + 1
+        const createdthaiYear = createdAtUtc.getFullYear() + 543
+        const createdAtThai = `${createdthaiDay}/${createdthaiMonth}/${createdthaiYear}`
 
         // คำนวณระยะห่างเป็นวัน
-        const created = new Date(item.createdAt);
-        const updated = new Date(item.updatedAt);
-        const diffMs = updated - created;
-        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const created = new Date(item.createdAt)
+        const updated = new Date(item.updatedAt)
+        const diffMs = updated - created
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
 
         const data = {
           เลขที่เอกสาร: item.orderId,
@@ -1787,10 +1891,9 @@ exports.withdrawBackOrderToExcel = async (req, res) => {
           รหัสสินค้า: product.id,
           ชื่อสินค้า: product.name,
           เบิก: product.qty,
-          ได้รับ: product.receiveQty == 0? '-':product.receiveQty,
+          ได้รับ: product.receiveQty == 0 ? '-' : product.receiveQty,
           ไม่ได้รับ: diff,
           มูลค่าที่ไม่ได้รับ: (diff * product.price).toLocaleString()
-
         }
         dataExcel.push(data)
       }
@@ -1804,39 +1907,24 @@ exports.withdrawBackOrderToExcel = async (req, res) => {
       data: dataExcel
     })
   } else {
-
     const wb = xlsx.utils.book_new()
     const ws = xlsx.utils.json_to_sheet(dataExcel)
-    xlsx.utils.book_append_sheet(
-      wb,
-      ws,
-      `backOrder`
-    )
+    xlsx.utils.book_append_sheet(wb, ws, `backOrder`)
 
-    const tempPath = path.join(
-      os.tmpdir(),
-      `backOrder.xlsx`
-    )
+    const tempPath = path.join(os.tmpdir(), `backOrder.xlsx`)
     xlsx.writeFile(wb, tempPath)
 
-    res.download(
-      tempPath,
-      `backOrder.xlsx`,
-      err => {
-        if (err) {
-          console.error('❌ Download error:', err)
-          // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
-          if (!res.headersSent) {
-            res.status(500).send('Download failed')
-          }
+    res.download(tempPath, `backOrder.xlsx`, err => {
+      if (err) {
+        console.error('❌ Download error:', err)
+        // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+        if (!res.headersSent) {
+          res.status(500).send('Download failed')
         }
-
-        // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
       }
-    )
 
+      // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+      fs.unlink(tempPath, () => {})
+    })
   }
-
-
 }

@@ -10,7 +10,8 @@ const { checkout,
     approveWithdraw,
     saleConfirmWithdraw,
     getReceiveQty,
-    withdrawBackOrderToExcel
+    withdrawBackOrderToExcel,
+
 } = require('../../controllers/distribution/withdrawController')
 const { getPlace, addPlace, getType, addAllPlace, addWereHouse } = require('../../controllers/distribution/placeController')
 
