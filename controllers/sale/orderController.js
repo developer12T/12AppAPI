@@ -4458,7 +4458,7 @@ exports.getTarget = async (req, res) => {
       'store.area': area,
       createdAt: { $gte: startTH, $lte: endTH },
       type: 'sale',
-      status: { $nin: ['canceled'] }
+      status: { $nin: ['canceled', 'reject'] }
     }),
     Order.find({
       'store.area': area,
@@ -4814,7 +4814,7 @@ exports.getTarget = async (req, res) => {
   res.status(200).json({
     status: 200,
     message: 'Sucess',
-    sale: to2(sale),
+    sale: to2(sale + (change - refund))  ,
     saleQty: saleQty,
     good: to2(good),
     goodQty: goodQty,

@@ -30,7 +30,8 @@ const {
   updateStoreStatusNoNewId,
   fixStatusStore,
   insertStoreToM3,
-  storeToExcel
+  storeToExcel,
+  updateStatusM3ToMongo,
   // test
 } = require('../../controllers/store/storeController')
 
@@ -77,6 +78,9 @@ router.post('/editShippingInStore', editShippingInStore)
 router.post('/deleteStore', deleteStore)
 router.post('/updateStoreStatusNoNewId', updateStoreStatusNoNewId)
 router.post('/fixStatusStore', fixStatusStore)
+router.post('/updateStatusM3ToMongo', updateStatusM3ToMongo)
+
+
 
 // router.get('/test', test)
 
