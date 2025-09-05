@@ -1082,24 +1082,24 @@ exports.insertStoreToM3 = async (req, res) => {
     customerCoType: item.type ?? '',
     customerAddress1: (
       item.address +
-        item.subDistrict +
-        item.subDistrict +
-        item.province +
-        item.postCode ?? ''
+      item.subDistrict +
+      item.subDistrict +
+      item.province +
+      item.postCode ?? ''
     ).substring(0, 35),
     customerAddress2: (
       item.address +
-        item.subDistrict +
-        item.subDistrict +
-        item.province +
-        item.postCode ?? ''
+      item.subDistrict +
+      item.subDistrict +
+      item.province +
+      item.postCode ?? ''
     ).substring(35, 70),
     customerAddress3: (
       item.address +
-        item.subDistrict +
-        item.subDistrict +
-        item.province +
-        item.postCode ?? ''
+      item.subDistrict +
+      item.subDistrict +
+      item.province +
+      item.postCode ?? ''
     ).substring(70, 105),
     customerAddress4: item.name.substring(35, 70),
     customerPoscode: (item.postCode ?? '').substring(0, 35),
@@ -1239,24 +1239,24 @@ exports.updateStoreStatus = async (req, res) => {
       customerCoType: item.type ?? '',
       customerAddress1: (
         item.address +
-          item.subDistrict +
-          item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
       ).substring(0, 35),
       customerAddress2: (
         item.address +
-          item.subDistrict +
-          item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
       ).substring(35, 70),
       customerAddress3: (
         item.address +
-          item.subDistrict +
-          item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
       ).substring(70, 105),
       customerAddress4: '',
       customerPoscode: (item.postCode ?? '').substring(0, 35),
@@ -2320,7 +2320,7 @@ exports.storeToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
+      fs.unlink(tempPath, () => { })
     })
   } catch (err) {
     console.error(err)
@@ -2328,3 +2328,40 @@ exports.storeToExcel = async (req, res) => {
   }
 }
 
+exports.updateStatusM3ToMongo = async (req, res) => {
+
+  const { storeId } = req.body
+  const channel = req.headers['x-channel']
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+
+  const storeData = await Store.findOne({ storeId: storeId })
+  const storeDataM3 = await Customer.findOne({
+    where: { customerNo: storeId }
+  })
+
+  if (storeData) {
+     await Store.findOneAndUpdate(
+      { storeId: storeId }, // filter
+      { $set: { route: storeDataM3.OKCFC3 } }, // update
+      { new: true } // optional: คืนค่าที่อัปเดตแล้ว (default คืนค่าก่อนอัปเดต)
+    )
+
+
+    return res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: storeUpdated
+    })
+
+
+  } else {
+
+    return res.status(404).json({
+      status: 404,
+      message: 'Not found store',
+      // data: storeUpdated
+    })
+  }
+
+
+}
