@@ -1038,29 +1038,39 @@ exports.approveWithdraw = async (req, res) => {
       }).select('wh_name')
 
       // console.log(process.env.BANK_MAIL)
-  //     sendEmail({
-  //       to: email.Dc_Email,
-  //       // cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
-  //       cc: process.env.IT_MAIL,
-  //       subject: `${distributionTran.orderId} 12App cash`,
-  //       html: `
-  //   <h1>แจ้งการส่งใบขอเบิกผ่านทางอีเมล</h1>
-  //   <p>
-  //     <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
-  //     <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-  //     <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName}<br>
-  //     <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
-  //         }<br>
-  //     <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
-  //         }<br>
-  //     <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
-  //     <strong>เขต:</strong> ${distributionTran.area}<br>
-  //     <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
-  //     <strong>เบอร์โทรศัพท์เซลล์:</strong> ${userData.tel}<br>
-  //     <strong>หมายเหตุ:</strong> ${distributionTran.remark}
-  //   </p>
-  // `
-  //     })
+      // console.log(process.env.CA_DB_URI,process.env.UAT_CHECK)
+      if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
+            sendEmail({
+              to: email.Dc_Email,
+              // cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
+              cc: process.env.IT_MAIL,
+              subject: `${distributionTran.orderId} 12App cash`,
+              html: `
+          <h1>แจ้งการส่งใบขอเบิกผ่านทางอีเมล</h1>
+          <p>
+            <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
+            <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
+            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName}<br>
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
+                }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
+                }<br>
+            <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
+            <strong>เขต:</strong> ${distributionTran.area}<br>
+            <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
+            <strong>เบอร์โทรศัพท์เซลล์:</strong> ${userData.tel}<br>
+            <strong>หมายเหตุ:</strong> ${distributionTran.remark}
+          </p>
+        `
+            })
+
+
+      }
+
+
+
+
+
       const io = getSocket()
       io.emit('distribution/approveWithdraw', {
         status: 200,
@@ -1274,39 +1284,8 @@ exports.saleConfirmWithdraw = async (req, res) => {
       // ✅ อัปเดตข้อมูลถ้า status เป็น approved
       // if (distributionTran.status === 'approved') {
       // // บันทึก listProduct ที่แก้ไขแล้ว
-      await Distribution.updateOne(
-        { _id: distributionTran._id },
-        { $set: { listProduct: distributionTran.listProduct } }
-      )
 
-      const distributionData = await Distribution.findOneAndUpdate(
-        { orderId, type: 'withdraw' },
-        {
-          $set: {
-            statusTH: 'ยืนยันรับของ',
-            status: 'confirm',
-            receivetotal: receivetotal,
-            receivetotalQty: receivetotalQty,
-            receivetotalWeightGross: receivetotalWeightGross,
-            receivetotalWeightNet: receivetotalWeightNet
-          }
-        },
-        { new: true }
-      )
 
-      if (!distributionData) {
-        return res.status(404).json({
-          status: 404,
-          message: 'Withdraw transaction not found for update.'
-        })
-      }
-
-      if (!distributionTran.period) {
-        return res.status(400).json({
-          status: 400,
-          message: 'Period is missing in withdrawal transaction.'
-        })
-      }
 
       // ✅ อัปเดตสต๊อก
       // const qtyproduct = [];
@@ -1342,7 +1321,7 @@ exports.saleConfirmWithdraw = async (req, res) => {
         qtyproduct.push({ id: productQty.id, unit, qty })
       }
 
-      
+
 
       for (const item of qtyproduct) {
 
@@ -1358,12 +1337,35 @@ exports.saleConfirmWithdraw = async (req, res) => {
         if (updateResult) return
       }
 
+      await Distribution.updateOne(
+        { _id: distributionTran._id },
+        { $set: { listProduct: distributionTran.listProduct } }
+      )
+
+      const distributionData = await Distribution.findOneAndUpdate(
+        { orderId, type: 'withdraw' },
+        {
+          $set: {
+            statusTH: 'ยืนยันรับของ',
+            status: 'confirm',
+            receivetotal: receivetotal,
+            receivetotalQty: receivetotalQty,
+            receivetotalWeightGross: receivetotalWeightGross,
+            receivetotalWeightNet: receivetotalWeightNet
+          }
+        },
+        { new: true }
+      )
+
       // ✅ ส่ง socket แจ้งผล
       const io = getSocket()
       io.emit('distribution/saleConfirmWithdraw', {
         status: 200,
         message: 'Confirm withdraw success'
       })
+
+
+
 
       return res.status(200).json({
         status: 200,

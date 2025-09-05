@@ -4409,7 +4409,7 @@ exports.addStockAllWithInOut = async (req, res) => {
 
     const { startDate, endDate } = rangeDate(period)
 
-    console.log(startDate,endDate)
+    // console.log(startDate,endDate)
     if (!period) {
       return res
         .status(400)
@@ -4421,8 +4421,8 @@ exports.addStockAllWithInOut = async (req, res) => {
     const rawAreas = userData
       .flatMap(u => (Array.isArray(u.area) ? u.area : [u.area]))
       .filter(Boolean)
-    const uniqueAreas = [...new Set(rawAreas)]
-    // uniqueAreas = ['NE214']
+    // const uniqueAreas = [...new Set(rawAreas)]
+    uniqueAreas = ['BE225']
     // 2) ฟังก์ชันย่อย: ประมวลผลต่อ 1 area
     const buildAreaStock = async area => {
       // สร้าง match สำหรับ collections ต่าง ๆ
@@ -4970,35 +4970,55 @@ exports.addStockAllWithInOut = async (req, res) => {
       // console.log(area)
     }
 
-    for (item of results) {
-      for (i of item.data) {
-        // console.log(item.area)
+    for (const item of results) {
+      for (const i of item.data) {
+        const filter = {
+          area: item.area,
+          period: period,
+          'listProduct.productId': i.productId
+        }
 
-        await Stock.findOneAndUpdate(
-          {
-            area: item.area,
-            period: period,
-            'listProduct.productId': i.productId
-          },
-          {
-            $set: {
-              // 'listProduct.$[elem].stockPcs': i.summaryQty.PCS.stock,
-              'listProduct.$[elem].stockInPcs': i.summaryQty.PCS.in,
-              'listProduct.$[elem].stockOutPcs': i.summaryQty.PCS.out,
-              'listProduct.$[elem].balancePcs': i.summaryQty.PCS.balance,
-              // 'listProduct.$[elem].stockCtn': i.summaryQty.CTN.stock,
-              'listProduct.$[elem].stockInCtn': i.summaryQty.CTN.in,
-              'listProduct.$[elem].stockOutCtn': i.summaryQty.CTN.out,
-              'listProduct.$[elem].balanceCtn': i.summaryQty.CTN.balance
-            }
-          },
-          {
-            arrayFilters: [{ 'elem.productId': i.productId }],
-            new: true
+        const update = {
+          $set: {
+            'listProduct.$[elem].stockInPcs': i.summaryQty.PCS.in,
+            'listProduct.$[elem].stockOutPcs': i.summaryQty.PCS.out,
+            'listProduct.$[elem].balancePcs': i.summaryQty.PCS.balance,
+            'listProduct.$[elem].stockInCtn': i.summaryQty.CTN.in,
+            'listProduct.$[elem].stockOutCtn': i.summaryQty.CTN.out,
+            'listProduct.$[elem].balanceCtn': i.summaryQty.CTN.balance
           }
-        )
+        }
+
+        const options = {
+          arrayFilters: [{ 'elem.productId': i.productId }],
+          new: true
+        }
+
+        // Try update first
+        const updatedDoc = await Stock.findOneAndUpdate(filter, update, options)
+
+        // If product not found in listProduct, push a new one
+        if (!updatedDoc) {
+          await Stock.updateOne(
+            { area: item.area, period: period },
+            {
+              $push: {
+                listProduct: {
+                  productId: i.productId,
+                  stockInPcs: i.summaryQty.PCS.in,
+                  stockOutPcs: i.summaryQty.PCS.out,
+                  balancePcs: i.summaryQty.PCS.balance,
+                  stockInCtn: i.summaryQty.CTN.in,
+                  stockOutCtn: i.summaryQty.CTN.out,
+                  balanceCtn: i.summaryQty.CTN.balance
+                }
+              }
+            }
+          )
+        }
       }
     }
+
 
     return res.status(200).json({
       status: 200,

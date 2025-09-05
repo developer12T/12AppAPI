@@ -40,5 +40,6 @@ module.exports = {
   BELL_MAIL: process.env.BELL_MAIL,
   BANK_MAIL: process.env.BANK_MAIL,
 
-  SERVER_WEREHOUSE: process.env.SERVER_WEREHOUSE
+  SERVER_WEREHOUSE: process.env.SERVER_WEREHOUSE,
+  UAT_CHECK:process.env.UAT_CHECK
 }
