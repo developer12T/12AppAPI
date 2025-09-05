@@ -1,7 +1,7 @@
 const cron = require('node-cron')
 // const { erpApiCheckOrder,erpApiCheckDisributionM3 } = require('../../controllers/sale/orderController')
 const { OrderToExcelConJob } = require('../../controllers/sale/orderController')
-const { period } = require('../../utilities/datetime')
+const { period, rangeDate } = require('../../utilities/datetime')
 const { to2, updateStockMongo } = require('../../middleware/order')
 
 const {
@@ -1003,9 +1003,11 @@ async function reStoreStock(channel = 'cash') {
               $push: {
                 listProduct: {
                   productId: i.productId,
+                  stockPcs: 0,
                   stockInPcs: i.summaryQty.PCS.in,
                   stockOutPcs: i.summaryQty.PCS.out,
                   balancePcs: i.summaryQty.PCS.balance,
+                  stockCtn: 0,
                   stockInCtn: i.summaryQty.CTN.in,
                   stockOutCtn: i.summaryQty.CTN.out,
                   balanceCtn: i.summaryQty.CTN.balance

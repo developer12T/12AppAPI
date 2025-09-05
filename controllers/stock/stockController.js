@@ -4421,8 +4421,8 @@ exports.addStockAllWithInOut = async (req, res) => {
     const rawAreas = userData
       .flatMap(u => (Array.isArray(u.area) ? u.area : [u.area]))
       .filter(Boolean)
-    // const uniqueAreas = [...new Set(rawAreas)]
-    uniqueAreas = ['BE225']
+    const uniqueAreas = [...new Set(rawAreas)]
+    // uniqueAreas = ['BE225']
     // 2) ฟังก์ชันย่อย: ประมวลผลต่อ 1 area
     const buildAreaStock = async area => {
       // สร้าง match สำหรับ collections ต่าง ๆ
@@ -5005,9 +5005,11 @@ exports.addStockAllWithInOut = async (req, res) => {
               $push: {
                 listProduct: {
                   productId: i.productId,
+                  stockPcs: 0,
                   stockInPcs: i.summaryQty.PCS.in,
                   stockOutPcs: i.summaryQty.PCS.out,
                   balancePcs: i.summaryQty.PCS.balance,
+                  stockCtn: 0,
                   stockInCtn: i.summaryQty.CTN.in,
                   stockOutCtn: i.summaryQty.CTN.out,
                   balanceCtn: i.summaryQty.CTN.balance
