@@ -2251,7 +2251,7 @@ exports.addRouteIt = async (req, res) => {
         }
       })
     };
-        route.push(data)
+    route.push(data)
   }
 
   Route.create(route)
@@ -2262,4 +2262,49 @@ exports.addRouteIt = async (req, res) => {
     data: route
   })
 
+}
+
+
+exports.addStoreOneToRoute = async (req, res) => {
+
+  const { storeId, routeId } = req.body
+  const channel = req.headers['x-channel']
+  const { Route } = getModelsByChannel(channel, res, routeModel)
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+
+  const storeData = await Store.findOne({ storeId: storeId })
+
+
+
+  for (const i of routeId) {
+    const routeData = await Route.findOne({ id: i }) // ถ้า id เป็น unique
+
+    if (!routeData) continue; // ตรวจสอบว่ามีข้อมูลจริง
+
+    const newData = {
+      storeInfo: storeData._id,
+      note: '',
+      image: '',
+      latitude: '',
+      longtitude: '',
+      status: 0,
+      statusText: 'รอเยี่ยม',
+      listOrder: [],
+      date: ''
+    }
+
+    routeData.listStore.push(newData)
+
+    await routeData.save() // สำคัญ: บันทึกกลับเข้า MongoDB
+  }
+
+
+
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    // data: newData
+  })
 }
