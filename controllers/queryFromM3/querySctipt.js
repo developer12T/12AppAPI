@@ -47,7 +47,8 @@ FROM
 WHERE 
   DA.CHANNEL_NAME = 'Cash' AND 
   DA.Sale_Code is not NULL AND
-  DA.Sale_Code != 'ว่าง'
+  DA.Sale_Code != 'ว่าง' AND
+  DA.AREA = 'NE224'
   `
   }
   else if (channel == 'credit') {
@@ -875,6 +876,7 @@ exports.routeQuery = async function (channel) {
                 AND 
                 LEFT(OKRGDT, 6) <> CONVERT(nvarchar(6), GETDATE(), 112)
                AND a.Channel = '103'
+               AND a.Area = 'NE224'
              ORDER BY a.Area, RouteSet
         `
   }
