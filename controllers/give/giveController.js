@@ -5,7 +5,11 @@ const {
   generateGiveawaysId,
   generateGivetypeId
 } = require('../../utilities/genetateId')
-const { getProductGive, getStoreGive, getProductGiveNew } = require('./giveProduct')
+const {
+  getProductGive,
+  getStoreGive,
+  getProductGiveNew
+} = require('./giveProduct')
 const { summaryGive } = require('../../utilities/summary')
 const { rangeDate } = require('../../utilities/datetime')
 const { period, previousPeriod } = require('../../utilities/datetime')
@@ -115,7 +119,7 @@ exports.getGiveType = async (req, res) => {
 
 exports.getGiveProductFilter = async (req, res) => {
   try {
-    const { area, period, giveId, } = req.body
+    const { area, period, giveId } = req.body
     const channel = req.headers['x-channel']
 
     const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
@@ -123,7 +127,6 @@ exports.getGiveProductFilter = async (req, res) => {
       res,
       stockModel
     )
-
 
     if (!giveId) {
       return res.status(400).json({
@@ -135,18 +138,19 @@ exports.getGiveProductFilter = async (req, res) => {
     const products = await getProductGiveNew(giveId, area, channel, res)
     const stock = await Stock.findOne({ period: period, area: area })
 
-
-
     let data = []
 
     for (item of products) {
       const factor = item.listUnit[0].factor
       const stockProduct = stock.listProduct.find(i => i.productId === item.id)
 
-      if (!stockProduct || !stockProduct.balancePcs || stockProduct.balancePcs <= 0) {
-        continue;
+      if (
+        !stockProduct ||
+        !stockProduct.balancePcs ||
+        stockProduct.balancePcs <= 0
+      ) {
+        continue
       }
-
 
       const dataTran = {
         ...item,
@@ -158,7 +162,6 @@ exports.getGiveProductFilter = async (req, res) => {
       data.push(dataTran)
     }
 
-
     if (!products.length) {
       return res.status(404).json({
         status: 404,
@@ -166,7 +169,6 @@ exports.getGiveProductFilter = async (req, res) => {
         data: []
       })
     }
-
 
     res.status(200).json({
       status: 200,
@@ -243,7 +245,7 @@ exports.checkout = async (req, res) => {
         .json({ status: 400, message: 'Missing required fields!' })
     }
 
-    const cart = await Cart.findOne({ type, area, storeId })
+    const cart = await Cart.findOne({ type, area, storeId, proId: giveId })
     if (!cart || cart.listProduct.length === 0) {
       return res.status(404).json({ status: 404, message: 'Cart is empty!' })
     }
@@ -735,7 +737,6 @@ exports.updateStatus = async (req, res) => {
     orderUpdateTimestamps[orderId] = now
     // ===== end debounce =====
 
-
     // ✅ Set Thai status name
     const statusTH = status === 'canceled' ? 'ยกเลิก' : 'ไม่ระบุสถานะ'
 
@@ -877,7 +878,7 @@ exports.giveToExcel = async (req, res) => {
     }
   ])
 
-  function formatDateToThaiYYYYMMDD(date) {
+  function formatDateToThaiYYYYMMDD (date) {
     const d = new Date(date)
     // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -929,7 +930,7 @@ exports.giveToExcel = async (req, res) => {
 
   const data = dataTran.flatMap(item => item)
 
-  function yyyymmddToDdMmYyyy(dateString) {
+  function yyyymmddToDdMmYyyy (dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -972,7 +973,7 @@ exports.giveToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     }
   )
 
