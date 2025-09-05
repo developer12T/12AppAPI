@@ -1040,21 +1040,21 @@ exports.approveWithdraw = async (req, res) => {
       // console.log(process.env.BANK_MAIL)
       // console.log(process.env.CA_DB_URI,process.env.UAT_CHECK)
       if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
-            sendEmail({
-              to: email.Dc_Email,
-              // cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
-              cc: process.env.IT_MAIL,
-              subject: `${distributionTran.orderId} 12App cash`,
-              html: `
+        sendEmail({
+          to: email.Dc_Email,
+          // cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
+          cc: process.env.IT_MAIL,
+          subject: `${distributionTran.orderId} 12App cash`,
+          html: `
           <h1>แจ้งการส่งใบขอเบิกผ่านทางอีเมล</h1>
           <p>
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
             <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName}<br>
             <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
-                }<br>
+            }<br>
             <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
-                }<br>
+            }<br>
             <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
             <strong>เขต:</strong> ${distributionTran.area}<br>
             <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -1062,7 +1062,7 @@ exports.approveWithdraw = async (req, res) => {
             <strong>หมายเหตุ:</strong> ${distributionTran.remark}
           </p>
         `
-            })
+        })
 
 
       }
@@ -1746,4 +1746,97 @@ exports.withdrawToExcel = async (req, res) => {
       .status(500)
       .json({ status: 500, message: 'Server error', error: error.message })
   }
+}
+
+
+exports.withdrawBackOrderToExcel = async (req, res) => {
+
+  const { excel,period } = req.query
+
+  const channel = req.headers['x-channel']
+  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+  
+  const dataDist = await Distribution.find({ status: 'confirm', area: { $ne: 'IT211' } ,period:period}).sort({ createdAt: 1 })
+
+
+  let dataExcel = []
+  for (const item of dataDist) {
+    for (const product of item.listProduct) {
+      if (product.qty != product.receiveQty) {
+
+        const diff = product.qty - product.receiveQty
+        // แปลง createdAt เป็น UTC+7 และ format วันที่ไทย
+        const createdAtUtc = new Date(item.createdAt);
+        createdAtUtc.setHours(createdAtUtc.getHours() + 7);
+        const createdthaiDay = createdAtUtc.getDate();
+        const createdthaiMonth = createdAtUtc.getMonth() + 1;
+        const createdthaiYear = createdAtUtc.getFullYear() + 543;
+        const createdAtThai = `${createdthaiDay}/${createdthaiMonth}/${createdthaiYear}`;
+
+        // คำนวณระยะห่างเป็นวัน
+        const created = new Date(item.createdAt);
+        const updated = new Date(item.updatedAt);
+        const diffMs = updated - created;
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+        const data = {
+          เลขที่เอกสาร: item.orderId,
+          เขตการขาย: item.area,
+          วันที่เบิก: createdAtThai,
+          ระยะเวลาเบิก: diffDays,
+          รหัสสินค้า: product.id,
+          ชื่อสินค้า: product.name,
+          เบิก: product.qty,
+          ได้รับ: product.receiveQty == 0? '-':product.receiveQty,
+          ไม่ได้รับ: diff,
+          มูลค่าที่ไม่ได้รับ: (diff * product.price).toLocaleString()
+
+        }
+        dataExcel.push(data)
+      }
+    }
+  }
+
+  if (!excel) {
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: dataExcel
+    })
+  } else {
+
+    const wb = xlsx.utils.book_new()
+    const ws = xlsx.utils.json_to_sheet(dataExcel)
+    xlsx.utils.book_append_sheet(
+      wb,
+      ws,
+      `backOrder`
+    )
+
+    const tempPath = path.join(
+      os.tmpdir(),
+      `backOrder.xlsx`
+    )
+    xlsx.writeFile(wb, tempPath)
+
+    res.download(
+      tempPath,
+      `backOrder.xlsx`,
+      err => {
+        if (err) {
+          console.error('❌ Download error:', err)
+          // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+          if (!res.headersSent) {
+            res.status(500).send('Download failed')
+          }
+        }
+
+        // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+        fs.unlink(tempPath, () => { })
+      }
+    )
+
+  }
+
+
 }

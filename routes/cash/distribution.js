@@ -9,7 +9,8 @@ const { checkout,
     addFromERPWithdraw,
     approveWithdraw,
     saleConfirmWithdraw,
-    getReceiveQty
+    getReceiveQty,
+    withdrawBackOrderToExcel
 } = require('../../controllers/distribution/withdrawController')
 const { getPlace, addPlace, getType, addAllPlace, addWereHouse } = require('../../controllers/distribution/placeController')
 
@@ -36,4 +37,5 @@ router.post('/addWereHouse', addWereHouse)
 router.post('/saleConfirmWithdraw', saleConfirmWithdraw)
 
 router.post('/getReceiveQty', getReceiveQty)
+router.get('/withdrawBackOrderToExcel', withdrawBackOrderToExcel)
 module.exports = router
