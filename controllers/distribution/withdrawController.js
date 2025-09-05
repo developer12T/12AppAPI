@@ -1038,29 +1038,29 @@ exports.approveWithdraw = async (req, res) => {
       }).select('wh_name')
 
       // console.log(process.env.BANK_MAIL)
-      sendEmail({
-        to: email.Dc_Email,
-        // cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
-        cc: process.env.IT_MAIL,
-        subject: `${distributionTran.orderId} 12App cash`,
-        html: `
-    <h1>แจ้งการส่งใบขอเบิกผ่านทางอีเมล</h1>
-    <p>
-      <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
-      <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-      <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName}<br>
-      <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
-          }<br>
-      <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
-          }<br>
-      <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
-      <strong>เขต:</strong> ${distributionTran.area}<br>
-      <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
-      <strong>เบอร์โทรศัพท์เซลล์:</strong> ${userData.tel}<br>
-      <strong>หมายเหตุ:</strong> ${distributionTran.remark}
-    </p>
-  `
-      })
+  //     sendEmail({
+  //       to: email.Dc_Email,
+  //       // cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
+  //       cc: process.env.IT_MAIL,
+  //       subject: `${distributionTran.orderId} 12App cash`,
+  //       html: `
+  //   <h1>แจ้งการส่งใบขอเบิกผ่านทางอีเมล</h1>
+  //   <p>
+  //     <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
+  //     <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
+  //     <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName}<br>
+  //     <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
+  //         }<br>
+  //     <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
+  //         }<br>
+  //     <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
+  //     <strong>เขต:</strong> ${distributionTran.area}<br>
+  //     <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
+  //     <strong>เบอร์โทรศัพท์เซลล์:</strong> ${userData.tel}<br>
+  //     <strong>หมายเหตุ:</strong> ${distributionTran.remark}
+  //   </p>
+  // `
+  //     })
       const io = getSocket()
       io.emit('distribution/approveWithdraw', {
         status: 200,
