@@ -131,7 +131,7 @@ exports.addSendMoneyImage = async (req, res) => {
           $addFields: {
             thaiDate: {
               $dateAdd: {
-                startDate: '$createdAt',
+                startDate: '$dateAt',
                 unit: 'hour',
                 amount: 7
               }
@@ -227,9 +227,27 @@ exports.getSendMoney = async (req, res) => {
       return result.length > 0 ? result[0].sendmoney : 0
     }
 
+    const sumByTypeChangeRefund = async (Model, type) => {
+      const result = await Model.aggregate([
+        {
+          $match: {
+            type,
+            'store.area': area,
+            status: { $nin: ['pending','canceled', 'delete'] },
+            createdAt: { $gte: startOfDayUTC, $lte: endOfDayUTC }
+          }
+        },
+        { $group: { _id: null, sendmoney: { $sum: '$total' } } }
+      ])
+      return result.length > 0 ? result[0].sendmoney : 0
+    }
+
+
+
+
     const saleSum = await sumByType(Order, 'sale')
-    const changeSum = await sumByType(Order, 'change')
-    const refundSum = await sumByType(Refund, 'refund')
+    const changeSum = await sumByTypeChangeRefund(Order, 'change')
+    const refundSum = await sumByTypeChangeRefund(Refund, 'refund')
 
     // console.log(saleSum, changeSum, refundSum)
 
@@ -252,6 +270,9 @@ exports.getSendMoney = async (req, res) => {
       { $project: { _id: 0, path: '$_id', totalSent: 1, count: 1 } }, // แปลงให้อ่านง่าย
       { $sort: { path: 1 } }
     ]);
+
+    // console.log(alreadySentDocs)
+
 
     const image = alreadySentDocs.map(item => {
       return {

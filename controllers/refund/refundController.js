@@ -527,7 +527,7 @@ exports.refundExcel = async (req, res) => {
 
   const tranFromChange = modelChange.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD (date) {
+    function formatDateToThaiYYYYMMDD(date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -775,7 +775,7 @@ exports.refundExcel = async (req, res) => {
 
   const tranFromRefund = tranFromRefundNested.flat()
 
-  function yyyymmddToDdMmYyyy (dateString) {
+  function yyyymmddToDdMmYyyy(dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -813,7 +813,7 @@ exports.refundExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
+      fs.unlink(tempPath, () => { })
     }
   )
 }
@@ -1025,18 +1025,18 @@ exports.getDetail = async (req, res) => {
 
     const listProductChange = order
       ? order.listProduct.map(product => ({
-          id: product.id,
-          name: product.name,
-          group: product.group,
-          brand: product.brand,
-          size: product.size,
-          flavour: product.flavour,
-          qty: product.qty,
-          unit: product.unit,
-          unitName: product.unitName,
-          price: product.price,
-          netTotal: product.netTotal
-        }))
+        id: product.id,
+        name: product.name,
+        group: product.group,
+        brand: product.brand,
+        size: product.size,
+        flavour: product.flavour,
+        qty: product.qty,
+        unit: product.unit,
+        unitName: product.unitName,
+        price: product.price,
+        netTotal: product.netTotal
+      }))
       : []
 
     const totalChange = order ? order.total : 0
@@ -1158,7 +1158,7 @@ exports.addSlip = async (req, res) => {
       .json({ status: 500, message: 'Server error', error: error.message })
   }
 }
-
+const orderUpdateTimestamps = {}
 exports.updateStatus = async (req, res) => {
   try {
     const { orderId, status } = req.body
@@ -1166,6 +1166,22 @@ exports.updateStatus = async (req, res) => {
 
     const { Refund } = getModelsByChannel(channel, res, refundModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
+
+    // ===== debounce ตรงนี้ =====
+    const now = Date.now()
+    const lastUpdate = orderUpdateTimestamps[orderId] || 0
+    const ONE_MINUTE = 60 * 1000
+
+    if (now - lastUpdate < ONE_MINUTE) {
+      return res.status(429).json({
+        status: 429,
+        message:
+          'This order was updated less than 1 minute ago. Please try again later!'
+      })
+    }
+    orderUpdateTimestamps[orderId] = now
+    // ===== end debounce =====
+
 
     const changeOrder = await Order.findOne({ reference: orderId })
 
@@ -1220,9 +1236,18 @@ exports.updateStatus = async (req, res) => {
     let newOrderId = orderId
     if (status === 'canceled') {
       statusTH = 'ยกเลิก'
-      if (!changeOrder.orderId.endsWith('CC')) {
+      if (!/CC\d+$/.test(changeOrder.orderId)) {
+        const baseId = changeOrder.orderId // ล็อกฐานไว้ อย่าไปแก้ค่านี้
         let counter = 1
-        newOrderId = `${changeOrder.orderId}CC${counter++}`
+        newOrderId = `${baseId}CC${counter}`
+
+        // ใช้ exists() เร็วกว่า findOne เมื่อเช็คมี/ไม่มี
+        while (await Order.exists({ orderId: newOrderId })) {
+          counter += 1
+          newOrderId = `${baseId}CC${counter}` // ต่อกับ baseId เสมอ
+        }
+
+
       }
       for (const item of productChange) {
         const updateResult = await updateStockMongo(
@@ -1235,7 +1260,7 @@ exports.updateStatus = async (req, res) => {
         )
         if (updateResult) return
       }
-
+      // console.log(newOrderId)
       const updatedOrder = await Order.findOneAndUpdate(
         { reference: orderId },
         { $set: { status, statusTH, orderId: newOrderId } },
@@ -1244,9 +1269,18 @@ exports.updateStatus = async (req, res) => {
       // console.log(orderId)
     } else if (status === 'reject') {
       statusTH = 'ถูกปฏิเสธ'
-      if (!changeOrder.orderId.endsWith('CC')) {
+      if (!/CC\d+$/.test(changeOrder.orderId)) {
+        const baseId = changeOrder.orderId // ล็อกฐานไว้ อย่าไปแก้ค่านี้
         let counter = 1
-        newOrderId = `${changeOrder.orderId}CC${counter++}`
+        newOrderId = `${baseId}CC${counter}`
+
+        // ใช้ exists() เร็วกว่า findOne เมื่อเช็คมี/ไม่มี
+        while (await Order.exists({ orderId: newOrderId })) {
+          counter += 1
+          newOrderId = `${baseId}CC${counter}` // ต่อกับ baseId เสมอ
+        }
+
+
       }
 
       // console.log(productChange)

@@ -412,6 +412,8 @@ async function reStoreStock(channel = 'cash') {
     const { User } = getModelsByChannel(channel, null, userModel)
     const { Cart } = getModelsByChannel(channel, null, cartModel)
 
+    const { startDate, endDate } = rangeDate(periodstr)
+
     // 1) เตรียม unique areas
     const userData = await User.find({ role: 'sale' }).select('area')
     const rawAreas = userData
@@ -541,11 +543,12 @@ async function reStoreStock(channel = 'cash') {
         {
           $match: {
             type: { $in: ['give', 'refund', 'sale'] },
-            area: area
+            area,
+            createdAt: { $gte: startDate, $lte: endDate }
           }
         },
         { $project: { listProduct: 1, _id: 0, zone: 1 } }
-      ])
+      ]);
 
       const dataChangePending = await Order.aggregate([
         { $addFields: { zone: { $substrBytes: ['$area', 0, 2] } } },
@@ -965,33 +968,52 @@ async function reStoreStock(channel = 'cash') {
       // console.log(area)
     }
 
-    for (item of results) {
-      for (i of item.data) {
-        // console.log(item.area)
+    for (const item of results) {
+      for (const i of item.data) {
+        const filter = {
+          area: item.area,
+          period: period,
+          'listProduct.productId': i.productId
+        }
 
-        await Stock.findOneAndUpdate(
-          {
-            area: item.area,
-            period: periodstr,
-            'listProduct.productId': i.productId
-          },
-          {
-            $set: {
-              // 'listProduct.$[elem].stockPcs': i.summaryQty.PCS.stock,
-              'listProduct.$[elem].stockInPcs': i.summaryQty.PCS.in,
-              'listProduct.$[elem].stockOutPcs': i.summaryQty.PCS.out,
-              'listProduct.$[elem].balancePcs': i.summaryQty.PCS.balance,
-              // 'listProduct.$[elem].stockCtn': i.summaryQty.CTN.stock,
-              'listProduct.$[elem].stockInCtn': i.summaryQty.CTN.in,
-              'listProduct.$[elem].stockOutCtn': i.summaryQty.CTN.out,
-              'listProduct.$[elem].balanceCtn': i.summaryQty.CTN.balance
-            }
-          },
-          {
-            arrayFilters: [{ 'elem.productId': i.productId }],
-            new: true
+        const update = {
+          $set: {
+            'listProduct.$[elem].stockInPcs': i.summaryQty.PCS.in,
+            'listProduct.$[elem].stockOutPcs': i.summaryQty.PCS.out,
+            'listProduct.$[elem].balancePcs': i.summaryQty.PCS.balance,
+            'listProduct.$[elem].stockInCtn': i.summaryQty.CTN.in,
+            'listProduct.$[elem].stockOutCtn': i.summaryQty.CTN.out,
+            'listProduct.$[elem].balanceCtn': i.summaryQty.CTN.balance
           }
-        )
+        }
+
+        const options = {
+          arrayFilters: [{ 'elem.productId': i.productId }],
+          new: true
+        }
+
+        // Try update first
+        const updatedDoc = await Stock.findOneAndUpdate(filter, update, options)
+
+        // If product not found in listProduct, push a new one
+        if (!updatedDoc) {
+          await Stock.updateOne(
+            { area: item.area, period: period },
+            {
+              $push: {
+                listProduct: {
+                  productId: i.productId,
+                  stockInPcs: i.summaryQty.PCS.in,
+                  stockOutPcs: i.summaryQty.PCS.out,
+                  balancePcs: i.summaryQty.PCS.balance,
+                  stockInCtn: i.summaryQty.CTN.in,
+                  stockOutCtn: i.summaryQty.CTN.out,
+                  balanceCtn: i.summaryQty.CTN.balance
+                }
+              }
+            }
+          )
+        }
       }
     }
   } catch (err) {

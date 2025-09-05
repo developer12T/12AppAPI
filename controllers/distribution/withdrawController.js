@@ -239,11 +239,11 @@ exports.checkout = async (req, res) => {
       totalWeightNet: parseFloat(totalWeightNet.toFixed(2)),
       createdBy: sale.username,
       period: period,
-      newTrip:'false'
+      newTrip: 'false'
     })
 
     if (newtrip === true) {
-      newOrder.newTrip = 'true' 
+      newOrder.newTrip = 'true'
       const productNew = await Product.findOne({ type: 'new' })
       if (productNew) {
         const npd = await Npd.findOne({ period: period })
@@ -269,7 +269,7 @@ exports.checkout = async (req, res) => {
         }
 
         newOrder.listProduct.push(npdProduct)
-        
+
       }
     }
 
@@ -460,9 +460,9 @@ exports.getOrder = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-                fullname: `${userData.firstName} ${userData.surName}`,
-                tel: `${userData.tel}`
-              }
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
             : null,
           orderId: o.orderId,
           orderType: o.orderType,
@@ -1038,31 +1038,39 @@ exports.approveWithdraw = async (req, res) => {
       }).select('wh_name')
 
       // console.log(process.env.BANK_MAIL)
-      sendEmail({
-        to: email.Dc_Email,
-        // cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
-        cc: process.env.IT_MAIL,
-        subject: `${distributionTran.orderId} 12App cash`,
-        html: `
-    <h1>แจ้งการส่งใบขอเบิกผ่านทางอีเมล</h1>
-    <p>
-      <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
-      <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-      <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName}<br>
-      <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
-          '-' + wereHouseName?.wh_name || ''
-        }<br>
-      <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
-          distributionTran.shippingName
-        }<br>
-      <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
-      <strong>เขต:</strong> ${distributionTran.area}<br>
-      <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
-      <strong>เบอร์โทรศัพท์เซลล์:</strong> ${userData.tel}<br>
-      <strong>หมายเหตุ:</strong> ${distributionTran.remark}
-    </p>
-  `
-      })
+      // console.log(process.env.CA_DB_URI,process.env.UAT_CHECK)
+      if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
+            sendEmail({
+              to: email.Dc_Email,
+              // cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
+              cc: process.env.IT_MAIL,
+              subject: `${distributionTran.orderId} 12App cash`,
+              html: `
+          <h1>แจ้งการส่งใบขอเบิกผ่านทางอีเมล</h1>
+          <p>
+            <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
+            <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
+            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName}<br>
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
+                }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
+                }<br>
+            <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
+            <strong>เขต:</strong> ${distributionTran.area}<br>
+            <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
+            <strong>เบอร์โทรศัพท์เซลล์:</strong> ${userData.tel}<br>
+            <strong>หมายเหตุ:</strong> ${distributionTran.remark}
+          </p>
+        `
+            })
+
+
+      }
+
+
+
+
+
       const io = getSocket()
       io.emit('distribution/approveWithdraw', {
         status: 200,
@@ -1179,7 +1187,7 @@ exports.saleConfirmWithdraw = async (req, res) => {
         if (!row)
           return res
             .status(404)
-            .json({ status: 404, message: `${orderId} not found` })
+            .json({ status: 404, message: `${orderId} not found in M3` })
 
         // ✅ ดึงข้อมูลสินค้าที่เกี่ยวข้อง
         const listProductId = distributionTran.listProduct
@@ -1213,9 +1221,8 @@ exports.saleConfirmWithdraw = async (req, res) => {
         const ReceiveQty = Object.values(
           Receive.reduce((acc, cur) => {
             // ใช้ key จาก coNo + withdrawUnit + productId (ถ้าอยากแยกตาม productId ด้วย)
-            const key = `${cur.coNo}_${
-              cur.withdrawUnit
-            }_${cur.productId.trim()}`
+            const key = `${cur.coNo}_${cur.withdrawUnit
+              }_${cur.productId.trim()}`
             if (!acc[key]) {
               acc[key] = { ...cur }
             } else {
@@ -1229,7 +1236,7 @@ exports.saleConfirmWithdraw = async (req, res) => {
 
         receivetotalQty = 0
         receivetotal = 0
-        
+
         for (const i of distributionTran.listProduct) {
           const productIdTrimmed = String(i.id || '').trim()
           const match = ReceiveQty.find(
@@ -1277,39 +1284,8 @@ exports.saleConfirmWithdraw = async (req, res) => {
       // ✅ อัปเดตข้อมูลถ้า status เป็น approved
       // if (distributionTran.status === 'approved') {
       // // บันทึก listProduct ที่แก้ไขแล้ว
-      await Distribution.updateOne(
-        { _id: distributionTran._id },
-        { $set: { listProduct: distributionTran.listProduct } }
-      )
 
-      const distributionData = await Distribution.findOneAndUpdate(
-        { orderId, type: 'withdraw' },
-        {
-          $set: {
-            statusTH: 'ยืนยันรับของ',
-            status: 'confirm',
-            receivetotal: receivetotal,
-            receivetotalQty: receivetotalQty,
-            receivetotalWeightGross: receivetotalWeightGross,
-            receivetotalWeightNet: receivetotalWeightNet
-          }
-        },
-        { new: true }
-      )
 
-      if (!distributionData) {
-        return res.status(404).json({
-          status: 404,
-          message: 'Withdraw transaction not found for update.'
-        })
-      }
-
-      if (!distributionTran.period) {
-        return res.status(400).json({
-          status: 400,
-          message: 'Period is missing in withdrawal transaction.'
-        })
-      }
 
       // ✅ อัปเดตสต๊อก
       // const qtyproduct = [];
@@ -1335,6 +1311,9 @@ exports.saleConfirmWithdraw = async (req, res) => {
         const productQty = distributionTran.listProduct.find(
           item => item.id === i
         )
+        if (productQty.receiveQty === 0) {
+          continue
+        }
 
         const unit = (productQty.receiveUnit ?? '').trim()
         const qty = Number(productQty.receiveQty)
@@ -1342,7 +1321,7 @@ exports.saleConfirmWithdraw = async (req, res) => {
         qtyproduct.push({ id: productQty.id, unit, qty })
       }
 
-      // console.log(qtyproduct)
+
 
       for (const item of qtyproduct) {
 
@@ -1358,12 +1337,35 @@ exports.saleConfirmWithdraw = async (req, res) => {
         if (updateResult) return
       }
 
+      await Distribution.updateOne(
+        { _id: distributionTran._id },
+        { $set: { listProduct: distributionTran.listProduct } }
+      )
+
+      const distributionData = await Distribution.findOneAndUpdate(
+        { orderId, type: 'withdraw' },
+        {
+          $set: {
+            statusTH: 'ยืนยันรับของ',
+            status: 'confirm',
+            receivetotal: receivetotal,
+            receivetotalQty: receivetotalQty,
+            receivetotalWeightGross: receivetotalWeightGross,
+            receivetotalWeightNet: receivetotalWeightNet
+          }
+        },
+        { new: true }
+      )
+
       // ✅ ส่ง socket แจ้งผล
       const io = getSocket()
       io.emit('distribution/saleConfirmWithdraw', {
         status: 200,
         message: 'Confirm withdraw success'
       })
+
+
+
 
       return res.status(200).json({
         status: 200,
@@ -1645,7 +1647,7 @@ exports.withdrawToExcel = async (req, res) => {
 
     const tranFromOrder = modelWithdraw.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD (date) {
+      function formatDateToThaiYYYYMMDD(date) {
         const d = new Date(date)
         // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1735,7 +1737,7 @@ exports.withdrawToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => {})
+        fs.unlink(tempPath, () => { })
       }
     )
   } catch (error) {

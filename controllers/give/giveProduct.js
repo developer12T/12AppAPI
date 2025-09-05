@@ -98,6 +98,110 @@ async function getProductGive (giveId, area, channel, res) {
   }
 }
 
+
+async function getProductGiveNew(giveId, area, channel, res) {
+  try {
+    const { Givetype } = getModelsByChannel(channel, res, givetypeModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+
+    const giveType = await Givetype.findOne({ giveId }).lean()
+
+    if (!giveType) {
+      return []
+    }
+
+    const conditions = giveType.conditions
+
+    if (!conditions || conditions.length === 0) {
+      return []
+    }
+
+    let unitFilter = {}
+
+
+    let products = []
+
+    for (const condition of conditions) {
+      let productQuery = { statusSale: 'Y' }
+      // ✅ ถ้าเจอ productId (ไม่ว่าง/มีค่า) ให้ข้าม loop ไป
+      if (condition.productId && condition.productId.length > 0) {
+
+        productQuery.id = { $in: condition.productId }
+
+        const dataProduct = await Product.aggregate([{ $match: productQuery },
+        {
+          $set: {
+            listUnit: {
+              $filter:
+                { input: '$listUnit', as: 'u', cond: { $in: ['$$u.unit', condition.productUnit] } }
+            },
+            qtyPro: condition.productQty,
+            limitType:condition.limitType
+          }
+        }]).exec()
+        products.push(...dataProduct)
+
+        continue
+      }
+
+
+
+      if (condition.productGroup?.length > 0) {
+        productQuery.group = { $in: condition.productGroup }
+      }
+      if (condition.productBrand?.length > 0) {
+        productQuery.brand = { $in: condition.productBrand }
+      }
+      if (condition.productSize?.length > 0) {
+        productQuery.size = { $in: condition.productSize }
+      }
+      if (condition.productFlavour?.length > 0) {
+        productQuery.flavour = { $in: condition.productFlavour }
+      }
+
+      if (condition.productUnit?.length > 0) {
+        unitFilter[condition.productUnit.join(',')] = condition.productUnit
+      }
+
+      // console.log(unitFilter)
+
+
+
+      const dataProduct = await Product.aggregate([{ $match: productQuery },
+      {
+        $set: {
+          listUnit: {
+            $filter:
+              { input: '$listUnit', as: 'u', cond: { $in: ['$$u.unit', condition.productUnit] } }
+          },
+          qtyPro: condition.productQty,
+          limitType:condition.limitType
+        }
+      }]).exec()
+      products.push(...dataProduct) // กัน nested array
+    }
+
+
+    //  products = await Product.find(productQuery).lean()
+    // console.log('products', products)
+
+
+    return products
+  } catch (error) {
+    console.error('Error fetching products by give type:', error)
+    return []
+  }
+}
+
+
+
+
+
+
+
+
+
+
 async function getStoreGive (giveId, area, channel, res) {
   try {
     const { Givetype } = getModelsByChannel(channel, res, givetypeModel)
@@ -152,4 +256,4 @@ async function getStoreGive (giveId, area, channel, res) {
   }
 }
 
-module.exports = { getProductGive, getStoreGive }
+module.exports = { getProductGive, getStoreGive,getProductGiveNew }
