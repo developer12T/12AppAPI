@@ -1018,6 +1018,9 @@ async function reStoreStock(channel = 'cash') {
         }
       }
     }
+
+    console.log('ReStoreSucess')
+
   } catch (err) {
     console.error(err)
     // return res.status(500).json({ status: 500, message: err.message })
@@ -1067,7 +1070,7 @@ const startCronJobDeleteCartDaily = () => {
 
 const startCronJobreStoreStockDaily = () => {
   cron.schedule(
-    '0 21 * * *', // 21:00
+    '0 22 * * *', // 21:00
     async () => {
       console.log(
         'Running cron job reStoreStock at 21:00 Bangkok time. Now:',
