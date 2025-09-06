@@ -1028,10 +1028,19 @@ async function reStoreStock(channel = 'cash') {
 }
 
 const startCronJobErpApiCheck = () => {
-  cron.schedule('0 5 * * *', async () => {
-    console.log('Running cron job startCronJobErpApiCheck at 6:00 AM Thai time')
-    await erpApiCheckOrderJob()
-  })
+  cron.schedule(
+    '0 6 * * *', // 👉 6:00 AM (เวลาไทย)
+    async () => {
+      console.log(
+        'Running cron job startCronJobErpApiCheck at 6:00 AM Thai time. Now:',
+        new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+      )
+      await erpApiCheckOrderJob()
+    },
+    {
+      timezone: 'Asia/Bangkok' // 👈 สำคัญมาก
+    }
+  )
 }
 
 const startCronJobErpApiCheckDisribution = () => {
