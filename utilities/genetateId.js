@@ -92,7 +92,7 @@ const generateOrderId = async (area, warehouse, channel, res) => {
         `${new Date().getFullYear()}-${parseInt(currentMonth) + 1}-01`
       )
     },
-    status: { $ne: 'canceled' }
+    status: { $nin: ['canceled', 'reject'] }
   })
     .sort({ orderId: -1 })
     .select('orderId')
@@ -100,6 +100,8 @@ const generateOrderId = async (area, warehouse, channel, res) => {
   let runningNumber = latestOrder
     ? parseInt(latestOrder.orderId.slice(-4)) + 1
     : 1
+
+  console.log(latestOrder)
 
   return `${currentYear
     .toString()
