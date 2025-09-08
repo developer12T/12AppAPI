@@ -972,7 +972,7 @@ async function reStoreStock(channel = 'cash') {
       for (const i of item.data) {
         const filter = {
           area: item.area,
-          period: period,
+          period: periodstr,
           'listProduct.productId': i.productId
         }
 
@@ -998,7 +998,7 @@ async function reStoreStock(channel = 'cash') {
         // If product not found in listProduct, push a new one
         if (!updatedDoc) {
           await Stock.updateOne(
-            { area: item.area, period: period },
+            { area: item.area, period: periodstr },
             {
               $push: {
                 listProduct: {
