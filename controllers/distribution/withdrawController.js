@@ -274,7 +274,7 @@ exports.checkout = async (req, res) => {
 
           newOrder.listProduct.push(npdProduct)
 
-          await npd.findOneAndUpdate(
+          await Npd.findOneAndUpdate(
             { period: period },
             {
               $push: {
