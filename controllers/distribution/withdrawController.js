@@ -51,7 +51,7 @@ exports.checkout = async (req, res) => {
       sendDate,
       note,
       period
-      // newtrip
+      // , newtrip
     } = req.body
     const newtrip = false
     const channel = req.headers['x-channel']
@@ -244,32 +244,43 @@ exports.checkout = async (req, res) => {
     })
 
     if (newtrip === true) {
-      newOrder.newTrip = 'true'
-      const productNew = await Product.findOne({ type: 'new' })
-      if (productNew) {
-        const npd = await Npd.findOne({ period: period })
+      const getNpd = await Npd.findOne({ period: period, areaGet: { $in: [area] } })
 
-        factor = productNew.listUnit.find(item => item.unit === npd.unit)
-        qtyPcs = npd.qty * factor.factor
+      if (!getNpd) {
+        newOrder.newTrip = 'true'
+        const productNew = await Product.findOne({ type: 'new' })
+        if (productNew) {
+          const npd = await Npd.findOne({ period: period })
 
-        const npdProduct = {
-          id: productNew.id,
-          lot: '',
-          name: productNew.name,
-          group: productNew.group,
-          brand: productNew.brand,
-          size: productNew.size,
-          flavour: productNew.flavour,
-          qty: npd.qty,
-          unit: npd.unit,
-          qtyPcs: qtyPcs,
-          price: factor.price.sale,
-          total: factor.price.sale * npd.qty,
-          weightGross: parseFloat(productNew.weightGross.toFixed(2)),
-          weightNet: parseFloat(productNew.weightNet.toFixed(2))
+          factor = productNew.listUnit.find(item => item.unit === npd.unit)
+          qtyPcs = npd.qty * factor.factor
+
+          const npdProduct = {
+            id: productNew.id,
+            lot: '',
+            name: productNew.name,
+            group: productNew.group,
+            brand: productNew.brand,
+            size: productNew.size,
+            flavour: productNew.flavour,
+            qty: npd.qty,
+            unit: npd.unit,
+            qtyPcs: qtyPcs,
+            price: factor.price.sale,
+            total: factor.price.sale * npd.qty,
+            weightGross: parseFloat(productNew.weightGross.toFixed(2)),
+            weightNet: parseFloat(productNew.weightNet.toFixed(2))
+          }
+
+          newOrder.listProduct.push(npdProduct)
+          // console.log(period,[area])
+          await Npd.findOneAndUpdate(
+            { period: period },
+            {
+              $push: { areaGet: area }
+            }
+          )
         }
-
-        newOrder.listProduct.push(npdProduct)
       }
     }
 
@@ -460,9 +471,9 @@ exports.getOrder = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-                fullname: `${userData.firstName} ${userData.surName}`,
-                tel: `${userData.tel}`
-              }
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
             : null,
           orderId: o.orderId,
           orderType: o.orderType,
@@ -921,7 +932,7 @@ exports.approveWithdraw = async (req, res) => {
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Stock } = getModelsByChannel(channel, res, stockModel)
     const { Option } = getModelsByChannel(channel, res, optionsModel)
-
+    const { Npd } = getModelsByChannel(channel, res, npdModel)
     const { User } = getModelsByChannel(channel, res, userModel)
     const { Withdraw } = getModelsByChannel(channel, res, DistributionModel)
     if (statusStr === 'approved') {
@@ -1050,15 +1061,12 @@ exports.approveWithdraw = async (req, res) => {
           <p>
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-            <strong>ประเภทการจัดส่ง:</strong> ${
-              distributionTran.orderTypeName
+            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName
             }<br>
-            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
-            '-' + wereHouseName?.wh_name || ''
-          }<br>
-            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
-            distributionTran.shippingName
-          }<br>
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
+            }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
+            }<br>
             <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
             <strong>เขต:</strong> ${distributionTran.area}<br>
             <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -1087,6 +1095,19 @@ exports.approveWithdraw = async (req, res) => {
         { $set: { statusTH: statusThStr, status: statusStr } },
         { new: true }
       )
+      // if (distributionData.newTrip === 'true') {
+      //   await Npd.findOneAndUpdate(
+      //     { period: distributionData.period },
+      //     {
+      //       $pull: { areaGet: distributionData.area }
+      //     }
+      //   )
+
+      // }
+
+
+
+
 
       res.status(200).json({
         status: 200,
@@ -1220,9 +1241,8 @@ exports.saleConfirmWithdraw = async (req, res) => {
         const ReceiveQty = Object.values(
           Receive.reduce((acc, cur) => {
             // ใช้ key จาก coNo + withdrawUnit + productId (ถ้าอยากแยกตาม productId ด้วย)
-            const key = `${cur.coNo}_${
-              cur.withdrawUnit
-            }_${cur.productId.trim()}`
+            const key = `${cur.coNo}_${cur.withdrawUnit
+              }_${cur.productId.trim()}`
             if (!acc[key]) {
               acc[key] = { ...cur }
             } else {
@@ -1640,7 +1660,7 @@ exports.withdrawToExcel = async (req, res) => {
 
     const tranFromOrder = modelWithdraw.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD (date) {
+      function formatDateToThaiYYYYMMDD(date) {
         const d = new Date(date)
         // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1730,7 +1750,7 @@ exports.withdrawToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => {})
+        fs.unlink(tempPath, () => { })
       }
     )
   } catch (error) {
@@ -1924,7 +1944,7 @@ exports.withdrawBackOrderToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
+      fs.unlink(tempPath, () => { })
     })
   }
 }

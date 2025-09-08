@@ -553,7 +553,7 @@ async function applyPromotion(order, channel, res) {
         let totalAmount = matchedProducts.reduce((sum, p) => sum + (p.total), 0)
         let totalQty = matchedProducts.reduce((sum, p) => sum + p.qtyPromo, 0)
 
-        console.log(totalAmount)
+        // console.log(totalAmount)
         let meetsCondition = promo.conditions.some(condition =>
             (promo.proType === 'free' && condition.productQty >= 0 && totalQty >= condition.productQty) ||
             (promo.proType === 'amount' && condition.productAmount >= 0 && totalAmount >= condition.productAmount)
