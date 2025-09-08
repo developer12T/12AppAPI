@@ -245,7 +245,7 @@ exports.checkout = async (req, res) => {
 
     if (newtrip === true) {
 
-      const getNpd = await Npd.findOne({ period: period, areaGet: { $in: area } })
+      const getNpd = await Npd.findOne({ period: period, areaGet: { $in: Array.isArray(area) } })
 
       if (!getNpd) {
         newOrder.newTrip = 'true'
