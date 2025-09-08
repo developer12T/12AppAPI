@@ -51,9 +51,9 @@ exports.checkout = async (req, res) => {
       sendDate,
       note,
       period
-      ,newtrip
+      // , newtrip
     } = req.body
-    // const newtrip = false
+    const newtrip = false
     const channel = req.headers['x-channel']
     const { Cart } = getModelsByChannel(channel, res, cartModel)
     const { User } = getModelsByChannel(channel, res, userModel)
@@ -932,7 +932,7 @@ exports.approveWithdraw = async (req, res) => {
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Stock } = getModelsByChannel(channel, res, stockModel)
     const { Option } = getModelsByChannel(channel, res, optionsModel)
-
+    const { Npd } = getModelsByChannel(channel, res, npdModel)
     const { User } = getModelsByChannel(channel, res, userModel)
     const { Withdraw } = getModelsByChannel(channel, res, DistributionModel)
     if (statusStr === 'approved') {
@@ -1095,6 +1095,19 @@ exports.approveWithdraw = async (req, res) => {
         { $set: { statusTH: statusThStr, status: statusStr } },
         { new: true }
       )
+      // if (distributionData.newTrip === 'true') {
+      //   await Npd.findOneAndUpdate(
+      //     { period: distributionData.period },
+      //     {
+      //       $pull: { areaGet: distributionData.area }
+      //     }
+      //   )
+
+      // }
+
+
+
+
 
       res.status(200).json({
         status: 200,
