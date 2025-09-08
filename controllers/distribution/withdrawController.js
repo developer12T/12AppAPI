@@ -50,8 +50,8 @@ exports.checkout = async (req, res) => {
       withdrawType,
       sendDate,
       note,
-      period,
-      newtrip
+      period
+      ,newtrip
     } = req.body
     // const newtrip = false
     const channel = req.headers['x-channel']
@@ -273,13 +273,11 @@ exports.checkout = async (req, res) => {
           }
 
           newOrder.listProduct.push(npdProduct)
-
+          // console.log(period,[area])
           await Npd.findOneAndUpdate(
             { period: period },
             {
-              $push: {
-                areaGet: area
-              }
+              $push: { areaGet: area }
             }
           )
         }
