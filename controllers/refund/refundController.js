@@ -19,6 +19,7 @@ const cartModel = require('../../models/cash/cart')
 const productModel = require('../../models/cash/product')
 const userModel = require('../../models/cash/user')
 const stockModel = require('../../models/cash/stock')
+const storeModel = require('../../models/cash/store')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { ItemLotM3 } = require('../../models/cash/master')
 const { Op, literal } = require('sequelize')
@@ -57,7 +58,7 @@ exports.checkout = async (req, res) => {
     const { Refund } = getModelsByChannel(channel, res, refundModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
-
+    const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
     const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
       channel,
       res,
