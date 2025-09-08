@@ -50,8 +50,8 @@ exports.checkout = async (req, res) => {
       withdrawType,
       sendDate,
       note,
-      period
-      // newtrip
+      period,
+      newtrip
     } = req.body
     // const newtrip = false
     const channel = req.headers['x-channel']
