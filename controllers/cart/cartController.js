@@ -151,10 +151,10 @@ exports.getCart = async (req, res) => {
       type === 'withdraw'
         ? { type, area }
         : type === 'adjuststock'
-        ? { type, area, withdrawId }
-        : type === 'give'
-        ? { type, area, storeId, proId }
-        : { type, area, storeId }
+          ? { type, area, withdrawId }
+          : type === 'give'
+            ? { type, area, storeId, proId }
+            : { type, area, storeId }
 
     // ใช้ session ใน findOne เฉพาะกรณีที่ต้อง update ข้อมูล (กัน dirty read ใน replica set)
     let cart = await Cart.findOne(cartQuery)
@@ -221,8 +221,12 @@ exports.getCart = async (req, res) => {
         )
         if (updateResult) return
       }
-      console.log(cart.listPromotion)
-      await cart.save()
+      // console.log(cart.listPromotion)
+      const updated = await Cart.findOneAndUpdate(
+        { _id: cart._id },
+        { $set: { listPromotion: promotion.appliedPromotions } },
+        { new: true, runValidators: true }
+      );
 
       // await session.commitTransaction();
     }
@@ -326,11 +330,11 @@ exports.addProduct = async (req, res) => {
       type === 'withdraw'
         ? { type, area }
         : type === 'adjuststock'
-        ? { type, area, withdrawId }
-        : type === 'give'
-        ? { type, area, storeId, proId }
-        : { type, area, storeId }
-        
+          ? { type, area, withdrawId }
+          : type === 'give'
+            ? { type, area, storeId, proId }
+            : { type, area, storeId }
+
     const { Cart } = getModelsByChannel(channel, res, cartModel)
 
     let cart = await Cart.findOne(cartQuery)
@@ -538,8 +542,8 @@ exports.adjustProduct = async (req, res) => {
       type === 'withdraw'
         ? { type, area }
         : type === 'adjuststock'
-        ? { type, area, withdrawId }
-        : { type, area, storeId }
+          ? { type, area, withdrawId }
+          : { type, area, storeId }
 
     let cart = await Cart.findOne(cartQuery)
     if (!cart) {
