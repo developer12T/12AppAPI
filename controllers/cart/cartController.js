@@ -221,7 +221,7 @@ exports.getCart = async (req, res) => {
         )
         if (updateResult) return
       }
-
+      console.log(cart.listPromotion)
       await cart.save()
 
       // await session.commitTransaction();
