@@ -101,7 +101,7 @@ const generateOrderId = async (area, warehouse, channel, res) => {
     ? parseInt(latestOrder.orderId.slice(-4)) + 1
     : 1
 
-  console.log(latestOrder)
+  // console.log(latestOrder)
 
   return `${currentYear
     .toString()

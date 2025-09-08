@@ -120,6 +120,42 @@ exports.checkout = async (req, res) => {
       res
     )
 
+    const storeData =
+      (await Store.findOne({
+        storeId: cart.storeId,
+        area: cart.area
+      }).lean()) || {}
+
+
+    function isAug2025OrLater(createAt) {
+      if (!createAt) return false
+
+      // case: "YYYYMM" เช่น "202508"
+      if (typeof createAt === 'string' && /^\d{6}$/.test(createAt)) {
+        const y = Number(createAt.slice(0, 4))
+        const m = Number(createAt.slice(4, 6))
+        return y * 100 + m >= 2025 * 100 + 8
+      }
+
+      // case: Date / ISO / YYYY-MM-DD / YYYYMMDD
+      const d = createAt instanceof Date ? createAt : new Date(createAt)
+      // console.log(d)
+      if (isNaN(d)) return false
+      const ym = d.getFullYear() * 100 + (d.getMonth() + 1) // เดือนเริ่มที่ 0
+      return ym >= 202508
+    }
+
+    // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
+    const addressFinal = isAug2025OrLater(storeData.createdAt)
+      ? [
+        storeData.address,
+        storeData.subDistrict && `ต.${storeData.subDistrict}`,
+        storeData.district && `อ.${storeData.district}`,
+        storeData.province && `จ.${storeData.province}`,
+        storeData.postCode
+      ].filter(Boolean).join(' ')
+      : storeData.address;
+
     const summary = await summaryRefund(cart, channel, res)
     // console.log('summary:', JSON.stringify(summary, null, 2))
 
@@ -135,14 +171,14 @@ exports.checkout = async (req, res) => {
         warehouse: sale.warehouse
       },
       store: {
-        storeId: summary.store.storeId,
-        name: summary.store.name,
-        type: summary.store.type,
-        address: summary.store.address,
-        taxId: summary.store.taxId,
-        tel: summary.store.tel,
-        area: summary.store.area,
-        zone: summary.store.zone
+        storeId: storeData.storeId,
+        name: storeData.name,
+        type: storeData.type,
+        address: addressFinal,
+        taxId: storeData.taxId,
+        tel: storeData.tel,
+        area: storeData.area,
+        zone: storeData.zone
       },
       note,
       latitude,
