@@ -233,13 +233,15 @@ exports.checkout = async (req, res) => {
     // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-        storeData.address,
-        storeData.subDistrict && `ต.${storeData.subDistrict}`,
-        storeData.district && `อ.${storeData.district}`,
-        storeData.province && `จ.${storeData.province}`,
-        storeData.postCode
-      ].filter(Boolean).join(' ')
-      : storeData.address;
+          storeData.address,
+          storeData.subDistrict && `ต.${storeData.subDistrict}`,
+          storeData.district && `อ.${storeData.district}`,
+          storeData.province && `จ.${storeData.province}`,
+          storeData.postCode
+        ]
+          .filter(Boolean)
+          .join(' ')
+      : storeData.address
 
     // const addressFinal = `${storeData.address} ต.${storeData.subDistrict} อ.${storeData.district} จ.${province} ${postCode}`
 
@@ -2613,13 +2615,16 @@ exports.erpApiCheckOrder = async (req, res) => {
     const { Refund } = getModelsByChannel(channel, res, refundModel)
 
     // 2. Get pending orderIds ใน MongoDB
-    // const inMongo = await Order.find({ status: 'pending' }).select('orderId')
     const inMongo = await Order.find({ status: 'pending' }).select('orderId')
+    const inMongoRefund = await Refund.find({ status: 'approved' }).select(
+      'orderId'
+    )
     // const inMongoRefund = await Refund.find({ status: 'pending' }).select(
     //   'orderId'
     // )
 
     const orderIdsInMongo = inMongo.map(item => item.orderId.toString())
+    const refundIdsInMongo = inMongoRefund.map(item => item.orderId.toString())
     // const refundIdsInMongo = inMongoRefund.map(item => item.orderId.toString())
 
     // 2) กันลิมิต MSSQL ด้วยการ chunk (เช่น ชุดละ 1000)
@@ -2630,9 +2635,11 @@ exports.erpApiCheckOrder = async (req, res) => {
       return out
     }
     const idChunks = chunk(orderIdsInMongo, 1000)
+    const idChunksRefund = chunk(refundIdsInMongo, 1000)
 
     // const matchedIdsRefund = inMongoRefund.filter(id => saleIds.includes(id))
     let sales = []
+    let refund = []
 
     for (const ids of idChunks) {
       // 1) ดึงยอดจากตาราง Sale (SQL)
@@ -2651,6 +2658,23 @@ exports.erpApiCheckOrder = async (req, res) => {
       sales = sales.concat(rows)
     }
 
+    for (const ids of idChunksRefund) {
+      // 1) ดึงยอดจากตาราง Sale (SQL)
+      const rows = await OOHEAD.findAll({
+        attributes: [
+          'OACUOR',
+          [sequelize.fn('MAX', sequelize.col('OAORNO')), 'OAORNO'],
+          [sequelize.fn('MAX', sequelize.col('OAORST')), 'OAORST'],
+          [sequelize.fn('MAX', sequelize.col('OAORSL')), 'OAORSL']
+        ],
+        where: { OACUOR: { [Op.in]: ids } }, // ✅ เฉพาะที่มีใน Mongo
+        // where: { OACUOR: '6808133120225' }, // หรือ { OACUOR: { [Op.in]: ids } }
+        group: ['OACUOR'],
+        raw: true
+      })
+      refund = refund.concat(rows)
+    }
+
     // 2) ทำ map เพื่ออ้างอิงข้อมูลรายรายการ
     const saleById = new Map(
       sales.map(r => [
@@ -2662,11 +2686,25 @@ exports.erpApiCheckOrder = async (req, res) => {
         }
       ])
     )
+
+    const refundById = new Map(
+      refund.map(r => [
+        String(r.OACUOR),
+        {
+          lowStatus: String(r.OAORSL),
+          heightStatus: String(r.OAORST),
+          orderNo: String(r.OAORNO)
+        }
+      ])
+    )
     const saleIdSet = new Set(sales.map(s => String(s.OACUOR)))
+    const refundIdSet = new Set(refund.map(s => String(s.OACUOR)))
     // 3. filter ให้เหลือเฉพาะที่อยู่ทั้งสองฝั่ง
     const matchedIds = orderIdsInMongo.filter(id => saleIdSet.has(id))
+    const refundMatchedIds = refundIdsInMongo.filter(id => refundIdSet.has(id))
 
     const oaornoList = sales.map(r => r.OACUOR).filter(Boolean)
+    const refundList = refund.map(r => r.OACUOR).filter(Boolean)
 
     const lineAgg = await OOLINE.findAll({
       attributes: ['OBCUOR', [fn('COUNT', literal('*')), 'lineCount']],
@@ -2721,45 +2759,36 @@ exports.erpApiCheckOrder = async (req, res) => {
       }))
 
       const res = await Order.bulkWrite(ops, { ordered: false })
+      if (res.modifiedCount > 0) updatedCount++
       console.log('Order updated:', res.modifiedCount)
     }
 
-    // for (const orderId of matchedIds) {
-    //   try {
-    //     const result = await Order.updateOne(
-    //       { orderId },
-    //       {
-    //         $set: {
-    //           status: 'completed',
-    //           statusTH: 'สำเร็จ',
-    //           updatedAt: new Date()
-    //         }
-    //       }
-    //     )
-    //     if (result.modifiedCount > 0) updatedCount++
-    //   } catch (err) {
-    //     console.error(`Error update orderId: ${orderId}`, err)
-    //   }
-    // }
+    if (refundMatchedIds.length) {
+      const ops = refundMatchedIds.map(orderId => ({
+        updateOne: {
+          filter: { orderId },
+          update: {
+            $set: {
+              status: 'completed',
+              statusTH: 'สำเร็จ',
+              updatedAt: new Date(),
+              // เก็บ OACUOR ไว้ในเอกสารด้วย (ถ้าต้องการ)
+              // oacuor: orderId,
+              // ใส่ข้อมูลประกอบจากฝั่ง Sale (เช่นจำนวนแถวที่เจอ)
+              lowStatus: refundById.get(orderId)?.lowStatus ?? '',
+              heightStatus: refundById.get(orderId)?.heightStatus ?? '',
+              orderNo: refundById.get(orderId)?.orderNo ?? '',
 
-    // for (const orderId of matchedIdsRefund) {
-    //   try {
-    //     const result = await Refund.updateOne(
-    //       { orderId },
-    //       {
-    //         $set: {
-    //           status: 'completed',
-    //           statusTH: 'สำเร็จ',
-    //           updatedAt: new Date()
-    //         }
-    //       }
-    //     )
-    //     if (result.modifiedCount > 0) updatedCountReufund++
-    //   } catch (err) {
-    //     console.error(`Error update Refund orderId: ${orderId}`, err)
-    //   }
-    // }
-
+              // ✅ จำนวนบรรทัดจาก OOLINE
+              lineM3: lineCountByOACUOR.get(orderId) ?? 0
+            }
+          }
+        }
+      }))
+      const res = await Refund.bulkWrite(ops, { ordered: false })
+      if (res.modifiedCount > 0) updatedCountReufund++
+      console.log('Refund updated:', res.modifiedCount)
+    }
     const summaryCount = updatedCount + updatedCountReufund
 
     const io = getSocket()
@@ -4963,20 +4992,17 @@ exports.getTarget = async (req, res) => {
   })
 }
 
-
-
 exports.orderPowerBI = async (req, res) => {
-
   const channel = req.headers['x-channel']
   const { Order } = getModelsByChannel(channel, res, orderModel)
-  const OrderData = await Order.find({status:{$nin:['canceled','reject']},
-  period:'202509'})
-
-  res.status(200).json({
-    status:200,
-    message:'Sucess',
-    data:OrderData
+  const OrderData = await Order.find({
+    status: { $nin: ['canceled', 'reject'] },
+    period: '202509'
   })
 
-
+  res.status(200).json({
+    status: 200,
+    message: 'Sucess',
+    data: OrderData
+  })
 }

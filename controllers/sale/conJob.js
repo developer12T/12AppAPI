@@ -34,38 +34,72 @@ async function erpApiCheckOrderJob (channel = 'cash') {
     const { Order } = getModelsByChannel(channel, null, orderModel)
     const { Refund } = getModelsByChannel(channel, null, refundModel)
 
-    // // 1. Get sale order numbers (OAORNO) ที่มีใน Sale
-    // const modelSale = await OOHEAD.findAll({
-    //   attributes: [
-    //     'OACUOR',
-    //     [sequelize.fn('COUNT', sequelize.col('OACUOR')), 'count']
-    //   ],
-    //   group: ['OACUOR']
-    // })
-    // const saleIds = modelSale.map(row => row.get('OACUOR').toString())
+    // 2. Get pending orderIds ใน MongoDB
+    const inMongo = await Order.find({ status: 'pending' }).select('orderId')
+    const inMongoRefund = await Refund.find({ status: 'approved' }).select(
+      'orderId'
+    )
+    // const inMongoRefund = await Refund.find({ status: 'pending' }).select(
+    //   'orderId'
+    // )
 
-    // 1) ดึงยอดจากตาราง Sale (SQL)
-    const sales = await OOHEAD.findAll({
-      attributes: [
-        'OACUOR',
-        'OAORNO',
-        'OAORST',
-        'OAORSL',
-        [(sequelize.fn('COUNT', sequelize.col('*')), 'count')]
-      ],
-      group: ['OACUOR'],
-      // where: {
-      //   OACUOR: '6808133120225'
-      // },
-      raw: true // จะได้ object ปกติ เช่น { OACUOR: '6808134360150', count: '3' }
-    })
+    const orderIdsInMongo = inMongo.map(item => item.orderId.toString())
+    const refundIdsInMongo = inMongoRefund.map(item => item.orderId.toString())
+    // const refundIdsInMongo = inMongoRefund.map(item => item.orderId.toString())
+
+    // 2) กันลิมิต MSSQL ด้วยการ chunk (เช่น ชุดละ 1000)
+    const chunk = (arr, size) => {
+      const out = []
+      for (let i = 0; i < arr.length; i += size)
+        out.push(arr.slice(i, i + size))
+      return out
+    }
+    const idChunks = chunk(orderIdsInMongo, 1000)
+    const idChunksRefund = chunk(refundIdsInMongo, 1000)
+
+    // const matchedIdsRefund = inMongoRefund.filter(id => saleIds.includes(id))
+    let sales = []
+    let refund = []
+
+    for (const ids of idChunks) {
+      // 1) ดึงยอดจากตาราง Sale (SQL)
+      const rows = await OOHEAD.findAll({
+        attributes: [
+          'OACUOR',
+          [sequelize.fn('MAX', sequelize.col('OAORNO')), 'OAORNO'],
+          [sequelize.fn('MAX', sequelize.col('OAORST')), 'OAORST'],
+          [sequelize.fn('MAX', sequelize.col('OAORSL')), 'OAORSL']
+        ],
+        where: { OACUOR: { [Op.in]: ids } }, // ✅ เฉพาะที่มีใน Mongo
+        // where: { OACUOR: '6808133120225' }, // หรือ { OACUOR: { [Op.in]: ids } }
+        group: ['OACUOR'],
+        raw: true
+      })
+      sales = sales.concat(rows)
+    }
+
+    for (const ids of idChunksRefund) {
+      // 1) ดึงยอดจากตาราง Sale (SQL)
+      const rows = await OOHEAD.findAll({
+        attributes: [
+          'OACUOR',
+          [sequelize.fn('MAX', sequelize.col('OAORNO')), 'OAORNO'],
+          [sequelize.fn('MAX', sequelize.col('OAORST')), 'OAORST'],
+          [sequelize.fn('MAX', sequelize.col('OAORSL')), 'OAORSL']
+        ],
+        where: { OACUOR: { [Op.in]: ids } }, // ✅ เฉพาะที่มีใน Mongo
+        // where: { OACUOR: '6808133120225' }, // หรือ { OACUOR: { [Op.in]: ids } }
+        group: ['OACUOR'],
+        raw: true
+      })
+      refund = refund.concat(rows)
+    }
 
     // 2) ทำ map เพื่ออ้างอิงข้อมูลรายรายการ
     const saleById = new Map(
       sales.map(r => [
         String(r.OACUOR),
         {
-          count: Number(r.count),
           lowStatus: String(r.OAORSL),
           heightStatus: String(r.OAORST),
           orderNo: String(r.OAORNO)
@@ -73,44 +107,54 @@ async function erpApiCheckOrderJob (channel = 'cash') {
       ])
     )
 
-    // 2. Get pending orderIds ใน MongoDB
-    // const inMongo = await Order.find({ status: 'pending' }).select('orderId')
-    const inMongo = await Order.find().select('orderId')
-    const inMongoRefund = await Refund.find({ status: 'pending' }).select(
-      'orderId'
+    const refundById = new Map(
+      refund.map(r => [
+        String(r.OACUOR),
+        {
+          lowStatus: String(r.OAORSL),
+          heightStatus: String(r.OAORST),
+          orderNo: String(r.OAORNO)
+        }
+      ])
+    )
+    const saleIdSet = new Set(sales.map(s => String(s.OACUOR)))
+    const refundIdSet = new Set(refund.map(s => String(s.OACUOR)))
+    // 3. filter ให้เหลือเฉพาะที่อยู่ทั้งสองฝั่ง
+    const matchedIds = orderIdsInMongo.filter(id => saleIdSet.has(id))
+    const refundMatchedIds = refundIdsInMongo.filter(id => refundIdSet.has(id))
+
+    const oaornoList = sales.map(r => r.OACUOR).filter(Boolean)
+    const refundList = refund.map(r => r.OACUOR).filter(Boolean)
+
+    const lineAgg = await OOLINE.findAll({
+      attributes: ['OBCUOR', [fn('COUNT', literal('*')), 'lineCount']],
+      where: { OBCUOR: { [Op.in]: oaornoList } },
+      group: ['OBCUOR'],
+      raw: true
+    })
+
+    console.log(lineAgg)
+
+    const lineCountByOBORNO = new Map(
+      lineAgg.map(r => [String(r.OBCUOR), Number(r.lineCount) || 0])
     )
 
-    const orderIdsInMongo = inMongo.map(item => item.orderId.toString())
-    const refundIdsInMongo = inMongoRefund.map(item => item.orderId.toString())
+    console.log(lineCountByOBORNO)
 
-    // 3. filter ให้เหลือเฉพาะที่อยู่ทั้งสองฝั่ง
-    // const matchedIds = orderIdsInMongo.filter(id => saleIds.includes(id))
-    // const matchedIdsRefund = inMongoRefund.filter(id => saleIds.includes(id))
-    const matchedIds = orderIdsInMongo.filter(id => saleIdSet.has(id))
+    // 4) แปลงเป็น OACUOR -> lineCount (อาศัย OAORNO ของ sales)
+    const lineCountByOACUOR = new Map(
+      sales.map(r => [
+        String(r.OACUOR),
+        lineCountByOBORNO.get(String(r.OACUOR)) ?? 0
+      ])
+    )
+
+    console.log(lineCountByOACUOR)
 
     // 4. อัปเดตทุกตัวที่ match (วนทีละตัว)
     let updatedCount = 0
     let updatedCountReufund = 0
 
-    // for (const orderId of matchedIds) {
-    //   try {
-    //     const result = await Order.updateOne(
-    //       { orderId },
-    //       {
-    //         $set: {
-    //           status: 'completed',
-    //           statusTH: 'สำเร็จ',
-    //           updatedAt: new Date()
-    //         }
-    //       }
-    //     )
-    //     if (result.modifiedCount > 0) updatedCount++
-    //   } catch (err) {
-    //     console.error(`Error update orderId: ${orderId}`, err)
-    //   }
-    // }
-
-    // 4) อัปเดต Mongo ทีเดียวด้วย bulkWrite (ใส่ OACUOR และข้อมูลจาก Sale)
     if (matchedIds.length) {
       const ops = matchedIds.map(orderId => ({
         updateOne: {
@@ -121,40 +165,50 @@ async function erpApiCheckOrderJob (channel = 'cash') {
               statusTH: 'สำเร็จ',
               updatedAt: new Date(),
               // เก็บ OACUOR ไว้ในเอกสารด้วย (ถ้าต้องการ)
-              oacuor: orderId,
+              // oacuor: orderId,
               // ใส่ข้อมูลประกอบจากฝั่ง Sale (เช่นจำนวนแถวที่เจอ)
               lowStatus: saleById.get(orderId)?.lowStatus ?? '',
               heightStatus: saleById.get(orderId)?.heightStatus ?? '',
-              orderNo: saleById.get(orderId)?.orderNo ?? ''
+              orderNo: saleById.get(orderId)?.orderNo ?? '',
+
+              // ✅ จำนวนบรรทัดจาก OOLINE
+              lineM3: lineCountByOACUOR.get(orderId) ?? 0
             }
           }
         }
       }))
 
       const res = await Order.bulkWrite(ops, { ordered: false })
+      if (res.modifiedCount > 0) updatedCount++
       console.log('Order updated:', res.modifiedCount)
     }
 
-    // 4) อัปเดต Mongo ทีเดียวด้วย bulkWrite (ใส่ OACUOR และข้อมูลจาก Sale)
-
-    for (const orderId of matchedIdsRefund) {
-      try {
-        const result = await Refund.updateOne(
-          { orderId },
-          {
+    if (refundMatchedIds.length) {
+      const ops = refundMatchedIds.map(orderId => ({
+        updateOne: {
+          filter: { orderId },
+          update: {
             $set: {
               status: 'completed',
               statusTH: 'สำเร็จ',
-              updatedAt: new Date()
+              updatedAt: new Date(),
+              // เก็บ OACUOR ไว้ในเอกสารด้วย (ถ้าต้องการ)
+              // oacuor: orderId,
+              // ใส่ข้อมูลประกอบจากฝั่ง Sale (เช่นจำนวนแถวที่เจอ)
+              lowStatus: refundById.get(orderId)?.lowStatus ?? '',
+              heightStatus: refundById.get(orderId)?.heightStatus ?? '',
+              orderNo: refundById.get(orderId)?.orderNo ?? '',
+
+              // ✅ จำนวนบรรทัดจาก OOLINE
+              lineM3: lineCountByOACUOR.get(orderId) ?? 0
             }
           }
-        )
-        if (result.modifiedCount > 0) updatedCountReufund++
-      } catch (err) {
-        console.error(`Error update Refund orderId: ${orderId}`, err)
-      }
+        }
+      }))
+      const res = await Refund.bulkWrite(ops, { ordered: false })
+      if (res.modifiedCount > 0) updatedCountReufund++
+      console.log('Refund updated:', res.modifiedCount)
     }
-
     const summaryCount = updatedCount + updatedCountReufund
 
     const io = getSocket()
