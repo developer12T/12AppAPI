@@ -29,7 +29,7 @@ const adjustStockModel = require('../../models/cash/stock')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { create } = require('lodash')
 
-async function erpApiCheckOrderJob(channel = 'cash') {
+async function erpApiCheckOrderJob (channel = 'cash') {
   try {
     const { Order } = getModelsByChannel(channel, null, orderModel)
     const { Refund } = getModelsByChannel(channel, null, refundModel)
@@ -54,9 +54,9 @@ async function erpApiCheckOrderJob(channel = 'cash') {
         [(sequelize.fn('COUNT', sequelize.col('*')), 'count')]
       ],
       group: ['OACUOR'],
-      where: {
-        OACUOR: '6808133120225'
-      },
+      // where: {
+      //   OACUOR: '6808133120225'
+      // },
       raw: true // จะได้ object ปกติ เช่น { OACUOR: '6808134360150', count: '3' }
     })
 
@@ -75,7 +75,7 @@ async function erpApiCheckOrderJob(channel = 'cash') {
 
     // 2. Get pending orderIds ใน MongoDB
     // const inMongo = await Order.find({ status: 'pending' }).select('orderId')
-    const inMongo = await Order.find({ orderId: '6808133120225' }).select('orderId')
+    const inMongo = await Order.find().select('orderId')
     const inMongoRefund = await Refund.find({ status: 'pending' }).select(
       'orderId'
     )
@@ -173,7 +173,7 @@ async function erpApiCheckOrderJob(channel = 'cash') {
   }
 }
 
-async function erpApiCheckDisributionM3Job(channel = 'cash') {
+async function erpApiCheckDisributionM3Job (channel = 'cash') {
   try {
     const { Distribution } = getModelsByChannel(channel, null, disributionModel)
 
@@ -255,7 +255,7 @@ async function erpApiCheckDisributionM3Job(channel = 'cash') {
   }
 }
 
-async function DeleteCartDaily(channel = 'cash') {
+async function DeleteCartDaily (channel = 'cash') {
   // เปิด session สำหรับ transaction
   // const session = await mongoose.startSession();
   // session.startTransaction();
@@ -395,7 +395,7 @@ async function DeleteCartDaily(channel = 'cash') {
   }
 }
 
-async function reStoreStock(channel = 'cash') {
+async function reStoreStock (channel = 'cash') {
   try {
     const periodstr = period()
     const { Stock } = getModelsByChannel(channel, null, stockModel)
@@ -548,7 +548,7 @@ async function reStoreStock(channel = 'cash') {
           }
         },
         { $project: { listProduct: 1, _id: 0, zone: 1 } }
-      ]);
+      ])
 
       const dataChangePending = await Order.aggregate([
         { $addFields: { zone: { $substrBytes: ['$area', 0, 2] } } },
@@ -642,7 +642,7 @@ async function reStoreStock(channel = 'cash') {
       )
 
       const mergedProductPromotions = allOrderPromotion.reduce((acc, promo) => {
-        ; (promo.listProduct || []).forEach(prod => {
+        ;(promo.listProduct || []).forEach(prod => {
           const key = `${prod.id}_${prod.unit}`
           if (acc[key]) {
             acc[key].qty += prod.qty || 0
@@ -1020,7 +1020,6 @@ async function reStoreStock(channel = 'cash') {
     }
 
     console.log('ReStoreSucess')
-
   } catch (err) {
     console.error(err)
     // return res.status(500).json({ status: 500, message: err.message })
@@ -1092,7 +1091,6 @@ const startCronJobreStoreStockDaily = () => {
     }
   )
 }
-
 
 module.exports = {
   startCronJobErpApiCheck,

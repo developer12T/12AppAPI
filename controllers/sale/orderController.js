@@ -207,12 +207,12 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-        .map(item => item.price)
-        .reduce((sum, price) => sum + price, 0)
+          .map(item => item.price)
+          .reduce((sum, price) => sum + price, 0)
       : 0
 
     // ✅ ช่วยฟังก์ชัน: เช็คว่า createAt ตั้งแต่ Aug-2025 ขึ้นไปไหม
-    function isAug2025OrLater(createAt) {
+    function isAug2025OrLater (createAt) {
       if (!createAt) return false
 
       // case: "YYYYMM" เช่น "202508"
@@ -233,16 +233,17 @@ exports.checkout = async (req, res) => {
     // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-        storeData.address,
-        storeData.subDistrict && `ต.${storeData.subDistrict}`,
-        storeData.district && `อ.${storeData.district}`,
-        storeData.province && `จ.${storeData.province}`,
-         storeData.postCode
-      ].filter(Boolean).join(' ')
-      : storeData.address;
+          storeData.address,
+          storeData.subDistrict && `ต.${storeData.subDistrict}`,
+          storeData.district && `อ.${storeData.district}`,
+          storeData.province && `จ.${storeData.province}`,
+          storeData.postCode
+        ]
+          .filter(Boolean)
+          .join(' ')
+      : storeData.address
 
     // const addressFinal = `${storeData.address} ต.${storeData.subDistrict} อ.${storeData.district} จ.${province} ${postCode}`
-
 
     const total = subtotal - discountProduct
     const newOrder = new Order({
@@ -887,7 +888,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -1179,7 +1180,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1290,7 +1291,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromChange = modelChange.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1553,7 +1554,7 @@ exports.OrderToExcel = async (req, res) => {
       message: 'Not Found Order'
     })
   }
-  function yyyymmddToDdMmYyyy(dateString) {
+  function yyyymmddToDdMmYyyy (dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -1595,7 +1596,7 @@ exports.OrderToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     }
   )
 
@@ -2487,6 +2488,126 @@ exports.getSummarybyGroup = async (req, res) => {
   }
 }
 
+exports.updateCompletedOrder = async (req, res) => {
+  try {
+    const { Order } = getModelsByChannel(channel, null, orderModel)
+    const { Refund } = getModelsByChannel(channel, null, refundModel)
+
+    // 1) ดึงยอดจากตาราง Sale (SQL)
+    const sales = await OOHEAD.findAll({
+      attributes: [
+        'OACUOR',
+        'OAORNO',
+        'OAORST',
+        'OAORSL',
+        [(sequelize.fn('COUNT', sequelize.col('*')), 'count')]
+      ],
+      group: ['OACUOR'],
+      // where: {
+      //   OACUOR: '6808133120225'
+      // },
+      raw: true // จะได้ object ปกติ เช่น { OACUOR: '6808134360150', count: '3' }
+    })
+
+    // 2) ทำ map เพื่ออ้างอิงข้อมูลรายรายการ
+    const saleById = new Map(
+      sales.map(r => [
+        String(r.OACUOR),
+        {
+          count: Number(r.count),
+          lowStatus: String(r.OAORSL),
+          heightStatus: String(r.OAORST),
+          orderNo: String(r.OAORNO)
+        }
+      ])
+    )
+
+    // 2. Get pending orderIds ใน MongoDB
+    // const inMongo = await Order.find({ status: 'pending' }).select('orderId')
+    const inMongo = await Order.find().select('orderId')
+    const inMongoRefund = await Refund.find({ status: 'pending' }).select(
+      'orderId'
+    )
+
+    const orderIdsInMongo = inMongo.map(item => item.orderId.toString())
+    const refundIdsInMongo = inMongoRefund.map(item => item.orderId.toString())
+
+    // 3. filter ให้เหลือเฉพาะที่อยู่ทั้งสองฝั่ง
+    // const matchedIds = orderIdsInMongo.filter(id => saleIds.includes(id))
+    // const matchedIdsRefund = inMongoRefund.filter(id => saleIds.includes(id))
+    const matchedIds = orderIdsInMongo.filter(id => saleIdSet.has(id))
+
+    // 4. อัปเดตทุกตัวที่ match (วนทีละตัว)
+    let updatedCount = 0
+    let updatedCountReufund = 0
+
+    // 4) อัปเดต Mongo ทีเดียวด้วย bulkWrite (ใส่ OACUOR และข้อมูลจาก Sale)
+    if (matchedIds.length) {
+      const ops = matchedIds.map(orderId => ({
+        updateOne: {
+          filter: { orderId },
+          update: {
+            $set: {
+              status: 'completed',
+              statusTH: 'สำเร็จ',
+              updatedAt: new Date(),
+              // เก็บ OACUOR ไว้ในเอกสารด้วย (ถ้าต้องการ)
+              oacuor: orderId,
+              // ใส่ข้อมูลประกอบจากฝั่ง Sale (เช่นจำนวนแถวที่เจอ)
+              lowStatus: saleById.get(orderId)?.lowStatus ?? '',
+              heightStatus: saleById.get(orderId)?.heightStatus ?? '',
+              orderNo: saleById.get(orderId)?.orderNo ?? ''
+            }
+          }
+        }
+      }))
+
+      const res = await Order.bulkWrite(ops, { ordered: false })
+      console.log('Order updated:', res.modifiedCount)
+    }
+
+    // 4) อัปเดต Mongo ทีเดียวด้วย bulkWrite (ใส่ OACUOR และข้อมูลจาก Sale)
+
+    for (const orderId of matchedIdsRefund) {
+      try {
+        const result = await Refund.updateOne(
+          { orderId },
+          {
+            $set: {
+              status: 'completed',
+              statusTH: 'สำเร็จ',
+              updatedAt: new Date()
+            }
+          }
+        )
+        if (result.modifiedCount > 0) updatedCountReufund++
+      } catch (err) {
+        console.error(`Error update Refund orderId: ${orderId}`, err)
+      }
+    }
+
+    const summaryCount = updatedCount + updatedCountReufund
+
+    const io = getSocket()
+    io.emit('order/statusOrderUpdated', {
+      summaryCount,
+      updatedAt: new Date()
+    })
+
+    // });
+
+    console.log(`Total updated Order: ${summaryCount}`)
+
+    res.status(200).json({
+      status: 200,
+      message: 'Successful',
+      summaryCount: summaryCount
+    })
+  } catch (error) {
+    res.status(500).json({ status: 500, message: error.message })
+  }
+}
+
 exports.erpApiCheckOrder = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
@@ -2495,7 +2616,7 @@ exports.erpApiCheckOrder = async (req, res) => {
 
     // 2. Get pending orderIds ใน MongoDB
     // const inMongo = await Order.find({ status: 'pending' }).select('orderId')
-    const inMongo = await Order.find({ status: 'completed' }).select('orderId')
+    const inMongo = await Order.find({ status: 'pending' }).select('orderId')
     // const inMongoRefund = await Refund.find({ status: 'pending' }).select(
     //   'orderId'
     // )
@@ -4326,28 +4447,28 @@ exports.checkOrderCancelM3 = async (req, res) => {
     const type = saleSet.has(id)
       ? 'Sale'
       : refundSet.has(id)
-        ? 'Refund'
-        : changeSet.has(id)
-          ? 'Change'
-          : ''
+      ? 'Refund'
+      : changeSet.has(id)
+      ? 'Change'
+      : ''
 
     const typeId =
       type === 'Sale'
         ? 'A31'
         : type === 'Refund'
-          ? 'A34'
-          : type === 'Change'
-            ? 'B31'
-            : ''
+        ? 'A34'
+        : type === 'Change'
+        ? 'B31'
+        : ''
 
     const statusTablet =
       type === 'Sale'
         ? saleStatusMap.get(id) ?? ''
         : type === 'Refund'
-          ? refundStatusMap.get(id) ?? ''
-          : type === 'Change'
-            ? changeStatusMap.get(id) ?? ''
-            : ''
+        ? refundStatusMap.get(id) ?? ''
+        : type === 'Change'
+        ? changeStatusMap.get(id) ?? ''
+        : ''
 
     return { orderId: id, type, typeId, statusTablet }
   })
@@ -4369,7 +4490,7 @@ exports.checkOrderCancelM3 = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => { })
+    fs.unlink(tempPath, () => {})
   })
 
   // res.status(200).json({
