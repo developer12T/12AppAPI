@@ -127,8 +127,7 @@ exports.checkout = async (req, res) => {
         area: cart.area
       }).lean()) || {}
 
-
-    function isAug2025OrLater(createAt) {
+    function isAug2025OrLater (createAt) {
       if (!createAt) return false
 
       // case: "YYYYMM" เช่น "202508"
@@ -149,13 +148,15 @@ exports.checkout = async (req, res) => {
     // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-        storeData.address,
-        storeData.subDistrict && `ต.${storeData.subDistrict}`,
-        storeData.district && `อ.${storeData.district}`,
-        storeData.province && `จ.${storeData.province}`,
-        storeData.postCode
-      ].filter(Boolean).join(' ')
-      : storeData.address;
+          storeData.address,
+          storeData.subDistrict && `ต.${storeData.subDistrict}`,
+          storeData.district && `อ.${storeData.district}`,
+          storeData.province && `จ.${storeData.province}`,
+          storeData.postCode
+        ]
+          .filter(Boolean)
+          .join(' ')
+      : storeData.address
 
     const summary = await summaryRefund(cart, channel, res)
     // console.log('summary:', JSON.stringify(summary, null, 2))
@@ -564,7 +565,7 @@ exports.refundExcel = async (req, res) => {
 
   const tranFromChange = modelChange.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -812,7 +813,7 @@ exports.refundExcel = async (req, res) => {
 
   const tranFromRefund = tranFromRefundNested.flat()
 
-  function yyyymmddToDdMmYyyy(dateString) {
+  function yyyymmddToDdMmYyyy (dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -850,7 +851,7 @@ exports.refundExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     }
   )
 }
@@ -987,6 +988,10 @@ exports.getRefund = async (req, res) => {
 
         return {
           orderId: refund.orderId,
+          orderNo: refund.orderNo,
+          lowStatus: refund.lowStatus,
+          heightStatus: refund.heightStatus,
+          lineM3: refund.lineM3,
           area: refund.store.area,
           storeId: refund.store?.storeId || '',
           storeName: refund.store?.name || '',
@@ -1062,18 +1067,18 @@ exports.getDetail = async (req, res) => {
 
     const listProductChange = order
       ? order.listProduct.map(product => ({
-        id: product.id,
-        name: product.name,
-        group: product.group,
-        brand: product.brand,
-        size: product.size,
-        flavour: product.flavour,
-        qty: product.qty,
-        unit: product.unit,
-        unitName: product.unitName,
-        price: product.price,
-        netTotal: product.netTotal
-      }))
+          id: product.id,
+          name: product.name,
+          group: product.group,
+          brand: product.brand,
+          size: product.size,
+          flavour: product.flavour,
+          qty: product.qty,
+          unit: product.unit,
+          unitName: product.unitName,
+          price: product.price,
+          netTotal: product.netTotal
+        }))
       : []
 
     const totalChange = order ? order.total : 0
@@ -1219,7 +1224,6 @@ exports.updateStatus = async (req, res) => {
     orderUpdateTimestamps[orderId] = now
     // ===== end debounce =====
 
-
     const changeOrder = await Order.findOne({ reference: orderId })
 
     if (!changeOrder) {
@@ -1283,8 +1287,6 @@ exports.updateStatus = async (req, res) => {
           counter += 1
           newOrderId = `${baseId}CC${counter}` // ต่อกับ baseId เสมอ
         }
-
-
       }
       for (const item of productChange) {
         const updateResult = await updateStockMongo(
@@ -1316,8 +1318,6 @@ exports.updateStatus = async (req, res) => {
           counter += 1
           newOrderId = `${baseId}CC${counter}` // ต่อกับ baseId เสมอ
         }
-
-
       }
 
       // console.log(productChange)

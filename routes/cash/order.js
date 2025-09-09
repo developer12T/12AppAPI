@@ -29,7 +29,8 @@ const {
   OrderZeroDiff,
   checkOrderCancelM3,
   getTarget,
-  orderPowerBI
+  orderPowerBI,
+  updateCompletedOrder
 } = require('../../controllers/sale/orderController')
 
 const router = express.Router()
@@ -50,6 +51,7 @@ router.get('/getSummarybyMonth', getSummarybyMonth)
 router.get('/getSummarybyArea', getSummarybyArea)
 router.post('/getSummarybyGroup', getSummarybyGroup)
 router.get('/erpApiCheck', erpApiCheckOrder)
+router.get('/updateCompletedOrder', updateCompletedOrder)
 // router.get('/erpApiCheckDisributionM3', erpApiCheckDisributionM3)
 
 router.post('/getSummarybyChoice', getSummarybyChoice)

@@ -275,8 +275,7 @@ exports.checkout = async (req, res) => {
         area: cart.area
       }).lean()) || {}
 
-
-    function isAug2025OrLater(createAt) {
+    function isAug2025OrLater (createAt) {
       if (!createAt) return false
 
       // case: "YYYYMM" เช่น "202508"
@@ -297,13 +296,15 @@ exports.checkout = async (req, res) => {
     // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-        storeData.address,
-        storeData.subDistrict && `ต.${storeData.subDistrict}`,
-        storeData.district && `อ.${storeData.district}`,
-        storeData.province && `จ.${storeData.province}`,
-        storeData.postCode
-      ].filter(Boolean).join(' ')
-      : storeData.address;
+          storeData.address,
+          storeData.subDistrict && `ต.${storeData.subDistrict}`,
+          storeData.district && `อ.${storeData.district}`,
+          storeData.province && `จ.${storeData.province}`,
+          storeData.postCode
+        ]
+          .filter(Boolean)
+          .join(' ')
+      : storeData.address
 
     const orderId = await generateGiveawaysId(
       area,
@@ -430,7 +431,7 @@ exports.checkout = async (req, res) => {
 
 exports.getOrder = async (req, res) => {
   try {
-    const { type, area, store, period, start, end } = req.query
+    const { type, area, store, period, start, end, zone } = req.query
     let response = []
 
     const channel = req.headers['x-channel']
@@ -474,12 +475,18 @@ exports.getOrder = async (req, res) => {
       }
     }
 
+    // if (zone && !area) {
+    //   areaQuery['store.area'] = { $regex: `^${zone}`, $options: 'i' }
+    // } else if (area.length == 5) {
+    //   areaQuery['store.area'] = area
+    // }
+
     let query = {
       type,
       ...areaQuery,
       // 'store.area': area,
       // createdAt: { $gte: startDate, $lt: endDate }
-      period: period,
+      ...(period ? { period } : {}),
       createdAt: { $gte: startDate, $lte: endDate }
     }
 
@@ -733,6 +740,7 @@ exports.approveGive = async (req, res) => {
       message: `อัปเดตสถานะเรียบร้อย (${statusThStr})`,
       data: giveawayData
     })
+    
   } catch (error) {
     console.error('Error approving giveaway:', error)
     res.status(500).json({
@@ -915,7 +923,7 @@ exports.giveToExcel = async (req, res) => {
     }
   ])
 
-  function formatDateToThaiYYYYMMDD(date) {
+  function formatDateToThaiYYYYMMDD (date) {
     const d = new Date(date)
     // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -967,7 +975,7 @@ exports.giveToExcel = async (req, res) => {
 
   const data = dataTran.flatMap(item => item)
 
-  function yyyymmddToDdMmYyyy(dateString) {
+  function yyyymmddToDdMmYyyy (dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -1010,7 +1018,7 @@ exports.giveToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     }
   )
 
