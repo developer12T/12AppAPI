@@ -2616,7 +2616,7 @@ exports.erpApiCheckOrder = async (req, res) => {
 
     // 2. Get pending orderIds ใน MongoDB
     const inMongo = await Order.find({ status: 'pending' }).select('orderId')
-    const inMongoRefund = await Refund.find({ status: 'approved' }).select(
+    const inMongoRefund = await Refund.find({ status: 'completed' }).select(
       'orderId'
     )
     // const inMongoRefund = await Refund.find({ status: 'pending' }).select(
@@ -2713,10 +2713,21 @@ exports.erpApiCheckOrder = async (req, res) => {
       raw: true
     })
 
+    const refundLineAgg = await OOLINE.findAll({
+      attributes: ['OBCUOR', [fn('COUNT', literal('*')), 'lineCount']],
+      where: { OBCUOR: { [Op.in]: refundList } },
+      group: ['OBCUOR'],
+      raw: true
+    })
+
     console.log(lineAgg)
 
     const lineCountByOBORNO = new Map(
       lineAgg.map(r => [String(r.OBCUOR), Number(r.lineCount) || 0])
+    )
+
+    const lineCountByOBORNORefund = new Map(
+      refundLineAgg.map(r => [String(r.OBCUOR), Number(r.lineCount) || 0])
     )
 
     console.log(lineCountByOBORNO)
@@ -2726,6 +2737,13 @@ exports.erpApiCheckOrder = async (req, res) => {
       sales.map(r => [
         String(r.OACUOR),
         lineCountByOBORNO.get(String(r.OACUOR)) ?? 0
+      ])
+    )
+
+    const lineCountByOACUORRefund = new Map(
+      sales.map(r => [
+        String(r.OACUOR),
+        lineCountByOBORNORefund.get(String(r.OACUOR)) ?? 0
       ])
     )
 
@@ -2780,7 +2798,7 @@ exports.erpApiCheckOrder = async (req, res) => {
               orderNo: refundById.get(orderId)?.orderNo ?? '',
 
               // ✅ จำนวนบรรทัดจาก OOLINE
-              lineM3: lineCountByOACUOR.get(orderId) ?? 0
+              lineM3: lineCountByOACUORRefund.get(orderId) ?? 0
             }
           }
         }

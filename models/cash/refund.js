@@ -54,6 +54,7 @@ const refundSchema = new mongoose.Schema(
     lowStatus: { type: String },
     heightStatus: { type: String },
     lineM3: { type: String },
+    orderNo: { type: String },
     latitude: { type: String, require: true },
     longitude: { type: String, require: true },
     status: {

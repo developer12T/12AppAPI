@@ -479,12 +479,17 @@ exports.getOrder = async (req, res) => {
               }
             : null,
           orderId: o.orderId,
+          // orderNo: o.orderNo,
+          // highStatus: o.highStatus,
+          // lowStatus: o.lowStatus,
+          // lineM3: o.lineM3,
           orderType: o.orderType,
           orderTypeName: o.orderTypeName,
           sendDate: o.sendDate,
           total: o.totalQty || 0,
           status: o.status,
-          createdAt: formatDateTimeToThai(o.createdAt)
+          createdAt:o.createdAt,
+          formmatDate: formatDateTimeToThai(o.createdAt)
         }
       })
     )
