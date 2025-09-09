@@ -244,7 +244,10 @@ exports.checkout = async (req, res) => {
     })
 
     if (newtrip === true) {
-      const getNpd = await Npd.findOne({ period: period, areaGet: { $in: [area] } })
+      const getNpd = await Npd.findOne({
+        period: period,
+        areaGet: { $in: [area] }
+      })
 
       if (!getNpd) {
         newOrder.newTrip = 'true'
@@ -471,17 +474,22 @@ exports.getOrder = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
+          // orderNo: o.orderNo,
+          // highStatus: o.highStatus,
+          // lowStatus: o.lowStatus,
+          // lineM3: o.lineM3,
           orderType: o.orderType,
           orderTypeName: o.orderTypeName,
           sendDate: o.sendDate,
           total: o.totalQty || 0,
           status: o.status,
-          createdAt: formatDateTimeToThai(o.createdAt)
+          createdAt:o.createdAt,
+          formmatDate: formatDateTimeToThai(o.createdAt)
         }
       })
     )
@@ -1061,12 +1069,15 @@ exports.approveWithdraw = async (req, res) => {
           <p>
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName
+            <strong>ประเภทการจัดส่ง:</strong> ${
+              distributionTran.orderTypeName
             }<br>
-            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
-            }<br>
-            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
-            }<br>
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
+            '-' + wereHouseName?.wh_name || ''
+          }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
+            distributionTran.shippingName
+          }<br>
             <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
             <strong>เขต:</strong> ${distributionTran.area}<br>
             <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -1104,10 +1115,6 @@ exports.approveWithdraw = async (req, res) => {
       //   )
 
       // }
-
-
-
-
 
       res.status(200).json({
         status: 200,
@@ -1241,8 +1248,9 @@ exports.saleConfirmWithdraw = async (req, res) => {
         const ReceiveQty = Object.values(
           Receive.reduce((acc, cur) => {
             // ใช้ key จาก coNo + withdrawUnit + productId (ถ้าอยากแยกตาม productId ด้วย)
-            const key = `${cur.coNo}_${cur.withdrawUnit
-              }_${cur.productId.trim()}`
+            const key = `${cur.coNo}_${
+              cur.withdrawUnit
+            }_${cur.productId.trim()}`
             if (!acc[key]) {
               acc[key] = { ...cur }
             } else {
@@ -1660,7 +1668,7 @@ exports.withdrawToExcel = async (req, res) => {
 
     const tranFromOrder = modelWithdraw.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD(date) {
+      function formatDateToThaiYYYYMMDD (date) {
         const d = new Date(date)
         // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1750,7 +1758,7 @@ exports.withdrawToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       }
     )
   } catch (error) {
@@ -1763,12 +1771,14 @@ exports.withdrawToExcel = async (req, res) => {
 
 exports.updateReciveFix = async (req, res) => {
   try {
-    const { period, orderId } = req.body
-    const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
-    const { Product } = getModelsByChannel(channel, res, productModel)
     const channel = req.headers['x-channel']
+    const { period, orderId } = req.body
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
 
-    const withdrawFix = Withdraw.findAll({ period, orderId })
+    const withdrawFix = await Distribution.find({ period })
+    // console.log(withdrawFix)
+
     for (const order of withdrawFix) {
       // const distributionTran = await Distribution.findOne({
       //   orderId: order.orderId,
@@ -1795,7 +1805,7 @@ exports.updateReciveFix = async (req, res) => {
       })
 
       const ReceiveWeight = await MHDISH.findAll({
-        where: { coNo: orderId },
+        where: { coNo: order.orderId },
         raw: true
       })
 
@@ -1863,7 +1873,23 @@ exports.updateReciveFix = async (req, res) => {
       }
       receivetotalWeightGross = ReceiveWeight?.[0]?.weightGross || 0
       receivetotalWeightNet = ReceiveWeight?.[0]?.weightNet || 0
+      console.log(order.listProduct)
+
+      await Distribution.updateOne(
+        { orderId: order.orderId },
+        { $set: { listProduct: order.listProduct } }
+      )
     }
+    res.status(200).json({
+      status: 200,
+      message: `Sucess`
+      // data: {
+      //   orderId: orderId,
+      //   lowStatus: row.MGTRSL,
+      //   highStatus: row.MGTRSH,
+      //   listProduct: distributionTran.listProduct
+      // }
+    })
   } catch (error) {
     console.error('Error uploading images:', error)
     res
@@ -1887,36 +1913,34 @@ exports.withdrawBackOrderToExcel = async (req, res) => {
   let dataExcel = []
   for (const item of dataDist) {
     for (const product of item.listProduct) {
-      if (product.qty != product.receiveQty) {
-        const diff = product.qty - product.receiveQty
-        // แปลง createdAt เป็น UTC+7 และ format วันที่ไทย
-        const createdAtUtc = new Date(item.createdAt)
-        createdAtUtc.setHours(createdAtUtc.getHours() + 7)
-        const createdthaiDay = createdAtUtc.getDate()
-        const createdthaiMonth = createdAtUtc.getMonth() + 1
-        const createdthaiYear = createdAtUtc.getFullYear() + 543
-        const createdAtThai = `${createdthaiDay}/${createdthaiMonth}/${createdthaiYear}`
+      const diff = product.qty - product.receiveQty
+      // แปลง createdAt เป็น UTC+7 และ format วันที่ไทย
+      const createdAtUtc = new Date(item.createdAt)
+      createdAtUtc.setHours(createdAtUtc.getHours() + 7)
+      const createdthaiDay = createdAtUtc.getDate()
+      const createdthaiMonth = createdAtUtc.getMonth() + 1
+      const createdthaiYear = createdAtUtc.getFullYear() + 543
+      const createdAtThai = `${createdthaiDay}/${createdthaiMonth}/${createdthaiYear}`
 
-        // คำนวณระยะห่างเป็นวัน
-        const created = new Date(item.createdAt)
-        const updated = new Date(item.updatedAt)
-        const diffMs = updated - created
-        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+      // คำนวณระยะห่างเป็นวัน
+      const created = new Date(item.createdAt)
+      const updated = new Date(item.updatedAt)
+      const diffMs = updated - created
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
 
-        const data = {
-          เลขที่เอกสาร: item.orderId,
-          เขตการขาย: item.area,
-          วันที่เบิก: createdAtThai,
-          ระยะเวลาเบิก: diffDays,
-          รหัสสินค้า: product.id,
-          ชื่อสินค้า: product.name,
-          เบิก: product.qty,
-          ได้รับ: product.receiveQty == 0 ? '-' : product.receiveQty,
-          ไม่ได้รับ: diff,
-          มูลค่าที่ไม่ได้รับ: (diff * product.price).toLocaleString()
-        }
-        dataExcel.push(data)
+      const data = {
+        เลขที่เอกสาร: item.orderId,
+        เขตการขาย: item.area,
+        วันที่เบิก: createdAtThai,
+        ระยะเวลาเบิก: diffDays,
+        รหัสสินค้า: product.id,
+        ชื่อสินค้า: product.name,
+        เบิก: product.qty,
+        ได้รับ: product.receiveQty == 0 ? '-' : product.receiveQty,
+        ไม่ได้รับ: diff,
+        มูลค่าที่ไม่ได้รับ: (diff * product.price).toLocaleString()
       }
+      dataExcel.push(data)
     }
   }
 
@@ -1944,7 +1968,7 @@ exports.withdrawBackOrderToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
   }
 }
