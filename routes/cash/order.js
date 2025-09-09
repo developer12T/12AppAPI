@@ -28,7 +28,8 @@ const {
   reflashOrder,
   OrderZeroDiff,
   checkOrderCancelM3,
-  getTarget
+  getTarget,
+  orderPowerBI
 } = require('../../controllers/sale/orderController')
 
 const router = express.Router()
@@ -66,4 +67,5 @@ router.post('/reportCheckin', reportCheckin)
 router.post('/OrderZeroDiff', OrderZeroDiff)
 router.post('/checkOrderCancelM3', checkOrderCancelM3)
 router.get('/getTarget', getTarget)
+router.get('/orderPowerBI', orderPowerBI)
 module.exports = router
