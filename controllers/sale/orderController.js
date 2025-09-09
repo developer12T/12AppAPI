@@ -233,15 +233,13 @@ exports.checkout = async (req, res) => {
     // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-          storeData.address,
-          storeData.subDistrict && `ต.${storeData.subDistrict}`,
-          storeData.district && `อ.${storeData.district}`,
-          storeData.province && `จ.${storeData.province}`,
-          storeData.postCode
-        ]
-          .filter(Boolean)
-          .join(' ')
-      : storeData.address
+        storeData.address,
+        storeData.subDistrict && `ต.${storeData.subDistrict}`,
+        storeData.district && `อ.${storeData.district}`,
+        storeData.province && `จ.${storeData.province}`,
+        storeData.postCode
+      ].filter(Boolean).join(' ')
+      : storeData.address;
 
     // const addressFinal = `${storeData.address} ต.${storeData.subDistrict} อ.${storeData.district} จ.${province} ${postCode}`
 
@@ -1182,7 +1180,7 @@ exports.OrderToExcel = async (req, res) => {
     let counterOrder = 0
     function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
-      // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
+      d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
       const yyyy = d.getFullYear()
       const mm = String(d.getMonth() + 1).padStart(2, '0')
@@ -4963,4 +4961,22 @@ exports.getTarget = async (req, res) => {
     targetPercent:
       to2((sale * 100) / parseFloat(dataTarget?.TG_AMOUNT ?? 0) ?? 0) ?? 0
   })
+}
+
+
+
+exports.orderPowerBI = async (req, res) => {
+
+  const channel = req.headers['x-channel']
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+  const OrderData = await Order.find({status:{$nin:['canceled','reject']},
+  period:'202509'})
+
+  res.status(200).json({
+    status:200,
+    message:'Sucess',
+    data:OrderData
+  })
+
+
 }
