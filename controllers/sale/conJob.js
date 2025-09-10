@@ -2,7 +2,11 @@ const cron = require('node-cron')
 // const { erpApiCheckOrder,erpApiCheckDisributionM3 } = require('../../controllers/sale/orderController')
 const { OrderToExcelConJob } = require('../../controllers/sale/orderController')
 const { period, rangeDate } = require('../../utilities/datetime')
-const { to2, updateStockMongo } = require('../../middleware/order')
+const {
+  to2,
+  updateStockMongo,
+  calculateStockSummary
+} = require('../../middleware/order')
 
 const {
   Warehouse,
@@ -490,8 +494,8 @@ async function reStoreStock (channel = 'cash') {
         else if (area.length === 5) areaQueryRefund['store.area'] = area
       }
 
-      const matchQuery = { ...areaQuery, periodstr }
-      const matchQueryRefund = { ...areaQueryRefund, periodstr }
+      const matchQuery = { ...areaQuery, period:periodstr }
+      const matchQueryRefund = { ...areaQueryRefund, period:periodstr }
 
       const dataRefund = await Refund.aggregate([
         {
@@ -632,6 +636,9 @@ async function reStoreStock (channel = 'cash') {
         { $match: matchQuery },
         { $project: { listProduct: 1, _id: 0 } }
       ])
+
+      // console.log(matchQuery)
+
 
       if (dataStock.length === 0) {
         return {
@@ -1022,6 +1029,7 @@ async function reStoreStock (channel = 'cash') {
       // console.log(area)
     }
 
+    // console.log(results)
     for (const item of results) {
       for (const i of item.data) {
         const filter = {
@@ -1029,6 +1037,7 @@ async function reStoreStock (channel = 'cash') {
           period: periodstr,
           'listProduct.productId': i.productId
         }
+        // console.log(i.summaryQty.PCS.in)
 
         const update = {
           $set: {
@@ -1132,19 +1141,37 @@ const startCronJobDeleteCartDaily = () => {
 
 const startCronJobreStoreStockDaily = () => {
   cron.schedule(
-    '0 22 * * *', // 21:00
+    '30 21 * * *', // 21:30 ทุกวัน
     async () => {
       console.log(
-        'Running cron job reStoreStock at 21:00 Bangkok time. Now:',
+        'Running cron job reStoreStock at 21:30 Bangkok time. Now:',
         new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
-      )
-      await reStoreStock()
+      );
+      await reStoreStock();
     },
     {
       timezone: 'Asia/Bangkok' // 👈 สำคัญ
     }
-  )
-}
+  );
+};
+
+// const startCronJobreStoreStockDaily = () => {
+//   cron.schedule(
+//     '* * * * *', // ทุก 1 นาที
+//     async () => {
+//       console.log(
+//         'Running cron job reStoreStock every 1 minute. Now:',
+//         new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+//       );
+//       await reStoreStock();
+//     },
+//     {
+//       timezone: 'Asia/Bangkok' // 👈 สำคัญ
+//     }
+//   );
+// };
+
+
 
 module.exports = {
   startCronJobErpApiCheck,
