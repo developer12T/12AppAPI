@@ -5387,7 +5387,7 @@ exports.orderPowerBI = async (req, res) => {
 
 exports.getTargetProduct = async (req, res) => {
 
-  const { period, area, team } = req.query
+  const { period, area, team, zone } = req.query
   const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const { Order } = getModelsByChannel(channel, res, orderModel)
@@ -5419,9 +5419,14 @@ exports.getTargetProduct = async (req, res) => {
 
   // ใช้ $lt แทน $lte (แนะนำให้กำหนด endOfMonthUTC = วันแรกของเดือนถัดไป 00:00:00Z)
   const baseFilter = { period };
-  if (area) baseFilter['store.area'] = area;
-  if (team) baseFilter['team'] = team;
 
+  if (area) baseFilter['store.area'] = area
+
+  const teamFilter = {}
+  if (team) teamFilter['team3'] = team
+
+  const zoneFilter = {}
+  if (zone) zoneFilter['store.zone'] = zone
 
   const [dataRefund, dataOrderSale, dataOrderChange] = await Promise.all([
     Refund.aggregate([
@@ -5439,6 +5444,8 @@ exports.getTargetProduct = async (req, res) => {
       {
         $match: {
           ...baseFilter,
+          ...teamFilter,
+          ...zoneFilter,
           type: 'refund',
           status: { $nin: ['pending', 'canceled', 'reject'] }
         }
@@ -5459,6 +5466,8 @@ exports.getTargetProduct = async (req, res) => {
       {
         $match: {
           ...baseFilter,
+          ...teamFilter,
+          ...zoneFilter,
           type: 'sale',
           status: { $nin: ['canceled', 'reject'] }
         }
@@ -5478,6 +5487,8 @@ exports.getTargetProduct = async (req, res) => {
       {
         $match: {
           ...baseFilter,
+          ...teamFilter,
+          ...zoneFilter,
           type: 'change',
           status: { $nin: ['pending', 'canceled', 'reject'] }
         }
