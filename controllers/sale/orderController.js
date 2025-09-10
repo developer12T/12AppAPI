@@ -48,6 +48,7 @@ const promotionModel = require('../../models/cash/promotion')
 const distributionModel = require('../../models/cash/distribution')
 const refundModel = require('../../models/cash/refund')
 const storeModel = require('../../models/cash/store')
+const targetProductModel = require('../../models/cash/targetProduct')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { formatDateTimeToThai } = require('../../middleware/order')
 
@@ -5386,7 +5387,7 @@ exports.orderPowerBI = async (req, res) => {
 
 exports.getTargetProduct = async (req, res) => {
 
-  const { period,area } = req.query
+  const { period, area } = req.query
   const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const { Order } = getModelsByChannel(channel, res, orderModel)
@@ -5396,14 +5397,173 @@ exports.getTargetProduct = async (req, res) => {
   const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
   const { Giveaway } = getModelsByChannel(channel, res, giveModel)
   const { Target } = getModelsByChannel(channel, res, targetModel)
+  const { targetProduct } = getModelsByChannel(channel, res, targetProductModel)
+
+  const query = { period };
+  if (area) query.area = area;
+
+  const targetProductData = await targetProduct.find(query).lean();
+
+
+  
+  // กันกรณี grp_target เป็น undefined/null แล้วทำ flatMap พัง
+  const listGroupM3 = [
+    ...new Set(
+      targetProductData.flatMap(item => item.grp_target ?? [])
+    )
+  ];
 
 
 
+  const productData = await Product.find({ groupCodeM3: { $in: listGroupM3 } }).lean();
+
+  // ใช้ $lt แทน $lte (แนะนำให้กำหนด endOfMonthUTC = วันแรกของเดือนถัดไป 00:00:00Z)
+  const baseFilter = { period };
+  if (area) baseFilter['store.area'] = area;
 
 
-  res.status(200).message({
-    status:200,
-    message:'Sucess',
-    // data:
+
+  const [dataRefund, dataOrderSale, dataOrderChange] = await Promise.all([
+    Refund.aggregate([
+      {
+        $match: {
+          ...baseFilter,
+          type: 'refund',
+          status: { $nin: ['pending', 'canceled', 'reject'] }
+        }
+      }
+    ]),
+    Order.aggregate([
+      {
+        $match: {
+          ...baseFilter,
+          type: 'sale',
+          status: { $nin: ['canceled', 'reject'] }
+        }
+      }
+    ]),
+    Order.aggregate([
+      {
+        $match: {
+          ...baseFilter,
+          type: 'change',
+          status: { $nin: ['pending', 'canceled', 'reject'] }
+        }
+      }
+    ])
+  ]);
+
+  const orderSaleTran = [...dataOrderChange, ...dataOrderSale].flatMap(item =>
+    item.listProduct.map(i => {
+      const productDetail = productData.find(o => o.id === i.id)
+      const factor = productDetail.listUnit.find(o => o.unit === i.unit).factor
+      const factorCtn = productDetail.listUnit.find(o => o.unit === 'CTN').factor
+      const groupM3 = productDetail.groupCodeM3
+      const groupNameM3 = productDetail.groupM3
+      return {
+        ...i,
+        area: item.store.area,
+        groupM3,
+        groupNameM3,
+        qtyPcs: i.qty * factor,
+        factorCtn: factorCtn,
+
+      };
+    })
+  );
+
+
+  const orderSaleTranMerged = Object.values(
+    orderSaleTran.reduce((acc, cur) => {
+      const key = `${cur.id}_${cur.area}`; // ใช้ id + unit เป็น key
+      if (!acc[key]) {
+        acc[key] = { ...cur };
+      } else {
+        acc[key].qty += cur.qty || 0;
+        acc[key].qtyPcs += cur.qtyPcs || 0;
+        acc[key].subtotal += cur.subtotal || 0;
+      }
+      return acc;
+    }, {})
+  );
+
+  const orderSaleTranMergedCtn = orderSaleTranMerged.map(item => {
+    return {
+      ...item,
+      qtyCtn: Math.floor(item.qtyPcs / item.factorCtn)
+    }
+  })
+
+
+
+  let areaList = []
+  if (area) {
+    areaList = [area]
+  } else {
+    areaList = [
+      ...new Set(
+        targetProductData.flatMap(item => item.area ?? [])
+      )
+    ]
+  }
+  // console.log(areaList)
+
+  let data = []
+  for (const i of areaList) {
+    // console.log(i)
+    const orderArea = orderSaleTranMergedCtn.filter(item => item.area === i)
+
+    for (const u of orderArea) {
+
+      const targetDetail = targetProductData.find(item => item.area === i && item.period === period && item.grp_target === u.groupM3)
+      // console.log(u.area)
+      dataTran = {
+        id: targetDetail.id,
+        period: period,
+        area: i,
+        groupCode: u.groupM3,
+        group: u.groupNameM3,
+        targetQty: targetDetail.tg,
+        targetAll: targetDetail.all_amt_target,
+        actualCtn: u.qtyCtn,
+        actual: u.subtotal,
+        unit: 'THB'
+      }
+      data.push(dataTran)
+    }
+  }
+
+  const dataFinal = Object.values(
+    data.reduce((acc, cur) => {
+      const key = `${cur.groupCode}_${cur.area}`; // ใช้ id + unit เป็น key
+      if (!acc[key]) {
+        acc[key] = { ...cur };
+      } else {
+        acc[key].actualCtn += cur.actualCtn || 0;
+        acc[key].actual += cur.actual || 0;
+      }
+      return acc;
+    }, {})
+  );
+
+  const result = dataFinal.map(item => ({
+    id: item.id,
+    period: item.period,        // แก้จาก item.id เป็น item.period (เดาว่าพิมพ์ตก)
+    area: item.area,
+    groupCode: item.groupCode,
+    group: item.group,
+    targetQty: item.targetQty,
+    targetAll: item.targetAll,
+    actualCtn: item.actualCtn ?? 0,
+    actual: to2(item.actual ?? 0),
+    unit: item.unit,
+  }))
+
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'Sucess',
+    data: result
   })
 }
