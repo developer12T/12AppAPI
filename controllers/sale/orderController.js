@@ -5387,7 +5387,7 @@ exports.orderPowerBI = async (req, res) => {
 
 exports.getTargetProduct = async (req, res) => {
 
-  const { period, area } = req.query
+  const { period, area, team } = req.query
   const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const { Order } = getModelsByChannel(channel, res, orderModel)
@@ -5405,7 +5405,7 @@ exports.getTargetProduct = async (req, res) => {
   const targetProductData = await targetProduct.find(query).lean();
 
 
-  
+
   // กันกรณี grp_target เป็น undefined/null แล้วทำ flatMap พัง
   const listGroupM3 = [
     ...new Set(
@@ -5420,20 +5420,42 @@ exports.getTargetProduct = async (req, res) => {
   // ใช้ $lt แทน $lte (แนะนำให้กำหนด endOfMonthUTC = วันแรกของเดือนถัดไป 00:00:00Z)
   const baseFilter = { period };
   if (area) baseFilter['store.area'] = area;
-
+  if (team) baseFilter['team'] = team;
 
 
   const [dataRefund, dataOrderSale, dataOrderChange] = await Promise.all([
     Refund.aggregate([
+      {
+        $addFields: {
+          team3: {
+            $concat: [
+              { $substrCP: ['$store.area', 0, 2] },
+              { $substrCP: ['$store.area', 3, 1] }
+            ]
+          }
+        }
+      }
+      ,
       {
         $match: {
           ...baseFilter,
           type: 'refund',
           status: { $nin: ['pending', 'canceled', 'reject'] }
         }
-      }
+      },
+
     ]),
     Order.aggregate([
+      {
+        $addFields: {
+          team3: {
+            $concat: [
+              { $substrCP: ['$store.area', 0, 2] },
+              { $substrCP: ['$store.area', 3, 1] }
+            ]
+          }
+        }
+      },
       {
         $match: {
           ...baseFilter,
@@ -5443,6 +5465,16 @@ exports.getTargetProduct = async (req, res) => {
       }
     ]),
     Order.aggregate([
+      {
+        $addFields: {
+          team3: {
+            $concat: [
+              { $substrCP: ['$store.area', 0, 2] },
+              { $substrCP: ['$store.area', 3, 1] }
+            ]
+          }
+        }
+      },
       {
         $match: {
           ...baseFilter,
@@ -5548,7 +5580,7 @@ exports.getTargetProduct = async (req, res) => {
 
   const result = dataFinal.map(item => ({
     id: item.id,
-    period: item.period,        // แก้จาก item.id เป็น item.period (เดาว่าพิมพ์ตก)
+    period: item.period,
     area: item.area,
     groupCode: item.groupCode,
     group: item.group,
@@ -5557,7 +5589,24 @@ exports.getTargetProduct = async (req, res) => {
     actualCtn: item.actualCtn ?? 0,
     actual: to2(item.actual ?? 0),
     unit: item.unit,
-  }))
+  }));
+
+  // เรียงตาม area ก่อน แล้ว groupCode ต่อ
+  result.sort((a, b) => {
+    // 1) เทียบ area ก่อน
+    const areaCmp = String(a.area).localeCompare(String(b.area), undefined, {
+      numeric: true,
+      sensitivity: 'base'
+    });
+    if (areaCmp !== 0) return areaCmp;
+
+    // 2) ถ้า area เท่ากัน ค่อยเทียบ groupCode
+    return String(a.groupCode).localeCompare(String(b.groupCode), undefined, {
+      numeric: true,
+      sensitivity: 'base'
+    });
+  });
+
 
 
 
