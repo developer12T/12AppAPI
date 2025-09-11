@@ -955,6 +955,49 @@ exports.routeQueryOne = async function (channel, RouteId) {
 }
 
 
+exports.dataPowerBiQuery = async function (channel) {
+
+  const config = {
+    user: process.env.POWERBI_USER,
+    password: process.env.POWERBI_PASSWORD,
+    server: process.env.POWERBI_HOST,
+    database: process.env.POWERBI_DATABASE,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  };
+  // console.log(RouteId)
+  await sql.connect(config);
+
+  let result = ''
+  if (channel == 'cash') {
+    result = await sql.query`
+SELECT DISTINCT CONO FROM [dbo].[CO_ORDER]
+        `
+  }
+  //   if (channel == 'credit') {
+  //     result = await sql.query`
+
+  // SELECT a.Area AS area, 
+  //                     CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
+  //                     RIGHT(RouteSet, 2) AS day, 
+  //                     CONVERT(nvarchar(6), GETDATE(), 112) AS period, 
+  //                     StoreID AS storeId
+  //              FROM [DATA_OMS].[dbo].[DATA_StoreSet] a
+  //              LEFT JOIN [DATA_OMS].[dbo].[OCUSMA] ON StoreID = OKCUNO COLLATE Latin1_General_BIN
+  //              LEFT JOIN [dbo].[store_credit] b ON StoreID = customerCode
+  //             WHERE a.Channel = '102'
+  //             ORDER BY a.Area, RouteSet
+
+  //     `
+  //   }
+  await sql.close();
+  return result.recordset
+}
+
+
+
 
 
 

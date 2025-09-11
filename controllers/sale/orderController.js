@@ -3,6 +3,7 @@
 // const { User } = require('../../models/cash/user')
 // const { Product } = require('../../models/cash/product')
 // const { Route } = require('../../models/cash/route')
+const { dataPowerBiQuery } = require('../../controllers/queryFromM3/querySctipt')
 const { period, previousPeriod } = require('../../utilities/datetime')
 const axios = require('axios')
 const dayjs = require('dayjs')
@@ -5020,6 +5021,10 @@ exports.orderPowerBI = async (req, res) => {
   const { Refund } = getModelsByChannel(channel, res, refundModel)
   const { Store } = getModelsByChannel(channel, res, storeModel)
 
+  const conoBi = await dataPowerBiQuery(channel)
+  const conoBiList = conoBi.flatMap(item => item.CONO)
+  // console.log(conoBiList)
+
   function yyyymmddToDdMmYyyy(dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
@@ -5239,7 +5244,9 @@ exports.orderPowerBI = async (req, res) => {
     return productIDS
       .filter(p => typeof p?.id === 'string' && p.id.trim() !== '')
       .map(product => {
+        const existPowerBi = conoBiList.find(item => item === order.orderNo)
 
+        if (existPowerBi) return null;
 
         counterOrder++
 
@@ -5332,7 +5339,7 @@ exports.orderPowerBI = async (req, res) => {
           DUO_NAME: order.store.name,
           CUS_TEAM: `${order.store.zone}${store.area.slice(3, 4)}`
         }
-      })
+      }).filter(Boolean)
   })
 
   const allTransactions = [
