@@ -3,7 +3,9 @@
 // const { User } = require('../../models/cash/user')
 // const { Product } = require('../../models/cash/product')
 // const { Route } = require('../../models/cash/route')
-const { dataPowerBiQuery } = require('../../controllers/queryFromM3/querySctipt')
+const {
+  dataPowerBiQuery
+} = require('../../controllers/queryFromM3/querySctipt')
 const { period, previousPeriod } = require('../../utilities/datetime')
 const axios = require('axios')
 const dayjs = require('dayjs')
@@ -209,12 +211,12 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-        .map(item => item.price)
-        .reduce((sum, price) => sum + price, 0)
+          .map(item => item.price)
+          .reduce((sum, price) => sum + price, 0)
       : 0
 
     // ✅ ช่วยฟังก์ชัน: เช็คว่า createAt ตั้งแต่ Aug-2025 ขึ้นไปไหม
-    function isAug2025OrLater(createAt) {
+    function isAug2025OrLater (createAt) {
       if (!createAt) return false
 
       // case: "YYYYMM" เช่น "202508"
@@ -235,14 +237,14 @@ exports.checkout = async (req, res) => {
     // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-        storeData.address,
-        storeData.subDistrict && `ต.${storeData.subDistrict}`,
-        storeData.district && `อ.${storeData.district}`,
-        storeData.province && `จ.${storeData.province}`,
-        storeData.postCode
-      ]
-        .filter(Boolean)
-        .join(' ')
+          storeData.address,
+          storeData.subDistrict && `ต.${storeData.subDistrict}`,
+          storeData.district && `อ.${storeData.district}`,
+          storeData.province && `จ.${storeData.province}`,
+          storeData.postCode
+        ]
+          .filter(Boolean)
+          .join(' ')
       : storeData.address
 
     // const addressFinal = `${storeData.address} ต.${storeData.subDistrict} อ.${storeData.district} จ.${province} ${postCode}`
@@ -890,7 +892,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -1182,7 +1184,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1293,7 +1295,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromChange = modelChange.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1556,7 +1558,7 @@ exports.OrderToExcel = async (req, res) => {
       message: 'Not Found Order'
     })
   }
-  function yyyymmddToDdMmYyyy(dateString) {
+  function yyyymmddToDdMmYyyy (dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -1598,7 +1600,7 @@ exports.OrderToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     }
   )
 
@@ -2618,7 +2620,7 @@ exports.erpApiCheckOrder = async (req, res) => {
 
     // 2. Get pending orderIds ใน MongoDB
     const inMongo = await Order.find({ status: 'pending' }).select('orderId')
-    const inMongoRefund = await Refund.find({ status: 'completed' }).select(
+    const inMongoRefund = await Refund.find({ status: 'approved' }).select(
       'orderId'
     )
     // const inMongoRefund = await Refund.find({ status: 'pending' }).select(
@@ -4494,28 +4496,28 @@ exports.checkOrderCancelM3 = async (req, res) => {
     const type = saleSet.has(id)
       ? 'Sale'
       : refundSet.has(id)
-        ? 'Refund'
-        : changeSet.has(id)
-          ? 'Change'
-          : ''
+      ? 'Refund'
+      : changeSet.has(id)
+      ? 'Change'
+      : ''
 
     const typeId =
       type === 'Sale'
         ? 'A31'
         : type === 'Refund'
-          ? 'A34'
-          : type === 'Change'
-            ? 'B31'
-            : ''
+        ? 'A34'
+        : type === 'Change'
+        ? 'B31'
+        : ''
 
     const statusTablet =
       type === 'Sale'
         ? saleStatusMap.get(id) ?? ''
         : type === 'Refund'
-          ? refundStatusMap.get(id) ?? ''
-          : type === 'Change'
-            ? changeStatusMap.get(id) ?? ''
-            : ''
+        ? refundStatusMap.get(id) ?? ''
+        : type === 'Change'
+        ? changeStatusMap.get(id) ?? ''
+        : ''
 
     return { orderId: id, type, typeId, statusTablet }
   })
@@ -4537,7 +4539,7 @@ exports.checkOrderCancelM3 = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => { })
+    fs.unlink(tempPath, () => {})
   })
 
   // res.status(200).json({
@@ -5025,7 +5027,7 @@ exports.orderPowerBI = async (req, res) => {
   const conoBiList = conoBi.flatMap(item => item.CONO)
   // console.log(conoBiList)
 
-  function yyyymmddToDdMmYyyy(dateString) {
+  function yyyymmddToDdMmYyyy (dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -5042,7 +5044,6 @@ exports.orderPowerBI = async (req, res) => {
     statusArray = ['pending'] // default
   }
 
-
   const startTH = new Date(
     `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
       6,
@@ -5055,7 +5056,6 @@ exports.orderPowerBI = async (req, res) => {
       8
     )}T23:59:59.999+07:00`
   )
-
 
   const modelOrder = await Order.aggregate([
     {
@@ -5091,7 +5091,6 @@ exports.orderPowerBI = async (req, res) => {
     }
   ])
 
-
   const modelChange = await Order.aggregate([
     {
       $match: {
@@ -5125,7 +5124,6 @@ exports.orderPowerBI = async (req, res) => {
       $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
     }
   ])
-
 
   const modelRefund = await Refund.aggregate([
     {
@@ -5167,12 +5165,12 @@ exports.orderPowerBI = async (req, res) => {
       [...modelChange, ...modelOrder]
         .flatMap(it => it.store?.storeId ?? [])
         .filter(Boolean) // ตัด null/undefined/'' ออก
-    ),
-  ];
+    )
+  ]
 
   const storeData = await Store.find({ storeId: { $in: storeIdList } })
 
-  function formatDateToThaiYYYYMMDD(date) {
+  function formatDateToThaiYYYYMMDD (date) {
     const d = new Date(date)
     d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -5183,168 +5181,184 @@ exports.orderPowerBI = async (req, res) => {
     return `${yyyy}${mm}${dd}`
   }
 
-  const tranFromOrder = [...modelOrder, ...modelChange, ...modelRefund].flatMap(order => {
-    const store = storeData.find(i => i.storeId === order.store.storeId)
-    let counterOrder = 0
+  const tranFromOrder = [...modelOrder, ...modelChange, ...modelRefund].flatMap(
+    order => {
+      const store = storeData.find(i => i.storeId === order.store.storeId)
+      let counterOrder = 0
 
-    // console.log(order)
-    // ใช้งาน
-    const RLDT = formatDateToThaiYYYYMMDD(order.createdAt)
+      // console.log(order)
+      // ใช้งาน
+      const RLDT = formatDateToThaiYYYYMMDD(order.createdAt)
 
-    const createdAtDate = `${RLDT.slice(0, 4)}-${RLDT.slice(4, 6)}-${RLDT.slice(6, 8)}`
-    const createdAtDatetime = new Date(new Date(order.createdAt).getTime() + 7 * 3600 * 1000)
-      .toISOString()
-      .replace('Z', ''); // "2025-08-25T14:41:30.582"
+      const createdAtDate = `${RLDT.slice(0, 4)}-${RLDT.slice(
+        4,
+        6
+      )}-${RLDT.slice(6, 8)}`
+      const createdAtDatetime = new Date(
+        new Date(order.createdAt).getTime() + 7 * 3600 * 1000
+      )
+        .toISOString()
+        .replace('Z', '') // "2025-08-25T14:41:30.582"
 
-    const hhmmss = createdAtDatetime.slice(11, 19).replace(/:/g, '');
+      const hhmmss = createdAtDatetime.slice(11, 19).replace(/:/g, '')
 
-
-
-    const listProduct = order.listProduct.map(product => {
-      return {
-        proCode: '',
-        id: product.id,
-        name: product.name,
-        group: product.group,
-        brand: product.brand,
-        size: product.size,
-        flavour: product.flavour,
-        qty: product.qty,
-        unit: product.unit,
-        unitName: product.unitName,
-        price: product.price,
-        subtotal: product.subtotal,
-        discount: product.discount,
-        netTotal: product.netTotal
-      }
-    })
-
-    const listPromotion = order.listPromotions?.flatMap(promo =>
-      promo.listProduct?.map(product => ({
-        proCode: promo.proCode,
-        id: product.id,
-        name: product.name,
-        group: product.group,
-        brand: product.brand,
-        size: product.size,
-        flavour: product.flavour,
-        qty: product.qty,
-        unit: product.unit,
-        unitName: product.unitName,
-        qtyPcs: product.qtyPcs,
-      })) || []
-    ) || [];
-
-    const productIDS = [...listProduct, ...listPromotion].flat()
-
-
-
-
-    // console.log("createdAtDate", createdAtDate)
-    return productIDS
-      .filter(p => typeof p?.id === 'string' && p.id.trim() !== '')
-      .map(product => {
-        const existPowerBi = conoBiList.find(item => item === order.orderNo)
-
-        if (existPowerBi) return null;
-
-        counterOrder++
-
-        const productDetail = productDetails.find(i => product.id === i.id)
-        const factorCtn =
-          productDetail?.listUnit?.find?.(i => i.unit === 'CTN')?.factor ?? 1;
-        const factor =
-          productDetail?.listUnit?.find?.(i => i.unit === product?.unit)?.factor ?? 0;
-        const MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-        const monthName = MONTHS_EN[Number(RLDT.slice(4, 6)) - 1];
-
-        let SALE_FOC = ''
-
-
-        let orderType = ''
-        if (order.type === 'refund') {
-          orderType = 'A34'
-          SALE_FOC = 'CN'
-        } else if (order.type === 'sale') {
-          orderType = 'A31'
-          if (product.proCode) {
-            SALE_FOC = 'FOC'
-          } else {
-            SALE_FOC = 'SALE'
-          }
-        } else if (order.type === 'change') {
-          orderType = 'B31'
-          SALE_FOC = 'CN'
-        }
-
+      const listProduct = order.listProduct.map(product => {
         return {
-          order: order.orderId,
-          ORDER_DATE: createdAtDate,
-          OLINE_DATE: createdAtDate,
-          OOLINE_TIME: createdAtDatetime,
-          COMP_NO: '410',
-          CONO: order?.orderNo || '',
-          RUNNO_BILL: `${counterOrder}`,
-          STATUS_BILL: order?.lowStatus || '11',
-          WHCODE: order.sale.warehouse,
-          ITEM_CODE: product.id,
-          ITEM_NAME: product.name,
-          ITEM_DES: product.name,
-          QTY_USC: factor * product.qty,
-          QTY_PACK: product.qty,
-          UNIT_SHIP: product.unit,
-          PACK_SIZE: factor,
-          AMOUNT_DIS: product?.price || 0,
-          AMOUNT_FULL: product?.price || 0,
-          SUM_AMOUNT: product?.subtotal || 0,
-          SUM_AMOUNT2: product?.subtotal || 0,
-          CUS_CODE: order.store.storeId,
-          RUNNING_NO: '',
-          DUO_CODE: order.store.storeId,
-          CREATE_DATE: RLDT,
-          CREATE_TIME: hhmmss,
-          CO_TYPE: product.proCode,
-          DARIVERY_DATE: RLDT,
-          IMPORT_TYPE: 'MVXSECOFR',
-          CHANNEL: '103',
-          SALE_FOC: SALE_FOC,
-          CO_MONTH: monthName,
-          CO_YEAR: RLDT.slice(0, 4),
-          MT_ID: '',
-          SALE_CODE: order.sale.saleCode,
-          OOTYPE: orderType,
-          GROUP_TYPE: productDetail.groupCodeM3,
-          BRAND: productDetail.brandCode,
-          FLAVOUR: product.flavourCode,
-          CUS_NAME: order.store.name,
-          CUS_DESCRIPTION: order.store.name,
-          PROVINCE: store.province,
-          DISTRICT: store.district,
-          SHOP_TYPE: store.typeName,
-          CUS_AREA: store.area,
-          CUS_ZONE: store.zone,
-          PROVINCE_ZONE: store.zone,
-          PROVINCE_CODE: store.postCode,
-          QTY_CTN: factorCtn,
-          QTY: to2(factor / factorCtn),
-          REMAIN_QTY: 0,
-          SALE_PLAYER: order.store.salePayer,
-          SYS_STATUS: 'Y',
-          MODIFY_DATE: '',
-          FOC_AMOUNT: 0,
-          ROUTE_ID: order.shipping?.shippingId || '',
-          ROUTE_NAME: "",
-          SHIPPING_PROVINCE: order.shipping?.postCode || '',
-          SHIPPING_NAME: order.shipping?.province || '',
-          DUO_NAME: order.store.name,
-          CUS_TEAM: `${order.store.zone}${store.area.slice(3, 4)}`
+          proCode: '',
+          id: product.id,
+          name: product.name,
+          group: product.group,
+          brand: product.brand,
+          size: product.size,
+          flavour: product.flavour,
+          qty: product.qty,
+          unit: product.unit,
+          unitName: product.unitName,
+          price: product.price,
+          subtotal: product.subtotal,
+          discount: product.discount,
+          netTotal: product.netTotal
         }
-      }).filter(Boolean)
-  })
+      })
 
-  const allTransactions = [
-    ...tranFromOrder
-  ]
+      const listPromotion =
+        order.listPromotions?.flatMap(
+          promo =>
+            promo.listProduct?.map(product => ({
+              proCode: promo.proCode,
+              id: product.id,
+              name: product.name,
+              group: product.group,
+              brand: product.brand,
+              size: product.size,
+              flavour: product.flavour,
+              qty: product.qty,
+              unit: product.unit,
+              unitName: product.unitName,
+              qtyPcs: product.qtyPcs
+            })) || []
+        ) || []
+
+      const productIDS = [...listProduct, ...listPromotion].flat()
+
+      // console.log("createdAtDate", createdAtDate)
+      return productIDS
+        .filter(p => typeof p?.id === 'string' && p.id.trim() !== '')
+        .map(product => {
+          const existPowerBi = conoBiList.find(item => item === order.orderNo)
+
+          if (existPowerBi) return null
+
+          counterOrder++
+
+          const productDetail = productDetails.find(i => product.id === i.id)
+          const factorCtn =
+            productDetail?.listUnit?.find?.(i => i.unit === 'CTN')?.factor ?? 1
+          const factor =
+            productDetail?.listUnit?.find?.(i => i.unit === product?.unit)
+              ?.factor ?? 0
+          const MONTHS_EN = [
+            'January',
+            'February',
+            'March',
+            'April',
+            'May',
+            'June',
+            'July',
+            'August',
+            'September',
+            'October',
+            'November',
+            'December'
+          ]
+          const monthName = MONTHS_EN[Number(RLDT.slice(4, 6)) - 1]
+
+          let SALE_FOC = ''
+
+          let orderType = ''
+          if (order.type === 'refund') {
+            orderType = 'A34'
+            SALE_FOC = 'CN'
+          } else if (order.type === 'sale') {
+            orderType = 'A31'
+            if (product.proCode) {
+              SALE_FOC = 'FOC'
+            } else {
+              SALE_FOC = 'SALE'
+            }
+          } else if (order.type === 'change') {
+            orderType = 'B31'
+            SALE_FOC = 'CN'
+          }
+
+          return {
+            order: order.orderId,
+            ORDER_DATE: createdAtDate,
+            OLINE_DATE: createdAtDate,
+            OOLINE_TIME: createdAtDatetime,
+            COMP_NO: '410',
+            CONO: order?.orderNo || '',
+            RUNNO_BILL: `${counterOrder}`,
+            STATUS_BILL: order?.lowStatus || '11',
+            WHCODE: order.sale.warehouse,
+            ITEM_CODE: product.id,
+            ITEM_NAME: product.name,
+            ITEM_DES: product.name,
+            QTY_USC: factor * product.qty,
+            QTY_PACK: product.qty,
+            UNIT_SHIP: product.unit,
+            PACK_SIZE: factor,
+            AMOUNT_DIS: product?.price || 0,
+            AMOUNT_FULL: product?.price || 0,
+            SUM_AMOUNT: product?.subtotal || 0,
+            SUM_AMOUNT2: product?.subtotal || 0,
+            CUS_CODE: order.store.storeId,
+            RUNNING_NO: '',
+            DUO_CODE: order.store.storeId,
+            CREATE_DATE: RLDT,
+            CREATE_TIME: hhmmss,
+            CO_TYPE: product.proCode,
+            DARIVERY_DATE: RLDT,
+            IMPORT_TYPE: 'MVXSECOFR',
+            CHANNEL: '103',
+            SALE_FOC: SALE_FOC,
+            CO_MONTH: monthName,
+            CO_YEAR: RLDT.slice(0, 4),
+            MT_ID: '',
+            SALE_CODE: order.sale.saleCode,
+            OOTYPE: orderType,
+            GROUP_TYPE: productDetail.groupCodeM3,
+            BRAND: productDetail.brandCode,
+            FLAVOUR: product.flavourCode,
+            CUS_NAME: order.store.name,
+            CUS_DESCRIPTION: order.store.name,
+            PROVINCE: store.province,
+            DISTRICT: store.district,
+            SHOP_TYPE: store.typeName,
+            CUS_AREA: store.area,
+            CUS_ZONE: store.zone,
+            PROVINCE_ZONE: store.zone,
+            PROVINCE_CODE: store.postCode,
+            QTY_CTN: factorCtn,
+            QTY: to2(factor / factorCtn),
+            REMAIN_QTY: 0,
+            SALE_PLAYER: order.store.salePayer,
+            SYS_STATUS: 'Y',
+            MODIFY_DATE: '',
+            FOC_AMOUNT: 0,
+            ROUTE_ID: order.shipping?.shippingId || '',
+            ROUTE_NAME: '',
+            SHIPPING_PROVINCE: order.shipping?.postCode || '',
+            SHIPPING_NAME: order.shipping?.province || '',
+            DUO_NAME: order.store.name,
+            CUS_TEAM: `${order.store.zone}${store.area.slice(3, 4)}`
+          }
+        })
+        .filter(Boolean)
+    }
+  )
+
+  const allTransactions = [...tranFromOrder]
 
   if (excel == 'true') {
     const wb = xlsx.utils.book_new()
@@ -5357,13 +5371,17 @@ exports.orderPowerBI = async (req, res) => {
 
     const tempPath = path.join(
       os.tmpdir(),
-      `powerBi${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}.xlsx`
+      `powerBi${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(
+        endDate
+      )}.xlsx`
     )
     xlsx.writeFile(wb, tempPath)
 
     res.download(
       tempPath,
-      `powerBi${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}.xlsx`,
+      `powerBi${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(
+        endDate
+      )}.xlsx`,
       err => {
         if (err) {
           console.error('❌ Download error:', err)
@@ -5374,26 +5392,57 @@ exports.orderPowerBI = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       }
     )
-
   } else {
-
     return res.status(200).json({
       status: 200,
       message: 'Sucess',
       data: [...tranFromOrder]
     })
+  }
+}
+exports.productOrderToExcel = async (req, res) => {
+  const { channel } = req.query
+  let { startDate, endDate } = req.query
 
+  let statusArray = (req.query.status || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
 
+  if (statusArray.length === 0) {
+    statusArray = ['pending'] // default
   }
 
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+
+  if (!/^\d{8}$/.test(startDate)) {
+    const nowTH = new Date(
+      new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })
+    )
+    const y = nowTH.getFullYear()
+    const m = String(nowTH.getMonth() + 1).padStart(2, '0')
+    const d = String(nowTH.getDate()).padStart(2, '0') // ← ใช้ getDate() ไม่ใช่ getDay()
+    startDate = `${y}${m}${d}` // YYYYMMDD
+    endDate = `${y}${m}${d}` // YYYYMMDD
+  }
+  const startTH = new Date(
+    `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
+      6,
+      8
+    )}T00:00:00+07:00`
+  )
+  const endTH = new Date(
+    `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(
+      6,
+      8
+    )}T23:59:59.999+07:00`
+  )
 }
 
-
 exports.getTargetProduct = async (req, res) => {
-
   const { period, area, team, zone } = req.query
   const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
@@ -5406,26 +5455,22 @@ exports.getTargetProduct = async (req, res) => {
   const { Target } = getModelsByChannel(channel, res, targetModel)
   const { targetProduct } = getModelsByChannel(channel, res, targetProductModel)
 
-  const query = { period };
-  if (area) query.area = area;
+  const query = { period }
+  if (area) query.area = area
 
-  const targetProductData = await targetProduct.find(query).lean();
-
-
+  const targetProductData = await targetProduct.find(query).lean()
 
   // กันกรณี grp_target เป็น undefined/null แล้วทำ flatMap พัง
   const listGroupM3 = [
-    ...new Set(
-      targetProductData.flatMap(item => item.grp_target ?? [])
-    )
-  ];
+    ...new Set(targetProductData.flatMap(item => item.grp_target ?? []))
+  ]
 
-
-
-  const productData = await Product.find({ groupCodeM3: { $in: listGroupM3 } }).lean();
+  const productData = await Product.find({
+    groupCodeM3: { $in: listGroupM3 }
+  }).lean()
 
   // ใช้ $lt แทน $lte (แนะนำให้กำหนด endOfMonthUTC = วันแรกของเดือนถัดไป 00:00:00Z)
-  const baseFilter = { period };
+  const baseFilter = { period }
 
   if (area) baseFilter['store.area'] = area
 
@@ -5446,8 +5491,7 @@ exports.getTargetProduct = async (req, res) => {
             ]
           }
         }
-      }
-      ,
+      },
       {
         $match: {
           ...baseFilter,
@@ -5456,8 +5500,7 @@ exports.getTargetProduct = async (req, res) => {
           type: 'refund',
           status: { $nin: ['pending', 'canceled', 'reject'] }
         }
-      },
-
+      }
     ]),
     Order.aggregate([
       {
@@ -5501,13 +5544,15 @@ exports.getTargetProduct = async (req, res) => {
         }
       }
     ])
-  ]);
+  ])
 
   const orderSaleTran = [...dataOrderChange, ...dataOrderSale].flatMap(item =>
     item.listProduct.map(i => {
       const productDetail = productData.find(o => o.id === i.id)
       const factor = productDetail.listUnit.find(o => o.unit === i.unit).factor
-      const factorCtn = productDetail.listUnit.find(o => o.unit === 'CTN').factor
+      const factorCtn = productDetail.listUnit.find(
+        o => o.unit === 'CTN'
+      ).factor
       const groupM3 = productDetail.groupCodeM3
       const groupNameM3 = productDetail.groupM3
       return {
@@ -5516,26 +5561,24 @@ exports.getTargetProduct = async (req, res) => {
         groupM3,
         groupNameM3,
         qtyPcs: i.qty * factor,
-        factorCtn: factorCtn,
-
-      };
+        factorCtn: factorCtn
+      }
     })
-  );
-
+  )
 
   const orderSaleTranMerged = Object.values(
     orderSaleTran.reduce((acc, cur) => {
-      const key = `${cur.id}_${cur.area}`; // ใช้ id + unit เป็น key
+      const key = `${cur.id}_${cur.area}` // ใช้ id + unit เป็น key
       if (!acc[key]) {
-        acc[key] = { ...cur };
+        acc[key] = { ...cur }
       } else {
-        acc[key].qty += cur.qty || 0;
-        acc[key].qtyPcs += cur.qtyPcs || 0;
-        acc[key].subtotal += cur.subtotal || 0;
+        acc[key].qty += cur.qty || 0
+        acc[key].qtyPcs += cur.qtyPcs || 0
+        acc[key].subtotal += cur.subtotal || 0
       }
-      return acc;
+      return acc
     }, {})
-  );
+  )
 
   const orderSaleTranMergedCtn = orderSaleTranMerged.map(item => {
     return {
@@ -5544,17 +5587,11 @@ exports.getTargetProduct = async (req, res) => {
     }
   })
 
-
-
   let areaList = []
   if (area) {
     areaList = [area]
   } else {
-    areaList = [
-      ...new Set(
-        targetProductData.flatMap(item => item.area ?? [])
-      )
-    ]
+    areaList = [...new Set(targetProductData.flatMap(item => item.area ?? []))]
   }
   // console.log(areaList)
 
@@ -5564,8 +5601,12 @@ exports.getTargetProduct = async (req, res) => {
     const orderArea = orderSaleTranMergedCtn.filter(item => item.area === i)
 
     for (const u of orderArea) {
-
-      const targetDetail = targetProductData.find(item => item.area === i && item.period === period && item.grp_target === u.groupM3)
+      const targetDetail = targetProductData.find(
+        item =>
+          item.area === i &&
+          item.period === period &&
+          item.grp_target === u.groupM3
+      )
       // console.log(u.area)
       dataTran = {
         id: targetDetail.id,
@@ -5585,16 +5626,16 @@ exports.getTargetProduct = async (req, res) => {
 
   const dataFinal = Object.values(
     data.reduce((acc, cur) => {
-      const key = `${cur.groupCode}_${cur.area}`; // ใช้ id + unit เป็น key
+      const key = `${cur.groupCode}_${cur.area}` // ใช้ id + unit เป็น key
       if (!acc[key]) {
-        acc[key] = { ...cur };
+        acc[key] = { ...cur }
       } else {
-        acc[key].actualCtn += cur.actualCtn || 0;
-        acc[key].actual += cur.actual || 0;
+        acc[key].actualCtn += cur.actualCtn || 0
+        acc[key].actual += cur.actual || 0
       }
-      return acc;
+      return acc
     }, {})
-  );
+  )
 
   const result = dataFinal.map(item => ({
     id: item.id,
@@ -5606,8 +5647,8 @@ exports.getTargetProduct = async (req, res) => {
     targetAll: item.targetAll,
     actualCtn: item.actualCtn ?? 0,
     actual: to2(item.actual ?? 0),
-    unit: item.unit,
-  }));
+    unit: item.unit
+  }))
 
   // เรียงตาม area ก่อน แล้ว groupCode ต่อ
   result.sort((a, b) => {
@@ -5615,18 +5656,15 @@ exports.getTargetProduct = async (req, res) => {
     const areaCmp = String(a.area).localeCompare(String(b.area), undefined, {
       numeric: true,
       sensitivity: 'base'
-    });
-    if (areaCmp !== 0) return areaCmp;
+    })
+    if (areaCmp !== 0) return areaCmp
 
     // 2) ถ้า area เท่ากัน ค่อยเทียบ groupCode
     return String(a.groupCode).localeCompare(String(b.groupCode), undefined, {
       numeric: true,
       sensitivity: 'base'
-    });
-  });
-
-
-
+    })
+  })
 
   res.status(200).json({
     status: 200,

@@ -49,7 +49,7 @@ exports.getRoute = async (req, res) => {
       'storeId name address typeName taxId tel'
     )
 
-    // console.log(routes)
+    console.log(routes)
 
     const filteredRoutes = routes
       .map(route => {
@@ -59,6 +59,7 @@ exports.getRoute = async (req, res) => {
           const matchDistrict = district
             ? addr.includes(district.toLowerCase())
             : true
+
           const matchProvince = province
             ? addr.includes(province.toLowerCase())
             : true
@@ -69,7 +70,7 @@ exports.getRoute = async (req, res) => {
 
           return matchDistrict && matchProvince && matchStoreId
         })
-        // console.log(route)
+        console.log(route)
         return {
           ...route.toObject(),
           listStore: filteredListStore
@@ -115,12 +116,17 @@ exports.getRoute = async (req, res) => {
 
     // console.log(enrichedRoutes)
 
-    if (area && period && !routeId && !storeId) {
+    if (area && period && !routeId && !storeId && !province) {
       enrichedRoutes = (enrichedRoutes || []).map(item => ({
         ...item,
         listStore: []
-      }));
+      }))
     }
+
+    // enrichedRoutes = (enrichedRoutes || []).map(item => ({
+    //   ...item,
+    //   listStore: []
+    // }))
 
     // }
     // const io = getSocket()
@@ -2084,7 +2090,7 @@ exports.checkRouteStore = async (req, res) => {
       areaMap[area].del = storeCountMap[area]?.del || 0
     }
 
-    function sortKeys(obj) {
+    function sortKeys (obj) {
       const { area, R, del, ...days } = obj
       const sortedDays = Object.keys(days)
         .filter(k => /^R\d+$/.test(k))
@@ -2146,20 +2152,20 @@ exports.polylineRoute = async (req, res) => {
           $addFields: {
             listStore: {
               $filter: {
-                input: "$listStore",
-                as: "s",
+                input: '$listStore',
+                as: 's',
                 cond: {
                   $and: [
-                    { $gte: ["$$s.date", startTH] },
-                    { $lt: ["$$s.date", endTH] }
+                    { $gte: ['$$s.date', startTH] },
+                    { $lt: ['$$s.date', endTH] }
                   ]
                 }
               }
             }
           }
         },
-        { $match: { "listStore.0": { $exists: true } } }
-      );
+        { $match: { 'listStore.0': { $exists: true } } }
+      )
     }
 
     // const dataRoute = await Route.find({ area, period })
@@ -2217,21 +2223,18 @@ exports.polylineRoute = async (req, res) => {
   }
 }
 
-
 exports.addRouteIt = async (req, res) => {
-
   const { period } = req.body
   const channel = req.headers['x-channel']
   const { Route } = getModelsByChannel(channel, res, routeModel)
   const { Store } = getModelsByChannel(channel, res, storeModel)
 
-  const dataStore = await Store.find({ area: "IT211", status: { $ne: '90' } })
-
+  const dataStore = await Store.find({ area: 'IT211', status: { $ne: '90' } })
 
   let route = []
 
   for (let i = 1; i <= 25; i++) {
-    const idx2 = String(i).padStart(2, '0'); // "01".."25"
+    const idx2 = String(i).padStart(2, '0') // "01".."25"
     const data = {
       id: `${period}IT211R${idx2}`,
       period: period,
@@ -2250,7 +2253,7 @@ exports.addRouteIt = async (req, res) => {
           date: ''
         }
       })
-    };
+    }
     route.push(data)
   }
 
@@ -2261,12 +2264,9 @@ exports.addRouteIt = async (req, res) => {
     message: 'sucess',
     data: route
   })
-
 }
 
-
 exports.addStoreOneToRoute = async (req, res) => {
-
   const { storeId, routeId } = req.body
   const channel = req.headers['x-channel']
   const { Route } = getModelsByChannel(channel, res, routeModel)
@@ -2274,12 +2274,10 @@ exports.addStoreOneToRoute = async (req, res) => {
 
   const storeData = await Store.findOne({ storeId: storeId })
 
-
-
   for (const i of routeId) {
     const routeData = await Route.findOne({ id: i }) // ถ้า id เป็น unique
 
-    if (!routeData) continue; // ตรวจสอบว่ามีข้อมูลจริง
+    if (!routeData) continue // ตรวจสอบว่ามีข้อมูลจริง
 
     const newData = {
       storeInfo: storeData._id,
@@ -2298,13 +2296,9 @@ exports.addStoreOneToRoute = async (req, res) => {
     await routeData.save() // สำคัญ: บันทึกกลับเข้า MongoDB
   }
 
-
-
-
-
   res.status(200).json({
     status: 200,
-    message: 'sucess',
+    message: 'sucess'
     // data: newData
   })
 }
