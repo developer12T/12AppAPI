@@ -570,7 +570,7 @@ exports.getOrder = async (req, res) => {
     let query = {
       ...areaQuery,
       ...(period ? { period } : {}),
-      withdrawType: { $ne: 'credit' },
+      // withdrawType: { $ne: 'credit' },
       createdAt: { $gte: startDate, $lt: endDate },
       ...statusQuery
     }
