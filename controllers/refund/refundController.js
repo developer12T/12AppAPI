@@ -460,6 +460,7 @@ exports.checkout = async (req, res) => {
 exports.refundExcel = async (req, res) => {
   const { channel } = req.query
   let { startDate, endDate } = req.query
+  const { area, team, zone } = req.query
 
   let statusArray = (req.query.status || '')
     .split(',')
@@ -467,8 +468,10 @@ exports.refundExcel = async (req, res) => {
     .filter(Boolean)
 
   if (statusArray.length === 0) {
-    statusArray = ['pending'] // default
+    statusArray = ['pending', 'approved'] // default
   }
+
+  console.log(statusArray)
 
   const { Order } = getModelsByChannel(channel, res, orderModel)
   const { Refund } = getModelsByChannel(channel, res, refundModel)
@@ -483,6 +486,7 @@ exports.refundExcel = async (req, res) => {
     startDate = `${y}${m}${d}` // YYYYMMDD
     endDate = `${y}${m}${d}` // YYYYMMDD
   }
+
   const startTH = new Date(
     `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
       6,
@@ -496,48 +500,38 @@ exports.refundExcel = async (req, res) => {
     )}T23:59:59.999+07:00`
   )
 
-  const modelChange = await Order.aggregate([
-    {
-      $match: {
-        'store.area': { $ne: 'IT211' },
-        // 'store.area': 'NE211',
-        status: { $in: statusArray },
-        status: { $nin: ['canceled', 'pending'] },
-        type: { $in: ['change'] }
-      }
+  let queryRefund = {
+    createdAt: {
+      $gte: startTH,
+      $lte: endTH
     },
-    {
-      $addFields: {
-        createdAtThai: {
-          $dateAdd: {
-            startDate: '$createdAt',
-            unit: 'hour',
-            amount: 7
-          }
-        }
-      }
-    },
-    {
-      $match: {
-        createdAt: {
-          $gte: startTH,
-          $lte: endTH
-        }
-      }
-    },
-    {
-      $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
-    }
-  ])
+    status: { $nin: ['canceled', 'reject'] },
+    status: { $in: statusArray },
+    'store.area': { $ne: 'IT211' }
+  }
 
-  const modelRefund = await Refund.aggregate([
+  let queryChange = {
+    createdAt: {
+      $gte: startTH,
+      $lte: endTH
+    },
+    'store.area': { $ne: 'IT211' },
+    status: { $in: statusArray },
+    status: { $nin: ['canceled', 'reject'] },
+    type: { $in: ['change'] }
+  }
+
+  if (area) {
+    queryRefund['store.area'] = area
+    queryChange['store.area'] = area
+  } else if (zone) {
+    queryRefund['store.area'] = { $regex: `^${zone}`, $options: 'i' }
+    queryChange['store.area'] = { $regex: `^${zone}`, $options: 'i' }
+  }
+
+  const pipelineChange = [
     {
-      $match: {
-        status: { $in: statusArray },
-        status: { $nin: ['canceled', 'reject', 'pending'] },
-        'store.area': { $ne: 'IT211' }
-        // 'store.area': 'NE211'
-      }
+      $match: queryChange
     },
     {
       $addFields: {
@@ -547,21 +541,66 @@ exports.refundExcel = async (req, res) => {
             unit: 'hour',
             amount: 7
           }
+        },
+        team3: {
+          $concat: [
+            { $substrCP: ['$store.area', 0, 2] },
+            { $substrCP: ['$store.area', 3, 1] }
+          ]
         }
       }
     },
+
     {
-      $match: {
-        createdAt: {
-          $gte: startTH,
-          $lte: endTH
+      $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
+    }
+  ]
+
+  const pipelineRefund = [
+    {
+      $match: queryRefund
+    },
+    {
+      $addFields: {
+        createdAtThai: {
+          $dateAdd: {
+            startDate: '$createdAt',
+            unit: 'hour',
+            amount: 7
+          }
+        },
+        team3: {
+          $concat: [
+            { $substrCP: ['$store.area', 0, 2] },
+            { $substrCP: ['$store.area', 3, 1] }
+          ]
         }
       }
     },
     {
       $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
     }
-  ])
+  ]
+
+  if (team) {
+    pipelineChange.push({
+      $match: {
+        team3: { $regex: `^${team}`, $options: 'i' }
+      }
+    })
+    pipelineRefund.push({
+      $match: {
+        team3: { $regex: `^${team}`, $options: 'i' }
+      }
+    })
+  }
+
+  const modelChange = await Order.aggregate(pipelineChange)
+  const modelRefund = await Refund.aggregate(pipelineRefund)
+
+  // console.log(modelChange)
+  console.log(modelRefund)
+  // console.log()
 
   const tranFromChange = modelChange.flatMap(order => {
     let counterOrder = 0
@@ -876,15 +915,16 @@ exports.getRefund = async (req, res) => {
     if (start && end) {
       // ตัด string แล้ว parse เป็น Date
       startDate = new Date(
-        start.substring(0, 4), // year: 2025
-        parseInt(start.substring(4, 6), 10) - 1, // month: 08 → index 7
-        start.substring(6, 8) // day: 01
+        `${start.slice(0, 4)}-${start.slice(4, 6)}-${start.slice(
+          6,
+          8
+        )}T00:00:00+07:00`
       )
-
       endDate = new Date(
-        end.substring(0, 4), // year: 2025
-        parseInt(end.substring(4, 6), 10) - 1, // month: 08 → index 7
-        end.substring(6, 8) // day: 01
+        `${end.slice(0, 4)}-${end.slice(4, 6)}-${end.slice(
+          6,
+          8
+        )}T23:59:59.999+07:00`
       )
     } else if (period) {
       const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว

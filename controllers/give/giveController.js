@@ -31,6 +31,7 @@ const { uploadFiles } = require('../../utilities/upload')
 const xlsx = require('xlsx')
 const os = require('os')
 const fs = require('fs')
+const { pipeline } = require('stream')
 
 exports.addGiveType = async (req, res) => {
   try {
@@ -448,16 +449,29 @@ exports.getOrder = async (req, res) => {
 
     if (start && end) {
       // ตัด string แล้ว parse เป็น Date
-      startDate = new Date(
-        start.substring(0, 4), // year: 2025
-        parseInt(start.substring(4, 6), 10) - 1, // month: 08 → index 7
-        start.substring(6, 8) // day: 01
-      )
+      // startDate = new Date(
+      //   start.substring(0, 4), // year: 2025
+      //   parseInt(start.substring(4, 6), 10) - 1, // month: 08 → index 7
+      //   start.substring(6, 8) // day: 01
+      // )
 
+      // endDate = new Date(
+      //   end.substring(0, 4), // year: 2025
+      //   parseInt(end.substring(4, 6), 10) - 1, // month: 08 → index 7
+      //   end.substring(6, 8) // day: 01
+      // )
+
+      startDate = new Date(
+        `${start.slice(0, 4)}-${start.slice(4, 6)}-${start.slice(
+          6,
+          8
+        )}T00:00:00+07:00`
+      )
       endDate = new Date(
-        end.substring(0, 4), // year: 2025
-        parseInt(end.substring(4, 6), 10) - 1, // month: 08 → index 7
-        end.substring(6, 8) // day: 01
+        `${end.slice(0, 4)}-${end.slice(4, 6)}-${end.slice(
+          6,
+          8
+        )}T23:59:59.999+07:00`
       )
     } else if (period) {
       const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
@@ -845,7 +859,7 @@ exports.updateStatus = async (req, res) => {
 }
 
 exports.giveToExcel = async (req, res) => {
-  const { channel, startDate, endDate, giveName } = req.query
+  const { channel, startDate, endDate, giveName, area, team, zone } = req.query
 
   // console.log(channel, date)
   let statusArray = (req.query.status || '')
@@ -907,7 +921,11 @@ exports.giveToExcel = async (req, res) => {
     }
   }
 
-  // console.log(giveName)
+  if (area) {
+    query['store.area'] = area
+  } else if (zone) {
+    query['store.area'] = { $regex: `^${zone}`, $options: 'i' }
+  }
 
   if (giveName) {
     query['giveInfo.name'] = giveName
@@ -915,19 +933,10 @@ exports.giveToExcel = async (req, res) => {
 
   console.log(query)
 
-  const giveOrder = await Giveaway.aggregate([
+  const pipeline = [
     {
       $match: query
     },
-    // {
-    //   $match: {
-    //     status: { $nin: ['canceled', 'competed'] },
-    //     status: { $in: statusArray },
-    //     type: { $in: ['give'] },
-    //     'store.area': { $ne: 'IT211' }
-    //     // 'store.area': 'NE211'
-    //   }
-    // },
     {
       $addFields: {
         createdAtThai: {
@@ -936,13 +945,30 @@ exports.giveToExcel = async (req, res) => {
             unit: 'hour',
             amount: 7
           }
+        },
+        team3: {
+          $concat: [
+            { $substrCP: ['$store.area', 0, 2] },
+            { $substrCP: ['$store.area', 3, 1] }
+          ]
         }
       }
-    },
-    {
-      $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
     }
-  ])
+  ]
+
+  if (team) {
+    pipeline.push({
+      $match: {
+        team3: { $regex: `^${team}`, $options: 'i' }
+      }
+    })
+  }
+
+  // pipeline.push({
+  //   $sort: { statusASC: 1, createdAt: -1 }
+  // })
+
+  const giveOrder = await Giveaway.aggregate(pipeline)
 
   function formatDateToThaiYYYYMMDD (date) {
     const d = new Date(date)
