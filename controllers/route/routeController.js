@@ -49,7 +49,7 @@ exports.getRoute = async (req, res) => {
       'storeId name address typeName taxId tel'
     )
 
-    console.log(routes)
+    // console.log(routes)
 
     const filteredRoutes = routes
       .map(route => {
@@ -70,7 +70,7 @@ exports.getRoute = async (req, res) => {
 
           return matchDistrict && matchProvince && matchStoreId
         })
-        console.log(route)
+        // console.log(route)
         return {
           ...route.toObject(),
           listStore: filteredListStore
@@ -176,8 +176,8 @@ exports.addFromERP = async (req, res) => {
     const latestRoute = route.sort((a, b) => b.id.localeCompare(a.id))[0]
     if (!latestRoute) {
       routeId = `${period()}${response.data.area}R01`
-      console.log('route', routeId)
-      console.log('period', period())
+      // console.log('route', routeId)
+      // console.log('period', period())
     } else {
       const prefix = latestRoute.id.slice(0, 6)
       const subfix = (parseInt(latestRoute.id.slice(7)) + 1)
@@ -323,8 +323,8 @@ exports.addFromERPnew = async (req, res) => {
     const latestRoute = route.sort((a, b) => b.id.localeCompare(a.id))[0]
     if (!latestRoute) {
       routeId = `${period}${return_arr.area}R01`
-      console.log('route', routeId)
-      console.log('period', period)
+      // console.log('route', routeId)
+      // console.log('period', period)
     } else {
       const prefix = latestRoute.id.slice(0, 6)
       const subfix = (parseInt(latestRoute.id.slice(7)) + 1)
@@ -1414,8 +1414,8 @@ exports.updateAndAddRoute = async (req, res) => {
 
   if (!latestRoute) {
     routeId = `${period()}${response.data.area}R01`
-    console.log('route', routeId)
-    console.log('period', period())
+    // console.log('route', routeId)
+    // console.log('period', period())
   } else {
     const prefix = latestRoute.id.slice(0, 6)
     const subfix = (parseInt(latestRoute.id.slice(7)) + 1)
@@ -1456,7 +1456,7 @@ exports.updateAndAddRoute = async (req, res) => {
       }
 
       await existingRoute.save()
-      console.log('existingRoute')
+      // console.log('existingRoute')
     } else {
       const listStore = []
 

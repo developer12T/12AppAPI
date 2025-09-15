@@ -60,6 +60,7 @@ const path = require('path')
 const os = require('os')
 const fs = require('fs')
 const target = require('../../models/cash/target')
+const product = require('../../models/cash/product')
 
 const orderTimestamps = {}
 
@@ -5104,7 +5105,7 @@ exports.orderPowerBI = async (req, res) => {
   const day = String(thailand.getDate()).padStart(2, '0')
   const currentDate = `${year}${month}${day}`
 
-  const channel = req.headers['x-channel']
+  const channel = 'cash'
   const { Order } = getModelsByChannel(channel, res, orderModel)
   const { Product } = getModelsByChannel(channel, res, productModel)
   const { Refund } = getModelsByChannel(channel, res, refundModel)
@@ -5763,7 +5764,8 @@ exports.getTargetProduct = async (req, res) => {
 }
 
 exports.getOrderExcelNew = async (req, res) => {
-  const { period, area, team, zone } = req.query
+
+  const { period, area, team, zone, excel } = req.query
   const channel = req.headers['x-channel']
 
   const { Order } = getModelsByChannel(channel, res, orderModel)
@@ -5826,20 +5828,119 @@ exports.getOrderExcelNew = async (req, res) => {
 
   let data = []
 
+  const productIds = [
+    ...new Set(
+      [...dataOrderSale, ...dataOrderChange]
+        .flatMap(item => item.listProduct?.map(i => i.id) ?? [])
+        .filter(Boolean) // ตัด null/undefined/'' ทิ้ง
+    )
+  ];
+
+
+  const productData = await Product.find({ id: { $in: productIds } })
+
   for (const i of [...dataOrderSale, ...dataOrderChange]) {
-    for (const item of i.listProduct ?? []) {
+    for (const item of (i.listProduct ?? [])) {
+
+      const productDetail = productData.find(o => o.id === item.id)
+      const unitCtn = productDetail.listUnit.find(o => o.unit === 'CTN');
+      const unitBag = productDetail.listUnit.find(
+        o => o.unit === 'BAG' || o.unit === 'PAC'
+      );
+      const unitPcs = productDetail.listUnit.find(
+        o => o.unit === 'BOT' || o.unit === 'PCS'
+      );
+
+      let ctnQty = 0
+      let ctnPrice = 0
+      let bagQty = 0
+      let bagPrice = 0
+      let pcsQty = 0
+      let pcsPrice = 0
+
+
+      if (item.unit === 'CTN') {
+        // logic สำหรับ CTN
+        ctnQty = item.qty
+        ctnPrice = item.price
+        factor = unitCtn.factor
+      } else if (item.unit === 'BAG' || item.unit === 'PAC') {
+        // logic สำหรับ BAG หรือ PAC
+        bagQty = item.qty
+        bagPrice = item.price
+        factor = unitBag.factor
+      } else if (item.unit === 'BOT' || item.unit === 'PCS') {
+        // logic สำหรับ BOT หรือ PCS
+        pcsQty = item.qty
+        pcsPrice = item.price
+        factor = unitPcs.factor
+      }
+
+
+
+
+
+      // console.log(productDetail.listUnit[1].unit)
+
       const dataTran = {
         orderId: i.orderId,
         productId: item.id,
-        productName: item.name
-      }
-      data.push(dataTran)
+        productName: item.name,
+        ctnQty,
+        ctnPrice,
+        bagQty,
+        bagPrice,
+        pcsQty,
+        pcsPrice,
+        sumPrice: item.subtotal,
+        sumPcs: factor * item.qty
+
+      };
+      data.push(dataTran);
     }
   }
 
-  res.status(200).json({
-    status: 200,
-    message: 'Sucess',
-    data: data
-  })
+
+  if (excel == 'true') {
+    const wb = xlsx.utils.book_new()
+    const ws = xlsx.utils.json_to_sheet(data)
+    xlsx.utils.book_append_sheet(
+      wb,
+      ws,
+      `CheckOrderProduct${period}_${area}`
+    )
+
+    const tempPath = path.join(
+      os.tmpdir(),
+      `powerBi${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(
+        endDate
+      )}.xlsx`
+    )
+    xlsx.writeFile(wb, tempPath)
+
+    res.download(
+      tempPath,
+      `powerBi${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(
+        endDate
+      )}.xlsx`,
+      err => {
+        if (err) {
+          console.error('❌ Download error:', err)
+          // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+          if (!res.headersSent) {
+            res.status(500).send('Download failed')
+          }
+        }
+
+        // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+        fs.unlink(tempPath, () => { })
+      }
+    )
+  } else {
+    return res.status(200).json({
+      status: 200,
+      message: 'Sucess',
+      data: data
+    })
+  }
 }
