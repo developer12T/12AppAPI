@@ -5672,3 +5672,97 @@ exports.getTargetProduct = async (req, res) => {
     data: result
   })
 }
+
+
+
+
+exports.getOrderExcelNew = async (req, res) => {
+
+  const { period, area, team, zone } = req.query
+  const channel = req.headers['x-channel']
+
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+
+  const { Product } = getModelsByChannel(channel, res, productModel)
+
+  const baseFilter = {};
+  if (area) baseFilter['store.area'] = area
+
+  const teamFilter = {}
+  if (team) teamFilter['team3'] = team
+
+  const zoneFilter = {}
+  if (zone) zoneFilter['store.zone'] = zone
+
+  const [dataOrderSale, dataOrderChange] = await Promise.all([
+    Order.aggregate([
+      {
+        $addFields: {
+          team3: {
+            $concat: [
+              { $substrCP: ['$store.area', 0, 2] },
+              { $substrCP: ['$store.area', 3, 1] }
+            ]
+          }
+        }
+      },
+      {
+        $match: {
+          ...baseFilter,
+          ...teamFilter,
+          ...zoneFilter,
+          type: 'sale',
+          status: { $nin: ['canceled', 'reject'] }
+        }
+      }
+    ]),
+    Order.aggregate([
+      {
+        $addFields: {
+          team3: {
+            $concat: [
+              { $substrCP: ['$store.area', 0, 2] },
+              { $substrCP: ['$store.area', 3, 1] }
+            ]
+          }
+        }
+      },
+      {
+        $match: {
+          ...baseFilter,
+          ...teamFilter,
+          ...zoneFilter,
+          type: 'change',
+          status: { $nin: ['pending', 'canceled', 'reject'] }
+        }
+      }
+    ])
+  ]);
+
+  let data = []
+
+for (const i of [...dataOrderSale, ...dataOrderChange]) {
+  for (const item of (i.listProduct ?? [])) {
+    const dataTran = {
+      orderId: i.orderId,
+      productId: item.id,
+      productName: item.name,
+
+
+
+
+
+      
+    };
+    data.push(dataTran);
+  }
+}
+
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'Sucess',
+    data: data
+  })
+}
