@@ -5097,7 +5097,7 @@ exports.orderPowerBI = async (req, res) => {
         'store.area': { $ne: 'IT211' },
         // 'store.area': 'NE211',
         status: { $in: statusArray },
-        status: { $nin: ['canceled', 'pending'] },
+        status: { $nin: ['reject','canceled', 'pending'] },
         type: { $in: ['change'] }
       }
     },
