@@ -60,6 +60,7 @@ const path = require('path')
 const os = require('os')
 const fs = require('fs')
 const target = require('../../models/cash/target')
+const product = require('../../models/cash/product')
 
 const orderTimestamps = {}
 
@@ -5753,12 +5754,33 @@ exports.getOrderExcelNew = async (req, res) => {
 
   let data = []
 
+  const productIds = [
+    ...new Set(
+      [...dataOrderSale, ...dataOrderChange]
+        .flatMap(item => item.listProduct?.map(i => i.id) ?? [])
+        .filter(Boolean) // ตัด null/undefined/'' ทิ้ง
+    )
+  ];
+
+
+  const productData = await Product.find({ id: { $in: productIds } })
+
   for (const i of [...dataOrderSale, ...dataOrderChange]) {
     for (const item of (i.listProduct ?? [])) {
+
+      const productDetail = productData.find(o => o.id === item.id)
+      // console.log(productDetail.listUnit[0].unit)
+      if (item.unit === productDetail.listUnit[0].unit) { // CTN
+        ctnQty = item.qty
+        ctnPrice = item.price
+      }
+
       const dataTran = {
         orderId: i.orderId,
         productId: item.id,
         productName: item.name,
+        ctnQty: ctnQty,
+        ctnPrice: ctnPrice
 
 
 
