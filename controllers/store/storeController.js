@@ -1250,8 +1250,9 @@ exports.insertStoreToM3 = async (req, res) => {
           shippingPoscode: u.postCode ?? '',
           shippingPhone: store.tel ?? '',
           shippingRoute: u.postCode ?? '',
-          OPGEOX: u.latitude ?? null,
-          OPGEOY: u.longitude ?? null // เดิมสะกด longtitude
+          OPGEOX:
+            u.latitude == 'Error fetching latitude' ? '0.0000' : u.latitude,
+          OPGEOY: u.longitude == 'Error fetching latitude' ? '0.0000' : u.longitude // เดิมสะกด longtitude
         }
       })
     }

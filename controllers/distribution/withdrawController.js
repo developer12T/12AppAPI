@@ -349,7 +349,7 @@ exports.checkout = async (req, res) => {
   }
 }
 
-exports.getOrder = async (req, res) => {
+exports.getOrderCredit = async (req, res) => {
   try {
     const { type, area, period, zone, team, year, month, start, end } =
       req.query
@@ -409,6 +409,7 @@ exports.getOrder = async (req, res) => {
     let query = {
       ...areaQuery,
       ...(period ? { period } : {}),
+      withdrawType: 'credit',
       createdAt: { $gte: startDate, $lt: endDate },
       ...statusQuery
     }
@@ -489,7 +490,168 @@ exports.getOrder = async (req, res) => {
           sendDate: o.sendDate,
           total: o.totalQty || 0,
           status: o.status,
-          createdAt:o.createdAt,
+          createdAt: o.createdAt,
+          formmatDate: formatDateTimeToThai(o.createdAt)
+        }
+      })
+    )
+
+    // const io = getSocket()
+    // io.emit('distribution/get', {});
+
+    res.status(200).json({
+      status: 200,
+      message: 'Successful!',
+      data: response
+    })
+  } catch (error) {
+    console.error('Error saving store to MongoDB:', error)
+    res.status(500).json({ status: '500', message: 'Server Error' })
+  }
+}
+
+exports.getOrder = async (req, res) => {
+  try {
+    const { type, area, period, zone, team, year, month, start, end } =
+      req.query
+    const channel = req.headers['x-channel']
+
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+
+    // let response = []
+    // if (!type) {
+    //   return res.status(400).json({ status: 400, message: 'type is required!' })
+    // }
+
+    let startDate, endDate
+
+    if (start && end) {
+      // ตัด string แล้ว parse เป็น Date
+      startDate = new Date(
+        start.substring(0, 4), // year: 2025
+        parseInt(start.substring(4, 6), 10) - 1, // month: 08 → index 7
+        start.substring(6, 8) // day: 01
+      )
+
+      endDate = new Date(
+        end.substring(0, 4), // year: 2025
+        parseInt(end.substring(4, 6), 10) - 1, // month: 08 → index 7
+        end.substring(6, 8) // day: 01
+      )
+    } else if (period) {
+      const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
+      startDate = range.startDate
+      endDate = range.endDate
+    } else {
+      return res
+        .status(400)
+        .json({ status: 400, message: 'period or start/end are required!' })
+    }
+
+    let statusQuery = {}
+    if (type === 'pending') {
+      statusQuery.status = { $in: ['pending', 'approved', 'rejected'] }
+    } else if (type === 'history') {
+      statusQuery.status = {
+        $in: ['approved', 'rejected', 'success', 'confirm']
+      }
+    }
+
+    // const status = type === 'history' ? { $ne: 'pending' } : 'pending'
+    let areaQuery = {}
+
+    if (area) {
+      areaQuery.area = area
+    } else if (zone) {
+      areaQuery.area = { $regex: `^${zone}`, $options: 'i' }
+    }
+
+    let query = {
+      ...areaQuery,
+      ...(period ? { period } : {}),
+      withdrawType: { $ne: 'credit' },
+      createdAt: { $gte: startDate, $lt: endDate },
+      ...statusQuery
+    }
+
+    console.log(query)
+
+    const pipeline = [
+      {
+        $addFields: {
+          team3: {
+            $concat: [
+              { $substrCP: ['$area', 0, 2] },
+              { $substrCP: ['$area', 3, 1] }
+            ]
+          },
+          statusASC: {
+            $cond: [
+              { $eq: ['$status', 'pending'] },
+              0,
+              {
+                $cond: [
+                  { $eq: ['$status', 'approved'] },
+                  1,
+                  2 // else: rejected (or other status)
+                ]
+              }
+            ]
+          }
+        }
+      },
+      { $match: query }
+    ]
+
+    if (team) {
+      pipeline.push({
+        $match: {
+          team3: { $regex: `^${team}`, $options: 'i' }
+        }
+      })
+    }
+
+    pipeline.push({
+      $sort: { statusASC: 1, createdAt: -1 }
+    })
+
+    const order = await Distribution.aggregate(pipeline)
+
+    if (order.length == 0) {
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Distribution order not found!' })
+    }
+
+    const response = await Promise.all(
+      order.map(async o => {
+        // ใช้ o.area ในแต่ละรอบ
+        const userData = await User.findOne({
+          role: 'sale',
+          area: o.area // <--- ใช้อันนี้
+        })
+
+        return {
+          area: o.area,
+          sale: userData
+            ? {
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
+            : null,
+          orderId: o.orderId,
+          // orderNo: o.orderNo,
+          // highStatus: o.highStatus,
+          // lowStatus: o.lowStatus,
+          totalWeightGross: o.totalWeightGross,
+          totalWeightNet: o.totalWeightNet,
+          orderType: o.orderType,
+          orderTypeName: o.orderTypeName,
+          sendDate: o.sendDate,
+          total: o.totalQty || 0,
+          status: o.status,
+          createdAt: o.createdAt,
           formmatDate: formatDateTimeToThai(o.createdAt)
         }
       })
@@ -1926,7 +2088,7 @@ exports.withdrawBackOrderToExcel = async (req, res) => {
       // คำนวณระยะห่างเป็นวัน
       const created = new Date(item.createdAt)
       const sendDate = new Date(item.sendDate)
-      const diffMs =  sendDate - created 
+      const diffMs = sendDate - created
       const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
 
       const data = {

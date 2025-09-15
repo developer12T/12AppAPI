@@ -12,6 +12,7 @@ const {
   saleConfirmWithdraw,
   getReceiveQty,
   withdrawBackOrderToExcel,
+  getOrderCredit,
   updateReciveFix
 } = require('../../controllers/distribution/withdrawController')
 const {
@@ -25,6 +26,7 @@ const {
 const router = express.Router()
 
 router.get('/get', getOrder)
+router.get('/getCredit', getOrderCredit)
 router.get('/detail/:orderId', getDetail)
 router.post('/checkout', checkout)
 router.post('/updateStatus', updateStatus)
