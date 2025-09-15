@@ -1697,7 +1697,7 @@ exports.getStockQtyNew = async (req, res) => {
 
   const dataProduct = await Product.find({
     id: { $in: uniqueProductId }
-  }).select('id name listUnit group groupCode')
+  }).select('id name listUnit group groupCode size')
 
   let data = []
   let summaryStock = 0
@@ -1848,6 +1848,7 @@ exports.getStockQtyNew = async (req, res) => {
         productName: productDetail.name,
         productGroup: productDetail.group,
         productGroupCode: productDetail.groupCode,
+        size: productDetail.size,
         pcsMain: pcsMain,
         listUnit: listUnitStock,
         summaryQty: summaryQty
@@ -1857,13 +1858,33 @@ exports.getStockQtyNew = async (req, res) => {
   }
 
   data.sort((a, b) => {
-    const numA = parseInt(a.productGroupCode.replace(/\D/g, ''), 10);
-    const numB = parseInt(b.productGroupCode.replace(/\D/g, ''), 10);
-    return numA - numB; // จากน้อยไปมาก
+    // ===== 1) เทียบ group แบบ natural (รองรับตัวเลขปนตัวอักษร) =====
+    const gA = String(a.productGroupCode || '');
+    const gB = String(b.productGroupCode || '');
+    const g = gA.localeCompare(gB, undefined, { numeric: true, sensitivity: 'base' });
+    if (g !== 0) return g;
+
+    // ===== 2) เทียบ size หลัง normalize หน่วยเป็นกรัม =====
+    const parseSize = (s) => {
+      const str = String(s || '');
+      const num = parseFloat(str.replace(/[^0-9.]/g, '')) || 0; // ดึงตัวเลข/ทศนิยม
+      if (/\bkg\b/i.test(str)) return num * 1000; // KG -> กรัม
+      if (/\bg\b/i.test(str)) return num;        // G  -> กรัม
+      return num; // ถ้าไม่เจอหน่วย ชั่งใจให้เป็นกรัมไปก่อน
+    };
+
+    const sizeA = parseSize(a.size);
+    const sizeB = parseSize(b.size);
+    if (sizeA !== sizeB) return sizeB - sizeA;
+
+    // tie-breaker สุดท้าย: เทียบสตริง size ตรง ๆ
+    return String(a.size || '').localeCompare(String(b.size || ''), undefined, { numeric: true, sensitivity: 'base' });
   });
 
+
   data.forEach(item => {
-    delete item.pcsMain
+    delete item.pcsMain,
+    delete item.size
   })
 
 
@@ -1948,6 +1969,7 @@ exports.getStockQtyNew = async (req, res) => {
       productId: i.productId,
       productName: i.productName,
       productGroup: i.productGroup,
+      size: i.size,
       listUnit
     };
 

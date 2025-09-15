@@ -482,7 +482,8 @@ exports.getOrder = async (req, res) => {
           // orderNo: o.orderNo,
           // highStatus: o.highStatus,
           // lowStatus: o.lowStatus,
-          // lineM3: o.lineM3,
+          totalWeightGross: o.totalWeightGross,
+          totalWeightNet: o.totalWeightNet,
           orderType: o.orderType,
           orderTypeName: o.orderTypeName,
           sendDate: o.sendDate,
@@ -1924,8 +1925,8 @@ exports.withdrawBackOrderToExcel = async (req, res) => {
 
       // คำนวณระยะห่างเป็นวัน
       const created = new Date(item.createdAt)
-      const updated = new Date(item.updatedAt)
-      const diffMs = updated - created
+      const sendDate = new Date(item.sendDate)
+      const diffMs =  sendDate - created 
       const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
 
       const data = {

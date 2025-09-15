@@ -2,14 +2,19 @@ const cron = require('node-cron')
 // const { erpApiCheckOrder,erpApiCheckDisributionM3 } = require('../../controllers/sale/orderController')
 const { OrderToExcelConJob } = require('../../controllers/sale/orderController')
 const { period, rangeDate } = require('../../utilities/datetime')
-const { to2, updateStockMongo } = require('../../middleware/order')
+const {
+  to2,
+  updateStockMongo,
+  calculateStockSummary
+} = require('../../middleware/order')
 
 const {
   Warehouse,
   Locate,
   Balance,
   DisributionM3,
-  OOHEAD
+  OOHEAD,
+  OOLINE
 } = require('../../models/cash/master')
 const fs = require('fs')
 
@@ -132,11 +137,21 @@ async function erpApiCheckOrderJob (channel = 'cash') {
       group: ['OBCUOR'],
       raw: true
     })
+    const refundLineAgg = await OOLINE.findAll({
+      attributes: ['OBCUOR', [fn('COUNT', literal('*')), 'lineCount']],
+      where: { OBCUOR: { [Op.in]: refundList } },
+      group: ['OBCUOR'],
+      raw: true
+    })
 
     console.log(lineAgg)
 
     const lineCountByOBORNO = new Map(
       lineAgg.map(r => [String(r.OBCUOR), Number(r.lineCount) || 0])
+    )
+
+    const lineCountByOBORNORefund = new Map(
+      refundLineAgg.map(r => [String(r.OBCUOR), Number(r.lineCount) || 0])
     )
 
     console.log(lineCountByOBORNO)
@@ -146,6 +161,13 @@ async function erpApiCheckOrderJob (channel = 'cash') {
       sales.map(r => [
         String(r.OACUOR),
         lineCountByOBORNO.get(String(r.OACUOR)) ?? 0
+      ])
+    )
+
+    const lineCountByOACUORRefund = new Map(
+      sales.map(r => [
+        String(r.OACUOR),
+        lineCountByOBORNORefund.get(String(r.OACUOR)) ?? 0
       ])
     )
 
@@ -200,7 +222,7 @@ async function erpApiCheckOrderJob (channel = 'cash') {
               orderNo: refundById.get(orderId)?.orderNo ?? '',
 
               // ✅ จำนวนบรรทัดจาก OOLINE
-              lineM3: lineCountByOACUOR.get(orderId) ?? 0
+              lineM3: lineCountByOACUORRefund.get(orderId) ?? 0
             }
           }
         }
@@ -490,8 +512,8 @@ async function reStoreStock (channel = 'cash') {
         else if (area.length === 5) areaQueryRefund['store.area'] = area
       }
 
-      const matchQuery = { ...areaQuery, periodstr }
-      const matchQueryRefund = { ...areaQueryRefund, periodstr }
+      const matchQuery = { ...areaQuery, period: periodstr }
+      const matchQueryRefund = { ...areaQueryRefund, period: periodstr }
 
       const dataRefund = await Refund.aggregate([
         {
@@ -632,6 +654,8 @@ async function reStoreStock (channel = 'cash') {
         { $match: matchQuery },
         { $project: { listProduct: 1, _id: 0 } }
       ])
+
+      // console.log(matchQuery)
 
       if (dataStock.length === 0) {
         return {
@@ -1022,6 +1046,7 @@ async function reStoreStock (channel = 'cash') {
       // console.log(area)
     }
 
+    // console.log(results)
     for (const item of results) {
       for (const i of item.data) {
         const filter = {
@@ -1029,6 +1054,7 @@ async function reStoreStock (channel = 'cash') {
           period: periodstr,
           'listProduct.productId': i.productId
         }
+        // console.log(i.summaryQty.PCS.in)
 
         const update = {
           $set: {
@@ -1132,10 +1158,10 @@ const startCronJobDeleteCartDaily = () => {
 
 const startCronJobreStoreStockDaily = () => {
   cron.schedule(
-    '0 22 * * *', // 21:00
+    '30 21 * * *', // 21:30 ทุกวัน
     async () => {
       console.log(
-        'Running cron job reStoreStock at 21:00 Bangkok time. Now:',
+        'Running cron job reStoreStock at 21:30 Bangkok time. Now:',
         new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
       )
       await reStoreStock()
@@ -1145,6 +1171,22 @@ const startCronJobreStoreStockDaily = () => {
     }
   )
 }
+
+// const startCronJobreStoreStockDaily = () => {
+//   cron.schedule(
+//     '* * * * *', // ทุก 1 นาที
+//     async () => {
+//       console.log(
+//         'Running cron job reStoreStock every 1 minute. Now:',
+//         new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+//       );
+//       await reStoreStock();
+//     },
+//     {
+//       timezone: 'Asia/Bangkok' // 👈 สำคัญ
+//     }
+//   );
+// };
 
 module.exports = {
   startCronJobErpApiCheck,

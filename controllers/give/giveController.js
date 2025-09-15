@@ -94,7 +94,9 @@ exports.getGiveType = async (req, res) => {
     const channel = req.headers['x-channel']
     const { Givetype } = getModelsByChannel(channel, res, giveawaysModel)
 
-    const givetypes = await Givetype.find({}).select('-_id giveId name').lean()
+    const givetypes = await Givetype.find({})
+      .select('-_id giveId type remark name')
+      .lean()
 
     if (!givetypes || givetypes.length === 0) {
       return res.status(404).json({
@@ -309,6 +311,7 @@ exports.checkout = async (req, res) => {
     const orderId = await generateGiveawaysId(
       area,
       sale.warehouse,
+      give.type,
       channel,
       res
     )
@@ -431,7 +434,7 @@ exports.checkout = async (req, res) => {
 
 exports.getOrder = async (req, res) => {
   try {
-    const { type, area, store, period, start, end, zone } = req.query
+    const { type, area, store, period, start, end, zone, giveName } = req.query
     let response = []
 
     const channel = req.headers['x-channel']
@@ -473,6 +476,10 @@ exports.getOrder = async (req, res) => {
       } else if (area.length == 5) {
         areaQuery['store.area'] = area
       }
+    }
+
+    if (giveName) {
+      areaQuery.giveInfo.name = giveName
     }
 
     // if (zone && !area) {
@@ -518,6 +525,8 @@ exports.getOrder = async (req, res) => {
         orderId: o.orderId,
         area: o.store.area,
         giveName: o.giveInfo?.name || '',
+        giveInfo: o.giveInfo,
+        sale: o.sale,
         storeId: o.store?.storeId || '',
         storeName: o.store?.name || '',
         storeAddress: o.store?.address || '',
@@ -740,7 +749,6 @@ exports.approveGive = async (req, res) => {
       message: `อัปเดตสถานะเรียบร้อย (${statusThStr})`,
       data: giveawayData
     })
-    
   } catch (error) {
     console.error('Error approving giveaway:', error)
     res.status(500).json({
@@ -837,7 +845,7 @@ exports.updateStatus = async (req, res) => {
 }
 
 exports.giveToExcel = async (req, res) => {
-  const { channel, startDate, endDate } = req.query
+  const { channel, startDate, endDate, giveName } = req.query
 
   // console.log(channel, date)
   let statusArray = (req.query.status || '')
@@ -887,26 +895,37 @@ exports.giveToExcel = async (req, res) => {
     )}T23:59:59.999+07:00`
   )
 
+  let query = {
+    status: { $nin: ['canceled', 'competed'] },
+    status: { $in: statusArray },
+    type: { $in: ['give'] },
+    'store.area': { $ne: 'IT211' },
+    createdAt: {
+      $gte: startTH,
+      $lte: endTH
+    }
+  }
+  console.log(giveName)
+
+  // if (giveName) {
+  //   query.giveInfo = { name: giveName }
+  // }
+
   // console.log(startTH, endTH)
 
   const giveOrder = await Giveaway.aggregate([
     {
-      $match: {
-        createdAt: {
-          $gte: startTH,
-          $lte: endTH
-        }
-      }
+      $match: query
     },
-    {
-      $match: {
-        status: { $nin: ['canceled', 'competed'] },
-        status: { $in: statusArray },
-        type: { $in: ['give'] },
-        'store.area': { $ne: 'IT211' }
-        // 'store.area': 'NE211'
-      }
-    },
+    // {
+    //   $match: {
+    //     status: { $nin: ['canceled', 'competed'] },
+    //     status: { $in: statusArray },
+    //     type: { $in: ['give'] },
+    //     'store.area': { $ne: 'IT211' }
+    //     // 'store.area': 'NE211'
+    //   }
+    // },
     {
       $addFields: {
         createdAtThai: {
@@ -934,6 +953,14 @@ exports.giveToExcel = async (req, res) => {
     return `${yyyy}${mm}${dd}`
   }
 
+  function getCurrentTimeFormatted () {
+    const now = new Date()
+    const hours = String(now.getHours()).padStart(2, '0')
+    const minutes = String(now.getMinutes()).padStart(2, '0')
+    const seconds = String(now.getSeconds()).padStart(2, '0')
+    return `${hours}${minutes}${seconds}`
+  }
+
   const dataTran = giveOrder.map(item => {
     const TRDT = formatDateToThaiYYYYMMDD(item.createdAt)
     const TRTM = new Date(item.createdAt).getTime()
@@ -948,10 +975,10 @@ exports.giveToExcel = async (req, res) => {
         RIDN: '',
         TRTP: item.giveInfo.type,
         RORC: '0',
-        RORN: item.orderId.slice(1),
-        DEPT: item.giveInfo.dept,
+        RORN: `${item.orderId}`,
+        DEPT: `${item.giveInfo.dept}`,
         TRDT: `${TRDT}`,
-        TRTM: `${TRTM}`,
+        TRTM: `${getCurrentTimeFormatted()}`,
         RIDT: '',
         RITM: '',
         REMK: item.giveInfo.remark,
@@ -1028,3 +1055,134 @@ exports.giveToExcel = async (req, res) => {
   //   data: data
   // })
 }
+
+exports.fixOrderIdsGive = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel)
+
+    // 1) ดึงเฉพาะออเดอร์รูปแบบเก่า แล้ว sort ตาม createdAt : 1 (เก่าสุดก่อน)
+    const giveOrders = await Giveaway.find(
+      { orderId: /^6809\d{3}/ }, // ของเดิม 6809 + 3 หลัก
+      { _id: 1, orderId: 1, giveInfo: 1, createdAt: 1 }
+    )
+      .sort({ createdAt: 1, _id: 1 }) // สำคัญ: ให้เลขแรกมาจาก createdAt เก่าสุด
+      .lean()
+
+    // 2) preload orderId ที่อยู่ในรูปแบบใหม่แล้ว (6809 + 2 หลัก + 4 หลักรัน)
+    const existingNew = await Giveaway.find(
+      { orderId: /^6809\d{2}\d{4}$/ }, // 6809XX####
+      { orderId: 1, _id: 0 }
+    ).lean()
+
+    // set สำหรับกันชนซ้ำ และ map เก็บ next seq ต่อ prefix
+    const used = new Set(existingNew.map(d => d.orderId))
+    const nextSeqByPrefix = new Map()
+
+    // คำนวณ next seq เริ่มต้นจากข้อมูลที่มีอยู่แล้วใน DB
+    for (const { orderId } of existingNew) {
+      const prefix = orderId.slice(0, 6) // 6809 + 2 หลัก type
+      const seq = parseInt(orderId.slice(6), 10) // ####
+      const curr = nextSeqByPrefix.get(prefix) ?? 1
+      nextSeqByPrefix.set(prefix, Math.max(curr, seq + 1))
+    }
+
+    // cache กันชนซ้ำในรอบนี้ (ลดโอกาส duplicate)
+    const seenThisRun = new Set()
+
+    const ops = []
+
+    for (const doc of giveOrders) {
+      // ดึง typePart = giveInfo.type.slice(1,3) → 2 หลัก
+      const typePart = doc.giveInfo?.type?.slice(1, 3) || '00'
+      const prefix = `6809${typePart}` // ตัวอย่าง: 680916
+
+      // หา seq เริ่มต้นต่อ prefix
+      let seq = nextSeqByPrefix.get(prefix) ?? 1
+      let newId = `${prefix}${String(seq).padStart(4, '0')}`
+
+      // กันชนซ้ำทั้งใน DB ที่ preload มา และในรอบนี้
+      while (used.has(newId) || seenThisRun.has(newId)) {
+        seq++
+        newId = `${prefix}${String(seq).padStart(4, '0')}`
+      }
+
+      // ถ้า orderId เดิมเหมือนใหม่ → skip
+      if (doc.orderId === newId) continue
+
+      // mark ใช้แล้ว & อัป next seq
+      used.add(newId)
+      seenThisRun.add(newId)
+      nextSeqByPrefix.set(prefix, seq + 1)
+
+      // ใช้ bulkWrite ให้เร็วและกัน race เล็กน้อยด้วยการแมทช์ orderId เดิม
+      ops.push({
+        updateOne: {
+          filter: { _id: doc._id, orderId: doc.orderId },
+          update: { $set: { orderId: newId } }
+        }
+      })
+    }
+
+    if (ops.length) {
+      await Giveaway.bulkWrite(ops, { ordered: true })
+    }
+
+    return res.json({
+      message: 'fixOrderIdsGive completed',
+      total: giveOrders.length,
+      updated: ops.length
+    })
+  } catch (error) {
+    console.error('fixOrderIdsGive error', error)
+    return res.status(500).json({ message: 'Internal Server Error' })
+  }
+}
+
+// exports.fixOrderIdsGive = async (req, res) => {
+//   try {
+//     const channel = req.headers['x-channel']
+//     const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel)
+//     const giveOrders = await Giveaway.find({ orderId: /^6809\d{3}/ })
+//     // cache กันชนซ้ำในรอบนี้ (ลดโอกาส duplicate)
+//     const seen = new Set()
+
+//     for (const doc of giveOrders) {
+//       // ดึง typePart = giveInfo.type.slice(1,3)
+//       const typePart = doc.giveInfo?.type?.slice(1, 3) || '00'
+//       const prefix = `6809${typePart}`
+
+//       // เริ่ม seq ที่ 1
+//       let seq = 1
+//       let newId = `${prefix}${String(seq).padStart(4, '0')}`
+
+//       // วนเช็คซ้ำ: ใน DB และใน memory
+//       // (index orderId จะช่วยให้เร็วขึ้น)
+//       // เพิ่ม check ทั้งใน DB และใน set
+//       while (seen.has(newId) || (await Giveaway.exists({ orderId: newId }))) {
+//         seq++
+//         newId = `${prefix}${String(seq).padStart(4, '0')}`
+//       }
+
+//       // ถ้า orderId เดิมเหมือนกับใหม่ → skip
+//       if (doc.orderId === newId) {
+//         continue
+//       }
+
+//       // บันทึกค่าใหม่
+//       doc.orderId = newId
+//       await doc.save()
+
+//       // mark ว่ามีใช้แล้ว
+//       seen.add(newId)
+//     }
+
+//     return res.json({
+//       message: 'fixOrderIdsGive completed',
+//       count: giveOrders.length
+//     })
+//   } catch (error) {
+//     console.error('fixOrderIdsGive error', error)
+//     return res.status(500).json({ message: 'Internal Server Error' })
+//   }
+// }

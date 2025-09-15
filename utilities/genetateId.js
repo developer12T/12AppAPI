@@ -18,7 +18,7 @@ const { Op } = require('sequelize')
 
 const { DisributionM3 } = require('../models/cash/master')
 
-async function generateCampaignId(channel, res) {
+async function generateCampaignId (channel, res) {
   const { Campaign } = getModelsByChannel(channel, res, campaignModel)
   const now = new Date()
   const yyyy = now.getFullYear()
@@ -74,8 +74,8 @@ const generateStockId = async (area, warehouse, channel, res) => {
   return `S${currentYear
     .toString()
     .slice(2, 4)}${currentMonth}13${warehouse}${runningNumber
-      .toString()
-      .padStart(4, '0')}`
+    .toString()
+    .padStart(4, '0')}`
 }
 
 const generateOrderId = async (area, warehouse, channel, res) => {
@@ -106,8 +106,8 @@ const generateOrderId = async (area, warehouse, channel, res) => {
   return `${currentYear
     .toString()
     .slice(2, 4)}${currentMonth}13${warehouse}${runningNumber
-      .toString()
-      .padStart(4, '0')}`
+    .toString()
+    .padStart(4, '0')}`
 }
 const generateRefundId = async (area, warehouse, channel, res) => {
   const currentYear = new Date().getFullYear() + 543
@@ -135,11 +135,17 @@ const generateRefundId = async (area, warehouse, channel, res) => {
   return `${currentYear
     .toString()
     .slice(2, 4)}${currentMonth}93${warehouse}${runningNumber
-      .toString()
-      .padStart(4, '0')}`
+    .toString()
+    .padStart(4, '0')}`
 }
 
-const generateDistributionId = async (area, warehouse, channel, res, newtrip = false) => {
+const generateDistributionId = async (
+  area,
+  warehouse,
+  channel,
+  res,
+  newtrip = false
+) => {
   // โหลดโมเดลก่อนใช้งาน
   const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
@@ -149,8 +155,8 @@ const generateDistributionId = async (area, warehouse, channel, res, newtrip = f
   const target = new Date(now)
   if (newtrip) target.setMonth(target.getMonth() + 1) // auto handle Dec -> Jan
 
-  const targetYearAD = target.getFullYear()        // ค.ศ.
-  const targetMonth = target.getMonth() + 1        // 1..12
+  const targetYearAD = target.getFullYear() // ค.ศ.
+  const targetMonth = target.getMonth() + 1 // 1..12
   const mm = String(targetMonth).padStart(2, '0')
 
   // ปี พ.ศ. 2 หลักท้าย
@@ -162,18 +168,24 @@ const generateDistributionId = async (area, warehouse, channel, res, newtrip = f
 
   // สร้างช่วงวันที่ของ "เดือนเป้าหมาย" แบบเวลาไทย (UTC+7)
   const startTH = new Date(`${targetYearAD}-${mm}-01T00:00:00+07:00`)
-  const nextMonth = new Date(startTH); nextMonth.setMonth(nextMonth.getMonth() + 1)
-  const endTHExclusive = new Date(`${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01T00:00:00+07:00`)
+  const nextMonth = new Date(startTH)
+  nextMonth.setMonth(nextMonth.getMonth() + 1)
+  const endTHExclusive = new Date(
+    `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(
+      2,
+      '0'
+    )}-01T00:00:00+07:00`
+  )
 
   // console.log(startTH, endTHExclusive)
 
   // หาเลขรันล่าสุดจาก order ที่ขึ้นต้นด้วย prefix นี้ ใน area เดียวกันและภายในเดือนเป้าหมาย
   const latestOrder = await Distribution.findOne({
     area,
-    orderId: { $regex: `^${prefix}` }   // เช่น ^W6809{warehouse}
+    orderId: { $regex: `^${prefix}` } // เช่น ^W6809{warehouse}
   })
     .sort({ orderId: -1 })
-    .select('orderId');
+    .select('orderId')
 
   // ตัดเอาเฉพาะส่วนเลขรันท้าย แล้ว +1 (ไม่ fix ความยาว เพื่อรองรับ >99)
   let runningNumber = 1
@@ -189,12 +201,12 @@ const generateDistributionId = async (area, warehouse, channel, res, newtrip = f
   return newOrderId
 }
 
-
-const generateGiveawaysId = async (area, warehouse, channel, res) => {
+const generateGiveawaysId = async (area, warehouse, type, channel, res) => {
   const currentYear = new Date().getFullYear() + 543
   const currentMonth = (new Date().getMonth() + 1).toString().padStart(2, '0')
 
   const { Giveaway } = getModelsByChannel(channel, res, giveawayModel)
+  const orderType = type.slice(1, 3)
   const latestOrder = await Giveaway.findOne({
     'store.area': area,
     createdAt: {
@@ -212,11 +224,11 @@ const generateGiveawaysId = async (area, warehouse, channel, res) => {
     ? parseInt(latestOrder.orderId.slice(-2)) + 1
     : 1
 
-  return `P${currentYear
+  return `${currentYear
     .toString()
-    .slice(2, 4)}${currentMonth}${warehouse}${runningNumber
-      .toString()
-      .padStart(2, '0')}`
+    .slice(2, 4)}${currentMonth}${orderType}${runningNumber
+    .toString()
+    .padStart(4, '0')}`
 }
 
 const generateGivetypeId = async (channel, res) => {
@@ -248,7 +260,7 @@ const generatePromotionId = async (channel, res) => {
 
   const lastPromotion = await Promotion.findOne()
     .sort({ proId: -1 })
-    .select('proId');
+    .select('proId')
 
   let runningNumber = 1
   if (lastPromotion && lastPromotion.proId.startsWith(`PRO-${year}${month}`)) {
