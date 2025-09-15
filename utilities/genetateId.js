@@ -208,7 +208,7 @@ const generateGiveawaysId = async (area, warehouse, type, channel, res) => {
   const { Giveaway } = getModelsByChannel(channel, res, giveawayModel)
   const orderType = type.slice(1, 3)
   const latestOrder = await Giveaway.findOne({
-    'store.area': area,
+    // 'store.area': area,
     createdAt: {
       $gte: new Date(`${new Date().getFullYear()}-${currentMonth}-01`),
       $lt: new Date(
