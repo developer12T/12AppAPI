@@ -25,6 +25,7 @@ const shippingSchema = mongoose.Schema({
     address: { type: String },
     district: { type: String },
     subDistrict: { type: String },
+    provinceCode: { type: String },
     province: { type: String },
     postCode: { type: String },
     latitude: { type: String },

@@ -31,7 +31,8 @@ const {
   getTarget,
   orderPowerBI,
   updateCompletedOrder,
-  getTargetProduct
+  getTargetProduct,
+  getOrderExcelNew
 } = require('../../controllers/sale/orderController')
 
 const router = express.Router()
@@ -73,4 +74,7 @@ router.get('/getTarget', getTarget)
 router.get('/orderPowerBI', orderPowerBI)
 
 router.get('/getTargetProduct', getTargetProduct)
+
+
+router.get('/getOrderExcelNew', getOrderExcelNew)
 module.exports = router

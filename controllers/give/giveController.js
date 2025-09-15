@@ -894,6 +894,7 @@ exports.giveToExcel = async (req, res) => {
       8
     )}T23:59:59.999+07:00`
   )
+  // let query = {}
 
   let query = {
     status: { $nin: ['canceled', 'competed'] },
@@ -905,13 +906,14 @@ exports.giveToExcel = async (req, res) => {
       $lte: endTH
     }
   }
-  console.log(giveName)
 
-  // if (giveName) {
-  //   query.giveInfo = { name: giveName }
-  // }
+  // console.log(giveName)
 
-  // console.log(startTH, endTH)
+  if (giveName) {
+    query['giveInfo.name'] = giveName
+  }
+
+  console.log(query)
 
   const giveOrder = await Giveaway.aggregate([
     {
