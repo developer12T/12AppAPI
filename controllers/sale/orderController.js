@@ -211,12 +211,12 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-        .map(item => item.price)
-        .reduce((sum, price) => sum + price, 0)
+          .map(item => item.price)
+          .reduce((sum, price) => sum + price, 0)
       : 0
 
     // ✅ ช่วยฟังก์ชัน: เช็คว่า createAt ตั้งแต่ Aug-2025 ขึ้นไปไหม
-    function isAug2025OrLater(createAt) {
+    function isAug2025OrLater (createAt) {
       if (!createAt) return false
 
       // case: "YYYYMM" เช่น "202508"
@@ -237,14 +237,14 @@ exports.checkout = async (req, res) => {
     // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-        storeData.address,
-        storeData.subDistrict && `ต.${storeData.subDistrict}`,
-        storeData.district && `อ.${storeData.district}`,
-        storeData.province && `จ.${storeData.province}`,
-        storeData.postCode
-      ]
-        .filter(Boolean)
-        .join(' ')
+          storeData.address,
+          storeData.subDistrict && `ต.${storeData.subDistrict}`,
+          storeData.district && `อ.${storeData.district}`,
+          storeData.province && `จ.${storeData.province}`,
+          storeData.postCode
+        ]
+          .filter(Boolean)
+          .join(' ')
       : storeData.address
 
     // const addressFinal = `${storeData.address} ต.${storeData.subDistrict} อ.${storeData.district} จ.${province} ${postCode}`
@@ -551,15 +551,16 @@ exports.getOrder = async (req, res) => {
     if (start && end) {
       // ตัด string แล้ว parse เป็น Date
       startDate = new Date(
-        start.substring(0, 4), // year: 2025
-        parseInt(start.substring(4, 6), 10) - 1, // month: 08 → index 7
-        start.substring(6, 8) // day: 01
+        `${start.slice(0, 4)}-${start.slice(4, 6)}-${start.slice(
+          6,
+          8
+        )}T00:00:00+07:00`
       )
-
       endDate = new Date(
-        end.substring(0, 4), // year: 2025
-        parseInt(end.substring(4, 6), 10) - 1, // month: 08 → index 7
-        end.substring(6, 8) // day: 01
+        `${end.slice(0, 4)}-${end.slice(4, 6)}-${end.slice(
+          6,
+          8
+        )}T23:59:59.999+07:00`
       )
     } else if (period) {
       const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
@@ -892,7 +893,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -1013,6 +1014,7 @@ exports.addSlip = async (req, res) => {
 exports.OrderToExcel = async (req, res) => {
   const { channel } = req.query
   let { startDate, endDate } = req.query
+  const { area, team, zone } = req.query
 
   // console.log(channel, date)
   let statusArray = (req.query.status || '')
@@ -1070,93 +1072,52 @@ exports.OrderToExcel = async (req, res) => {
 
   // console.log(startTH, endTH)
 
-  const modelOrder = await Order.aggregate([
-    {
-      $match: {
-        createdAt: {
-          $gte: startTH,
-          $lte: endTH
-        }
-      }
+  let query = {
+    createdAt: {
+      $gte: startTH,
+      $lte: endTH
     },
-    {
-      $match: {
-        status: { $nin: ['canceled'] },
-        status: { $in: statusArray },
-        type: { $in: ['sale'] },
-        'store.area': { $ne: 'IT211' }
-        // 'store.area': 'NE211'
-      }
-    },
-    {
-      $addFields: {
-        createdAtThai: {
-          $dateAdd: {
-            startDate: '$createdAt',
-            unit: 'hour',
-            amount: 7
-          }
-        }
-      }
-    },
-    {
-      $project: {
-        // ดึงเฉพาะที่ต้องใช้
-        createdAt: 1,
-        orderId: 1,
-        sale: 1,
-        store: 1,
-        listProduct: 1,
-        listPromotions: 1
-      }
-    },
-    {
-      $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
-    }
-  ])
+    status: { $nin: ['canceled'] },
+    status: { $in: statusArray },
+    type: { $in: ['sale'] },
+    'store.area': { $ne: 'IT211' }
+  }
 
-  const modelChange = await Order.aggregate([
-    {
-      $match: {
-        'store.area': { $ne: 'IT211' },
-        // 'store.area': 'NE211',
-        status: { $in: statusArray },
-        status: { $nin: ['canceled', 'pending'] },
-        type: { $in: ['change'] }
-      }
+  // Order Change
+  let queryChange = {
+    createdAt: {
+      $gte: startTH,
+      $lte: endTH
     },
-    {
-      $addFields: {
-        createdAtThai: {
-          $dateAdd: {
-            startDate: '$createdAt',
-            unit: 'hour',
-            amount: 7
-          }
-        }
-      }
-    },
-    {
-      $match: {
-        createdAt: {
-          $gte: startTH,
-          $lte: endTH
-        }
-      }
-    },
-    {
-      $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
-    }
-  ])
+    'store.area': { $ne: 'IT211' },
+    status: { $in: statusArray },
+    status: { $nin: ['canceled', 'pending', 'reject'] },
+    type: { $in: ['change'] }
+  }
 
-  const modelRefund = await Refund.aggregate([
+  let queryRefund = {
+    status: { $in: statusArray },
+    status: { $nin: ['canceled', 'reject', 'pending'] },
+    'store.area': { $ne: 'IT211' },
+    createdAt: {
+      $gte: startTH,
+      $lte: endTH
+    }
+  }
+
+  if (area) {
+    query['store.area'] = area
+    queryChange['store.area'] = area
+    queryRefund['store.area'] = area
+  } else if (zone) {
+    query['store.area'] = { $regex: `^${zone}`, $options: 'i' }
+    queryChange['store.area'] = { $regex: `^${zone}`, $options: 'i' }
+    queryRefund['store.area'] = { $regex: `^${zone}`, $options: 'i' }
+  }
+
+  const pipeline = [
     {
-      $match: {
-        status: { $in: statusArray },
-        status: { $nin: ['canceled', 'reject', 'pending'] },
-        'store.area': { $ne: 'IT211' }
-        // 'store.area': 'NE211'
-      }
+      $match: query
     },
     {
       $addFields: {
@@ -1166,25 +1127,138 @@ exports.OrderToExcel = async (req, res) => {
             unit: 'hour',
             amount: 7
           }
+        },
+        team3: {
+          $concat: [
+            { $substrCP: ['$store.area', 0, 2] },
+            { $substrCP: ['$store.area', 3, 1] }
+          ]
         }
       }
+    }
+    // {
+    //   $project: {
+    //     // ดึงเฉพาะที่ต้องใช้
+    //     createdAt: 1,
+    //     orderId: 1,
+    //     sale: 1,
+    //     store: 1,
+    //     // team3: 1,
+    //     listProduct: 1,
+    //     listPromotions: 1
+    //   }
+    // }
+  ]
+  if (team) {
+    pipeline.push({
+      $match: {
+        team3: { $regex: `^${team}`, $options: 'i' }
+      }
+    })
+  }
+
+  // pipeline.push({
+  //   $project: {
+  //     // ดึงเฉพาะที่ต้องใช้
+  //     createdAt: 1,
+  //     orderId: 1,
+  //     sale: 1,
+  //     store: 1,
+  //     // team3: 1,
+  //     listProduct: 1,
+  //     listPromotions: 1
+  //   }
+  // })
+
+  console.log(pipeline[3])
+
+  pipeline.push({
+    $sort: { statusASC: 1, createdAt: -1 }
+  })
+
+  const modelOrder = await Order.aggregate(pipeline)
+  // console.log(modelOrder)
+
+  const pipelineChange = [
+    {
+      $match: queryChange
     },
     {
-      $match: {
-        createdAt: {
-          $gte: startTH,
-          $lte: endTH
+      $addFields: {
+        createdAtThai: {
+          $dateAdd: {
+            startDate: '$createdAt',
+            unit: 'hour',
+            amount: 7
+          }
+        },
+        team3: {
+          $concat: [
+            { $substrCP: ['$store.area', 0, 2] }, // "BE"
+            { $substrCP: ['$store.area', 3, 1] } // "1" → from "212" (character at index 3)
+          ]
         }
       }
     },
     {
       $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
     }
-  ])
+  ]
+
+  if (team) {
+    pipelineChange.push({
+      $match: {
+        team3: { $regex: `^${team}`, $options: 'i' }
+      }
+    })
+  }
+
+  pipelineChange.push({
+    $sort: { statusASC: 1, createdAt: -1 }
+  })
+
+  const modelChange = await Order.aggregate(pipelineChange)
+
+  const pipelineRefund = [
+    {
+      $match: queryRefund
+    },
+    {
+      $addFields: {
+        createdAtThai: {
+          $dateAdd: {
+            startDate: '$createdAt',
+            unit: 'hour',
+            amount: 7
+          }
+        },
+        team3: {
+          $concat: [
+            { $substrCP: ['$store.area', 0, 2] },
+            { $substrCP: ['$store.area', 3, 1] }
+          ]
+        }
+      }
+    }
+  ]
+
+  if (team) {
+    pipelineRefund.push({
+      $match: {
+        team3: { $regex: `^${team}`, $options: 'i' }
+      }
+    })
+  }
+
+  pipelineRefund.push({
+    $sort: { statusASC: 1, createdAt: -1 }
+  })
+
+  const modelRefund = await Refund.aggregate(pipelineRefund)
 
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1244,6 +1318,7 @@ exports.OrderToExcel = async (req, res) => {
       // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
 
       return {
+        AREA: order.store.area,
         CUNO: order.store.storeId,
         FACI: 'F10',
         WHLO: order.sale.warehouse,
@@ -1295,7 +1370,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromChange = modelChange.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1337,6 +1412,7 @@ exports.OrderToExcel = async (req, res) => {
       // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
 
       return {
+        AREA: order.store.area,
         CUNO: order.store.storeId,
         FACI: 'F10',
         WHLO: order.sale.warehouse,
@@ -1500,6 +1576,7 @@ exports.OrderToExcel = async (req, res) => {
       return listProduct.map(product => {
         counterOrder++
         return {
+          AREA: order.store.area,
           CUNO: order.store.storeId,
           FACI: 'F10',
           WHLO: order.sale.warehouse,
@@ -1558,7 +1635,7 @@ exports.OrderToExcel = async (req, res) => {
       message: 'Not Found Order'
     })
   }
-  function yyyymmddToDdMmYyyy(dateString) {
+  function yyyymmddToDdMmYyyy (dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -1600,7 +1677,7 @@ exports.OrderToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     }
   )
 
@@ -4496,28 +4573,28 @@ exports.checkOrderCancelM3 = async (req, res) => {
     const type = saleSet.has(id)
       ? 'Sale'
       : refundSet.has(id)
-        ? 'Refund'
-        : changeSet.has(id)
-          ? 'Change'
-          : ''
+      ? 'Refund'
+      : changeSet.has(id)
+      ? 'Change'
+      : ''
 
     const typeId =
       type === 'Sale'
         ? 'A31'
         : type === 'Refund'
-          ? 'A34'
-          : type === 'Change'
-            ? 'B31'
-            : ''
+        ? 'A34'
+        : type === 'Change'
+        ? 'B31'
+        : ''
 
     const statusTablet =
       type === 'Sale'
         ? saleStatusMap.get(id) ?? ''
         : type === 'Refund'
-          ? refundStatusMap.get(id) ?? ''
-          : type === 'Change'
-            ? changeStatusMap.get(id) ?? ''
-            : ''
+        ? refundStatusMap.get(id) ?? ''
+        : type === 'Change'
+        ? changeStatusMap.get(id) ?? ''
+        : ''
 
     return { orderId: id, type, typeId, statusTablet }
   })
@@ -4539,7 +4616,7 @@ exports.checkOrderCancelM3 = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => { })
+    fs.unlink(tempPath, () => {})
   })
 
   // res.status(200).json({
@@ -5017,15 +5094,15 @@ exports.getTarget = async (req, res) => {
 exports.orderPowerBI = async (req, res) => {
   let { startDate, endDate, excel } = req.query
 
-  const now = new Date();
-  const thailandOffset = 7 * 60; // นาที
-  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-  const thailand = new Date(utc + (thailandOffset * 60000));
+  const now = new Date()
+  const thailandOffset = 7 * 60 // นาที
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000
+  const thailand = new Date(utc + thailandOffset * 60000)
 
-  const year = thailand.getFullYear();
-  const month = String(thailand.getMonth() + 1).padStart(2, '0');
-  const day = String(thailand.getDate()).padStart(2, '0');
-  const currentDate = `${year}${month}${day}`;
+  const year = thailand.getFullYear()
+  const month = String(thailand.getMonth() + 1).padStart(2, '0')
+  const day = String(thailand.getDate()).padStart(2, '0')
+  const currentDate = `${year}${month}${day}`
 
   const channel = req.headers['x-channel']
   const { Order } = getModelsByChannel(channel, res, orderModel)
@@ -5037,7 +5114,7 @@ exports.orderPowerBI = async (req, res) => {
   const conoBiList = conoBi.flatMap(item => item.CONO)
   // console.log(conoBiList)
 
-  function yyyymmddToDdMmYyyy(dateString) {
+  function yyyymmddToDdMmYyyy (dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -5180,7 +5257,7 @@ exports.orderPowerBI = async (req, res) => {
 
   const storeData = await Store.find({ storeId: { $in: storeIdList } })
 
-  function formatDateToThaiYYYYMMDD(date) {
+  function formatDateToThaiYYYYMMDD (date) {
     const d = new Date(date)
     d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -5404,7 +5481,7 @@ exports.orderPowerBI = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       }
     )
   } else {
@@ -5685,11 +5762,7 @@ exports.getTargetProduct = async (req, res) => {
   })
 }
 
-
-
-
 exports.getOrderExcelNew = async (req, res) => {
-
   const { period, area, team, zone } = req.query
   const channel = req.headers['x-channel']
 
@@ -5697,7 +5770,7 @@ exports.getOrderExcelNew = async (req, res) => {
 
   const { Product } = getModelsByChannel(channel, res, productModel)
 
-  const baseFilter = {};
+  const baseFilter = {}
   if (area) baseFilter['store.area'] = area
 
   const teamFilter = {}
@@ -5749,28 +5822,20 @@ exports.getOrderExcelNew = async (req, res) => {
         }
       }
     ])
-  ]);
+  ])
 
   let data = []
 
   for (const i of [...dataOrderSale, ...dataOrderChange]) {
-    for (const item of (i.listProduct ?? [])) {
+    for (const item of i.listProduct ?? []) {
       const dataTran = {
         orderId: i.orderId,
         productId: item.id,
-        productName: item.name,
-
-
-
-
-
-
-      };
-      data.push(dataTran);
+        productName: item.name
+      }
+      data.push(dataTran)
     }
   }
-
-
 
   res.status(200).json({
     status: 200,
