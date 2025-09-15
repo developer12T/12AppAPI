@@ -5292,7 +5292,7 @@ exports.orderPowerBI = async (req, res) => {
           }
 
           return {
-            order: order.orderId,
+            invoice: order.orderId,
             ORDER_DATE: createdAtDate,
             OLINE_DATE: createdAtDate,
             OOLINE_TIME: createdAtDatetime,

@@ -474,7 +474,8 @@ exports.addStore = async (req, res) => {
         address: ship.address || '',
         district: ship.district || '',
         subDistrict: ship.subDistrict || '',
-        province: ship.provinceCode || '',
+        provinceCode: ship.provinceCode || '',
+        province: ship.province || '',
         postCode: ship.postCode || '',
         latitude: ship.latitude || '',
         longtitude: ship.longtitude || ''
