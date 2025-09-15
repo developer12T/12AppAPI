@@ -5695,9 +5695,9 @@ exports.getOrderExcelNew = async (req, res) => {
   const channel = req.headers['x-channel']
 
   const { Order } = getModelsByChannel(channel, res, orderModel)
-
+  const { Refund } = getModelsByChannel(channel, res, refundModel)
   const { Product } = getModelsByChannel(channel, res, productModel)
-
+  const { Giveaway } = getModelsByChannel(channel, res, giveModel)
   const baseFilter = {};
   if (area) baseFilter['store.area'] = area
 
@@ -5707,7 +5707,7 @@ exports.getOrderExcelNew = async (req, res) => {
   const zoneFilter = {}
   if (zone) zoneFilter['store.zone'] = zone
 
-  const [dataOrderSale, dataOrderChange] = await Promise.all([
+  const [dataOrderSale, dataOrderChange, dataOrderRefund, dataOrderGive] = await Promise.all([
     Order.aggregate([
       {
         $addFields: {
@@ -5750,32 +5750,73 @@ exports.getOrderExcelNew = async (req, res) => {
         }
       }
     ])
+    ,
+    Refund.aggregate([
+      {
+        $addFields: {
+          team3: {
+            $concat: [
+              { $substrCP: ['$store.area', 0, 2] },
+              { $substrCP: ['$store.area', 3, 1] }
+            ]
+          }
+        }
+      },
+      {
+        $match: {
+          ...baseFilter,
+          ...teamFilter,
+          ...zoneFilter,
+          type: 'refund',
+          status: { $nin: ['pending', 'canceled', 'reject'] }
+        }
+      }
+    ])
+    ,
+    Giveaway.aggregate([
+      {
+        $addFields: {
+          team3: {
+            $concat: [
+              { $substrCP: ['$store.area', 0, 2] },
+              { $substrCP: ['$store.area', 3, 1] }
+            ]
+          }
+        }
+      },
+      {
+        $match: {
+          ...baseFilter,
+          ...teamFilter,
+          ...zoneFilter,
+          type: 'give',
+          status: { $nin: ['canceled', 'reject'] }
+        }
+      }
+    ])
   ]);
 
-  let data = []
-
-  const productIds = [
-    ...new Set(
-      [...dataOrderSale, ...dataOrderChange]
-        .flatMap(item => item.listProduct?.map(i => i.id) ?? [])
-        .filter(Boolean) // ตัด null/undefined/'' ทิ้ง
-    )
-  ];
 
 
-  const productData = await Product.find({ id: { $in: productIds } })
+  const dataOrderPro = dataOrderSale.flatMap(item =>
+    (item.listPromotions ?? []).map(promo => ({
+      ...promo,
+      orderId: item.orderId,
+      type: 'pro'
+    }))
+  );
 
-  for (const i of [...dataOrderSale, ...dataOrderChange]) {
+  let dataSale = []
+  const productData = await Product.find()
+
+  for (const i of [...dataOrderSale, ...dataOrderPro]) {
     for (const item of (i.listProduct ?? [])) {
 
       const productDetail = productData.find(o => o.id === item.id)
-      const unitCtn = productDetail.listUnit.find(o => o.unit === 'CTN');
-      const unitBag = productDetail.listUnit.find(
-        o => o.unit === 'BAG' || o.unit === 'PAC'
-      );
-      const unitPcs = productDetail.listUnit.find(
-        o => o.unit === 'BOT' || o.unit === 'PCS'
-      );
+      const units = productDetail?.listUnit ?? [];
+      const unitCtn = units.find(u => u.unit === 'CTN') ?? {};
+      const unitBag = units.find(u => ['BAG', 'PAC'].includes(u.unit)) ?? {};
+      const unitPcs = units.find(u => ['BOT', 'PCS'].includes(u.unit)) ?? {};
 
       let ctnQty = 0
       let ctnPrice = 0
@@ -5784,6 +5825,183 @@ exports.getOrderExcelNew = async (req, res) => {
       let pcsQty = 0
       let pcsPrice = 0
 
+      if (item.unit === 'CTN') {
+        // logic สำหรับ CTN
+        ctnQty = item.qty
+        ctnPrice = item.price
+        factor = unitCtn.factor
+      } else if (item.unit === 'BAG' || item.unit === 'PAC') {
+        // logic สำหรับ BAG หรือ PAC
+        bagQty = item.qty
+        bagPrice = item.price
+        factor = unitBag.factor
+      } else if (item.unit === 'BOT' || item.unit === 'PCS') {
+        // logic สำหรับ BOT หรือ PCS
+        pcsQty = item.qty
+        pcsPrice = item.price
+        factor = unitPcs.factor
+      }
+
+      if (i.type === 'pro') {
+        typedetail = 'Promotion'
+      } else {
+        typedetail = 'Sale'
+      }
+
+      const dataTran = {
+        orderId: i.orderId,
+        productId: item.id,
+        productName: item.name,
+        ctnQty,
+        ctnPrice: ctnPrice ?? 0,
+        bagQty,
+        bagPrice: bagPrice ?? 0,
+        pcsQty,
+        pcsPrice: pcsPrice ?? 0,
+        sumPrice: item.subtotal ?? 0,
+        sumPcs: (factor ?? 1) * item.qty,
+        type: typedetail
+
+      };
+      dataSale.push(dataTran);
+    }
+  }
+
+  dataSale.sort((a, b) => {
+    if (a.orderId < b.orderId) return -1; // ASC
+    if (a.orderId > b.orderId) return 1;
+    return 0;
+  });
+
+  let dataRefundChangeTran = []
+
+  // for (const i of [...dataOrderChange, ...dataOrderRefund]) {
+  for (const i of [...dataOrderChange, ...dataOrderRefund]) {
+
+    if (i.type === 'change') {
+      typedetail = 'change'
+    } else {
+      typedetail = 'refund'
+    }
+
+
+    for (const item of (i.listProduct ?? [])) {
+
+      const productDetail = productData.find(o => o.id === item.id)
+      const units = productDetail?.listUnit ?? [];
+      const unitCtn = units.find(u => u.unit === 'CTN') ?? {};
+      const unitBag = units.find(u => ['BAG', 'PAC'].includes(u.unit)) ?? {};
+      const unitPcs = units.find(u => ['BOT', 'PCS'].includes(u.unit)) ?? {};
+
+      let ctnQty = 0
+      let ctnPrice = 0
+      let bagQty = 0
+      let bagPrice = 0
+      let pcsQty = 0
+      let pcsPrice = 0
+
+      if (item.unit === 'CTN') {
+        // logic สำหรับ CTN
+        ctnQty = item.qty
+        ctnPrice = item.price
+        factor = unitCtn.factor
+      } else if (item.unit === 'BAG' || item.unit === 'PAC') {
+        // logic สำหรับ BAG หรือ PAC
+        bagQty = item.qty
+        bagPrice = item.price
+        factor = unitBag.factor
+      } else if (item.unit === 'BOT' || item.unit === 'PCS') {
+        // logic สำหรับ BOT หรือ PCS
+        pcsQty = item.qty
+        pcsPrice = item.price
+        factor = unitPcs.factor
+      }
+
+      if (typedetail === 'change') {
+        sumPrice = item.subtotal
+      } else {
+        sumPrice = item.total
+      }
+
+      const dataTran = {
+        orderId: i.orderId,
+        productId: item.id,
+        productName: item.name,
+        ctnQty,
+        ctnPrice: ctnPrice ?? 0,
+        bagQty,
+        bagPrice: bagPrice ?? 0,
+        pcsQty,
+        pcsPrice: pcsPrice ?? 0,
+        sumPrice: sumPrice,
+        sumPcs: (factor ?? 1) * item.qty,
+        type: typedetail,
+        refundType: item.condition ?? '',
+        ref: i.reference ?? ''
+
+      };
+      dataRefundChangeTran.push(dataTran);
+    }
+  }
+
+  const refundGroups = new Map();   // key = refund.orderId, value = array ของแถว refund ทั้งหมดของออเดอร์นั้น
+  const changeGroups = new Map();   // key = change.orderId, value = array ของแถว change ทั้งหมดของออเดอร์นั้น
+
+  // เก็บลำดับปรากฏของ refund order เพื่อนำไปใช้เป็นคิวเรียง
+  const refundOrderSeq = [];
+
+  for (const row of dataRefundChangeTran) {
+    if (row.type === 'refund') {
+      if (!refundGroups.has(row.orderId)) {
+        refundGroups.set(row.orderId, []);
+        refundOrderSeq.push(row.orderId); // จำลำดับของ refund แต่ละ orderId ไว้
+      }
+      refundGroups.get(row.orderId).push(row);
+    } else if (row.type === 'change') {
+      if (!changeGroups.has(row.orderId)) {
+        changeGroups.set(row.orderId, []);
+      }
+      changeGroups.get(row.orderId).push(row);
+    }
+  }
+
+  // 2) ประกบ: เดินตามลำดับ refund → ต่อด้วย change ที่อ้างด้วย ref
+  const dataRefundChange = [];
+
+  for (const refundOrderId of refundOrderSeq) {
+    const refundRows = refundGroups.get(refundOrderId) ?? [];
+
+    // ใส่ทุกแถวของ refund (ตามออเดอร์นี้) ก่อน
+    dataRefundChange.push(...refundRows);
+
+    // หา change ที่ต้องตามมา: ใช้ค่า ref ของแถว refund (เผื่อมีหลายค่า ref ในออเดอร์เดียวกันให้ dedupe)
+    const refIds = [...new Set(refundRows.map(r => r.ref).filter(Boolean))];
+
+    for (const refId of refIds) {
+      const changeRows = changeGroups.get(refId) ?? [];
+      // ใส่ทุกแถวของ change ที่ถูกอ้างถึง
+      dataRefundChange.push(...changeRows);
+    }
+  }
+
+
+  const dataGive = [];
+
+  for (const i of [...dataOrderGive,]) {
+    for (const item of (i.listProduct ?? [])) {
+
+      const productDetail = productData.find(o => o.id === item.id)
+      const units = productDetail?.listUnit ?? [];
+      const unitCtn = units.find(u => u.unit === 'CTN') ?? {};
+      const unitBag = units.find(u => ['BAG', 'PAC'].includes(u.unit)) ?? {};
+      const unitPcs = units.find(u => ['BOT', 'PCS'].includes(u.unit)) ?? {};
+
+      let ctnQty = 0
+      let ctnPrice = 0
+      let bagQty = 0
+      let bagPrice = 0
+      let pcsQty = 0
+      let pcsPrice = 0
 
       if (item.unit === 'CTN') {
         // logic สำหรับ CTN
@@ -5803,70 +6021,130 @@ exports.getOrderExcelNew = async (req, res) => {
       }
 
 
-
-
-
-      // console.log(productDetail.listUnit[1].unit)
-
       const dataTran = {
         orderId: i.orderId,
         productId: item.id,
         productName: item.name,
         ctnQty,
-        ctnPrice,
+        ctnPrice: ctnPrice ?? 0,
         bagQty,
-        bagPrice,
+        bagPrice: bagPrice ?? 0,
         pcsQty,
-        pcsPrice,
-        sumPrice: item.subtotal,
-        sumPcs: factor * item.qty
+        pcsPrice: pcsPrice ?? 0,
+        sumPrice: item.total,
+        sumPcs: (factor ?? 1) * item.qty,
+        type: i.type
 
       };
-      data.push(dataTran);
+      dataGive.push(dataTran);
     }
   }
 
 
+
+
+
+
+
+
+
+
+
   if (excel == 'true') {
-    const wb = xlsx.utils.book_new()
-    const ws = xlsx.utils.json_to_sheet(data)
-    xlsx.utils.book_append_sheet(
-      wb,
-      ws,
-      `CheckOrderProduct${period}_${area}`
-    )
-
-    const tempPath = path.join(
-      os.tmpdir(),
-      `powerBi${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(
-        endDate
-      )}.xlsx`
-    )
-    xlsx.writeFile(wb, tempPath)
-
-    res.download(
-      tempPath,
-      `powerBi${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(
-        endDate
-      )}.xlsx`,
-      err => {
-        if (err) {
-          console.error('❌ Download error:', err)
-          // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
-          if (!res.headersSent) {
-            res.status(500).send('Download failed')
-          }
-        }
-
-        // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+    function zeroToDash(value) {
+      return value === 0 ? '-' : value
+    }
+    const dataSaleFinal = dataSale.map(item => {
+      return {
+        invoice: item.orderId,
+        รหัสสินค้า: item.productId,
+        รายละเอียดสินค้า: item.productName,
+        หีบ: zeroToDash(item.ctnQty),
+        ราคาหีบ: zeroToDash(item.ctnPrice),
+        "ถุง/แพ็ค": zeroToDash(item.bagQty),
+        ราคาถุง: zeroToDash(item.bagPrice),
+        "ซอง/ขวด": zeroToDash(item.pcsQty),
+        ราคาซอง: zeroToDash(item.pcsPrice),
+        จำนวนเงิน: zeroToDash(item.sumPrice),
+        จำนวนรวมชิ้น: zeroToDash(item.sumPcs),
+        ประเภทรายการ: item.type
       }
-    )
+    })
+
+    const dataRefundFinal = dataRefundChange.map(item => {
+      return {
+        invoice: item.orderId,
+        รหัสสินค้า: item.productId,
+        รายละเอียดสินค้า: item.productName,
+        หีบ: zeroToDash(item.ctnQty),
+        ราคาหีบ: zeroToDash(item.ctnPrice),
+        "ถุง/แพ็ค": zeroToDash(item.bagQty),
+        ราคาถุง: zeroToDash(item.bagPrice),
+        "ซอง/ขวด": zeroToDash(item.pcsQty),
+        ราคาซอง: zeroToDash(item.pcsPrice),
+        จำนวนเงิน: zeroToDash(item.sumPrice),
+        จำนวนรวมชิ้น: zeroToDash(item.sumPcs),
+        ประเภทรายการ: item.type,
+        ประเภทการคืน: item.refundType,
+        ref: item.ref
+      }
+    })
+
+    const dataGiveFinal = dataGive.map(item => {
+      return {
+        invoice: item.orderId,
+        รหัสสินค้า: item.productId,
+        รายละเอียดสินค้า: item.productName,
+        หีบ: zeroToDash(item.ctnQty),
+        ราคาหีบ: zeroToDash(item.ctnPrice),
+        "ถุง/แพ็ค": zeroToDash(item.bagQty),
+        ราคาถุง: zeroToDash(item.bagPrice),
+        "ซอง/ขวด": zeroToDash(item.pcsQty),
+        ราคาซอง: zeroToDash(item.pcsPrice),
+        จำนวนเงิน: zeroToDash(item.sumPrice),
+        จำนวนรวมชิ้น: zeroToDash(item.sumPcs),
+        ประเภทรายการ: item.type
+      }
+    })
+
+
+    const parts = [area, team, zone].filter(v => v) // เก็บเฉพาะค่าที่ truthy (ไม่ว่าง/null/undefined)
+    const fileName = `CheckOrderProduct_${parts.join("_")}.xlsx`
+    const tempPath = path.join(os.tmpdir(), fileName);
+
+    const wb = xlsx.utils.book_new();
+
+    // ✅ สร้าง 2 sheet แยก
+    const wsSale = xlsx.utils.json_to_sheet(dataSaleFinal);
+    const wsRefund = xlsx.utils.json_to_sheet(dataRefundFinal);
+    const wsGive = xlsx.utils.json_to_sheet(dataGiveFinal);
+    // ✅ เพิ่มเข้า workbook เป็น 2 ชีต
+    xlsx.utils.book_append_sheet(wb, wsSale, `Sale_${area}`);
+    xlsx.utils.book_append_sheet(wb, wsRefund, `Refund_${area}`);
+    xlsx.utils.book_append_sheet(wb, wsGive, `Give_${area}`);
+    // ✅ เขียนไฟล์ไปยัง tempPath (ต้องเขียนที่เดียวกับที่กำลังจะดาวน์โหลด)
+    xlsx.writeFile(wb, tempPath);
+
+    // ✅ ส่งไฟล์ให้ดาวน์โหลด แล้วค่อยลบทิ้ง
+    res.download(tempPath, fileName, err => {
+      if (err) {
+        console.error('❌ Download error:', err);
+        if (!res.headersSent) {
+          res.status(500).send('Download failed');
+        }
+      }
+      // ลบไฟล์ทิ้งหลังจบ (สำเร็จหรือไม่ก็ตาม)
+      fs.unlink(tempPath, () => { });
+    });
   } else {
     return res.status(200).json({
       status: 200,
       message: 'Sucess',
-      data: data
+      data: {
+        dataSale
+        , dataRefundChange,
+        dataGive
+      }
     })
   }
 }
