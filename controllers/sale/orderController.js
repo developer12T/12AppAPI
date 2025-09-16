@@ -5916,14 +5916,14 @@ exports.getOrderExcelNew = async (req, res) => {
         factor = unitPcs.factor
       }
 
-      if (i.type === 'pro') {
-        typedetail = 'Promotion'
-      } else {
-        typedetail = 'Sale'
-      }
+      // if (i.type === 'pro') {
+      //   typedetail = 'Promotion'
+      // } else {
+      //   typedetail = 'Sale'
+      // }
 
       const dataTran = {
-        orderId: i.orderId,
+        // orderId: i.orderId,
         productId: item.id,
         productName: item.name,
         ctnQty,
@@ -5934,7 +5934,7 @@ exports.getOrderExcelNew = async (req, res) => {
         pcsPrice: pcsPrice ?? 0,
         sumPrice: item.subtotal ?? 0,
         sumPcs: (factor ?? 1) * item.qty,
-        type: typedetail
+        // type: typedetail
 
       };
       dataSale.push(dataTran);
