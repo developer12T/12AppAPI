@@ -2401,10 +2401,10 @@ exports.updateRouteAllStore = async (req, res) => {
       const day = `R${r.day}`
 
       // อัปเดตเฉพาะเมื่อค่าเปลี่ยนจริง ๆ
-      const result = await Store.updateOne(
-        { storeId: item.storeId, route: { $ne: day } },
-        { $set: { route: day } }
-      )
+      // const result = await Store.updateOne(
+      //   { storeId: item.storeId, route: { $ne: day } },
+      //   { $set: { route: day } }
+      // )
 
       if (result.modifiedCount > 0) {
         updated.push({ storeId: item.storeId, route: day })
