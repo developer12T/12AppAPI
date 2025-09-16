@@ -5086,9 +5086,10 @@ exports.getTarget = async (req, res) => {
     recieveQty: recieveQty,
     adjustStock: to2(adjustStock),
     adjustStockQty: adjustStockQty,
-    target: parseFloat(dataTarget?.TG_AMOUNT ?? 0),
+    target: parseFloat(dataTarget?.TG_AMOUNT * 1.07 ?? 0),
     targetPercent:
-      to2((sale * 100) / parseFloat(dataTarget?.TG_AMOUNT ?? 0) ?? 0) ?? 0
+      to2((sale * 100) / parseFloat(dataTarget?.TG_AMOUNT * 1.07 ?? 0) ?? 0) ??
+      0
   })
 }
 
@@ -5493,44 +5494,6 @@ exports.orderPowerBI = async (req, res) => {
     })
   }
 }
-exports.productOrderToExcel = async (req, res) => {
-  const { channel } = req.query
-  let { startDate, endDate } = req.query
-
-  let statusArray = (req.query.status || '')
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean)
-
-  if (statusArray.length === 0) {
-    statusArray = ['pending'] // default
-  }
-
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-
-  if (!/^\d{8}$/.test(startDate)) {
-    const nowTH = new Date(
-      new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })
-    )
-    const y = nowTH.getFullYear()
-    const m = String(nowTH.getMonth() + 1).padStart(2, '0')
-    const d = String(nowTH.getDate()).padStart(2, '0') // ← ใช้ getDate() ไม่ใช่ getDay()
-    startDate = `${y}${m}${d}` // YYYYMMDD
-    endDate = `${y}${m}${d}` // YYYYMMDD
-  }
-  const startTH = new Date(
-    `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
-      6,
-      8
-    )}T00:00:00+07:00`
-  )
-  const endTH = new Date(
-    `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(
-      6,
-      8
-    )}T23:59:59.999+07:00`
-  )
-}
 
 exports.getTargetProduct = async (req, res) => {
   const { period, area, team, zone } = req.query
@@ -5764,7 +5727,6 @@ exports.getTargetProduct = async (req, res) => {
 }
 
 exports.getOrderExcelNew = async (req, res) => {
-
   const { period, area, team, zone, excel } = req.query
   const channel = req.headers['x-channel']
 
@@ -5772,7 +5734,7 @@ exports.getOrderExcelNew = async (req, res) => {
   const { Refund } = getModelsByChannel(channel, res, refundModel)
   const { Product } = getModelsByChannel(channel, res, productModel)
   const { Giveaway } = getModelsByChannel(channel, res, giveModel)
-  const baseFilter = {};
+  const baseFilter = {}
   if (area) baseFilter['store.area'] = area
 
   const teamFilter = {}
@@ -5781,96 +5743,93 @@ exports.getOrderExcelNew = async (req, res) => {
   const zoneFilter = {}
   if (zone) zoneFilter['store.zone'] = zone
 
-  const [dataOrderSale, dataOrderChange, dataOrderRefund, dataOrderGive] = await Promise.all([
-    Order.aggregate([
-      {
-        $addFields: {
-          team3: {
-            $concat: [
-              { $substrCP: ['$store.area', 0, 2] },
-              { $substrCP: ['$store.area', 3, 1] }
-            ]
+  const [dataOrderSale, dataOrderChange, dataOrderRefund, dataOrderGive] =
+    await Promise.all([
+      Order.aggregate([
+        {
+          $addFields: {
+            team3: {
+              $concat: [
+                { $substrCP: ['$store.area', 0, 2] },
+                { $substrCP: ['$store.area', 3, 1] }
+              ]
+            }
+          }
+        },
+        {
+          $match: {
+            ...baseFilter,
+            ...teamFilter,
+            ...zoneFilter,
+            type: 'sale',
+            status: { $nin: ['canceled', 'reject'] }
           }
         }
-      },
-      {
-        $match: {
-          ...baseFilter,
-          ...teamFilter,
-          ...zoneFilter,
-          type: 'sale',
-          status: { $nin: ['canceled', 'reject'] }
-        }
-      }
-    ]),
-    Order.aggregate([
-      {
-        $addFields: {
-          team3: {
-            $concat: [
-              { $substrCP: ['$store.area', 0, 2] },
-              { $substrCP: ['$store.area', 3, 1] }
-            ]
+      ]),
+      Order.aggregate([
+        {
+          $addFields: {
+            team3: {
+              $concat: [
+                { $substrCP: ['$store.area', 0, 2] },
+                { $substrCP: ['$store.area', 3, 1] }
+              ]
+            }
+          }
+        },
+        {
+          $match: {
+            ...baseFilter,
+            ...teamFilter,
+            ...zoneFilter,
+            type: 'change',
+            status: { $nin: ['pending', 'canceled', 'reject'] }
           }
         }
-      },
-      {
-        $match: {
-          ...baseFilter,
-          ...teamFilter,
-          ...zoneFilter,
-          type: 'change',
-          status: { $nin: ['pending', 'canceled', 'reject'] }
+      ]),
+      Refund.aggregate([
+        {
+          $addFields: {
+            team3: {
+              $concat: [
+                { $substrCP: ['$store.area', 0, 2] },
+                { $substrCP: ['$store.area', 3, 1] }
+              ]
+            }
+          }
+        },
+        {
+          $match: {
+            ...baseFilter,
+            ...teamFilter,
+            ...zoneFilter,
+            type: 'refund',
+            status: { $nin: ['pending', 'canceled', 'reject'] }
+          }
         }
-      }
+      ]),
+      Giveaway.aggregate([
+        {
+          $addFields: {
+            team3: {
+              $concat: [
+                { $substrCP: ['$store.area', 0, 2] },
+                { $substrCP: ['$store.area', 3, 1] }
+              ]
+            }
+          }
+        },
+        {
+          $match: {
+            ...baseFilter,
+            ...teamFilter,
+            ...zoneFilter,
+            type: 'give',
+            status: { $nin: ['canceled', 'reject'] }
+          }
+        }
+      ])
     ])
-    ,
-    Refund.aggregate([
-      {
-        $addFields: {
-          team3: {
-            $concat: [
-              { $substrCP: ['$store.area', 0, 2] },
-              { $substrCP: ['$store.area', 3, 1] }
-            ]
-          }
-        }
-      },
-      {
-        $match: {
-          ...baseFilter,
-          ...teamFilter,
-          ...zoneFilter,
-          type: 'refund',
-          status: { $nin: ['pending', 'canceled', 'reject'] }
-        }
-      }
-    ])
-    ,
-    Giveaway.aggregate([
-      {
-        $addFields: {
-          team3: {
-            $concat: [
-              { $substrCP: ['$store.area', 0, 2] },
-              { $substrCP: ['$store.area', 3, 1] }
-            ]
-          }
-        }
-      },
-      {
-        $match: {
-          ...baseFilter,
-          ...teamFilter,
-          ...zoneFilter,
-          type: 'give',
-          status: { $nin: ['canceled', 'reject'] }
-        }
-      }
-    ])
-  ]);
-
-
 
   const dataOrderPro = dataOrderSale.flatMap(item =>
     (item.listPromotions ?? []).map(promo => ({
@@ -5878,19 +5837,18 @@ exports.getOrderExcelNew = async (req, res) => {
       orderId: item.orderId,
       type: 'pro'
     }))
-  );
+  )
 
   let dataSale = []
   const productData = await Product.find()
 
   for (const i of [...dataOrderSale, ...dataOrderPro]) {
-    for (const item of (i.listProduct ?? [])) {
-
+    for (const item of i.listProduct ?? []) {
       const productDetail = productData.find(o => o.id === item.id)
-      const units = productDetail?.listUnit ?? [];
-      const unitCtn = units.find(u => u.unit === 'CTN') ?? {};
-      const unitBag = units.find(u => ['BAG', 'PAC'].includes(u.unit)) ?? {};
-      const unitPcs = units.find(u => ['BOT', 'PCS'].includes(u.unit)) ?? {};
+      const units = productDetail?.listUnit ?? []
+      const unitCtn = units.find(u => u.unit === 'CTN') ?? {}
+      const unitBag = units.find(u => ['BAG', 'PAC'].includes(u.unit)) ?? {}
+      const unitPcs = units.find(u => ['BOT', 'PCS'].includes(u.unit)) ?? {}
 
       let ctnQty = 0
       let ctnPrice = 0
@@ -5935,37 +5893,33 @@ exports.getOrderExcelNew = async (req, res) => {
         sumPrice: item.subtotal ?? 0,
         sumPcs: (factor ?? 1) * item.qty,
         type: typedetail
-
-      };
-      dataSale.push(dataTran);
+      }
+      dataSale.push(dataTran)
     }
   }
 
   dataSale.sort((a, b) => {
-    if (a.orderId < b.orderId) return -1; // ASC
-    if (a.orderId > b.orderId) return 1;
-    return 0;
-  });
+    if (a.orderId < b.orderId) return -1 // ASC
+    if (a.orderId > b.orderId) return 1
+    return 0
+  })
 
   let dataRefundChangeTran = []
 
   // for (const i of [...dataOrderChange, ...dataOrderRefund]) {
   for (const i of [...dataOrderChange, ...dataOrderRefund]) {
-
     if (i.type === 'change') {
       typedetail = 'change'
     } else {
       typedetail = 'refund'
     }
 
-
-    for (const item of (i.listProduct ?? [])) {
-
+    for (const item of i.listProduct ?? []) {
       const productDetail = productData.find(o => o.id === item.id)
-      const units = productDetail?.listUnit ?? [];
-      const unitCtn = units.find(u => u.unit === 'CTN') ?? {};
-      const unitBag = units.find(u => ['BAG', 'PAC'].includes(u.unit)) ?? {};
-      const unitPcs = units.find(u => ['BOT', 'PCS'].includes(u.unit)) ?? {};
+      const units = productDetail?.listUnit ?? []
+      const unitCtn = units.find(u => u.unit === 'CTN') ?? {}
+      const unitBag = units.find(u => ['BAG', 'PAC'].includes(u.unit)) ?? {}
+      const unitPcs = units.find(u => ['BOT', 'PCS'].includes(u.unit)) ?? {}
 
       let ctnQty = 0
       let ctnPrice = 0
@@ -6012,63 +5966,60 @@ exports.getOrderExcelNew = async (req, res) => {
         type: typedetail,
         refundType: item.condition ?? '',
         ref: i.reference ?? ''
-
-      };
-      dataRefundChangeTran.push(dataTran);
+      }
+      dataRefundChangeTran.push(dataTran)
     }
   }
 
-  const refundGroups = new Map();   // key = refund.orderId, value = array ของแถว refund ทั้งหมดของออเดอร์นั้น
-  const changeGroups = new Map();   // key = change.orderId, value = array ของแถว change ทั้งหมดของออเดอร์นั้น
+  const refundGroups = new Map() // key = refund.orderId, value = array ของแถว refund ทั้งหมดของออเดอร์นั้น
+  const changeGroups = new Map() // key = change.orderId, value = array ของแถว change ทั้งหมดของออเดอร์นั้น
 
   // เก็บลำดับปรากฏของ refund order เพื่อนำไปใช้เป็นคิวเรียง
-  const refundOrderSeq = [];
+  const refundOrderSeq = []
 
   for (const row of dataRefundChangeTran) {
     if (row.type === 'refund') {
       if (!refundGroups.has(row.orderId)) {
-        refundGroups.set(row.orderId, []);
-        refundOrderSeq.push(row.orderId); // จำลำดับของ refund แต่ละ orderId ไว้
+        refundGroups.set(row.orderId, [])
+        refundOrderSeq.push(row.orderId) // จำลำดับของ refund แต่ละ orderId ไว้
       }
-      refundGroups.get(row.orderId).push(row);
+      refundGroups.get(row.orderId).push(row)
     } else if (row.type === 'change') {
       if (!changeGroups.has(row.orderId)) {
-        changeGroups.set(row.orderId, []);
+        changeGroups.set(row.orderId, [])
       }
-      changeGroups.get(row.orderId).push(row);
+      changeGroups.get(row.orderId).push(row)
     }
   }
 
   // 2) ประกบ: เดินตามลำดับ refund → ต่อด้วย change ที่อ้างด้วย ref
-  const dataRefundChange = [];
+  const dataRefundChange = []
 
   for (const refundOrderId of refundOrderSeq) {
-    const refundRows = refundGroups.get(refundOrderId) ?? [];
+    const refundRows = refundGroups.get(refundOrderId) ?? []
 
     // ใส่ทุกแถวของ refund (ตามออเดอร์นี้) ก่อน
-    dataRefundChange.push(...refundRows);
+    dataRefundChange.push(...refundRows)
 
     // หา change ที่ต้องตามมา: ใช้ค่า ref ของแถว refund (เผื่อมีหลายค่า ref ในออเดอร์เดียวกันให้ dedupe)
-    const refIds = [...new Set(refundRows.map(r => r.ref).filter(Boolean))];
+    const refIds = [...new Set(refundRows.map(r => r.ref).filter(Boolean))]
 
     for (const refId of refIds) {
-      const changeRows = changeGroups.get(refId) ?? [];
+      const changeRows = changeGroups.get(refId) ?? []
       // ใส่ทุกแถวของ change ที่ถูกอ้างถึง
-      dataRefundChange.push(...changeRows);
+      dataRefundChange.push(...changeRows)
     }
   }
 
+  const dataGive = []
 
-  const dataGive = [];
-
-  for (const i of [...dataOrderGive,]) {
-    for (const item of (i.listProduct ?? [])) {
-
+  for (const i of [...dataOrderGive]) {
+    for (const item of i.listProduct ?? []) {
       const productDetail = productData.find(o => o.id === item.id)
-      const units = productDetail?.listUnit ?? [];
-      const unitCtn = units.find(u => u.unit === 'CTN') ?? {};
-      const unitBag = units.find(u => ['BAG', 'PAC'].includes(u.unit)) ?? {};
-      const unitPcs = units.find(u => ['BOT', 'PCS'].includes(u.unit)) ?? {};
+      const units = productDetail?.listUnit ?? []
+      const unitCtn = units.find(u => u.unit === 'CTN') ?? {}
+      const unitBag = units.find(u => ['BAG', 'PAC'].includes(u.unit)) ?? {}
+      const unitPcs = units.find(u => ['BOT', 'PCS'].includes(u.unit)) ?? {}
 
       let ctnQty = 0
       let ctnPrice = 0
@@ -6094,7 +6045,6 @@ exports.getOrderExcelNew = async (req, res) => {
         factor = unitPcs.factor
       }
 
-
       const dataTran = {
         orderId: i.orderId,
         productId: item.id,
@@ -6108,24 +6058,13 @@ exports.getOrderExcelNew = async (req, res) => {
         sumPrice: item.total,
         sumPcs: (factor ?? 1) * item.qty,
         type: i.type
-
-      };
-      dataGive.push(dataTran);
+      }
+      dataGive.push(dataTran)
     }
   }
 
-
-
-
-
-
-
-
-
-
-
   if (excel == 'true') {
-    function zeroToDash(value) {
+    function zeroToDash (value) {
       return value === 0 ? '-' : value
     }
     const dataSaleFinal = dataSale.map(item => {
@@ -6135,9 +6074,9 @@ exports.getOrderExcelNew = async (req, res) => {
         รายละเอียดสินค้า: item.productName,
         หีบ: zeroToDash(item.ctnQty),
         ราคาหีบ: zeroToDash(item.ctnPrice),
-        "ถุง/แพ็ค": zeroToDash(item.bagQty),
+        'ถุง/แพ็ค': zeroToDash(item.bagQty),
         ราคาถุง: zeroToDash(item.bagPrice),
-        "ซอง/ขวด": zeroToDash(item.pcsQty),
+        'ซอง/ขวด': zeroToDash(item.pcsQty),
         ราคาซอง: zeroToDash(item.pcsPrice),
         จำนวนเงิน: zeroToDash(item.sumPrice),
         จำนวนรวมชิ้น: zeroToDash(item.sumPcs),
@@ -6152,9 +6091,9 @@ exports.getOrderExcelNew = async (req, res) => {
         รายละเอียดสินค้า: item.productName,
         หีบ: zeroToDash(item.ctnQty),
         ราคาหีบ: zeroToDash(item.ctnPrice),
-        "ถุง/แพ็ค": zeroToDash(item.bagQty),
+        'ถุง/แพ็ค': zeroToDash(item.bagQty),
         ราคาถุง: zeroToDash(item.bagPrice),
-        "ซอง/ขวด": zeroToDash(item.pcsQty),
+        'ซอง/ขวด': zeroToDash(item.pcsQty),
         ราคาซอง: zeroToDash(item.pcsPrice),
         จำนวนเงิน: zeroToDash(item.sumPrice),
         จำนวนรวมชิ้น: zeroToDash(item.sumPcs),
@@ -6171,9 +6110,9 @@ exports.getOrderExcelNew = async (req, res) => {
         รายละเอียดสินค้า: item.productName,
         หีบ: zeroToDash(item.ctnQty),
         ราคาหีบ: zeroToDash(item.ctnPrice),
-        "ถุง/แพ็ค": zeroToDash(item.bagQty),
+        'ถุง/แพ็ค': zeroToDash(item.bagQty),
         ราคาถุง: zeroToDash(item.bagPrice),
-        "ซอง/ขวด": zeroToDash(item.pcsQty),
+        'ซอง/ขวด': zeroToDash(item.pcsQty),
         ราคาซอง: zeroToDash(item.pcsPrice),
         จำนวนเงิน: zeroToDash(item.sumPrice),
         จำนวนรวมชิ้น: zeroToDash(item.sumPcs),
@@ -6181,42 +6120,41 @@ exports.getOrderExcelNew = async (req, res) => {
       }
     })
 
-
     const parts = [area, team, zone].filter(v => v) // เก็บเฉพาะค่าที่ truthy (ไม่ว่าง/null/undefined)
-    const fileName = `CheckOrderProduct_${parts.join("_")}.xlsx`
-    const tempPath = path.join(os.tmpdir(), fileName);
+    const fileName = `CheckOrderProduct_${parts.join('_')}.xlsx`
+    const tempPath = path.join(os.tmpdir(), fileName)
 
-    const wb = xlsx.utils.book_new();
+    const wb = xlsx.utils.book_new()
 
     // ✅ สร้าง 2 sheet แยก
-    const wsSale = xlsx.utils.json_to_sheet(dataSaleFinal);
-    const wsRefund = xlsx.utils.json_to_sheet(dataRefundFinal);
-    const wsGive = xlsx.utils.json_to_sheet(dataGiveFinal);
+    const wsSale = xlsx.utils.json_to_sheet(dataSaleFinal)
+    const wsRefund = xlsx.utils.json_to_sheet(dataRefundFinal)
+    const wsGive = xlsx.utils.json_to_sheet(dataGiveFinal)
     // ✅ เพิ่มเข้า workbook เป็น 2 ชีต
-    xlsx.utils.book_append_sheet(wb, wsSale, `Sale_${area}`);
-    xlsx.utils.book_append_sheet(wb, wsRefund, `Refund_${area}`);
-    xlsx.utils.book_append_sheet(wb, wsGive, `Give_${area}`);
+    xlsx.utils.book_append_sheet(wb, wsSale, `Sale_${area}`)
+    xlsx.utils.book_append_sheet(wb, wsRefund, `Refund_${area}`)
+    xlsx.utils.book_append_sheet(wb, wsGive, `Give_${area}`)
     // ✅ เขียนไฟล์ไปยัง tempPath (ต้องเขียนที่เดียวกับที่กำลังจะดาวน์โหลด)
-    xlsx.writeFile(wb, tempPath);
+    xlsx.writeFile(wb, tempPath)
 
     // ✅ ส่งไฟล์ให้ดาวน์โหลด แล้วค่อยลบทิ้ง
     res.download(tempPath, fileName, err => {
       if (err) {
-        console.error('❌ Download error:', err);
+        console.error('❌ Download error:', err)
         if (!res.headersSent) {
-          res.status(500).send('Download failed');
+          res.status(500).send('Download failed')
         }
       }
       // ลบไฟล์ทิ้งหลังจบ (สำเร็จหรือไม่ก็ตาม)
-      fs.unlink(tempPath, () => { });
-    });
+      fs.unlink(tempPath, () => {})
+    })
   } else {
     return res.status(200).json({
       status: 200,
       message: 'Sucess',
       data: {
-        dataSale
-        , dataRefundChange,
+        dataSale,
+        dataRefundChange,
         dataGive
       }
     })
