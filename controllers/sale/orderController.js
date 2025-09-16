@@ -1319,7 +1319,7 @@ exports.OrderToExcel = async (req, res) => {
       // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
 
       return {
-        AREA: order.store.area,
+        // AREA: order.store.area,
         CUNO: order.store.storeId,
         FACI: 'F10',
         WHLO: order.sale.warehouse,
