@@ -222,7 +222,7 @@ const generateGiveawaysId = async (area, warehouse, type, channel, res) => {
     .select('orderId')
 
   let runningNumber = latestOrder
-    ? parseInt(latestOrder.orderId.slice(-2)) + 1
+    ? parseInt(latestOrder.orderId.slice(-4)) + 1
     : 1
 
   return `${currentYear
