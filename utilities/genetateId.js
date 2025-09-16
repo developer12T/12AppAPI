@@ -206,9 +206,10 @@ const generateGiveawaysId = async (area, warehouse, type, channel, res) => {
   const currentMonth = (new Date().getMonth() + 1).toString().padStart(2, '0')
 
   const { Giveaway } = getModelsByChannel(channel, res, giveawayModel)
+  const giveType = type
   const orderType = type.slice(1, 3)
   const latestOrder = await Giveaway.findOne({
-    // 'store.area': area,
+    'giveInfo.type': giveType,
     createdAt: {
       $gte: new Date(`${new Date().getFullYear()}-${currentMonth}-01`),
       $lt: new Date(
@@ -221,7 +222,7 @@ const generateGiveawaysId = async (area, warehouse, type, channel, res) => {
     .select('orderId')
 
   let runningNumber = latestOrder
-    ? parseInt(latestOrder.orderId.slice(-2)) + 1
+    ? parseInt(latestOrder.orderId.slice(-4)) + 1
     : 1
 
   return `${currentYear
