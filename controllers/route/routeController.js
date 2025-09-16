@@ -2090,7 +2090,7 @@ exports.checkRouteStore = async (req, res) => {
       areaMap[area].del = storeCountMap[area]?.del || 0
     }
 
-    function sortKeys (obj) {
+    function sortKeys(obj) {
       const { area, R, del, ...days } = obj
       const sortedDays = Object.keys(days)
         .filter(k => /^R\d+$/.test(k))
@@ -2301,4 +2301,65 @@ exports.addStoreOneToRoute = async (req, res) => {
     message: 'sucess'
     // data: newData
   })
+}
+
+
+exports.getLatLongStore = async (req, res) => {
+
+  const { storeId } = req.body
+  const channel = req.headers['x-channel']
+  const { Route } = getModelsByChannel(channel, res, routeModel)
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+
+  const storeData = await Store.findOne({ storeId: storeId }).select('_id area')
+
+  const routeData = await Route.aggregate([
+    {
+      $match: {
+        area: storeData.area,
+      }
+    },
+    { $unwind: '$listStore' },
+    {
+      $match: {
+        'listStore.storeInfo': String(storeData._id)
+      }
+    }
+  ])
+
+
+
+
+  let data = []
+  for (const i of routeData) {
+
+    if (i.listStore.status === '0') {
+      continue
+    }
+    dataTran = {
+      id:i.id,
+      period:i.period,
+      lat:i.listStore.latitude,
+      long:i.listStore.longtitude
+    }
+
+    data.push(dataTran)
+  }
+
+
+  if (data.length === 0) {
+    return res.status(404).json({
+      status:404,
+      message:'Not found Lat Long'
+    })
+  }
+
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'Sucess',
+    data: data
+  })
+
 }
