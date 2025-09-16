@@ -22,7 +22,9 @@ const {
   checkRouteStore,
   polylineRoute,
   addRouteIt,
-  addStoreOneToRoute
+  addStoreOneToRoute,
+  getLatLongStore,
+  updateRouteAllStore
 } = require('../../controllers/route/routeController')
 
 const router = express.Router()
@@ -51,4 +53,6 @@ router.get('/polylineRoute', polylineRoute)
 
 router.post('/addRouteIt', addRouteIt)
 router.post('/addStoreOneToRoute', addStoreOneToRoute)
+router.post('/getLatLongStore', getLatLongStore)
+router.post('/updateRouteAllStore', updateRouteAllStore)
 module.exports = router
