@@ -5088,7 +5088,8 @@ exports.getTarget = async (req, res) => {
     adjustStockQty: adjustStockQty,
     target: parseFloat(dataTarget?.TG_AMOUNT ?? 0),
     targetPercent:
-      to2((sale * 100) / parseFloat(dataTarget?.TG_AMOUNT ?? 0) ?? 0) ?? 0
+      to2((sale * 100) / parseFloat(dataTarget?.TG_AMOUNT * 1.07 ?? 0) ?? 0) ??
+      0
   })
 }
 
@@ -5890,14 +5891,36 @@ exports.getOrderExcelNew = async (req, res) => {
         pcsQty,
         pcsPrice: pcsPrice ?? 0,
         sumPrice: item.subtotal ?? 0,
-        sumPcs: (factor ?? 1) * item.qty,
-        type: typedetail
+        sumPcs: (factor ?? 1) * item.qty
+        // type: typedetail
       }
       dataSale.push(dataTran)
     }
   }
 
-  dataSale.sort((a, b) => {
+  const dataSaleArray = Object.values(
+    dataSale.reduce((acc, curr) => {
+      const key = `${curr.productId}`
+      if (acc[key]) {
+        acc[key] = {
+          ...curr,
+          ctnQty: (acc[key].ctnQty || 0) + (curr.ctnQty || 0),
+          ctnPrice: (acc[key].ctnPrice || 0) + (curr.ctnPrice || 0),
+          bagQty: (acc[key].bagQty || 0) + (curr.bagQty || 0),
+          bagPrice: (acc[key].bagPrice || 0) + (curr.bagPrice || 0),
+          pcsQty: (acc[key].pcsQty || 0) + (curr.pcsQty || 0),
+          pcsPrice: (acc[key].pcsPrice || 0) + (curr.pcsPrice || 0),
+          sumPrice: (acc[key].sumPrice || 0) + (curr.sumPrice || 0),
+          sumPcs: (acc[key].sumPcs || 0) + (curr.sumPcs || 0)
+        }
+      } else {
+        acc[key] = { ...curr }
+      }
+      return acc
+    }, {})
+  )
+
+  dataSaleArray.sort((a, b) => {
     if (a.orderId < b.orderId) return -1 // ASC
     if (a.orderId > b.orderId) return 1
     return 0
@@ -5951,7 +5974,7 @@ exports.getOrderExcelNew = async (req, res) => {
       }
 
       const dataTran = {
-        orderId: i.orderId,
+        // orderId: i.orderId,
         productId: item.id,
         productName: item.name,
         ctnQty,
@@ -5963,52 +5986,74 @@ exports.getOrderExcelNew = async (req, res) => {
         sumPrice: sumPrice,
         sumPcs: (factor ?? 1) * item.qty,
         type: typedetail,
-        refundType: item.condition ?? '',
-        ref: i.reference ?? ''
+        refundType: item.condition ?? ''
+        // ref: i.reference ?? ''
       }
       dataRefundChangeTran.push(dataTran)
     }
   }
 
-  const refundGroups = new Map() // key = refund.orderId, value = array ของแถว refund ทั้งหมดของออเดอร์นั้น
-  const changeGroups = new Map() // key = change.orderId, value = array ของแถว change ทั้งหมดของออเดอร์นั้น
+  const dataRefundChange = Object.values(
+    dataRefundChangeTran.reduce((acc, curr) => {
+      const key = `${curr.productId}_${curr.type}_${curr.refundType}`
+      if (acc[key]) {
+        acc[key] = {
+          ...curr,
+          ctnQty: (acc[key].ctnQty || 0) + (curr.ctnQty || 0),
+          ctnPrice: (acc[key].ctnPrice || 0) + (curr.ctnPrice || 0),
+          bagQty: (acc[key].bagQty || 0) + (curr.bagQty || 0),
+          bagPrice: (acc[key].bagPrice || 0) + (curr.bagPrice || 0),
+          pcsQty: (acc[key].pcsQty || 0) + (curr.pcsQty || 0),
+          pcsPrice: (acc[key].pcsPrice || 0) + (curr.pcsPrice || 0),
+          sumPrice: (acc[key].sumPrice || 0) + (curr.sumPrice || 0),
+          sumPcs: (acc[key].sumPcs || 0) + (curr.sumPcs || 0)
+        }
+      } else {
+        acc[key] = { ...curr }
+      }
+      return acc
+    }, {})
+  )
+
+  // const refundGroups = new Map() // key = refund.orderId, value = array ของแถว refund ทั้งหมดของออเดอร์นั้น
+  // const changeGroups = new Map() // key = change.orderId, value = array ของแถว change ทั้งหมดของออเดอร์นั้น
 
   // เก็บลำดับปรากฏของ refund order เพื่อนำไปใช้เป็นคิวเรียง
-  const refundOrderSeq = []
+  // const refundOrderSeq = []
 
-  for (const row of dataRefundChangeTran) {
-    if (row.type === 'refund') {
-      if (!refundGroups.has(row.orderId)) {
-        refundGroups.set(row.orderId, [])
-        refundOrderSeq.push(row.orderId) // จำลำดับของ refund แต่ละ orderId ไว้
-      }
-      refundGroups.get(row.orderId).push(row)
-    } else if (row.type === 'change') {
-      if (!changeGroups.has(row.orderId)) {
-        changeGroups.set(row.orderId, [])
-      }
-      changeGroups.get(row.orderId).push(row)
-    }
-  }
+  // for (const row of dataRefundChangeTran) {
+  //   if (row.type === 'refund') {
+  //     if (!refundGroups.has(row.orderId)) {
+  //       refundGroups.set(row.orderId, [])
+  //       refundOrderSeq.push(row.orderId) // จำลำดับของ refund แต่ละ orderId ไว้
+  //     }
+  //     refundGroups.get(row.orderId).push(row)
+  //   } else if (row.type === 'change') {
+  //     if (!changeGroups.has(row.orderId)) {
+  //       changeGroups.set(row.orderId, [])
+  //     }
+  //     changeGroups.get(row.orderId).push(row)
+  //   }
+  // }
 
   // 2) ประกบ: เดินตามลำดับ refund → ต่อด้วย change ที่อ้างด้วย ref
-  const dataRefundChange = []
+  // const dataRefundChange = []
 
-  for (const refundOrderId of refundOrderSeq) {
-    const refundRows = refundGroups.get(refundOrderId) ?? []
+  // for (const refundOrderId of refundOrderSeq) {
+  //   const refundRows = refundGroups.get(refundOrderId) ?? []
 
-    // ใส่ทุกแถวของ refund (ตามออเดอร์นี้) ก่อน
-    dataRefundChange.push(...refundRows)
+  //   // ใส่ทุกแถวของ refund (ตามออเดอร์นี้) ก่อน
+  //   dataRefundChange.push(...refundRows)
 
-    // หา change ที่ต้องตามมา: ใช้ค่า ref ของแถว refund (เผื่อมีหลายค่า ref ในออเดอร์เดียวกันให้ dedupe)
-    const refIds = [...new Set(refundRows.map(r => r.ref).filter(Boolean))]
+  //   // หา change ที่ต้องตามมา: ใช้ค่า ref ของแถว refund (เผื่อมีหลายค่า ref ในออเดอร์เดียวกันให้ dedupe)
+  //   const refIds = [...new Set(refundRows.map(r => r.ref).filter(Boolean))]
 
-    for (const refId of refIds) {
-      const changeRows = changeGroups.get(refId) ?? []
-      // ใส่ทุกแถวของ change ที่ถูกอ้างถึง
-      dataRefundChange.push(...changeRows)
-    }
-  }
+  //   for (const refId of refIds) {
+  //     const changeRows = changeGroups.get(refId) ?? []
+  //     // ใส่ทุกแถวของ change ที่ถูกอ้างถึง
+  //     dataRefundChange.push(...changeRows)
+  //   }
+  // }
 
   const dataGive = []
 
@@ -6062,13 +6107,35 @@ exports.getOrderExcelNew = async (req, res) => {
     }
   }
 
+  const dataGiveArray = Object.values(
+    dataGive.reduce((acc, curr) => {
+      const key = `${curr.productId}`
+      if (acc[key]) {
+        acc[key] = {
+          ...curr,
+          ctnQty: (acc[key].ctnQty || 0) + (curr.ctnQty || 0),
+          ctnPrice: (acc[key].ctnPrice || 0) + (curr.ctnPrice || 0),
+          bagQty: (acc[key].bagQty || 0) + (curr.bagQty || 0),
+          bagPrice: (acc[key].bagPrice || 0) + (curr.bagPrice || 0),
+          pcsQty: (acc[key].pcsQty || 0) + (curr.pcsQty || 0),
+          pcsPrice: (acc[key].pcsPrice || 0) + (curr.pcsPrice || 0),
+          sumPrice: (acc[key].sumPrice || 0) + (curr.sumPrice || 0),
+          sumPcs: (acc[key].sumPcs || 0) + (curr.sumPcs || 0)
+        }
+      } else {
+        acc[key] = { ...curr }
+      }
+      return acc
+    }, {})
+  )
+
   if (excel == 'true') {
     function zeroToDash (value) {
       return value === 0 ? '-' : value
     }
-    const dataSaleFinal = dataSale.map(item => {
+    const dataSaleFinal = dataSaleArray.map(item => {
       return {
-        invoice: item.orderId,
+        // invoice: item.orderId,
         รหัสสินค้า: item.productId,
         รายละเอียดสินค้า: item.productName,
         หีบ: zeroToDash(item.ctnQty),
@@ -6078,14 +6145,14 @@ exports.getOrderExcelNew = async (req, res) => {
         'ซอง/ขวด': zeroToDash(item.pcsQty),
         ราคาซอง: zeroToDash(item.pcsPrice),
         จำนวนเงิน: zeroToDash(item.sumPrice),
-        จำนวนรวมชิ้น: zeroToDash(item.sumPcs),
-        ประเภทรายการ: item.type
+        จำนวนรวมชิ้น: zeroToDash(item.sumPcs)
+        // ประเภทรายการ: item.type
       }
     })
 
     const dataRefundFinal = dataRefundChange.map(item => {
       return {
-        invoice: item.orderId,
+        // invoice: item.orderId,
         รหัสสินค้า: item.productId,
         รายละเอียดสินค้า: item.productName,
         หีบ: zeroToDash(item.ctnQty),
@@ -6097,14 +6164,14 @@ exports.getOrderExcelNew = async (req, res) => {
         จำนวนเงิน: zeroToDash(item.sumPrice),
         จำนวนรวมชิ้น: zeroToDash(item.sumPcs),
         ประเภทรายการ: item.type,
-        ประเภทการคืน: item.refundType,
-        ref: item.ref
+        ประเภทการคืน: item.refundType
+        // ref: item.ref
       }
     })
 
-    const dataGiveFinal = dataGive.map(item => {
+    const dataGiveFinal = dataGiveArray.map(item => {
       return {
-        invoice: item.orderId,
+        // invoice: item.orderId,
         รหัสสินค้า: item.productId,
         รายละเอียดสินค้า: item.productName,
         หีบ: zeroToDash(item.ctnQty),
@@ -6152,9 +6219,9 @@ exports.getOrderExcelNew = async (req, res) => {
       status: 200,
       message: 'Sucess',
       data: {
-        dataSale,
+        dataSaleArray,
         dataRefundChange,
-        dataGive
+        dataGiveArray
       }
     })
   }

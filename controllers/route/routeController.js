@@ -18,6 +18,7 @@ const {
 } = require('../../controllers/queryFromM3/querySctipt')
 const orderModel = require('../../models/cash/sale')
 const routeModel = require('../../models/cash/route')
+const radiusModel = require('../../models/cash/radius')
 const storeModel = require('../../models/cash/store')
 const productModel = require('../../models/cash/product')
 const { getSocket } = require('../../socket')
@@ -2090,7 +2091,7 @@ exports.checkRouteStore = async (req, res) => {
       areaMap[area].del = storeCountMap[area]?.del || 0
     }
 
-    function sortKeys(obj) {
+    function sortKeys (obj) {
       const { area, R, del, ...days } = obj
       const sortedDays = Object.keys(days)
         .filter(k => /^R\d+$/.test(k))
@@ -2303,9 +2304,7 @@ exports.addStoreOneToRoute = async (req, res) => {
   })
 }
 
-
 exports.getLatLongStore = async (req, res) => {
-
   const { storeId } = req.body
   const channel = req.headers['x-channel']
   const { Route } = getModelsByChannel(channel, res, routeModel)
@@ -2314,7 +2313,6 @@ exports.getLatLongStore = async (req, res) => {
   const storeData = await Store.findOne({ storeId: storeId }).select('_id area')
 
   const routeData = await Route.aggregate([
-
     { $unwind: '$listStore' },
     {
       $match: {
@@ -2323,10 +2321,8 @@ exports.getLatLongStore = async (req, res) => {
     }
   ])
 
-
   let data = []
   for (const i of routeData) {
-
     if (i.listStore.status === '0') {
       continue
     }
@@ -2340,7 +2336,6 @@ exports.getLatLongStore = async (req, res) => {
     data.push(dataTran)
   }
 
-
   if (data.length === 0) {
     return res.status(404).json({
       status: 404,
@@ -2348,89 +2343,122 @@ exports.getLatLongStore = async (req, res) => {
     })
   }
 
-
-
   res.status(200).json({
     status: 200,
     message: 'Sucess',
     data: data
   })
-
 }
 
+exports.addRadius = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { Radius } = getModelsByChannel(channel, res, radiusModel)
+    const { radius, period } = req.body
+    await Radius.create({
+      radius: 50,
+      period: '202509'
+    })
+    res.status(200).json({
+      status: 200,
+      message: 'Sucess'
+      // data: data
+    })
+  } catch (error) {
+    console.error(error)
+    return res.status(500).json({ ok: false, message: error.message })
+  }
+}
 
+exports.getRadius = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { Radius } = getModelsByChannel(channel, res, radiusModel)
+    const { period } = req.query
+    const data = await Radius.findOne({ period })
+    res.status(200).json({
+      status: 200,
+      message: 'Sucess',
+      data: data
+    })
+  } catch (error) {
+    console.error(error)
+    return res.status(500).json({ ok: false, message: error.message })
+  }
+}
 
 exports.updateRouteAllStore = async (req, res) => {
 
-  const { storeId, period } = req.body
+  const { storeId } = req.body
   const channel = req.headers['x-channel']
   const { Route } = getModelsByChannel(channel, res, routeModel)
   const { Store } = getModelsByChannel(channel, res, storeModel)
 
-  // สมมติอยู่ใน async handler (req, res)
-  try {
-    const storeData = await Store.find({
-      area: { $nin: ['IT211', null, ''] }
-    }).select('_id storeId').lean();
+  const storeData = await Store.find({
+    area: { $nin: ['IT211', null, ''] }
+  })
+    .select('_id storeId')
+    .lean()
 
-    const updated = []
-    const notModified = []
-    const noRoute = []
+  let dataFinal = []
+  const BATCH = 20;                 // ปรับตามแรงเครื่อง/DB
+  let loopCount = 0;
 
-    for (const item of storeData) {
-      // หา route ของร้านนี้ (ตัดสถานะ '0' ออกตั้งแต่ pipeline)
-      const routeData = await Route.aggregate([
-        { $match: { period } },
+  for (let i = 0; i < storeData.length; i += BATCH) {
+    const chunk = storeData.slice(i, i + BATCH);
+
+    await Promise.all(chunk.map(async (item) => {
+      loopCount++;
+
+      const latest = await Route.aggregate([
+        // { $match: { period } }, // ถ้ามีก็เปิดได้
         { $unwind: '$listStore' },
         {
           $match: {
             'listStore.storeInfo': String(item._id),
             'listStore.status': { $ne: '0' }
           }
+        },
+        { $sort: { 'listStore.date': -1 } },
+        { $limit: 1 },
+        {
+          $project: {
+            day: { $concat: ['R', { $toString: '$day' }] },
+            period: 1,
+            lat: '$listStore.latitude',
+            long: '$listStore.longtitude',     
+            date: '$listStore.date'
+          }
         }
-      ])
+      ]);
 
-      if (!routeData || routeData.length === 0) {
-        // ไม่มีข้อมูล route ที่ใช้ได้
-        noRoute.push({ storeId: item.storeId })
-        continue
-      }
+      if (latest.length === 0) return;
 
-      // เลือกตัวแรกพอ (หรือจะเลือกตามเงื่อนไขอื่นเพิ่มเติมก็ได้)
-      const r = routeData[0]
-      const day = `R${r.day}`
+      const dataUpdated = await Store.findOneAndUpdate(
+        { storeId: item.storeId },
+        {
+          $set: {
+            route: latest[0].day,
+            latitude: latest[0].lat,
+            longtitude: latest[0].long
+          }
+        },
+        { new: true, runValidators: true }
+      );
 
-      // อัปเดตเฉพาะเมื่อค่าเปลี่ยนจริง ๆ
-      // const result = await Store.updateOne(
-      //   { storeId: item.storeId, route: { $ne: day } },
-      //   { $set: { route: day } }
-      // )
+      dataFinal.push(dataUpdated);
+    }));
 
-      if (result.modifiedCount > 0) {
-        updated.push({ storeId: item.storeId, route: day })
-      } else {
-        // มีข้อมูล route แต่ค่าเดิมตรงอยู่แล้วเลยไม่แก้
-        notModified.push({ storeId: item.storeId, route: day })
-      }
-    }
-
-    return res.json({
-      ok: true,
-      summary: {
-        totalStores: storeData.length,
-        updated: updated.length,
-        notModified: notModified.length,
-        noRoute: noRoute.length
-      },
-      updated,
-      notModified,
-      noRoute
-    })
-  } catch (err) {
-    console.error(err)
-    return res.status(500).json({ ok: false, message: err.message })
+    console.log(`processed ${Math.min(i + BATCH, storeData.length)} / ${storeData.length}`);
   }
 
+  console.log(`total loop: ${loopCount}`);
 
+
+  res.status(200).json({
+    status: 200,
+    message: 'Sucess',
+    data: dataFinal
+  })
 
 }
