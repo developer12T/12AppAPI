@@ -250,9 +250,6 @@ exports.getSendMoney = async (req, res) => {
       return result.length > 0 ? result[0].sendmoney : 0
     }
 
-
-
-
     const saleSum = await sumByType(Order, 'sale')
     const changeSum = await sumByTypeChangeRefund(Order, 'change')
     const refundSum = await sumByTypeChangeRefund(Refund, 'refund')
@@ -270,17 +267,16 @@ exports.getSendMoney = async (req, res) => {
       { $unwind: '$imageList' }, // ดึงแต่ละรูปออกมา
       {
         $group: {
-          _id: '$imageList.path',      // ✅ ใช้ path เป็น _id
+          _id: '$imageList.path', // ✅ ใช้ path เป็น _id
           totalSent: { $sum: '$sendmoney' },
-          count: { $sum: 1 }           // นับจำนวนรูป/เอกสารต่อ path (เผื่ออยากดู)
+          count: { $sum: 1 } // นับจำนวนรูป/เอกสารต่อ path (เผื่ออยากดู)
         }
       },
       { $project: { _id: 0, path: '$_id', totalSent: 1, count: 1 } }, // แปลงให้อ่านง่าย
       { $sort: { path: 1 } }
-    ]);
+    ])
 
     // console.log(alreadySentDocs)
-
 
     const image = alreadySentDocs.map(item => {
       return {
@@ -515,9 +511,8 @@ exports.getSendMoneyForAcc = async (req, res) => {
   }
 }
 
-
 exports.sendmoneyToExcel = async (req, res) => {
-  const { excel } = req.query
+  const { excel, period, start, end } = req.query
   const channel = 'cash'
 
   const { User } = getModelsByChannel(channel, res, userModel)
@@ -526,7 +521,42 @@ exports.sendmoneyToExcel = async (req, res) => {
   const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
 
   const userData = await User.find({ role: 'sale' }).select('area')
+  let startDate, endDate
 
+  if (start && end) {
+    // ตัด string แล้ว parse เป็น Date
+    startDate = new Date(
+      `${start.slice(0, 4)}-${start.slice(4, 6)}-${start.slice(
+        6,
+        8
+      )}T00:00:00+07:00`
+    )
+    endDate = new Date(
+      `${end.slice(0, 4)}-${end.slice(4, 6)}-${end.slice(
+        6,
+        8
+      )}T23:59:59.999+07:00`
+    )
+  } else if (period) {
+    const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
+    startDate = range.startDate
+    endDate = range.endDate
+  } else {
+    return res
+      .status(400)
+      .json({ status: 400, message: 'period or start/end are required!' })
+  }
+
+  const matchQuery = {
+    ...(period ? { period } : {}),
+    createdAt: { $gte: startDate, $lt: endDate }
+  }
+  const matchQuerySend = {
+    ...(period ? { period } : {}),
+    dateAt: { $gte: startDate, $lt: endDate }
+  }
+
+  console.log(matchQuery)
 
   const sumByType = async (Model, type, area) => {
     const result = await Model.aggregate([
@@ -534,8 +564,11 @@ exports.sendmoneyToExcel = async (req, res) => {
         $match: {
           type,
           'store.area': area,
-          status: { $nin: ['canceled', 'delete'] },
+          status: { $nin: ['canceled', 'delete'] }
         }
+      },
+      {
+        $match: matchQuery
       },
       { $group: { _id: null, sendmoney: { $sum: '$total' } } }
     ])
@@ -548,8 +581,11 @@ exports.sendmoneyToExcel = async (req, res) => {
         $match: {
           type,
           'store.area': area,
-          status: { $nin: ['pending', 'canceled', 'delete'] },
+          status: { $nin: ['pending', 'canceled', 'delete'] }
         }
+      },
+      {
+        $match: matchQuery
       },
       { $group: { _id: null, sendmoney: { $sum: '$total' } } }
     ])
@@ -557,10 +593,9 @@ exports.sendmoneyToExcel = async (req, res) => {
   }
 
   let dataFinal = []
+  let dataFinalExcel = []
 
   for (item of userData) {
-
-
     const saleSum = await sumByType(Order, 'sale', item.area)
     const changeSum = await sumByTypeChangeRefund(Order, 'change', item.area)
     const refundSum = await sumByTypeChangeRefund(Refund, 'refund', item.area)
@@ -569,66 +604,69 @@ exports.sendmoneyToExcel = async (req, res) => {
     const alreadySentDocs = await SendMoney.aggregate([
       {
         $match: {
-          area: item.area,
+          area: item.area
         }
       },
       {
+        $match: matchQuerySend
+      },
+      {
         $group: {
-          _id: null,                  // ไม่ group ตามค่าใด ๆ
+          _id: null, // ไม่ group ตามค่าใด ๆ
           totalSent: { $sum: '$sendmoney' }
         }
       },
       {
         $project: {
-          _id: 0,                     // ตัด _id ทิ้ง
+          _id: 0, // ตัด _id ทิ้ง
           totalSent: 1
         }
       }
     ])
 
     const dataTran = {
+      area: item.area,
+      sale: to2(saleSum),
+      refund: to2(changeSum - refundSum),
+      totalSale: to2(totalSale),
+      sendmoney: to2(alreadySentDocs[0]?.totalSent ?? 0),
+      diff: to2(alreadySentDocs[0]?.totalSent - totalSale ?? 0)
+    }
+
+    const dataTranExcel = {
       เขตการขาย: item.area,
       ยอดขาย: to2(saleSum),
-      ผลต่างใบเปลี่ยน: to2((changeSum - refundSum)),
+      ผลต่างใบเปลี่ยน: to2(changeSum - refundSum),
       รวมยอดขาย: to2(totalSale),
-      ยอดชำระเงิน: to2(alreadySentDocs[0].totalSent),
-      "ยอดส่งเงิน ขาด - เกิน": to2(totalSale - alreadySentDocs[0].totalSent)
+      ยอดชำระเงิน: to2(alreadySentDocs[0]?.totalSent ?? 0),
+      'ยอดส่งเงิน ขาด - เกิน': to2(
+        alreadySentDocs[0]?.totalSent - totalSale ?? 0
+      )
     }
     dataFinal.push(dataTran)
-
+    dataFinalExcel.push(dataTranExcel)
   }
 
-if (excel == 'true') {
+  if (excel == 'true') {
     const wb = xlsx.utils.book_new()
-    const ws = xlsx.utils.json_to_sheet(dataFinal)
-    xlsx.utils.book_append_sheet(
-      wb,
-      ws,
-      `sendMoney`
-    )
+    const ws = xlsx.utils.json_to_sheet(dataFinalExcel)
+    xlsx.utils.book_append_sheet(wb, ws, `sendMoney`)
 
-    const tempPath = path.join(
-      os.tmpdir(),
-      `sendMoney.xlsx`
-    )
+    const tempPath = path.join(os.tmpdir(), `sendMoney.xlsx`)
     xlsx.writeFile(wb, tempPath)
 
-    res.download(
-      tempPath,
-      `sendMoney.xlsx`,
-      err => {
-        if (err) {
-          console.error('❌ Download error:', err)
-          // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
-          if (!res.headersSent) {
-            res.status(500).send('Download failed')
-          }
+    res.download(tempPath, `sendMoney.xlsx`, err => {
+      if (err) {
+        console.error('❌ Download error:', err)
+        // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+        if (!res.headersSent) {
+          res.status(500).send('Download failed')
         }
-
-        // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => {})
       }
-    )
+
+      // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+      fs.unlink(tempPath, () => {})
+    })
   } else {
     return res.status(200).json({
       status: 200,
@@ -636,7 +674,4 @@ if (excel == 'true') {
       data: dataFinal
     })
   }
-
-
-
 }
