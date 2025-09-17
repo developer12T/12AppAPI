@@ -610,19 +610,24 @@ exports.sendmoneyToExcel = async (req, res) => {
       {
         $match: matchQuerySend
       },
+      { $unwind: '$imageList' },
       {
         $group: {
           _id: null, // ไม่ group ตามค่าใด ๆ
-          totalSent: { $sum: '$sendmoney' }
+          totalSent: { $sum: '$sendmoney' },
+          images: { $push: '$imageList.name' }
         }
       },
       {
         $project: {
           _id: 0, // ตัด _id ทิ้ง
-          totalSent: 1
+          totalSent: 1,
+          images: 1
         }
       }
     ])
+
+    // console.log(alreadySentDocs);
 
     const dataTran = {
       area: item.area,
@@ -630,7 +635,8 @@ exports.sendmoneyToExcel = async (req, res) => {
       refund: to2(changeSum - refundSum),
       totalSale: to2(totalSale),
       sendmoney: to2(alreadySentDocs[0]?.totalSent ?? 0),
-      diff: to2(alreadySentDocs[0]?.totalSent - totalSale ?? 0)
+      diff: to2(alreadySentDocs[0]?.totalSent - totalSale ?? 0),
+      image: alreadySentDocs[0]?.images
     }
 
     const dataTranExcel = {
