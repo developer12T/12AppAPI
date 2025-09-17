@@ -8,11 +8,19 @@ const userModel = require('../../models/cash/user')
 const sendmoneyModel = require('../../models/cash/sendmoney')
 const path = require('path')
 const multer = require('multer')
+const xlsx = require('xlsx')
+const os = require('os')
+const fs = require('fs')
 const { replace } = require('lodash')
 const upload = multer({ storage: multer.memoryStorage() }).array(
   'sendmoneyImage',
   1
 )
+const {
+  to2,
+  updateStockMongo,
+  generateDateList
+} = require('../../middleware/order')
 const { period, previousPeriod } = require('../../utilities/datetime')
 const { query } = require('mssql')
 exports.addSendMoney = async (req, res) => {
@@ -233,7 +241,7 @@ exports.getSendMoney = async (req, res) => {
           $match: {
             type,
             'store.area': area,
-            status: { $nin: ['pending','canceled', 'delete'] },
+            status: { $nin: ['pending', 'canceled', 'delete'] },
             createdAt: { $gte: startOfDayUTC, $lte: endOfDayUTC }
           }
         },
@@ -276,7 +284,7 @@ exports.getSendMoney = async (req, res) => {
 
     const image = alreadySentDocs.map(item => {
       return {
-        path:item.path
+        path: item.path
       }
     })
 
@@ -306,7 +314,7 @@ exports.getSendMoney = async (req, res) => {
         start: startOfDayUTC,
         end: endOfDayUTC
       },
-      image:image
+      image: image
     })
   } catch (err) {
     console.error('[getSendMoney Error]', err)
@@ -505,4 +513,130 @@ exports.getSendMoneyForAcc = async (req, res) => {
       message: err.message || 'Internal server error'
     })
   }
+}
+
+
+exports.sendmoneyToExcel = async (req, res) => {
+  const { excel } = req.query
+  const channel = 'cash'
+
+  const { User } = getModelsByChannel(channel, res, userModel)
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+  const { Refund } = getModelsByChannel(channel, res, refundModel)
+  const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+
+  const userData = await User.find({ role: 'sale' }).select('area')
+
+
+  const sumByType = async (Model, type, area) => {
+    const result = await Model.aggregate([
+      {
+        $match: {
+          type,
+          'store.area': area,
+          status: { $nin: ['canceled', 'delete'] },
+        }
+      },
+      { $group: { _id: null, sendmoney: { $sum: '$total' } } }
+    ])
+    return result.length > 0 ? result[0].sendmoney : 0
+  }
+
+  const sumByTypeChangeRefund = async (Model, type, area) => {
+    const result = await Model.aggregate([
+      {
+        $match: {
+          type,
+          'store.area': area,
+          status: { $nin: ['pending', 'canceled', 'delete'] },
+        }
+      },
+      { $group: { _id: null, sendmoney: { $sum: '$total' } } }
+    ])
+    return result.length > 0 ? result[0].sendmoney : 0
+  }
+
+  let dataFinal = []
+
+  for (item of userData) {
+
+
+    const saleSum = await sumByType(Order, 'sale', item.area)
+    const changeSum = await sumByTypeChangeRefund(Order, 'change', item.area)
+    const refundSum = await sumByTypeChangeRefund(Refund, 'refund', item.area)
+
+    const totalSale = saleSum + (changeSum - refundSum)
+    const alreadySentDocs = await SendMoney.aggregate([
+      {
+        $match: {
+          area: item.area,
+        }
+      },
+      {
+        $group: {
+          _id: null,                  // ไม่ group ตามค่าใด ๆ
+          totalSent: { $sum: '$sendmoney' }
+        }
+      },
+      {
+        $project: {
+          _id: 0,                     // ตัด _id ทิ้ง
+          totalSent: 1
+        }
+      }
+    ])
+
+    const dataTran = {
+      เขตการขาย: item.area,
+      ยอดขาย: to2(saleSum),
+      ผลต่างใบเปลี่ยน: to2((changeSum - refundSum)),
+      รวมยอดขาย: to2(totalSale),
+      ยอดชำระเงิน: to2(alreadySentDocs[0].totalSent),
+      "ยอดส่งเงิน ขาด - เกิน": to2(totalSale - alreadySentDocs[0].totalSent)
+    }
+    dataFinal.push(dataTran)
+
+  }
+
+if (excel == 'true') {
+    const wb = xlsx.utils.book_new()
+    const ws = xlsx.utils.json_to_sheet(dataFinal)
+    xlsx.utils.book_append_sheet(
+      wb,
+      ws,
+      `sendMoney`
+    )
+
+    const tempPath = path.join(
+      os.tmpdir(),
+      `sendMoney.xlsx`
+    )
+    xlsx.writeFile(wb, tempPath)
+
+    res.download(
+      tempPath,
+      `sendMoney.xlsx`,
+      err => {
+        if (err) {
+          console.error('❌ Download error:', err)
+          // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+          if (!res.headersSent) {
+            res.status(500).send('Download failed')
+          }
+        }
+
+        // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+        fs.unlink(tempPath, () => {})
+      }
+    )
+  } else {
+    return res.status(200).json({
+      status: 200,
+      message: 'Sucess',
+      data: dataFinal
+    })
+  }
+
+
+
 }

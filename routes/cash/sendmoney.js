@@ -6,7 +6,8 @@ const {
   addSendMoneyImage,
   getSendMoney,
   getAllSendMoney,
-  getSendMoneyForAcc
+  getSendMoneyForAcc,
+  sendmoneyToExcel
 } = require('../../controllers/sendmoney/sendmoneyController')
 const router = express.Router()
 router.post('/addSendMoney', addSendMoney)
@@ -14,4 +15,5 @@ router.post('/addSendMoneyImage', addSendMoneyImage)
 router.post('/getSendMoney', getSendMoney)
 router.get('/getAllSendMoney', getAllSendMoney)
 router.get('/getSendMoneyForAcc', getSendMoneyForAcc)
+router.get('/sendmoneyToExcel', sendmoneyToExcel)
 module.exports = router
