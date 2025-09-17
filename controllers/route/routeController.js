@@ -2362,75 +2362,76 @@ exports.getLatLongStore = async (req, res) => {
 
 exports.updateRouteAllStore = async (req, res) => {
 
-  const { storeId, period } = req.body
+  const { storeId } = req.body
   const channel = req.headers['x-channel']
   const { Route } = getModelsByChannel(channel, res, routeModel)
   const { Store } = getModelsByChannel(channel, res, storeModel)
 
-  // สมมติอยู่ใน async handler (req, res)
-  try {
-    const storeData = await Store.find({
-      area: { $nin: ['IT211', null, ''] }
-    }).select('_id storeId').lean();
+  const storeData = await Store.find({
+    area: { $nin: ['IT211', null, ''] }
+  })
+    .select('_id storeId')
+    .lean()
 
-    const updated = []
-    const notModified = []
-    const noRoute = []
+  let dataFinal = []
+  const BATCH = 20;                 // ปรับตามแรงเครื่อง/DB
+  let loopCount = 0;
 
-    for (const item of storeData) {
-      // หา route ของร้านนี้ (ตัดสถานะ '0' ออกตั้งแต่ pipeline)
-      const routeData = await Route.aggregate([
-        { $match: { period } },
+  for (let i = 0; i < storeData.length; i += BATCH) {
+    const chunk = storeData.slice(i, i + BATCH);
+
+    await Promise.all(chunk.map(async (item) => {
+      loopCount++;
+
+      const latest = await Route.aggregate([
+        // { $match: { period } }, // ถ้ามีก็เปิดได้
         { $unwind: '$listStore' },
         {
           $match: {
             'listStore.storeInfo': String(item._id),
             'listStore.status': { $ne: '0' }
           }
+        },
+        { $sort: { 'listStore.date': -1 } },
+        { $limit: 1 },
+        {
+          $project: {
+            day: { $concat: ['R', { $toString: '$day' }] },
+            period: 1,
+            lat: '$listStore.latitude',
+            long: '$listStore.longtitude',     
+            date: '$listStore.date'
+          }
         }
-      ])
+      ]);
 
-      if (!routeData || routeData.length === 0) {
-        // ไม่มีข้อมูล route ที่ใช้ได้
-        noRoute.push({ storeId: item.storeId })
-        continue
-      }
+      if (latest.length === 0) return;
 
-      // เลือกตัวแรกพอ (หรือจะเลือกตามเงื่อนไขอื่นเพิ่มเติมก็ได้)
-      const r = routeData[0]
-      const day = `R${r.day}`
+      const dataUpdated = await Store.findOneAndUpdate(
+        { storeId: item.storeId },
+        {
+          $set: {
+            route: latest[0].day,
+            latitude: latest[0].lat,
+            longtitude: latest[0].long
+          }
+        },
+        { new: true, runValidators: true }
+      );
 
-      // อัปเดตเฉพาะเมื่อค่าเปลี่ยนจริง ๆ
-      // const result = await Store.updateOne(
-      //   { storeId: item.storeId, route: { $ne: day } },
-      //   { $set: { route: day } }
-      // )
+      dataFinal.push(dataUpdated);
+    }));
 
-      if (result.modifiedCount > 0) {
-        updated.push({ storeId: item.storeId, route: day })
-      } else {
-        // มีข้อมูล route แต่ค่าเดิมตรงอยู่แล้วเลยไม่แก้
-        notModified.push({ storeId: item.storeId, route: day })
-      }
-    }
-
-    return res.json({
-      ok: true,
-      summary: {
-        totalStores: storeData.length,
-        updated: updated.length,
-        notModified: notModified.length,
-        noRoute: noRoute.length
-      },
-      updated,
-      notModified,
-      noRoute
-    })
-  } catch (err) {
-    console.error(err)
-    return res.status(500).json({ ok: false, message: err.message })
+    console.log(`processed ${Math.min(i + BATCH, storeData.length)} / ${storeData.length}`);
   }
 
+  console.log(`total loop: ${loopCount}`);
 
+
+  res.status(200).json({
+    status: 200,
+    message: 'Sucess',
+    data: dataFinal
+  })
 
 }
