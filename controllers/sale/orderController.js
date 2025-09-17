@@ -5873,14 +5873,14 @@ exports.getOrderExcelNew = async (req, res) => {
         factor = unitPcs.factor
       }
 
-      if (i.type === 'pro') {
-        typedetail = 'Promotion'
-      } else {
-        typedetail = 'Sale'
-      }
+      // if (i.type === 'pro') {
+      //   typedetail = 'Promotion'
+      // } else {
+      //   typedetail = 'Sale'
+      // }
 
       const dataTran = {
-        orderId: i.orderId,
+        // orderId: i.orderId,
         productId: item.id,
         productName: item.name,
         ctnQty,
