@@ -24,13 +24,17 @@ const {
   addRouteIt,
   addStoreOneToRoute,
   getLatLongStore,
-  updateRouteAllStore
+  updateRouteAllStore,
+  addRadius,
+  getRadius
 } = require('../../controllers/route/routeController')
 
 const router = express.Router()
 
 router.get('/getRoute', getRoute)
+router.get('/getRadius', getRadius)
 router.post('/checkIn', checkIn)
+router.post('/addRadius', addRadius)
 router.post('/checkInVisit', checkInVisit)
 router.post('/addFromERP', addFromERP)
 router.post('/change', changeRoute)
@@ -50,7 +54,6 @@ router.post('/addFromERPnew', addFromERPnew)
 router.post('/addFromERPOne', addFromERPOne)
 router.get('/checkRouteStore', checkRouteStore)
 router.get('/polylineRoute', polylineRoute)
-
 router.post('/addRouteIt', addRouteIt)
 router.post('/addStoreOneToRoute', addStoreOneToRoute)
 router.post('/getLatLongStore', getLatLongStore)

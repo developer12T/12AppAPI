@@ -18,6 +18,7 @@ const {
 } = require('../../controllers/queryFromM3/querySctipt')
 const orderModel = require('../../models/cash/sale')
 const routeModel = require('../../models/cash/route')
+const radiusModel = require('../../models/cash/radius')
 const storeModel = require('../../models/cash/store')
 const productModel = require('../../models/cash/product')
 const { getSocket } = require('../../socket')
@@ -2090,7 +2091,7 @@ exports.checkRouteStore = async (req, res) => {
       areaMap[area].del = storeCountMap[area]?.del || 0
     }
 
-    function sortKeys(obj) {
+    function sortKeys (obj) {
       const { area, R, del, ...days } = obj
       const sortedDays = Object.keys(days)
         .filter(k => /^R\d+$/.test(k))
@@ -2303,9 +2304,7 @@ exports.addStoreOneToRoute = async (req, res) => {
   })
 }
 
-
 exports.getLatLongStore = async (req, res) => {
-
   const { storeId } = req.body
   const channel = req.headers['x-channel']
   const { Route } = getModelsByChannel(channel, res, routeModel)
@@ -2314,7 +2313,6 @@ exports.getLatLongStore = async (req, res) => {
   const storeData = await Store.findOne({ storeId: storeId }).select('_id area')
 
   const routeData = await Route.aggregate([
-
     { $unwind: '$listStore' },
     {
       $match: {
@@ -2323,10 +2321,8 @@ exports.getLatLongStore = async (req, res) => {
     }
   ])
 
-
   let data = []
   for (const i of routeData) {
-
     if (i.listStore.status === '0') {
       continue
     }
@@ -2340,7 +2336,6 @@ exports.getLatLongStore = async (req, res) => {
     data.push(dataTran)
   }
 
-
   if (data.length === 0) {
     return res.status(404).json({
       status: 404,
@@ -2348,20 +2343,51 @@ exports.getLatLongStore = async (req, res) => {
     })
   }
 
-
-
   res.status(200).json({
     status: 200,
     message: 'Sucess',
     data: data
   })
-
 }
 
+exports.addRadius = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { Radius } = getModelsByChannel(channel, res, radiusModel)
+    const { radius, period } = req.body
+    await Radius.create({
+      radius: 50,
+      period: '202509'
+    })
+    res.status(200).json({
+      status: 200,
+      message: 'Sucess'
+      // data: data
+    })
+  } catch (error) {
+    console.error(error)
+    return res.status(500).json({ ok: false, message: error.message })
+  }
+}
 
+exports.getRadius = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { Radius } = getModelsByChannel(channel, res, radiusModel)
+    const { period } = req.query
+    const data = await Radius.findOne({ period })
+    res.status(200).json({
+      status: 200,
+      message: 'Sucess',
+      data: data
+    })
+  } catch (error) {
+    console.error(error)
+    return res.status(500).json({ ok: false, message: error.message })
+  }
+}
 
 exports.updateRouteAllStore = async (req, res) => {
-
   const { storeId, period } = req.body
   const channel = req.headers['x-channel']
   const { Route } = getModelsByChannel(channel, res, routeModel)
@@ -2371,7 +2397,9 @@ exports.updateRouteAllStore = async (req, res) => {
   try {
     const storeData = await Store.find({
       area: { $nin: ['IT211', null, ''] }
-    }).select('_id storeId').lean();
+    })
+      .select('_id storeId')
+      .lean()
 
     const updated = []
     const notModified = []
@@ -2430,7 +2458,4 @@ exports.updateRouteAllStore = async (req, res) => {
     console.error(err)
     return res.status(500).json({ ok: false, message: err.message })
   }
-
-
-
 }
