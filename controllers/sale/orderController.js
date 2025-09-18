@@ -212,12 +212,12 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-        .map(item => item.price)
-        .reduce((sum, price) => sum + price, 0)
+          .map(item => item.price)
+          .reduce((sum, price) => sum + price, 0)
       : 0
 
     // ✅ ช่วยฟังก์ชัน: เช็คว่า createAt ตั้งแต่ Aug-2025 ขึ้นไปไหม
-    function isAug2025OrLater(createAt) {
+    function isAug2025OrLater (createAt) {
       if (!createAt) return false
 
       // case: "YYYYMM" เช่น "202508"
@@ -238,14 +238,14 @@ exports.checkout = async (req, res) => {
     // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-        storeData.address,
-        storeData.subDistrict && `ต.${storeData.subDistrict}`,
-        storeData.district && `อ.${storeData.district}`,
-        storeData.province && `จ.${storeData.province}`,
-        storeData.postCode
-      ]
-        .filter(Boolean)
-        .join(' ')
+          storeData.address,
+          storeData.subDistrict && `ต.${storeData.subDistrict}`,
+          storeData.district && `อ.${storeData.district}`,
+          storeData.province && `จ.${storeData.province}`,
+          storeData.postCode
+        ]
+          .filter(Boolean)
+          .join(' ')
       : storeData.address
 
     // const addressFinal = `${storeData.address} ต.${storeData.subDistrict} อ.${storeData.district} จ.${province} ${postCode}`
@@ -894,7 +894,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -1259,7 +1259,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1371,7 +1371,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromChange = modelChange.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1636,7 +1636,7 @@ exports.OrderToExcel = async (req, res) => {
       message: 'Not Found Order'
     })
   }
-  function yyyymmddToDdMmYyyy(dateString) {
+  function yyyymmddToDdMmYyyy (dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -1678,7 +1678,7 @@ exports.OrderToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     }
   )
 
@@ -4574,28 +4574,28 @@ exports.checkOrderCancelM3 = async (req, res) => {
     const type = saleSet.has(id)
       ? 'Sale'
       : refundSet.has(id)
-        ? 'Refund'
-        : changeSet.has(id)
-          ? 'Change'
-          : ''
+      ? 'Refund'
+      : changeSet.has(id)
+      ? 'Change'
+      : ''
 
     const typeId =
       type === 'Sale'
         ? 'A31'
         : type === 'Refund'
-          ? 'A34'
-          : type === 'Change'
-            ? 'B31'
-            : ''
+        ? 'A34'
+        : type === 'Change'
+        ? 'B31'
+        : ''
 
     const statusTablet =
       type === 'Sale'
         ? saleStatusMap.get(id) ?? ''
         : type === 'Refund'
-          ? refundStatusMap.get(id) ?? ''
-          : type === 'Change'
-            ? changeStatusMap.get(id) ?? ''
-            : ''
+        ? refundStatusMap.get(id) ?? ''
+        : type === 'Change'
+        ? changeStatusMap.get(id) ?? ''
+        : ''
 
     return { orderId: id, type, typeId, statusTablet }
   })
@@ -4617,7 +4617,7 @@ exports.checkOrderCancelM3 = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => { })
+    fs.unlink(tempPath, () => {})
   })
 
   // res.status(200).json({
@@ -5088,7 +5088,8 @@ exports.getTarget = async (req, res) => {
     adjustStockQty: adjustStockQty,
     target: parseFloat(dataTarget?.TG_AMOUNT ?? 0),
     targetPercent:
-      to2((sale * 100) / parseFloat(dataTarget?.TG_AMOUNT ?? 0) ?? 0) ?? 0
+      to2((sale * 100) / parseFloat(dataTarget?.TG_AMOUNT * 1.07 ?? 0) ?? 0) ??
+      0
   })
 }
 
@@ -5115,7 +5116,7 @@ exports.orderPowerBI = async (req, res) => {
   const conoBiList = conoBi.flatMap(item => item.CONO)
   // console.log(conoBiList)
 
-  function yyyymmddToDdMmYyyy(dateString) {
+  function yyyymmddToDdMmYyyy (dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -5258,7 +5259,7 @@ exports.orderPowerBI = async (req, res) => {
 
   const storeData = await Store.find({ storeId: { $in: storeIdList } })
 
-  function formatDateToThaiYYYYMMDD(date) {
+  function formatDateToThaiYYYYMMDD (date) {
     const d = new Date(date)
     d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -5482,7 +5483,7 @@ exports.orderPowerBI = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       }
     )
   } else {
@@ -5890,7 +5891,7 @@ exports.getOrderExcelNew = async (req, res) => {
         pcsQty,
         pcsPrice: pcsPrice ?? 0,
         sumPrice: item.subtotal ?? 0,
-        sumPcs: (factor ?? 1) * item.qty,
+        sumPcs: (factor ?? 1) * item.qty
         // type: typedetail
       }
       dataSale.push(dataTran)
@@ -5910,7 +5911,7 @@ exports.getOrderExcelNew = async (req, res) => {
           pcsQty: (acc[key].pcsQty || 0) + (curr.pcsQty || 0),
           pcsPrice: (acc[key].pcsPrice || 0) + (curr.pcsPrice || 0),
           sumPrice: (acc[key].sumPrice || 0) + (curr.sumPrice || 0),
-          sumPcs: (acc[key].sumPcs || 0) + (curr.sumPcs || 0),
+          sumPcs: (acc[key].sumPcs || 0) + (curr.sumPcs || 0)
         }
       } else {
         acc[key] = { ...curr }
@@ -5918,11 +5919,6 @@ exports.getOrderExcelNew = async (req, res) => {
       return acc
     }, {})
   )
-
-
-
-
-
 
   dataSaleArray.sort((a, b) => {
     if (a.orderId < b.orderId) return -1 // ASC
@@ -5990,13 +5986,12 @@ exports.getOrderExcelNew = async (req, res) => {
         sumPrice: sumPrice,
         sumPcs: (factor ?? 1) * item.qty,
         type: typedetail,
-        refundType: item.condition ?? '',
+        refundType: item.condition ?? ''
         // ref: i.reference ?? ''
       }
       dataRefundChangeTran.push(dataTran)
     }
   }
-
 
   const dataRefundChange = Object.values(
     dataRefundChangeTran.reduce((acc, curr) => {
@@ -6011,7 +6006,7 @@ exports.getOrderExcelNew = async (req, res) => {
           pcsQty: (acc[key].pcsQty || 0) + (curr.pcsQty || 0),
           pcsPrice: (acc[key].pcsPrice || 0) + (curr.pcsPrice || 0),
           sumPrice: (acc[key].sumPrice || 0) + (curr.sumPrice || 0),
-          sumPcs: (acc[key].sumPcs || 0) + (curr.sumPcs || 0),
+          sumPcs: (acc[key].sumPcs || 0) + (curr.sumPcs || 0)
         }
       } else {
         acc[key] = { ...curr }
@@ -6125,7 +6120,7 @@ exports.getOrderExcelNew = async (req, res) => {
           pcsQty: (acc[key].pcsQty || 0) + (curr.pcsQty || 0),
           pcsPrice: (acc[key].pcsPrice || 0) + (curr.pcsPrice || 0),
           sumPrice: (acc[key].sumPrice || 0) + (curr.sumPrice || 0),
-          sumPcs: (acc[key].sumPcs || 0) + (curr.sumPcs || 0),
+          sumPcs: (acc[key].sumPcs || 0) + (curr.sumPcs || 0)
         }
       } else {
         acc[key] = { ...curr }
@@ -6134,10 +6129,8 @@ exports.getOrderExcelNew = async (req, res) => {
     }, {})
   )
 
-
-
   if (excel == 'true') {
-    function zeroToDash(value) {
+    function zeroToDash (value) {
       return value === 0 ? '-' : value
     }
     const dataSaleFinal = dataSaleArray.map(item => {
@@ -6152,7 +6145,7 @@ exports.getOrderExcelNew = async (req, res) => {
         'ซอง/ขวด': zeroToDash(item.pcsQty),
         ราคาซอง: zeroToDash(item.pcsPrice),
         จำนวนเงิน: zeroToDash(item.sumPrice),
-        จำนวนรวมชิ้น: zeroToDash(item.sumPcs),
+        จำนวนรวมชิ้น: zeroToDash(item.sumPcs)
         // ประเภทรายการ: item.type
       }
     })
@@ -6171,7 +6164,7 @@ exports.getOrderExcelNew = async (req, res) => {
         จำนวนเงิน: zeroToDash(item.sumPrice),
         จำนวนรวมชิ้น: zeroToDash(item.sumPcs),
         ประเภทรายการ: item.type,
-        ประเภทการคืน: item.refundType,
+        ประเภทการคืน: item.refundType
         // ref: item.ref
       }
     })
@@ -6219,7 +6212,7 @@ exports.getOrderExcelNew = async (req, res) => {
         }
       }
       // ลบไฟล์ทิ้งหลังจบ (สำเร็จหรือไม่ก็ตาม)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
   } else {
     return res.status(200).json({
