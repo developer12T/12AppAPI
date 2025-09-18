@@ -615,7 +615,7 @@ exports.sendmoneyToExcel = async (req, res) => {
         $group: {
           _id: null, // ไม่ group ตามค่าใด ๆ
           totalSent: { $sum: '$sendmoney' },
-          images: { $push: '$imageList.name' }
+          images: { $push: '$imageList.path' }
         }
       },
       {
