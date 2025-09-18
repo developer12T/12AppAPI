@@ -556,7 +556,7 @@ exports.sendmoneyToExcel = async (req, res) => {
     dateAt: { $gte: startDate, $lt: endDate }
   }
 
-  console.log(matchQuery)
+  // console.log(matchQuery)
 
   const sumByType = async (Model, type, area) => {
     const result = await Model.aggregate([
@@ -615,7 +615,7 @@ exports.sendmoneyToExcel = async (req, res) => {
         $group: {
           _id: null, // ไม่ group ตามค่าใด ๆ
           totalSent: { $sum: '$sendmoney' },
-          images: { $push: '$imageList.name' }
+          images: { $push: '$imageList.path' }
         }
       },
       {

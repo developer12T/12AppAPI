@@ -5,8 +5,8 @@ const { timestamp } = require('../../utilities/datetime')
 
 
 const listWarehouse = mongoose.Schema({
-    normal: { type: String, require: true },
-    clearance: { type: String, require: true },
+    normal: { type: String, require: false },
+    clearance: { type: String, require: false },
 })
 
 const listAddress = mongoose.Schema({
@@ -54,8 +54,8 @@ const receiveSchema = mongoose.Schema({
     orderTypeName: { type: String, require: true },
     area: { type: String, require: true },
     saleCode: { type: String, reuire: true },
-    fromWarehouse: { type: String, require: true },
-    toWarehouse: { type: String, require: true },
+    fromWarehouse: { type: String, require: false },
+    toWarehouse: { type: String, require: false },
     shippingId: { type: String, require: true },
     shippingRoute: { type: String, require: true },
     shippingName: { type: String, require: true },
@@ -101,8 +101,8 @@ const distributionSchema = mongoose.Schema({
     withdrawType: { type: String, require: true }, 
     area: { type: String, require: true },
     saleCode: { type: String, require: true },
-    fromWarehouse: { type: String, require: true },
-    toWarehouse: { type: String, require: true },
+    fromWarehouse: { type: String, require: false },
+    toWarehouse: { type: String, require: false },
     shippingId: { type: String, require: true }, //ex NS212-1
     shippingRoute: { type: String, require: true }, //ex NS212
     shippingName: { type: String, require: true }, // โรงแรมรำพึง

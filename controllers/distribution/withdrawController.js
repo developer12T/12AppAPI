@@ -11,7 +11,7 @@ const {
 const { sequelize, DataTypes } = require('../../config/m3db')
 const { getSeries, updateRunningNumber } = require('../../middleware/order')
 const axios = require('axios')
-const { generateDistributionId } = require('../../utilities/genetateId')
+const { generateDistributionId, generateDistributionIdCredit } = require('../../utilities/genetateId')
 const { rangeDate } = require('../../utilities/datetime')
 const { period, previousPeriod } = require('../../utilities/datetime')
 const cartModel = require('../../models/cash/cart')
@@ -50,10 +50,10 @@ exports.checkout = async (req, res) => {
       withdrawType,
       sendDate,
       note,
-      period
-      // , newtrip
+      period,
+      newtrip
     } = req.body
-    const newtrip = false
+    // const newtrip = false
     const channel = req.headers['x-channel']
     const { Cart } = getModelsByChannel(channel, res, cartModel)
     const { User } = getModelsByChannel(channel, res, userModel)
@@ -169,184 +169,162 @@ exports.checkout = async (req, res) => {
 
     if (listProduct.includes(null)) return
     // if (listProduct.some(p => p === null)) return res.status(400).json({ status: 400, message: 'Invalid product in cart!' })
-    const orderId = await generateDistributionId(
-      area,
-      sale.warehouse,
-      channel,
-      res,
-      newtrip
-    )
 
-    //  const orderId = await generateDistributionId(
-    //   area,
-    //   sale.warehouse,
-    //   channel,
-    //   res
-    // )
+    let orderId = ''
 
-    // const series = await getSeries(shipping.type)
-
-    // console.log(shipping.type)
-
-    // if (series == null) {
-    //   const error = new Error('Order Type is incorrect or not found')
-    //   error.statusCode = 422
-    //   throw error
+    // if (withdrawType == 'credit') {
+    //   orderId = await generateDistributionIdCredit(
+    //     area,
+    //     sale.warehouse,
+    //     channel,
+    //     res,
+    //     withdrawType
+    //   )
+    //   fromWarehouse = ''
+    //   toWarehouse = ''
+    // } else {
+      orderId = await generateDistributionId(
+        area,
+        sale.warehouse,
+        channel,
+        res,
+        newtrip
+      )
+    //   fromWarehouse = fromWarehouse
+    //   toWarehouse = sale.warehouse
     // }
+  
 
-    // const runningJson = {
-    //   coNo: '410',
-    //   series: series.OOOT05,
-    //   seriesType: '14'
-    // }
-    // const response = await axios.post(
-    //   `${process.env.API_URL_12ERP}/master/runningNumber/`,
-    //   {
-    //     coNo: runningJson.coNo,
-    //     series: runningJson.series,
-    //     seriesType: runningJson.seriesType
-    //   }
-    // );
-    // orderId = parseInt(response.data.lastNo) + 1
 
-    // await updateRunningNumber(
-    //   {
-    //     coNo: runningJson.coNo,
-    //     series: runningJson.series,
-    //     seriesType: runningJson.seriesType,
-    //     lastNo: orderId
-    //   },
-    //   transaction
-    // )
 
     const newOrder = new Distribution({
-      orderId,
-      orderType: shipping.type,
-      orderTypeName: shipping.typeNameTH,
-      withdrawType: withdrawType,
-      area,
-      fromWarehouse,
-      toWarehouse: sale.warehouse,
-      shippingId: shipping.shippingId,
-      shippingRoute: shipping.route,
-      shippingName: shipping.name,
-      sendAddress: shipping.address,
-      sendDate,
-      remark: note,
-      listProduct,
-      total: subtotal,
-      totalQty: totalQty,
-      totalWeightGross: parseFloat(totalWeightGross.toFixed(2)),
-      totalWeightNet: parseFloat(totalWeightNet.toFixed(2)),
-      createdBy: sale.username,
+    orderId,
+    orderType: shipping.type,
+    orderTypeName: shipping.typeNameTH,
+    withdrawType: withdrawType,
+    area,
+    fromWarehouse,
+    toWarehouse: sale.warehouse,
+    shippingId: shipping.shippingId,
+    shippingRoute: shipping.route,
+    shippingName: shipping.name,
+    sendAddress: shipping.address,
+    sendDate,
+    remark: note,
+    listProduct,
+    total: subtotal,
+    totalQty: totalQty,
+    totalWeightGross: parseFloat(totalWeightGross.toFixed(2)),
+    totalWeightNet: parseFloat(totalWeightNet.toFixed(2)),
+    createdBy: sale.username,
+    period: period,
+    newTrip: 'false'
+  })
+
+  if (newtrip === true) {
+    const getNpd = await Npd.findOne({
       period: period,
-      newTrip: 'false'
+      areaGet: { $in: [area] }
     })
 
-    if (newtrip === true) {
-      const getNpd = await Npd.findOne({
-        period: period,
-        areaGet: { $in: [area] }
-      })
+    if (!getNpd) {
+      newOrder.newTrip = 'true'
+      const productNew = await Product.findOne({ type: 'new' })
+      if (productNew) {
+        const npd = await Npd.findOne({ period: period })
 
-      if (!getNpd) {
-        newOrder.newTrip = 'true'
-        const productNew = await Product.findOne({ type: 'new' })
-        if (productNew) {
-          const npd = await Npd.findOne({ period: period })
+        factor = productNew.listUnit.find(item => item.unit === npd.unit)
+        qtyPcs = npd.qty * factor.factor
 
-          factor = productNew.listUnit.find(item => item.unit === npd.unit)
-          qtyPcs = npd.qty * factor.factor
-
-          const npdProduct = {
-            id: productNew.id,
-            lot: '',
-            name: productNew.name,
-            group: productNew.group,
-            brand: productNew.brand,
-            size: productNew.size,
-            flavour: productNew.flavour,
-            qty: npd.qty,
-            unit: npd.unit,
-            qtyPcs: qtyPcs,
-            price: factor.price.sale,
-            total: factor.price.sale * npd.qty,
-            weightGross: parseFloat(productNew.weightGross.toFixed(2)),
-            weightNet: parseFloat(productNew.weightNet.toFixed(2))
-          }
-
-          newOrder.listProduct.push(npdProduct)
-          // console.log(period,[area])
-          await Npd.findOneAndUpdate(
-            { period: period },
-            {
-              $push: { areaGet: area }
-            }
-          )
+        const npdProduct = {
+          id: productNew.id,
+          lot: '',
+          name: productNew.name,
+          group: productNew.group,
+          brand: productNew.brand,
+          size: productNew.size,
+          flavour: productNew.flavour,
+          qty: npd.qty,
+          unit: npd.unit,
+          qtyPcs: qtyPcs,
+          price: factor.price.sale,
+          total: factor.price.sale * npd.qty,
+          weightGross: parseFloat(productNew.weightGross.toFixed(2)),
+          weightNet: parseFloat(productNew.weightNet.toFixed(2))
         }
+
+        newOrder.listProduct.push(npdProduct)
+        // console.log(period,[area])
+        await Npd.findOneAndUpdate(
+          { period: period },
+          {
+            $push: { areaGet: area }
+          }
+        )
       }
     }
-
-    const productQty = newOrder.listProduct.map(u => {
-      return {
-        id: u.id,
-        // lot: u.lot,
-        unit: u.unit,
-        qty: u.qty,
-        statusMovement: 'OUT'
-      }
-    })
-
-    const calStock = {
-      // storeId: refundOrder.store.storeId,
-      orderId: newOrder.orderId,
-      area: newOrder.area,
-      saleCode: sale.saleCode,
-      period: period,
-      warehouse: newOrder.fromWarehouse,
-      status: 'pending',
-      statusTH: 'รอนำเข้า',
-      action: 'Withdraw',
-      type: 'Withdraw',
-      product: productQty
-    }
-
-    const createdMovement = await StockMovement.create({
-      ...calStock
-    })
-
-    await StockMovementLog.create({
-      ...calStock,
-      refOrderId: createdMovement._id
-    })
-
-    await newOrder.save()
-    await Cart.deleteOne({ type, area })
-    await transaction.commit()
-
-    const io = getSocket()
-    io.emit('distribution/checkout', {
-      status: 200,
-      message: 'Checkout successful!',
-      data: newOrder
-    })
-
-    res.status(200).json({
-      status: 200,
-      message: 'Checkout successful!',
-      // data: { orderId, total: subtotal, qty: totalQty }
-      data: newOrder
-      // data:listProductWithDraw
-    })
-  } catch (error) {
-    try {
-      await transaction.rollback()
-    } catch (rollbackErr) {
-      console.error('Transaction rollback failed:', rollbackErr)
-    }
-    console.error('Error saving store to MongoDB:', error)
-    res.status(500).json({ status: '500', message: 'Server Error' })
   }
+
+  const productQty = newOrder.listProduct.map(u => {
+    return {
+      id: u.id,
+      // lot: u.lot,
+      unit: u.unit,
+      qty: u.qty,
+      statusMovement: 'OUT'
+    }
+  })
+
+  const calStock = {
+    // storeId: refundOrder.store.storeId,
+    orderId: newOrder.orderId,
+    area: newOrder.area,
+    saleCode: sale.saleCode,
+    period: period,
+    warehouse: newOrder.fromWarehouse,
+    status: 'pending',
+    statusTH: 'รอนำเข้า',
+    action: 'Withdraw',
+    type: 'Withdraw',
+    product: productQty
+  }
+
+  const createdMovement = await StockMovement.create({
+    ...calStock
+  })
+
+  await StockMovementLog.create({
+    ...calStock,
+    refOrderId: createdMovement._id
+  })
+
+  await newOrder.save()
+  await Cart.deleteOne({ type, area })
+  await transaction.commit()
+
+  const io = getSocket()
+  io.emit('distribution/checkout', {
+    status: 200,
+    message: 'Checkout successful!',
+    data: newOrder
+  })
+
+  res.status(200).json({
+    status: 200,
+    message: 'Checkout successful!',
+    // data: { orderId, total: subtotal, qty: totalQty }
+    data: newOrder
+    // data:listProductWithDraw
+  })
+} catch (error) {
+  try {
+    await transaction.rollback()
+  } catch (rollbackErr) {
+    console.error('Transaction rollback failed:', rollbackErr)
+  }
+  console.error('Error saving store to MongoDB:', error)
+  res.status(500).json({ status: '500', message: 'Server Error' })
+}
 }
 
 exports.getOrderCredit = async (req, res) => {
@@ -410,7 +388,7 @@ exports.getOrderCredit = async (req, res) => {
       ...areaQuery,
       ...(period ? { period } : {}),
       withdrawType: 'credit',
-      createdAt: { $gte: startDate, $lt: endDate },
+      // createdAt: { $gte: startDate, $lt: endDate },
       ...statusQuery
     }
 
@@ -475,14 +453,16 @@ exports.getOrderCredit = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-                fullname: `${userData.firstName} ${userData.surName}`,
-                tel: `${userData.tel}`
-              }
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
           // highStatus: o.highStatus,
           // lowStatus: o.lowStatus,
+          newTrip: o.newTrip,
+          withdrawType: o.withdrawType,
           totalWeightGross: o.totalWeightGross,
           totalWeightNet: o.totalWeightNet,
           orderType: o.orderType,
@@ -636,14 +616,16 @@ exports.getOrder = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-                fullname: `${userData.firstName} ${userData.surName}`,
-                tel: `${userData.tel}`
-              }
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
           // highStatus: o.highStatus,
           // lowStatus: o.lowStatus,
+          newTrip: o.newTrip,
+          withdrawType: o.withdrawType,
           totalWeightGross: o.totalWeightGross,
           totalWeightNet: o.totalWeightNet,
           orderType: o.orderType,
@@ -670,7 +652,6 @@ exports.getOrder = async (req, res) => {
     res.status(500).json({ status: '500', message: 'Server Error' })
   }
 }
-
 
 exports.getOrderSup = async (req, res) => {
   try {
@@ -798,14 +779,13 @@ exports.getOrderSup = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-                fullname: `${userData.firstName} ${userData.surName}`,
-                tel: `${userData.tel}`
-              }
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
             : null,
           orderId: o.orderId,
-          // orderNo: o.orderNo,
-          // highStatus: o.highStatus,
-          // lowStatus: o.lowStatus,
+          newTrip: o.newTrip,
+          withdrawType: o.withdrawType,
           totalWeightGross: o.totalWeightGross,
           totalWeightNet: o.totalWeightNet,
           orderType: o.orderType,
@@ -890,6 +870,7 @@ exports.getDetail = async (req, res) => {
             _id: p._id
           }
         }),
+        newTrip: u.newTrip,
         total: u.total,
         totalQty: u.totalQty,
         totalWeightGross: u.totalWeightGross,
@@ -1394,15 +1375,12 @@ exports.approveWithdraw = async (req, res) => {
           <p>
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-            <strong>ประเภทการจัดส่ง:</strong> ${
-              distributionTran.orderTypeName
+            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName
             }<br>
-            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
-            '-' + wereHouseName?.wh_name || ''
-          }<br>
-            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
-            distributionTran.shippingName
-          }<br>
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
+            }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
+            }<br>
             <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
             <strong>เขต:</strong> ${distributionTran.area}<br>
             <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -1573,9 +1551,8 @@ exports.saleConfirmWithdraw = async (req, res) => {
         const ReceiveQty = Object.values(
           Receive.reduce((acc, cur) => {
             // ใช้ key จาก coNo + withdrawUnit + productId (ถ้าอยากแยกตาม productId ด้วย)
-            const key = `${cur.coNo}_${
-              cur.withdrawUnit
-            }_${cur.productId.trim()}`
+            const key = `${cur.coNo}_${cur.withdrawUnit
+              }_${cur.productId.trim()}`
             if (!acc[key]) {
               acc[key] = { ...cur }
             } else {
@@ -1993,7 +1970,7 @@ exports.withdrawToExcel = async (req, res) => {
 
     const tranFromOrder = modelWithdraw.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD (date) {
+      function formatDateToThaiYYYYMMDD(date) {
         const d = new Date(date)
         // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -2083,7 +2060,7 @@ exports.withdrawToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => {})
+        fs.unlink(tempPath, () => { })
       }
     )
   } catch (error) {
@@ -2293,7 +2270,7 @@ exports.withdrawBackOrderToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
+      fs.unlink(tempPath, () => { })
     })
   }
 }

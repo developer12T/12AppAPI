@@ -33,7 +33,7 @@ exports.getUser = async (req, res) => {
     const { User } = getModelsByChannel(channel, res, userModel);
 
     const users = await User.find({})
-      .select('-_id salecode salePayer username firstName password surName tel zone area warehouse role qrCodeImage updatedAt')
+      .select('-_id saleCode salePayer username firstName password surName tel zone area warehouse role qrCodeImage updatedAt')
       .lean();
 
     const usersWithTHTime = users.map(item => {
@@ -303,9 +303,7 @@ exports.addUser = async (req, res) => {
 exports.addUserOne = async (req, res) => {
   const channel = req.headers['x-channel']
   const { User } = getModelsByChannel(channel, res, userModel)
-  const saleInData = await User.findOne({ saleCode: req.body.saleCode })
 
-  if (!saleInData) {
     const user = new User({
       saleCode: req.body.saleCode,
       salePayer: req.body.salePayer,
@@ -322,12 +320,8 @@ exports.addUserOne = async (req, res) => {
       image: req.body.image
     })
     await user.save()
-  } else {
-    return res.status(409).json({
-      status: 409,
-      message: 'This saleCode already exists in the system'
-    })
-  }
+
+  
   res.status(200).json({
     status: 200,
     message: 'Insert User Success'
@@ -347,9 +341,8 @@ exports.updateUserOne = async (req, res) => {
     })
   }
 
-  const saltRounds = 10;
 
-  const hashedPassword = await bcrypt.hash(req.body.password, saltRounds);
+  const encryptedPassword = encrypt(req.body.password);
   const user = await User.updateOne(
     { username: req.body.username },
     {
@@ -358,7 +351,7 @@ exports.updateUserOne = async (req, res) => {
         username: req.body.username,
         firstName: req.body.firstName,
         surName: req.body.surName,
-        password: hashedPassword,
+        password: encryptedPassword,
         tel: req.body.tel,
         zone: req.body.zone,
         area: req.body.area,
