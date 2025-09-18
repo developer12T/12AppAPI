@@ -180,6 +180,8 @@ exports.checkout = async (req, res) => {
         res,
         withdrawType
       )
+      fromWarehouse = ''
+      toWarehouse = ''
     } else {
       orderId = await generateDistributionId(
         area,
@@ -188,6 +190,8 @@ exports.checkout = async (req, res) => {
         res,
         newtrip
       )
+      fromWarehouse = fromWarehouse
+      toWarehouse = sale.warehouse
     }
   
 
@@ -200,7 +204,7 @@ exports.checkout = async (req, res) => {
     withdrawType: withdrawType,
     area,
     fromWarehouse,
-    toWarehouse: sale.warehouse,
+    toWarehouse: toWarehouse,
     shippingId: shipping.shippingId,
     shippingRoute: shipping.route,
     shippingName: shipping.name,

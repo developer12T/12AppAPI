@@ -2044,6 +2044,7 @@ exports.getStockQtyNew = async (req, res) => {
     // data:data,
     summaryStock: Number(summaryStock.toFixed(2)),
     // StockTotalCtn,
+    StockTotalPcs,
 
     summaryWithdraw: Number(summaryWithdraw.toFixed(2)),
     // withdrawTotalCtn,

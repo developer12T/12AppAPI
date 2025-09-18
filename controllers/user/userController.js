@@ -303,9 +303,7 @@ exports.addUser = async (req, res) => {
 exports.addUserOne = async (req, res) => {
   const channel = req.headers['x-channel']
   const { User } = getModelsByChannel(channel, res, userModel)
-  const saleInData = await User.findOne({ saleCode: req.body.saleCode })
 
-  if (!saleInData) {
     const user = new User({
       saleCode: req.body.saleCode,
       salePayer: req.body.salePayer,
@@ -322,12 +320,8 @@ exports.addUserOne = async (req, res) => {
       image: req.body.image
     })
     await user.save()
-  } else {
-    return res.status(409).json({
-      status: 409,
-      message: 'This saleCode already exists in the system'
-    })
-  }
+
+  
   res.status(200).json({
     status: 200,
     message: 'Insert User Success'
