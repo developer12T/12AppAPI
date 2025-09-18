@@ -1899,7 +1899,7 @@ exports.getStockQtyNew = async (req, res) => {
   })
 
   let StockTotalCtn = 0
-  let StockTotalPcs = 0
+  let stockTotalPcs = 0
   let withdrawTotalCtn = 0
   let withdrawTotalPcs = 0
   let goodTotalCtn = 0
@@ -1942,7 +1942,7 @@ exports.getStockQtyNew = async (req, res) => {
     // console.log(pcs.damaged)
 
     StockTotalCtn += stockCtn
-    StockTotalPcs += pcs.stock
+    stockTotalPcs += pcs.stock
     withdrawTotalCtn += withdrawCtn
     withdrawTotalPcs += pcs.withdraw
     goodTotalCtn += goodCtn
@@ -2044,7 +2044,7 @@ exports.getStockQtyNew = async (req, res) => {
     // data:data,
     summaryStock: Number(summaryStock.toFixed(2)),
     // StockTotalCtn,
-    StockTotalPcs,
+    stockTotalPcs,
 
     summaryWithdraw: Number(summaryWithdraw.toFixed(2)),
     // withdrawTotalCtn,
