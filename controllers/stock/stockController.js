@@ -2040,8 +2040,8 @@ exports.getStockQtyNew = async (req, res) => {
     status: 200,
     message: 'suceesful',
     // data: listUnitPcs,
-    // data: dataFinal,
-    data:data,
+    data: dataFinal,
+    // data:data,
     summaryStock: Number(summaryStock.toFixed(2)),
     // StockTotalCtn,
 
