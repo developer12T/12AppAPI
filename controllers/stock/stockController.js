@@ -1837,14 +1837,14 @@ exports.getStockQtyNew = async (req, res) => {
           balance: balanceQty
         }
       })
-      // .filter(unitData => {
-      //   if (!condition || condition === '') return true
-      //   if (condition === 'good') return unitData.good !== 0
-      //   if (condition === 'damaged') return unitData.damaged !== 0
-      //   if (condition === 'goodandDamaged')
-      //     return unitData.good !== 0 || unitData.damaged !== 0
-      //   return true
-      // })
+    // .filter(unitData => {
+    //   if (!condition || condition === '') return true
+    //   if (condition === 'good') return unitData.good !== 0
+    //   if (condition === 'damaged') return unitData.damaged !== 0
+    //   if (condition === 'goodandDamaged')
+    //     return unitData.good !== 0 || unitData.damaged !== 0
+    //   return true
+    // })
 
     // console.log(listUnitPcs)
     const summaryQty = calculateStockSummary(productDetail, listUnitStock)
@@ -4341,7 +4341,7 @@ exports.stockToExcelSummary = async (req, res) => {
     // ---------- Product detail (เฉพาะที่จำเป็น) ----------
     const productDetail = await Product.find(
       { id: { $in: uniqueProductId } },
-      { id: 1, name: 1, listUnit: 1 }
+      { id: 1, name: 1, listUnit: 1, groupCodeM3: 1, size: 1 }
     ).lean()
 
     // Fast lookup
@@ -4550,6 +4550,8 @@ exports.stockToExcelSummary = async (req, res) => {
         // inv: item.inv,
         productId: pid,
         productName: prod?.name || '',
+        productGroup: prod?.groupCodeM3 || '',
+        size: prod?.size || '',
         mainPcs: stockMain?.stockPcs || 0,
         mainUnit: convertToUnits(stockMain?.stockPcs || 0, productDetailUnit),
         withdrawPcs: item.qtyWithdraw,
@@ -4574,6 +4576,37 @@ exports.stockToExcelSummary = async (req, res) => {
         outUnit: outUnit,
         totalPrice: totalPrice
       }
+    })
+
+
+    stockOutDataFinal.sort((a, b) => {
+      // ===== 1) เทียบ group แบบ natural (รองรับตัวเลขปนตัวอักษร) =====
+      const gA = String(a.productGroup || '')
+      const gB = String(b.productGroup || '')
+      const g = gA.localeCompare(gB, undefined, {
+        numeric: true,
+        sensitivity: 'base'
+      })
+      if (g !== 0) return g
+
+      // ===== 2) เทียบ size หลัง normalize หน่วยเป็นกรัม =====
+      const parseSize = s => {
+        const str = String(s || '')
+        const num = parseFloat(str.replace(/[^0-9.]/g, '')) || 0 // ดึงตัวเลข/ทศนิยม
+        if (/\bkg\b/i.test(str)) return num * 1000 // KG -> กรัม
+        if (/\bg\b/i.test(str)) return num // G  -> กรัม
+        return num // ถ้าไม่เจอหน่วย ชั่งใจให้เป็นกรัมไปก่อน
+      }
+
+      const sizeA = parseSize(a.size)
+      const sizeB = parseSize(b.size)
+      if (sizeA !== sizeB) return sizeB - sizeA
+
+      // tie-breaker สุดท้าย: เทียบสตริง size ตรง ๆ
+      return String(a.size || '').localeCompare(String(b.size || ''), undefined, {
+        numeric: true,
+        sensitivity: 'base'
+      })
     })
 
     // ---------- Export / JSON ----------

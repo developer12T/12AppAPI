@@ -556,7 +556,7 @@ exports.sendmoneyToExcel = async (req, res) => {
     dateAt: { $gte: startDate, $lt: endDate }
   }
 
-  console.log(matchQuery)
+  // console.log(matchQuery)
 
   const sumByType = async (Model, type, area) => {
     const result = await Model.aggregate([
