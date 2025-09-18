@@ -8,6 +8,7 @@
 const { rangeDate } = require('../../utilities/datetime')
 const xlsx = require('xlsx')
 const { generateStockId } = require('../../utilities/genetateId')
+const { sortProduct } = require('../../utilities/product')
 const path = require('path')
 const errorEndpoint = require('../../middleware/errorEndpoint')
 const currentFilePath = path.basename(__filename)
@@ -1864,39 +1865,6 @@ exports.getStockQtyNew = async (req, res) => {
     }
   }
 
-  data.sort((a, b) => {
-    // ===== 1) เทียบ group แบบ natural (รองรับตัวเลขปนตัวอักษร) =====
-    const gA = String(a.productGroupCode || '')
-    const gB = String(b.productGroupCode || '')
-    const g = gA.localeCompare(gB, undefined, {
-      numeric: true,
-      sensitivity: 'base'
-    })
-    if (g !== 0) return g
-
-    // ===== 2) เทียบ size หลัง normalize หน่วยเป็นกรัม =====
-    const parseSize = s => {
-      const str = String(s || '')
-      const num = parseFloat(str.replace(/[^0-9.]/g, '')) || 0 // ดึงตัวเลข/ทศนิยม
-      if (/\bkg\b/i.test(str)) return num * 1000 // KG -> กรัม
-      if (/\bg\b/i.test(str)) return num // G  -> กรัม
-      return num // ถ้าไม่เจอหน่วย ชั่งใจให้เป็นกรัมไปก่อน
-    }
-
-    const sizeA = parseSize(a.size)
-    const sizeB = parseSize(b.size)
-    if (sizeA !== sizeB) return sizeB - sizeA
-
-    // tie-breaker สุดท้าย: เทียบสตริง size ตรง ๆ
-    return String(a.size || '').localeCompare(String(b.size || ''), undefined, {
-      numeric: true,
-      sensitivity: 'base'
-    })
-  })
-
-  data.forEach(item => {
-    delete item.pcsMain, delete item.size
-  })
 
   let StockTotalCtn = 0
   let stockTotalPcs = 0
@@ -2019,7 +1987,7 @@ exports.getStockQtyNew = async (req, res) => {
 
   // const io = getSocket()
   // io.emit('stock/getStockQtyNew', {});
-  const dataFinal = data.map(item => {
+  let dataFinal = data.map(item => {
     const productDetail = dataProduct.find(o => o.id === item.productId)
     const minFactorObj = productDetail.listUnit.reduce((min, o) => {
       return o.factor < min.factor ? o : min
@@ -2034,6 +2002,7 @@ exports.getStockQtyNew = async (req, res) => {
   })
 
 
+  dataFinal = sortProduct(dataFinal, 'productGroupCode')
 
 
   res.status(200).json({
@@ -4517,7 +4486,7 @@ exports.stockToExcelSummary = async (req, res) => {
     const stockOutData = mergeDuplicateRows(stockOutDataRaw)
 
     // (3) ประกอบ balance ต่อสินค้าใน stock
-    const stockOutDataFinal = stockOutData.map(item => {
+    let stockOutDataFinal = stockOutData.map(item => {
       const pid = String(item?.productId || '').trim()
       const productDetailItem = productDetail.find(u => u.id == pid)
       const productDetailUnit = productDetailItem?.listUnit || []
@@ -4579,35 +4548,7 @@ exports.stockToExcelSummary = async (req, res) => {
     })
 
 
-    stockOutDataFinal.sort((a, b) => {
-      // ===== 1) เทียบ group แบบ natural (รองรับตัวเลขปนตัวอักษร) =====
-      const gA = String(a.productGroup || '')
-      const gB = String(b.productGroup || '')
-      const g = gA.localeCompare(gB, undefined, {
-        numeric: true,
-        sensitivity: 'base'
-      })
-      if (g !== 0) return g
-
-      // ===== 2) เทียบ size หลัง normalize หน่วยเป็นกรัม =====
-      const parseSize = s => {
-        const str = String(s || '')
-        const num = parseFloat(str.replace(/[^0-9.]/g, '')) || 0 // ดึงตัวเลข/ทศนิยม
-        if (/\bkg\b/i.test(str)) return num * 1000 // KG -> กรัม
-        if (/\bg\b/i.test(str)) return num // G  -> กรัม
-        return num // ถ้าไม่เจอหน่วย ชั่งใจให้เป็นกรัมไปก่อน
-      }
-
-      const sizeA = parseSize(a.size)
-      const sizeB = parseSize(b.size)
-      if (sizeA !== sizeB) return sizeB - sizeA
-
-      // tie-breaker สุดท้าย: เทียบสตริง size ตรง ๆ
-      return String(a.size || '').localeCompare(String(b.size || ''), undefined, {
-        numeric: true,
-        sensitivity: 'base'
-      })
-    })
+    stockOutDataFinal = sortProduct(stockOutDataFinal,'productGroup')
 
     // ---------- Export / JSON ----------
     if (excel === true) {
