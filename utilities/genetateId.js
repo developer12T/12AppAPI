@@ -18,7 +18,7 @@ const { Op } = require('sequelize')
 
 const { DisributionM3 } = require('../models/cash/master')
 
-async function generateCampaignId (channel, res) {
+async function generateCampaignId(channel, res) {
   const { Campaign } = getModelsByChannel(channel, res, campaignModel)
   const now = new Date()
   const yyyy = now.getFullYear()
@@ -74,8 +74,8 @@ const generateStockId = async (area, warehouse, channel, res) => {
   return `S${currentYear
     .toString()
     .slice(2, 4)}${currentMonth}13${warehouse}${runningNumber
-    .toString()
-    .padStart(4, '0')}`
+      .toString()
+      .padStart(4, '0')}`
 }
 
 const generateOrderId = async (area, warehouse, channel, res) => {
@@ -106,8 +106,8 @@ const generateOrderId = async (area, warehouse, channel, res) => {
   return `${currentYear
     .toString()
     .slice(2, 4)}${currentMonth}13${warehouse}${runningNumber
-    .toString()
-    .padStart(4, '0')}`
+      .toString()
+      .padStart(4, '0')}`
 }
 const generateRefundId = async (area, warehouse, channel, res) => {
   const currentYear = new Date().getFullYear() + 543
@@ -135,8 +135,8 @@ const generateRefundId = async (area, warehouse, channel, res) => {
   return `${currentYear
     .toString()
     .slice(2, 4)}${currentMonth}93${warehouse}${runningNumber
-    .toString()
-    .padStart(4, '0')}`
+      .toString()
+      .padStart(4, '0')}`
 }
 
 const generateDistributionId = async (
@@ -201,6 +201,69 @@ const generateDistributionId = async (
   return newOrderId
 }
 
+const generateDistributionIdCredit = async (
+  area,
+  warehouse,
+  channel,
+  res,
+  withdrawType
+) => {
+  // โหลดโมเดลก่อนใช้งาน
+  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+
+  const now = new Date()
+
+  // คำนวณ "เดือนเป้าหมาย" (ถ้า newtrip ให้เลื่อนไปเดือนถัดไป และข้ามปีได้)
+  const target = new Date(now)
+
+  const targetYearAD = target.getFullYear() // ค.ศ.
+  const targetMonth = target.getMonth() + 1 // 1..12
+  const mm = String(targetMonth).padStart(2, '0')
+
+  // ปี พ.ศ. 2 หลักท้าย
+  const buddhistYear = targetYearAD + 543
+  const yy = String(buddhistYear).slice(-2)
+
+  // prefix: W + (ปี พ.ศ. 2 หลัก) + (เดือน 2 หลัก) + warehouse
+  const prefix = `CN${yy}${mm}${warehouse}`
+
+  // สร้างช่วงวันที่ของ "เดือนเป้าหมาย" แบบเวลาไทย (UTC+7)
+  const startTH = new Date(`${targetYearAD}-${mm}-01T00:00:00+07:00`)
+  const nextMonth = new Date(startTH)
+  nextMonth.setMonth(nextMonth.getMonth() + 1)
+  const endTHExclusive = new Date(
+    `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(
+      2,
+      '0'
+    )}-01T00:00:00+07:00`
+  )
+
+  // console.log(startTH, endTHExclusive)
+
+  // หาเลขรันล่าสุดจาก order ที่ขึ้นต้นด้วย prefix นี้ ใน area เดียวกันและภายในเดือนเป้าหมาย
+  const latestOrder = await Distribution.findOne({
+    area,
+    orderId: { $regex: `^${prefix}` }, // เช่น ^W6809{warehouse}
+    withdrawType:withdrawType
+  })
+    .sort({ orderId: -1 })
+    .select('orderId')
+
+  // ตัดเอาเฉพาะส่วนเลขรันท้าย แล้ว +1 (ไม่ fix ความยาว เพื่อรองรับ >99)
+  let runningNumber = 1
+  if (latestOrder?.orderId?.startsWith(prefix)) {
+    const tail = latestOrder.orderId.slice(prefix.length) // ตัวเลขรันล้วนๆ
+    const lastNum = parseInt(tail || '0', 10)
+    runningNumber = (isNaN(lastNum) ? 0 : lastNum) + 1
+  }
+
+  // กำหนดความยาวเลขรัน (แนะนำ 3 หลักขึ้นไป ป้องกันทะลุ 99)
+  const newOrderId = `${prefix}${String(runningNumber).padStart(2, '0')}`
+  // console.log(latestOrder)
+  return newOrderId
+}
+
+
 const generateGiveawaysId = async (area, warehouse, type, channel, res) => {
   const currentYear = new Date().getFullYear() + 543
   const currentMonth = (new Date().getMonth() + 1).toString().padStart(2, '0')
@@ -228,8 +291,8 @@ const generateGiveawaysId = async (area, warehouse, type, channel, res) => {
   return `${currentYear
     .toString()
     .slice(2, 4)}${currentMonth}${orderType}${runningNumber
-    .toString()
-    .padStart(4, '0')}`
+      .toString()
+      .padStart(4, '0')}`
 }
 
 const generateGivetypeId = async (channel, res) => {
@@ -280,5 +343,6 @@ module.exports = {
   generateGivetypeId,
   generatePromotionId,
   generateStockId,
-  generateCampaignId
+  generateCampaignId,
+  generateDistributionIdCredit
 }
