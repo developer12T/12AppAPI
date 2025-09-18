@@ -50,10 +50,10 @@ exports.checkout = async (req, res) => {
       withdrawType,
       sendDate,
       note,
-      period
-      // , newtrip
+      period,
+      newtrip
     } = req.body
-    const newtrip = false
+    // const newtrip = false
     const channel = req.headers['x-channel']
     const { Cart } = getModelsByChannel(channel, res, cartModel)
     const { User } = getModelsByChannel(channel, res, userModel)
@@ -410,7 +410,7 @@ exports.getOrderCredit = async (req, res) => {
       ...areaQuery,
       ...(period ? { period } : {}),
       withdrawType: 'credit',
-      createdAt: { $gte: startDate, $lt: endDate },
+      // createdAt: { $gte: startDate, $lt: endDate },
       ...statusQuery
     }
 
@@ -483,6 +483,8 @@ exports.getOrderCredit = async (req, res) => {
           // orderNo: o.orderNo,
           // highStatus: o.highStatus,
           // lowStatus: o.lowStatus,
+          newTrip: o.newTrip,
+          withdrawType: o.withdrawType,
           totalWeightGross: o.totalWeightGross,
           totalWeightNet: o.totalWeightNet,
           orderType: o.orderType,
@@ -644,6 +646,8 @@ exports.getOrder = async (req, res) => {
           // orderNo: o.orderNo,
           // highStatus: o.highStatus,
           // lowStatus: o.lowStatus,
+          newTrip: o.newTrip,
+          withdrawType: o.withdrawType,
           totalWeightGross: o.totalWeightGross,
           totalWeightNet: o.totalWeightNet,
           orderType: o.orderType,
@@ -670,7 +674,6 @@ exports.getOrder = async (req, res) => {
     res.status(500).json({ status: '500', message: 'Server Error' })
   }
 }
-
 
 exports.getOrderSup = async (req, res) => {
   try {
@@ -803,9 +806,8 @@ exports.getOrderSup = async (req, res) => {
               }
             : null,
           orderId: o.orderId,
-          // orderNo: o.orderNo,
-          // highStatus: o.highStatus,
-          // lowStatus: o.lowStatus,
+          newTrip: o.newTrip,
+          withdrawType: o.withdrawType,
           totalWeightGross: o.totalWeightGross,
           totalWeightNet: o.totalWeightNet,
           orderType: o.orderType,
@@ -890,6 +892,7 @@ exports.getDetail = async (req, res) => {
             _id: p._id
           }
         }),
+        newTrip: u.newTrip,
         total: u.total,
         totalQty: u.totalQty,
         totalWeightGross: u.totalWeightGross,
