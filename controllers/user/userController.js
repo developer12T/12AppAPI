@@ -33,7 +33,7 @@ exports.getUser = async (req, res) => {
     const { User } = getModelsByChannel(channel, res, userModel);
 
     const users = await User.find({})
-      .select('-_id salecode salePayer username firstName password surName tel zone area warehouse role qrCodeImage updatedAt')
+      .select('-_id saleCode salePayer username firstName password surName tel zone area warehouse role qrCodeImage updatedAt')
       .lean();
 
     const usersWithTHTime = users.map(item => {
