@@ -341,9 +341,8 @@ exports.updateUserOne = async (req, res) => {
     })
   }
 
-  const saltRounds = 10;
 
-  const hashedPassword = await bcrypt.hash(req.body.password, saltRounds);
+  const encryptedPassword = encrypt(req.body.password);
   const user = await User.updateOne(
     { username: req.body.username },
     {
@@ -352,7 +351,7 @@ exports.updateUserOne = async (req, res) => {
         username: req.body.username,
         firstName: req.body.firstName,
         surName: req.body.surName,
-        password: hashedPassword,
+        password: encryptedPassword,
         tel: req.body.tel,
         zone: req.body.zone,
         area: req.body.area,
