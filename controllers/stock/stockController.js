@@ -1295,7 +1295,7 @@ exports.getStockQtyNew = async (req, res) => {
   const matchQuery = { ...areaQuery, period }
 
   const matchQueryRefund = { ...areaQueryRefund, period }
-
+  // console.log(matchQueryRefund)
   const dataRefund = await Refund.aggregate([
     {
       $match: {
@@ -1305,7 +1305,7 @@ exports.getStockQtyNew = async (req, res) => {
     },
     {
       $project: {
-        listProduct: 1,
+        // listProduct: 1,
         _id: 0
       }
     }
@@ -1500,6 +1500,9 @@ exports.getStockQtyNew = async (req, res) => {
       return acc
     }, {})
   )
+
+  // console.log(JSON.stringify(dataRefund, null, 2))
+
 
   const withdrawProductArray = Object.values(
     allWithdrawProducts.reduce((acc, curr) => {
@@ -1795,7 +1798,7 @@ exports.getStockQtyNew = async (req, res) => {
         const adjustQty =
           productDetailAdjust.find(i => i.unit === u.unit)?.qty ?? 0
         const giveQty = productDetailGive.find(i => i.unit === u.unit)?.qty ?? 0
-        // console.log(goodQty)
+        // console.log(damagedQty)
 
         const goodSale = u.price.refund
         const damagedSale = u.price.refundDmg
@@ -1834,14 +1837,14 @@ exports.getStockQtyNew = async (req, res) => {
           balance: balanceQty
         }
       })
-      .filter(unitData => {
-        if (!condition || condition === '') return true
-        if (condition === 'good') return unitData.good !== 0
-        if (condition === 'damaged') return unitData.damaged !== 0
-        if (condition === 'goodandDamaged')
-          return unitData.good !== 0 || unitData.damaged !== 0
-        return true
-      })
+      // .filter(unitData => {
+      //   if (!condition || condition === '') return true
+      //   if (condition === 'good') return unitData.good !== 0
+      //   if (condition === 'damaged') return unitData.damaged !== 0
+      //   if (condition === 'goodandDamaged')
+      //     return unitData.good !== 0 || unitData.damaged !== 0
+      //   return true
+      // })
 
     // console.log(listUnitPcs)
     const summaryQty = calculateStockSummary(productDetail, listUnitStock)
@@ -1896,15 +1899,25 @@ exports.getStockQtyNew = async (req, res) => {
   })
 
   let StockTotalCtn = 0
+  let StockTotalPcs = 0
   let withdrawTotalCtn = 0
+  let withdrawTotalPcs = 0
   let goodTotalCtn = 0
+  let goodTotalPcs = 0
   let damagedTotalCtn = 0
+  let damagedTotalPcs = 0
   let saleTotalCtn = 0
+  let saleTotalPcs = 0
   let promotionTotalCtn = 0
+  let promotionTotalPcs = 0
   let changeTotalCtn = 0
+  let changeTotalPcs = 0
   let adjustTotalCtn = 0
+  let adjustTotalPcs = 0
   let giveTotalCtn = 0
+  let giveTotalPcs = 0
   let balTotalCtn = 0
+  let balTotalPcs = 0
 
   // console.log(data[0].summaryQty[0])
 
@@ -1915,27 +1928,39 @@ exports.getStockQtyNew = async (req, res) => {
         .listUnit.find(i => i.unit === 'CTN')?.factor ?? 0
     const pcs = item.summaryQty[0]
 
-    const stockPcs = Math.floor((pcs.stock || 0) / (factorCtn || 1))
-    const withdrawPcs = Math.floor((pcs.withdraw || 0) / (factorCtn || 1))
-    const goodPcs = Math.floor((pcs.good || 0) / (factorCtn || 1))
-    const damagedPcs = Math.floor((pcs.damagedPcs || 0) / (factorCtn || 1))
-    const salePcs = Math.floor((pcs.sale || 0) / (factorCtn || 1))
-    const promotionPcs = Math.floor((pcs.promotion || 0) / (factorCtn || 1))
-    const changePcs = Math.floor((pcs.change || 0) / (factorCtn || 1))
-    const adjustPcs = Math.floor((pcs.adjust || 0) / (factorCtn || 1))
-    const givePcs = Math.floor((pcs.give || 0) / (factorCtn || 1))
-    const balPcs = Math.floor((pcs.balance || 0) / (factorCtn || 1))
+    const stockCtn = Math.floor((pcs.stock || 0) / (factorCtn || 1))
+    const withdrawCtn = Math.floor((pcs.withdraw || 0) / (factorCtn || 1))
+    const goodCtn = Math.floor((pcs.good || 0) / (factorCtn || 1))
+    const damagedCtn = Math.floor((pcs.damaged || 0) / (factorCtn || 1))
+    const saleCtn = Math.floor((pcs.sale || 0) / (factorCtn || 1))
+    const promotionCtn = Math.floor((pcs.promotion || 0) / (factorCtn || 1))
+    const changeCtn = Math.floor((pcs.change || 0) / (factorCtn || 1))
+    const adjustCtn = Math.floor((pcs.adjust || 0) / (factorCtn || 1))
+    const giveCtn = Math.floor((pcs.give || 0) / (factorCtn || 1))
+    const balCtn = Math.floor((pcs.balance || 0) / (factorCtn || 1))
 
-    StockTotalCtn += stockPcs
-    withdrawTotalCtn += withdrawPcs
-    goodTotalCtn += goodPcs
-    damagedTotalCtn += damagedPcs
-    saleTotalCtn += salePcs
-    promotionTotalCtn += promotionPcs
-    changeTotalCtn += changePcs
-    adjustTotalCtn += adjustPcs
-    giveTotalCtn += givePcs
-    balTotalCtn += balPcs
+    // console.log(pcs.damaged)
+
+    StockTotalCtn += stockCtn
+    StockTotalPcs += pcs.stock
+    withdrawTotalCtn += withdrawCtn
+    withdrawTotalPcs += pcs.withdraw
+    goodTotalCtn += goodCtn
+    goodTotalPcs += pcs.good
+    damagedTotalCtn += damagedCtn
+    damagedTotalPcs += pcs.damaged
+    saleTotalCtn += saleCtn
+    saleTotalPcs += pcs.sale
+    promotionTotalCtn += promotionCtn
+    promotionTotalPcs += pcs.promotion
+    changeTotalCtn += changeCtn
+    changeTotalPcs += pcs.change
+    adjustTotalCtn += adjustCtn
+    adjustTotalPcs += pcs.adjust
+    giveTotalCtn += giveCtn
+    giveTotalPcs += pcs.give
+    balTotalCtn += balCtn
+    balTotalPcs += pcs.balance
   })
   // console.log(pcs)
 
@@ -1994,32 +2019,59 @@ exports.getStockQtyNew = async (req, res) => {
 
   // const io = getSocket()
   // io.emit('stock/getStockQtyNew', {});
+  const dataFinal = data.map(item => {
+    const productDetail = dataProduct.find(o => o.id === item.productId)
+    const minFactorObj = productDetail.listUnit.reduce((min, o) => {
+      return o.factor < min.factor ? o : min
+    })
+
+    const { summaryQty, ...rest } = item  // destructure แล้วแยกออก
+
+    return {
+      ...rest,
+      summaryPcsPerProduct: summaryQty.find(i => i.unit === minFactorObj.unit)
+    }
+  })
+
+
+
 
   res.status(200).json({
     status: 200,
     message: 'suceesful',
-    data: listUnitPcs,
-    // data: data,
+    // data: listUnitPcs,
+    // data: dataFinal,
+    data:data,
     summaryStock: Number(summaryStock.toFixed(2)),
-    StockTotalCtn,
+    // StockTotalCtn,
+
     summaryWithdraw: Number(summaryWithdraw.toFixed(2)),
-    withdrawTotalCtn,
+    // withdrawTotalCtn,
+    withdrawTotalPcs,
     summaryGood: Number(summaryGood.toFixed(2)),
-    goodTotalCtn,
+    // goodTotalCtn,
+    goodTotalPcs,
     summaryDamaged: Number(summaryDamaged.toFixed(2)),
-    damagedTotalCtn,
+    // damagedTotalCtn,
+    damagedTotalPcs,
     summarySale: Number(summarySale.toFixed(2)),
-    saleTotalCtn,
+    // saleTotalCtn,
+    saleTotalPcs,
     summaryPromotion: Number(summaryPromotion.toFixed(2)),
-    promotionTotalCtn,
+    // promotionTotalCtn,
+    promotionTotalPcs,
     summaryChange: Number(summaryChange.toFixed(2)),
-    changeTotalCtn,
+    // changeTotalCtn,
+    changeTotalPcs,
     summaryAdjust: Number(summaryAdjust.toFixed(2)),
-    adjustTotalCtn,
+    // adjustTotalCtn,
+    adjustTotalPcs,
     summaryGive: Number(summaryGive.toFixed(2)),
-    giveTotalCtn,
+    // giveTotalCtn,
+    giveTotalPcs,
     summaryStockBal: Number(summaryStockBal.toFixed(2)),
-    balTotalCtn
+    // balTotalCtn,
+    balTotalPcs
   })
 }
 
