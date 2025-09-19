@@ -2220,6 +2220,7 @@ exports.getSummarybyArea = async (req, res) => {
     const { Route } = getModelsByChannel(channel, res, routeModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
     const { Refund } = getModelsByChannel(channel, res, refundModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
     if (!period) {
       return res.status(404).json({
         status: 404,
@@ -2384,7 +2385,7 @@ exports.getSummarybyArea = async (req, res) => {
 
     // const areaList = [...new Set(modelRoute.map(item => item.area))].filter(area => area !== undefined).sort();
 
-    const areaList = [
+    let areaList = [
       ...new Set(
         modelRoute
           .map(item => item.area)
@@ -2423,6 +2424,10 @@ exports.getSummarybyArea = async (req, res) => {
         }
       })
     } else if (type === 'year') {
+      if (!zone && !area) {
+        const users = await User.find({ role: 'sale' }).select('area') // ดึงเฉพาะ field area
+        areaList = [...new Set(users.map(u => u.area))] // แปลงเป็น array + unique
+      }
 
       let dataOrder = await getOrders(areaList, res, channel)
       let dataChange = await getChange(areaList, res, channel)
