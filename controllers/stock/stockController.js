@@ -2702,7 +2702,7 @@ exports.checkout = async (req, res) => {
 }
 
 exports.approveAdjustStock = async (req, res) => {
-  const { orderId, status,user } = req.body
+  const { orderId, status, user } = req.body
   const channel = req.headers['x-channel']
   let statusStr = ''
   let statusThStr = ''
@@ -4346,6 +4346,9 @@ exports.stockToExcelSummary = async (req, res) => {
 
         for (const p of item.listProduct) {
 
+          if (p.receiveQty === 0) {
+            continue
+          }
           const qtyPCS = (Number(p?.qty) || 0) * getFactor(p?.id, p?.unit)
 
           const row = {
@@ -4385,7 +4388,9 @@ exports.stockToExcelSummary = async (req, res) => {
               row.valGood = Number(p?.total ?? 0)
             }
           } else if (sourceName === 'Withdraw') {
-            row.qtyWithdraw = qtyPCS
+            const qtyPCSWithdraw = (Number(p?.receiveQty) || 0) * getFactor(p?.id, p?.unit)
+
+            row.qtyWithdraw = qtyPCSWithdraw
             row.valWithdraw = Number(p?.total ?? 0)
           } else if (sourceName === 'Adjuststock') {
             // console.log(p?.qty)
@@ -4521,7 +4526,7 @@ exports.stockToExcelSummary = async (req, res) => {
         0
       )
 
-      // console.log(qtyGood)
+      // console.log("pid", pid)
       return {
         // customerCode: item.customerCode,
         // customerName: item.customerName,
