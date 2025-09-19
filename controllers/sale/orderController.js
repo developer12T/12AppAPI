@@ -5810,7 +5810,7 @@ exports.getTargetProduct = async (req, res) => {
 }
 
 exports.getOrderExcelNew = async (req, res) => {
-  const { period, area, team, zone, excel } = req.query
+  const { period, area, team, zone, excel, type } = req.query
   const channel = req.headers['x-channel']
 
   const { Order } = getModelsByChannel(channel, res, orderModel)
@@ -5844,6 +5844,7 @@ exports.getOrderExcelNew = async (req, res) => {
             ...baseFilter,
             ...teamFilter,
             ...zoneFilter,
+            period: period,
             type: 'sale',
             status: { $nin: ['canceled', 'reject'] }
           }
@@ -5865,6 +5866,7 @@ exports.getOrderExcelNew = async (req, res) => {
             ...baseFilter,
             ...teamFilter,
             ...zoneFilter,
+            period: period,
             type: 'change',
             status: { $nin: ['pending', 'canceled', 'reject'] }
           }
@@ -5886,6 +5888,7 @@ exports.getOrderExcelNew = async (req, res) => {
             ...baseFilter,
             ...teamFilter,
             ...zoneFilter,
+            period: period,
             type: 'refund',
             status: { $nin: ['pending', 'canceled', 'reject'] }
           }
@@ -5907,6 +5910,7 @@ exports.getOrderExcelNew = async (req, res) => {
             ...baseFilter,
             ...teamFilter,
             ...zoneFilter,
+            period: period,
             type: 'give',
             status: { $nin: ['canceled', 'reject'] }
           }
@@ -6262,9 +6266,20 @@ exports.getOrderExcelNew = async (req, res) => {
     const wsRefund = xlsx.utils.json_to_sheet(dataRefundFinal)
     const wsGive = xlsx.utils.json_to_sheet(dataGiveFinal)
     // ✅ เพิ่มเข้า workbook เป็น 2 ชีต
-    xlsx.utils.book_append_sheet(wb, wsSale, `Sale_${area}`)
-    xlsx.utils.book_append_sheet(wb, wsRefund, `Refund_${area}`)
-    xlsx.utils.book_append_sheet(wb, wsGive, `Give_${area}`)
+
+    if (type === 'sale') {
+      xlsx.utils.book_append_sheet(wb, wsSale, `Sale`)
+    } else if (type === 'refund') {
+      xlsx.utils.book_append_sheet(wb, wsRefund, `Refund`)
+    } else if (type === 'give') {
+      xlsx.utils.book_append_sheet(wb, wsGive, `Give`)
+    } else {
+      xlsx.utils.book_append_sheet(wb, wsSale, `Sale`)
+      xlsx.utils.book_append_sheet(wb, wsRefund, `Refund`)
+      xlsx.utils.book_append_sheet(wb, wsGive, `Give`)
+    }
+
+
     // ✅ เขียนไฟล์ไปยัง tempPath (ต้องเขียนที่เดียวกับที่กำลังจะดาวน์โหลด)
     xlsx.writeFile(wb, tempPath)
 
@@ -6279,6 +6294,15 @@ exports.getOrderExcelNew = async (req, res) => {
       // ลบไฟล์ทิ้งหลังจบ (สำเร็จหรือไม่ก็ตาม)
       fs.unlink(tempPath, () => { })
     })
+
+
+
+
+
+
+
+
+
   } else {
     return res.status(200).json({
       status: 200,
