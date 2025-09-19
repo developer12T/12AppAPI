@@ -2218,7 +2218,8 @@ exports.getSummarybyArea = async (req, res) => {
     const channel = req.headers['x-channel'] // 'credit' or 'cash'
 
     const { Route } = getModelsByChannel(channel, res, routeModel)
-
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
     if (!period) {
       return res.status(404).json({
         status: 404,
@@ -2274,7 +2275,7 @@ exports.getSummarybyArea = async (req, res) => {
     }
 
     const modelRouteValue = await Route.aggregate([
-      { $match: { period } },
+      // { $match: { period } },
       { $project: { area: 1, day: 1, listStore: 1 } },
       { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
       {
@@ -2395,7 +2396,7 @@ exports.getSummarybyArea = async (req, res) => {
 
     let data = []
 
-    if (type === 'route' || type === 'year') {
+    if (type === 'route') {
       const totalMonths = type === 'route' ? 27 : 12
 
       data = areaList.map(area => {
@@ -2421,6 +2422,10 @@ exports.getSummarybyArea = async (req, res) => {
           summary: filledMonths.map(item => item.totalAmount)
         }
       })
+    } else if (type === 'year') {
+
+      console.log(areaList)
+
     }
 
     // const io = getSocket()
@@ -5844,7 +5849,13 @@ exports.getOrderExcelNew = async (req, res) => {
   const productData = await Product.find()
 
   for (const i of [...dataOrderSale, ...dataOrderPro]) {
+    // console.log(i)
     for (const item of i.listProduct ?? []) {
+
+      if (!item.id || item.id.trim() === '') {
+        continue;
+      }
+
       const productDetail = productData.find(o => o.id === item.id)
       const units = productDetail?.listUnit ?? []
       const unitCtn = units.find(u => u.unit === 'CTN') ?? {}
@@ -5880,7 +5891,7 @@ exports.getOrderExcelNew = async (req, res) => {
       // } else {
       //   typedetail = 'Sale'
       // }
-
+      // console.log(item.id)
       const dataTran = {
         // orderId: i.orderId,
         productId: item.id,
@@ -5934,6 +5945,11 @@ exports.getOrderExcelNew = async (req, res) => {
     }
 
     for (const item of i.listProduct ?? []) {
+
+      if (!item.id || item.id.trim() === '') {
+        continue;
+      }
+
       const productDetail = productData.find(o => o.id === item.id)
       const units = productDetail?.listUnit ?? []
       const unitCtn = units.find(u => u.unit === 'CTN') ?? {}
@@ -6018,6 +6034,11 @@ exports.getOrderExcelNew = async (req, res) => {
 
   for (const i of [...dataOrderGive]) {
     for (const item of i.listProduct ?? []) {
+
+      if (!item.id || item.id.trim() === '') {
+        continue;
+      }
+
       const productDetail = productData.find(o => o.id === item.id)
       const units = productDetail?.listUnit ?? []
       const unitCtn = units.find(u => u.unit === 'CTN') ?? {}
@@ -6090,9 +6111,9 @@ exports.getOrderExcelNew = async (req, res) => {
     }, {})
   )
 
-  dataSaleArray = sortProduct(dataSaleArray,'productGroup')
-  dataRefundChange = sortProduct(dataRefundChange,'productGroup')
-  dataGiveArray = sortProduct(dataGiveArray,'productGroup')
+  dataSaleArray = sortProduct(dataSaleArray, 'productGroup')
+  dataRefundChange = sortProduct(dataRefundChange, 'productGroup')
+  dataGiveArray = sortProduct(dataGiveArray, 'productGroup')
 
 
 
