@@ -50,11 +50,19 @@ function formatDate () {
   return `${year}${month}${day}`
 }
 
+const toThaiTime = (utcDate) => {
+  if (!utcDate) return null;
+  const date = new Date(utcDate);
+  date.setHours(date.getHours() + 7);
+  return date;
+};
+
 module.exports = {
   period,
   previousPeriod,
   timestamp,
   rangeDate,
   formatDate,
-  getCurrentTimeFormatted
+  getCurrentTimeFormatted,
+  toThaiTime
 }

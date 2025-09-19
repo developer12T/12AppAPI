@@ -6,10 +6,10 @@
 const {
   dataPowerBiQuery
 } = require('../../controllers/queryFromM3/querySctipt')
-const { period, previousPeriod } = require('../../utilities/datetime')
+const { period, previousPeriod, toThaiTime } = require('../../utilities/datetime')
 const axios = require('axios')
 const dayjs = require('dayjs')
-const { getSeries, updateRunningNumber } = require('../../middleware/order')
+const { getSeries, updateRunningNumber, getOrders, getChange, getRefund } = require('../../middleware/order')
 const { Item } = require('../../models/item/itemlot')
 const { OOHEAD, ItemLotM3, OOLINE } = require('../../models/cash/master')
 const { Op, fn, col, where, literal } = require('sequelize')
@@ -2424,9 +2424,81 @@ exports.getSummarybyArea = async (req, res) => {
       })
     } else if (type === 'year') {
 
-      console.log(areaList)
+      let dataOrder = await getOrders(areaList, res, channel)
+      let dataChange = await getChange(areaList, res, channel)
+      let dataRefund = await getRefund(areaList, res, channel)
+
+      dataOrder = dataOrder.map((item) => ({
+        ...item,
+        createdAtThai: toThaiTime(item.createdAt),
+      }));
+
+      dataChange = dataChange.map((item) => ({
+        ...item,
+        createdAtThai: toThaiTime(item.createdAt),
+      }));
+
+      dataRefund = dataRefund.map((item) => ({
+        ...item,
+        createdAtThai: toThaiTime(item.createdAt),
+      }));
+
+      function groupByMonthAndSum(data) {
+        return data.reduce((acc, item) => {
+          // ดึงเดือนจาก createdAtThai (หรือใช้ createdAt ก็ได้ถ้าเป็น Date)
+          const date = new Date(item.createdAt);
+          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+          // ถ้ายังไม่มีเดือนนี้ ให้ set ค่าเริ่มต้น
+          if (!acc[monthKey]) {
+            acc[monthKey] = 0;
+          }
+
+          // บวกค่า total เข้าไป
+          acc[monthKey] += item.total || 0;
+          return acc;
+        }, {});
+      }
+
+      data = []
+
+      for (const area of areaList) {
+        const dataOrderArea = dataOrder.filter(item => item.store.area === area)
+        const dataChangeArea = dataChange.filter(item => item.store.area === area)
+        const dataRefundArea = dataRefund.filter(item => item.store.area === area)
+
+        const orderByMonth = groupByMonthAndSum(dataOrderArea)
+        const changeByMonth = groupByMonthAndSum(dataChangeArea)
+        const refundByMonth = groupByMonthAndSum(dataRefundArea)
+
+        // ✅ array 12 เดือน (index 0 = Jan, index 11 = Dec)
+        const monthlySummary = Array(12).fill(0)
+
+        for (let m = 1; m <= 12; m++) {
+          const monthKey = `${new Date().getFullYear()}-${String(m).padStart(2, "0")}`
+          const order = orderByMonth[monthKey] || 0
+          const change = changeByMonth[monthKey] || 0
+          const refund = refundByMonth[monthKey] || 0
+          monthlySummary[m - 1] = to2(order + change - refund)
+        }
+
+        data.push({
+          area,
+          summary: monthlySummary
+        })
+      }
+
+
+      return res.status(200).json({
+        status: 200,
+        message: 'Sucess',
+        data: data
+      })
 
     }
+
+
+
 
     // const io = getSocket()
     // io.emit('order/getSummarybyArea', {});
