@@ -116,7 +116,7 @@ const orderModel = require('../../models/cash/sale')
 const storeModel = require('../../models/cash/store')
 const routeModel = require('../../models/cash/route')
 const refundModel = require('../../models/cash/refund')
-
+const approveLogModel = require('../../models/cash/approveLog')
 // const userModel = require('../../models/cash/user')
 const DistributionModel = require('../../models/cash/distribution')
 const promotionModel = require('../../models/cash/promotion')
@@ -1311,6 +1311,7 @@ exports.updateStoreStatus = async (req, res) => {
   const channel = req.headers['x-channel']
   const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
   const { User } = getModelsByChannel(channel, res, userModel)
+  const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
   const store = await Store.findOne({ storeId: storeId })
   // console.log(store)
   if (!store) {
@@ -1383,24 +1384,24 @@ exports.updateStoreStatus = async (req, res) => {
       customerCoType: item.type ?? '',
       customerAddress1: (
         item.address +
-          item.subDistrict +
-          item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
       ).substring(0, 35),
       customerAddress2: (
         item.address +
-          item.subDistrict +
-          item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
       ).substring(35, 70),
       customerAddress3: (
         item.address +
-          item.subDistrict +
-          item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
       ).substring(70, 105),
       customerAddress4: '',
       customerPoscode: (item.postCode ?? '').substring(0, 35),
@@ -1468,6 +1469,13 @@ exports.updateStoreStatus = async (req, res) => {
     //     error: error.message
     //   })
     // }
+    await ApproveLogs.create({
+      module: 'approveStore',
+      user: user,
+      status: 'approved',
+      id: item.storeId,
+    })
+
 
     return res.status(200).json({
       status: 200,
@@ -1486,6 +1494,13 @@ exports.updateStoreStatus = async (req, res) => {
       },
       { new: true }
     )
+
+    await ApproveLogs.create({
+      module: 'approveStore',
+      user: user,
+      status: 'rejected',
+      id: item.storeId,
+    })
 
     res.status(200).json({
       status: 200,
@@ -2464,7 +2479,7 @@ exports.storeToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
+      fs.unlink(tempPath, () => { })
     })
   } catch (err) {
     console.error(err)

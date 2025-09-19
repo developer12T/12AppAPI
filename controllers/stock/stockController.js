@@ -2702,7 +2702,7 @@ exports.checkout = async (req, res) => {
 }
 
 exports.approveAdjustStock = async (req, res) => {
-  const { orderId, status } = req.body
+  const { orderId, status,user } = req.body
   const channel = req.headers['x-channel']
   let statusStr = ''
   let statusThStr = ''
@@ -2792,6 +2792,15 @@ exports.approveAdjustStock = async (req, res) => {
     status: 200,
     message: 'successfully'
   })
+
+  await ApproveLogs.create({
+    module: 'approveAdjustStock',
+    user: user,
+    status: statusStr,
+    id: orderId,
+  })
+
+
 
   res.status(200).json({
     status: 200,
@@ -4548,7 +4557,7 @@ exports.stockToExcelSummary = async (req, res) => {
     })
 
 
-    stockOutDataFinal = sortProduct(stockOutDataFinal,'productGroup')
+    stockOutDataFinal = sortProduct(stockOutDataFinal, 'productGroup')
 
     // ---------- Export / JSON ----------
     if (excel === true) {

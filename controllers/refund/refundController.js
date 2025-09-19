@@ -20,6 +20,7 @@ const productModel = require('../../models/cash/product')
 const userModel = require('../../models/cash/user')
 const stockModel = require('../../models/cash/stock')
 const storeModel = require('../../models/cash/store')
+const approveLogModel = require('../../models/cash/approveLog')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { ItemLotM3 } = require('../../models/cash/master')
 const { Op, literal } = require('sequelize')
@@ -127,7 +128,7 @@ exports.checkout = async (req, res) => {
         area: cart.area
       }).lean()) || {}
 
-    function isAug2025OrLater (createAt) {
+    function isAug2025OrLater(createAt) {
       if (!createAt) return false
 
       // case: "YYYYMM" เช่น "202508"
@@ -148,14 +149,14 @@ exports.checkout = async (req, res) => {
     // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-          storeData.address,
-          storeData.subDistrict && `ต.${storeData.subDistrict}`,
-          storeData.district && `อ.${storeData.district}`,
-          storeData.province && `จ.${storeData.province}`,
-          storeData.postCode
-        ]
-          .filter(Boolean)
-          .join(' ')
+        storeData.address,
+        storeData.subDistrict && `ต.${storeData.subDistrict}`,
+        storeData.district && `อ.${storeData.district}`,
+        storeData.province && `จ.${storeData.province}`,
+        storeData.postCode
+      ]
+        .filter(Boolean)
+        .join(' ')
       : storeData.address
 
     const summary = await summaryRefund(cart, channel, res)
@@ -604,7 +605,7 @@ exports.refundExcel = async (req, res) => {
 
   const tranFromChange = modelChange.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD (date) {
+    function formatDateToThaiYYYYMMDD(date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -852,7 +853,7 @@ exports.refundExcel = async (req, res) => {
 
   const tranFromRefund = tranFromRefundNested.flat()
 
-  function yyyymmddToDdMmYyyy (dateString) {
+  function yyyymmddToDdMmYyyy(dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -890,7 +891,7 @@ exports.refundExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
+      fs.unlink(tempPath, () => { })
     }
   )
 }
@@ -1107,18 +1108,18 @@ exports.getDetail = async (req, res) => {
 
     const listProductChange = order
       ? order.listProduct.map(product => ({
-          id: product.id,
-          name: product.name,
-          group: product.group,
-          brand: product.brand,
-          size: product.size,
-          flavour: product.flavour,
-          qty: product.qty,
-          unit: product.unit,
-          unitName: product.unitName,
-          price: product.price,
-          netTotal: product.netTotal
-        }))
+        id: product.id,
+        name: product.name,
+        group: product.group,
+        brand: product.brand,
+        size: product.size,
+        flavour: product.flavour,
+        qty: product.qty,
+        unit: product.unit,
+        unitName: product.unitName,
+        price: product.price,
+        netTotal: product.netTotal
+      }))
       : []
 
     const totalChange = order ? order.total : 0
@@ -1243,9 +1244,9 @@ exports.addSlip = async (req, res) => {
 const orderUpdateTimestamps = {}
 exports.updateStatus = async (req, res) => {
   try {
-    const { orderId, status } = req.body
+    const { orderId, status,user } = req.body
     const channel = req.headers['x-channel']
-
+    const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
     const { Refund } = getModelsByChannel(channel, res, refundModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
 
@@ -1427,6 +1428,21 @@ exports.updateStatus = async (req, res) => {
       message: 'Updated status successfully!',
       data: orderId
     })
+
+    await ApproveLogs.create({
+      module: 'approveRefund',
+      user: user,
+      status: status,
+      id: orderId,
+    })
+
+    await ApproveLogs.create({
+      module: 'approveChange',
+      user: user,
+      status: status,
+      id: newOrderId,
+    })
+
 
     res.status(200).json({
       status: 200,
