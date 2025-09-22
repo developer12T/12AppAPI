@@ -2424,14 +2424,21 @@ exports.getSummarybyArea = async (req, res) => {
         }
       })
     } else if (type === 'year') {
+      const users = await User.find({ role: 'sale',area:{$ne:'IT211'} }).select('area zone')
       if (!zone && !area) {
-        const users = await User.find({ role: 'sale' }).select('area') // ดึงเฉพาะ field area
-        areaList = [...new Set(users.map(u => u.area))] // แปลงเป็น array + unique
+
+        zoneList = [...new Set(users.map(u => u.zone))]
+        dataOrder = await getOrders(areaList, res, channel, 'zone')
+        dataChange = await getChange(areaList, res, channel, 'zone')
+        dataRefund = await getRefund(areaList, res, channel, 'zone')
+      } else {
+        areaList = [...new Set(users.map(u => u.area))]
+        dataOrder = await getOrders(areaList, res, channel, 'area')
+        dataChange = await getChange(areaList, res, channel, 'area')
+        dataRefund = await getRefund(areaList, res, channel, 'area')
       }
 
-      let dataOrder = await getOrders(areaList, res, channel)
-      let dataChange = await getChange(areaList, res, channel)
-      let dataRefund = await getRefund(areaList, res, channel)
+
 
       dataOrder = dataOrder.map((item) => ({
         ...item,
@@ -2466,32 +2473,66 @@ exports.getSummarybyArea = async (req, res) => {
       }
 
       data = []
+      if (!zone && !area) {
+        for (const zone of zoneList) {
 
-      for (const area of areaList) {
-        const dataOrderArea = dataOrder.filter(item => item.store.area === area)
-        const dataChangeArea = dataChange.filter(item => item.store.area === area)
-        const dataRefundArea = dataRefund.filter(item => item.store.area === area)
+          dataOrderArea = dataOrder.filter(item => item.store.zone === zone)
+          dataChangeArea = dataChange.filter(item => item.store.zone === zone)
+          dataRefundArea = dataRefund.filter(item => item.store.zone === zone)
 
-        const orderByMonth = groupByMonthAndSum(dataOrderArea)
-        const changeByMonth = groupByMonthAndSum(dataChangeArea)
-        const refundByMonth = groupByMonthAndSum(dataRefundArea)
+          const orderByMonth = groupByMonthAndSum(dataOrderArea)
+          const changeByMonth = groupByMonthAndSum(dataChangeArea)
+          const refundByMonth = groupByMonthAndSum(dataRefundArea)
 
-        // ✅ array 12 เดือน (index 0 = Jan, index 11 = Dec)
-        const monthlySummary = Array(12).fill(0)
+          // ✅ array 12 เดือน (index 0 = Jan, index 11 = Dec)
+          const monthlySummary = Array(12).fill(0)
 
-        for (let m = 1; m <= 12; m++) {
-          const monthKey = `${new Date().getFullYear()}-${String(m).padStart(2, "0")}`
-          const order = orderByMonth[monthKey] || 0
-          const change = changeByMonth[monthKey] || 0
-          const refund = refundByMonth[monthKey] || 0
-          monthlySummary[m - 1] = to2(order + change - refund)
+          for (let m = 1; m <= 12; m++) {
+            const monthKey = `${new Date().getFullYear()}-${String(m).padStart(2, "0")}`
+            const order = orderByMonth[monthKey] || 0
+            const change = changeByMonth[monthKey] || 0
+            const refund = refundByMonth[monthKey] || 0
+            monthlySummary[m - 1] = to2(order + change - refund)
+          }
+
+          data.push({
+            zone,
+            summary: monthlySummary
+          })
         }
 
-        data.push({
-          area,
-          summary: monthlySummary
-        })
+
       }
+      else {
+
+        for (const area of areaList) {
+
+          dataOrderArea = dataOrder.filter(item => item.store.area === area)
+          dataChangeArea = dataChange.filter(item => item.store.area === area)
+          dataRefundArea = dataRefund.filter(item => item.store.area === area)
+
+          const orderByMonth = groupByMonthAndSum(dataOrderArea)
+          const changeByMonth = groupByMonthAndSum(dataChangeArea)
+          const refundByMonth = groupByMonthAndSum(dataRefundArea)
+
+          // ✅ array 12 เดือน (index 0 = Jan, index 11 = Dec)
+          const monthlySummary = Array(12).fill(0)
+
+          for (let m = 1; m <= 12; m++) {
+            const monthKey = `${new Date().getFullYear()}-${String(m).padStart(2, "0")}`
+            const order = orderByMonth[monthKey] || 0
+            const change = changeByMonth[monthKey] || 0
+            const refund = refundByMonth[monthKey] || 0
+            monthlySummary[m - 1] = to2(order + change - refund)
+          }
+
+          data.push({
+            area,
+            summary: monthlySummary
+          })
+        }
+      }
+
 
 
       return res.status(200).json({

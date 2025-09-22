@@ -767,36 +767,54 @@ function calculateStockSummary(productDetail, listUnitStock) {
   return [resultPCS, resultCTN];
 }
 
-const getOrders = async (areaList, res, channel) => {
+const getOrders = async (areaList, res, channel, type) => {
+
   const { Order } = getModelsByChannel(channel, null, orderModel)
+
   const match = {
     status: { $nin: ['canceled'] },
     type: { $in: ['sale'] },
     'store.area': { $ne: 'IT211' }
   };
 
-  if (Array.isArray(areaList) && areaList.length > 0) {
-    match['store.area'] = { $in: areaList };
+  if (type === 'area') {
+    if (Array.isArray(areaList) && areaList.length > 0) {
+      match['store.area'] = { $in: areaList };
+    }
+  } else if (type === 'zone') {
+    if (Array.isArray(areaList) && areaList.length > 0) {
+      match['store.zone'] = { $in: areaList };
+    }
   }
 
   const orders = await Order.aggregate([
     { $match: match },
+    {
+      $addFields: {
+        zone: { $substr: ["$store.area", 0, 2] } // ✅ เอา 2 ตัวแรกจาก store.area
+      }
+    },
     { $sort: { createdAt: 1, orderId: 1 } }
   ]);
 
   return orders;
 };
 
-const getChange = async (areaList, res, channel) => {
+const getChange = async (areaList, res, channel,type) => {
   const { Order } = getModelsByChannel(channel, null, orderModel)
   const match = {
     status: { $nin: ['canceled', 'reject'] },
     type: { $in: ['change'] },
     'store.area': { $ne: 'IT211' }
   };
-
-  if (Array.isArray(areaList) && areaList.length > 0) {
-    match['store.area'] = { $in: areaList };
+  if (type === 'area') {
+    if (Array.isArray(areaList) && areaList.length > 0) {
+      match['store.area'] = { $in: areaList };
+    }
+  } else if (type === 'zone') {
+    if (Array.isArray(areaList) && areaList.length > 0) {
+      match['store.zone'] = { $in: areaList };
+    }
   }
 
   const orders = await Order.aggregate([
@@ -807,7 +825,7 @@ const getChange = async (areaList, res, channel) => {
   return orders;
 };
 
-const getRefund = async (areaList, res, channel) => {
+const getRefund = async (areaList, res, channel,type) => {
   const { Refund } = getModelsByChannel(channel, null, refundModel)
   const match = {
     status: { $nin: ['canceled', 'reject'] },
@@ -815,8 +833,14 @@ const getRefund = async (areaList, res, channel) => {
     'store.area': { $ne: 'IT211' }
   };
 
-  if (Array.isArray(areaList) && areaList.length > 0) {
-    match['store.area'] = { $in: areaList };
+  if (type === 'area') {
+    if (Array.isArray(areaList) && areaList.length > 0) {
+      match['store.area'] = { $in: areaList };
+    }
+  } else if (type === 'zone') {
+    if (Array.isArray(areaList) && areaList.length > 0) {
+      match['store.zone'] = { $in: areaList };
+    }
   }
 
   const orders = await Refund.aggregate([
