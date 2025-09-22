@@ -59,6 +59,8 @@ exports.getCartAll = async (req, res) => {
   }
 }
 
+const orderTimestamps = {}
+
 exports.clearCartAll = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
@@ -68,6 +70,19 @@ exports.clearCartAll = async (req, res) => {
     if (!Array.isArray(cartAll) || cartAll.length === 0) {
       return res.status(404).json({ status: 404, message: 'Cart not found!' })
     }
+
+    const now = Date.now()
+    const lastUpdate = orderTimestamps[storeId] || 0
+    const ONE_MINUTE = 60 * 1000
+
+    if (now - lastUpdate < ONE_MINUTE) {
+      return res.status(429).json({
+        status: 429,
+        message:
+          'This order was updated less than 1 minute ago. Please try again later!'
+      })
+    }
+    orderTimestamps[storeId] = now
 
     const toDeleteIds = []
     const updateErrors = []
