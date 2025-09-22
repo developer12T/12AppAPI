@@ -2600,13 +2600,7 @@ exports.addLatLongNew = async (req, res) => {
       return res.status(200).json({
         status: '200',
         message: 'Store added successfully',
-        data: {
-          orderId: orderId,
-          storeId: storeData.storeId,
-          latitude: storeData.latitude,
-          longtitude: storeData.longtitude,
-          imageList // คืนให้ client ใช้แสดงรูปต่อได้ทันที
-        }
+        data: storeLatLong
       })
     } catch (error) {
       console.error('Error saving store to MongoDB:', error)
@@ -2750,12 +2744,17 @@ exports.approveLatLongStore = async (req, res) => {
 
 
   if (statusStr === 'approved') {
+
+    const storeData = await Store.findOne({ storeId: storeLatLongData.storeId })
+
     await StoreLatLong.findOneAndUpdate(
       { orderId: storeLatLongData.orderId },
       {
         $set: {
           status: statusStr,
           statusTH: statusThStr,
+          latitudeOld: storeData.latitude,
+          longtitudeOld: storeData.longtitude,
           'approve.dateAction': new Date(),
           'approve.appPerson': user
         }
@@ -2810,7 +2809,6 @@ exports.canceledOrderLatLongStore = async (req, res) => {
   const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
   const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
 
-
   const storeLatLongData = await StoreLatLong.findOne({
     orderId: orderId
   })
@@ -2837,7 +2835,7 @@ exports.canceledOrderLatLongStore = async (req, res) => {
 
 
   await ApproveLogs.create({
-    module: 'approveLatLongStore',
+    module: 'canceledOrderLatLongStore',
     user: user,
     status: status,
     id: orderId,

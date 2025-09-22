@@ -20,6 +20,8 @@ const storeLatLongSchema = new mongoose.Schema({
   zone: { type: String, require: true, },
   latitude: { type: String, require: true },
   longtitude: { type: String, require: true },
+  latitudeOld: { type: String, default:'' },
+  longtitudeOld: { type: String, default:'' },
   imageList: [imageSchema],
   approve: approveSchema,
   status: { type: String, require: true, enum: ['pending', 'completed', 'canceled', 'rejected'], default: 'pending' },
