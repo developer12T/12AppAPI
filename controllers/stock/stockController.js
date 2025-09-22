@@ -5194,7 +5194,7 @@ exports.addStockAllWithInOut = async (req, res) => {
         .filter(Boolean)
       uniqueAreas = [...new Set(rawAreas)]
     } else if (area) {
-      uniqueAreas = ['BE225']
+      uniqueAreas = [area]
     }
 
     // 2) ฟังก์ชันย่อย: ประมวลผลต่อ 1 area

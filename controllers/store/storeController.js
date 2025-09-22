@@ -6,7 +6,9 @@ const { calculateSimilarity } = require('../../utilities/utility')
 const axios = require('axios')
 const multer = require('multer')
 const userModel = require('../../models/cash/user')
+const storeLatLongModel = require('../../models/cash/storeLatLong')
 const ExcelJS = require('exceljs')
+const { generateOrderIdStoreLatLong } = require('../../utilities/genetateId')
 const { getSocket } = require('../../socket')
 const addUpload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages'
@@ -2517,3 +2519,153 @@ exports.updateStatusM3ToMongo = async (req, res) => {
     })
   }
 }
+
+
+exports.addLatLongNew = async (req, res) => {
+
+  const channel = req.headers['x-channel'] // 'credit' or 'cash'
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const { User } = getModelsByChannel(channel, res, userModel)
+  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+  const upload = getUploadMiddleware(channel)
+  // console.log(upload)
+
+  upload(req, res, async err => {
+    try {
+
+
+      const files = req.files || []
+      const reqStore = JSON.parse(req.body.store)
+      const types = req.body.types ? req.body.types.split(',') : []
+
+      const uploadedFiles = []
+      for (let i = 0; i < files.length; i++) {
+        const uploadedFile = await uploadFiles(
+          [files[i]],
+          path.join(__dirname, '../../public/images/storesLatLong'),
+          reqStore.area,
+          types[i]
+        )
+
+        const originalPath = uploadedFile[0].fullPath // เช่น .../public/images/stores/xxx.jpg
+        const webpPath = originalPath.replace(/\.[a-zA-Z]+$/, '.webp') // แปลงชื่อไฟล์นามสกุล .webp
+
+        await sharp(originalPath)
+          .rotate()
+          .resize(800)
+          .webp({ quality: 80 })
+          .toFile(webpPath)
+
+        fs.unlinkSync(originalPath)
+        uploadedFiles.push({
+          name: path.basename(webpPath),
+          path: webpPath,
+          type: types[i]
+        })
+      }
+
+      const imageList = uploadedFiles
+
+
+      const storeData = await Store.findOne({ storeId: reqStore.storeId })
+      // console.log(storeData)
+      const sale = await User.findOne({ area: storeData.area }).select(
+        'firstName surName warehouse tel saleCode salePayer'
+      )
+
+      const orderId = await generateOrderIdStoreLatLong(storeData.area, sale.warehouse, channel, res)
+
+      const storeLatLong = new StoreLatLong({
+        orderId: orderId,
+        storeId: reqStore.storeId,
+        name: storeData.name,
+        zone: storeData.zone,
+        area: storeData.area,
+        latitude: reqStore.latitude,
+        longtitude: reqStore.longtitude,
+        imageList,
+        status: 'pending',
+        statusTh: 'รอนำเข้า',
+        approve: {
+          appPerson: reqStore.user
+        }
+      })
+
+      await storeLatLong.save()
+
+      const io = getSocket()
+      io.emit('store/addStore', {
+        status: '200',
+        message: 'Store added successfully'
+      })
+
+      return res.status(200).json({
+        status: '200',
+        message: 'Store added successfully',
+        data: {
+          orderId: orderId,
+          storeId: storeData.storeId,
+          latitude: storeData.latitude,
+          longtitude: storeData.longtitude,
+          imageList // คืนให้ client ใช้แสดงรูปต่อได้ทันที
+        }
+      })
+    } catch (error) {
+      console.error('Error saving store to MongoDB:', error)
+      return res
+        .status(500)
+        .json({ status: '500', message: 'Server Error', debug: error.message })
+    }
+  })
+
+}
+
+
+exports.getLatLongOrder = async (req, res) => {
+  const { zone, team, area } = req.body
+  const channel = req.headers['x-channel'] // 'credit' or 'cash'
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const { User } = getModelsByChannel(channel, res, userModel)
+  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+
+  let query = []
+  if (zone) {
+    query['zone'] = zone
+  } else if (team) {
+    query['team3'] = team
+  } else if (area) {
+    query['area'] = area
+  }
+
+  const StoreLatLongData = await StoreLatLong.aggregate([
+    {
+      $addFields: {
+        team3: {
+          $concat: [
+            { $substrCP: ['$area', 0, 2] },
+            { $substrCP: ['$area', 3, 1] }
+          ]
+        },
+      }
+    },
+      ...query
+  ])
+
+  console.log(StoreLatLongData)
+
+
+
+
+  return res.status(200).json({
+    status: '200',
+    message: 'Store added successfully',
+    data: {
+      orderId: orderId,
+      storeId: storeData.storeId,
+      latitude: storeData.latitude,
+      longtitude: storeData.longtitude,
+      imageList // คืนให้ client ใช้แสดงรูปต่อได้ทันที
+    }
+  })
+}
+
