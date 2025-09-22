@@ -5165,7 +5165,7 @@ exports.checkStockWithdraw = async (req, res) => {
 
 exports.addStockAllWithInOut = async (req, res) => {
   try {
-    const { period } = req.body // << ต้องส่งมาด้วย
+    const { period, area } = req.body // << ต้องส่งมาด้วย
     const channel = req.headers['x-channel']
 
     const { Stock } = getModelsByChannel(channel, res, stockModel)
@@ -5187,13 +5187,16 @@ exports.addStockAllWithInOut = async (req, res) => {
         .json({ status: 400, message: 'period is required' })
     }
 
-    // 1) เตรียม unique areas
-    const userData = await User.find({ role: 'sale' }).select('area')
-    const rawAreas = userData
-      .flatMap(u => (Array.isArray(u.area) ? u.area : [u.area]))
-      .filter(Boolean)
-    const uniqueAreas = [...new Set(rawAreas)]
-    // uniqueAreas = ['BE225']
+    if (!area) {
+      const userData = await User.find({ role: 'sale' }).select('area')
+      const rawAreas = userData
+        .flatMap(u => (Array.isArray(u.area) ? u.area : [u.area]))
+        .filter(Boolean)
+      uniqueAreas = [...new Set(rawAreas)]
+    } else if (area) {
+      uniqueAreas = ['BE225']
+    }
+
     // 2) ฟังก์ชันย่อย: ประมวลผลต่อ 1 area
     const buildAreaStock = async area => {
       // สร้าง match สำหรับ collections ต่าง ๆ
