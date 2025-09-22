@@ -2741,6 +2741,13 @@ exports.approveLatLongStore = async (req, res) => {
     })
   }
 
+  if (storeLatLongData.status !== 'pending') {
+    return res.status(409).json({
+      status: 409,
+      message: 'Order is not pending'
+    })
+  }
+
 
   if (statusStr === 'approved') {
     await StoreLatLong.findOneAndUpdate(
@@ -2792,7 +2799,54 @@ exports.approveLatLongStore = async (req, res) => {
     message: 'Update status sucess'
   })
 
+}
 
+
+exports.canceledOrderLatLongStore = async (req, res) => {
+
+  const { orderId, status, user } = req.body
+  const channel = req.headers['x-channel']
+  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+  const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
+  const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
+
+
+  const storeLatLongData = await StoreLatLong.findOne({
+    orderId: orderId
+  })
+
+  if (!storeLatLongData) {
+    return res.status(404).json({
+      status: 404,
+      message: 'Not found order'
+    })
+  }
+
+
+  await StoreLatLong.findOneAndUpdate(
+    { orderId: storeLatLongData.orderId },
+    {
+      $set: {
+        status: status,
+        statusTH: 'ยกเลิก',
+        'approve.dateAction': new Date(),
+        'approve.appPerson': user
+      }
+    },
+  )
+
+
+  await ApproveLogs.create({
+    module: 'approveLatLongStore',
+    user: user,
+    status: status,
+    id: orderId,
+  })
+
+  res.status(201).json({
+    status: 201,
+    message: 'Update status sucess'
+  })
 
 }
 

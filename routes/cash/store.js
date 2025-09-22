@@ -35,7 +35,8 @@ const {
   addLatLongNew,
   getLatLongOrder,
   getLatLongOrderDetail,
-  approveLatLongStore
+  approveLatLongStore,
+  canceledOrderLatLongStore
   // test
 } = require('../../controllers/store/storeController')
 
@@ -58,6 +59,7 @@ router.get('/check/:storeId', checkSimilarStores)
 router.get('/getLatLongOrder', getLatLongOrder)
 router.get('/getLatLongOrderDetail', getLatLongOrderDetail)
 router.post('/approveLatLongStore', approveLatLongStore)
+router.post('/canceledOrderLatLongStore', canceledOrderLatLongStore)
 router.get('/:storeId', getDetailStore)
 router.post('/addStore', addStore)
 router.post('/updateImage', updateImage)
