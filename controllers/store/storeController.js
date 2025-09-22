@@ -13,6 +13,7 @@ const { getSocket } = require('../../socket')
 const addUpload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages'
 )
+const { toThaiTime } = require('../../utilities/datetime')
 const sharp = require('sharp')
 const xlsx = require('xlsx')
 
@@ -2585,10 +2586,7 @@ exports.addLatLongNew = async (req, res) => {
         longtitude: reqStore.longtitude,
         imageList,
         status: 'pending',
-        statusTh: 'รอนำเข้า',
-        approve: {
-          appPerson: reqStore.user
-        }
+        statusTH: 'รอนำเข้า',
       })
 
       await storeLatLong.save()
@@ -2648,24 +2646,154 @@ exports.getLatLongOrder = async (req, res) => {
         },
       }
     },
-      ...query
+    ...query,
+    { $sort: { createdAt: -1 } },
   ])
 
-  console.log(StoreLatLongData)
-
-
-
+  const data = StoreLatLongData.map(item => {
+    return {
+      orderId: item.orderId,
+      storeId: item.storeId,
+      name: item.name,
+      area: item.area,
+      zone: item.zone,
+      latitude: item.latitude,
+      longtitude: item.longtitude,
+      imageList: item.imageList.map(i => {
+        return {
+          name: i.name,
+          path: i.path
+        }
+      }),
+      approve: item.appPerson,
+      status: item.status,
+      statusTH: item.statusTH,
+      createdAt: toThaiTime(item.createdAt)
+    }
+  })
 
   return res.status(200).json({
     status: '200',
-    message: 'Store added successfully',
-    data: {
-      orderId: orderId,
-      storeId: storeData.storeId,
-      latitude: storeData.latitude,
-      longtitude: storeData.longtitude,
-      imageList // คืนให้ client ใช้แสดงรูปต่อได้ทันที
-    }
+    message: 'StoreLatLong added successfully',
+    data: data
   })
 }
+
+
+exports.getLatLongOrderDetail = async (req, res) => {
+  const { orderId } = req.query
+  const channel = req.headers['x-channel'] // 'credit' or 'cash'
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const { User } = getModelsByChannel(channel, res, userModel)
+  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+
+
+  const StoreLatLongData = await StoreLatLong.findOne({ orderId })
+  // console.log(orderId)
+
+  const data = {
+    orderId: StoreLatLongData.orderId,
+    storeId: StoreLatLongData.storeId,
+    name: StoreLatLongData.name,
+    area: StoreLatLongData.area,
+    zone: StoreLatLongData.zone,
+    latitude: StoreLatLongData.latitude,
+    longtitude: StoreLatLongData.longtitude,
+    imageList: StoreLatLongData.imageList.map(i => ({
+      name: i.name,
+      path: i.path
+    })),
+    approve: StoreLatLongData.appPerson,
+    status: StoreLatLongData.status,
+    statusTH: StoreLatLongData.statusTH,
+    createdAt: toThaiTime(StoreLatLongData.createdAt)
+  }
+
+  return res.status(200).json({
+    status: '200',
+    message: 'StoreLatLong added successfully',
+    data: data
+  })
+}
+
+
+
+exports.approveLatLongStore = async (req, res) => {
+
+  const { orderId, status, user } = req.body
+  let statusStr = status === true ? 'approved' : 'rejected'
+  let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ'
+  const channel = req.headers['x-channel']
+  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+  const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
+  const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
+
+  // console.log(orderId)
+
+  const storeLatLongData = await StoreLatLong.findOne({
+    orderId: orderId
+  })
+
+  if (!storeLatLongData) {
+    return res.status(404).json({
+      status: 404,
+      message: 'Not found order'
+    })
+  }
+
+
+  if (statusStr === 'approved') {
+    await StoreLatLong.findOneAndUpdate(
+      { orderId: storeLatLongData.orderId },
+      {
+        $set: {
+          status: statusStr,
+          statusTH: statusThStr,
+          'approve.dateAction': new Date(),
+          'approve.appPerson': user
+        }
+      },
+    )
+
+
+    await Store.findOneAndUpdate(
+      { storeId: storeLatLongData.storeId },
+      {
+        $set: {
+
+          latitude: storeLatLongData.latitude,
+          longtitude: storeLatLongData.longtitude,
+        }
+      },
+    )
+  } else {
+    await StoreLatLong.findOneAndUpdate(
+      { orderId: storeLatLongData.orderId },
+      {
+        $set: {
+          status: statusStr,
+          statusTH: statusThStr,
+          'approve.dateAction': new Date(),
+          'approve.appPerson': user
+        }
+      },
+    )
+  }
+
+  await ApproveLogs.create({
+    module: 'approveLatLongStore',
+    user: user,
+    status: statusStr,
+    id: orderId,
+  })
+
+  res.status(201).json({
+    status: 201,
+    message: 'Update status sucess'
+  })
+
+
+
+}
+
 
