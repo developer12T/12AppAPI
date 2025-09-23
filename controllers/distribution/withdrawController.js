@@ -230,9 +230,9 @@ exports.checkout = async (req, res) => {
       if (!getNpd) {
         newOrder.newTrip = 'true'
         const productNew = await Product.findOne({ type: 'new' })
-        if (productNew) {
-          const npd = await Npd.findOne({ period: period })
-
+        const npd = await Npd.findOne({ period: period })
+        if (productNew && npd) {
+          
           factor = productNew.listUnit.find(item => item.unit === npd.unit)
           qtyPcs = npd.qty * factor.factor
 
