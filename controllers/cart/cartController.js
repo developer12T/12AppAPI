@@ -21,7 +21,8 @@ const {
   summaryGive,
   summaryAjustStock
 } = require('../../utilities/summary')
-const { forEach, chain, forIn } = require('lodash')
+
+const { forEach, chain, forIn, create } = require('lodash')
 const { error } = require('console')
 const cartModel = require('../../models/cash/cart')
 const productModel = require('../../models/cash/product')
@@ -1053,3 +1054,66 @@ exports.updateStock = async (req, res) => {
     res.status(500).json({ status: 500, message: error.message })
   }
 }
+
+exports.autoDeleteCart = async (req, res) => {
+
+  const channel = req.headers['x-channel']
+  const { period } = req.body || {}
+  const { Cart } = getModelsByChannel(channel, res, cartModel)
+
+  const { startDate, endDate } = rangeDate(period)
+
+  const cartData = await Cart.find({
+    createdAt: { $gte: startDate, $lt: endDate }
+  })
+
+  const toDeleteIds = []
+  const updateErrors = []
+
+  for (const cart of cartData) {
+    if (!cart || !cart._id) continue
+
+  //   // keep your condition: only update stock for non-withdraw / non-adjuststock
+    if (cart.type !== 'withdraw' && cart.type !== 'adjuststock') {
+      const products = Array.isArray(cart.listProduct) ? cart.listProduct : []
+      for (const prod of products) {
+        try {
+          // console.log(cart.area)
+          if (!prod.condition && !prod.expire) {
+            // If updateStockMongo expects an ID instead of the whole object, use prod.id
+            // await updateStockMongo(
+            //   prod, // or prod.id
+            //   cart.area,
+            //   period, // period is provided at body root
+            //   'deleteCart',
+            //   channel,
+            //   res
+            // )
+          }
+        } catch (e) {
+          updateErrors.push({
+            cartId: cart._id,
+            product: prod?.id || prod,
+            error: e?.message
+          })
+          // keep going; don't block deletion
+        }
+      }
+    }
+
+    toDeleteIds.push(cart._id)
+  }
+  // // console.log(toDeleteIds)
+
+  // // delete all carts referenced in the request body by _id
+  // const { acknowledged, deletedCount } = await Cart.deleteMany({
+  //   _id: { $in: toDeleteIds }
+  // })
+
+  res.status(200).json({
+    status: 200,
+    message: 'Stock updated successfully',
+    data: cartData
+  })
+}
+
