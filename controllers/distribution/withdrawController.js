@@ -1887,18 +1887,47 @@ exports.getReceiveQty = async (req, res) => {
       }
     }
 
-    // await Distribution.updateOne(
-    //   { _id: distributionTran._id },
-    //   { $set: { listProduct: distributionTran.listProduct } }
-    // )
+
+
+    const lowStatus = row.MGTRSL
+    const highStatus = row.MGTRSH
+
+    let statusStr = ''
+    let statusThStr = ''
+
+
+    if (lowStatus == '99') {
+      statusStr = 'success'
+      statusThStr = 'จัดส่งสําเร็จ'
+    } else if (highStatus == '99') {
+      statusStr = 'on progress'
+      statusThStr = 'รอศูนย์ดำเนินการ'
+    } else {
+      statusStr = 'on progress'
+      statusThStr = 'รอศูนย์ดำเนินการ'
+    }
+
+    if (distributionTran.status !== 'confirm') {
+      await Distribution.updateOne(
+        { orderId: orderId },    // filter: เงื่อนไขในการหา document
+        {
+          $set: {
+            status: statusStr,
+            statusTH: statusThStr
+          }
+        }
+      )
+    }
+
+
 
     res.status(200).json({
       status: 200,
       message: `Sucess`,
       data: {
         orderId: orderId,
-        lowStatus: row.MGTRSL,
-        highStatus: row.MGTRSH,
+        lowStatus: lowStatus,
+        highStatus: highStatus,
         listProduct: distributionTran.listProduct
       }
     })
