@@ -11,7 +11,10 @@ const {
 const { sequelize, DataTypes } = require('../../config/m3db')
 const { getSeries, updateRunningNumber } = require('../../middleware/order')
 const axios = require('axios')
-const { generateDistributionId, generateDistributionIdCredit } = require('../../utilities/genetateId')
+const {
+  generateDistributionId,
+  generateDistributionIdCredit
+} = require('../../utilities/genetateId')
 const { rangeDate } = require('../../utilities/datetime')
 const { period, previousPeriod } = require('../../utilities/datetime')
 const cartModel = require('../../models/cash/cart')
@@ -183,19 +186,16 @@ exports.checkout = async (req, res) => {
       fromWarehouse = ''
       toWarehouse = ''
     } else {
-    orderId = await generateDistributionId(
-      area,
-      sale.warehouse,
-      channel,
-      res,
-      newtrip
-    )
+      orderId = await generateDistributionId(
+        area,
+        sale.warehouse,
+        channel,
+        res,
+        newtrip
+      )
       fromWarehouse = fromWarehouse
       toWarehouse = sale.warehouse
     }
-
-
-
 
     const newOrder = new Distribution({
       orderId,
@@ -453,9 +453,9 @@ exports.getOrderCredit = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -531,7 +531,9 @@ exports.getOrder = async (req, res) => {
 
     let statusQuery = {}
     if (type === 'pending') {
-      statusQuery.status = { $in: ['pending', 'approved', 'rejected'] }
+      statusQuery.status = {
+        $in: ['pending', 'approved', 'rejected', 'onprocess', 'success']
+      }
     } else if (type === 'history') {
       statusQuery.status = {
         $in: ['approved', 'rejected', 'success', 'confirm']
@@ -616,9 +618,9 @@ exports.getOrder = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -633,6 +635,7 @@ exports.getOrder = async (req, res) => {
           sendDate: o.sendDate,
           total: o.totalQty || 0,
           status: o.status,
+          statusTH: o.statusTH,
           createdAt: o.createdAt,
           formmatDate: formatDateTimeToThai(o.createdAt)
         }
@@ -779,9 +782,9 @@ exports.getOrderSup = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           newTrip: o.newTrip,
@@ -880,6 +883,7 @@ exports.getDetail = async (req, res) => {
         receivetotalWeightGross: u.receivetotalWeightGross,
         receivetotalWeightNet: u.receivetotalWeightNet,
         status: u.status,
+        statusTH: u.statusTH,
         createdAt: u.createdAt
       }
     })
@@ -1376,12 +1380,15 @@ exports.approveWithdraw = async (req, res) => {
           <p>
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName
+            <strong>ประเภทการจัดส่ง:</strong> ${
+              distributionTran.orderTypeName
             }<br>
-            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
-            }<br>
-            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
-            }<br>
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
+            '-' + wereHouseName?.wh_name || ''
+          }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
+            distributionTran.shippingName
+          }<br>
             <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
             <strong>เขต:</strong> ${distributionTran.area}<br>
             <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -1399,17 +1406,12 @@ exports.approveWithdraw = async (req, res) => {
         data: dataTran
       })
 
-
-
       await ApproveLogs.create({
         module: 'approveWithdraw',
         user: user,
         status: statusStr,
-        id: orderId,
+        id: orderId
       })
-
-
-
 
       res.status(200).json({
         status: 200,
@@ -1436,9 +1438,8 @@ exports.approveWithdraw = async (req, res) => {
         module: 'approveWithdraw',
         user: user,
         status: statusStr,
-        id: orderId,
+        id: orderId
       })
-
 
       res.status(200).json({
         status: 200,
@@ -1572,8 +1573,9 @@ exports.saleConfirmWithdraw = async (req, res) => {
         const ReceiveQty = Object.values(
           Receive.reduce((acc, cur) => {
             // ใช้ key จาก coNo + withdrawUnit + productId (ถ้าอยากแยกตาม productId ด้วย)
-            const key = `${cur.coNo}_${cur.withdrawUnit
-              }_${cur.productId.trim()}`
+            const key = `${cur.coNo}_${
+              cur.withdrawUnit
+            }_${cur.productId.trim()}`
             if (!acc[key]) {
               acc[key] = { ...cur }
             } else {
@@ -1714,9 +1716,8 @@ exports.saleConfirmWithdraw = async (req, res) => {
         module: 'saleConfirmWithdraw',
         user: user,
         status: 'confirm',
-        id: orderId,
+        id: orderId
       })
-
 
       return res.status(200).json({
         status: 200,
@@ -1887,29 +1888,26 @@ exports.getReceiveQty = async (req, res) => {
       }
     }
 
-
-
     const lowStatus = row.MGTRSL
     const highStatus = row.MGTRSH
 
     let statusStr = ''
     let statusThStr = ''
 
-
     if (lowStatus == '99') {
       statusStr = 'success'
       statusThStr = 'จัดส่งสําเร็จ'
     } else if (highStatus == '99') {
-      statusStr = 'on progress'
+      statusStr = 'onprocess'
       statusThStr = 'รอศูนย์ดำเนินการ'
     } else {
-      statusStr = 'on progress'
+      statusStr = 'onprocess'
       statusThStr = 'รอศูนย์ดำเนินการ'
     }
 
     if (distributionTran.status !== 'confirm') {
       await Distribution.updateOne(
-        { orderId: orderId },    // filter: เงื่อนไขในการหา document
+        { orderId: orderId }, // filter: เงื่อนไขในการหา document
         {
           $set: {
             status: statusStr,
@@ -1918,8 +1916,6 @@ exports.getReceiveQty = async (req, res) => {
         }
       )
     }
-
-
 
     res.status(200).json({
       status: 200,
@@ -2022,7 +2018,7 @@ exports.withdrawToExcel = async (req, res) => {
 
     const tranFromOrder = modelWithdraw.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD(date) {
+      function formatDateToThaiYYYYMMDD (date) {
         const d = new Date(date)
         // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -2112,7 +2108,7 @@ exports.withdrawToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       }
     )
   } catch (error) {
@@ -2322,7 +2318,7 @@ exports.withdrawBackOrderToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
   }
 }

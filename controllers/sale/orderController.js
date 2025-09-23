@@ -6336,14 +6336,6 @@ exports.getOrderExcelNew = async (req, res) => {
       fs.unlink(tempPath, () => { })
     })
 
-
-
-
-
-
-
-
-
   } else {
     return res.status(200).json({
       status: 200,
