@@ -2703,6 +2703,8 @@ exports.getLatLongOrder = async (req, res) => {
       zone: item.zone,
       latitude: item.latitude,
       longtitude: item.longtitude,
+      latitudeOld: item.latitudeOld,
+      longtitudeOld: item.longtitudeOld,
       imageList: item.imageList.map(i => {
         return {
           name: i.name,
