@@ -2551,6 +2551,8 @@ exports.addLatLong = async (req, res) => {
       area: storeData.area,
       latitude: latitude,
       longtitude: longtitude,
+      latitudeOld: storeData.latitude,
+      longtitudeOld: storeData.longtitude,
       status: 'pending',
       statusTH: 'รอนำเข้า',
     })
@@ -2793,7 +2795,7 @@ exports.approveLatLongStore = async (req, res) => {
 
   if (statusStr === 'approved') {
 
-    const storeData = await Store.findOne({ storeId: storeLatLongData.storeId })
+    // const storeData = await Store.findOne({ storeId: storeLatLongData.storeId })
 
     await StoreLatLong.findOneAndUpdate(
       { orderId: storeLatLongData.orderId },
@@ -2801,8 +2803,6 @@ exports.approveLatLongStore = async (req, res) => {
         $set: {
           status: statusStr,
           statusTH: statusThStr,
-          latitudeOld: storeData.latitude,
-          longtitudeOld: storeData.longtitude,
           'approve.dateAction': new Date(),
           'approve.appPerson': user
         }
