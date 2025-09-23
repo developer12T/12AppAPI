@@ -21,7 +21,8 @@ const {
   summaryGive,
   summaryAjustStock
 } = require('../../utilities/summary')
-const { forEach, chain, forIn } = require('lodash')
+
+const { forEach, chain, forIn, create } = require('lodash')
 const { error } = require('console')
 const cartModel = require('../../models/cash/cart')
 const productModel = require('../../models/cash/product')
@@ -71,18 +72,19 @@ exports.clearCartAll = async (req, res) => {
       return res.status(404).json({ status: 404, message: 'Cart not found!' })
     }
 
+    const area = [...new Set(cartAll.map(item => item.area))]
+
     const now = Date.now()
-    const lastUpdate = orderTimestamps[storeId] || 0
-    const ONE_MINUTE = 60 * 1000
+    const lastUpdate = orderTimestamps[area] || 0
+    const ONE_MINUTE = 15 * 1000
 
     if (now - lastUpdate < ONE_MINUTE) {
       return res.status(429).json({
         status: 429,
-        message:
-          'This order was updated less than 1 minute ago. Please try again later!'
+        message: 'This order was updated less than 15 seconds ago. Please try again later!'
       })
     }
-    orderTimestamps[storeId] = now
+    orderTimestamps[area] = now
 
     const toDeleteIds = []
     const updateErrors = []
@@ -95,6 +97,7 @@ exports.clearCartAll = async (req, res) => {
         const products = Array.isArray(cart.listProduct) ? cart.listProduct : []
         for (const prod of products) {
           try {
+            // console.log(prod)
             if (!prod.condition && !prod.expire) {
               // If updateStockMongo expects an ID instead of the whole object, use prod.id
               await updateStockMongo(
@@ -119,6 +122,7 @@ exports.clearCartAll = async (req, res) => {
 
       toDeleteIds.push(cart._id)
     }
+    // console.log(toDeleteIds)
 
     // delete all carts referenced in the request body by _id
     const { acknowledged, deletedCount } = await Cart.deleteMany({
@@ -694,12 +698,29 @@ exports.adjustProduct = async (req, res) => {
   }
 }
 
+const productTimestamps = {}
+
 exports.deleteProduct = async (req, res) => {
   // const session = await require('mongoose').startSession();
   // session.startTransaction();
   try {
     const { type, area, storeId, id, unit, condition, expire } = req.body
     const channel = req.headers['x-channel']
+
+    const storeIdAndId = `${type}_${storeId}_${id}`
+    const now = Date.now()
+    const lastUpdate = productTimestamps[storeIdAndId] || 0
+    const ONE_MINUTE = 15 * 1000
+
+    if (now - lastUpdate < ONE_MINUTE) {
+      return res.status(429).json({
+        status: 429,
+        message: 'This order was updated less than 15 seconds ago. Please try again later!'
+      })
+    }
+    productTimestamps[storeIdAndId] = now
+
+    // console.log(productTimestamps)
 
     if (!type || !area || !id || !unit) {
       // await session.abortTransaction();
@@ -1036,3 +1057,66 @@ exports.updateStock = async (req, res) => {
     res.status(500).json({ status: 500, message: error.message })
   }
 }
+
+exports.autoDeleteCart = async (req, res) => {
+
+  const channel = req.headers['x-channel']
+  const { period } = req.body || {}
+  const { Cart } = getModelsByChannel(channel, res, cartModel)
+
+  const { startDate, endDate } = rangeDate(period)
+
+  const cartData = await Cart.find({
+    createdAt: { $gte: startDate, $lt: endDate }
+  })
+
+  const toDeleteIds = []
+  const updateErrors = []
+
+  for (const cart of cartData) {
+    if (!cart || !cart._id) continue
+
+  //   // keep your condition: only update stock for non-withdraw / non-adjuststock
+    if (cart.type !== 'withdraw' && cart.type !== 'adjuststock') {
+      const products = Array.isArray(cart.listProduct) ? cart.listProduct : []
+      for (const prod of products) {
+        try {
+          // console.log(cart.area)
+          if (!prod.condition && !prod.expire) {
+            // If updateStockMongo expects an ID instead of the whole object, use prod.id
+            // await updateStockMongo(
+            //   prod, // or prod.id
+            //   cart.area,
+            //   period, // period is provided at body root
+            //   'deleteCart',
+            //   channel,
+            //   res
+            // )
+          }
+        } catch (e) {
+          updateErrors.push({
+            cartId: cart._id,
+            product: prod?.id || prod,
+            error: e?.message
+          })
+          // keep going; don't block deletion
+        }
+      }
+    }
+
+    toDeleteIds.push(cart._id)
+  }
+  // // console.log(toDeleteIds)
+
+  // // delete all carts referenced in the request body by _id
+  // const { acknowledged, deletedCount } = await Cart.deleteMany({
+  //   _id: { $in: toDeleteIds }
+  // })
+
+  res.status(200).json({
+    status: 200,
+    message: 'Stock updated successfully',
+    data: cartData
+  })
+}
+

@@ -2522,7 +2522,64 @@ exports.updateStatusM3ToMongo = async (req, res) => {
 }
 
 
-exports.addLatLongNew = async (req, res) => {
+
+exports.addLatLong = async (req, res) => {
+
+  const channel = req.headers['x-channel'] // 'credit' or 'cash'
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const { User } = getModelsByChannel(channel, res, userModel)
+  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+
+  try {
+    const { storeId, latitude, longtitude } = req.body
+
+    const storeData = await Store.findOne({ storeId: storeId })
+    // console.log(storeData)
+    const sale = await User.findOne({ area: storeData.area }).select(
+      'firstName surName warehouse tel saleCode salePayer'
+    )
+
+    const orderId = await generateOrderIdStoreLatLong(storeData.area, sale.warehouse, channel, res)
+
+    const storeLatLong = new StoreLatLong({
+      orderId: orderId,
+      storeId: storeId,
+      name: storeData.name,
+      type: storeData.type,
+      typeName: storeData.typeName,
+      zone: storeData.zone,
+      area: storeData.area,
+      latitude: latitude,
+      longtitude: longtitude,
+      status: 'pending',
+      statusTH: 'รอนำเข้า',
+    })
+
+    await storeLatLong.save()
+
+    const io = getSocket()
+    io.emit('store/addStore', {
+      status: '200',
+      message: 'Store added successfully'
+    })
+
+    return res.status(200).json({
+      status: '200',
+      message: 'Store added successfully',
+      data: storeLatLong
+    })
+  } catch (error) {
+    console.error('Error saving store to MongoDB:', error)
+    return res
+      .status(500)
+      .json({ status: '500', message: 'Server Error', debug: error.message })
+  }
+
+
+}
+
+
+exports.addImageLatLong = async (req, res) => {
 
   const channel = req.headers['x-channel'] // 'credit' or 'cash'
   const { Store } = getModelsByChannel(channel, res, storeModel)
@@ -2534,17 +2591,25 @@ exports.addLatLongNew = async (req, res) => {
   upload(req, res, async err => {
     try {
 
-
       const files = req.files || []
-      const reqStore = JSON.parse(req.body.store)
+      const orderId = req.body.orderId
       const types = req.body.types ? req.body.types.split(',') : []
+
+      const LatLongData = await StoreLatLong.findOne({ orderId: orderId })
+
+      if (!LatLongData) {
+        return res.status(404).message({
+          status:404,
+          message:'Not found lat long'
+        })
+      }
 
       const uploadedFiles = []
       for (let i = 0; i < files.length; i++) {
         const uploadedFile = await uploadFiles(
           [files[i]],
           path.join(__dirname, '../../public/images/storesLatLong'),
-          reqStore.area,
+          LatLongData.area,
           types[i]
         )
 
@@ -2567,40 +2632,23 @@ exports.addLatLongNew = async (req, res) => {
 
       const imageList = uploadedFiles
 
+      if (uploadedFiles.length > 0) {
+        await StoreLatLong.updateOne(
+          { orderId: orderId },
+          { $push: { imageList: { $each: uploadedFiles } } }
+        )
+      }
 
-      const storeData = await Store.findOne({ storeId: reqStore.storeId })
-      // console.log(storeData)
-      const sale = await User.findOne({ area: storeData.area }).select(
-        'firstName surName warehouse tel saleCode salePayer'
-      )
-
-      const orderId = await generateOrderIdStoreLatLong(storeData.area, sale.warehouse, channel, res)
-
-      const storeLatLong = new StoreLatLong({
-        orderId: orderId,
-        storeId: reqStore.storeId,
-        name: storeData.name,
-        zone: storeData.zone,
-        area: storeData.area,
-        latitude: reqStore.latitude,
-        longtitude: reqStore.longtitude,
-        imageList,
-        status: 'pending',
-        statusTH: 'รอนำเข้า',
-      })
-
-      await storeLatLong.save()
 
       const io = getSocket()
       io.emit('store/addStore', {
         status: '200',
-        message: 'Store added successfully'
+        message: 'Image added successfully'
       })
 
       return res.status(200).json({
         status: '200',
-        message: 'Store added successfully',
-        data: storeLatLong
+        message: 'Image added successfully',
       })
     } catch (error) {
       console.error('Error saving store to MongoDB:', error)

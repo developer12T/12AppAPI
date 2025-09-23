@@ -32,11 +32,12 @@ const {
   insertStoreToM3,
   storeToExcel,
   updateStatusM3ToMongo,
-  addLatLongNew,
+  addImageLatLong,
   getLatLongOrder,
   getLatLongOrderDetail,
   approveLatLongStore,
-  canceledOrderLatLongStore
+  canceledOrderLatLongStore,
+  addLatLong
   // test
 } = require('../../controllers/store/storeController')
 
@@ -101,6 +102,6 @@ router.post('/updateDetailStore', updateDetailStore)
 router.post('/updateDailyvisit', updateDailyvisit)
 router.post('/updateGooglemap', updateGooglemap)
 router.post('/addVisit', addVisit)
-router.post('/addLatLongNew', addLatLongNew)
-
+router.post('/addImageLatLong', addImageLatLong)
+router.post('/addLatLong', addLatLong)
 module.exports = router
