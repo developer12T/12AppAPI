@@ -359,9 +359,9 @@ const generateOrderIdStoreLatLong = async (area, warehouse, channel, res) => {
 
   // console.log(latestOrder)
 
-  return `S${currentYear
+  return `L${currentYear
     .toString()
-    .slice(2, 4)}${currentMonth}13${warehouse}${runningNumber
+    .slice(2, 4)}${currentMonth}${warehouse}${runningNumber
       .toString()
       .padStart(4, '0')}`
 }

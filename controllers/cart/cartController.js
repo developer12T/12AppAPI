@@ -71,18 +71,19 @@ exports.clearCartAll = async (req, res) => {
       return res.status(404).json({ status: 404, message: 'Cart not found!' })
     }
 
+    const area = [...new Set(cartAll.map(item => item.area))]
+
     const now = Date.now()
-    const lastUpdate = orderTimestamps[storeId] || 0
-    const ONE_MINUTE = 60 * 1000
+    const lastUpdate = orderTimestamps[area] || 0
+    const ONE_MINUTE = 15 * 1000
 
     if (now - lastUpdate < ONE_MINUTE) {
       return res.status(429).json({
         status: 429,
-        message:
-          'This order was updated less than 1 minute ago. Please try again later!'
+        message: 'This order was updated less than 15 seconds ago. Please try again later!'
       })
     }
-    orderTimestamps[storeId] = now
+    orderTimestamps[area] = now
 
     const toDeleteIds = []
     const updateErrors = []
@@ -95,6 +96,7 @@ exports.clearCartAll = async (req, res) => {
         const products = Array.isArray(cart.listProduct) ? cart.listProduct : []
         for (const prod of products) {
           try {
+            // console.log(prod)
             if (!prod.condition && !prod.expire) {
               // If updateStockMongo expects an ID instead of the whole object, use prod.id
               await updateStockMongo(
@@ -119,6 +121,7 @@ exports.clearCartAll = async (req, res) => {
 
       toDeleteIds.push(cart._id)
     }
+    // console.log(toDeleteIds)
 
     // delete all carts referenced in the request body by _id
     const { acknowledged, deletedCount } = await Cart.deleteMany({
@@ -694,12 +697,26 @@ exports.adjustProduct = async (req, res) => {
   }
 }
 
+const productTimestamps = {}
+
 exports.deleteProduct = async (req, res) => {
   // const session = await require('mongoose').startSession();
   // session.startTransaction();
   try {
     const { type, area, storeId, id, unit, condition, expire } = req.body
     const channel = req.headers['x-channel']
+
+    const now = Date.now()
+    const lastUpdate = productTimestamps[id] || 0
+    const ONE_MINUTE = 15 * 1000
+
+    if (now - lastUpdate < ONE_MINUTE) {
+      return res.status(429).json({
+        status: 429,
+        message: 'This order was updated less than 15 seconds ago. Please try again later!'
+      })
+    }
+    productTimestamps[id] = now
 
     if (!type || !area || !id || !unit) {
       // await session.abortTransaction();
