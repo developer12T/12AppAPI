@@ -1900,10 +1900,10 @@ exports.getReceiveQty = async (req, res) => {
       statusStr = 'success'
       statusThStr = 'จัดส่งสําเร็จ'
     } else if (highStatus == '99') {
-      statusStr = 'on progress'
+      statusStr = 'on process'
       statusThStr = 'รอศูนย์ดำเนินการ'
     } else {
-      statusStr = 'on progress'
+      statusStr = 'on process'
       statusThStr = 'รอศูนย์ดำเนินการ'
     }
 
