@@ -16,6 +16,8 @@ const storeLatLongSchema = new mongoose.Schema({
   orderId: { type: String, require: true, unique: true },
   storeId: { type: String, require: true, },
   name: { type: String, require: true, },
+  type:{ type: String, require: true, },
+  typeName:{ type: String, require: true, },
   area: { type: String, require: true, },
   zone: { type: String, require: true, },
   latitude: { type: String, require: true },
