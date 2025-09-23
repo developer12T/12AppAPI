@@ -707,8 +707,9 @@ exports.deleteProduct = async (req, res) => {
     const { type, area, storeId, id, unit, condition, expire } = req.body
     const channel = req.headers['x-channel']
 
+    const storeIdAndId = `${type}_${storeId}_${id}`
     const now = Date.now()
-    const lastUpdate = productTimestamps[id] || 0
+    const lastUpdate = productTimestamps[storeIdAndId] || 0
     const ONE_MINUTE = 15 * 1000
 
     if (now - lastUpdate < ONE_MINUTE) {
@@ -717,7 +718,9 @@ exports.deleteProduct = async (req, res) => {
         message: 'This order was updated less than 15 seconds ago. Please try again later!'
       })
     }
-    productTimestamps[id] = now
+    productTimestamps[storeIdAndId] = now
+
+    // console.log(productTimestamps)
 
     if (!type || !area || !id || !unit) {
       // await session.abortTransaction();
