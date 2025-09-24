@@ -2664,8 +2664,7 @@ exports.addImageLatLong = async (req, res) => {
 
 
 exports.getLatLongOrder = async (req, res) => {
-  const { zone, team, area } = req.body
-  const { storeId } = req.query
+  const { storeId, zone, team, area } = req.query
 
 
   const channel = req.headers['x-channel'] // 'credit' or 'cash'
@@ -2687,6 +2686,8 @@ exports.getLatLongOrder = async (req, res) => {
     }
   }
 
+  // console.log(matchStage)
+
   const StoreLatLongData = await StoreLatLong.aggregate([
     {
       $addFields: {
@@ -2695,8 +2696,12 @@ exports.getLatLongOrder = async (req, res) => {
             { $substrCP: ['$area', 0, 2] },
             { $substrCP: ['$area', 3, 1] }
           ]
+        },
+        zone: {
+          $substrCP: ['$area', 0, 2]
         }
-      }
+      },
+
     },
     { $match: matchStage },
     { $sort: { createdAt: -1 } }
