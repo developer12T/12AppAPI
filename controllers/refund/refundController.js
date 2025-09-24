@@ -1244,7 +1244,7 @@ exports.addSlip = async (req, res) => {
 const orderUpdateTimestamps = {}
 exports.updateStatus = async (req, res) => {
   try {
-    const { orderId, status,user } = req.body
+    const { orderId, status, user } = req.body
     const channel = req.headers['x-channel']
     const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
     const { Refund } = getModelsByChannel(channel, res, refundModel)
@@ -1507,3 +1507,86 @@ exports.deleteRefund = async (req, res) => {
     res.status(500).json({ status: 500, message: 'Server error' })
   }
 }
+
+
+exports.cancelApproveRefund = async (req, res) => {
+  try {
+    const { orderId, status, user } = req.body
+    if (!orderId || !status) {
+      return res.status(400).json({ status: 400, message: 'orderId and status are required!' })
+    }
+
+    const channel = req.headers['x-channel']
+    const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+
+    const changeOrder = await Order.findOne({ reference: orderId })
+    if (!changeOrder) {
+      return res.status(404).json({ status: 404, message: 'Not found change Order' })
+    }
+
+    const refundOrder = await Refund.findOne({ orderId })
+    if (!refundOrder) {
+      return res.status(404).json({ status: 404, message: 'Refund order not found!' })
+    }
+
+    if (refundOrder.status !== 'pending' && status !== 'canceled') {
+      return res.status(400).json({
+        status: 400,
+        message: 'Cannot update status, refund is not in pending state!'
+      })
+    }
+
+    let statusTH = ''
+    if (status === 'canceled') statusTH = 'ยกเลิก'
+    else if (status === 'reject') statusTH = 'ถูกปฏิเสธ'
+
+    let newOrderId = orderId
+    if (status === 'canceled' || status === 'reject') {
+      newOrderId = changeOrder.orderId
+      if (!/CC\d+$/.test(newOrderId)) {
+        let n = 1
+        while (await Order.exists({ orderId: `${changeOrder.orderId}CC${n}` })) n++
+        newOrderId = `${changeOrder.orderId}CC${n}`
+      }
+
+      for (const item of changeOrder.listProduct) {
+        const hasError = await updateStockMongo(
+          { id: item.id, unit: item.unit, qty: item.qty },
+          changeOrder.store.area,
+          changeOrder.period,
+          'orderCanceled',
+          channel,
+          res
+        )
+        if (hasError) {
+          return res.status(500).json({ status: 500, message: 'Stock update error' })
+        }
+      }
+    }
+
+    await Refund.findOneAndUpdate({ orderId }, { $set: { status, statusTH } }, { new: true })
+    await Order.findOneAndUpdate(
+      { orderId: refundOrder.reference, type: 'change' },
+      { $set: { status, statusTH } },
+      { new: true }
+    )
+
+    const io = getSocket()
+    io.emit('refund/updateStatus', {
+      status: 200,
+      message: 'Updated status successfully!',
+      data: orderId
+    })
+
+    await ApproveLogs.create({ module: 'approveRefund', user, status, statusTH, id: orderId })
+    await ApproveLogs.create({ module: 'approveChange', user, status, statusTH, id: newOrderId })
+
+    res.status(200).json({ status: 200, message: 'Updated status successfully!' })
+  } catch (error) {
+    console.error('Error updating refund status:', error)
+    res.status(500).json({ status: 500, message: 'Server error' })
+  }
+}
+

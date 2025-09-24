@@ -1766,9 +1766,6 @@ exports.getStockQtyNew = async (req, res) => {
     if (!productDetailGive) continue
 
     // let goodqty = productDetailRufund.qtyPcs
-
-    // console.log(productDetailPromotion)
-
     const pcsMain = stockItem.stockPcs
     let stock = stockItem.stockPcs
     let balance = stockItem.balancePcs

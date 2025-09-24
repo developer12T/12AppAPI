@@ -6,7 +6,8 @@ const {
   addSlip,
   updateStatus,
   deleteRefund,
-  refundExcel
+  refundExcel,
+  cancelApproveRefund
 } = require('../../controllers/refund/refundController')
 
 const router = express.Router()
@@ -18,4 +19,5 @@ router.get('/refundExcel', refundExcel)
 router.post('/addSlip', addSlip)
 router.post('/updateStatus', updateStatus) 
 router.post('/deleteRefund', deleteRefund)
+router.post('/cancelApproveRefund', cancelApproveRefund)
 module.exports = router
