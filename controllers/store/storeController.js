@@ -1,4 +1,5 @@
 const mongoose = require('mongoose')
+const { Types } = require('mongoose')
 const { Customer } = require('../../models/cash/master')
 const { uploadFiles } = require('../../utilities/upload')
 const { sequelize, DataTypes } = require('../../config/m3db')
@@ -2912,3 +2913,76 @@ exports.canceledOrderLatLongStore = async (req, res) => {
 }
 
 
+
+exports.getStorePage = async (req, res) => {
+  try {
+    const {
+      area,
+      type = 'all',
+      route,
+      page = 1,
+      limit = 20,
+      q, // optional search text
+    } = req.query;
+
+    const channel = req.headers['x-channel'];
+    const { Store } = getModelsByChannel(channel, res, storeModel);
+    const { Route } = getModelsByChannel(channel, res, routeModel);
+
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+    const perPage = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+
+    // ประกอบ filter แบบใส่เฉพาะคีย์ที่มีค่า
+    const filter = {};
+    if (area) filter.area = area;
+    if (route) filter.route = route;
+    if (type && type !== 'all') filter.type = type;
+
+
+
+    const qText = (q || '').trim();
+    if (qText) {
+      filter.$or = [
+        { storeId: { $regex: qText, $options: 'i' } },
+        { name: { $regex: qText, $options: 'i' } },
+      ];
+    }
+    if (route) {
+      const routeData = await Route.findOne({ id: route })
+
+      const storeIds = routeData.listStore
+        .flatMap(item => item.storeInfo)
+        .map(id => new Types.ObjectId(id))
+      // console.log(storeIds)
+
+      docs = await Store.find({ _id: { $in: storeIds } })
+
+
+    } else {
+      docs = await Store.find(filter)
+        .sort({ createdAt: -1 }) // คงลำดับให้เสถียร
+        .skip((pageNum - 1) * perPage)
+        .limit(perPage)
+        .lean();
+
+    }
+
+
+    const total = await Store.countDocuments(filter);
+
+    res.status(200).json({
+      status:200,
+      message:'success',
+      data: docs,
+      meta: {
+        page: pageNum,
+        limit: perPage,
+        total,
+        hasMore: pageNum * perPage < total,
+      },
+    });
+  } catch (err) {
+    console.error('getStorePage error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
