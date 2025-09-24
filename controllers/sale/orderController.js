@@ -780,7 +780,18 @@ exports.getDetail = async (req, res) => {
 
     const raw = doc.toObject ? doc.toObject() : doc
     if (!raw.shipping || raw.shipping === 0) {
-      raw.shipping = []
+      raw.shipping = {
+        default:"",
+        shippingId:"",
+        address:"",
+        district:"",
+        subDistrict:"",
+        province:"",
+        postCode:"",
+        latitude:"",
+        longtitude:"",
+        _id:""
+      }
     }
 
     const data = {
