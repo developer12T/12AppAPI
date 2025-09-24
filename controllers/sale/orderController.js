@@ -2424,7 +2424,7 @@ exports.getSummarybyArea = async (req, res) => {
         }
       })
     } else if (type === 'year') {
-      const users = await User.find({ role: 'sale',area:{$ne:'IT211'} }).select('area zone')
+      const users = await User.find({ role: 'sale', area: { $ne: 'IT211' } }).select('area zone')
       if (!zone && !area) {
 
         zoneList = [...new Set(users.map(u => u.zone))]
@@ -6336,14 +6336,6 @@ exports.getOrderExcelNew = async (req, res) => {
       fs.unlink(tempPath, () => { })
     })
 
-
-
-
-
-
-
-
-
   } else {
     return res.status(200).json({
       status: 200,
@@ -6353,6 +6345,45 @@ exports.getOrderExcelNew = async (req, res) => {
         dataRefundChange,
         dataGiveArray
       }
+    })
+  }
+}
+
+
+exports.updatePaymentOrder = async (req, res) => {
+  try {
+    const { orderId, paymentMethod } = req.body
+    const channel = req.headers['x-channel']
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+
+    const dataOrder = await Order.findOne({ orderId: orderId })
+
+    let updateOrder = ''
+    if (!dataOrder) {
+      return res.status(200).json(({
+        status: 404,
+        message: 'Not found order'
+      }))
+    } else {
+      updateOrder = await Order.findOneAndUpdate(
+        { orderId: orderId },                 
+        { $set: { paymentMethod: paymentMethod } },  
+        { new: true }                         
+      )
+
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: updateOrder
+    })
+  } catch (error) {
+    console.error('Error in updatePaymentOrder:', error)
+    res.status(500).json({
+      status: 500,
+      message: 'Internal server error',
+      error: error.message
     })
   }
 }
