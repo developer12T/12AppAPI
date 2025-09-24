@@ -781,16 +781,16 @@ exports.getDetail = async (req, res) => {
     const raw = doc.toObject ? doc.toObject() : doc
     if (!raw.shipping || raw.shipping === 0) {
       raw.shipping = {
-        default:"",
-        shippingId:"",
-        address:"",
-        district:"",
-        subDistrict:"",
-        province:"",
-        postCode:"",
-        latitude:"",
-        longtitude:"",
-        _id:""
+        default: "",
+        shippingId: "",
+        address: "",
+        district: "",
+        subDistrict: "",
+        province: "",
+        postCode: "",
+        latitude: "",
+        longtitude: "",
+        _id: ""
       }
     }
 
@@ -2099,95 +2099,57 @@ exports.getSummarybyMonth = async (req, res) => {
     const channel = req.headers['x-channel'] // 'credit' or 'cash'
 
     // const { Store } = getModelsByChannel(channel,res,storeModel);
-    // const { Route } = getModelsByChannel(channel,res,routeModel);
+    const { Refund } = getModelsByChannel(channel, res, refundModel);
     const { Order } = getModelsByChannel(channel, res, orderModel)
 
-    let pipeline = []
+    const buildPipeline = (type) => {
+      const match = {
+        'store.area': area,
+        status: { $nin: ['canceled', 'reject'] },
+      };
+      if (type) match.type = type;               // ใส่ type ถ้ากำหนด
+      if (storeId) match['store.storeId'] = storeId;
 
-    pipeline.push(
-      {
-        $match: {
-          'store.area': area,
-          status: 'pending'
-        }
-      },
-      { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
-      // { $match: matchStore },
-      {
-        $unwind: {
-          path: '$listStore.listOrder',
-          preserveNullAndEmptyArrays: true
-        }
-      },
+      return [
+        { $match: match },
 
-      {
-        $addFields: {
-          createdAtThai: {
-            $dateAdd: {
-              startDate: '$createdAt',
-              unit: 'hour',
-              amount: 7
-            }
-          }
-        }
-      },
-      {
-        $addFields: {
-          createdDay: { $dayOfMonth: '$createdAtThai' }
-        }
-      },
-      {
-        $addFields: {
-          createdYear: { $year: '$createdAtThai' }
-        }
-      }
-    )
+        { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: '$listStore.listOrder', preserveNullAndEmptyArrays: true } },
 
-    if (storeId) {
-      pipeline.push({
-        $match: {
-          'store.storeId': storeId
-        }
-      })
-    }
-    if (year) {
-      pipeline.push({
-        $match: {
-          createdYear: parseInt(year)
-        }
-      })
-    }
+        // ดึงส่วนประกอบวันที่ตามโซนเวลาไทยในทีเดียว
+        { $addFields: { parts: { $dateToParts: { date: '$createdAt', timezone: 'Asia/Bangkok' } } } },
 
-    pipeline.push(
-      {
-        $project: {
-          month: { $month: '$createdAtThai' },
-          total: '$total'
-        }
-      },
-      {
-        $group: {
-          _id: '$month',
-          totalAmount: { $sum: '$total' }
-        }
-      },
-      { $sort: { _id: 1 } },
-      {
-        $project: {
-          month: '$_id',
-          totalAmount: 1,
-          _id: 0
-        }
-      }
-    )
+        // กรองปี ถ้ามี
+        ...(year ? [{ $match: { 'parts.year': parseInt(year, 10) } }] : []),
 
-    const modelOrder = await Order.aggregate(pipeline)
-    const modelOrderValue = modelOrder.map(item => {
-      return {
-        month: item.month,
-        summary: item.totalAmount
-      }
-    })
+        // รวมยอดตามเดือน
+        { $group: { _id: '$parts.month', totalAmount: { $sum: '$total' } } },
+        { $project: { _id: 0, month: '$_id', totalAmount: 1 } },
+        { $sort: { month: 1 } },
+      ];
+    };
+
+    // เรียกใช้งาน (ตัวอย่าง: แยกตามชนิด)
+    const modelSale = await Order.aggregate(buildPipeline('sale'));
+    const modelChange = await Order.aggregate(buildPipeline('change'));
+    const modelRefund = await Refund.aggregate(buildPipeline('refund'));
+
+
+    const merged = [
+      ...modelSale.map(i => ({ ...i, totalAmount: i.totalAmount })),       // บวก
+      ...modelChange.map(i => ({ ...i, totalAmount: i.totalAmount })),     // บวก
+      ...modelRefund.map(i => ({ ...i, totalAmount: -i.totalAmount }))     // ลบ
+    ];
+
+    const modelOrderValue = Object.values(
+      merged.reduce((acc, item) => {
+        if (!acc[item.month]) {
+          acc[item.month] = { month: item.month, summary: 0 };
+        }
+        acc[item.month].summary += item.totalAmount;
+        return acc;
+      }, {})
+    );
 
     const result = Array.from({ length: 12 }, (_, i) => ({
       month: i + 1,
