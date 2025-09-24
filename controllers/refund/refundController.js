@@ -183,6 +183,7 @@ exports.checkout = async (req, res) => {
         area: storeData.area,
         zone: storeData.zone
       },
+      shipping: shipping,
       note,
       latitude,
       longitude,
@@ -221,7 +222,7 @@ exports.checkout = async (req, res) => {
         area: summary.store.area,
         zone: summary.store.zone
       },
-      // shipping: shipping,
+      shipping: shipping,
       note,
       latitude,
       longitude,

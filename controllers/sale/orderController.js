@@ -777,11 +777,17 @@ exports.getDetail = async (req, res) => {
     const toThai = d =>
       d instanceof Date ? new Date(d.getTime() + 7 * 60 * 60 * 1000) : d
 
+
+    const raw = doc.toObject ? doc.toObject() : doc
+    if (!raw.shipping || raw.shipping === 0) {
+      raw.shipping = []
+    }
+
     const data = {
-      ...doc.toObject(),
+      ...raw,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
-      _source: source // บอกว่าได้มาจากไหน (order/refund)
+      _source: source
     }
 
     return res.status(200).json({
@@ -6366,9 +6372,9 @@ exports.updatePaymentOrder = async (req, res) => {
       }))
     } else {
       updateOrder = await Order.findOneAndUpdate(
-        { orderId: orderId },                 
-        { $set: { paymentMethod: paymentMethod } },  
-        { new: true }                         
+        { orderId: orderId },
+        { $set: { paymentMethod: paymentMethod } },
+        { new: true }
       )
 
     }
