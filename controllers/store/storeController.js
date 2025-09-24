@@ -2601,8 +2601,8 @@ exports.addImageLatLong = async (req, res) => {
 
       if (!LatLongData) {
         return res.status(404).message({
-          status:404,
-          message:'Not found lat long'
+          status: 404,
+          message: 'Not found lat long'
         })
       }
 
@@ -2665,18 +2665,26 @@ exports.addImageLatLong = async (req, res) => {
 
 exports.getLatLongOrder = async (req, res) => {
   const { zone, team, area } = req.body
+  const { storeId } = req.query
+
+
   const channel = req.headers['x-channel'] // 'credit' or 'cash'
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const { User } = getModelsByChannel(channel, res, userModel)
   const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
 
-  let query = []
-  if (zone) {
-    query['zone'] = zone
-  } else if (team) {
-    query['team3'] = team
-  } else if (area) {
-    query['area'] = area
+  let matchStage = {}
+
+  if (storeId) {
+    matchStage.storeId = storeId
+  } else {
+    if (zone) {
+      matchStage.zone = zone
+    } else if (team) {
+      matchStage.team3 = team
+    } else if (area) {
+      matchStage.area = area
+    }
   }
 
   const StoreLatLongData = await StoreLatLong.aggregate([
@@ -2687,11 +2695,11 @@ exports.getLatLongOrder = async (req, res) => {
             { $substrCP: ['$area', 0, 2] },
             { $substrCP: ['$area', 3, 1] }
           ]
-        },
+        }
       }
     },
-    ...query,
-    { $sort: { createdAt: -1 } },
+    { $match: matchStage },
+    { $sort: { createdAt: -1 } }
   ])
 
   const data = StoreLatLongData.map(item => {
