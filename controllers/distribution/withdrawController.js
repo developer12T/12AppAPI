@@ -1703,7 +1703,7 @@ exports.saleConfirmWithdraw = async (req, res) => {
         { orderId, type: 'withdraw' },
         {
           $set: {
-            statusTH: 'ยืนยันรับของ',
+            statusTH: 'รับสินค้าสำเร็จ',
             status: 'confirm',
             receivetotal: receivetotal,
             receivetotalQty: receivetotalQty,
@@ -1905,7 +1905,7 @@ exports.getReceiveQty = async (req, res) => {
 
     if (lowStatus == '99') {
       statusStr = 'success'
-      statusThStr = 'จัดส่งสําเร็จ'
+      statusThStr = 'กรุณากดรับสินค้า'
     } else if (highStatus == '99') {
       statusStr = 'onprocess'
       statusThStr = 'รอศูนย์ดำเนินการ'

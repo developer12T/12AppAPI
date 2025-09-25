@@ -2620,6 +2620,8 @@ exports.addImageLatLong = async (req, res) => {
         const originalPath = uploadedFile[0].fullPath // เช่น .../public/images/stores/xxx.jpg
         const webpPath = originalPath.replace(/\.[a-zA-Z]+$/, '.webp') // แปลงชื่อไฟล์นามสกุล .webp
 
+        // console.log("webpPath",path.basename(webpPath))
+
         await sharp(originalPath)
           .rotate()
           .resize(800)
@@ -2634,6 +2636,8 @@ exports.addImageLatLong = async (req, res) => {
         })
       }
 
+
+      
       const imageList = uploadedFiles
 
       if (uploadedFiles.length > 0) {
