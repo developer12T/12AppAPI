@@ -2550,6 +2550,7 @@ exports.addLatLong = async (req, res) => {
       typeName: storeData.typeName,
       zone: storeData.zone,
       area: storeData.area,
+      address: storeData.address,
       latitude: latitude,
       longtitude: longtitude,
       latitudeOld: storeData.latitude,

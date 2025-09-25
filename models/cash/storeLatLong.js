@@ -20,6 +20,7 @@ const storeLatLongSchema = new mongoose.Schema({
   typeName:{ type: String, require: true, },
   area: { type: String, require: true, },
   zone: { type: String, require: true, },
+  address: { type: String },
   latitude: { type: String, require: true },
   longtitude: { type: String, require: true },
   latitudeOld: { type: String, default:'' },
