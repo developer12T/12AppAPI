@@ -883,6 +883,7 @@ exports.getDetail = async (req, res) => {
         receivetotalWeightGross: u.receivetotalWeightGross,
         receivetotalWeightNet: u.receivetotalWeightNet,
         status: u.status,
+        newTrip: u.newTrip,
         statusTH: u.statusTH,
         createdAt: u.createdAt
       }
