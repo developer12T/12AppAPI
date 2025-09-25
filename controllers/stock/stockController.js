@@ -2712,6 +2712,7 @@ exports.approveAdjustStock = async (req, res) => {
   }
 
   const { Product } = getModelsByChannel(channel, res, productModel)
+  const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
   const { Stock, StockMovementLog, StockMovement, AdjustStock } =
     getModelsByChannel(channel, res, stockModel)
 
