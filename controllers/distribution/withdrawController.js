@@ -232,7 +232,7 @@ exports.checkout = async (req, res) => {
         const productNew = await Product.findOne({ type: 'new' })
         const npd = await Npd.findOne({ period: period })
         if (productNew && npd) {
-          
+
           factor = productNew.listUnit.find(item => item.unit === npd.unit)
           qtyPcs = npd.qty * factor.factor
 
@@ -453,9 +453,9 @@ exports.getOrderCredit = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-                fullname: `${userData.firstName} ${userData.surName}`,
-                tel: `${userData.tel}`
-              }
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -618,9 +618,9 @@ exports.getOrder = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-                fullname: `${userData.firstName} ${userData.surName}`,
-                tel: `${userData.tel}`
-              }
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -782,9 +782,9 @@ exports.getOrderSup = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-                fullname: `${userData.firstName} ${userData.surName}`,
-                tel: `${userData.tel}`
-              }
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
             : null,
           orderId: o.orderId,
           newTrip: o.newTrip,
@@ -1380,15 +1380,12 @@ exports.approveWithdraw = async (req, res) => {
           <p>
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-            <strong>ประเภทการจัดส่ง:</strong> ${
-              distributionTran.orderTypeName
+            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName
             }<br>
-            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
-            '-' + wereHouseName?.wh_name || ''
-          }<br>
-            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
-            distributionTran.shippingName
-          }<br>
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
+            }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
+            }<br>
             <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
             <strong>เขต:</strong> ${distributionTran.area}<br>
             <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -1424,15 +1421,15 @@ exports.approveWithdraw = async (req, res) => {
         { $set: { statusTH: statusThStr, status: statusStr } },
         { new: true }
       )
-      // if (distributionData.newTrip === 'true') {
-      //   await Npd.findOneAndUpdate(
-      //     { period: distributionData.period },
-      //     {
-      //       $pull: { areaGet: distributionData.area }
-      //     }
-      //   )
+      if (distributionData.newTrip === 'true') {
+        await Npd.findOneAndUpdate(
+          { period: distributionData.period },
+          {
+            $pull: { areaGet: distributionData.area }
+          }
+        )
 
-      // }
+      }
 
       await ApproveLogs.create({
         module: 'approveWithdraw',
@@ -1573,9 +1570,8 @@ exports.saleConfirmWithdraw = async (req, res) => {
         const ReceiveQty = Object.values(
           Receive.reduce((acc, cur) => {
             // ใช้ key จาก coNo + withdrawUnit + productId (ถ้าอยากแยกตาม productId ด้วย)
-            const key = `${cur.coNo}_${
-              cur.withdrawUnit
-            }_${cur.productId.trim()}`
+            const key = `${cur.coNo}_${cur.withdrawUnit
+              }_${cur.productId.trim()}`
             if (!acc[key]) {
               acc[key] = { ...cur }
             } else {
@@ -1630,8 +1626,8 @@ exports.saleConfirmWithdraw = async (req, res) => {
 
         // receivetotal = receivetotal
         // receivetotalQty = receivetotalQty
-        receivetotalWeightGross = ReceiveWeight?.[0]?.weightGross || 0
-        receivetotalWeightNet = ReceiveWeight?.[0]?.weightNet || 0
+        // receivetotalWeightGross = ReceiveWeight?.[0]?.weightGross || 0
+        // receivetotalWeightNet = ReceiveWeight?.[0]?.weightNet || 0
       }
 
       // ✅ อัปเดตข้อมูลถ้า status เป็น approved
@@ -1672,8 +1668,19 @@ exports.saleConfirmWithdraw = async (req, res) => {
         qtyproduct.push({ id: productQty.id, unit, qty })
       }
 
+      receivetotalWeightGross = 0
+      receivetotalWeightNet = 0
+
+
       for (const item of qtyproduct) {
         // console.log(item)
+
+        const productData = productDetail.find(o => o.id === item.id)
+        const weightGross = productData.weightGross * item.qty
+        const weightNet = productData.weightNet * item.qty
+
+        receivetotalWeightGross += weightGross
+        receivetotalWeightNet += weightNet
         const updateResult = await updateStockMongo(
           item,
           distributionTran.area,
@@ -1689,6 +1696,10 @@ exports.saleConfirmWithdraw = async (req, res) => {
         { _id: distributionTran._id },
         { $set: { listProduct: distributionTran.listProduct } }
       )
+
+
+
+
 
       const distributionData = await Distribution.findOneAndUpdate(
         { orderId, type: 'withdraw' },
@@ -2018,7 +2029,7 @@ exports.withdrawToExcel = async (req, res) => {
 
     const tranFromOrder = modelWithdraw.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD (date) {
+      function formatDateToThaiYYYYMMDD(date) {
         const d = new Date(date)
         // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -2108,7 +2119,7 @@ exports.withdrawToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => {})
+        fs.unlink(tempPath, () => { })
       }
     )
   } catch (error) {
@@ -2318,7 +2329,7 @@ exports.withdrawBackOrderToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
+      fs.unlink(tempPath, () => { })
     })
   }
 }
