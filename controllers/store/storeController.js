@@ -2720,6 +2720,8 @@ exports.getLatLongOrder = async (req, res) => {
       name: item.name,
       area: item.area,
       zone: item.zone,
+      typeName: item.typeName,
+      address: item.address,
       latitude: item.latitude,
       longtitude: item.longtitude,
       latitudeOld: item.latitudeOld,

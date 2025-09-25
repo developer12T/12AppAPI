@@ -1042,6 +1042,7 @@ exports.getRefund = async (req, res) => {
           totalRefund: totalRefund.toFixed(2),
           total: total,
           status: refund.status,
+          statusTH: refund.statusTH,
           createdAt: refund.createdAt,
           updatedAt: refund.updatedAt
         }
