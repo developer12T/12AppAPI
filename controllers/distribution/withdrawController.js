@@ -1542,7 +1542,7 @@ exports.saleConfirmWithdraw = async (req, res) => {
         const listProductId = distributionTran.listProduct
           .map(i => i.id)
           .filter(Boolean)
-        const productDetail = await Product.find({ id: { $in: listProductId } })
+        productDetail = await Product.find({ id: { $in: listProductId } })
 
         const checkStatus = await MGLINE.findAll({
           where: {
