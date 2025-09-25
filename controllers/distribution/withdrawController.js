@@ -1908,10 +1908,10 @@ exports.getReceiveQty = async (req, res) => {
       statusThStr = 'จัดส่งสําเร็จ'
     } else if (highStatus == '99') {
       statusStr = 'onprocess'
-      statusThStr = 'รอดำเนินการ'
+      statusThStr = 'รอศูนย์ดำเนินการ'
     } else {
       statusStr = 'onprocess'
-      statusThStr = 'รอดำเนินการ'
+      statusThStr = 'รอศูนย์ดำเนินการ'
     }
 
     if (distributionTran.status !== 'confirm') {
