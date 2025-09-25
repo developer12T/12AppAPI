@@ -2597,9 +2597,12 @@ exports.addImageLatLong = async (req, res) => {
 
       const files = req.files || []
       const orderId = req.body.orderId
-      const types = req.body.types ? req.body.types.split(',') : []
+      
 
       const LatLongData = await StoreLatLong.findOne({ orderId: orderId })
+
+
+      const types = LatLongData.storeId
 
       if (!LatLongData) {
         return res.status(404).message({

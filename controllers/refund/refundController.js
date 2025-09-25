@@ -1442,7 +1442,7 @@ exports.updateStatus = async (req, res) => {
       module: 'approveChange',
       user: user,
       status: status,
-      id: newOrderId,
+      id: changeOrder.orderId,
     })
 
 
