@@ -1592,5 +1592,56 @@ exports.cancelApproveRefund = async (req, res) => {
 }
 
 
-// exports.updateAddressChange = async ('))
+exports.updateAddressChange = async (req, res) => {
+  const channel = req.headers['x-channel']
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+  const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
+
+  const changeData = await Order.find({ type: 'change' })
+  const storeId = [
+    ...new Set(
+      changeData.flatMap(item => item.store.storeId)
+    )
+  ];
+
+  const storeData = await Store.find({ storeId: { $in: storeId } })
+
+  for (i of changeData) {
+
+    const store = storeData.find(item => item.storeId === i.store.storeId)
+
+    const shipping = store.shippingAddress[0]
+
+    await Order.findOneAndUpdate(
+      { orderId: i.orderId },  // filter
+      {
+        $set: {
+          shipping: {
+            default: shipping.shipping,
+            shippingId: shipping.shippingId,
+            address: shipping.address,
+            district: shipping.district,
+            subDistrict: shipping.subDistrict,
+            province: shipping.province,
+            postCode: shipping.postCode,
+            latitude: shipping.latitude,
+            longitude: shipping.longtitude, // 👈 ระวังสะกดผิด ควรเป็น longitude
+          },
+        },
+      },
+      { new: true } // options: คืนค่าที่อัปเดตแล้ว
+    );
+  }
+
+
+  res.status(200).json(
+    {
+      status: 200,
+      message: 'Updated status successfully!',
+      // storeId,
+      data: changeData
+    }
+  )
+
+}
 
