@@ -866,57 +866,57 @@ exports.availableStock = async (req, res, next) => {
       // console.log('lot', lot)
       const tranFromProduct = product
         ? {
-            // ...product,
-            _id: product._id,
-            id: product.id,
-            name: product.name,
-            group: product.group,
-            groupCode: product.groupCode,
-            brandCode: product.brandCode,
-            brand: product.brand,
-            size: product.size,
-            flavourCode: product.flavourCode,
-            flavour: product.flavour,
-            type: product.type,
-            weightGross: product.weightGross,
-            weightNet: product.weightNet,
-            statusSale: product.statusSale,
-            statusWithdraw: product.statusWithdraw,
-            statusRefund: product.statusRefund,
-            image: product.image,
+          // ...product,
+          _id: product._id,
+          id: product.id,
+          name: product.name,
+          group: product.group,
+          groupCode: product.groupCode,
+          brandCode: product.brandCode,
+          brand: product.brand,
+          size: product.size,
+          flavourCode: product.flavourCode,
+          flavour: product.flavour,
+          type: product.type,
+          weightGross: product.weightGross,
+          weightNet: product.weightNet,
+          statusSale: product.statusSale,
+          statusWithdraw: product.statusWithdraw,
+          statusRefund: product.statusRefund,
+          image: product.image,
 
-            listUnit: product.listUnit.map(unit => {
-              // console.log("lot",lot)
-              // const totalQtyPcsToCtn = Math.floor(
-              //   lot.available.reduce((sum, item) => {
-              //     return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor
-              //   }, 0)
-              // )
-              if (unit.unit == 'CTN') {
-                qty = lot.available.reduce((total, u) => total + u.qtyCtn, 0)
-              } else if (unit.unit == 'PCS') {
-                qty = lot.available.reduce((total, u) => total + u.qtyPcs, 0)
-              } else {
-                qty = 0
+          listUnit: product.listUnit.map(unit => {
+            // console.log("lot",lot)
+            // const totalQtyPcsToCtn = Math.floor(
+            //   lot.available.reduce((sum, item) => {
+            //     return sum + (parseFloat(item.qtyPcs) || 0) / unit.factor
+            //   }, 0)
+            // )
+            if (unit.unit == 'CTN') {
+              qty = lot.available.reduce((total, u) => total + u.qtyCtn, 0)
+            } else if (unit.unit == 'PCS') {
+              qty = lot.available.reduce((total, u) => total + u.qtyPcs, 0)
+            } else {
+              qty = 0
+            }
+
+            return {
+              unit: unit.unit,
+              name: unit.name,
+              factor: unit.factor,
+              // qty: totalQtyPcsToCtn,
+
+              qty: qty,
+              price: {
+                sale: unit.price.sale,
+                Refund: unit.price.refund
               }
-
-              return {
-                unit: unit.unit,
-                name: unit.name,
-                factor: unit.factor,
-                // qty: totalQtyPcsToCtn,
-
-                qty: qty,
-                price: {
-                  sale: unit.price.sale,
-                  Refund: unit.price.refund
-                }
-              }
-            }),
-            created: product.created,
-            updated: product.updated,
-            __v: product.__v
-          }
+            }
+          }),
+          created: product.created,
+          updated: product.updated,
+          __v: product.__v
+        }
         : null
 
       // console.log(lot)
@@ -944,7 +944,7 @@ exports.availableStock = async (req, res, next) => {
       }
     })
 
-    function parseSize (sizeStr) {
+    function parseSize(sizeStr) {
       if (!sizeStr) return 0
 
       const units = {
@@ -1176,7 +1176,7 @@ exports.getStockQty = async (req, res) => {
 
   const dataProduct = await Product.find({
     id: { $in: uniqueProductId }
-  }).select('id name listUnit')
+  }).select('id name groupCode size listUnit')
 
   let data = []
   let summaryStock = 0
@@ -1234,18 +1234,25 @@ exports.getStockQty = async (req, res) => {
     const finalProductStock = {
       productId: stockItem.id,
       productName: productDetail.name,
-      pcsMain: pcsMain,
+      productGroupCode: productDetail.groupCode,
+      size: productDetail.size,
+      // pcsMain: pcsMain,
       listUnit: listUnitStock
     }
 
     data.push(finalProductStock)
   }
 
-  // sort และลบ pcsMain ก่อนส่งออก
-  data.sort((a, b) => b.pcsMain - a.pcsMain)
-  data.forEach(item => {
-    delete item.pcsMain
+
+
+  let dataFinal = sortProduct(data, 'productGroupCode')
+
+  // ลบ field ที่ไม่ต้องการ
+  dataFinal = dataFinal.map(item => {
+    const { productGroupCode, size, ...rest } = item
+    return rest
   })
+
 
   // const io = getSocket()
   // io.emit('stock/getStockQty', {});
@@ -1253,7 +1260,7 @@ exports.getStockQty = async (req, res) => {
   res.status(200).json({
     status: 200,
     message: 'suceesful',
-    data: data,
+    data: dataFinal,
     summaryStock: Number(summaryStock.toFixed(2)),
     summaryStockIn: Number(summaryStockIn.toFixed(2)),
     summaryStockOut: Number(summaryStockOut.toFixed(2)),
@@ -2161,7 +2168,7 @@ exports.getStockQtyDetail = async (req, res) => {
         .AdjustStock
     }
 
-    function rollupUnits (summaryByUnit, listUnit) {
+    function rollupUnits(summaryByUnit, listUnit) {
       // ต้องมี factor = จำนวนชิ้นเล็กสุดต่อ 1 หน่วยนั้น
       // เช่น CTN=80, BAG=10, PCS=1
       const meta = Object.fromEntries(
@@ -3188,7 +3195,7 @@ exports.stockToExcel = async (req, res) => {
           res.status(500).send('Download failed')
         }
       }
-      fs.unlink(tempPath, () => {})
+      fs.unlink(tempPath, () => { })
     })
   } else {
     res.status(200).json({
@@ -3561,8 +3568,8 @@ exports.stockToExcelNew = async (req, res) => {
     )
     const sumStockOutSummarySalePromotionChange = to2(
       sumStockOutSummarySale +
-        sumStockOutSummaryPromotion +
-        sumStockOutSummaryChange
+      sumStockOutSummaryPromotion +
+      sumStockOutSummaryChange
     )
 
     // ---------- Stock IN ----------
@@ -3643,7 +3650,7 @@ exports.stockToExcelNew = async (req, res) => {
               sumStock: 0,
               summary: 0
             }),
-            m.get(pid))
+              m.get(pid))
           o.withdraw += +r.withdraw || 0
           o.good += +r.good || 0
           o.sumStock += +r.sumStock || 0
@@ -4150,7 +4157,7 @@ exports.stockToExcelNew = async (req, res) => {
           console.error('❌ Download error:', err)
           if (!res.headersSent) res.status(500).send('Download failed')
         }
-        fs.unlink(tempPath, () => {})
+        fs.unlink(tempPath, () => { })
       })
     }
 
@@ -4711,7 +4718,7 @@ exports.stockToExcelSummary = async (req, res) => {
           console.error('❌ Download error:', err)
           if (!res.headersSent) res.status(500).send('Download failed')
         }
-        fs.unlink(tempPath, () => {})
+        fs.unlink(tempPath, () => { })
       })
     } else {
       return res.status(200).json({
@@ -5438,7 +5445,7 @@ exports.addStockAllWithInOut = async (req, res) => {
       )
 
       const mergedProductPromotions = allOrderPromotion.reduce((acc, promo) => {
-        ;(promo.listProduct || []).forEach(prod => {
+        ; (promo.listProduct || []).forEach(prod => {
           const key = `${prod.id}_${prod.unit}`
           if (acc[key]) {
             acc[key].qty += prod.qty || 0
