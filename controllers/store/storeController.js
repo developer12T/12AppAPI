@@ -2617,7 +2617,7 @@ exports.addImageLatLong = async (req, res) => {
           [files[i]],
           path.join(__dirname, '../../public/images/storesLatLong'),
           LatLongData.area,
-          types[i]
+          types
         )
 
         const originalPath = uploadedFile[0].fullPath // เช่น .../public/images/stores/xxx.jpg
@@ -2635,7 +2635,7 @@ exports.addImageLatLong = async (req, res) => {
         uploadedFiles.push({
           name: path.basename(webpPath),
           path: webpPath,
-          type: types[i]
+          // type: types
         })
       }
 
