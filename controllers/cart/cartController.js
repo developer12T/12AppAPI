@@ -1084,14 +1084,14 @@ exports.autoDeleteCart = async (req, res) => {
           // console.log(cart.area)
           if (!prod.condition && !prod.expire) {
             // If updateStockMongo expects an ID instead of the whole object, use prod.id
-            // await updateStockMongo(
-            //   prod, // or prod.id
-            //   cart.area,
-            //   period, // period is provided at body root
-            //   'deleteCart',
-            //   channel,
-            //   res
-            // )
+            await updateStockMongo(
+              prod, // or prod.id
+              cart.area,
+              period, // period is provided at body root
+              'deleteCart',
+              channel,
+              res
+            )
           }
         } catch (e) {
           updateErrors.push({
@@ -1108,15 +1108,17 @@ exports.autoDeleteCart = async (req, res) => {
   }
   // // console.log(toDeleteIds)
 
-  // // delete all carts referenced in the request body by _id
-  // const { acknowledged, deletedCount } = await Cart.deleteMany({
-  //   _id: { $in: toDeleteIds }
-  // })
+  // delete all carts referenced in the request body by _id
+  const { acknowledged, deletedCount } = await Cart.deleteMany({
+    _id: { $in: toDeleteIds }
+  })
 
   res.status(200).json({
     status: 200,
     message: 'Stock updated successfully',
-    data: cartData
+    data: cartData,
+    acknowledged,
+    deletedCount
   })
 }
 

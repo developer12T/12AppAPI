@@ -1611,6 +1611,8 @@ exports.updateAddressChange = async (req, res) => {
 
     const store = storeData.find(item => item.storeId === i.store.storeId)
 
+    // console.log(store.storeId)
+
     const shipping = store.shippingAddress[0]
 
     await Order.findOneAndUpdate(
@@ -1618,15 +1620,15 @@ exports.updateAddressChange = async (req, res) => {
       {
         $set: {
           shipping: {
-            default: shipping.shipping,
-            shippingId: shipping.shippingId,
-            address: shipping.address,
-            district: shipping.district,
-            subDistrict: shipping.subDistrict,
-            province: shipping.province,
-            postCode: shipping.postCode,
-            latitude: shipping.latitude,
-            longitude: shipping.longtitude, // 👈 ระวังสะกดผิด ควรเป็น longitude
+            default: shipping?.default ?? '',
+            shippingId: shipping?.shippingId ?? '',
+            address: shipping?.address ?? '',
+            district: shipping?.district ?? '',
+            subDistrict: shipping?.subDistrict ?? '',
+            province: shipping?.province ?? '',
+            postCode: shipping?.postCode ?? '',
+            latitude: shipping?.latitude ?? '0',
+            longtitude: shipping?.longtitude ?? '0'
           },
         },
       },
