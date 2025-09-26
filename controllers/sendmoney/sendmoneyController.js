@@ -26,12 +26,15 @@ const { query } = require('mssql')
 exports.addSendMoney = async (req, res) => {
   const channel = req.headers['x-channel']
   const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+  const { Refund } = getModelsByChannel(channel, res, refundModel)
   const { area, date, sendmoney, salePayer, saleCode } = req.body
 
   const year = parseInt(date.slice(0, 4), 10)
   const month = parseInt(date.slice(4, 6), 10)
   const day = parseInt(date.slice(6, 8), 10)
-  const dateObj = new Date(Date.UTC(year, month - 1, day - 1, 17, 0, 0))
+  const startOfMonthUTC = new Date(Date.UTC(year, month - 1, day - 1, 17, 0, 0))
+  const endOfMonthUTC = new Date(Date.UTC(year, month - 1, day, 16, 59, 59, 999));
 
   const existData = await SendMoney.aggregate([
     { $match: { area: area } },
@@ -59,19 +62,66 @@ exports.addSendMoney = async (req, res) => {
     }
   ])
 
-  // let sendmoneyData = {}
+  const periodStr = period()
 
-  // console.log(existData)
+
+
+  const [dataRefund, dataOrderSale, dataOrderChange] =
+    await Promise.all([
+      Refund.find({
+        'store.area': area,
+        period: periodStr,
+        createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+        type: 'refund',
+        status: { $nin: ['pending', 'canceled', 'reject'] }
+      }),
+      Order.find({
+        'store.area': area,
+        period: periodStr,
+        createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+        type: 'sale',
+        status: { $nin: ['canceled', 'reject'] }
+      }),
+      Order.find({
+        'store.area': area,
+        period: periodStr,
+        createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+        type: 'change',
+        status: { $nin: ['pending', 'canceled', 'reject'] }
+      })
+    ])
+
+  const refundSum = dataRefund.reduce((sum, item) => {
+    return sum + item.total;
+  }, 0);
+
+  const saleSum = dataOrderSale.reduce((sum, item) => {
+    return sum + item.total;
+  }, 0);
+
+  const changeSum = dataOrderChange.reduce((sum, item) => {
+    return sum + item.total;
+  }, 0);
+
+
+  const sumTotalSale = saleSum + (changeSum - refundSum)
+
+
+
 
   if (existData.length == 0) {
+    const different = sendmoney - sumTotalSale
     sendmoneyData = await SendMoney.create({
       area: area,
-      dateAt: dateObj,
+      dateAt: startOfMonthUTC,
       sendmoney: sendmoney,
       salePayer: salePayer,
-      saleCode: saleCode
+      saleCode: saleCode,
+      period: periodStr,
+      different: to2(different)
     })
   } else {
+    const different = (existData[0].sendmoney + sendmoney) - sumTotalSale
     sendmoneyData = await SendMoney.findOneAndUpdate(
       { _id: existData[0]._id },
       {
@@ -79,7 +129,8 @@ exports.addSendMoney = async (req, res) => {
           sendmoney: +sendmoney
         },
         salePayer: salePayer,
-        saleCode: saleCode
+        saleCode: saleCode,
+        different: to2(different)
       }
     )
   }
@@ -671,7 +722,7 @@ exports.sendmoneyToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
+      fs.unlink(tempPath, () => { })
     })
   } else {
     return res.status(200).json({
