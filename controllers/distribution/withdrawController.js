@@ -2537,35 +2537,62 @@ exports.getWithdrawError = async (req, res) => {
     area: { $ne: 'IT211' }
   })
 
-  const withdrawTran = withdrawData.map(item => {
-    createdAtThai = toThaiTime(item.createdAt)
-    return {
+  let data = []
+
+  for (item of withdrawData) {
+    let typeError = ''
+    const mgHead = await DisributionM3.findOne({ where: { coNo: item.orderId } })
+    const countProduct = item.listProduct.length
+
+    if (mgHead) {
+      if (countProduct === parseInt(item.lineM3)) {
+        typeError = 'สินค้าครบ';
+      } else {
+        typeError = 'สินค้าไม่ครบ';
+      }
+
+    } else {
+      typeError = 'ไม่เข้าระบบ M3'
+
+    }
+
+    const dataTran = {
       orderId: item.orderId,
-      createdAt: item.createdAt,
-      createdAtThai: createdAtThai,
-      MGTRDT_NEW: formatDateToYYYYMMDD(createdAtThai)
+      orderType: item.orderType,
+      newTrip: item.newTrip,
+      orderTypeName: item.orderTypeName,
+      withdrawType: item.withdrawType,
+      area: item.area,
+      fromWarehouse: item.fromWarehouse,
+      toWarehouse: item.toWarehouse,
+      shippingId: item.shippingId,
+      shippingRoute: item.shippingRoute,
+      shippingName: item.shippingName,
+      sendAddress: item.sendAddress,
+      sendDate: item.sendDate,
+      remark: item.remark,
+      status: item.status,
+      statusTH: item.statusTH,
+      period: item.period,
+      createdAt: toThaiTime(item.createdAt),
+      updatedAt: toThaiTime(item.updatedAt),
+      listProduct: countProduct,
+      lineM3: item.lineM3 || "0",
+      heightStatus: item.heightStatus || "0",
+      lowStatus: item.lowStatus || "0",
+      typeError: typeError
     }
-  })
-
-  let NotInM3 = []
-
-  for (i of withdrawTran) {
-    const row = await DisributionM3.findOne({ where: { coNo: i.orderId } })
-    if (!row) {
-      NotInM3.push(i.orderId)
-    }
+    data.push(dataTran)
   }
-  // let typeError = ''
-  // if (!mgHead) {
-  // typeError = 'ไม่เข้าระบบ M3'      
-  // NotInM3.push(i.orderId)
-  // }
+
+
+
 
 
   res.status(200).json({
     status: 200,
     message: "fetch Sucess",
-    data: NotInM3
+    data: data
   })
 }
 
@@ -2593,9 +2620,9 @@ exports.UpdateWithdrawConjob = async (req, res) => {
         { orderId: i.orderId },
         {
           $set: {
-            lineM3: count ,
-            lowStatus: lowStatus ,
-            heightStatus: highStatus 
+            lineM3: count,
+            lowStatus: lowStatus,
+            heightStatus: highStatus
           }
         }
       )
