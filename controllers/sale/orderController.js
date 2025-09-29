@@ -6334,7 +6334,7 @@ exports.updatePaymentOrder = async (req, res) => {
     const { orderId, paymentMethod } = req.body
     const channel = req.headers['x-channel']
     const { Order } = getModelsByChannel(channel, res, orderModel)
-
+    const { User } = getModelsByChannel(channel, res, userModel)
     const dataOrder = await Order.findOne({ orderId: orderId })
 
     let updateOrder = ''
