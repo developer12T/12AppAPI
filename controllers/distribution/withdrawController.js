@@ -16,7 +16,13 @@ const {
   generateDistributionIdCredit
 } = require('../../utilities/genetateId')
 const { rangeDate } = require('../../utilities/datetime')
-const { period, previousPeriod, toThaiTime, formatDate, formatDateToYYYYMMDD } = require('../../utilities/datetime')
+const {
+  period,
+  previousPeriod,
+  toThaiTime,
+  formatDate,
+  formatDateToYYYYMMDD
+} = require('../../utilities/datetime')
 const cartModel = require('../../models/cash/cart')
 const productModel = require('../../models/cash/product')
 const distributionModel = require('../../models/cash/distribution')
@@ -343,17 +349,17 @@ exports.getOrderCredit = async (req, res) => {
     let startDate, endDate
 
     if (start && end) {
-      // ตัด string แล้ว parse เป็น Date
       startDate = new Date(
-        start.substring(0, 4), // year: 2025
-        parseInt(start.substring(4, 6), 10) - 1, // month: 08 → index 7
-        start.substring(6, 8) // day: 01
+        `${start.slice(0, 4)}-${start.slice(4, 6)}-${start.slice(
+          6,
+          8
+        )}T00:00:00+07:00`
       )
-
       endDate = new Date(
-        end.substring(0, 4), // year: 2025
-        parseInt(end.substring(4, 6), 10) - 1, // month: 08 → index 7
-        end.substring(6, 8) // day: 01
+        `${end.slice(0, 4)}-${end.slice(4, 6)}-${end.slice(
+          6,
+          8
+        )}T23:59:59.999+07:00`
       )
     } else if (period) {
       const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
@@ -366,13 +372,18 @@ exports.getOrderCredit = async (req, res) => {
     }
 
     let statusQuery = {}
-    if (type === 'pending') {
-      statusQuery.status = { $in: ['pending', 'approved', 'rejected'] }
-    } else if (type === 'history') {
-      statusQuery.status = {
-        $in: ['approved', 'rejected', 'success', 'confirm']
-      }
+
+    statusQuery.status = {
+      $in: ['approved', 'rejected', 'success', 'confirm', 'pending']
     }
+
+    // if (type === 'pending') {
+    //   statusQuery.status = { $in: ['pending', 'approved', 'rejected'] }
+    // } else if (type === 'history') {
+    //   statusQuery.status = {
+    //     $in: ['approved', 'rejected', 'success', 'confirm','pending']
+    //   }
+    // }
 
     // const status = type === 'history' ? { $ne: 'pending' } : 'pending'
     let areaQuery = {}
@@ -387,7 +398,7 @@ exports.getOrderCredit = async (req, res) => {
       ...areaQuery,
       ...(period ? { period } : {}),
       withdrawType: 'credit',
-      // createdAt: { $gte: startDate, $lt: endDate },
+      createdAt: { $gte: startDate, $lt: endDate },
       ...statusQuery
     }
 
@@ -507,16 +518,28 @@ exports.getOrder = async (req, res) => {
 
     if (start && end) {
       // ตัด string แล้ว parse เป็น Date
-      startDate = new Date(
-        start.substring(0, 4), // year: 2025
-        parseInt(start.substring(4, 6), 10) - 1, // month: 08 → index 7
-        start.substring(6, 8) // day: 01
-      )
+      // startDate = new Date(
+      //   start.substring(0, 4), // year: 2025
+      //   parseInt(start.substring(4, 6), 10) - 1, // month: 08 → index 7
+      //   start.substring(6, 8) // day: 01
+      // )
 
+      // endDate = new Date(
+      //   end.substring(0, 4), // year: 2025
+      //   parseInt(end.substring(4, 6), 10) - 1, // month: 08 → index 7
+      //   end.substring(6, 8) // day: 01
+      // )
+      startDate = new Date(
+        `${start.slice(0, 4)}-${start.slice(4, 6)}-${start.slice(
+          6,
+          8
+        )}T00:00:00+07:00`
+      )
       endDate = new Date(
-        end.substring(0, 4), // year: 2025
-        parseInt(end.substring(4, 6), 10) - 1, // month: 08 → index 7
-        end.substring(6, 8) // day: 01
+        `${end.slice(0, 4)}-${end.slice(4, 6)}-${end.slice(
+          6,
+          8
+        )}T23:59:59.999+07:00`
       )
     } else if (period) {
       const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
@@ -529,6 +552,7 @@ exports.getOrder = async (req, res) => {
     }
 
     let statusQuery = {}
+
     if (type === 'pending') {
       statusQuery.status = {
         $in: ['pending', 'approved', 'onprocess', 'success']
@@ -2394,15 +2418,13 @@ exports.withdrawBackOrderToExcel = async (req, res) => {
   }
 }
 
-
-
-
 exports.withdrawUpdateMGTRDT = async (req, res) => {
-
   const channel = req.headers['x-channel']
   const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
-  const withdrawData = await Distribution.find({ status: ['approved', 'confirm'] })
+  const withdrawData = await Distribution.find({
+    status: ['approved', 'confirm']
+  })
 
   const withdrawTran = withdrawData.map(item => {
     createdAtThai = toThaiTime(item.createdAt)
@@ -2417,37 +2439,31 @@ exports.withdrawUpdateMGTRDT = async (req, res) => {
   let m3 = []
 
   for (i of withdrawTran) {
-
     const row = await DisributionM3.findOne({ where: { coNo: i.orderId } })
 
     if (row) {
-      row.MGTRDT = i.MGTRDT_NEW;
-      await row.save(); // บันทึกการเปลี่ยนแปลง
+      row.MGTRDT = i.MGTRDT_NEW
+      await row.save() // บันทึกการเปลี่ยนแปลง
       m3.push(row)
     }
-
-
   }
-
 
   res.status(200).json({
     status: 200,
-    message: "Update Sucess",
+    message: 'Update Sucess',
     data: withdrawTran
   })
-
 }
-
 
 exports.withdrawCheckM3 = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
-  const withdrawData = await Distribution.find({ 
-    status: ['approved', 'confirm'], 
-    withdrawType: { $ne: "credit" },
-    area: { $ne :'IT211'}
-   })
+  const withdrawData = await Distribution.find({
+    status: ['approved', 'confirm'],
+    withdrawType: { $ne: 'credit' },
+    area: { $ne: 'IT211' }
+  })
 
   const withdrawTran = withdrawData.map(item => {
     createdAtThai = toThaiTime(item.createdAt)
@@ -2462,7 +2478,6 @@ exports.withdrawCheckM3 = async (req, res) => {
   let NotInM3 = []
 
   for (i of withdrawTran) {
-
     const row = await DisributionM3.findOne({ where: { coNo: i.orderId } })
     if (!row) {
       NotInM3.push(i.orderId)
@@ -2471,8 +2486,7 @@ exports.withdrawCheckM3 = async (req, res) => {
 
   res.status(200).json({
     status: 200,
-    message: "Update Sucess",
+    message: 'Update Sucess',
     data: NotInM3
   })
-
 }
