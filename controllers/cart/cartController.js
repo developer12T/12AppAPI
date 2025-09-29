@@ -1124,6 +1124,7 @@ exports.autoDeleteCart = async (req, res) => {
 
 exports.getCountCart = async (req, res) => {
 
+  const { zone } = req.query
   const channel = req.headers['x-channel']
   const { Cart } = getModelsByChannel(channel, res, cartModel)
   const { User } = getModelsByChannel(channel, res, userModel)
@@ -1143,20 +1144,23 @@ exports.getCountCart = async (req, res) => {
   ]);
 
   let data = []
-  for (item of userZones) {
 
-    const count = cartData.filter(o => o.zone === item.zone).length;
-    const areaFilter = cartData.filter(o => o.zone === item.zone)
-    const dataTram = {
-      zone : item.zone,
-      count : count,
-      cart : areaFilter
+
+  if (zone) {
+    const areaFilter = cartData.filter(o => o.zone === zone)
+    data = areaFilter
+  } else {
+    for (item of userZones) {
+      const count = cartData.filter(o => o.zone === item.zone).length;
+      const areaFilter = cartData.filter(o => o.zone === item.zone)
+      const dataTram = {
+        zone: item.zone,
+        count: count,
+        // cart : areaFilter
+      }
+      data.push(dataTram)
     }
-
-    data.push(dataTram)
   }
-
-
 
   res.status(200).json({
     status: 200,

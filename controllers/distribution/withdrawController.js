@@ -2476,3 +2476,42 @@ exports.withdrawCheckM3 = async (req, res) => {
   })
 
 }
+
+
+exports.withdrawCheckM3Detail = async (req, res) => {
+  const channel = req.headers['x-channel']
+  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+
+  const withdrawData = await Distribution.find({ 
+    status: ['approved', 'confirm'], 
+    withdrawType: { $ne: "credit" },
+    area: { $ne :'IT211'}
+   })
+
+  const withdrawTran = withdrawData.map(item => {
+    createdAtThai = toThaiTime(item.createdAt)
+    return {
+      orderId: item.orderId,
+      createdAt: item.createdAt,
+      createdAtThai: createdAtThai,
+      MGTRDT_NEW: formatDateToYYYYMMDD(createdAtThai)
+    }
+  })
+
+  let NotInM3 = []
+
+  for (i of withdrawTran) {
+
+    const row = await DisributionM3.findOne({ where: { coNo: i.orderId } })
+    if (!row) {
+      NotInM3.push(i.orderId)
+    }
+  }
+
+  res.status(200).json({
+    status: 200,
+    message: "Update Sucess",
+    data: NotInM3
+  })
+
+}
