@@ -1124,7 +1124,7 @@ exports.autoDeleteCart = async (req, res) => {
 
 exports.getCountCart = async (req, res) => {
 
-  const { orderId } = req.query
+  const { zone } = req.query
   const channel = req.headers['x-channel']
   const { Cart } = getModelsByChannel(channel, res, cartModel)
   const { User } = getModelsByChannel(channel, res, userModel)
