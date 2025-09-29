@@ -38,7 +38,7 @@ async function erpApiCheckOrderJob (channel = 'cash') {
   try {
     const { Order } = getModelsByChannel(channel, null, orderModel)
     const { Refund } = getModelsByChannel(channel, null, refundModel)
-
+    const { Distribution } = getModelsByChannel(channel, null, distributionModel)
     // 2. Get pending orderIds ใน MongoDB
     const inMongo = await Order.find({ status: 'pending' }).select('orderId')
     const inMongoRefund = await Refund.find({ status: 'approved' }).select(

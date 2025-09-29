@@ -452,9 +452,9 @@ exports.getOrderCredit = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-                fullname: `${userData.firstName} ${userData.surName}`,
-                tel: `${userData.tel}`
-              }
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -617,9 +617,9 @@ exports.getOrder = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-                fullname: `${userData.firstName} ${userData.surName}`,
-                tel: `${userData.tel}`
-              }
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -790,9 +790,9 @@ exports.getOrderSup = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-                fullname: `${userData.firstName} ${userData.surName}`,
-                tel: `${userData.tel}`
-              }
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
             : null,
           orderId: o.orderId,
           newTrip: o.newTrip,
@@ -1442,15 +1442,12 @@ exports.approveWithdraw = async (req, res) => {
           <p>
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-            <strong>ประเภทการจัดส่ง:</strong> ${
-              distributionTran.orderTypeName
+            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName
             }<br>
-            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
-            '-' + wereHouseName?.wh_name || ''
-          }<br>
-            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
-            distributionTran.shippingName
-          }<br>
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
+            }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
+            }<br>
             <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
             <strong>เขต:</strong> ${distributionTran.area}<br>
             <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -1634,9 +1631,8 @@ exports.saleConfirmWithdraw = async (req, res) => {
         const ReceiveQty = Object.values(
           Receive.reduce((acc, cur) => {
             // ใช้ key จาก coNo + withdrawUnit + productId (ถ้าอยากแยกตาม productId ด้วย)
-            const key = `${cur.coNo}_${
-              cur.withdrawUnit
-            }_${cur.productId.trim()}`
+            const key = `${cur.coNo}_${cur.withdrawUnit
+              }_${cur.productId.trim()}`
             if (!acc[key]) {
               acc[key] = { ...cur }
             } else {
@@ -2089,7 +2085,7 @@ exports.withdrawToExcel = async (req, res) => {
 
     const tranFromOrder = modelWithdraw.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD (date) {
+      function formatDateToThaiYYYYMMDD(date) {
         const d = new Date(date)
         // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -2179,7 +2175,7 @@ exports.withdrawToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => {})
+        fs.unlink(tempPath, () => { })
       }
     )
   } catch (error) {
@@ -2389,7 +2385,7 @@ exports.withdrawBackOrderToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
+      fs.unlink(tempPath, () => { })
     })
   }
 }
@@ -2443,11 +2439,11 @@ exports.withdrawCheckM3 = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
-  const withdrawData = await Distribution.find({ 
-    status: ['approved', 'confirm'], 
+  const withdrawData = await Distribution.find({
+    status: ['approved', 'confirm'],
     withdrawType: { $ne: "credit" },
-    area: { $ne :'IT211'}
-   })
+    area: { $ne: 'IT211' }
+  })
 
   const withdrawTran = withdrawData.map(item => {
     createdAtThai = toThaiTime(item.createdAt)
@@ -2471,22 +2467,22 @@ exports.withdrawCheckM3 = async (req, res) => {
 
   res.status(200).json({
     status: 200,
-    message: "Update Sucess",
+    message: "fetch Sucess",
     data: NotInM3
   })
 
 }
 
 
-exports.withdrawCheckM3Detail = async (req, res) => {
+exports.getWithdrawError = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
-  const withdrawData = await Distribution.find({ 
-    status: ['approved', 'confirm'], 
+  const withdrawData = await Distribution.find({
+    status: ['approved', 'confirm'],
     withdrawType: { $ne: "credit" },
-    area: { $ne :'IT211'}
-   })
+    area: { $ne: 'IT211' }
+  })
 
   const withdrawTran = withdrawData.map(item => {
     createdAtThai = toThaiTime(item.createdAt)
@@ -2507,11 +2503,58 @@ exports.withdrawCheckM3Detail = async (req, res) => {
       NotInM3.push(i.orderId)
     }
   }
+  // let typeError = ''
+  // if (!mgHead) {
+  // typeError = 'ไม่เข้าระบบ M3'      
+  // NotInM3.push(i.orderId)
+  // }
+
+
+  res.status(200).json({
+    status: 200,
+    message: "fetch Sucess",
+    data: NotInM3
+  })
+
+}
+
+exports.UpdateWithdrawConjob = async (req, res) => {
+
+  const channel = req.headers['x-channel']
+  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+
+  const withdrawData = await Distribution.find({
+    // status: ['approved', 'confirm'],
+    withdrawType: { $ne: "credit" },
+    area: { $ne: 'IT211' }
+  })
+
+
+  for (i of withdrawData) {
+
+    const mgHead = await DisributionM3.findOne({ where: { coNo: i.orderId } })
+    if (mgHead) {
+      const count = await MGLINE.count({ where: { MRTRNR: i.orderId } });
+      const lowStatus = mgHead.MGTRSL
+      const highStatus = mgHead.MGTRSH
+
+      await Distribution.updateOne(
+        { orderId: i.orderId },
+        {
+          $set: {
+            lineM3: count ,
+            lowStatus: lowStatus ,
+            heightStatus: highStatus 
+          }
+        }
+      )
+    }
+  }
+
 
   res.status(200).json({
     status: 200,
     message: "Update Sucess",
-    data: NotInM3
+    // data: NotInM3
   })
-
 }

@@ -71,7 +71,7 @@ const receiveSchema = mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
 }, {
-  timestamps: true
+    timestamps: true
 })
 
 const listProductDistribution = new mongoose.Schema({
@@ -89,7 +89,7 @@ const listProductDistribution = new mongoose.Schema({
     total: { type: Number, require: true },
     weightGross: { type: Number, require: true },
     weightNet: { type: Number, require: true },
-    receiveUnit: { type: String,  default: '' },
+    receiveUnit: { type: String, default: '' },
     receiveQty: { type: Number, require: true, default: 0 }
 })
 
@@ -98,7 +98,7 @@ const distributionSchema = mongoose.Schema({
     orderId: { type: String, require: true },
     orderType: { type: String, require: true }, //T04, T05
     orderTypeName: { type: String, require: true }, //รับเอง, ส่งสินค้า
-    withdrawType: { type: String, require: true }, 
+    withdrawType: { type: String, require: true },
     area: { type: String, require: true },
     saleCode: { type: String, require: true },
     fromWarehouse: { type: String, require: false },
@@ -123,7 +123,10 @@ const distributionSchema = mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
     period: { type: String, require: true },
-    newTrip:{ type: String },
+    newTrip: { type: String },
+    lineM3: { type: String },
+    lowStatus: { type: String },
+    heightStatus: { type: String },
 }, {
     timestamps: true
 })
@@ -139,7 +142,7 @@ const withdrawSchema = mongoose.Schema({
     WH: { type: String, required: true },
     ROUTE: { type: String, required: true },
     WH1: { type: String, required: true },
-    Dc_Email: { type: String,  },
+    Dc_Email: { type: String, },
 });
 
 
