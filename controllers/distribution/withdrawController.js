@@ -500,6 +500,57 @@ exports.getOrderCredit = async (req, res) => {
   }
 }
 
+exports.getOrderPending = async (req, res) => {
+  try {
+    const { type, area, period, zone } = req.query
+    const channel = req.headers['x-channel']
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+    let areaQuery = {}
+    let statusQuery = {}
+
+    console.log(area)
+    console.log(period)
+    console.log(zone)
+
+    if (area) {
+      areaQuery.area = area
+    } else if (zone) {
+      areaQuery.area = { $regex: `^${zone}`, $options: 'i' }
+    }
+
+    statusQuery.status = {
+      $in: ['pending']
+    }
+
+    let query = {
+      ...areaQuery,
+      ...(period ? { period } : {}),
+      ...statusQuery
+    }
+
+    const pipeline = [{ $match: query }]
+    console.log(areaQuery.area)
+    // console.log(pipeline)
+    // console.log(pipeline.status)
+    const order = await Distribution.aggregate(pipeline)
+    console.log(order)
+    if (order.length == 0) {
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Distribution order not found!' })
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'Successful!',
+      data: order.length
+    })
+  } catch (error) {
+    console.error('Error saving store to MongoDB:', error)
+    res.status(500).json({ status: '500', message: 'Server Error' })
+  }
+}
+
 exports.getOrder = async (req, res) => {
   try {
     const { type, area, period, zone, team, year, month, start, end } =
@@ -517,18 +568,6 @@ exports.getOrder = async (req, res) => {
     let startDate, endDate
 
     if (start && end) {
-      // ตัด string แล้ว parse เป็น Date
-      // startDate = new Date(
-      //   start.substring(0, 4), // year: 2025
-      //   parseInt(start.substring(4, 6), 10) - 1, // month: 08 → index 7
-      //   start.substring(6, 8) // day: 01
-      // )
-
-      // endDate = new Date(
-      //   end.substring(0, 4), // year: 2025
-      //   parseInt(end.substring(4, 6), 10) - 1, // month: 08 → index 7
-      //   end.substring(6, 8) // day: 01
-      // )
       startDate = new Date(
         `${start.slice(0, 4)}-${start.slice(4, 6)}-${start.slice(
           6,
@@ -2489,19 +2528,17 @@ exports.withdrawCheckM3 = async (req, res) => {
     message: 'Update Sucess',
     data: NotInM3
   })
-
 }
-
 
 exports.withdrawCheckM3Detail = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
-  const withdrawData = await Distribution.find({ 
-    status: ['approved', 'confirm'], 
-    withdrawType: { $ne: "credit" },
-    area: { $ne :'IT211'}
-   })
+  const withdrawData = await Distribution.find({
+    status: ['approved', 'confirm'],
+    withdrawType: { $ne: 'credit' },
+    area: { $ne: 'IT211' }
+  })
 
   const withdrawTran = withdrawData.map(item => {
     createdAtThai = toThaiTime(item.createdAt)
@@ -2516,7 +2553,6 @@ exports.withdrawCheckM3Detail = async (req, res) => {
   let NotInM3 = []
 
   for (i of withdrawTran) {
-
     const row = await DisributionM3.findOne({ where: { coNo: i.orderId } })
     if (!row) {
       NotInM3.push(i.orderId)
@@ -2525,8 +2561,7 @@ exports.withdrawCheckM3Detail = async (req, res) => {
 
   res.status(200).json({
     status: 200,
-    message: "Update Sucess",
+    message: 'Update Sucess',
     data: NotInM3
   })
-
 }

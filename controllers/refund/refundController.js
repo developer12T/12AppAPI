@@ -128,7 +128,7 @@ exports.checkout = async (req, res) => {
         area: cart.area
       }).lean()) || {}
 
-    function isAug2025OrLater(createAt) {
+    function isAug2025OrLater (createAt) {
       if (!createAt) return false
 
       // case: "YYYYMM" เช่น "202508"
@@ -149,14 +149,14 @@ exports.checkout = async (req, res) => {
     // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-        storeData.address,
-        storeData.subDistrict && `ต.${storeData.subDistrict}`,
-        storeData.district && `อ.${storeData.district}`,
-        storeData.province && `จ.${storeData.province}`,
-        storeData.postCode
-      ]
-        .filter(Boolean)
-        .join(' ')
+          storeData.address,
+          storeData.subDistrict && `ต.${storeData.subDistrict}`,
+          storeData.district && `อ.${storeData.district}`,
+          storeData.province && `จ.${storeData.province}`,
+          storeData.postCode
+        ]
+          .filter(Boolean)
+          .join(' ')
       : storeData.address
 
     const summary = await summaryRefund(cart, channel, res)
@@ -606,7 +606,7 @@ exports.refundExcel = async (req, res) => {
 
   const tranFromChange = modelChange.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -854,7 +854,7 @@ exports.refundExcel = async (req, res) => {
 
   const tranFromRefund = tranFromRefundNested.flat()
 
-  function yyyymmddToDdMmYyyy(dateString) {
+  function yyyymmddToDdMmYyyy (dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -892,9 +892,46 @@ exports.refundExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     }
   )
+}
+
+exports.getRefundPending = async (req, res) => {
+  try {
+    const { type, area, zone, team, store, period, start, end } = req.query
+
+    const channel = req.headers['x-channel']
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+
+    let areaQuery = {}
+
+    if (area) {
+      areaQuery['store.area'] = area
+    } else if (zone) {
+      areaQuery['store.zone'] = zone
+    }
+
+    areaQuery.status = 'pending'
+
+    let query = {
+      type,
+      ...areaQuery,
+      ...(period ? { period } : {})
+    }
+
+    const pipeline = [{ $match: query }]
+    const refunds = await Refund.aggregate(pipeline)
+
+    res.status(200).json({
+      status: 200,
+      message: 'Successful!',
+      data: refunds.length
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
 }
 
 exports.getRefund = async (req, res) => {
@@ -1110,18 +1147,18 @@ exports.getDetail = async (req, res) => {
 
     const listProductChange = order
       ? order.listProduct.map(product => ({
-        id: product.id,
-        name: product.name,
-        group: product.group,
-        brand: product.brand,
-        size: product.size,
-        flavour: product.flavour,
-        qty: product.qty,
-        unit: product.unit,
-        unitName: product.unitName,
-        price: product.price,
-        netTotal: product.netTotal
-      }))
+          id: product.id,
+          name: product.name,
+          group: product.group,
+          brand: product.brand,
+          size: product.size,
+          flavour: product.flavour,
+          qty: product.qty,
+          unit: product.unit,
+          unitName: product.unitName,
+          price: product.price,
+          netTotal: product.netTotal
+        }))
       : []
 
     const totalChange = order ? order.total : 0
@@ -1435,16 +1472,15 @@ exports.updateStatus = async (req, res) => {
       module: 'approveRefund',
       user: user,
       status: status,
-      id: orderId,
+      id: orderId
     })
 
     await ApproveLogs.create({
       module: 'approveChange',
       user: user,
       status: status,
-      id: changeOrder.orderId,
+      id: changeOrder.orderId
     })
-
 
     res.status(200).json({
       status: 200,
@@ -1510,12 +1546,13 @@ exports.deleteRefund = async (req, res) => {
   }
 }
 
-
 exports.cancelApproveRefund = async (req, res) => {
   try {
     const { orderId, status, user } = req.body
     if (!orderId || !status) {
-      return res.status(400).json({ status: 400, message: 'orderId and status are required!' })
+      return res
+        .status(400)
+        .json({ status: 400, message: 'orderId and status are required!' })
     }
 
     const channel = req.headers['x-channel']
@@ -1525,12 +1562,16 @@ exports.cancelApproveRefund = async (req, res) => {
 
     const changeOrder = await Order.findOne({ reference: orderId })
     if (!changeOrder) {
-      return res.status(404).json({ status: 404, message: 'Not found change Order' })
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Not found change Order' })
     }
 
     const refundOrder = await Refund.findOne({ orderId })
     if (!refundOrder) {
-      return res.status(404).json({ status: 404, message: 'Refund order not found!' })
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Refund order not found!' })
     }
 
     if (refundOrder.status !== 'pending' && status !== 'canceled') {
@@ -1549,7 +1590,8 @@ exports.cancelApproveRefund = async (req, res) => {
       newOrderId = changeOrder.orderId
       if (!/CC\d+$/.test(newOrderId)) {
         let n = 1
-        while (await Order.exists({ orderId: `${changeOrder.orderId}CC${n}` })) n++
+        while (await Order.exists({ orderId: `${changeOrder.orderId}CC${n}` }))
+          n++
         newOrderId = `${changeOrder.orderId}CC${n}`
       }
 
@@ -1563,12 +1605,18 @@ exports.cancelApproveRefund = async (req, res) => {
           res
         )
         if (hasError) {
-          return res.status(500).json({ status: 500, message: 'Stock update error' })
+          return res
+            .status(500)
+            .json({ status: 500, message: 'Stock update error' })
         }
       }
     }
 
-    await Refund.findOneAndUpdate({ orderId }, { $set: { status, statusTH } }, { new: true })
+    await Refund.findOneAndUpdate(
+      { orderId },
+      { $set: { status, statusTH } },
+      { new: true }
+    )
     await Order.findOneAndUpdate(
       { orderId: refundOrder.reference, type: 'change' },
       { $set: { status, statusTH } },
@@ -1582,16 +1630,29 @@ exports.cancelApproveRefund = async (req, res) => {
       data: orderId
     })
 
-    await ApproveLogs.create({ module: 'approveRefund', user, status, statusTH, id: orderId })
-    await ApproveLogs.create({ module: 'approveChange', user, status, statusTH, id: newOrderId })
+    await ApproveLogs.create({
+      module: 'approveRefund',
+      user,
+      status,
+      statusTH,
+      id: orderId
+    })
+    await ApproveLogs.create({
+      module: 'approveChange',
+      user,
+      status,
+      statusTH,
+      id: newOrderId
+    })
 
-    res.status(200).json({ status: 200, message: 'Updated status successfully!' })
+    res
+      .status(200)
+      .json({ status: 200, message: 'Updated status successfully!' })
   } catch (error) {
     console.error('Error updating refund status:', error)
     res.status(500).json({ status: 500, message: 'Server error' })
   }
 }
-
 
 exports.updateAddressChange = async (req, res) => {
   const channel = req.headers['x-channel']
@@ -1599,16 +1660,11 @@ exports.updateAddressChange = async (req, res) => {
   const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
 
   const changeData = await Order.find({ type: 'change' })
-  const storeId = [
-    ...new Set(
-      changeData.flatMap(item => item.store.storeId)
-    )
-  ];
+  const storeId = [...new Set(changeData.flatMap(item => item.store.storeId))]
 
   const storeData = await Store.find({ storeId: { $in: storeId } })
 
   for (i of changeData) {
-
     const store = storeData.find(item => item.storeId === i.store.storeId)
 
     // console.log(store.storeId)
@@ -1616,7 +1672,7 @@ exports.updateAddressChange = async (req, res) => {
     const shipping = store.shippingAddress[0]
 
     await Order.findOneAndUpdate(
-      { orderId: i.orderId },  // filter
+      { orderId: i.orderId }, // filter
       {
         $set: {
           shipping: {
@@ -1629,22 +1685,17 @@ exports.updateAddressChange = async (req, res) => {
             postCode: shipping?.postCode ?? '',
             latitude: shipping?.latitude ?? '0',
             longtitude: shipping?.longtitude ?? '0'
-          },
-        },
+          }
+        }
       },
       { new: true } // options: คืนค่าที่อัปเดตแล้ว
-    );
+    )
   }
 
-
-  res.status(200).json(
-    {
-      status: 200,
-      message: 'Updated status successfully!',
-      // storeId,
-      data: changeData
-    }
-  )
-
+  res.status(200).json({
+    status: 200,
+    message: 'Updated status successfully!',
+    // storeId,
+    data: changeData
+  })
 }
-

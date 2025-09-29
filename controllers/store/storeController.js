@@ -165,6 +165,70 @@ exports.getDetailStore = async (req, res) => {
     res.status(500).json({ status: '500', message: error.message })
   }
 }
+exports.getPendingStore = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel'] // 'credit' or 'cash'
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { area, type, route, zone, team, year, month, showMap } = req.body
+
+    let query = {}
+    query.status = { $in: ['10'] }
+
+    // query.createdAt = {
+    //   $gte: startMonth,
+    //   $lt: nextMonth
+    // }
+
+    if (area) {
+      query.area = area
+    } else if (zone) {
+      query.area = { $regex: `^${zone}`, $options: 'i' }
+    }
+
+    const pipeline = [
+      { $match: query },
+      {
+        $addFields: {
+          team3: {
+            $concat: [
+              { $substrCP: ['$area', 0, 2] },
+              { $substrCP: ['$area', 3, 1] }
+            ]
+          }
+        }
+      }
+    ]
+
+    pipeline.push(
+      {
+        $project: {
+          _id: 0,
+          __v: 0,
+          beauty: 0
+        }
+      },
+      {
+        $sort: {
+          status: 1,
+          createdAt: -1
+        }
+      }
+    )
+
+    console.log(pipeline)
+
+    let data = await Store.aggregate(pipeline)
+
+    res.status(200).json({
+      status: '200',
+      message: 'Success',
+      count: data.length
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
 
 exports.getStore = async (req, res) => {
   try {
@@ -1257,7 +1321,8 @@ exports.insertStoreToM3 = async (req, res) => {
           shippingRoute: u.postCode ?? '',
           OPGEOX:
             u.latitude == 'Error fetching latitude' ? '0.0000' : u.latitude,
-          OPGEOY: u.longitude == 'Error fetching latitude' ? '0.0000' : u.longitude // เดิมสะกด longtitude
+          OPGEOY:
+            u.longitude == 'Error fetching latitude' ? '0.0000' : u.longitude // เดิมสะกด longtitude
         }
       })
     }
@@ -1388,24 +1453,24 @@ exports.updateStoreStatus = async (req, res) => {
       customerCoType: item.type ?? '',
       customerAddress1: (
         item.address +
-        item.subDistrict +
-        item.subDistrict +
-        item.province +
-        item.postCode ?? ''
+          item.subDistrict +
+          item.subDistrict +
+          item.province +
+          item.postCode ?? ''
       ).substring(0, 35),
       customerAddress2: (
         item.address +
-        item.subDistrict +
-        item.subDistrict +
-        item.province +
-        item.postCode ?? ''
+          item.subDistrict +
+          item.subDistrict +
+          item.province +
+          item.postCode ?? ''
       ).substring(35, 70),
       customerAddress3: (
         item.address +
-        item.subDistrict +
-        item.subDistrict +
-        item.province +
-        item.postCode ?? ''
+          item.subDistrict +
+          item.subDistrict +
+          item.province +
+          item.postCode ?? ''
       ).substring(70, 105),
       customerAddress4: '',
       customerPoscode: (item.postCode ?? '').substring(0, 35),
@@ -1477,9 +1542,8 @@ exports.updateStoreStatus = async (req, res) => {
       module: 'approveStore',
       user: user,
       status: 'approved',
-      id: item.storeId,
+      id: item.storeId
     })
-
 
     return res.status(200).json({
       status: 200,
@@ -1503,7 +1567,7 @@ exports.updateStoreStatus = async (req, res) => {
       module: 'approveStore',
       user: user,
       status: 'rejected',
-      id: item.storeId,
+      id: item.storeId
     })
 
     res.status(200).json({
@@ -2483,7 +2547,7 @@ exports.storeToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
   } catch (err) {
     console.error(err)
@@ -2522,10 +2586,7 @@ exports.updateStatusM3ToMongo = async (req, res) => {
   }
 }
 
-
-
 exports.addLatLong = async (req, res) => {
-
   const channel = req.headers['x-channel'] // 'credit' or 'cash'
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const { User } = getModelsByChannel(channel, res, userModel)
@@ -2540,7 +2601,12 @@ exports.addLatLong = async (req, res) => {
       'firstName surName warehouse tel saleCode salePayer'
     )
 
-    const orderId = await generateOrderIdStoreLatLong(storeData.area, sale.warehouse, channel, res)
+    const orderId = await generateOrderIdStoreLatLong(
+      storeData.area,
+      sale.warehouse,
+      channel,
+      res
+    )
 
     const storeLatLong = new StoreLatLong({
       orderId: orderId,
@@ -2556,7 +2622,7 @@ exports.addLatLong = async (req, res) => {
       latitudeOld: storeData.latitude,
       longtitudeOld: storeData.longtitude,
       status: 'pending',
-      statusTH: 'รอนำเข้า',
+      statusTH: 'รอนำเข้า'
     })
 
     await storeLatLong.save()
@@ -2578,13 +2644,9 @@ exports.addLatLong = async (req, res) => {
       .status(500)
       .json({ status: '500', message: 'Server Error', debug: error.message })
   }
-
-
 }
 
-
 exports.addImageLatLong = async (req, res) => {
-
   const channel = req.headers['x-channel'] // 'credit' or 'cash'
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const { User } = getModelsByChannel(channel, res, userModel)
@@ -2594,13 +2656,10 @@ exports.addImageLatLong = async (req, res) => {
 
   upload(req, res, async err => {
     try {
-
       const files = req.files || []
       const orderId = req.body.orderId
-      
 
       const LatLongData = await StoreLatLong.findOne({ orderId: orderId })
-
 
       const types = LatLongData.storeId
 
@@ -2634,13 +2693,11 @@ exports.addImageLatLong = async (req, res) => {
         fs.unlinkSync(originalPath)
         uploadedFiles.push({
           name: path.basename(webpPath),
-          path: webpPath,
+          path: webpPath
           // type: types
         })
       }
 
-
-      
       const imageList = uploadedFiles
 
       if (uploadedFiles.length > 0) {
@@ -2650,7 +2707,6 @@ exports.addImageLatLong = async (req, res) => {
         )
       }
 
-
       const io = getSocket()
       io.emit('store/addStore', {
         status: '200',
@@ -2659,7 +2715,7 @@ exports.addImageLatLong = async (req, res) => {
 
       return res.status(200).json({
         status: '200',
-        message: 'Image added successfully',
+        message: 'Image added successfully'
       })
     } catch (error) {
       console.error('Error saving store to MongoDB:', error)
@@ -2668,13 +2724,54 @@ exports.addImageLatLong = async (req, res) => {
         .json({ status: '500', message: 'Server Error', debug: error.message })
     }
   })
-
 }
+exports.getLatLongOrderPending = async (req, res) => {
+  try {
+    const { zone, team, area } = req.query
+    const channel = req.headers['x-channel'] // 'credit' or 'cash'
+    const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
 
+    let matchStage = {}
+    if (zone) {
+      matchStage.zone = zone
+    } else if (team) {
+      matchStage.team3 = team
+    } else if (area) {
+      matchStage.area = area
+    }
+    const StoreLatLongData = await StoreLatLong.aggregate([
+      {
+        $addFields: {
+          team3: {
+            $concat: [
+              { $substrCP: ['$area', 0, 2] },
+              { $substrCP: ['$area', 3, 1] }
+            ]
+          },
+          zone: {
+            $substrCP: ['$area', 0, 2]
+          }
+        }
+      },
+      { $match: matchStage },
+      { $sort: { createdAt: -1 } }
+    ])
+
+    return res.status(200).json({
+      status: '200',
+      message: 'StoreLatLong added successfully',
+      data: StoreLatLongData.length
+    })
+  } catch (error) {
+    console.error('Error saving store to MongoDB:', error)
+    return res
+      .status(500)
+      .json({ status: '500', message: 'Server Error', debug: error.message })
+  }
+}
 
 exports.getLatLongOrder = async (req, res) => {
   const { storeId, zone, team, area } = req.query
-
 
   const channel = req.headers['x-channel'] // 'credit' or 'cash'
   const { Store } = getModelsByChannel(channel, res, storeModel)
@@ -2709,8 +2806,7 @@ exports.getLatLongOrder = async (req, res) => {
         zone: {
           $substrCP: ['$area', 0, 2]
         }
-      },
-
+      }
     },
     { $match: matchStage },
     { $sort: { createdAt: -1 } }
@@ -2749,14 +2845,12 @@ exports.getLatLongOrder = async (req, res) => {
   })
 }
 
-
 exports.getLatLongOrderDetail = async (req, res) => {
   const { orderId } = req.query
   const channel = req.headers['x-channel'] // 'credit' or 'cash'
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const { User } = getModelsByChannel(channel, res, userModel)
   const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
-
 
   const StoreLatLongData = await StoreLatLong.findOne({ orderId })
   // console.log(orderId)
@@ -2786,10 +2880,7 @@ exports.getLatLongOrderDetail = async (req, res) => {
   })
 }
 
-
-
 exports.approveLatLongStore = async (req, res) => {
-
   const { orderId, status, user } = req.body
   let statusStr = status === true ? 'approved' : 'rejected'
   let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ'
@@ -2818,9 +2909,7 @@ exports.approveLatLongStore = async (req, res) => {
     })
   }
 
-
   if (statusStr === 'approved') {
-
     // const storeData = await Store.findOne({ storeId: storeLatLongData.storeId })
 
     await StoreLatLong.findOneAndUpdate(
@@ -2832,19 +2921,17 @@ exports.approveLatLongStore = async (req, res) => {
           'approve.dateAction': new Date(),
           'approve.appPerson': user
         }
-      },
+      }
     )
-
 
     await Store.findOneAndUpdate(
       { storeId: storeLatLongData.storeId },
       {
         $set: {
-
           latitude: storeLatLongData.latitude,
-          longtitude: storeLatLongData.longtitude,
+          longtitude: storeLatLongData.longtitude
         }
-      },
+      }
     )
   } else {
     await StoreLatLong.findOneAndUpdate(
@@ -2856,7 +2943,7 @@ exports.approveLatLongStore = async (req, res) => {
           'approve.dateAction': new Date(),
           'approve.appPerson': user
         }
-      },
+      }
     )
   }
 
@@ -2864,19 +2951,16 @@ exports.approveLatLongStore = async (req, res) => {
     module: 'approveLatLongStore',
     user: user,
     status: statusStr,
-    id: orderId,
+    id: orderId
   })
 
   res.status(201).json({
     status: 201,
     message: 'Update status sucess'
   })
-
 }
 
-
 exports.canceledOrderLatLongStore = async (req, res) => {
-
   const { orderId, status, user } = req.body
   const channel = req.headers['x-channel']
   const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
@@ -2894,7 +2978,6 @@ exports.canceledOrderLatLongStore = async (req, res) => {
     })
   }
 
-
   await StoreLatLong.findOneAndUpdate(
     { orderId: storeLatLongData.orderId },
     {
@@ -2904,25 +2987,21 @@ exports.canceledOrderLatLongStore = async (req, res) => {
         'approve.dateAction': new Date(),
         'approve.appPerson': user
       }
-    },
+    }
   )
-
 
   await ApproveLogs.create({
     module: 'canceledOrderLatLongStore',
     user: user,
     status: status,
-    id: orderId,
+    id: orderId
   })
 
   res.status(201).json({
     status: 201,
     message: 'Update status sucess'
   })
-
 }
-
-
 
 exports.getStorePage = async (req, res) => {
   try {
@@ -2932,30 +3011,28 @@ exports.getStorePage = async (req, res) => {
       route,
       page = 1,
       limit = 20,
-      q, // optional search text
-    } = req.query;
+      q // optional search text
+    } = req.query
 
-    const channel = req.headers['x-channel'];
-    const { Store } = getModelsByChannel(channel, res, storeModel);
-    const { Route } = getModelsByChannel(channel, res, routeModel);
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { Route } = getModelsByChannel(channel, res, routeModel)
 
-    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
-    const perPage = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1)
+    const perPage = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100)
 
     // ประกอบ filter แบบใส่เฉพาะคีย์ที่มีค่า
-    const filter = {};
-    if (area) filter.area = area;
-    if (route) filter.route = route;
-    if (type && type !== 'all') filter.type = type;
+    const filter = {}
+    if (area) filter.area = area
+    if (route) filter.route = route
+    if (type && type !== 'all') filter.type = type
 
-
-
-    const qText = (q || '').trim();
+    const qText = (q || '').trim()
     if (qText) {
       filter.$or = [
         { storeId: { $regex: qText, $options: 'i' } },
-        { name: { $regex: qText, $options: 'i' } },
-      ];
+        { name: { $regex: qText, $options: 'i' } }
+      ]
     }
     if (route) {
       const routeData = await Route.findOne({ id: route })
@@ -2966,33 +3043,29 @@ exports.getStorePage = async (req, res) => {
       // console.log(storeIds)
 
       docs = await Store.find({ _id: { $in: storeIds } })
-
-
     } else {
       docs = await Store.find(filter)
         .sort({ createdAt: -1 }) // คงลำดับให้เสถียร
         .skip((pageNum - 1) * perPage)
         .limit(perPage)
-        .lean();
-
+        .lean()
     }
 
-
-    const total = await Store.countDocuments(filter);
+    const total = await Store.countDocuments(filter)
 
     res.status(200).json({
-      status:200,
-      message:'success',
+      status: 200,
+      message: 'success',
       data: docs,
       meta: {
         page: pageNum,
         limit: perPage,
         total,
-        hasMore: pageNum * perPage < total,
-      },
-    });
+        hasMore: pageNum * perPage < total
+      }
+    })
   } catch (err) {
-    console.error('getStorePage error:', err);
-    res.status(500).json({ message: 'Server error' });
+    console.error('getStorePage error:', err)
+    res.status(500).json({ message: 'Server error' })
   }
-};
+}

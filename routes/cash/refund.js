@@ -8,12 +8,14 @@ const {
   deleteRefund,
   refundExcel,
   cancelApproveRefund,
-  updateAddressChange
+  updateAddressChange,
+  getRefundPending
 } = require('../../controllers/refund/refundController')
 
 const router = express.Router()
 
 router.get('/all', getRefund)
+router.get('/getRefundPending', getRefundPending)
 router.get('/detail/:orderId', getDetail)
 router.post('/checkout', checkout)
 router.get('/refundExcel', refundExcel)

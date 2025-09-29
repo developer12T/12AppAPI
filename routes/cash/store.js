@@ -38,7 +38,9 @@ const {
   approveLatLongStore,
   canceledOrderLatLongStore,
   addLatLong,
-  getStorePage
+  getStorePage,
+  getPendingStore,
+  getLatLongOrderPending
   // test
 } = require('../../controllers/store/storeController')
 
@@ -55,6 +57,7 @@ const {
 
 const router = express.Router()
 router.get('/storeToExcel', storeToExcel)
+router.get('/getLatLongOrderPending', getLatLongOrderPending)
 router.get('/getStore', getStore)
 router.get('/getTypeStore', getTypeStore)
 router.get('/check/:storeId', checkSimilarStores)
@@ -92,8 +95,7 @@ router.post('/deleteStore', deleteStore)
 router.post('/updateStoreStatusNoNewId', updateStoreStatusNoNewId)
 router.post('/fixStatusStore', fixStatusStore)
 router.post('/updateStatusM3ToMongo', updateStatusM3ToMongo)
-
-
+router.post('/getPendingStore', getPendingStore)
 
 // router.get('/test', test)
 

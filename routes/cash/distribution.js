@@ -19,7 +19,8 @@ const {
   withdrawCheckM3,
   withdrawToExcel,
   withdrawUpdateMGTRDT,
-  withdrawCheckM3Detail
+  withdrawCheckM3Detail,
+  getOrderPending
 } = require('../../controllers/distribution/withdrawController')
 const {
   getPlace,
@@ -32,6 +33,7 @@ const {
 const router = express.Router()
 
 router.get('/get', getOrder)
+router.get('/getOrderPending', getOrderPending)
 router.get('/getsup', getOrderSup)
 router.get('/getCredit', getOrderCredit)
 router.get('/detail/:orderId', getDetail)
