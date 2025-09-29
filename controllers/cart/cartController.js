@@ -1164,7 +1164,7 @@ exports.getCountCart = async (req, res) => {
 
   res.status(200).json({
     status: 200,
-    message: 'Stock updated successfully',
+    message: 'Fetch data cart',
     data: data
   })
 
