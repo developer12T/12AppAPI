@@ -15,7 +15,8 @@ const {
   getOrderCredit,
   updateReciveFix,
   getOrderSup,
-  withdrawUpdateMGTRDT
+  withdrawUpdateMGTRDT,
+  withdrawCheckM3
 } = require('../../controllers/distribution/withdrawController')
 const {
   getPlace,
@@ -53,4 +54,5 @@ router.post('/saleConfirmWithdraw', saleConfirmWithdraw)
 router.post('/getReceiveQty', getReceiveQty)
 router.get('/withdrawBackOrderToExcel', withdrawBackOrderToExcel)
 router.post('/withdrawUpdateMGTRDT', withdrawUpdateMGTRDT)
+router.post('/withdrawCheckM3', withdrawCheckM3)
 module.exports = router

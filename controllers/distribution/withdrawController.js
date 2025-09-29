@@ -2358,12 +2358,12 @@ exports.withdrawUpdateMGTRDT = async (req, res) => {
     const row = await DisributionM3.findOne({ where: { coNo: i.orderId } })
 
     if (row) {
-      row.MGTRDT = i.MGTRDT_NEW; 
+      row.MGTRDT = i.MGTRDT_NEW;
       await row.save(); // บันทึกการเปลี่ยนแปลง
       m3.push(row)
     }
 
-    
+
   }
 
 
@@ -2371,6 +2371,45 @@ exports.withdrawUpdateMGTRDT = async (req, res) => {
     status: 200,
     message: "Update Sucess",
     data: withdrawTran
+  })
+
+}
+
+
+exports.withdrawCheckM3 = async (req, res) => {
+  const channel = req.headers['x-channel']
+  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+
+  const withdrawData = await Distribution.find({ 
+    status: ['approved', 'confirm'], 
+    withdrawType: { $ne: "credit" },
+    area: { $ne :'IT211'}
+   })
+
+  const withdrawTran = withdrawData.map(item => {
+    createdAtThai = toThaiTime(item.createdAt)
+    return {
+      orderId: item.orderId,
+      createdAt: item.createdAt,
+      createdAtThai: createdAtThai,
+      MGTRDT_NEW: formatDateToYYYYMMDD(createdAtThai)
+    }
+  })
+
+  let NotInM3 = []
+
+  for (i of withdrawTran) {
+
+    const row = await DisributionM3.findOne({ where: { coNo: i.orderId } })
+    if (!row) {
+      NotInM3.push(i.orderId)
+    }
+  }
+
+  res.status(200).json({
+    status: 200,
+    message: "Update Sucess",
+    data: NotInM3
   })
 
 }
