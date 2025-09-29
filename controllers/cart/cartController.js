@@ -28,7 +28,7 @@ const cartModel = require('../../models/cash/cart')
 const productModel = require('../../models/cash/product')
 const stockModel = require('../../models/cash/stock')
 const promotionModel = require('../../models/cash/promotion')
-
+const userModel = require('../../models/cash/user')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { getSocket } = require('../../socket')
 const { period, rangeDate } = require('../../utilities/datetime')
@@ -1076,7 +1076,7 @@ exports.autoDeleteCart = async (req, res) => {
   for (const cart of cartData) {
     if (!cart || !cart._id) continue
 
-  //   // keep your condition: only update stock for non-withdraw / non-adjuststock
+    //   // keep your condition: only update stock for non-withdraw / non-adjuststock
     if (cart.type !== 'withdraw' && cart.type !== 'adjuststock') {
       const products = Array.isArray(cart.listProduct) ? cart.listProduct : []
       for (const prod of products) {
@@ -1122,3 +1122,47 @@ exports.autoDeleteCart = async (req, res) => {
   })
 }
 
+exports.getCountCart = async (req, res) => {
+
+  const channel = req.headers['x-channel']
+  const { Cart } = getModelsByChannel(channel, res, cartModel)
+  const { User } = getModelsByChannel(channel, res, userModel)
+
+  const userZones = await User.aggregate([
+    { $match: { role: 'sale', zone: { $ne: 'IT' } } }, // เงื่อนไข role = sale
+    { $group: { _id: '$zone' } }, // รวมกลุ่มตาม zone
+    { $project: { _id: 0, zone: '$_id' } } // คืนค่า zone
+  ]);
+
+  const cartData = await Cart.aggregate([
+    {
+      $addFields: {
+        zone: { $substr: ["$area", 0, 2] } // เอา 2 ตัวแรกจาก area
+      }
+    }
+  ]);
+
+  let data = []
+  for (item of userZones) {
+
+    const count = cartData.filter(o => o.zone === item.zone).length;
+    const areaFilter = cartData.filter(o => o.zone === item.zone)
+    const dataTram = {
+      zone : item.zone,
+      count : count,
+      cart : areaFilter
+    }
+
+    data.push(dataTram)
+  }
+
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'Stock updated successfully',
+    data: data
+  })
+
+
+}
