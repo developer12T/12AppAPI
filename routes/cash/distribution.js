@@ -36,6 +36,7 @@ router.get('/getCredit', getOrderCredit)
 router.get('/detail/:orderId', getDetail)
 router.post('/checkout', checkout)
 router.post('/updateStatus', updateStatus)
+router.post('/cancelWithdraw', cancelWithdraw)
 router.get('/getType', getType)
 
 router.get('/place/get', getPlace)
