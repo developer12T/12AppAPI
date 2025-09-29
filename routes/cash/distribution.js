@@ -14,7 +14,8 @@ const {
   withdrawBackOrderToExcel,
   getOrderCredit,
   updateReciveFix,
-  getOrderSup
+  getOrderSup,
+  cancelWithdraw
 } = require('../../controllers/distribution/withdrawController')
 const {
   getPlace,
@@ -51,4 +52,5 @@ router.post('/saleConfirmWithdraw', saleConfirmWithdraw)
 
 router.post('/getReceiveQty', getReceiveQty)
 router.get('/withdrawBackOrderToExcel', withdrawBackOrderToExcel)
+router.post('/cancelWithdraw', cancelWithdraw)
 module.exports = router

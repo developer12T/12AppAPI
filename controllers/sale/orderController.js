@@ -6,10 +6,20 @@
 const {
   dataPowerBiQuery
 } = require('../../controllers/queryFromM3/querySctipt')
-const { period, previousPeriod, toThaiTime } = require('../../utilities/datetime')
+const {
+  period,
+  previousPeriod,
+  toThaiTime
+} = require('../../utilities/datetime')
 const axios = require('axios')
 const dayjs = require('dayjs')
-const { getSeries, updateRunningNumber, getOrders, getChange, getRefund } = require('../../middleware/order')
+const {
+  getSeries,
+  updateRunningNumber,
+  getOrders,
+  getChange,
+  getRefund
+} = require('../../middleware/order')
 const { Item } = require('../../models/item/itemlot')
 const { OOHEAD, ItemLotM3, OOLINE } = require('../../models/cash/master')
 const { Op, fn, col, where, literal } = require('sequelize')
@@ -213,12 +223,12 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-        .map(item => item.price)
-        .reduce((sum, price) => sum + price, 0)
+          .map(item => item.price)
+          .reduce((sum, price) => sum + price, 0)
       : 0
 
     // ✅ ช่วยฟังก์ชัน: เช็คว่า createAt ตั้งแต่ Aug-2025 ขึ้นไปไหม
-    function isAug2025OrLater(createAt) {
+    function isAug2025OrLater (createAt) {
       if (!createAt) return false
 
       // case: "YYYYMM" เช่น "202508"
@@ -239,14 +249,14 @@ exports.checkout = async (req, res) => {
     // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-        storeData.address,
-        storeData.subDistrict && `ต.${storeData.subDistrict}`,
-        storeData.district && `อ.${storeData.district}`,
-        storeData.province && `จ.${storeData.province}`,
-        storeData.postCode
-      ]
-        .filter(Boolean)
-        .join(' ')
+          storeData.address,
+          storeData.subDistrict && `ต.${storeData.subDistrict}`,
+          storeData.district && `อ.${storeData.district}`,
+          storeData.province && `จ.${storeData.province}`,
+          storeData.postCode
+        ]
+          .filter(Boolean)
+          .join(' ')
       : storeData.address
 
     // const addressFinal = `${storeData.address} ต.${storeData.subDistrict} อ.${storeData.district} จ.${province} ${postCode}`
@@ -535,7 +545,7 @@ exports.reflashOrder = async (req, res) => {
 
 exports.getOrder = async (req, res) => {
   try {
-    const { type, area, store, period, start, end } = req.query
+    const { type, area, store, period, start, end, zone } = req.query
 
     const channel = req.headers['x-channel']
 
@@ -575,22 +585,21 @@ exports.getOrder = async (req, res) => {
     }
 
     let areaQuery = {}
+
     if (area) {
-      if (area.length == 2) {
-        areaQuery.zone = area.slice(0, 2)
-      } else if (area.length == 5) {
-        areaQuery['store.area'] = area
-      }
+      areaQuery['store.area'] = area
+    } else if (zone) {
+      areaQuery['store.zone'] = zone
     }
 
-    let query = {
-      type,
-      ...areaQuery,
-      // 'store.area': area,
-      // createdAt: { $gte: startDate, $lt: endDate }
-      period: period,
-      createdAt: { $gte: startDate, $lte: endDate } // ✅ filter ช่วงวัน
-    }
+    // if (area) {
+    //   if (area.length == 2) {
+    //     areaQuery.zone = area.slice(0, 2)
+    //   } else if (area.length == 5) {
+    //     areaQuery['store.area'] = area
+    //   }
+    // }
+
 
     if (store) {
       query['store.storeId'] = store
@@ -603,6 +612,8 @@ exports.getOrder = async (req, res) => {
       ...(period ? { period } : {}),
       createdAt: { $gte: startDate, $lt: endDate }
     }
+
+    console.log(matchQuery)
 
     // console.log(matchQuery)
 
@@ -777,20 +788,19 @@ exports.getDetail = async (req, res) => {
     const toThai = d =>
       d instanceof Date ? new Date(d.getTime() + 7 * 60 * 60 * 1000) : d
 
-
     const raw = doc.toObject ? doc.toObject() : doc
     if (!raw.shipping || raw.shipping === 0) {
       raw.shipping = {
-        default: "",
-        shippingId: "",
-        address: "",
-        district: "",
-        subDistrict: "",
-        province: "",
-        postCode: "",
-        latitude: "",
-        longtitude: "",
-        _id: ""
+        default: '',
+        shippingId: '',
+        address: '',
+        district: '',
+        subDistrict: '',
+        province: '',
+        postCode: '',
+        latitude: '',
+        longtitude: '',
+        _id: ''
       }
     }
 
@@ -912,7 +922,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -1277,7 +1287,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1389,7 +1399,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromChange = modelChange.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1654,7 +1664,7 @@ exports.OrderToExcel = async (req, res) => {
       message: 'Not Found Order'
     })
   }
-  function yyyymmddToDdMmYyyy(dateString) {
+  function yyyymmddToDdMmYyyy (dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -1696,7 +1706,7 @@ exports.OrderToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     }
   )
 
@@ -2099,25 +2109,36 @@ exports.getSummarybyMonth = async (req, res) => {
     const channel = req.headers['x-channel'] // 'credit' or 'cash'
 
     // const { Store } = getModelsByChannel(channel,res,storeModel);
-    const { Refund } = getModelsByChannel(channel, res, refundModel);
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
 
-    const buildPipeline = (type) => {
+    const buildPipeline = type => {
       const match = {
         'store.area': area,
-        status: { $nin: ['canceled', 'reject'] },
-      };
-      if (type) match.type = type;               // ใส่ type ถ้ากำหนด
-      if (storeId) match['store.storeId'] = storeId;
+        status: { $nin: ['canceled', 'reject'] }
+      }
+      if (type) match.type = type // ใส่ type ถ้ากำหนด
+      if (storeId) match['store.storeId'] = storeId
 
       return [
         { $match: match },
 
         { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
-        { $unwind: { path: '$listStore.listOrder', preserveNullAndEmptyArrays: true } },
+        {
+          $unwind: {
+            path: '$listStore.listOrder',
+            preserveNullAndEmptyArrays: true
+          }
+        },
 
         // ดึงส่วนประกอบวันที่ตามโซนเวลาไทยในทีเดียว
-        { $addFields: { parts: { $dateToParts: { date: '$createdAt', timezone: 'Asia/Bangkok' } } } },
+        {
+          $addFields: {
+            parts: {
+              $dateToParts: { date: '$createdAt', timezone: 'Asia/Bangkok' }
+            }
+          }
+        },
 
         // กรองปี ถ้ามี
         ...(year ? [{ $match: { 'parts.year': parseInt(year, 10) } }] : []),
@@ -2125,31 +2146,30 @@ exports.getSummarybyMonth = async (req, res) => {
         // รวมยอดตามเดือน
         { $group: { _id: '$parts.month', totalAmount: { $sum: '$total' } } },
         { $project: { _id: 0, month: '$_id', totalAmount: 1 } },
-        { $sort: { month: 1 } },
-      ];
-    };
+        { $sort: { month: 1 } }
+      ]
+    }
 
     // เรียกใช้งาน (ตัวอย่าง: แยกตามชนิด)
-    const modelSale = await Order.aggregate(buildPipeline('sale'));
-    const modelChange = await Order.aggregate(buildPipeline('change'));
-    const modelRefund = await Refund.aggregate(buildPipeline('refund'));
-
+    const modelSale = await Order.aggregate(buildPipeline('sale'))
+    const modelChange = await Order.aggregate(buildPipeline('change'))
+    const modelRefund = await Refund.aggregate(buildPipeline('refund'))
 
     const merged = [
-      ...modelSale.map(i => ({ ...i, totalAmount: i.totalAmount })),       // บวก
-      ...modelChange.map(i => ({ ...i, totalAmount: i.totalAmount })),     // บวก
-      ...modelRefund.map(i => ({ ...i, totalAmount: -i.totalAmount }))     // ลบ
-    ];
+      ...modelSale.map(i => ({ ...i, totalAmount: i.totalAmount })), // บวก
+      ...modelChange.map(i => ({ ...i, totalAmount: i.totalAmount })), // บวก
+      ...modelRefund.map(i => ({ ...i, totalAmount: -i.totalAmount })) // ลบ
+    ]
 
     const modelOrderValue = Object.values(
       merged.reduce((acc, item) => {
         if (!acc[item.month]) {
-          acc[item.month] = { month: item.month, summary: 0 };
+          acc[item.month] = { month: item.month, summary: 0 }
         }
-        acc[item.month].summary += item.totalAmount;
-        return acc;
+        acc[item.month].summary += item.totalAmount
+        return acc
       }, {})
-    );
+    )
 
     const result = Array.from({ length: 12 }, (_, i) => ({
       month: i + 1,
@@ -2403,9 +2423,11 @@ exports.getSummarybyArea = async (req, res) => {
         }
       })
     } else if (type === 'year') {
-      const users = await User.find({ role: 'sale', area: { $ne: 'IT211' } }).select('area zone')
+      const users = await User.find({
+        role: 'sale',
+        area: { $ne: 'IT211' }
+      }).select('area zone')
       if (!zone && !area) {
-
         zoneList = [...new Set(users.map(u => u.zone))]
         dataOrder = await getOrders(areaList, res, channel, 'zone')
         dataChange = await getChange(areaList, res, channel, 'zone')
@@ -2417,44 +2439,43 @@ exports.getSummarybyArea = async (req, res) => {
         dataRefund = await getRefund(areaList, res, channel, 'area')
       }
 
-
-
-      dataOrder = dataOrder.map((item) => ({
+      dataOrder = dataOrder.map(item => ({
         ...item,
-        createdAtThai: toThaiTime(item.createdAt),
-      }));
+        createdAtThai: toThaiTime(item.createdAt)
+      }))
 
-      dataChange = dataChange.map((item) => ({
+      dataChange = dataChange.map(item => ({
         ...item,
-        createdAtThai: toThaiTime(item.createdAt),
-      }));
+        createdAtThai: toThaiTime(item.createdAt)
+      }))
 
-      dataRefund = dataRefund.map((item) => ({
+      dataRefund = dataRefund.map(item => ({
         ...item,
-        createdAtThai: toThaiTime(item.createdAt),
-      }));
+        createdAtThai: toThaiTime(item.createdAt)
+      }))
 
-      function groupByMonthAndSum(data) {
+      function groupByMonthAndSum (data) {
         return data.reduce((acc, item) => {
           // ดึงเดือนจาก createdAtThai (หรือใช้ createdAt ก็ได้ถ้าเป็น Date)
-          const date = new Date(item.createdAt);
-          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+          const date = new Date(item.createdAt)
+          const monthKey = `${date.getFullYear()}-${String(
+            date.getMonth() + 1
+          ).padStart(2, '0')}`
 
           // ถ้ายังไม่มีเดือนนี้ ให้ set ค่าเริ่มต้น
           if (!acc[monthKey]) {
-            acc[monthKey] = 0;
+            acc[monthKey] = 0
           }
 
           // บวกค่า total เข้าไป
-          acc[monthKey] += item.total || 0;
-          return acc;
-        }, {});
+          acc[monthKey] += item.total || 0
+          return acc
+        }, {})
       }
 
       data = []
       if (!zone && !area) {
         for (const zone of zoneList) {
-
           dataOrderArea = dataOrder.filter(item => item.store.zone === zone)
           dataChangeArea = dataChange.filter(item => item.store.zone === zone)
           dataRefundArea = dataRefund.filter(item => item.store.zone === zone)
@@ -2467,7 +2488,10 @@ exports.getSummarybyArea = async (req, res) => {
           const monthlySummary = Array(12).fill(0)
 
           for (let m = 1; m <= 12; m++) {
-            const monthKey = `${new Date().getFullYear()}-${String(m).padStart(2, "0")}`
+            const monthKey = `${new Date().getFullYear()}-${String(m).padStart(
+              2,
+              '0'
+            )}`
             const order = orderByMonth[monthKey] || 0
             const change = changeByMonth[monthKey] || 0
             const refund = refundByMonth[monthKey] || 0
@@ -2479,13 +2503,8 @@ exports.getSummarybyArea = async (req, res) => {
             summary: monthlySummary
           })
         }
-
-
-      }
-      else {
-
+      } else {
         for (const area of areaList) {
-
           dataOrderArea = dataOrder.filter(item => item.store.area === area)
           dataChangeArea = dataChange.filter(item => item.store.area === area)
           dataRefundArea = dataRefund.filter(item => item.store.area === area)
@@ -2498,7 +2517,10 @@ exports.getSummarybyArea = async (req, res) => {
           const monthlySummary = Array(12).fill(0)
 
           for (let m = 1; m <= 12; m++) {
-            const monthKey = `${new Date().getFullYear()}-${String(m).padStart(2, "0")}`
+            const monthKey = `${new Date().getFullYear()}-${String(m).padStart(
+              2,
+              '0'
+            )}`
             const order = orderByMonth[monthKey] || 0
             const change = changeByMonth[monthKey] || 0
             const refund = refundByMonth[monthKey] || 0
@@ -2512,18 +2534,12 @@ exports.getSummarybyArea = async (req, res) => {
         }
       }
 
-
-
       return res.status(200).json({
         status: 200,
         message: 'Sucess',
         data: data
       })
-
     }
-
-
-
 
     // const io = getSocket()
     // io.emit('order/getSummarybyArea', {});
@@ -4677,28 +4693,28 @@ exports.checkOrderCancelM3 = async (req, res) => {
     const type = saleSet.has(id)
       ? 'Sale'
       : refundSet.has(id)
-        ? 'Refund'
-        : changeSet.has(id)
-          ? 'Change'
-          : ''
+      ? 'Refund'
+      : changeSet.has(id)
+      ? 'Change'
+      : ''
 
     const typeId =
       type === 'Sale'
         ? 'A31'
         : type === 'Refund'
-          ? 'A34'
-          : type === 'Change'
-            ? 'B31'
-            : ''
+        ? 'A34'
+        : type === 'Change'
+        ? 'B31'
+        : ''
 
     const statusTablet =
       type === 'Sale'
         ? saleStatusMap.get(id) ?? ''
         : type === 'Refund'
-          ? refundStatusMap.get(id) ?? ''
-          : type === 'Change'
-            ? changeStatusMap.get(id) ?? ''
-            : ''
+        ? refundStatusMap.get(id) ?? ''
+        : type === 'Change'
+        ? changeStatusMap.get(id) ?? ''
+        : ''
 
     return { orderId: id, type, typeId, statusTablet }
   })
@@ -4720,7 +4736,7 @@ exports.checkOrderCancelM3 = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => { })
+    fs.unlink(tempPath, () => {})
   })
 
   // res.status(200).json({
@@ -5219,7 +5235,7 @@ exports.orderPowerBI = async (req, res) => {
   const conoBiList = conoBi.flatMap(item => item.CONO)
   // console.log(conoBiList)
 
-  function yyyymmddToDdMmYyyy(dateString) {
+  function yyyymmddToDdMmYyyy (dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -5362,7 +5378,7 @@ exports.orderPowerBI = async (req, res) => {
 
   const storeData = await Store.find({ storeId: { $in: storeIdList } })
 
-  function formatDateToThaiYYYYMMDD(date) {
+  function formatDateToThaiYYYYMMDD (date) {
     const d = new Date(date)
     d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -5586,7 +5602,7 @@ exports.orderPowerBI = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       }
     )
   } else {
@@ -5952,9 +5968,8 @@ exports.getOrderExcelNew = async (req, res) => {
   for (const i of [...dataOrderSale, ...dataOrderPro]) {
     // console.log(i)
     for (const item of i.listProduct ?? []) {
-
       if (!item.id || item.id.trim() === '') {
-        continue;
+        continue
       }
 
       const productDetail = productData.find(o => o.id === item.id)
@@ -6046,9 +6061,8 @@ exports.getOrderExcelNew = async (req, res) => {
     }
 
     for (const item of i.listProduct ?? []) {
-
       if (!item.id || item.id.trim() === '') {
-        continue;
+        continue
       }
 
       const productDetail = productData.find(o => o.id === item.id)
@@ -6135,9 +6149,8 @@ exports.getOrderExcelNew = async (req, res) => {
 
   for (const i of [...dataOrderGive]) {
     for (const item of i.listProduct ?? []) {
-
       if (!item.id || item.id.trim() === '') {
-        continue;
+        continue
       }
 
       const productDetail = productData.find(o => o.id === item.id)
@@ -6216,10 +6229,8 @@ exports.getOrderExcelNew = async (req, res) => {
   dataRefundChange = sortProduct(dataRefundChange, 'productGroup')
   dataGiveArray = sortProduct(dataGiveArray, 'productGroup')
 
-
-
   if (excel == 'true') {
-    function zeroToDash(value) {
+    function zeroToDash (value) {
       return value === 0 ? '-' : value
     }
     const dataSaleFinal = dataSaleArray.map(item => {
@@ -6299,7 +6310,6 @@ exports.getOrderExcelNew = async (req, res) => {
       xlsx.utils.book_append_sheet(wb, wsGive, `Give`)
     }
 
-
     // ✅ เขียนไฟล์ไปยัง tempPath (ต้องเขียนที่เดียวกับที่กำลังจะดาวน์โหลด)
     xlsx.writeFile(wb, tempPath)
 
@@ -6312,9 +6322,8 @@ exports.getOrderExcelNew = async (req, res) => {
         }
       }
       // ลบไฟล์ทิ้งหลังจบ (สำเร็จหรือไม่ก็ตาม)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
-
   } else {
     return res.status(200).json({
       status: 200,
@@ -6328,7 +6337,6 @@ exports.getOrderExcelNew = async (req, res) => {
   }
 }
 
-
 exports.updatePaymentOrder = async (req, res) => {
   try {
     const { orderId, paymentMethod } = req.body
@@ -6339,17 +6347,16 @@ exports.updatePaymentOrder = async (req, res) => {
 
     let updateOrder = ''
     if (!dataOrder) {
-      return res.status(200).json(({
+      return res.status(200).json({
         status: 404,
         message: 'Not found order'
-      }))
+      })
     } else {
       updateOrder = await Order.findOneAndUpdate(
         { orderId: orderId },
         { $set: { paymentMethod: paymentMethod } },
         { new: true }
       )
-
     }
 
     res.status(200).json({
