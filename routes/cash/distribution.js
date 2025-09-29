@@ -14,7 +14,11 @@ const {
   withdrawBackOrderToExcel,
   getOrderCredit,
   updateReciveFix,
-  getOrderSup
+  getOrderSup,
+  cancelWithdraw,
+  withdrawCheckM3,
+  withdrawToExcel,
+  withdrawUpdateMGTRDT
 } = require('../../controllers/distribution/withdrawController')
 const {
   getPlace,
