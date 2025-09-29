@@ -1124,7 +1124,7 @@ exports.autoDeleteCart = async (req, res) => {
 
 exports.getCountCart = async (req, res) => {
 
-  const { zone } = req.query
+  const { orderId } = req.query
   const channel = req.headers['x-channel']
   const { Cart } = getModelsByChannel(channel, res, cartModel)
   const { User } = getModelsByChannel(channel, res, userModel)
@@ -1136,6 +1136,14 @@ exports.getCountCart = async (req, res) => {
   ]);
 
   const cartData = await Cart.aggregate([
+    {
+      $match: {
+        type: {
+          $in: ['sale', 'refund', 'give']
+        }
+      }
+    }
+    ,
     {
       $addFields: {
         zone: { $substr: ["$area", 0, 2] } // เอา 2 ตัวแรกจาก area
@@ -1166,6 +1174,29 @@ exports.getCountCart = async (req, res) => {
     status: 200,
     message: 'Fetch data cart',
     data: data
+  })
+
+
+}
+
+exports.getCartDetail = async (req, res) => {
+
+  const { area, storeId } = req.query
+  const channel = req.headers['x-channel']
+  const { Cart } = getModelsByChannel(channel, res, cartModel)
+  const { User } = getModelsByChannel(channel, res, userModel)
+
+  const cartData = await Cart.findOne({
+    storeId: storeId,
+    area: area,
+    type: { $in: ['sale', 'refund', 'give'] }
+  })
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'Fetch data cart',
+    data: cartData || []
   })
 
 
