@@ -11,9 +11,18 @@ const {
 const { sequelize, DataTypes } = require('../../config/m3db')
 const { getSeries, updateRunningNumber } = require('../../middleware/order')
 const axios = require('axios')
-const { generateDistributionId, generateDistributionIdCredit } = require('../../utilities/genetateId')
+const {
+  generateDistributionId,
+  generateDistributionIdCredit
+} = require('../../utilities/genetateId')
 const { rangeDate } = require('../../utilities/datetime')
-const { period, previousPeriod } = require('../../utilities/datetime')
+const {
+  period,
+  previousPeriod,
+  toThaiTime,
+  formatDate,
+  formatDateToYYYYMMDD
+} = require('../../utilities/datetime')
 const cartModel = require('../../models/cash/cart')
 const productModel = require('../../models/cash/product')
 const distributionModel = require('../../models/cash/distribution')
@@ -33,7 +42,7 @@ const { to2, updateStockMongo } = require('../../middleware/order')
 const { getSocket } = require('../../socket')
 const { sendEmail } = require('../../middleware/order')
 const product = require('../../models/cash/product')
-
+const approveLogModel = require('../../models/cash/approveLog')
 const xlsx = require('xlsx')
 const path = require('path')
 const os = require('os')
@@ -172,17 +181,17 @@ exports.checkout = async (req, res) => {
 
     let orderId = ''
 
-    // if (withdrawType == 'credit') {
-    //   orderId = await generateDistributionIdCredit(
-    //     area,
-    //     sale.warehouse,
-    //     channel,
-    //     res,
-    //     withdrawType
-    //   )
-    //   fromWarehouse = ''
-    //   toWarehouse = ''
-    // } else {
+    if (withdrawType == 'credit') {
+      orderId = await generateDistributionIdCredit(
+        area,
+        sale.warehouse,
+        channel,
+        res,
+        withdrawType
+      )
+      fromWarehouse = ''
+      toWarehouse = ''
+    } else {
       orderId = await generateDistributionId(
         area,
         sale.warehouse,
@@ -190,141 +199,137 @@ exports.checkout = async (req, res) => {
         res,
         newtrip
       )
-    //   fromWarehouse = fromWarehouse
-    //   toWarehouse = sale.warehouse
-    // }
-  
-
-
+      fromWarehouse = fromWarehouse
+      toWarehouse = sale.warehouse
+    }
 
     const newOrder = new Distribution({
-    orderId,
-    orderType: shipping.type,
-    orderTypeName: shipping.typeNameTH,
-    withdrawType: withdrawType,
-    area,
-    fromWarehouse,
-    toWarehouse: sale.warehouse,
-    shippingId: shipping.shippingId,
-    shippingRoute: shipping.route,
-    shippingName: shipping.name,
-    sendAddress: shipping.address,
-    sendDate,
-    remark: note,
-    listProduct,
-    total: subtotal,
-    totalQty: totalQty,
-    totalWeightGross: parseFloat(totalWeightGross.toFixed(2)),
-    totalWeightNet: parseFloat(totalWeightNet.toFixed(2)),
-    createdBy: sale.username,
-    period: period,
-    newTrip: 'false'
-  })
-
-  if (newtrip === true) {
-    const getNpd = await Npd.findOne({
+      orderId,
+      orderType: shipping.type,
+      orderTypeName: shipping.typeNameTH,
+      withdrawType: withdrawType,
+      area,
+      fromWarehouse,
+      toWarehouse: toWarehouse,
+      shippingId: shipping.shippingId,
+      shippingRoute: shipping.route,
+      shippingName: shipping.name,
+      sendAddress: shipping.address,
+      sendDate,
+      remark: note,
+      listProduct,
+      total: subtotal,
+      totalQty: totalQty,
+      totalWeightGross: parseFloat(totalWeightGross.toFixed(2)),
+      totalWeightNet: parseFloat(totalWeightNet.toFixed(2)),
+      createdBy: sale.username,
       period: period,
-      areaGet: { $in: [area] }
+      newTrip: 'false'
     })
 
-    if (!getNpd) {
-      newOrder.newTrip = 'true'
-      const productNew = await Product.findOne({ type: 'new' })
-      if (productNew) {
+    if (newtrip === true) {
+      const getNpd = await Npd.findOne({
+        period: period,
+        areaGet: { $in: [area] }
+      })
+
+      if (!getNpd) {
+        newOrder.newTrip = 'true'
+        const productNew = await Product.findOne({ type: 'new' })
         const npd = await Npd.findOne({ period: period })
+        if (productNew && npd) {
+          factor = productNew.listUnit.find(item => item.unit === npd.unit)
+          qtyPcs = npd.qty * factor.factor
 
-        factor = productNew.listUnit.find(item => item.unit === npd.unit)
-        qtyPcs = npd.qty * factor.factor
-
-        const npdProduct = {
-          id: productNew.id,
-          lot: '',
-          name: productNew.name,
-          group: productNew.group,
-          brand: productNew.brand,
-          size: productNew.size,
-          flavour: productNew.flavour,
-          qty: npd.qty,
-          unit: npd.unit,
-          qtyPcs: qtyPcs,
-          price: factor.price.sale,
-          total: factor.price.sale * npd.qty,
-          weightGross: parseFloat(productNew.weightGross.toFixed(2)),
-          weightNet: parseFloat(productNew.weightNet.toFixed(2))
-        }
-
-        newOrder.listProduct.push(npdProduct)
-        // console.log(period,[area])
-        await Npd.findOneAndUpdate(
-          { period: period },
-          {
-            $push: { areaGet: area }
+          const npdProduct = {
+            id: productNew.id,
+            lot: '',
+            name: productNew.name,
+            group: productNew.group,
+            brand: productNew.brand,
+            size: productNew.size,
+            flavour: productNew.flavour,
+            qty: npd.qty,
+            unit: npd.unit,
+            qtyPcs: qtyPcs,
+            price: factor.price.sale,
+            total: factor.price.sale * npd.qty,
+            weightGross: parseFloat(productNew.weightGross.toFixed(2)),
+            weightNet: parseFloat(productNew.weightNet.toFixed(2))
           }
-        )
+
+          newOrder.listProduct.push(npdProduct)
+          // console.log(period,[area])
+          await Npd.findOneAndUpdate(
+            { period: period },
+            {
+              $push: { areaGet: area }
+            }
+          )
+        }
       }
     }
-  }
 
-  const productQty = newOrder.listProduct.map(u => {
-    return {
-      id: u.id,
-      // lot: u.lot,
-      unit: u.unit,
-      qty: u.qty,
-      statusMovement: 'OUT'
+    const productQty = newOrder.listProduct.map(u => {
+      return {
+        id: u.id,
+        // lot: u.lot,
+        unit: u.unit,
+        qty: u.qty,
+        statusMovement: 'OUT'
+      }
+    })
+
+    const calStock = {
+      // storeId: refundOrder.store.storeId,
+      orderId: newOrder.orderId,
+      area: newOrder.area,
+      saleCode: sale.saleCode,
+      period: period,
+      warehouse: newOrder.fromWarehouse,
+      status: 'pending',
+      statusTH: 'รอนำเข้า',
+      action: 'Withdraw',
+      type: 'Withdraw',
+      product: productQty
     }
-  })
 
-  const calStock = {
-    // storeId: refundOrder.store.storeId,
-    orderId: newOrder.orderId,
-    area: newOrder.area,
-    saleCode: sale.saleCode,
-    period: period,
-    warehouse: newOrder.fromWarehouse,
-    status: 'pending',
-    statusTH: 'รอนำเข้า',
-    action: 'Withdraw',
-    type: 'Withdraw',
-    product: productQty
+    const createdMovement = await StockMovement.create({
+      ...calStock
+    })
+
+    await StockMovementLog.create({
+      ...calStock,
+      refOrderId: createdMovement._id
+    })
+
+    await newOrder.save()
+    await Cart.deleteOne({ type, area })
+    await transaction.commit()
+
+    const io = getSocket()
+    io.emit('distribution/checkout', {
+      status: 200,
+      message: 'Checkout successful!',
+      data: newOrder
+    })
+
+    res.status(200).json({
+      status: 200,
+      message: 'Checkout successful!',
+      // data: { orderId, total: subtotal, qty: totalQty }
+      data: newOrder
+      // data:listProductWithDraw
+    })
+  } catch (error) {
+    try {
+      await transaction.rollback()
+    } catch (rollbackErr) {
+      console.error('Transaction rollback failed:', rollbackErr)
+    }
+    console.error('Error saving store to MongoDB:', error)
+    res.status(500).json({ status: '500', message: 'Server Error' })
   }
-
-  const createdMovement = await StockMovement.create({
-    ...calStock
-  })
-
-  await StockMovementLog.create({
-    ...calStock,
-    refOrderId: createdMovement._id
-  })
-
-  await newOrder.save()
-  await Cart.deleteOne({ type, area })
-  await transaction.commit()
-
-  const io = getSocket()
-  io.emit('distribution/checkout', {
-    status: 200,
-    message: 'Checkout successful!',
-    data: newOrder
-  })
-
-  res.status(200).json({
-    status: 200,
-    message: 'Checkout successful!',
-    // data: { orderId, total: subtotal, qty: totalQty }
-    data: newOrder
-    // data:listProductWithDraw
-  })
-} catch (error) {
-  try {
-    await transaction.rollback()
-  } catch (rollbackErr) {
-    console.error('Transaction rollback failed:', rollbackErr)
-  }
-  console.error('Error saving store to MongoDB:', error)
-  res.status(500).json({ status: '500', message: 'Server Error' })
-}
 }
 
 exports.getOrderCredit = async (req, res) => {
@@ -344,17 +349,17 @@ exports.getOrderCredit = async (req, res) => {
     let startDate, endDate
 
     if (start && end) {
-      // ตัด string แล้ว parse เป็น Date
       startDate = new Date(
-        start.substring(0, 4), // year: 2025
-        parseInt(start.substring(4, 6), 10) - 1, // month: 08 → index 7
-        start.substring(6, 8) // day: 01
+        `${start.slice(0, 4)}-${start.slice(4, 6)}-${start.slice(
+          6,
+          8
+        )}T00:00:00+07:00`
       )
-
       endDate = new Date(
-        end.substring(0, 4), // year: 2025
-        parseInt(end.substring(4, 6), 10) - 1, // month: 08 → index 7
-        end.substring(6, 8) // day: 01
+        `${end.slice(0, 4)}-${end.slice(4, 6)}-${end.slice(
+          6,
+          8
+        )}T23:59:59.999+07:00`
       )
     } else if (period) {
       const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
@@ -367,13 +372,18 @@ exports.getOrderCredit = async (req, res) => {
     }
 
     let statusQuery = {}
-    if (type === 'pending') {
-      statusQuery.status = { $in: ['pending', 'approved', 'rejected'] }
-    } else if (type === 'history') {
-      statusQuery.status = {
-        $in: ['approved', 'rejected', 'success', 'confirm']
-      }
+
+    statusQuery.status = {
+      $in: ['approved', 'rejected', 'success', 'confirm', 'pending']
     }
+
+    // if (type === 'pending') {
+    //   statusQuery.status = { $in: ['pending', 'approved', 'rejected'] }
+    // } else if (type === 'history') {
+    //   statusQuery.status = {
+    //     $in: ['approved', 'rejected', 'success', 'confirm','pending']
+    //   }
+    // }
 
     // const status = type === 'history' ? { $ne: 'pending' } : 'pending'
     let areaQuery = {}
@@ -388,169 +398,6 @@ exports.getOrderCredit = async (req, res) => {
       ...areaQuery,
       ...(period ? { period } : {}),
       withdrawType: 'credit',
-      // createdAt: { $gte: startDate, $lt: endDate },
-      ...statusQuery
-    }
-
-    console.log(query)
-
-    const pipeline = [
-      {
-        $addFields: {
-          team3: {
-            $concat: [
-              { $substrCP: ['$area', 0, 2] },
-              { $substrCP: ['$area', 3, 1] }
-            ]
-          },
-          statusASC: {
-            $cond: [
-              { $eq: ['$status', 'pending'] },
-              0,
-              {
-                $cond: [
-                  { $eq: ['$status', 'approved'] },
-                  1,
-                  2 // else: rejected (or other status)
-                ]
-              }
-            ]
-          }
-        }
-      },
-      { $match: query }
-    ]
-
-    if (team) {
-      pipeline.push({
-        $match: {
-          team3: { $regex: `^${team}`, $options: 'i' }
-        }
-      })
-    }
-
-    pipeline.push({
-      $sort: { statusASC: 1, createdAt: -1 }
-    })
-
-    const order = await Distribution.aggregate(pipeline)
-
-    if (order.length == 0) {
-      return res
-        .status(404)
-        .json({ status: 404, message: 'Distribution order not found!' })
-    }
-
-    const response = await Promise.all(
-      order.map(async o => {
-        // ใช้ o.area ในแต่ละรอบ
-        const userData = await User.findOne({
-          role: 'sale',
-          area: o.area // <--- ใช้อันนี้
-        })
-
-        return {
-          area: o.area,
-          sale: userData
-            ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
-            : null,
-          orderId: o.orderId,
-          // orderNo: o.orderNo,
-          // highStatus: o.highStatus,
-          // lowStatus: o.lowStatus,
-          newTrip: o.newTrip,
-          withdrawType: o.withdrawType,
-          totalWeightGross: o.totalWeightGross,
-          totalWeightNet: o.totalWeightNet,
-          orderType: o.orderType,
-          orderTypeName: o.orderTypeName,
-          sendDate: o.sendDate,
-          total: o.totalQty || 0,
-          status: o.status,
-          createdAt: o.createdAt,
-          formmatDate: formatDateTimeToThai(o.createdAt)
-        }
-      })
-    )
-
-    // const io = getSocket()
-    // io.emit('distribution/get', {});
-
-    res.status(200).json({
-      status: 200,
-      message: 'Successful!',
-      data: response
-    })
-  } catch (error) {
-    console.error('Error saving store to MongoDB:', error)
-    res.status(500).json({ status: '500', message: 'Server Error' })
-  }
-}
-
-exports.getOrder = async (req, res) => {
-  try {
-    const { type, area, period, zone, team, year, month, start, end } =
-      req.query
-    const channel = req.headers['x-channel']
-
-    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
-    const { User } = getModelsByChannel(channel, res, userModel)
-
-    // let response = []
-    // if (!type) {
-    //   return res.status(400).json({ status: 400, message: 'type is required!' })
-    // }
-
-    let startDate, endDate
-
-    if (start && end) {
-      // ตัด string แล้ว parse เป็น Date
-      startDate = new Date(
-        start.substring(0, 4), // year: 2025
-        parseInt(start.substring(4, 6), 10) - 1, // month: 08 → index 7
-        start.substring(6, 8) // day: 01
-      )
-
-      endDate = new Date(
-        end.substring(0, 4), // year: 2025
-        parseInt(end.substring(4, 6), 10) - 1, // month: 08 → index 7
-        end.substring(6, 8) // day: 01
-      )
-    } else if (period) {
-      const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
-      startDate = range.startDate
-      endDate = range.endDate
-    } else {
-      return res
-        .status(400)
-        .json({ status: 400, message: 'period or start/end are required!' })
-    }
-
-    let statusQuery = {}
-    if (type === 'pending') {
-      statusQuery.status = { $in: ['pending', 'approved', 'rejected'] }
-    } else if (type === 'history') {
-      statusQuery.status = {
-        $in: ['approved', 'rejected', 'success', 'confirm']
-      }
-    }
-
-    // const status = type === 'history' ? { $ne: 'pending' } : 'pending'
-    let areaQuery = {}
-
-    if (area) {
-      areaQuery.area = area
-    } else if (zone) {
-      areaQuery.area = { $regex: `^${zone}`, $options: 'i' }
-    }
-
-    let query = {
-      ...areaQuery,
-      ...(period ? { period } : {}),
-      // withdrawType: { $ne: 'credit' },
       createdAt: { $gte: startDate, $lt: endDate },
       ...statusQuery
     }
@@ -653,6 +500,224 @@ exports.getOrder = async (req, res) => {
   }
 }
 
+exports.getOrderPending = async (req, res) => {
+  try {
+    const { type, area, period, zone } = req.query
+    const channel = req.headers['x-channel']
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+    let areaQuery = {}
+    let statusQuery = {}
+
+    console.log(area)
+    console.log(period)
+    console.log(zone)
+
+    if (area) {
+      areaQuery.area = area
+    } else if (zone) {
+      areaQuery.area = { $regex: `^${zone}`, $options: 'i' }
+    }
+
+    statusQuery.status = {
+      $in: ['pending']
+    }
+
+    let query = {
+      ...areaQuery,
+      ...(period ? { period } : {}),
+      ...statusQuery
+    }
+
+    const pipeline = [{ $match: query }]
+    console.log(areaQuery.area)
+    // console.log(pipeline)
+    // console.log(pipeline.status)
+    const order = await Distribution.aggregate(pipeline)
+    console.log(order)
+    if (order.length == 0) {
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Distribution order not found!' })
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'Successful!',
+      data: order.length
+    })
+  } catch (error) {
+    console.error('Error saving store to MongoDB:', error)
+    res.status(500).json({ status: '500', message: 'Server Error' })
+  }
+}
+
+exports.getOrder = async (req, res) => {
+  try {
+    const { type, area, period, zone, team, year, month, start, end } =
+      req.query
+    const channel = req.headers['x-channel']
+
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+
+    // let response = []
+    // if (!type) {
+    //   return res.status(400).json({ status: 400, message: 'type is required!' })
+    // }
+
+    let startDate, endDate
+
+    if (start && end) {
+      startDate = new Date(
+        `${start.slice(0, 4)}-${start.slice(4, 6)}-${start.slice(
+          6,
+          8
+        )}T00:00:00+07:00`
+      )
+      endDate = new Date(
+        `${end.slice(0, 4)}-${end.slice(4, 6)}-${end.slice(
+          6,
+          8
+        )}T23:59:59.999+07:00`
+      )
+    } else if (period) {
+      const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
+      startDate = range.startDate
+      endDate = range.endDate
+    } else {
+      return res
+        .status(400)
+        .json({ status: 400, message: 'period or start/end are required!' })
+    }
+
+    let statusQuery = {}
+
+    if (type === 'pending') {
+      statusQuery.status = {
+        $in: ['pending', 'approved', 'onprocess', 'success']
+      }
+    } else if (type === 'history') {
+      statusQuery.status = {
+        $in: ['rejected', 'confirm']
+      }
+    }
+
+    // const status = type === 'history' ? { $ne: 'pending' } : 'pending'
+    let areaQuery = {}
+
+    if (area) {
+      areaQuery.area = area
+    } else if (zone) {
+      areaQuery.area = { $regex: `^${zone}`, $options: 'i' }
+    }
+
+    let query = {
+      ...areaQuery,
+      ...(period ? { period } : {}),
+      // withdrawType: { $ne: 'credit' },
+      createdAt: { $gte: startDate, $lt: endDate },
+      ...statusQuery
+    }
+
+    console.log(query)
+
+    const pipeline = [
+      {
+        $addFields: {
+          team3: {
+            $concat: [
+              { $substrCP: ['$area', 0, 2] },
+              { $substrCP: ['$area', 3, 1] }
+            ]
+          },
+          statusASC: {
+            $cond: [
+              { $eq: ['$status', 'pending'] },
+              0,
+              {
+                $cond: [
+                  { $eq: ['$status', 'approved'] },
+                  1,
+                  2 // else: rejected (or other status)
+                ]
+              }
+            ]
+          }
+        }
+      },
+      { $match: query }
+    ]
+
+    if (team) {
+      pipeline.push({
+        $match: {
+          team3: { $regex: `^${team}`, $options: 'i' }
+        }
+      })
+    }
+
+    pipeline.push({
+      $sort: { statusASC: 1, createdAt: -1 }
+    })
+
+    const order = await Distribution.aggregate(pipeline)
+
+    if (order.length == 0) {
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Distribution order not found!' })
+    }
+
+    const response = await Promise.all(
+      order.map(async o => {
+        // ใช้ o.area ในแต่ละรอบ
+        const userData = await User.findOne({
+          role: 'sale',
+          area: o.area // <--- ใช้อันนี้
+        })
+
+        return {
+          area: o.area,
+          sale: userData
+            ? {
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
+            : null,
+          orderId: o.orderId,
+          // orderNo: o.orderNo,
+          // highStatus: o.highStatus,
+          // lowStatus: o.lowStatus,
+          newTrip: o.newTrip,
+          withdrawType: o.withdrawType,
+          totalWeightGross: o.totalWeightGross,
+          totalWeightNet: o.totalWeightNet,
+          orderType: o.orderType,
+          orderTypeName: o.orderTypeName,
+          sendDate: o.sendDate,
+          total: o.totalQty || 0,
+          status: o.status,
+          statusTH: o.statusTH,
+          createdAt: o.createdAt,
+          formmatDate: formatDateTimeToThai(o.createdAt)
+        }
+      })
+    )
+
+    // const io = getSocket()
+    // io.emit('distribution/get', {});
+
+    res.status(200).json({
+      status: 200,
+      message: 'Successful!',
+      data: response
+    })
+  } catch (error) {
+    console.error('Error saving store to MongoDB:', error)
+    res.status(500).json({ status: '500', message: 'Server Error' })
+  }
+}
+
 exports.getOrderSup = async (req, res) => {
   try {
     const { type, area, period, zone, team, year, month, start, end } =
@@ -694,7 +759,16 @@ exports.getOrderSup = async (req, res) => {
 
     let statusQuery = {}
     if (type === 'pending') {
-      statusQuery.status = { $in: ['pending', 'approved', 'rejected'] }
+      statusQuery.status = {
+        $in: [
+          'pending',
+          'approved',
+          'rejected',
+          'success',
+          'confirm',
+          'canceled'
+        ]
+      }
     } else if (type === 'history') {
       statusQuery.status = {
         $in: ['approved', 'rejected', 'success', 'confirm']
@@ -880,6 +954,8 @@ exports.getDetail = async (req, res) => {
         receivetotalWeightGross: u.receivetotalWeightGross,
         receivetotalWeightNet: u.receivetotalWeightNet,
         status: u.status,
+        newTrip: u.newTrip,
+        statusTH: u.statusTH,
         createdAt: u.createdAt
       }
     })
@@ -1207,6 +1283,7 @@ exports.insertOneWithdrawToErp = async (req, res) => {
 
 exports.addFromERPWithdraw = async (req, res) => {
   const channel = req.headers['x-channel']
+
   const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
   const result = await withdrawQuery(channel)
   // console.log(result)
@@ -1230,10 +1307,61 @@ exports.addFromERPWithdraw = async (req, res) => {
     data: result
   })
 }
+exports.cancelWithdraw = async (req, res) => {
+  try {
+    const { orderId, user } = req.body
+    const channel = req.headers['x-channel']
+    const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+
+    const distributionTran = await Distribution.findOne({
+      orderId: orderId,
+      type: 'withdraw'
+    })
+
+    if (!distributionTran) {
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Not found withdraw' })
+    }
+
+    const io = getSocket()
+    io.emit('distribution/cancelWithdraw', {
+      status: 200,
+      message: 'successfully',
+      data: distributionTran
+    })
+
+    await Distribution.findOneAndUpdate(
+      { orderId: orderId, type: 'withdraw' },
+      { $set: { statusTH: 'ยกเลิก', status: 'canceled' } },
+      { new: true }
+    )
+
+    await ApproveLogs.create({
+      module: 'cancelWithdraw',
+      user: user,
+      status: 'canceled',
+      id: orderId
+    })
+
+    res.status(200).json({
+      status: 200,
+      message: 'successfully',
+      data: 'canceled'
+    })
+  } catch (error) {
+    console.error('[❌ saleConfirmWithdraw ERROR]', error)
+    return res.status(500).json({
+      status: 500,
+      message: error.message || 'Internal server error'
+    })
+  }
+}
 
 exports.approveWithdraw = async (req, res) => {
   try {
-    const { orderId, status } = req.body
+    const { orderId, status, user } = req.body
     let statusStr = status === true ? 'approved' : 'rejected'
     let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ'
 
@@ -1243,12 +1371,14 @@ exports.approveWithdraw = async (req, res) => {
       res,
       distributionModel
     )
+    const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Stock } = getModelsByChannel(channel, res, stockModel)
     const { Option } = getModelsByChannel(channel, res, optionsModel)
     const { Npd } = getModelsByChannel(channel, res, npdModel)
     const { User } = getModelsByChannel(channel, res, userModel)
     const { Withdraw } = getModelsByChannel(channel, res, DistributionModel)
+
     if (statusStr === 'approved') {
       // console.log(orderId)
       const distributionTran = await Distribution.findOne({
@@ -1398,6 +1528,13 @@ exports.approveWithdraw = async (req, res) => {
         data: dataTran
       })
 
+      await ApproveLogs.create({
+        module: 'approveWithdraw',
+        user: user,
+        status: statusStr,
+        id: orderId
+      })
+
       res.status(200).json({
         status: 200,
         message: 'successfully',
@@ -1409,15 +1546,21 @@ exports.approveWithdraw = async (req, res) => {
         { $set: { statusTH: statusThStr, status: statusStr } },
         { new: true }
       )
-      // if (distributionData.newTrip === 'true') {
-      //   await Npd.findOneAndUpdate(
-      //     { period: distributionData.period },
-      //     {
-      //       $pull: { areaGet: distributionData.area }
-      //     }
-      //   )
+      if (distributionData.newTrip === 'true') {
+        await Npd.findOneAndUpdate(
+          { period: distributionData.period },
+          {
+            $pull: { areaGet: distributionData.area }
+          }
+        )
+      }
 
-      // }
+      await ApproveLogs.create({
+        module: 'approveWithdraw',
+        user: user,
+        status: statusStr,
+        id: orderId
+      })
 
       res.status(200).json({
         status: 200,
@@ -1426,7 +1569,7 @@ exports.approveWithdraw = async (req, res) => {
       })
     }
   } catch (error) {
-    console.error('[❌ approveWithdraw ERROR]', error) // แสดงใน console
+    console.error('[❌ approveWithdraw ERROR ', error) // แสดงใน console
     res.status(500).json({
       status: 500,
       message: error.message,
@@ -1439,7 +1582,7 @@ const withdrawUpdateTimestamps = {}
 
 exports.saleConfirmWithdraw = async (req, res) => {
   try {
-    const { orderId, status } = req.body
+    const { orderId, status, user } = req.body
 
     // ✅ ตรวจสอบ input
     if (!orderId || typeof status !== 'boolean') {
@@ -1452,7 +1595,7 @@ exports.saleConfirmWithdraw = async (req, res) => {
     const channel = req.headers['x-channel']
     const { Distribution } = getModelsByChannel(channel, res, distributionModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
-
+    const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
     // ===== debounce ตรงนี้ =====
     const now = Date.now()
     const lastUpdate = withdrawUpdateTimestamps[orderId] || 0
@@ -1480,6 +1623,12 @@ exports.saleConfirmWithdraw = async (req, res) => {
           .status(404)
           .json({ status: 404, message: 'Withdraw transaction not found.' })
       }
+
+      // ✅ ดึงข้อมูลสินค้าที่เกี่ยวข้อง
+      const listProductId = distributionTran.listProduct
+        .map(i => i.id)
+        .filter(Boolean)
+      productDetail = await Product.find({ id: { $in: listProductId } })
 
       if (
         !Array.isArray(distributionTran.listProduct) ||
@@ -1517,12 +1666,6 @@ exports.saleConfirmWithdraw = async (req, res) => {
           return res
             .status(404)
             .json({ status: 404, message: `${orderId} not found in M3` })
-
-        // ✅ ดึงข้อมูลสินค้าที่เกี่ยวข้อง
-        const listProductId = distributionTran.listProduct
-          .map(i => i.id)
-          .filter(Boolean)
-        const productDetail = await Product.find({ id: { $in: listProductId } })
 
         const checkStatus = await MGLINE.findAll({
           where: {
@@ -1607,8 +1750,8 @@ exports.saleConfirmWithdraw = async (req, res) => {
 
         // receivetotal = receivetotal
         // receivetotalQty = receivetotalQty
-        receivetotalWeightGross = ReceiveWeight?.[0]?.weightGross || 0
-        receivetotalWeightNet = ReceiveWeight?.[0]?.weightNet || 0
+        // receivetotalWeightGross = ReceiveWeight?.[0]?.weightGross || 0
+        // receivetotalWeightNet = ReceiveWeight?.[0]?.weightNet || 0
       }
 
       // ✅ อัปเดตข้อมูลถ้า status เป็น approved
@@ -1649,8 +1792,18 @@ exports.saleConfirmWithdraw = async (req, res) => {
         qtyproduct.push({ id: productQty.id, unit, qty })
       }
 
+      receivetotalWeightGross = 0
+      receivetotalWeightNet = 0
+
       for (const item of qtyproduct) {
         // console.log(item)
+
+        const productData = productDetail.find(o => o.id === item.id)
+        const weightGross = productData.weightGross * item.qty
+        const weightNet = productData.weightNet * item.qty
+
+        receivetotalWeightGross += weightGross
+        receivetotalWeightNet += weightNet
         const updateResult = await updateStockMongo(
           item,
           distributionTran.area,
@@ -1671,7 +1824,7 @@ exports.saleConfirmWithdraw = async (req, res) => {
         { orderId, type: 'withdraw' },
         {
           $set: {
-            statusTH: 'ยืนยันรับของ',
+            statusTH: 'รับสินค้าสำเร็จ',
             status: 'confirm',
             receivetotal: receivetotal,
             receivetotalQty: receivetotalQty,
@@ -1689,16 +1842,17 @@ exports.saleConfirmWithdraw = async (req, res) => {
         message: 'Confirm withdraw success'
       })
 
+      await ApproveLogs.create({
+        module: 'saleConfirmWithdraw',
+        user: user,
+        status: 'confirm',
+        id: orderId
+      })
+
       return res.status(200).json({
         status: 200,
         message: 'Confirm withdraw success'
       })
-      // } else {
-      //   return res.status(409).json({
-      //     status: 409,
-      //     message: 'Status withdraw is pending'
-      //   })
-      // }
     }
 
     // ✅ กรณี status === false
@@ -1864,18 +2018,42 @@ exports.getReceiveQty = async (req, res) => {
       }
     }
 
-    // await Distribution.updateOne(
-    //   { _id: distributionTran._id },
-    //   { $set: { listProduct: distributionTran.listProduct } }
-    // )
+    const lowStatus = row.MGTRSL
+    const highStatus = row.MGTRSH
+
+    let statusStr = ''
+    let statusThStr = ''
+
+    if (lowStatus == '99') {
+      statusStr = 'success'
+      statusThStr = 'กรุณากดรับสินค้า'
+    } else if (highStatus == '99') {
+      statusStr = 'onprocess'
+      statusThStr = 'รอศูนย์ดำเนินการ'
+    } else {
+      statusStr = 'onprocess'
+      statusThStr = 'รอศูนย์ดำเนินการ'
+    }
+
+    if (distributionTran.status !== 'confirm') {
+      await Distribution.updateOne(
+        { orderId: orderId }, // filter: เงื่อนไขในการหา document
+        {
+          $set: {
+            status: statusStr,
+            statusTH: statusThStr
+          }
+        }
+      )
+    }
 
     res.status(200).json({
       status: 200,
       message: `Sucess`,
       data: {
         orderId: orderId,
-        lowStatus: row.MGTRSL,
-        highStatus: row.MGTRSH,
+        lowStatus: lowStatus,
+        highStatus: highStatus,
         listProduct: distributionTran.listProduct
       }
     })
@@ -2273,4 +2451,188 @@ exports.withdrawBackOrderToExcel = async (req, res) => {
       fs.unlink(tempPath, () => { })
     })
   }
+}
+
+exports.withdrawUpdateMGTRDT = async (req, res) => {
+  const channel = req.headers['x-channel']
+  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+
+  const withdrawData = await Distribution.find({
+    status: ['approved', 'confirm']
+  })
+
+  const withdrawTran = withdrawData.map(item => {
+    createdAtThai = toThaiTime(item.createdAt)
+    return {
+      orderId: item.orderId,
+      createdAt: item.createdAt,
+      createdAtThai: createdAtThai,
+      MGTRDT_NEW: formatDateToYYYYMMDD(createdAtThai)
+    }
+  })
+
+  let m3 = []
+
+  for (i of withdrawTran) {
+    const row = await DisributionM3.findOne({ where: { coNo: i.orderId } })
+
+    if (row) {
+      row.MGTRDT = i.MGTRDT_NEW
+      await row.save() // บันทึกการเปลี่ยนแปลง
+      m3.push(row)
+    }
+  }
+
+  res.status(200).json({
+    status: 200,
+    message: 'Update Sucess',
+    data: withdrawTran
+  })
+}
+
+exports.withdrawCheckM3 = async (req, res) => {
+  const channel = req.headers['x-channel']
+  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+
+  const withdrawData = await Distribution.find({
+    status: ['approved', 'confirm'],
+    withdrawType: { $ne: "credit" },
+    area: { $ne: 'IT211' }
+  })
+
+  const withdrawTran = withdrawData.map(item => {
+    createdAtThai = toThaiTime(item.createdAt)
+    return {
+      orderId: item.orderId,
+      createdAt: item.createdAt,
+      createdAtThai: createdAtThai,
+      MGTRDT_NEW: formatDateToYYYYMMDD(createdAtThai)
+    }
+  })
+
+  let NotInM3 = []
+
+  for (i of withdrawTran) {
+    const row = await DisributionM3.findOne({ where: { coNo: i.orderId } })
+    if (!row) {
+      NotInM3.push(i.orderId)
+    }
+  }
+
+  res.status(200).json({
+    status: 200,
+    message: "fetch Sucess",
+    data: NotInM3
+  })
+}
+
+
+exports.getWithdrawError = async (req, res) => {
+  const channel = req.headers['x-channel']
+  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+
+  const withdrawData = await Distribution.find({
+    status: ['approved', 'confirm'],
+    withdrawType: { $ne: "credit" },
+    area: { $ne: 'IT211' }
+  })
+
+  let data = []
+
+  for (item of withdrawData) {
+    let typeError = ''
+    const mgHead = await DisributionM3.findOne({ where: { coNo: item.orderId } })
+    const countProduct = item.listProduct.length
+
+    if (mgHead) {
+      if (countProduct === parseInt(item.lineM3)) {
+        typeError = 'สินค้าครบ';
+      } else {
+        typeError = 'สินค้าไม่ครบ';
+      }
+
+    } else {
+      typeError = 'ไม่เข้าระบบ M3'
+
+    }
+
+    const dataTran = {
+      orderId: item.orderId,
+      orderType: item.orderType,
+      newTrip: item.newTrip,
+      orderTypeName: item.orderTypeName,
+      withdrawType: item.withdrawType,
+      area: item.area,
+      fromWarehouse: item.fromWarehouse,
+      toWarehouse: item.toWarehouse,
+      shippingId: item.shippingId,
+      shippingRoute: item.shippingRoute,
+      shippingName: item.shippingName,
+      sendAddress: item.sendAddress,
+      sendDate: item.sendDate,
+      remark: item.remark,
+      status: item.status,
+      statusTH: item.statusTH,
+      period: item.period,
+      createdAt: toThaiTime(item.createdAt),
+      updatedAt: toThaiTime(item.updatedAt),
+      listProduct: countProduct,
+      lineM3: item.lineM3 || "0",
+      heightStatus: item.heightStatus || "0",
+      lowStatus: item.lowStatus || "0",
+      typeError: typeError
+    }
+    data.push(dataTran)
+  }
+
+
+
+
+
+  res.status(200).json({
+    status: 200,
+    message: "fetch Sucess",
+    data: data
+  })
+}
+
+exports.UpdateWithdrawConjob = async (req, res) => {
+
+  const channel = req.headers['x-channel']
+  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+
+  const withdrawData = await Distribution.find({
+    // status: ['approved', 'confirm'],
+    withdrawType: { $ne: "credit" },
+    area: { $ne: 'IT211' }
+  })
+
+
+  for (i of withdrawData) {
+
+    const mgHead = await DisributionM3.findOne({ where: { coNo: i.orderId } })
+    if (mgHead) {
+      const count = await MGLINE.count({ where: { MRTRNR: i.orderId } });
+      const lowStatus = mgHead.MGTRSL
+      const highStatus = mgHead.MGTRSH
+
+      await Distribution.updateOne(
+        { orderId: i.orderId },
+        {
+          $set: {
+            lineM3: count,
+            lowStatus: lowStatus,
+            heightStatus: highStatus
+          }
+        }
+      )
+    }
+  }
+
+
+  res.status(200).json({
+    status: 200,
+    message: "Update Sucess",
+    // data: NotInM3
+  })
 }

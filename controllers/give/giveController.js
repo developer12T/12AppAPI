@@ -484,12 +484,17 @@ exports.getOrder = async (req, res) => {
     }
 
     let areaQuery = {}
+    // if (area) {
+    //   if (area.length == 2) {
+    //     areaQuery.zone = area.slice(0, 2)
+    //   } else if (area.length == 5) {
+    //     areaQuery['store.area'] = area
+    //   }
+    // }
     if (area) {
-      if (area.length == 2) {
-        areaQuery.zone = area.slice(0, 2)
-      } else if (area.length == 5) {
-        areaQuery['store.area'] = area
-      }
+      areaQuery['store.area'] = area
+    } else if (zone) {
+      areaQuery['store.zone'] = zone
     }
 
     if (giveName) {

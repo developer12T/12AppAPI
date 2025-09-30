@@ -14,7 +14,14 @@ const {
   withdrawBackOrderToExcel,
   getOrderCredit,
   updateReciveFix,
-  getOrderSup
+  getOrderSup,
+  cancelWithdraw,
+  withdrawCheckM3,
+  withdrawToExcel,
+  withdrawUpdateMGTRDT,
+  getWithdrawError,
+  UpdateWithdrawConjob,
+  getOrderPending
 } = require('../../controllers/distribution/withdrawController')
 const {
   getPlace,
@@ -27,11 +34,13 @@ const {
 const router = express.Router()
 
 router.get('/get', getOrder)
+router.get('/getOrderPending', getOrderPending)
 router.get('/getsup', getOrderSup)
 router.get('/getCredit', getOrderCredit)
 router.get('/detail/:orderId', getDetail)
 router.post('/checkout', checkout)
 router.post('/updateStatus', updateStatus)
+router.post('/cancelWithdraw', cancelWithdraw)
 router.get('/getType', getType)
 
 router.get('/place/get', getPlace)
@@ -51,4 +60,8 @@ router.post('/saleConfirmWithdraw', saleConfirmWithdraw)
 
 router.post('/getReceiveQty', getReceiveQty)
 router.get('/withdrawBackOrderToExcel', withdrawBackOrderToExcel)
+router.post('/withdrawUpdateMGTRDT', withdrawUpdateMGTRDT)
+router.post('/withdrawCheckM3', withdrawCheckM3)
+router.post('/getWithdrawError', getWithdrawError)
+router.post('/UpdateWithdrawConjob', UpdateWithdrawConjob)
 module.exports = router

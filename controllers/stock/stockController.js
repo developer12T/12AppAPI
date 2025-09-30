@@ -34,6 +34,7 @@ const stockModel = require('../../models/cash/stock')
 const giveModel = require('../../models/cash/give')
 const orderModel = require('../../models/cash/sale')
 const cartModel = require('../../models/cash/cart')
+const approveLogModel = require('../../models/cash/approveLog')
 const refundModel = require('../../models/cash/refund')
 const adjustStockModel = require('../../models/cash/stock')
 const { getModelsByChannel } = require('../../middleware/channel')
@@ -1175,7 +1176,7 @@ exports.getStockQty = async (req, res) => {
 
   const dataProduct = await Product.find({
     id: { $in: uniqueProductId }
-  }).select('id name listUnit')
+  }).select('id name groupCode size listUnit')
 
   let data = []
   let summaryStock = 0
@@ -1233,18 +1234,25 @@ exports.getStockQty = async (req, res) => {
     const finalProductStock = {
       productId: stockItem.id,
       productName: productDetail.name,
-      pcsMain: pcsMain,
+      productGroupCode: productDetail.groupCode,
+      size: productDetail.size,
+      // pcsMain: pcsMain,
       listUnit: listUnitStock
     }
 
     data.push(finalProductStock)
   }
 
-  // sort และลบ pcsMain ก่อนส่งออก
-  data.sort((a, b) => b.pcsMain - a.pcsMain)
-  data.forEach(item => {
-    delete item.pcsMain
+
+
+  let dataFinal = sortProduct(data, 'productGroupCode')
+
+  // ลบ field ที่ไม่ต้องการ
+  dataFinal = dataFinal.map(item => {
+    const { productGroupCode, size, ...rest } = item
+    return rest
   })
+
 
   // const io = getSocket()
   // io.emit('stock/getStockQty', {});
@@ -1252,7 +1260,7 @@ exports.getStockQty = async (req, res) => {
   res.status(200).json({
     status: 200,
     message: 'suceesful',
-    data: data,
+    data: dataFinal,
     summaryStock: Number(summaryStock.toFixed(2)),
     summaryStockIn: Number(summaryStockIn.toFixed(2)),
     summaryStockOut: Number(summaryStockOut.toFixed(2)),
@@ -1503,7 +1511,6 @@ exports.getStockQtyNew = async (req, res) => {
   )
 
   // console.log(JSON.stringify(dataRefund, null, 2))
-
 
   const withdrawProductArray = Object.values(
     allWithdrawProducts.reduce((acc, curr) => {
@@ -1766,78 +1773,73 @@ exports.getStockQtyNew = async (req, res) => {
     if (!productDetailGive) continue
 
     // let goodqty = productDetailRufund.qtyPcs
-
-    // console.log(productDetailPromotion)
-
     const pcsMain = stockItem.stockPcs
     let stock = stockItem.stockPcs
     let balance = stockItem.balancePcs
     summaryStockPcs += stockItem.stockPcs || 0
     summaryStockBalPcs += stockItem.balancePcs || 0
 
-    const listUnitStock = productDetail.listUnit
-      .map(u => {
-        const goodQty =
-          productDetailRufund.find(
-            i => i.unit === u.unit && i.condition === 'good'
-          )?.qty ?? 0
-        const damagedQty =
-          productDetailRufund.find(
-            i => i.unit === u.unit && i.condition === 'damaged'
-          )?.qty ?? 0
-        const withdrawQty =
-          productDetailWithdraw.find(i => i.unit === u.unit)?.qty ?? 0
+    const listUnitStock = productDetail.listUnit.map(u => {
+      const goodQty =
+        productDetailRufund.find(
+          i => i.unit === u.unit && i.condition === 'good'
+        )?.qty ?? 0
+      const damagedQty =
+        productDetailRufund.find(
+          i => i.unit === u.unit && i.condition === 'damaged'
+        )?.qty ?? 0
+      const withdrawQty =
+        productDetailWithdraw.find(i => i.unit === u.unit)?.qty ?? 0
 
-        // console.log(productDetailWithdraw.find(i => i.id === '10011101002'))
-        const saleQty =
-          productDetailOrder.find(i => i.unit === u.unit)?.qty ?? 0
-        const promoQty =
-          productDetailPromotion.find(i => i.unit === u.unit)?.qty ?? 0
-        // console.log("promoQty",promoQty)
-        const changeQty =
-          productDetailChange.find(i => i.unit === u.unit)?.qty ?? 0
-        const adjustQty =
-          productDetailAdjust.find(i => i.unit === u.unit)?.qty ?? 0
-        const giveQty = productDetailGive.find(i => i.unit === u.unit)?.qty ?? 0
-        // console.log(damagedQty)
+      // console.log(productDetailWithdraw.find(i => i.id === '10011101002'))
+      const saleQty = productDetailOrder.find(i => i.unit === u.unit)?.qty ?? 0
+      const promoQty =
+        productDetailPromotion.find(i => i.unit === u.unit)?.qty ?? 0
+      // console.log("promoQty",promoQty)
+      const changeQty =
+        productDetailChange.find(i => i.unit === u.unit)?.qty ?? 0
+      const adjustQty =
+        productDetailAdjust.find(i => i.unit === u.unit)?.qty ?? 0
+      const giveQty = productDetailGive.find(i => i.unit === u.unit)?.qty ?? 0
+      // console.log(damagedQty)
 
-        const goodSale = u.price.refund
-        const damagedSale = u.price.refundDmg
-        const changeSale = u.price.change
-        const sale = u.price.sale
-        const factor = u.factor
-        const stockQty = Math.floor(stock / factor) || 0
-        const balanceQty = Math.floor(balance / factor) || 0
+      const goodSale = u.price.refund
+      const damagedSale = u.price.refundDmg
+      const changeSale = u.price.change
+      const sale = u.price.sale
+      const factor = u.factor
+      const stockQty = Math.floor(stock / factor) || 0
+      const balanceQty = Math.floor(balance / factor) || 0
 
-        stock -= stockQty * factor
-        balance -= balanceQty * factor
-        // console.log(withdrawQty)
-        summaryStock += (stockQty || 0) * sale
-        summaryStockBal += (balanceQty || 0) * sale
-        summaryWithdraw += (withdrawQty || 0) * sale
-        summaryGood += (goodQty || 0) * goodSale
-        summaryDamaged += (damagedQty || 0) * damagedSale
-        summarySale += (saleQty || 0) * sale
-        summaryPromotion += (promoQty || 0) * sale
-        summaryChange += (changeQty || 0) * sale
-        summaryAdjust += (adjustQty || 0) * sale
-        summaryGive += (giveQty || 0) * sale
-        // console.log(withdrawQty)
-        return {
-          unit: u.unit,
-          unitName: u.name,
-          stock: stockQty,
-          withdraw: withdrawQty,
-          good: goodQty,
-          damaged: damagedQty,
-          sale: saleQty,
-          promotion: promoQty,
-          change: changeQty,
-          adjust: adjustQty,
-          give: giveQty,
-          balance: balanceQty
-        }
-      })
+      stock -= stockQty * factor
+      balance -= balanceQty * factor
+      // console.log(withdrawQty)
+      summaryStock += (stockQty || 0) * sale
+      summaryStockBal += (balanceQty || 0) * sale
+      summaryWithdraw += (withdrawQty || 0) * sale
+      summaryGood += (goodQty || 0) * goodSale
+      summaryDamaged += (damagedQty || 0) * damagedSale
+      summarySale += (saleQty || 0) * sale
+      summaryPromotion += (promoQty || 0) * sale
+      summaryChange += (changeQty || 0) * sale
+      summaryAdjust += (adjustQty || 0) * sale
+      summaryGive += (giveQty || 0) * sale
+      // console.log(withdrawQty)
+      return {
+        unit: u.unit,
+        unitName: u.name,
+        stock: stockQty,
+        withdraw: withdrawQty,
+        good: goodQty,
+        damaged: damagedQty,
+        sale: saleQty,
+        promotion: promoQty,
+        change: changeQty,
+        adjust: adjustQty,
+        give: giveQty,
+        balance: balanceQty
+      }
+    })
     // .filter(unitData => {
     //   if (!condition || condition === '') return true
     //   if (condition === 'good') return unitData.good !== 0
@@ -1864,7 +1866,6 @@ exports.getStockQtyNew = async (req, res) => {
       data.push(finalProductStock)
     }
   }
-
 
   let StockTotalCtn = 0
   let stockTotalPcs = 0
@@ -1993,7 +1994,7 @@ exports.getStockQtyNew = async (req, res) => {
       return o.factor < min.factor ? o : min
     })
 
-    const { summaryQty, ...rest } = item  // destructure แล้วแยกออก
+    const { summaryQty, ...rest } = item // destructure แล้วแยกออก
 
     return {
       ...rest,
@@ -2001,9 +2002,7 @@ exports.getStockQtyNew = async (req, res) => {
     }
   })
 
-
   dataFinal = sortProduct(dataFinal, 'productGroupCode')
-
 
   res.status(200).json({
     status: 200,
@@ -2244,7 +2243,10 @@ exports.getStockQtyDetail = async (req, res) => {
       orderTypeName: d.orderTypeName,
       sendDate: d.sendDate,
       total: d.listProduct.receiveQty,
-      status: d.status
+      status: d.status,
+      statusTH: d.statusTH,
+      newTrip: d.newTrip,
+      withdrawType: d.withdrawType
     }))
 
     const withdrawStock = productData.listUnit.map(unit => ({
@@ -2324,7 +2326,8 @@ exports.getStockQtyDetail = async (req, res) => {
           totalChange: (change?.total || 0).toFixed(2),
           totalRefund: (refund.total || 0).toFixed(2),
           total: ((change?.total || 0) - (refund.total || 0)).toFixed(2),
-          status: refund.status
+          status: refund.status,
+          statusTH: refund.statusTH
         }
       })
     )
@@ -2702,7 +2705,7 @@ exports.checkout = async (req, res) => {
 }
 
 exports.approveAdjustStock = async (req, res) => {
-  const { orderId, status } = req.body
+  const { orderId, status, user } = req.body
   const channel = req.headers['x-channel']
   let statusStr = ''
   let statusThStr = ''
@@ -2715,6 +2718,7 @@ exports.approveAdjustStock = async (req, res) => {
   }
 
   const { Product } = getModelsByChannel(channel, res, productModel)
+  const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
   const { Stock, StockMovementLog, StockMovement, AdjustStock } =
     getModelsByChannel(channel, res, stockModel)
 
@@ -2791,6 +2795,13 @@ exports.approveAdjustStock = async (req, res) => {
   io.emit('stock/approveAdjustStock', {
     status: 200,
     message: 'successfully'
+  })
+
+  await ApproveLogs.create({
+    module: 'approveAdjustStock',
+    user: user,
+    status: statusStr,
+    id: orderId
   })
 
   res.status(200).json({
@@ -4235,7 +4246,7 @@ exports.stockToExcelSummary = async (req, res) => {
       dataWithdraw,
       dataStockListOnly,
       dataGive,
-      dataAdjustStock,
+      dataAdjustStock
     ] = await Promise.all([
       Refund.find({
         'store.area': area,
@@ -4273,10 +4284,8 @@ exports.stockToExcelSummary = async (req, res) => {
         period,
         status: { $in: ['approved', 'completed'] },
         type: 'adjuststock'
-      }).lean(),
+      }).lean()
     ])
-
-
 
     // ---------- Promotions ใน order sale ----------
     const dataOrderPromotion = dataOrderSale.flatMap(item =>
@@ -4287,7 +4296,6 @@ exports.stockToExcelSummary = async (req, res) => {
     )
 
     // console.log(dataAdjustStock)
-
 
     // ---------- Unique product ids (ทุกแหล่งที่เกี่ยว) ----------
     const productIdUsed = [
@@ -4300,7 +4308,7 @@ exports.stockToExcelSummary = async (req, res) => {
       ...dataStockListOnly.flatMap(s =>
         (s.listProduct || []).map(i => i.productId)
       ),
-      ...dataAdjustStock.flatMap(x => (x.listProduct || []).map(i => i.id)),
+      ...dataAdjustStock.flatMap(x => (x.listProduct || []).map(i => i.id))
     ]
       .filter(Boolean)
       .map(s => String(s).trim())
@@ -4332,24 +4340,33 @@ exports.stockToExcelSummary = async (req, res) => {
     const buildRowsFromListProduct = (source, sourceName) => {
       const rows = []
       for (const item of source ?? []) {
-
         if (!Array.isArray(item?.listProduct)) continue
 
         for (const p of item.listProduct) {
-
+          if (p.receiveQty === 0) {
+            continue
+          }
           const qtyPCS = (Number(p?.qty) || 0) * getFactor(p?.id, p?.unit)
 
           const row = {
             productId: p?.id,
             productName: p?.name,
-            qtySale: 0, valSale: 0,
-            qtyPromo: 0, valPromo: 0,
-            qtyChange: 0, valChange: 0,
-            qtyGive: 0, valGive: 0,
-            qtyGood: 0, valGood: 0,
-            qtyDamaged: 0, valDamaged: 0,
-            qtyWithdraw: 0, valWithdraw: 0,
-            qtyAdjuststock: 0, valAdjuststock: 0
+            qtySale: 0,
+            valSale: 0,
+            qtyPromo: 0,
+            valPromo: 0,
+            qtyChange: 0,
+            valChange: 0,
+            qtyGive: 0,
+            valGive: 0,
+            qtyGood: 0,
+            valGood: 0,
+            qtyDamaged: 0,
+            valDamaged: 0,
+            qtyWithdraw: 0,
+            valWithdraw: 0,
+            qtyAdjuststock: 0,
+            valAdjuststock: 0
           }
 
           if (sourceName === 'Sale') {
@@ -4376,7 +4393,10 @@ exports.stockToExcelSummary = async (req, res) => {
               row.valGood = Number(p?.total ?? 0)
             }
           } else if (sourceName === 'Withdraw') {
-            row.qtyWithdraw = qtyPCS
+            const qtyPCSWithdraw =
+              (Number(p?.receiveQty) || 0) * getFactor(p?.id, p?.unit)
+
+            row.qtyWithdraw = qtyPCSWithdraw
             row.valWithdraw = Number(p?.total ?? 0)
           } else if (sourceName === 'Adjuststock') {
             // console.log(p?.qty)
@@ -4390,13 +4410,15 @@ exports.stockToExcelSummary = async (req, res) => {
       return rows
     }
     const getPromoValue = (productId, unit, qty) => {
-      const pid = String(productId ?? '').trim();
-      const u = String(unit ?? '').trim();
-      const prod = prodById.get(pid);
-      const unitInfo = prod?.listUnit?.find(x => String(x.unit ?? '').trim() === u);
-      const price = Number(unitInfo?.price?.sale) || 0;
-      return (Number(qty) || 0) * price;
-    };
+      const pid = String(productId ?? '').trim()
+      const u = String(unit ?? '').trim()
+      const prod = prodById.get(pid)
+      const unitInfo = prod?.listUnit?.find(
+        x => String(x.unit ?? '').trim() === u
+      )
+      const price = Number(unitInfo?.price?.sale) || 0
+      return (Number(qty) || 0) * price
+    }
 
     const buildRowsPromotionFromSale = saleOrders => {
       const rows = []
@@ -4448,7 +4470,7 @@ exports.stockToExcelSummary = async (req, res) => {
       ...buildRowsPromotionFromSale(dataOrderSale),
       ...buildRowsFromListProduct(dataRefund, 'Refund'),
       ...buildRowsFromListProduct(dataWithdraw, 'Withdraw'),
-      ...buildRowsFromListProduct(dataAdjustStock, 'Adjuststock'),
+      ...buildRowsFromListProduct(dataAdjustStock, 'Adjuststock')
     ]
 
     // console.log(buildRowsFromListProduct(dataAdjustStock, 'Adjuststock'))
@@ -4490,7 +4512,9 @@ exports.stockToExcelSummary = async (req, res) => {
       const pid = String(item?.productId || '').trim()
       const productDetailItem = productDetail.find(u => u.id == pid)
       const productDetailUnit = productDetailItem?.listUnit || []
-      const stockMain = dataStockListOnly[0].listProduct.find(u => u.productId == pid)
+      const stockMain = dataStockListOnly[0].listProduct.find(
+        u => u.productId == pid
+      )
 
       // console.log(item.qtyAdjuststock)
       const prod = prodById.get(pid)
@@ -4512,7 +4536,7 @@ exports.stockToExcelSummary = async (req, res) => {
         0
       )
 
-      // console.log(qtyGood)
+      // console.log("pid", pid)
       return {
         // customerCode: item.customerCode,
         // customerName: item.customerName,
@@ -4547,12 +4571,10 @@ exports.stockToExcelSummary = async (req, res) => {
       }
     })
 
-
-    stockOutDataFinal = sortProduct(stockOutDataFinal,'productGroup')
+    stockOutDataFinal = sortProduct(stockOutDataFinal, 'productGroup')
 
     // ---------- Export / JSON ----------
     if (excel === true) {
-
       const q = (arr, ...aliases) => {
         if (!arr?.length) return '-'
 
@@ -4580,7 +4602,7 @@ exports.stockToExcelSummary = async (req, res) => {
         'คืนสต๊อก',
         'ตัดแจก',
         'คงเหลือ'
-      ];
+      ]
 
       // สร้าง inRows (ถ้าคุณมีอยู่แล้ว ใช้ของเดิมได้ แต่ต้องใส่ค่า "หน่วย" ให้ครบคอลัมน์สุดท้าย)
       const inRows = [
@@ -4588,7 +4610,7 @@ exports.stockToExcelSummary = async (req, res) => {
           'รหัส',
           'ชื่อสินค้า',
           ...GROUPS.flatMap(g => [g, '', '']),
-          'รวม ซอง/ขวด คงเหลือ',
+          'รวม ซอง/ขวด คงเหลือ'
           // 'รวม ซอง/ขวด ต้นทริป',
           // 'รวม ซอง/ขวด เบิกระหว่างทริป',
           // 'รวม ซอง/ขวด รับคืนดี',
@@ -4602,7 +4624,7 @@ exports.stockToExcelSummary = async (req, res) => {
         [
           'รหัส',
           'ชื่อสินค้า',
-          ...GROUPS.flatMap(() => ['หีบ', 'แพค/ถุง', 'ซอง/ขวด']),
+          ...GROUPS.flatMap(() => ['หีบ', 'แพค/ถุง', 'ซอง/ขวด'])
           // 'รวม ซอง/ขวด คงเหลือ'
         ],
         ...stockOutDataFinal.map(it => [
@@ -4610,19 +4632,39 @@ exports.stockToExcelSummary = async (req, res) => {
           it.productName,
 
           // 10 กลุ่ม × 3 คอลัมน์
-          q(it.mainUnit, 'CTN'), q(it.mainUnit, 'BAG', 'PAC'), q(it.mainUnit, 'PCS', 'BOT'),
-          q(it.withdrawUnit, 'CTN'), q(it.withdrawUnit, 'BAG', 'PAC'), q(it.withdrawUnit, 'PCS', 'BOT'),
-          q(it.goodUnit, 'CTN'), q(it.goodUnit, 'BAG', 'PAC'), q(it.goodUnit, 'PCS', 'BOT'),
-          q(it.damagedUnit, 'CTN'), q(it.damagedUnit, 'BAG', 'PAC'), q(it.damagedUnit, 'PCS', 'BOT'),
-          q(it.saleUnit, 'CTN'), q(it.saleUnit, 'BAG', 'PAC'), q(it.saleUnit, 'PCS', 'BOT'),
-          q(it.promoUnit, 'CTN'), q(it.promoUnit, 'BAG', 'PAC'), q(it.promoUnit, 'PCS', 'BOT'),
-          q(it.changeUnit, 'CTN'), q(it.changeUnit, 'BAG', 'PAC'), q(it.changeUnit, 'PCS', 'BOT'),
-          q(it.adjustStockUnit, 'CTN'), q(it.adjustStockUnit, 'BAG', 'PAC'), q(it.adjustStockUnit, 'PCS', 'BOT'),
-          q(it.giveUnit, 'CTN'), q(it.giveUnit, 'BAG', 'PAC'), q(it.giveUnit, 'PCS', 'BOT'),
-          q(it.balanceUnit, 'CTN'), q(it.balanceUnit, 'BAG', 'PAC'), q(it.balanceUnit, 'PCS', 'BOT'),
+          q(it.mainUnit, 'CTN'),
+          q(it.mainUnit, 'BAG', 'PAC'),
+          q(it.mainUnit, 'PCS', 'BOT'),
+          q(it.withdrawUnit, 'CTN'),
+          q(it.withdrawUnit, 'BAG', 'PAC'),
+          q(it.withdrawUnit, 'PCS', 'BOT'),
+          q(it.goodUnit, 'CTN'),
+          q(it.goodUnit, 'BAG', 'PAC'),
+          q(it.goodUnit, 'PCS', 'BOT'),
+          q(it.damagedUnit, 'CTN'),
+          q(it.damagedUnit, 'BAG', 'PAC'),
+          q(it.damagedUnit, 'PCS', 'BOT'),
+          q(it.saleUnit, 'CTN'),
+          q(it.saleUnit, 'BAG', 'PAC'),
+          q(it.saleUnit, 'PCS', 'BOT'),
+          q(it.promoUnit, 'CTN'),
+          q(it.promoUnit, 'BAG', 'PAC'),
+          q(it.promoUnit, 'PCS', 'BOT'),
+          q(it.changeUnit, 'CTN'),
+          q(it.changeUnit, 'BAG', 'PAC'),
+          q(it.changeUnit, 'PCS', 'BOT'),
+          q(it.adjustStockUnit, 'CTN'),
+          q(it.adjustStockUnit, 'BAG', 'PAC'),
+          q(it.adjustStockUnit, 'PCS', 'BOT'),
+          q(it.giveUnit, 'CTN'),
+          q(it.giveUnit, 'BAG', 'PAC'),
+          q(it.giveUnit, 'PCS', 'BOT'),
+          q(it.balanceUnit, 'CTN'),
+          q(it.balanceUnit, 'BAG', 'PAC'),
+          q(it.balanceUnit, 'PCS', 'BOT'),
 
           // คอลัมน์สุดท้าย "หน่วย" — ใส่ชื่อหน่วยที่อยากโชว์ (เลือก field ที่มีในสินค้าคุณ)
-          (it.balancePcs),
+          it.balancePcs
           // (it.mainPcs),
           // (it.withdrawPcs),
           // (it.goodPcs),
@@ -4632,13 +4674,12 @@ exports.stockToExcelSummary = async (req, res) => {
           // (it.changePcs),
           // (it.adjustStockPcs),
           // (it.givePcs),
-
         ])
-      ];
+      ]
 
       // สร้างชีท
 
-      const wsIn = xlsx.utils.aoa_to_sheet(inRows);
+      const wsIn = xlsx.utils.aoa_to_sheet(inRows)
 
       // คำนวน merges ให้ตรงกับจำนวนคอลัมน์ที่แท้จริง
       const merges = [
@@ -4646,24 +4687,27 @@ exports.stockToExcelSummary = async (req, res) => {
         { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } }, // B1:B2 (ชื่อสินค้า)
         // กลุ่ม 10 ชุด × 3 คอลัมน์
         ...GROUPS.map((_, i) => {
-          const startC = 2 + i * 3;          // เริ่มหลังคอลัมน์ที่ 2
-          const endC = startC + 2;         // กิน 3 คอลัมน์
-          return { s: { r: 0, c: startC }, e: { r: 0, c: endC } };
+          const startC = 2 + i * 3 // เริ่มหลังคอลัมน์ที่ 2
+          const endC = startC + 2 // กิน 3 คอลัมน์
+          return { s: { r: 0, c: startC }, e: { r: 0, c: endC } }
         }),
         // "หน่วย" คอลัมน์สุดท้าย (merge ลงสองแถว)
-        { s: { r: 0, c: 2 + GROUPS.length * 3 }, e: { r: 1, c: 2 + GROUPS.length * 3 } }
-      ];
-      wsIn['!merges'] = merges;
+        {
+          s: { r: 0, c: 2 + GROUPS.length * 3 },
+          e: { r: 1, c: 2 + GROUPS.length * 3 }
+        }
+      ]
+      wsIn['!merges'] = merges
 
       // ตั้งความกว้างคอลัมน์แบบไดนามิก
-      const cols = [];
-      cols[0] = { wch: 14 };    // รหัส
-      cols[1] = { wch: 40 };    // ชื่อสินค้า
+      const cols = []
+      cols[0] = { wch: 14 } // รหัส
+      cols[1] = { wch: 40 } // ชื่อสินค้า
       for (let i = 0; i < GROUPS.length * 3; i++) {
-        cols[2 + i] = { wch: 10 }; // คอลัมน์ตัวเลข
+        cols[2 + i] = { wch: 10 } // คอลัมน์ตัวเลข
       }
-      cols[2 + GROUPS.length * 3] = { wch: 10 }; // "หน่วย"
-      wsIn['!cols'] = cols;
+      cols[2 + GROUPS.length * 3] = { wch: 10 } // "หน่วย"
+      wsIn['!cols'] = cols
 
       const wb = xlsx.utils.book_new()
       xlsx.utils.book_append_sheet(wb, wsIn, 'stockSummary')
@@ -4684,9 +4728,6 @@ exports.stockToExcelSummary = async (req, res) => {
         stockOutDataFinal
       })
     }
-
-
-
   } catch (error) {
     console.error('error:', error)
     return res.status(500).json({
@@ -5151,7 +5192,7 @@ exports.checkStockWithdraw = async (req, res) => {
 
 exports.addStockAllWithInOut = async (req, res) => {
   try {
-    const { period } = req.body // << ต้องส่งมาด้วย
+    const { period, area } = req.body // << ต้องส่งมาด้วย
     const channel = req.headers['x-channel']
 
     const { Stock } = getModelsByChannel(channel, res, stockModel)
@@ -5173,13 +5214,16 @@ exports.addStockAllWithInOut = async (req, res) => {
         .json({ status: 400, message: 'period is required' })
     }
 
-    // 1) เตรียม unique areas
-    const userData = await User.find({ role: 'sale' }).select('area')
-    const rawAreas = userData
-      .flatMap(u => (Array.isArray(u.area) ? u.area : [u.area]))
-      .filter(Boolean)
-    const uniqueAreas = [...new Set(rawAreas)]
-    // uniqueAreas = ['BE225']
+    if (!area) {
+      const userData = await User.find({ role: 'sale' }).select('area')
+      const rawAreas = userData
+        .flatMap(u => (Array.isArray(u.area) ? u.area : [u.area]))
+        .filter(Boolean)
+      uniqueAreas = [...new Set(rawAreas)]
+    } else if (area) {
+      uniqueAreas = [area]
+    }
+
     // 2) ฟังก์ชันย่อย: ประมวลผลต่อ 1 area
     const buildAreaStock = async area => {
       // สร้าง match สำหรับ collections ต่าง ๆ

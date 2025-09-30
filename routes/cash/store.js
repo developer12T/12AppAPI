@@ -32,6 +32,15 @@ const {
   insertStoreToM3,
   storeToExcel,
   updateStatusM3ToMongo,
+  addImageLatLong,
+  getLatLongOrder,
+  getLatLongOrderDetail,
+  approveLatLongStore,
+  canceledOrderLatLongStore,
+  addLatLong,
+  getStorePage,
+  getPendingStore,
+  getLatLongOrderPending
   // test
 } = require('../../controllers/store/storeController')
 
@@ -48,9 +57,16 @@ const {
 
 const router = express.Router()
 router.get('/storeToExcel', storeToExcel)
+router.get('/getLatLongOrderPending', getLatLongOrderPending)
 router.get('/getStore', getStore)
 router.get('/getTypeStore', getTypeStore)
 router.get('/check/:storeId', checkSimilarStores)
+router.get('/getLatLongOrder', getLatLongOrder)
+router.get('/getLatLongOrderDetail', getLatLongOrderDetail)
+router.post('/approveLatLongStore', approveLatLongStore)
+router.post('/canceledOrderLatLongStore', canceledOrderLatLongStore)
+router.get('/getStorePage', getStorePage)
+
 router.get('/:storeId', getDetailStore)
 router.post('/addStore', addStore)
 router.post('/updateImage', updateImage)
@@ -79,8 +95,7 @@ router.post('/deleteStore', deleteStore)
 router.post('/updateStoreStatusNoNewId', updateStoreStatusNoNewId)
 router.post('/fixStatusStore', fixStatusStore)
 router.post('/updateStatusM3ToMongo', updateStatusM3ToMongo)
-
-
+router.post('/getPendingStore', getPendingStore)
 
 // router.get('/test', test)
 
@@ -92,5 +107,6 @@ router.post('/updateDetailStore', updateDetailStore)
 router.post('/updateDailyvisit', updateDailyvisit)
 router.post('/updateGooglemap', updateGooglemap)
 router.post('/addVisit', addVisit)
-
+router.post('/addImageLatLong', addImageLatLong)
+router.post('/addLatLong', addLatLong)
 module.exports = router

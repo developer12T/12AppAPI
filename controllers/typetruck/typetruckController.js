@@ -75,18 +75,21 @@ exports.utilize = async (req, res) => {
   let qty = 0
   for (const item of allProductIds) {
     const stockItem = dataStock.listProduct.find(u => u.productId === item)
-
-
     const productItem = dataProduct.find(u => u.id === item)
     // console.log(item)
     // เช็คว่าหาเจอหรือไม่ (ป้องกัน error)
     if (!stockItem || !productItem) continue
 
+
+    const maxFactor = Math.max(...productItem.listUnit.map(u => u.factor))
+
+
     const dataStockPcs = stockItem.balancePcs
-    const productNet = productItem.weightNet
+    const productNet = productItem.weightNet / maxFactor
 
     qty += dataStockPcs
     stock += dataStockPcs * productNet
+
 
     const withdrawTotalQty = withdrawProduct
       .filter(u => u.id === item)
@@ -100,10 +103,7 @@ exports.utilize = async (req, res) => {
     withdraw += withdrawTotalQty * productNet
   }
 
-  // console.log(qty)
-
-  stock = stock / 1000
-  withdraw = withdraw / 1000
+  // console.log(stock)
 
   const sum = stock + withdraw
   const net = dataTypetrucks.weight
@@ -113,13 +113,13 @@ exports.utilize = async (req, res) => {
   // console.log(free,payload)
 
   const data = {
-    freePercentage: to2((free * 100) / payload / 100),
-    stocklPercentage: to2((stock * 100) / payload / 100),
-    withdrawPercentage: to2((withdraw * 100) / payload / 100),
+    freePercentage: to2(free / payload),
+    stockPercentage: to2(stock / payload),
+    withdrawPercentage: to2(withdraw / payload),
     sumPercentage: to2(sum / payload),
     free: to2(free),
     stock: to2(stock),
-    wtihdraw: to2(withdraw),
+    withdraw: to2(withdraw),
     sum: to2(sum),
     type_name: dataTypetrucks.type_name,
     // weight: dataTypetrucks.weight,

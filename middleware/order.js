@@ -2,6 +2,8 @@ const { OOTYPE, NumberSeries } = require('../models/cash/master')
 const { getModelsByChannel } = require('../middleware/channel')
 const cartModel = require('../models/cash/cart')
 const productModel = require('../models/cash/product')
+const orderModel = require('../models/cash/sale')
+const refundModel = require('../models/cash/refund')
 const stockModel = require('../models/cash/stock')
 const nodemailer = require('nodemailer')
 require('dotenv').config()
@@ -370,7 +372,7 @@ module.exports.updateStockMongo = async function (
   } else if (type === 'promotion') {
     // In: Increase stock (return cart to stock)
 
-    console.log(id,factorPcsQty)
+    console.log(id, factorPcsQty)
 
     try {
       await Stock.findOneAndUpdate(
@@ -729,7 +731,7 @@ function calculateStockSummary(productDetail, listUnitStock) {
     cart: totalStockCartPCS,
     promotion: totalStockPromotionPCS,
     change: totalStockChangePCS,
-    changePending : totalStockChangePendingPCS,
+    changePending: totalStockChangePendingPCS,
     adjust: totalStockAdjustPCS,
     give: totalStockGivePCS,
     in: inPCS,
@@ -750,10 +752,10 @@ function calculateStockSummary(productDetail, listUnitStock) {
     good: toCTN(totalStockGoodPCS),
     damaged: toCTN(totalStockDamagedPCS),
     sale: toCTN(totalStockSalePCS),
-    cart:toCTN(totalStockCartPCS),
+    cart: toCTN(totalStockCartPCS),
     promotion: toCTN(totalStockPromotionPCS),
     change: toCTN(totalStockChangePCS),
-    changePending : toCTN(totalStockChangePendingPCS),
+    changePending: toCTN(totalStockChangePendingPCS),
     adjust: toCTN(totalStockAdjustPCS),
     give: toCTN(totalStockGivePCS),
     in: toCTN(inPCS),
@@ -765,6 +767,95 @@ function calculateStockSummary(productDetail, listUnitStock) {
   return [resultPCS, resultCTN];
 }
 
-exports.calculateStockSummary = calculateStockSummary;
+const getOrders = async (areaList, res, channel, type) => {
 
+  const { Order } = getModelsByChannel(channel, null, orderModel)
+
+  const match = {
+    status: { $nin: ['canceled'] },
+    type: { $in: ['sale'] },
+    'store.area': { $ne: 'IT211' }
+  };
+
+  if (type === 'area') {
+    if (Array.isArray(areaList) && areaList.length > 0) {
+      match['store.area'] = { $in: areaList };
+    }
+  } else if (type === 'zone') {
+    if (Array.isArray(areaList) && areaList.length > 0) {
+      match['store.zone'] = { $in: areaList };
+    }
+  }
+
+  const orders = await Order.aggregate([
+    { $match: match },
+    {
+      $addFields: {
+        zone: { $substr: ["$store.area", 0, 2] } // ✅ เอา 2 ตัวแรกจาก store.area
+      }
+    },
+    { $sort: { createdAt: 1, orderId: 1 } }
+  ]);
+
+  return orders;
+};
+
+const getChange = async (areaList, res, channel,type) => {
+  const { Order } = getModelsByChannel(channel, null, orderModel)
+  const match = {
+    status: { $nin: ['canceled', 'reject'] },
+    type: { $in: ['change'] },
+    'store.area': { $ne: 'IT211' }
+  };
+  if (type === 'area') {
+    if (Array.isArray(areaList) && areaList.length > 0) {
+      match['store.area'] = { $in: areaList };
+    }
+  } else if (type === 'zone') {
+    if (Array.isArray(areaList) && areaList.length > 0) {
+      match['store.zone'] = { $in: areaList };
+    }
+  }
+
+  const orders = await Order.aggregate([
+    { $match: match },
+    { $sort: { createdAt: 1, orderId: 1 } }
+  ]);
+
+  return orders;
+};
+
+const getRefund = async (areaList, res, channel,type) => {
+  const { Refund } = getModelsByChannel(channel, null, refundModel)
+  const match = {
+    status: { $nin: ['canceled', 'reject'] },
+    type: { $in: ['refund'] },
+    'store.area': { $ne: 'IT211' }
+  };
+
+  if (type === 'area') {
+    if (Array.isArray(areaList) && areaList.length > 0) {
+      match['store.area'] = { $in: areaList };
+    }
+  } else if (type === 'zone') {
+    if (Array.isArray(areaList) && areaList.length > 0) {
+      match['store.zone'] = { $in: areaList };
+    }
+  }
+
+  const orders = await Refund.aggregate([
+    { $match: match },
+    { $sort: { createdAt: 1, orderId: 1 } }
+  ]);
+
+  return orders;
+};
+
+
+
+
+exports.calculateStockSummary = calculateStockSummary;
+exports.getOrders = getOrders
+exports.getChange = getChange
+exports.getRefund = getRefund
 // module.exports = { calculateStockSummary };

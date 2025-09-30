@@ -21,13 +21,14 @@ const {
   summaryGive,
   summaryAjustStock
 } = require('../../utilities/summary')
-const { forEach, chain, forIn } = require('lodash')
+
+const { forEach, chain, forIn, create } = require('lodash')
 const { error } = require('console')
 const cartModel = require('../../models/cash/cart')
 const productModel = require('../../models/cash/product')
 const stockModel = require('../../models/cash/stock')
 const promotionModel = require('../../models/cash/promotion')
-
+const userModel = require('../../models/cash/user')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { getSocket } = require('../../socket')
 const { period, rangeDate } = require('../../utilities/datetime')
@@ -59,6 +60,8 @@ exports.getCartAll = async (req, res) => {
   }
 }
 
+const orderTimestamps = {}
+
 exports.clearCartAll = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
@@ -68,6 +71,20 @@ exports.clearCartAll = async (req, res) => {
     if (!Array.isArray(cartAll) || cartAll.length === 0) {
       return res.status(404).json({ status: 404, message: 'Cart not found!' })
     }
+
+    const area = [...new Set(cartAll.map(item => item.area))]
+
+    const now = Date.now()
+    const lastUpdate = orderTimestamps[area] || 0
+    const ONE_MINUTE = 15 * 1000
+
+    if (now - lastUpdate < ONE_MINUTE) {
+      return res.status(429).json({
+        status: 429,
+        message: 'This order was updated less than 15 seconds ago. Please try again later!'
+      })
+    }
+    orderTimestamps[area] = now
 
     const toDeleteIds = []
     const updateErrors = []
@@ -80,6 +97,7 @@ exports.clearCartAll = async (req, res) => {
         const products = Array.isArray(cart.listProduct) ? cart.listProduct : []
         for (const prod of products) {
           try {
+            // console.log(prod)
             if (!prod.condition && !prod.expire) {
               // If updateStockMongo expects an ID instead of the whole object, use prod.id
               await updateStockMongo(
@@ -104,6 +122,7 @@ exports.clearCartAll = async (req, res) => {
 
       toDeleteIds.push(cart._id)
     }
+    // console.log(toDeleteIds)
 
     // delete all carts referenced in the request body by _id
     const { acknowledged, deletedCount } = await Cart.deleteMany({
@@ -679,12 +698,29 @@ exports.adjustProduct = async (req, res) => {
   }
 }
 
+const productTimestamps = {}
+
 exports.deleteProduct = async (req, res) => {
   // const session = await require('mongoose').startSession();
   // session.startTransaction();
   try {
     const { type, area, storeId, id, unit, condition, expire } = req.body
     const channel = req.headers['x-channel']
+
+    const storeIdAndId = `${type}_${storeId}_${id}`
+    const now = Date.now()
+    const lastUpdate = productTimestamps[storeIdAndId] || 0
+    const ONE_MINUTE = 15 * 1000
+
+    if (now - lastUpdate < ONE_MINUTE) {
+      return res.status(429).json({
+        status: 429,
+        message: 'This order was updated less than 15 seconds ago. Please try again later!'
+      })
+    }
+    productTimestamps[storeIdAndId] = now
+
+    // console.log(productTimestamps)
 
     if (!type || !area || !id || !unit) {
       // await session.abortTransaction();
@@ -1020,4 +1056,148 @@ exports.updateStock = async (req, res) => {
     console.error('[updateStock Error]', error)
     res.status(500).json({ status: 500, message: error.message })
   }
+}
+
+exports.autoDeleteCart = async (req, res) => {
+
+  const channel = req.headers['x-channel']
+  const { period } = req.body || {}
+  const { Cart } = getModelsByChannel(channel, res, cartModel)
+
+  const { startDate, endDate } = rangeDate(period)
+
+  const cartData = await Cart.find({
+    createdAt: { $gte: startDate, $lt: endDate }
+  })
+
+  const toDeleteIds = []
+  const updateErrors = []
+
+  for (const cart of cartData) {
+    if (!cart || !cart._id) continue
+
+    //   // keep your condition: only update stock for non-withdraw / non-adjuststock
+    if (cart.type !== 'withdraw' && cart.type !== 'adjuststock') {
+      const products = Array.isArray(cart.listProduct) ? cart.listProduct : []
+      for (const prod of products) {
+        try {
+          // console.log(cart.area)
+          if (!prod.condition && !prod.expire) {
+            // If updateStockMongo expects an ID instead of the whole object, use prod.id
+            await updateStockMongo(
+              prod, // or prod.id
+              cart.area,
+              period, // period is provided at body root
+              'deleteCart',
+              channel,
+              res
+            )
+          }
+        } catch (e) {
+          updateErrors.push({
+            cartId: cart._id,
+            product: prod?.id || prod,
+            error: e?.message
+          })
+          // keep going; don't block deletion
+        }
+      }
+    }
+
+    toDeleteIds.push(cart._id)
+  }
+  // // console.log(toDeleteIds)
+
+  // delete all carts referenced in the request body by _id
+  const { acknowledged, deletedCount } = await Cart.deleteMany({
+    _id: { $in: toDeleteIds }
+  })
+
+  res.status(200).json({
+    status: 200,
+    message: 'Stock updated successfully',
+    data: cartData,
+    acknowledged,
+    deletedCount
+  })
+}
+
+exports.getCountCart = async (req, res) => {
+
+  const { zone } = req.query
+  const channel = req.headers['x-channel']
+  const { Cart } = getModelsByChannel(channel, res, cartModel)
+  const { User } = getModelsByChannel(channel, res, userModel)
+
+  const userZones = await User.aggregate([
+    { $match: { role: 'sale', zone: { $ne: 'IT' } } }, // เงื่อนไข role = sale
+    { $group: { _id: '$zone' } }, // รวมกลุ่มตาม zone
+    { $project: { _id: 0, zone: '$_id' } } // คืนค่า zone
+  ]);
+
+  const cartData = await Cart.aggregate([
+    {
+      $match: {
+        type: {
+          $in: ['sale', 'refund', 'give']
+        }
+      }
+    }
+    ,
+    {
+      $addFields: {
+        zone: { $substr: ["$area", 0, 2] } // เอา 2 ตัวแรกจาก area
+      }
+    }
+  ]);
+
+  let data = []
+
+
+  if (zone) {
+    const areaFilter = cartData.filter(o => o.zone === zone)
+    data = areaFilter
+  } else {
+    for (item of userZones) {
+      const count = cartData.filter(o => o.zone === item.zone).length;
+      const areaFilter = cartData.filter(o => o.zone === item.zone)
+      const dataTram = {
+        zone: item.zone,
+        count: count,
+        // cart : areaFilter
+      }
+      data.push(dataTram)
+    }
+  }
+
+  res.status(200).json({
+    status: 200,
+    message: 'Fetch data cart',
+    data: data
+  })
+
+
+}
+
+exports.getCartDetail = async (req, res) => {
+
+  const { area, storeId } = req.query
+  const channel = req.headers['x-channel']
+  const { Cart } = getModelsByChannel(channel, res, cartModel)
+  const { User } = getModelsByChannel(channel, res, userModel)
+
+  const cartData = await Cart.findOne({
+    storeId: storeId,
+    area: area,
+    type: { $in: ['sale', 'refund', 'give'] }
+  })
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'Fetch data cart',
+    data: cartData || []
+  })
+
+
 }

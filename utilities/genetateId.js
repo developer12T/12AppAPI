@@ -4,7 +4,7 @@ const moment = require('moment')
 // const { Distribution } = require('../models/cash/distribution')
 // const { Giveaway, Givetype } = require('../models/cash/give')
 // const { Promotion } = require('../models/cash/promotion')
-
+const storeLatLongModel = require('../models/cash/storeLatLong')
 const orderModel = require('../models/cash/sale')
 const refundModel = require('../models/cash/refund')
 const distributionModel = require('../models/cash/distribution')
@@ -335,6 +335,40 @@ const generatePromotionId = async (channel, res) => {
   return `PRO-${year}${month}-${String(runningNumber).padStart(4, '0')}`
 }
 
+const generateOrderIdStoreLatLong = async (area, warehouse, channel, res) => {
+  const currentYear = new Date().getFullYear() + 543
+  const currentMonth = (new Date().getMonth() + 1).toString().padStart(2, '0')
+  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+
+  const latestOrder = await StoreLatLong.findOne({
+    area: area,
+    createdAt: {
+      $gte: new Date(`${new Date().getFullYear()}-${currentMonth}-01`),
+      $lt: new Date(
+        `${new Date().getFullYear()}-${parseInt(currentMonth) + 1}-01`
+      )
+    }
+  })
+    .sort({ orderId: -1 })
+    .select('orderId')
+  // console.log("latestOrder",latestOrder)
+  let runningNumber = latestOrder
+    ? parseInt(latestOrder.orderId.slice(-4)) + 1
+    : 1
+
+  // console.log(latestOrder)
+
+  return `L${currentYear
+    .toString()
+    .slice(2, 4)}${currentMonth}${warehouse}${runningNumber
+      .toString()
+      .padStart(4, '0')}`
+}
+
+
+
+
 module.exports = {
   generateOrderId,
   generateRefundId,
@@ -344,5 +378,6 @@ module.exports = {
   generatePromotionId,
   generateStockId,
   generateCampaignId,
-  generateDistributionIdCredit
+  generateDistributionIdCredit,
+  generateOrderIdStoreLatLong
 }

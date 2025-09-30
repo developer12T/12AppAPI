@@ -1,4 +1,5 @@
 const mongoose = require('mongoose')
+const { Types } = require('mongoose')
 const { Customer } = require('../../models/cash/master')
 const { uploadFiles } = require('../../utilities/upload')
 const { sequelize, DataTypes } = require('../../config/m3db')
@@ -6,11 +7,14 @@ const { calculateSimilarity } = require('../../utilities/utility')
 const axios = require('axios')
 const multer = require('multer')
 const userModel = require('../../models/cash/user')
+const storeLatLongModel = require('../../models/cash/storeLatLong')
 const ExcelJS = require('exceljs')
+const { generateOrderIdStoreLatLong } = require('../../utilities/genetateId')
 const { getSocket } = require('../../socket')
 const addUpload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages'
 )
+const { toThaiTime } = require('../../utilities/datetime')
 const sharp = require('sharp')
 const xlsx = require('xlsx')
 
@@ -116,7 +120,7 @@ const orderModel = require('../../models/cash/sale')
 const storeModel = require('../../models/cash/store')
 const routeModel = require('../../models/cash/route')
 const refundModel = require('../../models/cash/refund')
-
+const approveLogModel = require('../../models/cash/approveLog')
 // const userModel = require('../../models/cash/user')
 const DistributionModel = require('../../models/cash/distribution')
 const promotionModel = require('../../models/cash/promotion')
@@ -155,6 +159,70 @@ exports.getDetailStore = async (req, res) => {
     res.status(200).json({
       status: 200,
       data: storeData
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+exports.getPendingStore = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel'] // 'credit' or 'cash'
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { area, type, route, zone, team, year, month, showMap } = req.body
+
+    let query = {}
+    query.status = { $in: ['10'] }
+
+    // query.createdAt = {
+    //   $gte: startMonth,
+    //   $lt: nextMonth
+    // }
+
+    if (area) {
+      query.area = area
+    } else if (zone) {
+      query.area = { $regex: `^${zone}`, $options: 'i' }
+    }
+
+    const pipeline = [
+      { $match: query },
+      {
+        $addFields: {
+          team3: {
+            $concat: [
+              { $substrCP: ['$area', 0, 2] },
+              { $substrCP: ['$area', 3, 1] }
+            ]
+          }
+        }
+      }
+    ]
+
+    pipeline.push(
+      {
+        $project: {
+          _id: 0,
+          __v: 0,
+          beauty: 0
+        }
+      },
+      {
+        $sort: {
+          status: 1,
+          createdAt: -1
+        }
+      }
+    )
+
+    console.log(pipeline)
+
+    let data = await Store.aggregate(pipeline)
+
+    res.status(200).json({
+      status: '200',
+      message: 'Success',
+      count: data.length
     })
   } catch (error) {
     console.error(error)
@@ -1253,7 +1321,8 @@ exports.insertStoreToM3 = async (req, res) => {
           shippingRoute: u.postCode ?? '',
           OPGEOX:
             u.latitude == 'Error fetching latitude' ? '0.0000' : u.latitude,
-          OPGEOY: u.longitude == 'Error fetching latitude' ? '0.0000' : u.longitude // เดิมสะกด longtitude
+          OPGEOY:
+            u.longitude == 'Error fetching latitude' ? '0.0000' : u.longitude // เดิมสะกด longtitude
         }
       })
     }
@@ -1311,6 +1380,7 @@ exports.updateStoreStatus = async (req, res) => {
   const channel = req.headers['x-channel']
   const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
   const { User } = getModelsByChannel(channel, res, userModel)
+  const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
   const store = await Store.findOne({ storeId: storeId })
   // console.log(store)
   if (!store) {
@@ -1468,6 +1538,12 @@ exports.updateStoreStatus = async (req, res) => {
     //     error: error.message
     //   })
     // }
+    await ApproveLogs.create({
+      module: 'approveStore',
+      user: user,
+      status: 'approved',
+      id: item.storeId
+    })
 
     return res.status(200).json({
       status: 200,
@@ -1486,6 +1562,13 @@ exports.updateStoreStatus = async (req, res) => {
       },
       { new: true }
     )
+
+    await ApproveLogs.create({
+      module: 'approveStore',
+      user: user,
+      status: 'rejected',
+      id: item.storeId
+    })
 
     res.status(200).json({
       status: 200,
@@ -2500,5 +2583,489 @@ exports.updateStatusM3ToMongo = async (req, res) => {
       message: 'Not found store'
       // data: storeUpdated
     })
+  }
+}
+
+exports.addLatLong = async (req, res) => {
+  const channel = req.headers['x-channel'] // 'credit' or 'cash'
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const { User } = getModelsByChannel(channel, res, userModel)
+  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+
+  try {
+    const { storeId, latitude, longtitude } = req.body
+
+    const storeData = await Store.findOne({ storeId: storeId })
+    // console.log(storeData)
+    const sale = await User.findOne({ area: storeData.area }).select(
+      'firstName surName warehouse tel saleCode salePayer'
+    )
+
+    const orderId = await generateOrderIdStoreLatLong(
+      storeData.area,
+      sale.warehouse,
+      channel,
+      res
+    )
+
+    const storeLatLong = new StoreLatLong({
+      orderId: orderId,
+      storeId: storeId,
+      name: storeData.name,
+      type: storeData.type,
+      typeName: storeData.typeName,
+      zone: storeData.zone,
+      area: storeData.area,
+      address: storeData.address,
+      latitude: latitude,
+      longtitude: longtitude,
+      latitudeOld: storeData.latitude,
+      longtitudeOld: storeData.longtitude,
+      status: 'pending',
+      statusTH: 'รอนำเข้า'
+    })
+
+    await storeLatLong.save()
+
+    const io = getSocket()
+    io.emit('store/addStore', {
+      status: '200',
+      message: 'Store added successfully'
+    })
+
+    return res.status(200).json({
+      status: '200',
+      message: 'Store added successfully',
+      data: storeLatLong
+    })
+  } catch (error) {
+    console.error('Error saving store to MongoDB:', error)
+    return res
+      .status(500)
+      .json({ status: '500', message: 'Server Error', debug: error.message })
+  }
+}
+
+exports.addImageLatLong = async (req, res) => {
+  const channel = req.headers['x-channel'] // 'credit' or 'cash'
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const { User } = getModelsByChannel(channel, res, userModel)
+  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+  const upload = getUploadMiddleware(channel)
+  // console.log(upload)
+
+  upload(req, res, async err => {
+    try {
+      const files = req.files || []
+      const orderId = req.body.orderId
+
+      const LatLongData = await StoreLatLong.findOne({ orderId: orderId })
+
+      const types = LatLongData.storeId
+
+      if (!LatLongData) {
+        return res.status(404).message({
+          status: 404,
+          message: 'Not found lat long'
+        })
+      }
+
+      const uploadedFiles = []
+      for (let i = 0; i < files.length; i++) {
+        const uploadedFile = await uploadFiles(
+          [files[i]],
+          path.join(__dirname, '../../public/images/storesLatLong'),
+          LatLongData.area,
+          types
+        )
+
+        const originalPath = uploadedFile[0].fullPath // เช่น .../public/images/stores/xxx.jpg
+        const webpPath = originalPath.replace(/\.[a-zA-Z]+$/, '.webp') // แปลงชื่อไฟล์นามสกุล .webp
+
+        // console.log("webpPath",path.basename(webpPath))
+
+        await sharp(originalPath)
+          .rotate()
+          .resize(800)
+          .webp({ quality: 80 })
+          .toFile(webpPath)
+
+        fs.unlinkSync(originalPath)
+        uploadedFiles.push({
+          name: path.basename(webpPath),
+          path: webpPath
+          // type: types
+        })
+      }
+
+      const imageList = uploadedFiles
+
+      if (uploadedFiles.length > 0) {
+        await StoreLatLong.updateOne(
+          { orderId: orderId },
+          { $push: { imageList: { $each: uploadedFiles } } }
+        )
+      }
+
+      const io = getSocket()
+      io.emit('store/addStore', {
+        status: '200',
+        message: 'Image added successfully'
+      })
+
+      return res.status(200).json({
+        status: '200',
+        message: 'Image added successfully'
+      })
+    } catch (error) {
+      console.error('Error saving store to MongoDB:', error)
+      return res
+        .status(500)
+        .json({ status: '500', message: 'Server Error', debug: error.message })
+    }
+  })
+}
+exports.getLatLongOrderPending = async (req, res) => {
+  try {
+    const { zone, team, area } = req.query
+    const channel = req.headers['x-channel'] // 'credit' or 'cash'
+    const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+
+    let matchStage = {}
+    if (zone) {
+      matchStage.zone = zone
+    } else if (team) {
+      matchStage.team3 = team
+    } else if (area) {
+      matchStage.area = area
+    }
+    const StoreLatLongData = await StoreLatLong.aggregate([
+      {
+        $addFields: {
+          team3: {
+            $concat: [
+              { $substrCP: ['$area', 0, 2] },
+              { $substrCP: ['$area', 3, 1] }
+            ]
+          },
+          zone: {
+            $substrCP: ['$area', 0, 2]
+          }
+        }
+      },
+      { $match: matchStage },
+      { $sort: { createdAt: -1 } }
+    ])
+
+    return res.status(200).json({
+      status: '200',
+      message: 'StoreLatLong added successfully',
+      data: StoreLatLongData.length
+    })
+  } catch (error) {
+    console.error('Error saving store to MongoDB:', error)
+    return res
+      .status(500)
+      .json({ status: '500', message: 'Server Error', debug: error.message })
+  }
+}
+
+exports.getLatLongOrder = async (req, res) => {
+  const { storeId, zone, team, area } = req.query
+
+  const channel = req.headers['x-channel'] // 'credit' or 'cash'
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const { User } = getModelsByChannel(channel, res, userModel)
+  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+
+  let matchStage = {}
+
+  if (storeId) {
+    matchStage.storeId = storeId
+  } else {
+    if (zone) {
+      matchStage.zone = zone
+    } else if (team) {
+      matchStage.team3 = team
+    } else if (area) {
+      matchStage.area = area
+    }
+  }
+
+  // console.log(matchStage)
+
+  const StoreLatLongData = await StoreLatLong.aggregate([
+    {
+      $addFields: {
+        team3: {
+          $concat: [
+            { $substrCP: ['$area', 0, 2] },
+            { $substrCP: ['$area', 3, 1] }
+          ]
+        },
+        zone: {
+          $substrCP: ['$area', 0, 2]
+        }
+      }
+    },
+    { $match: matchStage },
+    { $sort: { createdAt: -1 } }
+  ])
+
+  const data = StoreLatLongData.map(item => {
+    return {
+      orderId: item.orderId,
+      storeId: item.storeId,
+      name: item.name,
+      area: item.area,
+      zone: item.zone,
+      typeName: item.typeName,
+      address: item.address,
+      latitude: item.latitude,
+      longtitude: item.longtitude,
+      latitudeOld: item.latitudeOld,
+      longtitudeOld: item.longtitudeOld,
+      imageList: item.imageList.map(i => {
+        return {
+          name: i.name,
+          path: i.path
+        }
+      }),
+      approve: item.appPerson,
+      status: item.status,
+      statusTH: item.statusTH,
+      createdAt: toThaiTime(item.createdAt)
+    }
+  })
+
+  return res.status(200).json({
+    status: '200',
+    message: 'StoreLatLong added successfully',
+    data: data
+  })
+}
+
+exports.getLatLongOrderDetail = async (req, res) => {
+  const { orderId } = req.query
+  const channel = req.headers['x-channel'] // 'credit' or 'cash'
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const { User } = getModelsByChannel(channel, res, userModel)
+  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+
+  const StoreLatLongData = await StoreLatLong.findOne({ orderId })
+  // console.log(orderId)
+
+  const data = {
+    orderId: StoreLatLongData.orderId,
+    storeId: StoreLatLongData.storeId,
+    name: StoreLatLongData.name,
+    area: StoreLatLongData.area,
+    zone: StoreLatLongData.zone,
+    latitude: StoreLatLongData.latitude,
+    longtitude: StoreLatLongData.longtitude,
+    imageList: StoreLatLongData.imageList.map(i => ({
+      name: i.name,
+      path: i.path
+    })),
+    approve: StoreLatLongData.appPerson,
+    status: StoreLatLongData.status,
+    statusTH: StoreLatLongData.statusTH,
+    createdAt: toThaiTime(StoreLatLongData.createdAt)
+  }
+
+  return res.status(200).json({
+    status: '200',
+    message: 'StoreLatLong added successfully',
+    data: data
+  })
+}
+
+exports.approveLatLongStore = async (req, res) => {
+  const { orderId, status, user } = req.body
+  let statusStr = status === true ? 'approved' : 'rejected'
+  let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ'
+  const channel = req.headers['x-channel']
+  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+  const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
+  const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
+
+  // console.log(orderId)
+
+  const storeLatLongData = await StoreLatLong.findOne({
+    orderId: orderId
+  })
+
+  if (!storeLatLongData) {
+    return res.status(404).json({
+      status: 404,
+      message: 'Not found order'
+    })
+  }
+
+  if (storeLatLongData.status !== 'pending') {
+    return res.status(409).json({
+      status: 409,
+      message: 'Order is not pending'
+    })
+  }
+
+  if (statusStr === 'approved') {
+    // const storeData = await Store.findOne({ storeId: storeLatLongData.storeId })
+
+    await StoreLatLong.findOneAndUpdate(
+      { orderId: storeLatLongData.orderId },
+      {
+        $set: {
+          status: statusStr,
+          statusTH: statusThStr,
+          'approve.dateAction': new Date(),
+          'approve.appPerson': user
+        }
+      }
+    )
+
+    await Store.findOneAndUpdate(
+      { storeId: storeLatLongData.storeId },
+      {
+        $set: {
+          latitude: storeLatLongData.latitude,
+          longtitude: storeLatLongData.longtitude
+        }
+      }
+    )
+  } else {
+    await StoreLatLong.findOneAndUpdate(
+      { orderId: storeLatLongData.orderId },
+      {
+        $set: {
+          status: statusStr,
+          statusTH: statusThStr,
+          'approve.dateAction': new Date(),
+          'approve.appPerson': user
+        }
+      }
+    )
+  }
+
+  await ApproveLogs.create({
+    module: 'approveLatLongStore',
+    user: user,
+    status: statusStr,
+    id: orderId
+  })
+
+  res.status(201).json({
+    status: 201,
+    message: 'Update status sucess'
+  })
+}
+
+exports.canceledOrderLatLongStore = async (req, res) => {
+  const { orderId, status, user } = req.body
+  const channel = req.headers['x-channel']
+  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+  const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
+  const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
+
+  const storeLatLongData = await StoreLatLong.findOne({
+    orderId: orderId
+  })
+
+  if (!storeLatLongData) {
+    return res.status(404).json({
+      status: 404,
+      message: 'Not found order'
+    })
+  }
+
+  await StoreLatLong.findOneAndUpdate(
+    { orderId: storeLatLongData.orderId },
+    {
+      $set: {
+        status: status,
+        statusTH: 'ยกเลิก',
+        'approve.dateAction': new Date(),
+        'approve.appPerson': user
+      }
+    }
+  )
+
+  await ApproveLogs.create({
+    module: 'canceledOrderLatLongStore',
+    user: user,
+    status: status,
+    id: orderId
+  })
+
+  res.status(201).json({
+    status: 201,
+    message: 'Update status sucess'
+  })
+}
+
+exports.getStorePage = async (req, res) => {
+  try {
+    const {
+      area,
+      type = 'all',
+      route,
+      page = 1,
+      limit = 20,
+      q // optional search text
+    } = req.query
+
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1)
+    const perPage = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100)
+
+    // ประกอบ filter แบบใส่เฉพาะคีย์ที่มีค่า
+    const filter = {}
+    if (area) filter.area = area
+    if (route) filter.route = route
+    if (type && type !== 'all') filter.type = type
+
+    const qText = (q || '').trim()
+    if (qText) {
+      filter.$or = [
+        { storeId: { $regex: qText, $options: 'i' } },
+        { name: { $regex: qText, $options: 'i' } }
+      ]
+    }
+    if (route) {
+      const routeData = await Route.findOne({ id: route })
+
+      const storeIds = routeData.listStore
+        .flatMap(item => item.storeInfo)
+        .map(id => new Types.ObjectId(id))
+      // console.log(storeIds)
+
+      docs = await Store.find({ _id: { $in: storeIds } })
+    } else {
+      docs = await Store.find(filter)
+        .sort({ createdAt: -1 }) // คงลำดับให้เสถียร
+        .skip((pageNum - 1) * perPage)
+        .limit(perPage)
+        .lean()
+    }
+
+    const total = await Store.countDocuments(filter)
+
+    res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: docs,
+      meta: {
+        page: pageNum,
+        limit: perPage,
+        total,
+        hasMore: pageNum * perPage < total
+      }
+    })
+  } catch (err) {
+    console.error('getStorePage error:', err)
+    res.status(500).json({ message: 'Server error' })
   }
 }

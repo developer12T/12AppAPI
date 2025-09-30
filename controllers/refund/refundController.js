@@ -20,6 +20,7 @@ const productModel = require('../../models/cash/product')
 const userModel = require('../../models/cash/user')
 const stockModel = require('../../models/cash/stock')
 const storeModel = require('../../models/cash/store')
+const approveLogModel = require('../../models/cash/approveLog')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { ItemLotM3 } = require('../../models/cash/master')
 const { Op, literal } = require('sequelize')
@@ -182,6 +183,7 @@ exports.checkout = async (req, res) => {
         area: storeData.area,
         zone: storeData.zone
       },
+      shipping: shipping,
       note,
       latitude,
       longitude,
@@ -220,7 +222,7 @@ exports.checkout = async (req, res) => {
         area: summary.store.area,
         zone: summary.store.zone
       },
-      // shipping: shipping,
+      shipping: shipping,
       note,
       latitude,
       longitude,
@@ -895,6 +897,43 @@ exports.refundExcel = async (req, res) => {
   )
 }
 
+exports.getRefundPending = async (req, res) => {
+  try {
+    const { type, area, zone, team, store, period, start, end } = req.query
+
+    const channel = req.headers['x-channel']
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+
+    let areaQuery = {}
+
+    if (area) {
+      areaQuery['store.area'] = area
+    } else if (zone) {
+      areaQuery['store.zone'] = zone
+    }
+
+    areaQuery.status = 'pending'
+
+    let query = {
+      type,
+      ...areaQuery,
+      ...(period ? { period } : {})
+    }
+
+    const pipeline = [{ $match: query }]
+    const refunds = await Refund.aggregate(pipeline)
+
+    res.status(200).json({
+      status: 200,
+      message: 'Successful!',
+      data: refunds.length
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
 exports.getRefund = async (req, res) => {
   try {
     const { type, area, zone, team, store, period, start, end } = req.query
@@ -1040,6 +1079,7 @@ exports.getRefund = async (req, res) => {
           totalRefund: totalRefund.toFixed(2),
           total: total,
           status: refund.status,
+          statusTH: refund.statusTH,
           createdAt: refund.createdAt,
           updatedAt: refund.updatedAt
         }
@@ -1243,9 +1283,9 @@ exports.addSlip = async (req, res) => {
 const orderUpdateTimestamps = {}
 exports.updateStatus = async (req, res) => {
   try {
-    const { orderId, status } = req.body
+    const { orderId, status, user } = req.body
     const channel = req.headers['x-channel']
-
+    const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
     const { Refund } = getModelsByChannel(channel, res, refundModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
 
@@ -1428,6 +1468,20 @@ exports.updateStatus = async (req, res) => {
       data: orderId
     })
 
+    await ApproveLogs.create({
+      module: 'approveRefund',
+      user: user,
+      status: status,
+      id: orderId
+    })
+
+    await ApproveLogs.create({
+      module: 'approveChange',
+      user: user,
+      status: status,
+      id: changeOrder.orderId
+    })
+
     res.status(200).json({
       status: 200,
       message: 'Updated status successfully!'
@@ -1490,4 +1544,158 @@ exports.deleteRefund = async (req, res) => {
     console.error('Error updating refund status:', error)
     res.status(500).json({ status: 500, message: 'Server error' })
   }
+}
+
+exports.cancelApproveRefund = async (req, res) => {
+  try {
+    const { orderId, status, user } = req.body
+    if (!orderId || !status) {
+      return res
+        .status(400)
+        .json({ status: 400, message: 'orderId and status are required!' })
+    }
+
+    const channel = req.headers['x-channel']
+    const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+
+    const changeOrder = await Order.findOne({ reference: orderId })
+    if (!changeOrder) {
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Not found change Order' })
+    }
+
+    const refundOrder = await Refund.findOne({ orderId })
+    if (!refundOrder) {
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Refund order not found!' })
+    }
+
+    if (refundOrder.status !== 'pending' && status !== 'canceled') {
+      return res.status(400).json({
+        status: 400,
+        message: 'Cannot update status, refund is not in pending state!'
+      })
+    }
+
+    let statusTH = ''
+    if (status === 'canceled') statusTH = 'ยกเลิก'
+    else if (status === 'reject') statusTH = 'ถูกปฏิเสธ'
+
+    let newOrderId = orderId
+    if (status === 'canceled' || status === 'reject') {
+      newOrderId = changeOrder.orderId
+      if (!/CC\d+$/.test(newOrderId)) {
+        let n = 1
+        while (await Order.exists({ orderId: `${changeOrder.orderId}CC${n}` }))
+          n++
+        newOrderId = `${changeOrder.orderId}CC${n}`
+      }
+
+      for (const item of changeOrder.listProduct) {
+        const hasError = await updateStockMongo(
+          { id: item.id, unit: item.unit, qty: item.qty },
+          changeOrder.store.area,
+          changeOrder.period,
+          'orderCanceled',
+          channel,
+          res
+        )
+        if (hasError) {
+          return res
+            .status(500)
+            .json({ status: 500, message: 'Stock update error' })
+        }
+      }
+    }
+
+    await Refund.findOneAndUpdate(
+      { orderId },
+      { $set: { status, statusTH } },
+      { new: true }
+    )
+    await Order.findOneAndUpdate(
+      { orderId: refundOrder.reference, type: 'change' },
+      { $set: { status, statusTH } },
+      { new: true }
+    )
+
+    const io = getSocket()
+    io.emit('refund/updateStatus', {
+      status: 200,
+      message: 'Updated status successfully!',
+      data: orderId
+    })
+
+    await ApproveLogs.create({
+      module: 'approveRefund',
+      user,
+      status,
+      statusTH,
+      id: orderId
+    })
+    await ApproveLogs.create({
+      module: 'approveChange',
+      user,
+      status,
+      statusTH,
+      id: newOrderId
+    })
+
+    res
+      .status(200)
+      .json({ status: 200, message: 'Updated status successfully!' })
+  } catch (error) {
+    console.error('Error updating refund status:', error)
+    res.status(500).json({ status: 500, message: 'Server error' })
+  }
+}
+
+exports.updateAddressChange = async (req, res) => {
+  const channel = req.headers['x-channel']
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+  const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
+
+  const changeData = await Order.find({ type: 'change' })
+  const storeId = [...new Set(changeData.flatMap(item => item.store.storeId))]
+
+  const storeData = await Store.find({ storeId: { $in: storeId } })
+
+  for (i of changeData) {
+    const store = storeData.find(item => item.storeId === i.store.storeId)
+
+    // console.log(store.storeId)
+
+    const shipping = store.shippingAddress[0]
+
+    await Order.findOneAndUpdate(
+      { orderId: i.orderId }, // filter
+      {
+        $set: {
+          shipping: {
+            default: shipping?.default ?? '',
+            shippingId: shipping?.shippingId ?? '',
+            address: shipping?.address ?? '',
+            district: shipping?.district ?? '',
+            subDistrict: shipping?.subDistrict ?? '',
+            province: shipping?.province ?? '',
+            postCode: shipping?.postCode ?? '',
+            latitude: shipping?.latitude ?? '0',
+            longtitude: shipping?.longtitude ?? '0'
+          }
+        }
+      },
+      { new: true } // options: คืนค่าที่อัปเดตแล้ว
+    )
+  }
+
+  res.status(200).json({
+    status: 200,
+    message: 'Updated status successfully!',
+    // storeId,
+    data: changeData
+  })
 }

@@ -387,10 +387,14 @@ const DisributionM3 = sequelize.define(
       primaryKey: true,
       field: 'MGTRNR'
     },
+    MGTRDT: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      field: 'MGTRDT'
+    },
     MGTRSL: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      primaryKey: true,
       field: 'MGTRSL'
     },
     MGTRSH: {

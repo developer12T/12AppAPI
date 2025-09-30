@@ -8,7 +8,7 @@ const imageSchema = mongoose.Schema({
 
 const sendMoneySchema = mongoose.Schema({
   area: { type: String, require: true },
-  preiod: { type: String, require: true },
+  period: { type: String, require: true },
   sendmoney: { type: Number, require: true },
   different: { type: Number, require: true },
   imageList: [imageSchema],

@@ -32,7 +32,9 @@ const {
   orderPowerBI,
   updateCompletedOrder,
   getTargetProduct,
-  getOrderExcelNew
+  getOrderExcelNew,
+  updatePaymentOrder,
+  updateAddressInOrder
 } = require('../../controllers/sale/orderController')
 
 const router = express.Router()
@@ -77,4 +79,6 @@ router.get('/getTargetProduct', getTargetProduct)
 
 
 router.get('/getOrderExcelNew', getOrderExcelNew)
+router.post('/updatePaymentOrder', updatePaymentOrder)
+router.post('/updateAddressInOrder',updateAddressInOrder)
 module.exports = router
