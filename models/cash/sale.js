@@ -151,6 +151,7 @@ const orderSchema = new mongoose.Schema(
     discountProduct: { type: Number, default: 0 },
     vat: { type: Number, default: 0 },
     totalExVat: { type: Number, default: 0 },
+    qr: { type: Number, default: 0 },
     total: { type: Number, require: true },
     paymentMethod: { type: String, require: true },
     paymentStatus: { type: String, default: 'unpaid' },
