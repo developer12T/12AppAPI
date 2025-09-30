@@ -6440,9 +6440,6 @@ exports.updateAddressInOrder = async (req, res) => {
       status: 200,
       message: 'Sucess',
       data: dataOrder
-      status: 200,
-      message: 'Sucess',
-      data: dataOrder
     })
   } catch (error) {
     console.error('Error in updatePaymentOrder:', error)
@@ -6453,3 +6450,5 @@ exports.updateAddressInOrder = async (req, res) => {
     })
   }
 }
+
+
