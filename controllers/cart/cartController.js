@@ -707,7 +707,7 @@ exports.deleteProduct = async (req, res) => {
     const { type, area, storeId, id, unit, condition, expire } = req.body
     const channel = req.headers['x-channel']
 
-    const storeIdAndId = `${type}_${storeId}_${id}`
+    const storeIdAndId = `${type}_${storeId}_${id}_${unit}`
     const now = Date.now()
     const lastUpdate = productTimestamps[storeIdAndId] || 0
     const ONE_MINUTE = 15 * 1000
