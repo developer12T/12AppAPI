@@ -19,6 +19,7 @@ const {
 const fs = require('fs')
 
 const { sequelize, DataTypes } = require('../../config/m3db')
+const { Op } = require('sequelize')
 const { getSocket } = require('../../socket')
 
 const userModel = require('../../models/cash/user')
