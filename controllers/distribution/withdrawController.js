@@ -509,9 +509,10 @@ exports.getOrderPending = async (req, res) => {
     } else if (zone) {
       areaQuery.area = { $regex: `^${zone}`, $options: 'i' }
     }
-    const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
-    startDate = range.startDate
-    endDate = range.endDate
+
+    // const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
+    // startDate = range.startDate
+    // endDate = range.endDate
 
     statusQuery.status = {
       $in: ['pending']
@@ -520,8 +521,8 @@ exports.getOrderPending = async (req, res) => {
     let query = {
       ...areaQuery,
       ...(period ? { period } : {}),
-      ...statusQuery,
-       createdAt: { $gte: startDate, $lt: endDate },
+      ...statusQuery
+      // createdAt: { $gte: startDate, $lt: endDate }
     }
 
     const pipeline = [{ $match: query }]
@@ -590,7 +591,7 @@ exports.getOrder = async (req, res) => {
 
     if (type === 'pending') {
       statusQuery.status = {
-        $in: ['pending', 'approved', 'onprocess', 'success']
+        $in: ['pending', 'approved', 'onprocess', 'success', 'supapproved']
       }
     } else if (type === 'history') {
       statusQuery.status = {
@@ -762,6 +763,7 @@ exports.getOrderSup = async (req, res) => {
           'rejected',
           'success',
           'confirm',
+          'supapproved',
           'canceled'
         ]
       }
@@ -783,7 +785,7 @@ exports.getOrderSup = async (req, res) => {
     let query = {
       ...areaQuery,
       ...(period ? { period } : {}),
-      withdrawType: { $ne: 'credit' },
+      // withdrawType: { $ne: 'credit' },
       createdAt: { $gte: startDate, $lt: endDate },
       ...statusQuery
     }
@@ -1333,7 +1335,7 @@ exports.cancelWithdraw = async (req, res) => {
       {
         $push: {
           approve: {
-            dateSend: new Date(),   // หรือจะไม่ใส่ก็ได้ถ้ามี default
+            dateSend: new Date(), // หรือจะไม่ใส่ก็ได้ถ้ามี default
             dateAction: new Date(),
             role: role,
             appPerson: user,
@@ -1346,9 +1348,7 @@ exports.cancelWithdraw = async (req, res) => {
         }
       },
       { new: true }
-    );
-
-
+    )
 
     await ApproveLogs.create({
       module: 'cancelWithdraw',
@@ -1481,8 +1481,6 @@ exports.approveWithdraw = async (req, res) => {
           }
         }
       }
-
-
 
       const withdrawType = await Option.findOne({ module: 'withdraw' })
       const withdrawTypeTh = withdrawType.list.find(
@@ -1637,12 +1635,13 @@ exports.approveWithdrawCredit = async (req, res) => {
     const { Option } = getModelsByChannel(channel, res, optionsModel)
     const { Npd } = getModelsByChannel(channel, res, npdModel)
     const { User } = getModelsByChannel(channel, res, userModel)
-    const { Distribution, WereHouse,Withdraw } = getModelsByChannel(
+    const { Distribution, WereHouse, Withdraw } = getModelsByChannel(
       channel,
       res,
       distributionModel
     )
 
+    let statusTH
 
     if (!orderId || !status) {
       return res
@@ -1652,11 +1651,15 @@ exports.approveWithdrawCredit = async (req, res) => {
 
     const distributionTran = await Distribution.findOne({ orderId })
     if (!distributionTran) {
-      return res.status(404).json({ status: 404, message: 'Distribution not found!' })
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Distribution not found!' })
     }
 
-    if (distributionTran.withdrawType != "credit") {
-      return res.status(401).json({ status: 404, message: 'Distribution is not credit!' })
+    if (distributionTran.withdrawType != 'credit') {
+      return res
+        .status(401)
+        .json({ status: 404, message: 'Distribution is not credit!' })
     }
 
     if (status === 'approved') {
@@ -1665,7 +1668,6 @@ exports.approveWithdrawCredit = async (req, res) => {
       statusTH = 'ไม่อนุมัติ'
     } else if (status === 'supapproved') {
       statusTH = 'ซุปอนุมัติ'
-
       const userData = await User.findOne({
         role: 'sale',
         area: distributionTran.area
@@ -1679,7 +1681,6 @@ exports.approveWithdrawCredit = async (req, res) => {
       }).select('wh_name')
 
       if (distributionTran.area != 'IT211') {
-
         if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
           sendEmail({
             to: email.Dc_Email,
@@ -1691,12 +1692,15 @@ exports.approveWithdrawCredit = async (req, res) => {
           <p>
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName
-              }<br>
-            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
-              }<br>
-            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
-              }<br>
+            <strong>ประเภทการจัดส่ง:</strong> ${
+              distributionTran.orderTypeName
+            }<br>
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
+              '-' + wereHouseName?.wh_name || ''
+            }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
+              distributionTran.shippingName
+            }<br>
             <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
             <strong>เขต:</strong> ${distributionTran.area}<br>
             <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -1714,7 +1718,7 @@ exports.approveWithdrawCredit = async (req, res) => {
       {
         $push: {
           approve: {
-            dateSend: new Date(),   // หรือจะไม่ใส่ก็ได้ถ้ามี default
+            dateSend: new Date(), // หรือจะไม่ใส่ก็ได้ถ้ามี default
             dateAction: new Date(),
             role: role,
             appPerson: user,
@@ -1727,7 +1731,7 @@ exports.approveWithdrawCredit = async (req, res) => {
         }
       },
       { new: true }
-    );
+    )
 
     await ApproveLogs.create({
       module: 'approveWithdraw',
@@ -1735,7 +1739,6 @@ exports.approveWithdrawCredit = async (req, res) => {
       status: status,
       id: orderId
     })
-
 
     const io = getSocket()
     io.emit('distribution/approveWithdrawCredit', {
@@ -1752,7 +1755,6 @@ exports.approveWithdrawCredit = async (req, res) => {
     res.status(500).json({ status: 500, message: 'Server error' })
   }
 }
-
 
 const withdrawUpdateTimestamps = {}
 
