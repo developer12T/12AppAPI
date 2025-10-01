@@ -1434,41 +1434,41 @@ exports.approveWithdraw = async (req, res) => {
         }))
       }
       data.push(dataTran)
-
-      let response
-      try {
-        if (distributionTran.withdrawType != 'credit') {
-          response = await axios.post(
-            `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
-            data
-          )
-        }
-      } catch (err) {
-        if (err.response) {
-          console.log('API error response:', err.response.data)
-          console.log('Status:', err.response.status)
-          return res.status(500).json({
-            status: 500,
-            message: 'External API failed',
-            error: err.response.data // <-- error ที่มาจากปลายทางจริง
-          })
-        } else if (err.request) {
-          console.log('No response from API:', err.message)
-          return res.status(500).json({
-            status: 500,
-            message: 'External API unreachable',
-            error: err.message
-          })
-        } else {
-          console.log('Other error:', err.message)
-          return res.status(500).json({
-            status: 500,
-            message: 'External API error',
-            error: err.message
-          })
+      if (distributionTran.area != 'IT211') {
+        let response
+        try {
+          if (distributionTran.withdrawType != 'credit') {
+            response = await axios.post(
+              `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
+              data
+            )
+          }
+        } catch (err) {
+          if (err.response) {
+            console.log('API error response:', err.response.data)
+            console.log('Status:', err.response.status)
+            return res.status(500).json({
+              status: 500,
+              message: 'External API failed',
+              error: err.response.data // <-- error ที่มาจากปลายทางจริง
+            })
+          } else if (err.request) {
+            console.log('No response from API:', err.message)
+            return res.status(500).json({
+              status: 500,
+              message: 'External API unreachable',
+              error: err.message
+            })
+          } else {
+            console.log('Other error:', err.message)
+            return res.status(500).json({
+              status: 500,
+              message: 'External API error',
+              error: err.message
+            })
+          }
         }
       }
-
 
 
 
@@ -1535,7 +1535,7 @@ exports.approveWithdraw = async (req, res) => {
             approve: {
               dateSend: new Date(),   // หรือจะไม่ใส่ก็ได้ถ้ามี default
               dateAction: new Date(),
-              role:role,
+              role: role,
               appPerson: user,
               status: statusStr
             }
@@ -1569,7 +1569,7 @@ exports.approveWithdraw = async (req, res) => {
             approve: {
               dateSend: new Date(),   // หรือจะไม่ใส่ก็ได้ถ้ามี default
               dateAction: new Date(),
-              role:role,
+              role: role,
               appPerson: user,
               status: statusStr
             }
