@@ -1469,11 +1469,8 @@ exports.approveWithdraw = async (req, res) => {
         }
       }
 
-      const distributionData = await Distribution.findOneAndUpdate(
-        { orderId: orderId, type: 'withdraw' },
-        { $set: { statusTH: statusThStr, status: statusStr } },
-        { new: true }
-      )
+
+
 
       const withdrawType = await Option.findOne({ module: 'withdraw' })
       const withdrawTypeTh = withdrawType.list.find(
@@ -1492,25 +1489,26 @@ exports.approveWithdraw = async (req, res) => {
         wh_code: distributionTran.fromWarehouse
       }).select('wh_name')
 
-      // console.log(process.env.BANK_MAIL)
-      // console.log(process.env.CA_DB_URI,process.env.UAT_CHECK)
-      if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
-        sendEmail({
-          to: email.Dc_Email,
-          // cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
-          cc: process.env.IT_MAIL,
-          subject: `${distributionTran.orderId} 12App cash`,
-          html: `
+      if (distributionTran.area != 'IT211') {
+
+
+        if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
+          sendEmail({
+            to: email.Dc_Email,
+            // cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
+            cc: process.env.IT_MAIL,
+            subject: `${distributionTran.orderId} 12App cash`,
+            html: `
           <h1>แจ้งการส่งใบขอเบิกผ่านทางอีเมล</h1>
           <p>
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
             <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName
-            }<br>
+              }<br>
             <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
-            }<br>
+              }<br>
             <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
-            }<br>
+              }<br>
             <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
             <strong>เขต:</strong> ${distributionTran.area}<br>
             <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -1518,7 +1516,9 @@ exports.approveWithdraw = async (req, res) => {
             <strong>หมายเหตุ:</strong> ${distributionTran.remark}
           </p>
         `
-        })
+          })
+        }
+
       }
 
       const io = getSocket()
@@ -1527,6 +1527,25 @@ exports.approveWithdraw = async (req, res) => {
         message: 'successfully',
         data: dataTran
       })
+
+      const distributionData = await Distribution.findOneAndUpdate(
+        { orderId: orderId, type: 'withdraw' },
+        {
+          $push: {
+            approve: {
+              dateSend: new Date(),   // หรือจะไม่ใส่ก็ได้ถ้ามี default
+              dateAction: new Date(),
+              appPerson: user,
+              status: statusStr
+            }
+          },
+          $set: {
+            statusTH: statusThStr,
+            status: statusStr
+          }
+        },
+        { new: true }
+      );
 
       await ApproveLogs.create({
         module: 'approveWithdraw',
@@ -1541,11 +1560,26 @@ exports.approveWithdraw = async (req, res) => {
         data: dataTran
       })
     } else {
+
       const distributionData = await Distribution.findOneAndUpdate(
         { orderId: orderId, type: 'withdraw' },
-        { $set: { statusTH: statusThStr, status: statusStr } },
+        {
+          $push: {
+            approve: {
+              dateSend: new Date(),   // หรือจะไม่ใส่ก็ได้ถ้ามี default
+              dateAction: new Date(),
+              appPerson: user,
+              status: statusStr
+            }
+          },
+          $set: {
+            statusTH: statusThStr,
+            status: statusStr
+          }
+        },
         { new: true }
-      )
+      );
+
       if (distributionData.newTrip === 'true') {
         await Npd.findOneAndUpdate(
           { period: distributionData.period },
