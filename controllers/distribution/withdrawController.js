@@ -1309,7 +1309,7 @@ exports.addFromERPWithdraw = async (req, res) => {
 }
 exports.cancelWithdraw = async (req, res) => {
   try {
-    const { orderId, user,role } = req.body
+    const { orderId, user, role } = req.body
     const channel = req.headers['x-channel']
     const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
     const { Distribution } = getModelsByChannel(channel, res, distributionModel)
@@ -1629,6 +1629,135 @@ exports.approveWithdraw = async (req, res) => {
     })
   }
 }
+
+exports.approveWithdrawCredit = async (req, res) => {
+  try {
+    const { orderId, status, user, role } = req.body
+
+    const channel = req.headers['x-channel']
+
+    const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
+    const { Option } = getModelsByChannel(channel, res, optionsModel)
+    const { Npd } = getModelsByChannel(channel, res, npdModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { Distribution, WereHouse,Withdraw } = getModelsByChannel(
+      channel,
+      res,
+      distributionModel
+    )
+
+
+    if (!orderId || !status) {
+      return res
+        .status(400)
+        .json({ status: 400, message: 'orderId, status are required!' })
+    }
+
+    const distributionTran = await Distribution.findOne({ orderId })
+    if (!distributionTran) {
+      return res.status(404).json({ status: 404, message: 'Distribution not found!' })
+    }
+
+    if (distributionTran.withdrawType != "credit") {
+      return res.status(401).json({ status: 404, message: 'Distribution is not credit!' })
+    }
+
+    if (status === 'approved') {
+      statusTH = 'อนุมัติ'
+    } else if (status === 'rejected') {
+      statusTH = 'ไม่อนุมัติ'
+    } else if (status === 'supapproved') {
+      statusTH = 'ซุปอนุมัติ'
+
+      const userData = await User.findOne({
+        role: 'sale',
+        area: distributionTran.area
+      })
+      const email = await Withdraw.findOne({
+        ROUTE: distributionTran.shippingRoute,
+        Des_No: distributionTran.shippingId
+      }).select('Dc_Email Des_Name')
+      const wereHouseName = await WereHouse.findOne({
+        wh_code: distributionTran.fromWarehouse
+      }).select('wh_name')
+
+      if (distributionTran.area != 'IT211') {
+
+        if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
+          sendEmail({
+            to: email.Dc_Email,
+            // cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
+            cc: process.env.IT_MAIL,
+            subject: `${distributionTran.orderId} 12App cash`,
+            html: `
+          <h1>แจ้งการส่งใบขอเบิกผ่านทางอีเมล</h1>
+          <p>
+            <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
+            <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
+            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName
+              }<br>
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
+              }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
+              }<br>
+            <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
+            <strong>เขต:</strong> ${distributionTran.area}<br>
+            <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
+            <strong>เบอร์โทรศัพท์เซลล์:</strong> ${userData.tel}<br>
+            <strong>หมายเหตุ:</strong> ${distributionTran.remark}
+          </p>
+        `
+          })
+        }
+      }
+    }
+
+    const distributionData = await Distribution.findOneAndUpdate(
+      { orderId: orderId, type: 'withdraw' },
+      {
+        $push: {
+          approve: {
+            dateSend: new Date(),   // หรือจะไม่ใส่ก็ได้ถ้ามี default
+            dateAction: new Date(),
+            role: role,
+            appPerson: user,
+            status: status
+          }
+        },
+        $set: {
+          statusTH: statusTH,
+          status: status
+        }
+      },
+      { new: true }
+    );
+
+    await ApproveLogs.create({
+      module: 'approveWithdraw',
+      user: user,
+      status: status,
+      id: orderId
+    })
+
+
+    const io = getSocket()
+    io.emit('distribution/approveWithdrawCredit', {
+      status: 200,
+      message: 'Updated status successfully!'
+    })
+
+    res.status(200).json({
+      status: 200,
+      message: 'Updated status successfully!'
+    })
+  } catch (error) {
+    console.error('Error updating order:', error)
+    res.status(500).json({ status: 500, message: 'Server error' })
+  }
+}
+
 
 const withdrawUpdateTimestamps = {}
 
