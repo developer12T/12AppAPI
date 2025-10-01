@@ -127,6 +127,13 @@ const distributionSchema = mongoose.Schema({
     lineM3: { type: String },
     lowStatus: { type: String },
     heightStatus: { type: String },
+    approve: [{
+        dateSend: { type: Date, default: Date.now },
+        dateAction: { type: Date, default: Date.now },
+        role: { type: String, },
+        appPerson: { type: String, },
+        status: { type: String, }
+    }]
 }, {
     timestamps: true
 })
