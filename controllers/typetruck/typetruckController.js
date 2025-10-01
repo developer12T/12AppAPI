@@ -32,9 +32,17 @@ exports.utilize = async (req, res) => {
   const { Distribution } = getModelsByChannel(channel, res, DistributionModel)
 
   const dataStock = await Stock.findOne({ area: area, period: period })
+  if (!dataStock) {
+    return res.status(404).json({
+      status: 404,
+      message: 'Not found Stock'
+    })
+  }
   const productIds = dataStock.listProduct.flatMap(item => {
     return item.productId
   })
+
+
 
   const dataTypetrucks = await Typetrucks.findOne({ type_name: typetruck })
   const datawithdraw = await Distribution.find({

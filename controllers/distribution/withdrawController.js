@@ -1671,6 +1671,10 @@ exports.approveWithdrawCredit = async (req, res) => {
     } else if (status === 'supapproved') {
       statusTH = 'ซุปอนุมัติ'
 
+      const withdrawType = await Option.findOne({ module: 'withdraw' })
+      const withdrawTypeTh = withdrawType.list.find(
+        item => item.value === distributionTran.withdrawType
+      ).name
       const userData = await User.findOne({
         role: 'sale',
         area: distributionTran.area
