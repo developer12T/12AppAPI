@@ -377,14 +377,6 @@ exports.getOrderCredit = async (req, res) => {
       $in: ['approved', 'rejected', 'success', 'confirm', 'pending']
     }
 
-    // if (type === 'pending') {
-    //   statusQuery.status = { $in: ['pending', 'approved', 'rejected'] }
-    // } else if (type === 'history') {
-    //   statusQuery.status = {
-    //     $in: ['approved', 'rejected', 'success', 'confirm','pending']
-    //   }
-    // }
-
     // const status = type === 'history' ? { $ne: 'pending' } : 'pending'
     let areaQuery = {}
 
@@ -463,9 +455,9 @@ exports.getOrderCredit = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -511,12 +503,15 @@ exports.getOrderPending = async (req, res) => {
     // console.log(area)
     // console.log(period)
     // console.log(zone)
-
+    let startDate, endDate
     if (area) {
       areaQuery.area = area
     } else if (zone) {
       areaQuery.area = { $regex: `^${zone}`, $options: 'i' }
     }
+    const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
+    startDate = range.startDate
+    endDate = range.endDate
 
     statusQuery.status = {
       $in: ['pending']
@@ -525,7 +520,8 @@ exports.getOrderPending = async (req, res) => {
     let query = {
       ...areaQuery,
       ...(period ? { period } : {}),
-      ...statusQuery
+      ...statusQuery,
+       createdAt: { $gte: startDate, $lt: endDate },
     }
 
     const pipeline = [{ $match: query }]
@@ -680,9 +676,9 @@ exports.getOrder = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -853,9 +849,9 @@ exports.getOrderSup = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           newTrip: o.newTrip,
@@ -1469,9 +1465,6 @@ exports.approveWithdraw = async (req, res) => {
         }
       }
 
-
-
-
       const withdrawType = await Option.findOne({ module: 'withdraw' })
       const withdrawTypeTh = withdrawType.list.find(
         item => item.value === distributionTran.withdrawType
@@ -1490,8 +1483,6 @@ exports.approveWithdraw = async (req, res) => {
       }).select('wh_name')
 
       if (distributionTran.area != 'IT211') {
-
-
         if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
           sendEmail({
             to: email.Dc_Email,
@@ -1503,12 +1494,15 @@ exports.approveWithdraw = async (req, res) => {
           <p>
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName
-              }<br>
-            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
-              }<br>
-            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
-              }<br>
+            <strong>ประเภทการจัดส่ง:</strong> ${
+              distributionTran.orderTypeName
+            }<br>
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
+              '-' + wereHouseName?.wh_name || ''
+            }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
+              distributionTran.shippingName
+            }<br>
             <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
             <strong>เขต:</strong> ${distributionTran.area}<br>
             <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -1518,7 +1512,6 @@ exports.approveWithdraw = async (req, res) => {
         `
           })
         }
-
       }
 
       const io = getSocket()
@@ -1533,9 +1526,9 @@ exports.approveWithdraw = async (req, res) => {
         {
           $push: {
             approve: {
-              dateSend: new Date(),   // หรือจะไม่ใส่ก็ได้ถ้ามี default
+              dateSend: new Date(), // หรือจะไม่ใส่ก็ได้ถ้ามี default
               dateAction: new Date(),
-              role:role,
+              role: role,
               appPerson: user,
               status: statusStr
             }
@@ -1546,7 +1539,7 @@ exports.approveWithdraw = async (req, res) => {
           }
         },
         { new: true }
-      );
+      )
 
       await ApproveLogs.create({
         module: 'approveWithdraw',
@@ -1561,15 +1554,14 @@ exports.approveWithdraw = async (req, res) => {
         data: dataTran
       })
     } else {
-
       const distributionData = await Distribution.findOneAndUpdate(
         { orderId: orderId, type: 'withdraw' },
         {
           $push: {
             approve: {
-              dateSend: new Date(),   // หรือจะไม่ใส่ก็ได้ถ้ามี default
+              dateSend: new Date(), // หรือจะไม่ใส่ก็ได้ถ้ามี default
               dateAction: new Date(),
-              role:role,
+              role: role,
               appPerson: user,
               status: statusStr
             }
@@ -1580,7 +1572,7 @@ exports.approveWithdraw = async (req, res) => {
           }
         },
         { new: true }
-      );
+      )
 
       if (distributionData.newTrip === 'true') {
         await Npd.findOneAndUpdate(
@@ -1730,8 +1722,9 @@ exports.saleConfirmWithdraw = async (req, res) => {
         const ReceiveQty = Object.values(
           Receive.reduce((acc, cur) => {
             // ใช้ key จาก coNo + withdrawUnit + productId (ถ้าอยากแยกตาม productId ด้วย)
-            const key = `${cur.coNo}_${cur.withdrawUnit
-              }_${cur.productId.trim()}`
+            const key = `${cur.coNo}_${
+              cur.withdrawUnit
+            }_${cur.productId.trim()}`
             if (!acc[key]) {
               acc[key] = { ...cur }
             } else {
@@ -2184,7 +2177,7 @@ exports.withdrawToExcel = async (req, res) => {
 
     const tranFromOrder = modelWithdraw.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD(date) {
+      function formatDateToThaiYYYYMMDD (date) {
         const d = new Date(date)
         // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -2274,7 +2267,7 @@ exports.withdrawToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       }
     )
   } catch (error) {
@@ -2484,7 +2477,7 @@ exports.withdrawBackOrderToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
   }
 }
@@ -2532,7 +2525,7 @@ exports.withdrawCheckM3 = async (req, res) => {
 
   const withdrawData = await Distribution.find({
     status: ['approved', 'confirm'],
-    withdrawType: { $ne: "credit" },
+    withdrawType: { $ne: 'credit' },
     area: { $ne: 'IT211' }
   })
 
@@ -2557,11 +2550,10 @@ exports.withdrawCheckM3 = async (req, res) => {
 
   res.status(200).json({
     status: 200,
-    message: "fetch Sucess",
+    message: 'fetch Sucess',
     data: NotInM3
   })
 }
-
 
 exports.getWithdrawError = async (req, res) => {
   const channel = req.headers['x-channel']
@@ -2569,7 +2561,7 @@ exports.getWithdrawError = async (req, res) => {
 
   const withdrawData = await Distribution.find({
     status: ['approved', 'confirm'],
-    withdrawType: { $ne: "credit" },
+    withdrawType: { $ne: 'credit' },
     area: { $ne: 'IT211' }
   })
 
@@ -2577,19 +2569,19 @@ exports.getWithdrawError = async (req, res) => {
 
   for (item of withdrawData) {
     let typeError = ''
-    const mgHead = await DisributionM3.findOne({ where: { coNo: item.orderId } })
+    const mgHead = await DisributionM3.findOne({
+      where: { coNo: item.orderId }
+    })
     const countProduct = item.listProduct.length
 
     if (mgHead) {
       if (countProduct === parseInt(item.lineM3)) {
-        typeError = 'สินค้าครบ';
+        typeError = 'สินค้าครบ'
       } else {
-        typeError = 'สินค้าไม่ครบ';
+        typeError = 'สินค้าไม่ครบ'
       }
-
     } else {
       typeError = 'ไม่เข้าระบบ M3'
-
     }
 
     const dataTran = {
@@ -2613,42 +2605,35 @@ exports.getWithdrawError = async (req, res) => {
       createdAt: toThaiTime(item.createdAt),
       updatedAt: toThaiTime(item.updatedAt),
       listProduct: countProduct,
-      lineM3: item.lineM3 || "0",
-      heightStatus: item.heightStatus || "0",
-      lowStatus: item.lowStatus || "0",
+      lineM3: item.lineM3 || '0',
+      heightStatus: item.heightStatus || '0',
+      lowStatus: item.lowStatus || '0',
       typeError: typeError
     }
     data.push(dataTran)
   }
 
-
-
-
-
   res.status(200).json({
     status: 200,
-    message: "fetch Sucess",
+    message: 'fetch Sucess',
     data: data
   })
 }
 
 exports.UpdateWithdrawConjob = async (req, res) => {
-
   const channel = req.headers['x-channel']
   const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
   const withdrawData = await Distribution.find({
     // status: ['approved', 'confirm'],
-    withdrawType: { $ne: "credit" },
+    withdrawType: { $ne: 'credit' },
     area: { $ne: 'IT211' }
   })
 
-
   for (i of withdrawData) {
-
     const mgHead = await DisributionM3.findOne({ where: { coNo: i.orderId } })
     if (mgHead) {
-      const count = await MGLINE.count({ where: { MRTRNR: i.orderId } });
+      const count = await MGLINE.count({ where: { MRTRNR: i.orderId } })
       const lowStatus = mgHead.MGTRSL
       const highStatus = mgHead.MGTRSH
 
@@ -2665,10 +2650,9 @@ exports.UpdateWithdrawConjob = async (req, res) => {
     }
   }
 
-
   res.status(200).json({
     status: 200,
-    message: "Update Sucess",
+    message: 'Update Sucess'
     // data: NotInM3
   })
 }
