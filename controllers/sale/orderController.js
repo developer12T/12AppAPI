@@ -6406,8 +6406,35 @@ exports.updateAddressInOrder = async (req, res) => {
     const { storeId } = req.body
     const channel = req.headers['x-channel']
     const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
+    const storeData = await Store.findOne({ storeId: storeId })
     const dataOrder = await Order.find({ 'store.storeId': storeId })
+
+
+    const addressFinal = isAug2025OrLater(storeData.createdAt)
+      ? [
+        storeData.address,
+        storeData.subDistrict && `ต.${storeData.subDistrict}`,
+        storeData.district && `อ.${storeData.district}`,
+        storeData.province && `จ.${storeData.province}`,
+        storeData.postCode
+      ]
+        .filter(Boolean)
+        .join(' ')
+      : storeData.address
+
+
+    for (i of dataOrder) {
+      // await i.findOneAndUpdate(
+      //   { orderId: i.orderId },
+      //   {
+      //     $set: {
+      //       'store.address':addressFinal
+      //   }
+      //   }
+      // )
+    }
 
     res.status(200).json({
       status: 200,
@@ -6423,3 +6450,5 @@ exports.updateAddressInOrder = async (req, res) => {
     })
   }
 }
+
+

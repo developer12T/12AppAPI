@@ -129,6 +129,7 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const { v4: uuidv4 } = require('uuid')
+const { rangeDate } = require('../../utilities/datetime')
 
 uuidv4() // ⇨ '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed'
 const {
@@ -174,6 +175,13 @@ exports.getPendingStore = async (req, res) => {
     let query = {}
     query.status = { $in: ['10'] }
 
+    // ✅ คำนวณช่วงวัน
+    let startDate, endDate
+
+    // const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
+    // startDate = range.startDate
+    // endDate = range.endDate
+
     // query.createdAt = {
     //   $gte: startMonth,
     //   $lt: nextMonth
@@ -217,12 +225,12 @@ exports.getPendingStore = async (req, res) => {
 
     console.log(pipeline)
 
-    let data = await Store.aggregate(pipeline)
+    const data = await Store.aggregate(pipeline)
 
     res.status(200).json({
       status: '200',
       message: 'Success',
-      count: data.length
+      count: data
     })
   } catch (error) {
     console.error(error)
@@ -244,6 +252,7 @@ exports.getStore = async (req, res) => {
       currentDate.getMonth() - 2,
       1
     )
+
     const nextMonth = new Date(
       currentDate.getFullYear(),
       currentDate.getMonth() + 1,
@@ -1547,7 +1556,8 @@ exports.updateStoreStatus = async (req, res) => {
 
     return res.status(200).json({
       status: 200,
-      message: 'update Store Status sucess'
+      message: 'update Store Status sucess',
+      storeId: item.storeId
     })
   } else {
     await Store.findOneAndUpdate(
@@ -2739,6 +2749,8 @@ exports.getLatLongOrderPending = async (req, res) => {
     } else if (area) {
       matchStage.area = area
     }
+
+    matchStage.status = 'pending'
     const StoreLatLongData = await StoreLatLong.aggregate([
       {
         $addFields: {

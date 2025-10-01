@@ -800,7 +800,7 @@ const getOrders = async (areaList, res, channel, type) => {
   return orders;
 };
 
-const getChange = async (areaList, res, channel,type) => {
+const getChange = async (areaList, res, channel, type) => {
   const { Order } = getModelsByChannel(channel, null, orderModel)
   const match = {
     status: { $nin: ['canceled', 'reject'] },
@@ -825,7 +825,7 @@ const getChange = async (areaList, res, channel,type) => {
   return orders;
 };
 
-const getRefund = async (areaList, res, channel,type) => {
+const getRefund = async (areaList, res, channel, type) => {
   const { Refund } = getModelsByChannel(channel, null, refundModel)
   const match = {
     status: { $nin: ['canceled', 'reject'] },
@@ -851,7 +851,57 @@ const getRefund = async (areaList, res, channel,type) => {
   return orders;
 };
 
+const distributionSendEmail = async (orderDetail, res, channel) => {
+  const { User } = getModelsByChannel(channel, res, userModel)
+  const { Distribution, WereHouse, Withdraw } = getModelsByChannel(
+    channel,
+    res,
+    distributionModel
+  )
 
+  const withdrawType = await Option.findOne({ module: 'withdraw' })
+  const withdrawTypeTh = withdrawType.list.find(
+    item => item.value === orderDetail.withdrawType
+  ).name
+  const userData = await User.findOne({
+    role: 'sale',
+    area: orderDetail.area
+  })
+  const email = await Withdraw.findOne({
+    ROUTE: orderDetail.shippingRoute,
+    Des_No: orderDetail.shippingId
+  }).select('Dc_Email Des_Name')
+  const wereHouseName = await WereHouse.findOne({
+    wh_code: orderDetail.fromWarehouse
+  }).select('wh_name')
+
+  sendEmail({
+    to: email.Dc_Email,
+    // cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
+    cc: process.env.IT_MAIL,
+    subject: `${orderDetail.orderId} 12App cash`,
+    html: `
+          <h1>แจ้งการส่งใบขอเบิกผ่านทางอีเมล</h1>
+          <p>
+            <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
+            <strong>เลขที่ใบเบิก:</strong> ${orderDetail.orderId}<br>
+            <strong>ประเภทการจัดส่ง:</strong> ${orderDetail.orderTypeName
+      }<br>
+            <strong>จัดส่ง:</strong> ${orderDetail.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
+      }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${orderDetail.toWarehouse}-${orderDetail.shippingName
+      }<br>
+            <strong>วันที่จัดส่ง:</strong> ${orderDetail.sendDate}<br>
+            <strong>เขต:</strong> ${orderDetail.area}<br>
+            <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
+            <strong>เบอร์โทรศัพท์เซลล์:</strong> ${userData.tel}<br>
+            <strong>หมายเหตุ:</strong> ${orderDetail.remark}
+          </p>
+        `
+  })
+
+
+}
 
 
 exports.calculateStockSummary = calculateStockSummary;

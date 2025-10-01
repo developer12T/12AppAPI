@@ -377,14 +377,6 @@ exports.getOrderCredit = async (req, res) => {
       $in: ['approved', 'rejected', 'success', 'confirm', 'pending']
     }
 
-    // if (type === 'pending') {
-    //   statusQuery.status = { $in: ['pending', 'approved', 'rejected'] }
-    // } else if (type === 'history') {
-    //   statusQuery.status = {
-    //     $in: ['approved', 'rejected', 'success', 'confirm','pending']
-    //   }
-    // }
-
     // const status = type === 'history' ? { $ne: 'pending' } : 'pending'
     let areaQuery = {}
 
@@ -402,7 +394,7 @@ exports.getOrderCredit = async (req, res) => {
       ...statusQuery
     }
 
-    console.log(query)
+    // console.log(query)
 
     const pipeline = [
       {
@@ -463,9 +455,9 @@ exports.getOrderCredit = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -508,15 +500,19 @@ exports.getOrderPending = async (req, res) => {
     let areaQuery = {}
     let statusQuery = {}
 
-    console.log(area)
-    console.log(period)
-    console.log(zone)
-
+    // console.log(area)
+    // console.log(period)
+    // console.log(zone)
+    let startDate, endDate
     if (area) {
       areaQuery.area = area
     } else if (zone) {
       areaQuery.area = { $regex: `^${zone}`, $options: 'i' }
     }
+
+    // const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
+    // startDate = range.startDate
+    // endDate = range.endDate
 
     statusQuery.status = {
       $in: ['pending']
@@ -526,14 +522,15 @@ exports.getOrderPending = async (req, res) => {
       ...areaQuery,
       ...(period ? { period } : {}),
       ...statusQuery
+      // createdAt: { $gte: startDate, $lt: endDate }
     }
 
     const pipeline = [{ $match: query }]
-    console.log(areaQuery.area)
+    // console.log(areaQuery.area)
     // console.log(pipeline)
     // console.log(pipeline.status)
     const order = await Distribution.aggregate(pipeline)
-    console.log(order)
+    // console.log(order)
     if (order.length == 0) {
       return res
         .status(404)
@@ -594,7 +591,7 @@ exports.getOrder = async (req, res) => {
 
     if (type === 'pending') {
       statusQuery.status = {
-        $in: ['pending', 'approved', 'onprocess', 'success']
+        $in: ['pending', 'approved', 'onprocess', 'success', 'supapproved']
       }
     } else if (type === 'history') {
       statusQuery.status = {
@@ -619,7 +616,7 @@ exports.getOrder = async (req, res) => {
       ...statusQuery
     }
 
-    console.log(query)
+    // console.log(query)
 
     const pipeline = [
       {
@@ -680,9 +677,9 @@ exports.getOrder = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -766,6 +763,7 @@ exports.getOrderSup = async (req, res) => {
           'rejected',
           'success',
           'confirm',
+          'supapproved',
           'canceled'
         ]
       }
@@ -787,12 +785,12 @@ exports.getOrderSup = async (req, res) => {
     let query = {
       ...areaQuery,
       ...(period ? { period } : {}),
-      withdrawType: { $ne: 'credit' },
+      // withdrawType: { $ne: 'credit' },
       createdAt: { $gte: startDate, $lt: endDate },
       ...statusQuery
     }
 
-    console.log(query)
+    // console.log(query)
 
     const pipeline = [
       {
@@ -853,9 +851,9 @@ exports.getOrderSup = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           newTrip: o.newTrip,
@@ -1309,7 +1307,7 @@ exports.addFromERPWithdraw = async (req, res) => {
 }
 exports.cancelWithdraw = async (req, res) => {
   try {
-    const { orderId, user } = req.body
+    const { orderId, user, role } = req.body
     const channel = req.headers['x-channel']
     const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
     const { Distribution } = getModelsByChannel(channel, res, distributionModel)
@@ -1332,9 +1330,23 @@ exports.cancelWithdraw = async (req, res) => {
       data: distributionTran
     })
 
-    await Distribution.findOneAndUpdate(
+    const distributionData = await Distribution.findOneAndUpdate(
       { orderId: orderId, type: 'withdraw' },
-      { $set: { statusTH: 'ยกเลิก', status: 'canceled' } },
+      {
+        $push: {
+          approve: {
+            dateSend: new Date(), // หรือจะไม่ใส่ก็ได้ถ้ามี default
+            dateAction: new Date(),
+            role: role,
+            appPerson: user,
+            status: 'canceled'
+          }
+        },
+        $set: {
+          statusTH: 'ยกเลิก',
+          status: 'canceled'
+        }
+      },
       { new: true }
     )
 
@@ -1361,7 +1373,7 @@ exports.cancelWithdraw = async (req, res) => {
 
 exports.approveWithdraw = async (req, res) => {
   try {
-    const { orderId, status, user } = req.body
+    const { orderId, status, user, role } = req.body
     let statusStr = status === true ? 'approved' : 'rejected'
     let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ'
 
@@ -1434,46 +1446,41 @@ exports.approveWithdraw = async (req, res) => {
         }))
       }
       data.push(dataTran)
-
-      let response
-      try {
-        if (distributionTran.withdrawType != 'credit') {
-          response = await axios.post(
-            `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
-            data
-          )
-        }
-      } catch (err) {
-        if (err.response) {
-          console.log('API error response:', err.response.data)
-          console.log('Status:', err.response.status)
-          return res.status(500).json({
-            status: 500,
-            message: 'External API failed',
-            error: err.response.data // <-- error ที่มาจากปลายทางจริง
-          })
-        } else if (err.request) {
-          console.log('No response from API:', err.message)
-          return res.status(500).json({
-            status: 500,
-            message: 'External API unreachable',
-            error: err.message
-          })
-        } else {
-          console.log('Other error:', err.message)
-          return res.status(500).json({
-            status: 500,
-            message: 'External API error',
-            error: err.message
-          })
+      if (distributionTran.area != 'IT211') {
+        let response
+        try {
+          if (distributionTran.withdrawType != 'credit') {
+            response = await axios.post(
+              `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
+              data
+            )
+          }
+        } catch (err) {
+          if (err.response) {
+            console.log('API error response:', err.response.data)
+            console.log('Status:', err.response.status)
+            return res.status(500).json({
+              status: 500,
+              message: 'External API failed',
+              error: err.response.data // <-- error ที่มาจากปลายทางจริง
+            })
+          } else if (err.request) {
+            console.log('No response from API:', err.message)
+            return res.status(500).json({
+              status: 500,
+              message: 'External API unreachable',
+              error: err.message
+            })
+          } else {
+            console.log('Other error:', err.message)
+            return res.status(500).json({
+              status: 500,
+              message: 'External API error',
+              error: err.message
+            })
+          }
         }
       }
-
-      const distributionData = await Distribution.findOneAndUpdate(
-        { orderId: orderId, type: 'withdraw' },
-        { $set: { statusTH: statusThStr, status: statusStr } },
-        { new: true }
-      )
 
       const withdrawType = await Option.findOne({ module: 'withdraw' })
       const withdrawTypeTh = withdrawType.list.find(
@@ -1492,24 +1499,26 @@ exports.approveWithdraw = async (req, res) => {
         wh_code: distributionTran.fromWarehouse
       }).select('wh_name')
 
-      // console.log(process.env.BANK_MAIL)
-      // console.log(process.env.CA_DB_URI,process.env.UAT_CHECK)
-      if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
-        sendEmail({
-          to: email.Dc_Email,
-          // cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
-          cc: process.env.IT_MAIL,
-          subject: `${distributionTran.orderId} 12App cash`,
-          html: `
+      if (distributionTran.area != 'IT211') {
+        if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
+          sendEmail({
+            to: email.Dc_Email,
+            // cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
+            cc: process.env.IT_MAIL,
+            subject: `${distributionTran.orderId} 12App cash`,
+            html: `
           <h1>แจ้งการส่งใบขอเบิกผ่านทางอีเมล</h1>
           <p>
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName
+            <strong>ประเภทการจัดส่ง:</strong> ${
+              distributionTran.orderTypeName
             }<br>
-            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
+              '-' + wereHouseName?.wh_name || ''
             }<br>
-            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
+              distributionTran.shippingName
             }<br>
             <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
             <strong>เขต:</strong> ${distributionTran.area}<br>
@@ -1518,7 +1527,8 @@ exports.approveWithdraw = async (req, res) => {
             <strong>หมายเหตุ:</strong> ${distributionTran.remark}
           </p>
         `
-        })
+          })
+        }
       }
 
       const io = getSocket()
@@ -1527,6 +1537,26 @@ exports.approveWithdraw = async (req, res) => {
         message: 'successfully',
         data: dataTran
       })
+
+      const distributionData = await Distribution.findOneAndUpdate(
+        { orderId: orderId, type: 'withdraw' },
+        {
+          $push: {
+            approve: {
+              dateSend: new Date(), // หรือจะไม่ใส่ก็ได้ถ้ามี default
+              dateAction: new Date(),
+              role: role,
+              appPerson: user,
+              status: statusStr
+            }
+          },
+          $set: {
+            statusTH: statusThStr,
+            status: statusStr
+          }
+        },
+        { new: true }
+      )
 
       await ApproveLogs.create({
         module: 'approveWithdraw',
@@ -1543,9 +1573,24 @@ exports.approveWithdraw = async (req, res) => {
     } else {
       const distributionData = await Distribution.findOneAndUpdate(
         { orderId: orderId, type: 'withdraw' },
-        { $set: { statusTH: statusThStr, status: statusStr } },
+        {
+          $push: {
+            approve: {
+              dateSend: new Date(), // หรือจะไม่ใส่ก็ได้ถ้ามี default
+              dateAction: new Date(),
+              role: role,
+              appPerson: user,
+              status: statusStr
+            }
+          },
+          $set: {
+            statusTH: statusThStr,
+            status: statusStr
+          }
+        },
         { new: true }
       )
+
       if (distributionData.newTrip === 'true') {
         await Npd.findOneAndUpdate(
           { period: distributionData.period },
@@ -1575,6 +1620,144 @@ exports.approveWithdraw = async (req, res) => {
       message: error.message,
       stack: error.stack // เพิ่มเพื่อ debug ลึกขึ้น (optional)
     })
+  }
+}
+
+exports.approveWithdrawCredit = async (req, res) => {
+  try {
+    const { orderId, status, user, role } = req.body
+
+    const channel = req.headers['x-channel']
+
+    const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
+    const { Option } = getModelsByChannel(channel, res, optionsModel)
+    const { Npd } = getModelsByChannel(channel, res, npdModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { Distribution, WereHouse, Withdraw } = getModelsByChannel(
+      channel,
+      res,
+      distributionModel
+    )
+
+    let statusTH
+
+    if (!orderId || !status) {
+      return res
+        .status(400)
+        .json({ status: 400, message: 'orderId, status are required!' })
+    }
+
+    const distributionTran = await Distribution.findOne({ orderId })
+    if (!distributionTran) {
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Distribution not found!' })
+    }
+
+    if (distributionTran.withdrawType != 'credit') {
+      return res
+        .status(401)
+        .json({ status: 404, message: 'Distribution is not credit!' })
+    }
+
+    if (status === 'approved') {
+      statusTH = 'อนุมัติ'
+    } else if (status === 'rejected') {
+      statusTH = 'ไม่อนุมัติ'
+    } else if (status === 'supapproved') {
+      statusTH = 'ซุปอนุมัติ'
+
+      const withdrawType = await Option.findOne({ module: 'withdraw' })
+      const withdrawTypeTh = withdrawType.list.find(
+        item => item.value === distributionTran.withdrawType
+      ).name
+      const userData = await User.findOne({
+        role: 'sale',
+        area: distributionTran.area
+      })
+      const email = await Withdraw.findOne({
+        ROUTE: distributionTran.shippingRoute,
+        Des_No: distributionTran.shippingId
+      }).select('Dc_Email Des_Name')
+      const wereHouseName = await WereHouse.findOne({
+        wh_code: distributionTran.fromWarehouse
+      }).select('wh_name')
+
+      if (distributionTran.area != 'IT211') {
+        if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
+          sendEmail({
+            to: email.Dc_Email,
+            // cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
+            cc: process.env.IT_MAIL,
+            subject: `${distributionTran.orderId} 12App cash`,
+            html: `
+          <h1>แจ้งการส่งใบขอเบิกผ่านทางอีเมล</h1>
+          <p>
+            <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
+            <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
+            <strong>ประเภทการจัดส่ง:</strong> ${
+              distributionTran.orderTypeName
+            }<br>
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
+              '-' + wereHouseName?.wh_name || ''
+            }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
+              distributionTran.shippingName
+            }<br>
+            <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
+            <strong>เขต:</strong> ${distributionTran.area}<br>
+            <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
+            <strong>เบอร์โทรศัพท์เซลล์:</strong> ${userData.tel}<br>
+            <strong>หมายเหตุ:</strong> ${distributionTran.remark}
+          </p>
+        `
+          })
+        }
+      }
+    }
+
+    const distributionData = await Distribution.findOneAndUpdate(
+      { orderId: orderId, type: 'withdraw' },
+      {
+        $push: {
+          approve: {
+            dateSend: new Date(), // หรือจะไม่ใส่ก็ได้ถ้ามี default
+            dateAction: new Date(),
+            role: role,
+            appPerson: user,
+            status: status
+          }
+        },
+        $set: {
+          statusTH: statusTH,
+          status: status
+        }
+      },
+      { new: true }
+    )
+
+    await ApproveLogs.create({
+      module: 'approveWithdraw',
+      user: user,
+      status: status,
+      id: orderId
+    })
+
+    const io = getSocket()
+    io.emit('distribution/approveWithdrawCredit', {
+      status: 200,
+      message: 'Updated status successfully!'
+    })
+
+    res.status(200).json({
+      status: 200,
+      message: 'Updated status successfully!'
+    })
+  } catch (error) {
+    console.error('Error updating order:', error)
+    res.status(500).json({ status: 500, message: 'Server error' })
   }
 }
 
@@ -1647,7 +1830,8 @@ exports.saleConfirmWithdraw = async (req, res) => {
         }
       }
 
-      // console.log(receiveQtyZero)
+      // console.log(receiveQtyZero)]
+
       if (distributionTran.withdrawType === 'credit') {
         distributionTran.listProduct.forEach(item => {
           item.receiveQty = item.qty // เพิ่มหรือทับ field ใน object เดิม
@@ -1694,8 +1878,9 @@ exports.saleConfirmWithdraw = async (req, res) => {
         const ReceiveQty = Object.values(
           Receive.reduce((acc, cur) => {
             // ใช้ key จาก coNo + withdrawUnit + productId (ถ้าอยากแยกตาม productId ด้วย)
-            const key = `${cur.coNo}_${cur.withdrawUnit
-              }_${cur.productId.trim()}`
+            const key = `${cur.coNo}_${
+              cur.withdrawUnit
+            }_${cur.productId.trim()}`
             if (!acc[key]) {
               acc[key] = { ...cur }
             } else {
@@ -2148,7 +2333,7 @@ exports.withdrawToExcel = async (req, res) => {
 
     const tranFromOrder = modelWithdraw.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD(date) {
+      function formatDateToThaiYYYYMMDD (date) {
         const d = new Date(date)
         // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -2238,7 +2423,7 @@ exports.withdrawToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       }
     )
   } catch (error) {
@@ -2353,7 +2538,7 @@ exports.updateReciveFix = async (req, res) => {
       }
       receivetotalWeightGross = ReceiveWeight?.[0]?.weightGross || 0
       receivetotalWeightNet = ReceiveWeight?.[0]?.weightNet || 0
-      console.log(order.listProduct)
+      // console.log(order.listProduct)
 
       await Distribution.updateOne(
         { orderId: order.orderId },
@@ -2448,7 +2633,7 @@ exports.withdrawBackOrderToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
   }
 }
@@ -2496,7 +2681,7 @@ exports.withdrawCheckM3 = async (req, res) => {
 
   const withdrawData = await Distribution.find({
     status: ['approved', 'confirm'],
-    withdrawType: { $ne: "credit" },
+    withdrawType: { $ne: 'credit' },
     area: { $ne: 'IT211' }
   })
 
@@ -2521,11 +2706,10 @@ exports.withdrawCheckM3 = async (req, res) => {
 
   res.status(200).json({
     status: 200,
-    message: "fetch Sucess",
+    message: 'fetch Sucess',
     data: NotInM3
   })
 }
-
 
 exports.getWithdrawError = async (req, res) => {
   const channel = req.headers['x-channel']
@@ -2533,7 +2717,7 @@ exports.getWithdrawError = async (req, res) => {
 
   const withdrawData = await Distribution.find({
     status: ['approved', 'confirm'],
-    withdrawType: { $ne: "credit" },
+    withdrawType: { $ne: 'credit' },
     area: { $ne: 'IT211' }
   })
 
@@ -2541,19 +2725,19 @@ exports.getWithdrawError = async (req, res) => {
 
   for (item of withdrawData) {
     let typeError = ''
-    const mgHead = await DisributionM3.findOne({ where: { coNo: item.orderId } })
+    const mgHead = await DisributionM3.findOne({
+      where: { coNo: item.orderId }
+    })
     const countProduct = item.listProduct.length
 
     if (mgHead) {
       if (countProduct === parseInt(item.lineM3)) {
-        typeError = 'สินค้าครบ';
+        typeError = 'สินค้าครบ'
       } else {
-        typeError = 'สินค้าไม่ครบ';
+        typeError = 'สินค้าไม่ครบ'
       }
-
     } else {
       typeError = 'ไม่เข้าระบบ M3'
-
     }
 
     const dataTran = {
@@ -2577,42 +2761,35 @@ exports.getWithdrawError = async (req, res) => {
       createdAt: toThaiTime(item.createdAt),
       updatedAt: toThaiTime(item.updatedAt),
       listProduct: countProduct,
-      lineM3: item.lineM3 || "0",
-      heightStatus: item.heightStatus || "0",
-      lowStatus: item.lowStatus || "0",
+      lineM3: item.lineM3 || '0',
+      heightStatus: item.heightStatus || '0',
+      lowStatus: item.lowStatus || '0',
       typeError: typeError
     }
     data.push(dataTran)
   }
 
-
-
-
-
   res.status(200).json({
     status: 200,
-    message: "fetch Sucess",
+    message: 'fetch Sucess',
     data: data
   })
 }
 
 exports.UpdateWithdrawConjob = async (req, res) => {
-
   const channel = req.headers['x-channel']
   const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
   const withdrawData = await Distribution.find({
     // status: ['approved', 'confirm'],
-    withdrawType: { $ne: "credit" },
+    withdrawType: { $ne: 'credit' },
     area: { $ne: 'IT211' }
   })
 
-
   for (i of withdrawData) {
-
     const mgHead = await DisributionM3.findOne({ where: { coNo: i.orderId } })
     if (mgHead) {
-      const count = await MGLINE.count({ where: { MRTRNR: i.orderId } });
+      const count = await MGLINE.count({ where: { MRTRNR: i.orderId } })
       const lowStatus = mgHead.MGTRSL
       const highStatus = mgHead.MGTRSH
 
@@ -2629,10 +2806,9 @@ exports.UpdateWithdrawConjob = async (req, res) => {
     }
   }
 
-
   res.status(200).json({
     status: 200,
-    message: "Update Sucess",
+    message: 'Update Sucess'
     // data: NotInM3
   })
 }
