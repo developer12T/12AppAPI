@@ -130,6 +130,7 @@ const distributionSchema = mongoose.Schema({
     approve: [{
         dateSend: { type: Date, default: Date.now },
         dateAction: { type: Date, default: Date.now },
+        role: { type: String, },
         appPerson: { type: String, },
         status: { type: String, }
     }]

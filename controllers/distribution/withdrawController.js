@@ -402,7 +402,7 @@ exports.getOrderCredit = async (req, res) => {
       ...statusQuery
     }
 
-    console.log(query)
+    // console.log(query)
 
     const pipeline = [
       {
@@ -508,9 +508,9 @@ exports.getOrderPending = async (req, res) => {
     let areaQuery = {}
     let statusQuery = {}
 
-    console.log(area)
-    console.log(period)
-    console.log(zone)
+    // console.log(area)
+    // console.log(period)
+    // console.log(zone)
 
     if (area) {
       areaQuery.area = area
@@ -529,11 +529,11 @@ exports.getOrderPending = async (req, res) => {
     }
 
     const pipeline = [{ $match: query }]
-    console.log(areaQuery.area)
+    // console.log(areaQuery.area)
     // console.log(pipeline)
     // console.log(pipeline.status)
     const order = await Distribution.aggregate(pipeline)
-    console.log(order)
+    // console.log(order)
     if (order.length == 0) {
       return res
         .status(404)
@@ -619,7 +619,7 @@ exports.getOrder = async (req, res) => {
       ...statusQuery
     }
 
-    console.log(query)
+    // console.log(query)
 
     const pipeline = [
       {
@@ -792,7 +792,7 @@ exports.getOrderSup = async (req, res) => {
       ...statusQuery
     }
 
-    console.log(query)
+    // console.log(query)
 
     const pipeline = [
       {
@@ -1361,7 +1361,7 @@ exports.cancelWithdraw = async (req, res) => {
 
 exports.approveWithdraw = async (req, res) => {
   try {
-    const { orderId, status, user } = req.body
+    const { orderId, status, user, role } = req.body
     let statusStr = status === true ? 'approved' : 'rejected'
     let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ'
 
@@ -1535,6 +1535,7 @@ exports.approveWithdraw = async (req, res) => {
             approve: {
               dateSend: new Date(),   // หรือจะไม่ใส่ก็ได้ถ้ามี default
               dateAction: new Date(),
+              role:role,
               appPerson: user,
               status: statusStr
             }
@@ -1568,6 +1569,7 @@ exports.approveWithdraw = async (req, res) => {
             approve: {
               dateSend: new Date(),   // หรือจะไม่ใส่ก็ได้ถ้ามี default
               dateAction: new Date(),
+              role:role,
               appPerson: user,
               status: statusStr
             }
@@ -2387,7 +2389,7 @@ exports.updateReciveFix = async (req, res) => {
       }
       receivetotalWeightGross = ReceiveWeight?.[0]?.weightGross || 0
       receivetotalWeightNet = ReceiveWeight?.[0]?.weightNet || 0
-      console.log(order.listProduct)
+      // console.log(order.listProduct)
 
       await Distribution.updateOne(
         { orderId: order.orderId },
