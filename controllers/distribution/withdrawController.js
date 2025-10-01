@@ -1309,7 +1309,7 @@ exports.addFromERPWithdraw = async (req, res) => {
 }
 exports.cancelWithdraw = async (req, res) => {
   try {
-    const { orderId, user } = req.body
+    const { orderId, user,role } = req.body
     const channel = req.headers['x-channel']
     const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
     const { Distribution } = getModelsByChannel(channel, res, distributionModel)
@@ -1332,11 +1332,27 @@ exports.cancelWithdraw = async (req, res) => {
       data: distributionTran
     })
 
-    await Distribution.findOneAndUpdate(
+    const distributionData = await Distribution.findOneAndUpdate(
       { orderId: orderId, type: 'withdraw' },
-      { $set: { statusTH: 'ยกเลิก', status: 'canceled' } },
+      {
+        $push: {
+          approve: {
+            dateSend: new Date(),   // หรือจะไม่ใส่ก็ได้ถ้ามี default
+            dateAction: new Date(),
+            role: role,
+            appPerson: user,
+            status: 'canceled'
+          }
+        },
+        $set: {
+          statusTH: 'ยกเลิก',
+          status: 'canceled'
+        }
+      },
       { new: true }
-    )
+    );
+
+
 
     await ApproveLogs.create({
       module: 'cancelWithdraw',
@@ -1683,7 +1699,8 @@ exports.saleConfirmWithdraw = async (req, res) => {
         }
       }
 
-      // console.log(receiveQtyZero)
+      // console.log(receiveQtyZero)]
+
       if (distributionTran.withdrawType === 'credit') {
         distributionTran.listProduct.forEach(item => {
           item.receiveQty = item.qty // เพิ่มหรือทับ field ใน object เดิม
