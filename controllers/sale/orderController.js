@@ -2450,15 +2450,18 @@ exports.getSummarybyArea = async (req, res) => {
         }
       })
     } else if (type === 'year') {
+      // console.log('test')
       const users = await User.find({
         role: 'sale',
         area: { $ne: 'IT211' }
       }).select('area zone')
       if (!zone && !area) {
         zoneList = [...new Set(users.map(u => u.zone))]
-        dataOrder = await getOrders(areaList, res, channel, 'zone')
-        dataChange = await getChange(areaList, res, channel, 'zone')
-        dataRefund = await getRefund(areaList, res, channel, 'zone')
+        dataOrder = await getOrders(zoneList, res, channel, 'zone')
+        dataChange = await getChange(zoneList, res, channel, 'zone')
+        dataRefund = await getRefund(zoneList, res, channel, 'zone')
+
+        console.log(zoneList)
       } else {
         areaList = [...new Set(users.map(u => u.area))]
         dataOrder = await getOrders(areaList, res, channel, 'area')
@@ -2480,6 +2483,8 @@ exports.getSummarybyArea = async (req, res) => {
         ...item,
         createdAtThai: toThaiTime(item.createdAt)
       }))
+
+      // console.log(dataRefund)
 
       function groupByMonthAndSum (data) {
         return data.reduce((acc, item) => {
