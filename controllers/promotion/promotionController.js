@@ -22,6 +22,7 @@ const { getSocket } = require('../../socket')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { OP } = require('../../models/cash/master')
 const { PromotionStore } = require('../../models/cash/master')
+const { stat } = require('fs')
 
 exports.addPromotion = async (req, res) => {
   try {
@@ -888,3 +889,4 @@ exports.deletePromotion = async (req, res) => {
     })
   }
 }
+

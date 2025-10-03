@@ -1234,3 +1234,46 @@ exports.addProductimage = async (req, res) => {
     // data: productId
   })
 }
+
+
+exports.productUpdatePrice = async (req, res) => {
+  const channel = req.headers['x-channel']
+  const { Product } = getModelsByChannel(channel, res, productModel)
+
+  const productData = await Product.find().select('id')
+
+  const productId = productData.flatMap(item => item.id)
+
+  const product96 = await productQuery(channel)
+  const data  = []
+  for (item of product96) {
+
+
+    for (unit of item.unitList) {
+      const dataTran = await Product.findOneAndUpdate(
+        {
+          id: item.id,
+          'unitList.unit': unit.unit
+        },
+        {
+          $set: {
+            'unitList.$.sale': unit.pricePerUnitSale,
+            'unitList.$.refund': unit.pricePerUnitRefund,
+            'unitList.$.refundDmg': unit.pricePerUnitRefundDamage,
+            'unitList.$.change': unit.pricePerUnitChange
+          }
+        },
+        { new: true }
+      )
+      data.push(dataTran)
+    }
+  }
+
+  res.status(200).json({
+    status: 200,
+    message: 'success',
+    data: data
+  })
+
+
+}
