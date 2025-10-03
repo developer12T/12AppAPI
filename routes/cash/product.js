@@ -18,7 +18,8 @@ const {
   brandByFilter,
   unitByFilter,
   addProductimage,
-  addProduct
+  addProduct,
+  productUpdatePrice
 } = require('../../controllers/product/productController')
 
 const router = express.Router()
@@ -44,4 +45,5 @@ router.post('/unitByFilter', unitByFilter)
 // router.get('/searchProduct', searchProduct)
 
 router.post('/addProductimage', addProductimage)
+router.post('/productUpdatePrice', productUpdatePrice)
 module.exports = router

@@ -19,7 +19,7 @@ const {
 const fs = require('fs')
 
 const { sequelize, DataTypes } = require('../../config/m3db')
-const { Op } = require('sequelize')
+const { Op,fn,literal } = require('sequelize')
 const { getSocket } = require('../../socket')
 
 const userModel = require('../../models/cash/user')
@@ -1131,19 +1131,19 @@ const startCronJobErpApiCheckDisribution = () => {
   })
 }
 
-const startCronJobDeleteCartDaily = () => {
-  cron.schedule(
-    '0 0 * * *',
-    async () => {
-      // cron.schedule('*/1 * * * *', async () => {
-      console.log('Running cron job DeleteCartDaily at 00:00 (Asia/Bangkok)')
-      await DeleteCartDaily()
-    },
-    {
-      timezone: 'Asia/Bangkok'
-    }
-  )
-}
+// const startCronJobDeleteCartDaily = () => {
+//   cron.schedule(
+//     '0 0 * * *',
+//     async () => {
+//       // cron.schedule('*/1 * * * *', async () => {
+//       console.log('Running cron job DeleteCartDaily at 00:00 (Asia/Bangkok)')
+//       await DeleteCartDaily()
+//     },
+//     {
+//       timezone: 'Asia/Bangkok'
+//     }
+//   )
+// }
 // const startCronJobreStoreStockDaily = () => {
 // cron.schedule(
 //   '* * * * *',  async () => {
