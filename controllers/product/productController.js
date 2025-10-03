@@ -3,6 +3,7 @@ const { Product } = require('../../models/cash/product')
 const fs = require('fs')
 const path = require('path')
 const productModel = require('../../models/cash/product')
+const productUATModel = require('../../models/cash/productUAT')
 const stockModel = require('../../models/cash/stock')
 const { getSocket } = require('../../socket')
 const { getModelsByChannel } = require('../../middleware/channel')
@@ -10,7 +11,7 @@ const { productQuery } = require('../../controllers/queryFromM3/querySctipt')
 const { group } = require('console')
 const { flatMap } = require('lodash')
 const distributionModel = require('../../models/cash/distribution')
-
+const { MongoClient } = require('mongodb')
 exports.getProductAll = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
@@ -1245,7 +1246,8 @@ exports.productUpdatePrice = async (req, res) => {
   const productId = productData.flatMap(item => item.id)
 
   const product96 = await productQuery(channel)
-  const data  = []
+  // console.log(product96)
+  const data = []
   for (item of product96) {
 
 
@@ -1253,18 +1255,19 @@ exports.productUpdatePrice = async (req, res) => {
       const dataTran = await Product.findOneAndUpdate(
         {
           id: item.id,
-          'unitList.unit': unit.unit
+          'listUnit.unit': unit.unit
         },
         {
           $set: {
-            'unitList.$.sale': unit.pricePerUnitSale,
-            'unitList.$.refund': unit.pricePerUnitRefund,
-            'unitList.$.refundDmg': unit.pricePerUnitRefundDamage,
-            'unitList.$.change': unit.pricePerUnitChange
+            'listUnit.$.price.sale': unit.pricePerUnitSale,
+            'listUnit.$.price.refund': unit.pricePerUnitRefund,
+            'listUnit.$.price.refundDmg': unit.pricePerUnitRefundDamage,
+            'listUnit.$.price.change': unit.pricePerUnitChange
           }
         },
         { new: true }
       )
+      // console.log(dataTran)
       data.push(dataTran)
     }
   }
@@ -1276,4 +1279,39 @@ exports.productUpdatePrice = async (req, res) => {
   })
 
 
+}
+
+exports.productCheckPrice = async (req, res) => {
+
+  const channel = req.headers['x-channel']
+  const { Product } = getModelsByChannel(channel, res, productModel)
+  const { ProductUAT } = getModelsByChannel(channel, res, productUATModel)
+
+  const productUatData = await ProductUAT.find()
+  const productPrdData = await Product.find()
+
+  const dataSet = new Set()
+
+  for (const item of productPrdData) {
+    const uatDetail = productUatData.find(o => o.id === item.id)
+
+    for (const unit of item.listUnit) {
+      const uatDetailUnit = uatDetail?.listUnit.find(o => o.unit === unit.unit)
+      const salePrd = unit.price.sale
+      const saleUat = uatDetailUnit?.price?.sale
+
+      if (salePrd !== saleUat) {
+        dataSet.add(item.id)
+      }
+    }
+  }
+
+  const data = Array.from(dataSet)
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'success',
+    data: data
+  })
 }
