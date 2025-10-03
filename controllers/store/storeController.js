@@ -1462,24 +1462,24 @@ exports.updateStoreStatus = async (req, res) => {
       customerCoType: item.type ?? '',
       customerAddress1: (
         item.address +
-          item.subDistrict +
-          item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
       ).substring(0, 35),
       customerAddress2: (
         item.address +
-          item.subDistrict +
-          item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
       ).substring(35, 70),
       customerAddress3: (
         item.address +
-          item.subDistrict +
-          item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+        item.subDistrict +
+        item.subDistrict +
+        item.province +
+        item.postCode ?? ''
       ).substring(70, 105),
       customerAddress4: '',
       customerPoscode: (item.postCode ?? '').substring(0, 35),
@@ -2557,7 +2557,7 @@ exports.storeToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
+      fs.unlink(tempPath, () => { })
     })
   } catch (err) {
     console.error(err)
@@ -3080,4 +3080,48 @@ exports.getStorePage = async (req, res) => {
     console.error('getStorePage error:', err)
     res.status(500).json({ message: 'Server error' })
   }
+}
+
+
+exports.updateStoreAddressIt = async (req, res) => {
+
+  const channel = req.headers['x-channel']
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+
+  const storeData = await Store.find({ area: 'IT211' })
+
+  let data = []
+  for (item of storeData) {
+    const shippingAddress = [{
+      default: '1',
+      shippingId: 'shippingId',
+      address: 'address',
+      district: 'district',
+      subDistrict: 'subDistrict',
+      province: 'province',
+      latitude: 'latitude',
+      longtitude: 'longtitude',
+    }]
+
+    const updateData =  await Store.findOneAndUpdate(
+      { storeId: item.storeId },
+      {
+        $set: {
+          shippingAddress:shippingAddress,
+          zone:'IT',
+          type:'0'
+        }
+      }
+    )
+
+    data.push(updateData)
+  }
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: data
+  })
+
 }

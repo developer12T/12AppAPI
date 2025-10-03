@@ -40,7 +40,8 @@ const {
   addLatLong,
   getStorePage,
   getPendingStore,
-  getLatLongOrderPending
+  getLatLongOrderPending,
+  updateStoreAddressIt
   // test
 } = require('../../controllers/store/storeController')
 
@@ -109,4 +110,5 @@ router.post('/updateGooglemap', updateGooglemap)
 router.post('/addVisit', addVisit)
 router.post('/addImageLatLong', addImageLatLong)
 router.post('/addLatLong', addLatLong)
+router.post('/updateStoreAddressIt', updateStoreAddressIt)
 module.exports = router
