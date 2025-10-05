@@ -2210,7 +2210,7 @@ exports.getReceiveQty = async (req, res) => {
     let statusThStr = ''
 
     if (lowStatus == '99') {
-      statusStr = 'success'
+      statusStr = 'approved'
       statusThStr = 'กรุณากดรับสินค้า'
     } else if (highStatus == '99') {
       statusStr = 'onprocess'
