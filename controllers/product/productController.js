@@ -4,6 +4,7 @@ const fs = require('fs')
 const path = require('path')
 const productModel = require('../../models/cash/product')
 const productUATModel = require('../../models/cash/productUAT')
+const orderModel = require('../../models/cash/sale')
 const stockModel = require('../../models/cash/stock')
 const { getSocket } = require('../../socket')
 const { getModelsByChannel } = require('../../middleware/channel')
@@ -12,6 +13,7 @@ const { group } = require('console')
 const { flatMap } = require('lodash')
 const distributionModel = require('../../models/cash/distribution')
 const { MongoClient } = require('mongodb')
+const { period } = require('../../utilities/datetime')
 exports.getProductAll = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
@@ -1314,4 +1316,41 @@ exports.productCheckPrice = async (req, res) => {
     message: 'success',
     data: data
   })
+}
+
+exports.checkPriceProductOrder = async (req, res) => {
+
+  const channel = req.headers['x-channel']
+  const { Product } = getModelsByChannel(channel, res, productModel)
+  const { ProductUAT } = getModelsByChannel(channel, res, productUATModel)
+
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+
+  const dataProduct = await Product.find()
+  const dataProductUAT = await ProductUAT.find()
+  const orderData = await Order.find({ period: '202510' })
+
+
+  let productId = []
+
+  for (item of orderData) {
+    for (i of item.listProduct) {
+      const product = dataProduct.find(o => o.id === i.id)
+      // const productUAT = dataProductUAT.find(o => o.id === i.id)
+      const productUnit = product.listUnit.find(o => o.unit === i.unit)
+      // const productUATUnit = product.listUnit.find(o => o.unit === i.unit)
+
+      if (i.price != productUnit.price.sale) {
+        productId.push(i.id)
+      }
+    }
+  }
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: productId
+  })
+
 }

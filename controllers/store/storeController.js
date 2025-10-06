@@ -1,5 +1,6 @@
 const mongoose = require('mongoose')
 const { Types } = require('mongoose')
+const { ObjectId } = mongoose.Types
 const { Customer } = require('../../models/cash/master')
 const { uploadFiles } = require('../../utilities/upload')
 const { sequelize, DataTypes } = require('../../config/m3db')
@@ -14,7 +15,7 @@ const { getSocket } = require('../../socket')
 const addUpload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages'
 )
-const { toThaiTime } = require('../../utilities/datetime')
+const { toThaiTime, period } = require('../../utilities/datetime')
 const sharp = require('sharp')
 const xlsx = require('xlsx')
 
@@ -3212,3 +3213,73 @@ exports.checkRangeLatLong = async (req, res) => {
   // })
 
 }
+
+exports.checkNewStoreLatLong = async (req, res) => {
+
+  const channel = req.headers['x-channel']
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const { Route } = getModelsByChannel(channel, res, routeModel)
+  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+
+  const dataStoreLatLong = await StoreLatLong.find({ status: 'approved' })
+
+  const storeData = await Store.find({
+    createdAt: {
+      $gte: new Date("2025-06-30T17:00:00.000Z"), // ✅ ใช้ new Date แทน ISODate
+      $lt: new Date("2025-09-30T17:00:00.000Z")
+    },
+    area: { $ne: 'IT211' }
+  });
+
+  const storeIds = storeData.map(s => s._id.toString());
+
+  const dataRoute = await Route.aggregate([
+    { $unwind: "$listStore" },
+    {
+      $match: {
+        "listStore.storeInfo": { $in: storeIds },
+        period: "202510"
+      }
+    },
+    { $group: { _id: "$_id", doc: { $first: "$$ROOT" } } },
+    { $replaceRoot: { newRoot: "$doc" } }
+  ]);
+
+  const storeIdTran = dataRoute
+    .filter(item => item.listStore.status !== '0') // ✅ เอาเฉพาะที่ status != '0'
+    .map(item => new ObjectId(
+      typeof item.listStore.storeInfo === 'object'
+        ? item.listStore.storeInfo._id
+        : item.listStore.storeInfo
+    ));
+
+  const idList = storeIdTran.map(id => id.toString());
+
+  const data = storeData.filter(item =>
+    idList.includes(item._id.toString())
+  );
+
+  const storeOrder = data.flatMap(item => item.storeId)
+
+  const orderData = await Order.find({
+    type: 'sale', routeId: { $ne: '' },
+    period: '202510', 'store.storeId': { $in: storeOrder }
+  })
+
+  const latLong = dataStoreLatLong.flatMap(item => item.storeId)
+
+  const missingStore = storeOrder.filter(id => !latLong.includes(id));
+
+  const existingStore = storeOrder.filter(id => latLong.includes(id));
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    missingStore: missingStore,
+    existingStore:existingStore
+  })
+
+}
+
