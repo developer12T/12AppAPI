@@ -20,7 +20,8 @@ const {
   addProductimage,
   addProduct,
   productUpdatePrice,
-  productCheckPrice
+  productCheckPrice,
+  checkPriceProductOrder
 } = require('../../controllers/product/productController')
 
 const router = express.Router()
@@ -48,4 +49,5 @@ router.post('/unitByFilter', unitByFilter)
 router.post('/addProductimage', addProductimage)
 router.post('/productUpdatePrice', productUpdatePrice)
 router.post('/productCheckPrice', productCheckPrice)
+router.post('/checkPriceProductOrder', checkPriceProductOrder)
 module.exports = router

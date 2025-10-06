@@ -4,6 +4,7 @@ const fs = require('fs')
 const path = require('path')
 const productModel = require('../../models/cash/product')
 const productUATModel = require('../../models/cash/productUAT')
+const orderModel = require('../../models/cash/sale')
 const stockModel = require('../../models/cash/stock')
 const { getSocket } = require('../../socket')
 const { getModelsByChannel } = require('../../middleware/channel')
@@ -12,6 +13,9 @@ const { group } = require('console')
 const { flatMap } = require('lodash')
 const distributionModel = require('../../models/cash/distribution')
 const { MongoClient } = require('mongodb')
+const { period } = require('../../utilities/datetime')
+const xlsx = require('xlsx')
+const os = require('os')
 exports.getProductAll = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
@@ -1284,6 +1288,7 @@ exports.productUpdatePrice = async (req, res) => {
 exports.productCheckPrice = async (req, res) => {
 
   const channel = req.headers['x-channel']
+  const { excel } = req.body
   const { Product } = getModelsByChannel(channel, res, productModel)
   const { ProductUAT } = getModelsByChannel(channel, res, productUATModel)
 
@@ -1291,7 +1296,7 @@ exports.productCheckPrice = async (req, res) => {
   const productPrdData = await Product.find()
 
   const dataSet = new Set()
-
+  const data = []
   for (const item of productPrdData) {
     const uatDetail = productUatData.find(o => o.id === item.id)
 
@@ -1302,16 +1307,92 @@ exports.productCheckPrice = async (req, res) => {
 
       if (salePrd !== saleUat) {
         dataSet.add(item.id)
+
+        const dataTran = {
+          id: item.id,
+          name: item.name,
+          group: item.group,
+          brand: item.brand,
+          flavour: item.flavour,
+          type: item.type,
+          unit: unit.unit,
+          unitName: unit.name,
+          saleOld: saleUat,
+          sale: salePrd
+
+        }
+        data.push(dataTran)
+
+
+
       }
     }
   }
 
-  const data = Array.from(dataSet)
+
+  if (excel == true) {
+    const wb = xlsx.utils.book_new()
+    const ws = xlsx.utils.json_to_sheet(data)
+    xlsx.utils.book_append_sheet(wb, ws, `productCheckPrice`)
+
+    const tempPath = path.join(os.tmpdir(), `productCheckPrice.xlsx`)
+    xlsx.writeFile(wb, tempPath)
+
+    res.download(tempPath, `productCheckPrice.xlsx`, err => {
+      if (err) {
+        console.error('❌ Download error:', err)
+        // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+        if (!res.headersSent) {
+          res.status(500).send('Download failed')
+        }
+      }
+
+      // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+      fs.unlink(tempPath, () => { })
+    })
+  } else {
+    res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: data
+    })
+  }
+
+}
+
+exports.checkPriceProductOrder = async (req, res) => {
+
+  const channel = req.headers['x-channel']
+  const { Product } = getModelsByChannel(channel, res, productModel)
+  const { ProductUAT } = getModelsByChannel(channel, res, productUATModel)
+
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+
+  const dataProduct = await Product.find()
+  const dataProductUAT = await ProductUAT.find()
+  const orderData = await Order.find({ period: '202510' })
+
+
+  let productId = []
+
+  for (item of orderData) {
+    for (i of item.listProduct) {
+      const product = dataProduct.find(o => o.id === i.id)
+      // const productUAT = dataProductUAT.find(o => o.id === i.id)
+      const productUnit = product.listUnit.find(o => o.unit === i.unit)
+      // const productUATUnit = product.listUnit.find(o => o.unit === i.unit)
+
+      if (i.price != productUnit.price.sale) {
+        productId.push(i.id)
+      }
+    }
+  }
 
 
   res.status(200).json({
     status: 200,
-    message: 'success',
-    data: data
+    message: 'sucess',
+    data: productId
   })
+
 }
