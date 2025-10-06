@@ -41,7 +41,8 @@ const {
   getStorePage,
   getPendingStore,
   getLatLongOrderPending,
-  updateStoreAddressIt
+  updateStoreAddressIt,
+  checkRangeLatLong
   // test
 } = require('../../controllers/store/storeController')
 
@@ -68,7 +69,7 @@ router.post('/approveLatLongStore', approveLatLongStore)
 router.post('/canceledOrderLatLongStore', canceledOrderLatLongStore)
 router.get('/getStorePage', getStorePage)
 
-router.get('/:storeId', getDetailStore)
+
 router.post('/addStore', addStore)
 router.post('/updateImage', updateImage)
 router.post('/insertStoreToM3', insertStoreToM3)
@@ -111,4 +112,10 @@ router.post('/addVisit', addVisit)
 router.post('/addImageLatLong', addImageLatLong)
 router.post('/addLatLong', addLatLong)
 router.post('/updateStoreAddressIt', updateStoreAddressIt)
+router.get('/checkRangeLatLong', checkRangeLatLong)
+
+
+
+
+router.get('/:storeId', getDetailStore)
 module.exports = router

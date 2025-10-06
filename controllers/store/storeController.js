@@ -3103,13 +3103,13 @@ exports.updateStoreAddressIt = async (req, res) => {
       longtitude: 'longtitude',
     }]
 
-    const updateData =  await Store.findOneAndUpdate(
+    const updateData = await Store.findOneAndUpdate(
       { storeId: item.storeId },
       {
         $set: {
-          shippingAddress:shippingAddress,
-          zone:'IT',
-          type:'0'
+          shippingAddress: shippingAddress,
+          zone: 'IT',
+          type: '0'
         }
       }
     )
@@ -3123,5 +3123,92 @@ exports.updateStoreAddressIt = async (req, res) => {
     message: 'sucess',
     data: data
   })
+
+}
+
+
+exports.checkRangeLatLong = async (req, res) => {
+
+  const channel = req.headers['x-channel']
+  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+
+  const dataStoreLatLong = await StoreLatLong.find({ status: 'approved' })
+
+  function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // รัศมีโลก (กิโลเมตร)
+
+    const dLat = deg2rad(lat2 - lat1);
+    const dLon = deg2rad(lon2 - lon1);
+
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(deg2rad(lat1)) *
+      Math.cos(deg2rad(lat2)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // ระยะทาง (กิโลเมตร)
+  }
+
+  function deg2rad(deg) {
+    return deg * (Math.PI / 180);
+  }
+
+
+  let data = []
+
+  for (const item of dataStoreLatLong) {
+    const rangeKm = calculateDistance(
+      parseFloat(item.latitudeOld),
+      parseFloat(item.longtitudeOld),
+      parseFloat(item.latitude),
+      parseFloat(item.longtitude)
+    );
+
+    const rangeMeter = rangeKm * 1000; // แปลงเป็นเมตร
+    const dateThai = toThaiTime(item.createdAt)
+    const dataTran = {
+      orderId: item.orderId,
+      storeId: item.storeId,
+      name: item.name,
+      area: item.area,
+      rangeKm: rangeKm.toFixed(2),      // กิโลเมตร (ทศนิยม 2 ตำแหน่ง)
+      rangeMeter: Math.round(rangeMeter), // เมตร (ปัดเศษเป็นจำนวนเต็ม)
+      date: dateThai
+    };
+
+    // console.log(dataTran);
+    data.push(dataTran)
+  }
+
+  const wb = xlsx.utils.book_new()
+  const ws = xlsx.utils.json_to_sheet(data)
+  xlsx.utils.book_append_sheet(wb, ws, `StoreLatLongCheck`)
+
+  const tempPath = path.join(os.tmpdir(), `StoreLatLongCheck.xlsx`)
+  xlsx.writeFile(wb, tempPath)
+
+  res.download(tempPath, `StoreLatLongCheck.xlsx`, err => {
+    if (err) {
+      console.error('❌ Download error:', err)
+      // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+      if (!res.headersSent) {
+        res.status(500).send('Download failed')
+      }
+    }
+
+    // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+    fs.unlink(tempPath, () => { })
+  })
+
+
+
+
+  // res.status(200).json({
+  //   status: 200,
+  //   message: 'sucess',
+  //   data: data
+  // })
 
 }
