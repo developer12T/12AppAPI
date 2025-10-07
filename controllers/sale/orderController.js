@@ -4,7 +4,9 @@
 // const { Product } = require('../../models/cash/product')
 // const { Route } = require('../../models/cash/route')
 const {
-  dataPowerBiQuery
+  dataPowerBiQuery,
+  dataM3Query,
+  dataPowerBiQueryDelete
 } = require('../../controllers/queryFromM3/querySctipt')
 const {
   period,
@@ -5669,13 +5671,28 @@ exports.updateOrderPowerBI = async (req, res) => {
   const { Product } = getModelsByChannel(channel, res, productModel)
   const { Refund } = getModelsByChannel(channel, res, refundModel)
   const { Store } = getModelsByChannel(channel, res, storeModel)
+
   const conoBi = await dataPowerBiQuery(channel)
   const conoBiList = conoBi.flatMap(item => item.CONO)
+  const conoM3 = await dataM3Query(channel)
+  const conoM3List = conoM3.flatMap(item => item.OACUOR)
+  let alreadyM3 = []
+
+  for (const item of conoBiList) {
+    if (conoM3List.includes(item)) {
+      alreadyM3.push(item)
+
+      dataPowerBiQueryDelete(item)
+    }
+  }
+
+
+
 
   return res.status(200).json({
     status: 200,
     message: 'Sucess',
-    data: conoBiList
+    data: alreadyM3
   })
 
 

@@ -81,7 +81,7 @@ WHERE
 }
 
 
-exports.userQueryOne = async function (channel,area) {
+exports.userQueryOne = async function (channel, area) {
 
   const config = {
     user: process.env.MS_SQL_USER,
@@ -1060,6 +1060,41 @@ SELECT DISTINCT CONO FROM [dbo].[CO_ORDER_copy1]
 }
 
 
+exports.dataPowerBiQueryDelete = async function (channel, cono) {
+
+
+  const conoStr = cono.map(c => `'${c}'`).join(","); // =>  '1001','1002','1003'
+
+
+  const config = {
+    user: process.env.POWERBI_USER,
+    password: process.env.POWERBI_PASSWORD,
+    server: process.env.POWERBI_HOST,
+    database: process.env.POWERBI_DATABASE,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  };
+  // console.log(RouteId)
+  await sql.connect(config);
+
+  let result = ''
+  if (channel == 'cash') {
+    result = await sql.query`
+SELECT *  FROM [dbo].[CO_ORDER_copy1]
+WHERE CONO IN (${conoStr})
+        `
+  }
+
+  await sql.close();
+  return result.recordset
+}
+
+
+
+
+
 exports.dataM3Query = async function (channel) {
 
   const config = {
@@ -1078,7 +1113,7 @@ exports.dataM3Query = async function (channel) {
   let result = ''
   if (channel == 'cash') {
     result = await sql.query`
-SELECT DISTINCT CONO FROM [dbo].[CO_ORDER_copy1]
+SELECT DISTINCT OACUOR FROM [MVXJDTA].[OOHEAD]
         `
   }
 
