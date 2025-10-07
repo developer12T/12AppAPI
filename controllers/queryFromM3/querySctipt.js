@@ -924,7 +924,7 @@ LEFT JOIN m_prd_group gp ON a.GRP = gp.GRP_CODE
 }
 
 
-exports.routeQuery = async function (channel) {
+exports.routeQuery = async function (channel, area) {
 
   const config = {
     user: process.env.MS_SQL_USER,
@@ -941,8 +941,27 @@ exports.routeQuery = async function (channel) {
 
   let result = ''
   if (channel == 'cash') {
-    result = await sql.query`
- SELECT a.Area AS area, 
+    if (area) {
+      result = await sql.query`
+            SELECT a.Area AS area, 
+                    CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
+                    RIGHT(RouteSet, 2) AS day, 
+                    CONVERT(nvarchar(6), GETDATE(), 112) AS period, 
+                    a.StoreID AS storeId
+             FROM [DATA_OMS].[dbo].[DATA_StoreSet] a
+             LEFT JOIN [DATA_OMS].[dbo].[OCUSMA] ON StoreID = OKCUNO COLLATE Latin1_General_BIN
+             LEFT JOIN [dbo].[data_store] b ON StoreID = customerCode
+            WHERE 
+                store_status <> '90' 
+                AND 
+                LEFT(OKRGDT, 6) <> CONVERT(nvarchar(6), GETDATE(), 112)
+               AND a.Channel = '103'
+               AND a.Area = ${area}
+             ORDER BY a.Area, RouteSet
+        `
+    } else {
+      `
+                  SELECT a.Area AS area, 
                     CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
                     RIGHT(RouteSet, 2) AS day, 
                     CONVERT(nvarchar(6), GETDATE(), 112) AS period, 
@@ -956,7 +975,9 @@ exports.routeQuery = async function (channel) {
                 LEFT(OKRGDT, 6) <> CONVERT(nvarchar(6), GETDATE(), 112)
                AND a.Channel = '103'
              ORDER BY a.Area, RouteSet
-        `
+      `
+    }
+
   }
   if (channel == 'credit') {
     result = await sql.query`
