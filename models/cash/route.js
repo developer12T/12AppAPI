@@ -22,13 +22,18 @@ const ListStoreSchema = new mongoose.Schema({
   listOrder: [ListOrderSchema]
 })
 
-const RouteSchema = new mongoose.Schema({
-  id: { type: String, required: true, index: true },
-  period: { type: String, required: true, index: true },
-  area: { type: String, required: true },
-  day: { type: String, required: true },
-  listStore: [ListStoreSchema]
-})
+const RouteSchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true, index: true },
+    period: { type: String, required: true, index: true },
+    area: { type: String, required: true },
+    day: { type: String, required: true },
+    listStore: [ListStoreSchema],
+  },
+  {
+    timestamps: true // ✅ Mongoose จะสร้าง createdAt / updatedAt ให้อัตโนมัติ
+  }
+);
 
 RouteSchema.virtual('storeAll').get(function () {
   return this.listStore.length

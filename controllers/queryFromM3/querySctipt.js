@@ -1147,7 +1147,7 @@ SELECT DISTINCT OACUOR FROM [MVXJDTA].[OOHEAD]
 
 
 
-exports.stockQuery = async function (channel, period) {
+exports.stockQuery = async function (channel, period, wereHouse) {
 
   const year = period.slice(0, 4);   // "2025"
   const month = period.slice(4, 6);  // "09"
@@ -1169,7 +1169,19 @@ exports.stockQuery = async function (channel, period) {
   await sql.connect(config);
   let result = ''
   if (channel == 'cash') {
-    result = await sql.query`
+
+    if (wereHouse) {
+`
+  SELECT WH, 
+  ITEM_CODE, 
+  SUM(ITEM_QTY) AS ITEM_QTY
+  FROM [dbo].[data_stock_van]
+  WHERE Stock_Date LIKE ${formatted} AND
+  WH = ${wereHouse}
+  GROUP BY WH, ITEM_CODE`
+
+    } else {
+      result = await sql.query`
   SELECT WH, 
   ITEM_CODE, 
   SUM(ITEM_QTY) AS ITEM_QTY
@@ -1177,6 +1189,12 @@ exports.stockQuery = async function (channel, period) {
   WHERE Stock_Date LIKE ${formatted}
   GROUP BY WH, ITEM_CODE
 `;
+
+
+    }
+
+
+
   }
   else if (channel == 'credit') {
     result = await sql.query`
