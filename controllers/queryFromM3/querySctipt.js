@@ -80,6 +80,86 @@ WHERE
 
 }
 
+
+exports.userQueryOne = async function (channel,area) {
+
+  const config = {
+    user: process.env.MS_SQL_USER,
+    password: process.env.MS_SQL_PASSWORD,
+    server: process.env.MS_SQL_SERVER,
+    database: process.env.MS_SQL_DATABASE,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  };
+  const hash = '$2b$10$DqTAeJ.dZ67XVLky203dn.77idSGjHqbOJ7ztOTeEpr1VeycWngua';
+
+  const areStr = area
+  await sql.connect(config);
+
+  let result = ''
+  if (channel == 'cash') {
+    result = await sql.query`
+SELECT
+    DA.Sale_Code as saleCode,
+    DA.Sale_Player as salePayer,
+    DA.Col_LoginName as username,
+    LEFT(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') - 1) AS firstName,
+    SUBSTRING(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') + 1, LEN(DA.Col_NameTH)) AS surName,
+    SUBSTRING(
+    REPLACE(CONVERT(VARCHAR(40), NEWID()), '-', ''),
+    1, 6
+) AS password,
+    SALE_MOBILE AS tel,
+    DA.ZONE AS zone,
+    DA.AREA AS area,
+    DA.WH AS warehouse,
+    'sale' AS role,
+    '1' AS status,
+    TRUCK_SIZE AS typeTruck,
+    TRUCK_NO as noTruck,
+    'https://apps.onetwotrading.co.th/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
+FROM 
+  [DATA_OMS].[dbo].[DATA_Area] AS DA
+WHERE 
+  DA.CHANNEL_NAME = 'Cash' AND 
+  DA.Sale_Code is not NULL AND
+  DA.Sale_Code != 'ว่าง'  AND
+  DA.AREA = ${areStr}
+  `
+  }
+  else if (channel == 'credit') {
+    result = await sql.query`
+SELECT
+    DA.Sale_Code as saleCode,
+    DA.Sale_Player as salePayer,
+    DA.Col_LoginName as username,
+    LEFT(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') - 1) AS firstName,
+    SUBSTRING(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') + 1, LEN(DA.Col_NameTH)) AS surName,
+    ${hash} AS password,
+    'TEL' AS tel,
+    DA.ZONE AS zone,
+    DA.AREA AS area,
+    DA.WH AS warehouse,
+    'sale' AS role,
+    '1' AS status,
+    'http://apps.onetwotrading.co.th/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
+FROM 
+  [DATA_OMS].[dbo].[DATA_Area] AS DA 
+WHERE 
+  DA.CHANNEL_NAME = 'Credit' AND 
+  DA.Sale_Code is not NULL AND
+  DA.Sale_Code != 'ว่าง'
+`
+  }
+
+  await sql.close();
+  return result.recordset
+
+}
+
+
 exports.userQueryManeger = async function (channel, area) {
 
   const config = {
@@ -971,31 +1051,40 @@ exports.dataPowerBiQuery = async function (channel) {
   let result = ''
   if (channel == 'cash') {
     result = await sql.query`
-SELECT DISTINCT CONO FROM [dbo].[CO_ORDER]
+SELECT DISTINCT CONO FROM [dbo].[CO_ORDER_copy1]
         `
   }
-  //   if (channel == 'credit') {
-  //     result = await sql.query`
 
-  // SELECT a.Area AS area, 
-  //                     CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
-  //                     RIGHT(RouteSet, 2) AS day, 
-  //                     CONVERT(nvarchar(6), GETDATE(), 112) AS period, 
-  //                     StoreID AS storeId
-  //              FROM [DATA_OMS].[dbo].[DATA_StoreSet] a
-  //              LEFT JOIN [DATA_OMS].[dbo].[OCUSMA] ON StoreID = OKCUNO COLLATE Latin1_General_BIN
-  //              LEFT JOIN [dbo].[store_credit] b ON StoreID = customerCode
-  //             WHERE a.Channel = '102'
-  //             ORDER BY a.Area, RouteSet
-
-  //     `
-  //   }
   await sql.close();
   return result.recordset
 }
 
 
+exports.dataM3Query = async function (channel) {
 
+  const config = {
+    user: process.env.M3_USER,
+    password: process.env.M3_PASSWORD,
+    server: process.env.M3_HOST,
+    database: process.env.M3_DATABASE,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  };
+  // console.log(RouteId)
+  await sql.connect(config);
+
+  let result = ''
+  if (channel == 'cash') {
+    result = await sql.query`
+SELECT DISTINCT CONO FROM [dbo].[CO_ORDER_copy1]
+        `
+  }
+
+  await sql.close();
+  return result.recordset
+}
 
 
 

@@ -207,6 +207,9 @@ exports.checkout = async (req, res) => {
     })
     if (listProduct.includes(null)) return
 
+    // console.log(area)
+    // console.log(sale)
+
     const orderId = await generateOrderId(area, sale.warehouse, channel, res)
 
     const storeData =
@@ -415,20 +418,20 @@ exports.checkout = async (req, res) => {
       product: [...productQty]
     }
 
-    const createdMovement = await StockMovement.create({
-      ...calStock
-    })
+    // const createdMovement = await StockMovement.create({
+    //   ...calStock
+    // })
 
-    await StockMovementLog.create({
-      ...calStock,
-      refOrderId: createdMovement._id
-    })
-    await newOrder.save()
-    await PromotionShelf.findOneAndUpdate(
-      { proShelfId: promotionshelf.proShelfId },
-      { $set: { qty: 0 } }
-    )
-    await Cart.deleteOne({ type, area, storeId })
+    // await StockMovementLog.create({
+    //   ...calStock,
+    //   refOrderId: createdMovement._id
+    // })
+    // await newOrder.save()
+    // await PromotionShelf.findOneAndUpdate(
+    //   { proShelfId: promotionshelf.proShelfId },
+    //   { $set: { qty: 0 } }
+    // )
+    // await Cart.deleteOne({ type, area, storeId })
     const currentDate = new Date()
     let query = {}
     const promoIds = newOrder.listPromotions.map(u => u.proId)
@@ -5647,6 +5650,38 @@ exports.orderPowerBI = async (req, res) => {
   }
 }
 
+
+exports.updateOrderPowerBI = async (req, res) => {
+  let { startDate, endDate, excel } = req.query
+
+  const now = new Date()
+  const thailandOffset = 7 * 60 // นาที
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000
+  const thailand = new Date(utc + thailandOffset * 60000)
+
+  const year = thailand.getFullYear()
+  const month = String(thailand.getMonth() + 1).padStart(2, '0')
+  const day = String(thailand.getDate()).padStart(2, '0')
+  const currentDate = `${year}${month}${day}`
+
+  const channel = 'cash'
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+  const { Product } = getModelsByChannel(channel, res, productModel)
+  const { Refund } = getModelsByChannel(channel, res, refundModel)
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const conoBi = await dataPowerBiQuery(channel)
+  const conoBiList = conoBi.flatMap(item => item.CONO)
+
+  return res.status(200).json({
+    status: 200,
+    message: 'Sucess',
+    data: conoBiList
+  })
+
+
+}
+
+
 exports.getTargetProduct = async (req, res) => {
   const { period, area, team, zone } = req.query
   const channel = req.headers['x-channel']
@@ -6458,3 +6493,21 @@ exports.updateAddressInOrder = async (req, res) => {
 }
 
 
+exports.addTarget = async (req, res) => {
+
+  const { storeId } = req.body
+  const channel = req.headers['x-channel']
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+
+  // const storeData = await Store.findOne({ storeId: storeId })
+  // const dataOrder = await Order.find({ 'store.storeId': storeId })
+
+  res.status(200).json({
+    status: 200,
+    message: 'Sucess',
+    data: dataOrder
+  })
+
+
+}
