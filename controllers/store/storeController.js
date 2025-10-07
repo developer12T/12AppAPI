@@ -15,6 +15,7 @@ const { getSocket } = require('../../socket')
 const addUpload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages'
 )
+
 const { toThaiTime, period } = require('../../utilities/datetime')
 const sharp = require('sharp')
 const xlsx = require('xlsx')
@@ -23,7 +24,9 @@ const sql = require('mssql')
 const {
   storeQuery,
   storeQueryFilter,
-  groupStoreType
+  groupStoreType,
+  routeQuery,
+  routeQueryOne
 } = require('../../controllers/queryFromM3/querySctipt')
 
 // ===== helper: สร้างไดเรกทอรี + เซฟไฟล์ buffer เป็น .webp =====
@@ -2608,13 +2611,13 @@ exports.addLatLong = async (req, res) => {
 
     const storeData = await Store.findOne({ storeId: storeId })
     // console.log(storeData)
-    const sale = await User.findOne({ area: storeData.area }).select(
-      'firstName surName warehouse tel saleCode salePayer'
-    )
+    // const sale = await User.findOne({ area: storeData.area }).select(
+    //   'firstName surName warehouse tel saleCode salePayer'
+    // )
 
     const orderId = await generateOrderIdStoreLatLong(
       storeData.area,
-      sale.warehouse,
+      // sale.warehouse,
       channel,
       res
     )
@@ -3278,8 +3281,62 @@ exports.checkNewStoreLatLong = async (req, res) => {
     status: 200,
     message: 'sucess',
     missingStore: missingStore,
-    existingStore:existingStore
+    existingStore: existingStore
   })
 
 }
 
+exports.updateAreaStore = async (req, res) => {
+
+  const channel = req.headers['x-channel']
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const { Route } = getModelsByChannel(channel, res, routeModel)
+  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+
+  const result = await routeQuery(channel)
+
+  // ดึงค่า storeId ทั้งหมดออกมา (flatten)
+  const storeIds = result.flatMap(item => item.storeId);
+
+  // หาค่าที่ซ้ำกัน
+  const duplicates = storeIds.filter((id, index, self) => self.indexOf(id) !== index);
+
+  // ลบค่าซ้ำซ้ำออกให้เหลือแค่ตัวเดียวต่อ id
+  const uniqueDuplicates = [...new Set(duplicates)];
+
+  if (uniqueDuplicates.length > 0) {
+    console.log('⚠️ เจอ storeId ซ้ำ:', uniqueDuplicates);
+  } else {
+    console.log('✅ ไม่มี storeId ซ้ำ');
+  }
+
+
+
+  // const storeId = [
+  //   ...new Set(result.flatMap(item =>
+  //     item.storeId.map(id => id.toString())
+  //   ))
+  // ];
+  // const storeData = await Store.find({storeId:{$in:storeId}})
+
+  // for (item of result) {
+
+  //   await Store.findOneAndUpdate(
+  //     {storeId:item.storeId},
+  //     {$set:{
+  //       area:itemarea
+  //     }}
+
+  //   )
+
+  // }
+
+
+  res.status(200).json({
+    status: 200,
+    message: 'sucess',
+    data: result
+
+  })
+}
