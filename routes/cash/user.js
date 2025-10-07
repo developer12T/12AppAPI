@@ -16,7 +16,8 @@ const {
   getAreaAll,
  checkUserLogin,
  getTeam,
- downloadUserExcel
+ downloadUserExcel,
+ 
 } = require('../../controllers/user/userController')
 
 const router = express.Router()
@@ -38,4 +39,5 @@ router.get('/getAreaAll', getAreaAll)
 router.get('/checkUserLogin', checkUserLogin)
 router.get('/getTeam', getTeam)
 router.get('/downloadUserExcel', downloadUserExcel)
+
 module.exports = router

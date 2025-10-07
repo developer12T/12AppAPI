@@ -6511,3 +6511,72 @@ exports.addTarget = async (req, res) => {
 
 
 }
+
+exports.updateUserSaleInOrder = async (req, res) => {
+  try {
+    const { area, period } = req.body;
+    const channel = req.headers['x-channel'];
+
+    const { Order } = getModelsByChannel(channel, res, orderModel);
+    const { Refund } = getModelsByChannel(channel, res, refundModel);
+    const { Giveaway } = getModelsByChannel(channel, res, giveModel);
+    const { User } = getModelsByChannel(channel, res, userModel);
+
+    const sale = await User.findOne({ area });
+
+    if (!sale) {
+      return res.status(404).json({
+        status: 404,
+        message: `❌ ไม่พบ sale ในพื้นที่ ${area}`
+      });
+    }
+
+    const saleInfo = {
+      saleCode: sale.saleCode,
+      salePayer: sale.salePayer,
+      name: `${sale.firstName} ${sale.surName}`,
+      tel: sale.tel || '',
+      warehouse: sale.warehouse
+    };
+
+    const [orderResult, refundResult, giveawayResult] = await Promise.all([
+      Order.updateMany(
+        { period, 'store.area': area },
+        { $set: { sale: saleInfo } }
+      ),
+      Refund.updateMany(
+        { period, 'store.area': area },
+        { $set: { sale: saleInfo } }
+      ),
+      Giveaway.updateMany(
+        { period, 'store.area': area },
+        { $set: { sale: saleInfo } }
+      )
+    ]);
+
+    const totalUpdated =
+      (orderResult.modifiedCount || 0) +
+      (refundResult.modifiedCount || 0) +
+      (giveawayResult.modifiedCount || 0);
+
+    console.log(`✅ อัปเดต Order:${orderResult.modifiedCount} | Refund:${refundResult.modifiedCount} | Giveaway:${giveawayResult.modifiedCount}`);
+
+    return res.status(200).json({
+      status: 200,
+      message: 'Success',
+      data: {
+        orderUpdated: orderResult.modifiedCount,
+        refundUpdated: refundResult.modifiedCount,
+        giveawayUpdated: giveawayResult.modifiedCount,
+        totalUpdated
+      }
+    });
+  } catch (error) {
+    console.error('❌ updateUserSaleInOrder error:', error);
+    return res.status(500).json({
+      status: 500,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
