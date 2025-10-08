@@ -2229,11 +2229,19 @@ exports.addRouteIt = async (req, res) => {
   const { Route } = getModelsByChannel(channel, res, routeModel)
   const { Store } = getModelsByChannel(channel, res, storeModel)
 
-  const dataStore = await Store.find({ area: 'IT211', status: { $ne: '90' } })
+  const now = new Date()
+  const startOfDay = new Date(now.setHours(0, 0, 0, 0) - 7 * 60 * 60 * 1000)
+  const endOfDay = new Date(now.setHours(23, 59, 59, 999) - 7 * 60 * 60 * 1000)
+
+  const dataStore = await Store.find({
+    area: 'IT211',
+    status: { $ne: '90' },
+    createdAt: { $gte: startOfDay, $lt: endOfDay }
+  })
 
   let route = []
 
-  for (let i = 1; i <= 25; i++) {
+  for (let i = 1; i <= 1; i++) {
     const idx2 = String(i).padStart(2, '0') // "01".."25"
     const data = {
       id: `${period}IT211R${idx2}`,
