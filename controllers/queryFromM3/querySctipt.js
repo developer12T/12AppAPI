@@ -1054,7 +1054,7 @@ exports.routeQueryOne = async function (channel, RouteId) {
 }
 
 
-exports.dataPowerBiQuery = async function (channel) {
+exports.dataPowerBiQuery = async function (channel, column) {
 
   const config = {
     user: process.env.POWERBI_USER,
@@ -1071,12 +1071,13 @@ exports.dataPowerBiQuery = async function (channel) {
 
   let result = ''
   if (channel == 'cash') {
-    result = await sql.query`
-SELECT DISTINCT CONO FROM [dbo].[CO_ORDER_copy1]
-        `
+    const query = `SELECT DISTINCT ${column} FROM [dbo].[CO_ORDER_copy1]`
+    result = await sql.query(query)
   }
 
   await sql.close();
+
+
   return result.recordset
 }
 

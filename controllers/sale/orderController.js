@@ -5341,25 +5341,29 @@ exports.updateOrderPowerBI = async (req, res) => {
   const { Store } = getModelsByChannel(channel, res, storeModel)
 
 
-  const conoBi = await dataPowerBiQuery(channel)
+  const conoBi = await dataPowerBiQuery(channel,'CONO')
   const conoBiList = conoBi.flatMap(item => item.CONO)
+
+  const invoBi = await dataPowerBiQuery(channel,'INVO')
+  const invoBiList = invoBi.flatMap(item => item.invo)
+
   const conoM3 = await dataM3Query(channel)
   const conoM3List = conoM3.flatMap(item => item.OACUOR)
 
 
   const allTransactions = await dataPowerBi(channel, conoBiList, status, startDate, endDate, currentDate)
-  // await dataPowerBiQueryInsert(channel,allTransactions)
+  await dataPowerBiQueryInsert(channel,allTransactions)
 
   let alreadyM3 = []
-  // for (const item of conoBiList) {
-  //   if (conoM3List.includes(item)) {
-  //     alreadyM3.push(item)
+  for (const item of invoBiList) {
+    if (conoM3List.includes(item)) {
+      alreadyM3.push(item)
 
 
-  //   }
-  // }
+    }
+  }
 
-  // dataPowerBiQueryDelete(channel,alreadyM3)
+  dataPowerBiQueryDelete(channel,alreadyM3)
 
 
 

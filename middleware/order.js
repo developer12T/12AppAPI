@@ -926,7 +926,7 @@ const dataPowerBi = async (channel, conoBiList,status,startDate,endDate,currentD
     .filter(Boolean)
 
   if (statusArray.length === 0) {
-    statusArray = ['approved'] // default
+    statusArray = ['pending'] // default
   }
 
   // console.log(statusArray)
