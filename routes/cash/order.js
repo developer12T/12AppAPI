@@ -85,6 +85,6 @@ router.get('/getTargetProduct', getTargetProduct)
 router.get('/getOrderExcelNew', getOrderExcelNew)
 router.post('/updatePaymentOrder', updatePaymentOrder)
 router.post('/updateAddressInOrder',updateAddressInOrder)
-router.get('/updateOrderPowerBI',updateOrderPowerBI)
+router.post('/updateOrderPowerBI',updateOrderPowerBI)
 router.post('/updateUserSaleInOrder', updateUserSaleInOrder)
 module.exports = router
