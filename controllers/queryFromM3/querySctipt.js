@@ -1082,10 +1082,7 @@ SELECT DISTINCT CONO FROM [dbo].[CO_ORDER_copy1]
 
 
 exports.dataPowerBiQueryInsert = async function (channel, data) {
-  if (!cono || cono.length === 0) {
-    return;
-  }
-  const conoStr = cono.map(c => `'${c}'`).join(","); // =>  '1001','1002','1003'
+
   const config = {
     user: process.env.POWERBI_USER,
     password: process.env.POWERBI_PASSWORD,
@@ -1099,80 +1096,22 @@ exports.dataPowerBiQueryInsert = async function (channel, data) {
   // console.log(RouteId)
   await sql.connect(config);
 
-  if (channel === 'cash') {
-    const query = `
-                  INSERT INTO [dbo].[test] (
-                  ORDER_DATE,
-                  OLINE_DATE,
-                  OOLINE_TIME,
-                  COMP_NO,
-                  CONO,
-                  RUNNO_BILL,
-                  STATUS_BILL,
-                  WHCODE,
-                  ITEM_CODE,
-                  ITEM_NAME,
-                  ITEM_DES,
-                  QTY_USC,
-                  QTY_PACK,
-                  UNIT_SHIP,
-                  PACK_SIZE,
-                  AMOUNT_DIS,
-                  AMOUNT_FULL,
-                  SUM_AMOUNT,
-                  SUM_AMOUNT2,
-                  CUS_CODE,
-                  RUNNING_NO,
-                  DUO_CODE,
-                  CREATE_DATE,
-                  CREATE_TIME,
-                  CO_TYPE,
-                  DARIVERY_DATE,
-                  IMPORT_TYPE,
-                  CHANNEL,
-                  SALE_FOC,
-                  CO_MONTH,
-                  CO_YEAR,
-                  MT_ID,
-                  SALE_CODE,
-                  OOTYPE,
-                  GROUP_TYPE,
-                  BRAND,
-                  FLAVOUR,
-                  CUS_NAME,
-                  CUS_DESCRIPTION,
-                  PROVINCE,
-                  DISTRICT,
-                  SHOP_TYPE,
-                  CUS_AREA,
-                  CUS_ZONE,
-                  PROVINCE_ZONE,
-                  PROVINCE_CODE,
-                  QTY_CTN,
-                  QTY,
-                  REMAIN_QTY,
-                  SALE_PLAYER,
-                  SYS_STATUS,
-                  MODIFY_DATE,
-                  FOC_AMOUNT,
-                  ROUTE_ID,
-                  ROUTE_NAME,
-                  SHIPPING_PROVINCE,
-                  SHIPPING_NAME,
-                  DUO_NAME,
-                  CUS_TEAM,
-                  INVO
-                  
-                  
-                  
-                  )
-// VALUES 
- `;
+  for (const item of data) {
+    const request = new sql.Request()
+    for (let [key, value] of Object.entries(item)) {
+      request.input(key, value)
+    }
 
-    const result = await sql.query(query);
-    await sql.close();
-    return result.recordset;
+    const query = `
+    INSERT INTO [dbo].[CO_ORDER_copy1] (
+      ${Object.keys(item).join(',')}
+    ) VALUES (
+      ${Object.keys(item).map(k => '@' + k).join(',')}
+    )
+  `
+    await request.query(query)
   }
+
 }
 
 exports.dataPowerBiQueryDelete = async function (channel, cono) {

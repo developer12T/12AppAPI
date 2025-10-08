@@ -6,7 +6,8 @@
 const {
   dataPowerBiQuery,
   dataM3Query,
-  dataPowerBiQueryDelete
+  dataPowerBiQueryDelete,
+  dataPowerBiQueryInsert
 } = require('../../controllers/queryFromM3/querySctipt')
 const {
   period,
@@ -5347,31 +5348,7 @@ exports.updateOrderPowerBI = async (req, res) => {
 
 
   const allTransactions = await dataPowerBi(channel, conoBiList, status, startDate, endDate, currentDate)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  // await dataPowerBiQueryInsert(channel,allTransactions)
 
   let alreadyM3 = []
   // for (const item of conoBiList) {

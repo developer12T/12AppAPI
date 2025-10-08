@@ -926,8 +926,10 @@ const dataPowerBi = async (channel, conoBiList,status,startDate,endDate,currentD
     .filter(Boolean)
 
   if (statusArray.length === 0) {
-    statusArray = ['pending'] // default
+    statusArray = ['approved'] // default
   }
+
+  // console.log(statusArray)
 
   const startTH = new Date(
     `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
@@ -1179,7 +1181,7 @@ const dataPowerBi = async (channel, conoBiList,status,startDate,endDate,currentD
           const QTY_USC = factor * product.qty
 
           return {
-            invoice: order.orderId,
+            INVO: order.orderId,
             ORDER_DATE: createdAtDate,
             OLINE_DATE: createdAtDate,
             OOLINE_TIME: createdAtDatetime,
