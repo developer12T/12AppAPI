@@ -11,11 +11,19 @@ const {
   startCronJobreStoreStockDaily
 } = require('../12AppAPI/controllers/sale/conJob')
 
-startCronJobErpApiCheck()
-// startCronJobErpApiCheckDisribution()
-// startCronJobDeleteCartDaily()
-// startCronJobOrderToExcel()
-startCronJobreStoreStockDaily()
+
+if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
+
+  startCronJobErpApiCheck()
+  // startCronJobErpApiCheckDisribution()
+  // startCronJobDeleteCartDaily()
+  // startCronJobOrderToExcel()
+  startCronJobreStoreStockDaily()
+
+}
+
+
+
 
 app.use(bodyParser.json({ limit: '50mb' }))
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }))

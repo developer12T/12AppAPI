@@ -924,7 +924,7 @@ LEFT JOIN m_prd_group gp ON a.GRP = gp.GRP_CODE
 }
 
 
-exports.routeQuery = async function (channel) {
+exports.routeQuery = async function (channel, area) {
 
   const config = {
     user: process.env.MS_SQL_USER,
@@ -941,8 +941,28 @@ exports.routeQuery = async function (channel) {
 
   let result = ''
   if (channel == 'cash') {
-    result = await sql.query`
- SELECT a.Area AS area, 
+    if (area) {
+      result = await sql.query`
+            SELECT a.Area AS area, 
+                    CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
+                    RIGHT(RouteSet, 2) AS day, 
+                    CONVERT(nvarchar(6), GETDATE(), 112) AS period, 
+                    a.StoreID AS storeId
+             FROM [DATA_OMS].[dbo].[DATA_StoreSet] a
+             LEFT JOIN [DATA_OMS].[dbo].[OCUSMA] ON StoreID = OKCUNO COLLATE Latin1_General_BIN
+             LEFT JOIN [dbo].[data_store] b ON StoreID = customerCode
+            WHERE 
+                store_status <> '90' 
+                AND 
+                LEFT(OKRGDT, 6) <> CONVERT(nvarchar(6), GETDATE(), 112)
+               AND a.Channel = '103'
+               AND a.Area = ${area}
+             ORDER BY a.Area, RouteSet
+        `
+        
+    } else {
+       result = await sql.query`
+                  SELECT a.Area AS area, 
                     CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
                     RIGHT(RouteSet, 2) AS day, 
                     CONVERT(nvarchar(6), GETDATE(), 112) AS period, 
@@ -956,23 +976,9 @@ exports.routeQuery = async function (channel) {
                 LEFT(OKRGDT, 6) <> CONVERT(nvarchar(6), GETDATE(), 112)
                AND a.Channel = '103'
              ORDER BY a.Area, RouteSet
-        `
-  }
-  if (channel == 'credit') {
-    result = await sql.query`
+      `
+    }
 
-SELECT a.Area AS area, 
-                    CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
-                    RIGHT(RouteSet, 2) AS day, 
-                    CONVERT(nvarchar(6), GETDATE(), 112) AS period, 
-                    StoreID AS storeId
-             FROM [DATA_OMS].[dbo].[DATA_StoreSet] a
-             LEFT JOIN [DATA_OMS].[dbo].[OCUSMA] ON StoreID = OKCUNO COLLATE Latin1_General_BIN
-             LEFT JOIN [dbo].[store_credit] b ON StoreID = customerCode
-            WHERE a.Channel = '102'
-            ORDER BY a.Area, RouteSet
-
-    `
   }
   await sql.close();
   return result.recordset
@@ -1033,7 +1039,7 @@ exports.routeQueryOne = async function (channel, RouteId) {
 }
 
 
-exports.dataPowerBiQuery = async function (channel) {
+exports.dataPowerBiQuery = async function (channel, column) {
 
   const config = {
     user: process.env.POWERBI_USER,
@@ -1050,21 +1056,18 @@ exports.dataPowerBiQuery = async function (channel) {
 
   let result = ''
   if (channel == 'cash') {
-    result = await sql.query`
-SELECT DISTINCT CONO FROM [dbo].[CO_ORDER_copy1]
-        `
+    const query = `SELECT DISTINCT ${column} FROM [dbo].[CO_ORDER_copy1]`
+    result = await sql.query(query)
   }
 
   await sql.close();
+
+
   return result.recordset
 }
 
 
-exports.dataPowerBiQueryDelete = async function (channel, cono) {
-
-
-  const conoStr = cono.map(c => `'${c}'`).join(","); // =>  '1001','1002','1003'
-
+exports.dataPowerBiQueryInsert = async function (channel, data) {
 
   const config = {
     user: process.env.POWERBI_USER,
@@ -1079,16 +1082,52 @@ exports.dataPowerBiQueryDelete = async function (channel, cono) {
   // console.log(RouteId)
   await sql.connect(config);
 
-  let result = ''
-  if (channel == 'cash') {
-    result = await sql.query`
-SELECT *  FROM [dbo].[CO_ORDER_copy1]
-WHERE CONO IN (${conoStr})
-        `
+  for (const item of data) {
+    const request = new sql.Request()
+    for (let [key, value] of Object.entries(item)) {
+      request.input(key, value)
+    }
+
+    const query = `
+    INSERT INTO [dbo].[CO_ORDER_copy1] (
+      ${Object.keys(item).join(',')}
+    ) VALUES (
+      ${Object.keys(item).map(k => '@' + k).join(',')}
+    )
+  `
+    await request.query(query)
   }
 
-  await sql.close();
-  return result.recordset
+}
+
+exports.dataPowerBiQueryDelete = async function (channel, cono) {
+  if (!cono || cono.length === 0) {
+    return;
+  }
+  const conoStr = cono.map(c => `'${c}'`).join(","); // =>  '1001','1002','1003'
+  const config = {
+    user: process.env.POWERBI_USER,
+    password: process.env.POWERBI_PASSWORD,
+    server: process.env.POWERBI_HOST,
+    database: process.env.POWERBI_DATABASE,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  };
+  // console.log(RouteId)
+  await sql.connect(config);
+
+  if (channel === 'cash') {
+    const query = `
+    DELETE FROM [dbo].[CO_ORDER_copy1]
+    WHERE CONO IN (${conoStr})
+  `;
+
+    const result = await sql.query(query);
+    await sql.close();
+    return result.recordset;
+  }
 }
 
 
@@ -1126,7 +1165,7 @@ SELECT DISTINCT OACUOR FROM [MVXJDTA].[OOHEAD]
 
 
 
-exports.stockQuery = async function (channel, period) {
+exports.stockQuery = async function (channel, period, wereHouse) {
 
   const year = period.slice(0, 4);   // "2025"
   const month = period.slice(4, 6);  // "09"
@@ -1148,7 +1187,19 @@ exports.stockQuery = async function (channel, period) {
   await sql.connect(config);
   let result = ''
   if (channel == 'cash') {
-    result = await sql.query`
+
+    if (wereHouse) {
+      `
+  SELECT WH, 
+  ITEM_CODE, 
+  SUM(ITEM_QTY) AS ITEM_QTY
+  FROM [dbo].[data_stock_van]
+  WHERE Stock_Date LIKE ${formatted} AND
+  WH = ${wereHouse}
+  GROUP BY WH, ITEM_CODE`
+
+    } else {
+      result = await sql.query`
   SELECT WH, 
   ITEM_CODE, 
   SUM(ITEM_QTY) AS ITEM_QTY
@@ -1156,6 +1207,12 @@ exports.stockQuery = async function (channel, period) {
   WHERE Stock_Date LIKE ${formatted}
   GROUP BY WH, ITEM_CODE
 `;
+
+
+    }
+
+
+
   }
   else if (channel == 'credit') {
     result = await sql.query`

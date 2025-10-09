@@ -62,7 +62,14 @@ exports.checkout = async (req, res) => {
       period,
       newtrip
     } = req.body
-    // const newtrip = false
+
+    const today = new Date()
+    const day = today.getDate()
+
+    if (day >= 1 && day <= 15) {
+      newtrip = false
+    }
+
     const channel = req.headers['x-channel']
     const { Cart } = getModelsByChannel(channel, res, cartModel)
     const { User } = getModelsByChannel(channel, res, userModel)
