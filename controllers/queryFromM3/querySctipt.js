@@ -959,8 +959,9 @@ exports.routeQuery = async function (channel, area) {
                AND a.Area = ${area}
              ORDER BY a.Area, RouteSet
         `
+        
     } else {
-      `
+       result = await sql.query`
                   SELECT a.Area AS area, 
                     CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
                     RIGHT(RouteSet, 2) AS day, 
@@ -978,22 +979,6 @@ exports.routeQuery = async function (channel, area) {
       `
     }
 
-  }
-  if (channel == 'credit') {
-    result = await sql.query`
-
-SELECT a.Area AS area, 
-                    CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
-                    RIGHT(RouteSet, 2) AS day, 
-                    CONVERT(nvarchar(6), GETDATE(), 112) AS period, 
-                    StoreID AS storeId
-             FROM [DATA_OMS].[dbo].[DATA_StoreSet] a
-             LEFT JOIN [DATA_OMS].[dbo].[OCUSMA] ON StoreID = OKCUNO COLLATE Latin1_General_BIN
-             LEFT JOIN [dbo].[store_credit] b ON StoreID = customerCode
-            WHERE a.Channel = '102'
-            ORDER BY a.Area, RouteSet
-
-    `
   }
   await sql.close();
   return result.recordset

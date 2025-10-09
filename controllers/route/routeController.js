@@ -276,6 +276,8 @@ exports.addFromERPnew = async (req, res) => {
     const channel = req.headers['x-channel']
     const { period } = req.body
     const result = await routeQuery(channel)
+
+
     const return_arr = []
 
     for (const row of result) {
