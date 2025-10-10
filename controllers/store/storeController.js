@@ -241,7 +241,7 @@ exports.getPendingStore = async (req, res) => {
     res.status(200).json({
       status: '200',
       message: 'Success',
-      count: data
+      count: data.length
     })
   } catch (error) {
     console.error(error)

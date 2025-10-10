@@ -16,6 +16,8 @@ const { MongoClient } = require('mongodb')
 const { period } = require('../../utilities/datetime')
 const xlsx = require('xlsx')
 const os = require('os')
+const approveLogModel = require('../../models/cash/approveLog')
+
 exports.getProductAll = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
@@ -367,79 +369,88 @@ exports.getFilters = async (req, res) => {
     // ✅ กรอง null ออกจากผลลัพธ์สุดท้ายด้วย
     const clean = arr => (arr || []).filter(item => item !== null)
 
-    const PLACEHOLDER = ['เลือกกลุ่มสินค้า'];
-    const collatorTH = new Intl.Collator('th-TH', { numeric: true, sensitivity: 'base' });
+    const PLACEHOLDER = ['เลือกกลุ่มสินค้า']
+    const collatorTH = new Intl.Collator('th-TH', {
+      numeric: true,
+      sensitivity: 'base'
+    })
 
-    function cleanList(list) {
-      const arr = Array.isArray(list) ? list : [];
+    function cleanList (list) {
+      const arr = Array.isArray(list) ? list : []
       const filtered = arr
         .map(v => (typeof v === 'string' ? v.trim() : v))
-        .filter(v => v !== undefined && v !== null && v !== '' && v !== 'null');
-      if (!filtered.length) return PLACEHOLDER;
-      const unique = [...new Set(filtered)];
-      return unique.sort(collatorTH.compare);
+        .filter(v => v !== undefined && v !== null && v !== '' && v !== 'null')
+      if (!filtered.length) return PLACEHOLDER
+      const unique = [...new Set(filtered)]
+      return unique.sort(collatorTH.compare)
     }
 
-    const firstAttr = attributes[0] ?? {}; // ปลอดภัยกว่า attributes.length เช็คทีเดียว
+    const firstAttr = attributes[0] ?? {} // ปลอดภัยกว่า attributes.length เช็คทีเดียว
 
-    function sortSizesAscGFirst(list) {
-      const UNIT_PRIORITY = { G: 0, KG: 1, L: 2 }; // อยากให้ L ไปท้ายสุดกว่าก็ปรับเลขได้
-      const coll = new Intl.Collator('th-TH', { numeric: true, sensitivity: 'base' });
+    function sortSizesAscGFirst (list) {
+      const UNIT_PRIORITY = { G: 0, KG: 1, L: 2 } // อยากให้ L ไปท้ายสุดกว่าก็ปรับเลขได้
+      const coll = new Intl.Collator('th-TH', {
+        numeric: true,
+        sensitivity: 'base'
+      })
 
-      const parse = (s) => {
-        const up = String(s || '').toUpperCase().trim();
+      const parse = s => {
+        const up = String(s || '')
+          .toUpperCase()
+          .trim()
 
         // ดึงเลขตัวหน้า (รองรับทศนิยม)
-        const m = up.match(/^(\d+(?:\.\d+)?)/);
-        const num = m ? Number(m[1]) : NaN;
+        const m = up.match(/^(\d+(?:\.\d+)?)/)
+        const num = m ? Number(m[1]) : NaN
 
         // หา unit (กัน KG ไปชน G)
-        const isKG = /\bKG\b/.test(up);
-        const isG = !isKG && /\bG\b/.test(up);
-        const isL = /\bL\b/.test(up);
+        const isKG = /\bKG\b/.test(up)
+        const isG = !isKG && /\bG\b/.test(up)
+        const isL = /\bL\b/.test(up)
 
-        const unit = isKG ? 'KG' : isG ? 'G' : isL ? 'L' : 'OTHER';
-        const priority = UNIT_PRIORITY[unit] ?? 3;
+        const unit = isKG ? 'KG' : isG ? 'G' : isL ? 'L' : 'OTHER'
+        const priority = UNIT_PRIORITY[unit] ?? 3
 
         // แปลงเป็นฐานเดียวเพื่อเทียบขนาด (G และ L→mL)
-        let normalized = Number.POSITIVE_INFINITY;
+        let normalized = Number.POSITIVE_INFINITY
         if (Number.isFinite(num)) {
-          if (unit === 'G') normalized = num;           // g
-          else if (unit === 'KG') normalized = num * 1000; // kg → g
-          else if (unit === 'L') normalized = num * 1000;  // L → mL (ถ้าอยากแยกกลุ่มน้ำ/ของแข็ง ก็พอแยกด้วย priority อยู่แล้ว)
+          if (unit === 'G') normalized = num // g
+          else if (unit === 'KG') normalized = num * 1000 // kg → g
+          else if (unit === 'L') normalized = num * 1000 // L → mL (ถ้าอยากแยกกลุ่มน้ำ/ของแข็ง ก็พอแยกด้วย priority อยู่แล้ว)
         }
 
-        return { s, unit, priority, normalized };
-      };
+        return { s, unit, priority, normalized }
+      }
 
       // คืน array ใหม่ (ไม่แก้ต้นฉบับ)
       return [...list].sort((a, b) => {
-        const A = parse(a);
-        const B = parse(b);
+        const A = parse(a)
+        const B = parse(b)
         return (
-          A.priority - B.priority ||                 // G ก่อน → KG → L → อื่น ๆ
-          A.normalized - B.normalized ||             // จากน้อยไปมากภายในหน่วย
-          coll.compare(A.s, B.s)                     // tie-break ตามตัวอักษร
-        );
-      });
+          A.priority - B.priority || // G ก่อน → KG → L → อื่น ๆ
+          A.normalized - B.normalized || // จากน้อยไปมากภายในหน่วย
+          coll.compare(A.s, B.s) // tie-break ตามตัวอักษร
+        )
+      })
     }
-
-
 
     const data = {
       group: cleanList(allGroups.map(g => g?.group)),
       brand: cleanList(firstAttr.brand),
       size: sortSizesAscGFirst(cleanList(firstAttr.size)),
-      flavour: cleanList(firstAttr.flavour).sort(
-        (a, b) => String(a).localeCompare(String(b), 'th-TH', { numeric: true, sensitivity: 'base' })
+      flavour: cleanList(firstAttr.flavour).sort((a, b) =>
+        String(a).localeCompare(String(b), 'th-TH', {
+          numeric: true,
+          sensitivity: 'base'
+        })
       )
-    };
+    }
 
     res.status(200).json({
       status: 200,
       message: 'Filters fetched successfully!',
       data
-    });
+    })
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
@@ -495,9 +506,10 @@ exports.searchProduct = async (req, res) => {
 
 exports.updateStatus = async (req, res) => {
   try {
-    const { id, type, status } = req.body
+    const { id, type, status, user } = req.body
     const channel = req.headers['x-channel']
     const { Product } = getModelsByChannel(channel, res, productModel)
+    const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
     if (!id || !type || !status) {
       return res
         .status(400)
@@ -531,6 +543,13 @@ exports.updateStatus = async (req, res) => {
     io.emit('product/onOff', {
       status: '200',
       message: 'Updated status successfully!'
+    })
+
+    await ApproveLogs.create({
+      module: 'changeStatusProduct',
+      user: user,
+      status: `${type} ${status}`,
+      id: id
     })
 
     res.status(200).json({
@@ -860,21 +879,40 @@ exports.groupSize = async (req, res) => {
           _sizeStr: { $ifNull: ['$size', ''] },
           _upper: { $toUpper: { $ifNull: ['$size', ''] } },
           _trimmed: { $trim: { input: { $ifNull: ['$size', ''] } } },
-          _match: { $regexFind: { input: { $trim: { input: { $ifNull: ['$size', ''] } } }, regex: regexNumber } }
+          _match: {
+            $regexFind: {
+              input: { $trim: { input: { $ifNull: ['$size', ''] } } },
+              regex: regexNumber
+            }
+          }
         }
       },
       // 2) แปลงเลข + หา unit (ทำใน stage แยก)
       {
         $addFields: {
           _num: {
-            $convert: { input: '$_match.match', to: 'double', onError: null, onNull: null }
+            $convert: {
+              input: '$_match.match',
+              to: 'double',
+              onError: null,
+              onNull: null
+            }
           },
           unit: {
             $switch: {
               branches: [
-                { case: { $regexMatch: { input: '$_upper', regex: /KG/ } }, then: 'KG' },
-                { case: { $regexMatch: { input: '$_upper', regex: / G/ } }, then: 'G' },
-                { case: { $regexMatch: { input: '$_upper', regex: / L/ } }, then: 'L' }
+                {
+                  case: { $regexMatch: { input: '$_upper', regex: /KG/ } },
+                  then: 'KG'
+                },
+                {
+                  case: { $regexMatch: { input: '$_upper', regex: / G/ } },
+                  then: 'G'
+                },
+                {
+                  case: { $regexMatch: { input: '$_upper', regex: / L/ } },
+                  then: 'L'
+                }
               ],
               default: null
             }
@@ -888,9 +926,15 @@ exports.groupSize = async (req, res) => {
           normalizedSize: {
             $switch: {
               branches: [
-                { case: { $eq: ['$unit', 'KG'] }, then: { $multiply: ['$_num', 1000] } }, // KG -> g
-                { case: { $eq: ['$unit', 'G'] }, then: '$_num' },                         // G  -> g
-                { case: { $eq: ['$unit', 'L'] }, then: { $multiply: ['$_num', 1000] } }  // L  -> mL
+                {
+                  case: { $eq: ['$unit', 'KG'] },
+                  then: { $multiply: ['$_num', 1000] }
+                }, // KG -> g
+                { case: { $eq: ['$unit', 'G'] }, then: '$_num' }, // G  -> g
+                {
+                  case: { $eq: ['$unit', 'L'] },
+                  then: { $multiply: ['$_num', 1000] }
+                } // L  -> mL
               ],
               default: null
             }
@@ -920,11 +964,6 @@ exports.groupSize = async (req, res) => {
     res.status(500).json({ status: 500, message: error.message })
   }
 }
-
-
-
-
-
 
 exports.groupFlavourId = async (req, res) => {
   const channel = req.headers['x-channel']
@@ -1240,7 +1279,6 @@ exports.addProductimage = async (req, res) => {
   })
 }
 
-
 exports.productUpdatePrice = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
@@ -1253,8 +1291,6 @@ exports.productUpdatePrice = async (req, res) => {
   // console.log(product96)
   const data = []
   for (item of product96) {
-
-
     for (unit of item.unitList) {
       const dataTran = await Product.findOneAndUpdate(
         {
@@ -1281,12 +1317,9 @@ exports.productUpdatePrice = async (req, res) => {
     message: 'success',
     data: data
   })
-
-
 }
 
 exports.productCheckPrice = async (req, res) => {
-
   const channel = req.headers['x-channel']
   const { excel } = req.body
   const { Product } = getModelsByChannel(channel, res, productModel)
@@ -1319,16 +1352,11 @@ exports.productCheckPrice = async (req, res) => {
           unitName: unit.name,
           saleOld: saleUat,
           sale: salePrd
-
         }
         data.push(dataTran)
-
-
-
       }
     }
   }
-
 
   if (excel == true) {
     const wb = xlsx.utils.book_new()
@@ -1348,7 +1376,7 @@ exports.productCheckPrice = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
   } else {
     res.status(200).json({
@@ -1357,11 +1385,9 @@ exports.productCheckPrice = async (req, res) => {
       data: data
     })
   }
-
 }
 
 exports.checkPriceProductOrder = async (req, res) => {
-
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
   const { ProductUAT } = getModelsByChannel(channel, res, productUATModel)
@@ -1371,7 +1397,6 @@ exports.checkPriceProductOrder = async (req, res) => {
   const dataProduct = await Product.find()
   const dataProductUAT = await ProductUAT.find()
   const orderData = await Order.find({ period: '202510' })
-
 
   let productId = []
 
@@ -1388,11 +1413,9 @@ exports.checkPriceProductOrder = async (req, res) => {
     }
   }
 
-
   res.status(200).json({
     status: 200,
     message: 'sucess',
     data: productId
   })
-
 }
