@@ -774,7 +774,8 @@ exports.getOrderSup = async (req, res) => {
           'success',
           'confirm',
           'supapproved',
-          'canceled'
+          'canceled',
+          'onprocess'
         ]
       }
     } else if (type === 'history') {
