@@ -5401,9 +5401,7 @@ exports.getTargetProduct = async (req, res) => {
     ...new Set(targetProductData.flatMap(item => item.grp_target ?? []))
   ]
 
-  const productData = await Product.find({
-    groupCodeM3: { $in: listGroupM3 }
-  }).lean()
+  const productData = await Product.find().lean()
 
   // ใช้ $lt แทน $lte (แนะนำให้กำหนด endOfMonthUTC = วันแรกของเดือนถัดไป 00:00:00Z)
   const baseFilter = { period }
