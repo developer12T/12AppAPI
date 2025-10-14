@@ -148,7 +148,7 @@ exports.getDetailStore = async (req, res) => {
     const { storeId } = req.params
     const channel = req.headers['x-channel'] // 'credit' or 'cash'
 
-    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
 
     // ตัวอย่างดึงข้อมูลจาก MongoDB
     const storeData = await Store.findOne({ storeId }).lean()
@@ -157,13 +157,20 @@ exports.getDetailStore = async (req, res) => {
       return res.status(404).json({ status: 404, message: 'Store not found' })
     }
 
+    const typeStores = await TypeStore.findOne({ storeId }).lean()
+
+    const store = {
+      ...storeData,
+      storeType: typeStores.type || []
+    }
+
     // const io = getSocket()
     // io.emit('store/', {});
 
     // ส่งข้อมูลกลับ
     res.status(200).json({
       status: 200,
-      data: storeData
+      data: store
     })
   } catch (error) {
     console.error(error)
@@ -234,7 +241,7 @@ exports.getPendingStore = async (req, res) => {
     res.status(200).json({
       status: '200',
       message: 'Success',
-      count: data
+      count: data.length
     })
   } catch (error) {
     console.error(error)
@@ -1466,24 +1473,24 @@ exports.updateStoreStatus = async (req, res) => {
       customerCoType: item.type ?? '',
       customerAddress1: (
         item.address +
-        item.subDistrict +
-        item.subDistrict +
-        item.province +
-        item.postCode ?? ''
+          item.subDistrict +
+          item.subDistrict +
+          item.province +
+          item.postCode ?? ''
       ).substring(0, 35),
       customerAddress2: (
         item.address +
-        item.subDistrict +
-        item.subDistrict +
-        item.province +
-        item.postCode ?? ''
+          item.subDistrict +
+          item.subDistrict +
+          item.province +
+          item.postCode ?? ''
       ).substring(35, 70),
       customerAddress3: (
         item.address +
-        item.subDistrict +
-        item.subDistrict +
-        item.province +
-        item.postCode ?? ''
+          item.subDistrict +
+          item.subDistrict +
+          item.province +
+          item.postCode ?? ''
       ).substring(70, 105),
       customerAddress4: '',
       customerPoscode: (item.postCode ?? '').substring(0, 35),
@@ -2561,7 +2568,7 @@ exports.storeToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
   } catch (err) {
     console.error(err)
@@ -3086,9 +3093,7 @@ exports.getStorePage = async (req, res) => {
   }
 }
 
-
 exports.updateStoreAddressIt = async (req, res) => {
-
   const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
 
@@ -3096,16 +3101,18 @@ exports.updateStoreAddressIt = async (req, res) => {
 
   let data = []
   for (item of storeData) {
-    const shippingAddress = [{
-      default: '1',
-      shippingId: 'shippingId',
-      address: 'address',
-      district: 'district',
-      subDistrict: 'subDistrict',
-      province: 'province',
-      latitude: 'latitude',
-      longtitude: 'longtitude',
-    }]
+    const shippingAddress = [
+      {
+        default: '1',
+        shippingId: 'shippingId',
+        address: 'address',
+        district: 'district',
+        subDistrict: 'subDistrict',
+        province: 'province',
+        latitude: 'latitude',
+        longtitude: 'longtitude'
+      }
+    ]
 
     const updateData = await Store.findOneAndUpdate(
       { storeId: item.storeId },
@@ -3121,44 +3128,40 @@ exports.updateStoreAddressIt = async (req, res) => {
     data.push(updateData)
   }
 
-
   res.status(200).json({
     status: 200,
     message: 'sucess',
     data: data
   })
-
 }
 
-
 exports.checkRangeLatLong = async (req, res) => {
-
   const channel = req.headers['x-channel']
   const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
 
   const dataStoreLatLong = await StoreLatLong.find({ status: 'approved' })
 
-  function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371; // รัศมีโลก (กิโลเมตร)
+  function calculateDistance (lat1, lon1, lat2, lon2) {
+    const R = 6371 // รัศมีโลก (กิโลเมตร)
 
-    const dLat = deg2rad(lat2 - lat1);
-    const dLon = deg2rad(lon2 - lon1);
+    const dLat = deg2rad(lat2 - lat1)
+    const dLon = deg2rad(lon2 - lon1)
 
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(deg2rad(lat1)) *
-      Math.cos(deg2rad(lat2)) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        Math.cos(deg2rad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2)
 
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 
-    return R * c; // ระยะทาง (กิโลเมตร)
+    return R * c // ระยะทาง (กิโลเมตร)
   }
 
-  function deg2rad(deg) {
-    return deg * (Math.PI / 180);
+  function deg2rad (deg) {
+    return deg * (Math.PI / 180)
   }
-
 
   let data = []
 
@@ -3168,19 +3171,19 @@ exports.checkRangeLatLong = async (req, res) => {
       parseFloat(item.longtitudeOld),
       parseFloat(item.latitude),
       parseFloat(item.longtitude)
-    );
+    )
 
-    const rangeMeter = rangeKm * 1000; // แปลงเป็นเมตร
+    const rangeMeter = rangeKm * 1000 // แปลงเป็นเมตร
     const dateThai = toThaiTime(item.createdAt)
     const dataTran = {
       orderId: item.orderId,
       storeId: item.storeId,
       name: item.name,
       area: item.area,
-      rangeKm: rangeKm.toFixed(2),      // กิโลเมตร (ทศนิยม 2 ตำแหน่ง)
+      rangeKm: rangeKm.toFixed(2), // กิโลเมตร (ทศนิยม 2 ตำแหน่ง)
       rangeMeter: Math.round(rangeMeter), // เมตร (ปัดเศษเป็นจำนวนเต็ม)
       date: dateThai
-    };
+    }
 
     // console.log(dataTran);
     data.push(dataTran)
@@ -3203,22 +3206,17 @@ exports.checkRangeLatLong = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => { })
+    fs.unlink(tempPath, () => {})
   })
-
-
-
 
   // res.status(200).json({
   //   status: 200,
   //   message: 'sucess',
   //   data: data
   // })
-
 }
 
 exports.checkNewStoreLatLong = async (req, res) => {
-
   const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const { Route } = getModelsByChannel(channel, res, routeModel)
@@ -3229,53 +3227,55 @@ exports.checkNewStoreLatLong = async (req, res) => {
 
   const storeData = await Store.find({
     createdAt: {
-      $gte: new Date("2025-06-30T17:00:00.000Z"), // ✅ ใช้ new Date แทน ISODate
-      $lt: new Date("2025-09-30T17:00:00.000Z")
+      $gte: new Date('2025-06-30T17:00:00.000Z'), // ✅ ใช้ new Date แทน ISODate
+      $lt: new Date('2025-09-30T17:00:00.000Z')
     },
     area: { $ne: 'IT211' }
-  });
+  })
 
-  const storeIds = storeData.map(s => s._id.toString());
+  const storeIds = storeData.map(s => s._id.toString())
 
   const dataRoute = await Route.aggregate([
-    { $unwind: "$listStore" },
+    { $unwind: '$listStore' },
     {
       $match: {
-        "listStore.storeInfo": { $in: storeIds },
-        period: "202510"
+        'listStore.storeInfo': { $in: storeIds },
+        period: '202510'
       }
     },
-    { $group: { _id: "$_id", doc: { $first: "$$ROOT" } } },
-    { $replaceRoot: { newRoot: "$doc" } }
-  ]);
+    { $group: { _id: '$_id', doc: { $first: '$$ROOT' } } },
+    { $replaceRoot: { newRoot: '$doc' } }
+  ])
 
   const storeIdTran = dataRoute
     .filter(item => item.listStore.status !== '0') // ✅ เอาเฉพาะที่ status != '0'
-    .map(item => new ObjectId(
-      typeof item.listStore.storeInfo === 'object'
-        ? item.listStore.storeInfo._id
-        : item.listStore.storeInfo
-    ));
+    .map(
+      item =>
+        new ObjectId(
+          typeof item.listStore.storeInfo === 'object'
+            ? item.listStore.storeInfo._id
+            : item.listStore.storeInfo
+        )
+    )
 
-  const idList = storeIdTran.map(id => id.toString());
+  const idList = storeIdTran.map(id => id.toString())
 
-  const data = storeData.filter(item =>
-    idList.includes(item._id.toString())
-  );
+  const data = storeData.filter(item => idList.includes(item._id.toString()))
 
   const storeOrder = data.flatMap(item => item.storeId)
 
   const orderData = await Order.find({
-    type: 'sale', routeId: { $ne: '' },
-    period: '202510', 'store.storeId': { $in: storeOrder }
+    type: 'sale',
+    routeId: { $ne: '' },
+    period: '202510',
+    'store.storeId': { $in: storeOrder }
   })
 
   const latLong = dataStoreLatLong.flatMap(item => item.storeId)
 
-  const missingStore = storeOrder.filter(id => !latLong.includes(id));
+  const missingStore = storeOrder.filter(id => !latLong.includes(id))
 
-  const existingStore = storeOrder.filter(id => latLong.includes(id));
-
+  const existingStore = storeOrder.filter(id => latLong.includes(id))
 
   res.status(200).json({
     status: 200,
@@ -3283,11 +3283,9 @@ exports.checkNewStoreLatLong = async (req, res) => {
     missingStore: missingStore,
     existingStore: existingStore
   })
-
 }
 
 exports.updateAreaStore = async (req, res) => {
-
   const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const { Route } = getModelsByChannel(channel, res, routeModel)
@@ -3297,21 +3295,21 @@ exports.updateAreaStore = async (req, res) => {
   const result = await routeQuery(channel)
 
   // ดึงค่า storeId ทั้งหมดออกมา (flatten)
-  const storeIds = result.flatMap(item => item.storeId);
+  const storeIds = result.flatMap(item => item.storeId)
 
   // หาค่าที่ซ้ำกัน
-  const duplicates = storeIds.filter((id, index, self) => self.indexOf(id) !== index);
+  const duplicates = storeIds.filter(
+    (id, index, self) => self.indexOf(id) !== index
+  )
 
   // ลบค่าซ้ำซ้ำออกให้เหลือแค่ตัวเดียวต่อ id
-  const uniqueDuplicates = [...new Set(duplicates)];
+  const uniqueDuplicates = [...new Set(duplicates)]
 
   if (uniqueDuplicates.length > 0) {
-    console.log('⚠️ เจอ storeId ซ้ำ:', uniqueDuplicates);
+    console.log('⚠️ เจอ storeId ซ้ำ:', uniqueDuplicates)
   } else {
-    console.log('✅ ไม่มี storeId ซ้ำ');
+    console.log('✅ ไม่มี storeId ซ้ำ')
   }
-
-
 
   // const storeId = [
   //   ...new Set(result.flatMap(item =>
@@ -3332,11 +3330,9 @@ exports.updateAreaStore = async (req, res) => {
 
   // }
 
-
   res.status(200).json({
     status: 200,
     message: 'sucess',
     data: result
-
   })
 }

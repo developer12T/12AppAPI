@@ -100,6 +100,7 @@ exports.getRoute = async (req, res) => {
         const storeInfo = item.storeInfo?.toObject
           ? item.storeInfo.toObject()
           : item.storeInfo || {}
+          
         const type = storeTypeMap.get(storeInfo.storeId)
         // console.log(item)
         return {
