@@ -5732,7 +5732,7 @@ exports.getOrderExcelNew = async (req, res) => {
   for (const i of [...dataOrderSale, ...dataOrderPro]) {
     // console.log(i)
     for (const item of i.listProduct ?? []) {
-      if (!item.id || item.id.trim() === '') {
+      if (!item.id || item.id.trim() === '' || item.unit == '') {
         continue
       }
 
