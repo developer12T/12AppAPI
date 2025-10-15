@@ -1174,7 +1174,7 @@ async function updateOrderPowerBI(channel = 'cash') {
 
 const startCronJobUpdateOrderPowerBI = () => {
   cron.schedule(
-     '* * * * *', // 👉 00:00 AM (เวลาไทย)
+     '0 0 * * *', // 👉 00:00 AM (เวลาไทย)
     async () => {
       console.log(
         'Running cron job startCronJobUpdateOrderPowerBI at 00:00 AM Thai time. Now:',
