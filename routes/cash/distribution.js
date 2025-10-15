@@ -23,7 +23,8 @@ const {
   UpdateWithdrawConjob,
   getOrderPending,
   approveWithdrawCredit,
-  getOrder2
+  getOrder2,
+  addRemark
 } = require('../../controllers/distribution/withdrawController')
 const {
   getPlace,
@@ -50,6 +51,8 @@ router.get('/getType', getType)
 
 router.get('/place/get', getPlace)
 router.post('/place/add', addPlace)
+
+router.post('/addRemark', addRemark)
 
 router.post('/place/addAllPlace', addAllPlace)
 
