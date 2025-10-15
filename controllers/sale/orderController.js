@@ -5322,7 +5322,6 @@ exports.orderPowerBI = async (req, res) => {
 
 
 exports.updateOrderPowerBI = async (req, res) => {
-  let { startDate, endDate, excel, status } = req.query
 
   const now = new Date()
   const thailandOffset = 7 * 60 // นาที
@@ -5332,48 +5331,49 @@ exports.updateOrderPowerBI = async (req, res) => {
   const year = thailand.getFullYear()
   const month = String(thailand.getMonth() + 1).padStart(2, '0')
   const day = String(thailand.getDate()).padStart(2, '0')
-  const currentDate = `${year}${month}${day}`
+  const nextDay = String(thailand.getDate() + 1).padStart(2, '0')
 
+  const currentDate = `${year}${month}${day}`
+  const startDate = `${year}${month}${day}`
+  const endDate = `${year}${month}${nextDay}`
+  const status =''
+  // console.log(startDate)
+  // console.log(endDate)
   const channel = 'cash'
   const { Order } = getModelsByChannel(channel, res, orderModel)
   const { Product } = getModelsByChannel(channel, res, productModel)
   const { Refund } = getModelsByChannel(channel, res, refundModel)
   const { Store } = getModelsByChannel(channel, res, storeModel)
 
+  const invoBi = await dataPowerBiQuery(channel, 'INVO')
+  const invoBiList = invoBi.flatMap(item => item.INVO)
 
-  const conoBi = await dataPowerBiQuery(channel,'CONO')
-  const conoBiList = conoBi.flatMap(item => item.CONO)
-
-  const invoBi = await dataPowerBiQuery(channel,'INVO')
-  const invoBiList = invoBi.flatMap(item => item.invo)
-
-  const conoM3 = await dataM3Query(channel)
-  const conoM3List = conoM3.flatMap(item => item.OACUOR)
+  const invoM3 = await dataM3Query(channel)
+  const invoM3List = invoM3.flatMap(item => item.OACUOR)
 
 
-  const allTransactions = await dataPowerBi(channel, conoBiList, status, startDate, endDate, currentDate)
-  await dataPowerBiQueryInsert(channel,allTransactions)
+  const allTransactions = await dataPowerBi(channel, invoBiList, status, startDate, endDate, currentDate)
+  await dataPowerBiQueryInsert(channel, allTransactions)
+
+  const invoBiAfter = await dataPowerBiQuery(channel, 'INVO')
+  const invoBiListAfter = invoBiAfter.flatMap(item => item.INVO)
 
   let alreadyM3 = []
-  for (const item of invoBiList) {
-    if (conoM3List.includes(item)) {
+  for (const item of invoBiListAfter) {
+
+    if (invoM3List.includes(item)) {
       alreadyM3.push(item)
 
 
     }
   }
 
-  dataPowerBiQueryDelete(channel,alreadyM3)
-
-
-
-
-
+  await dataPowerBiQueryDelete(channel, alreadyM3)
 
   return res.status(200).json({
     status: 200,
     message: 'Sucess',
-    data: allTransactions
+    data: alreadyM3
   })
 }
 
