@@ -1,6 +1,7 @@
 const { OOTYPE, NumberSeries } = require('../models/cash/master')
 const { getModelsByChannel } = require('../middleware/channel')
 const cartModel = require('../models/cash/cart')
+const storeModel = require('../models/cash/store')
 const productModel = require('../models/cash/product')
 const orderModel = require('../models/cash/sale')
 const refundModel = require('../models/cash/refund')
@@ -899,13 +900,370 @@ const distributionSendEmail = async (orderDetail, res, channel) => {
           </p>
         `
   })
+}
+
+
+function yyyymmddToDdMmYyyy(dateString) {
+  // สมมติ dateString คือ '20250804'
+  const year = dateString.slice(0, 4)
+  const month = dateString.slice(4, 6)
+  const day = dateString.slice(6, 8)
+  return `${day}${month}${year}`
+}
+
+
+const dataPowerBi = async (channel, conoBiList, status, startDate, endDate, currentDate) => {
+
+  const { Order } = getModelsByChannel(channel, null, orderModel)
+  const { Product } = getModelsByChannel(channel, null, productModel)
+  const { Refund } = getModelsByChannel(channel, null, refundModel)
+  const { Store } = getModelsByChannel(channel, null, storeModel)
+
+
+  let statusArray = (status || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+
+  if (statusArray.length === 0) {
+    statusArray = ['pending'] // default
+  }
+
+  // console.log(statusArray)
+
+  const startTH = new Date(
+    `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
+      6,
+      8
+    )}T00:00:00+07:00`
+  )
+  const endTH = new Date(
+    `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(
+      6,
+      8
+    )}T23:59:59.999+07:00`
+  )
+
+  const modelOrder = await Order.aggregate([
+    {
+      $match: {
+        createdAt: {
+          $gte: startTH,
+          $lte: endTH
+        }
+      }
+    },
+    {
+      $match: {
+        status: { $nin: ['canceled'] },
+        status: { $in: statusArray },
+        type: { $in: ['sale'] },
+        'store.area': { $ne: 'IT211' }
+        // 'store.area': 'NE211'
+      }
+    },
+    {
+      $addFields: {
+        createdAtThai: {
+          $dateAdd: {
+            startDate: '$createdAt',
+            unit: 'hour',
+            amount: 7
+          }
+        }
+      }
+    },
+    {
+      $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
+    }
+  ])
+
+  const modelChange = await Order.aggregate([
+    {
+      $match: {
+        'store.area': { $ne: 'IT211' },
+        // 'store.area': 'NE211',
+        status: { $in: statusArray },
+        status: { $nin: ['reject', 'canceled', 'pending'] },
+        type: { $in: ['change'] }
+      }
+    },
+    {
+      $addFields: {
+        createdAtThai: {
+          $dateAdd: {
+            startDate: '$createdAt',
+            unit: 'hour',
+            amount: 7
+          }
+        }
+      }
+    },
+    {
+      $match: {
+        createdAt: {
+          $gte: startTH,
+          $lte: endTH
+        }
+      }
+    },
+    {
+      $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
+    }
+  ])
+
+  const modelRefund = await Refund.aggregate([
+    {
+      $match: {
+        status: { $in: statusArray },
+        status: { $nin: ['canceled', 'reject', 'pending'] },
+        'store.area': { $ne: 'IT211' }
+        // 'store.area': 'NE211'
+      }
+    },
+    {
+      $addFields: {
+        createdAtThai: {
+          $dateAdd: {
+            startDate: '$createdAt',
+            unit: 'hour',
+            amount: 7
+          }
+        }
+      }
+    },
+    {
+      $match: {
+        createdAt: {
+          $gte: startTH,
+          $lte: endTH
+        }
+      }
+    },
+    {
+      $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
+    }
+  ])
+
+  const productDetails = await Product.find()
+
+  const storeIdList = [
+    ...new Set(
+      [...modelChange, ...modelOrder]
+        .flatMap(it => it.store?.storeId ?? [])
+        .filter(Boolean) // ตัด null/undefined/'' ออก
+    )
+  ]
+
+  const storeData = await Store.find({ storeId: { $in: storeIdList } })
+
+  function formatDateToThaiYYYYMMDD(date) {
+    const d = new Date(date)
+    d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
+
+    const yyyy = d.getFullYear()
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+
+    return `${yyyy}${mm}${dd}`
+  }
+
+  const tranFromOrder = [...modelOrder, ...modelChange, ...modelRefund].flatMap(
+    order => {
+      const store = storeData.find(i => i.storeId === order.store.storeId)
+      let counterOrder = 0
+
+      // console.log(order.orderId)
+      // ใช้งาน
+      const RLDT = formatDateToThaiYYYYMMDD(order.createdAt)
+
+      const createdAtDate = `${RLDT.slice(0, 4)}-${RLDT.slice(
+        4,
+        6
+      )}-${RLDT.slice(6, 8)}`
+      const createdAtDatetime = new Date(
+        new Date(order.createdAt).getTime() + 7 * 3600 * 1000
+      )
+        .toISOString()
+        .replace('Z', '') // "2025-08-25T14:41:30.582"
+
+      const hhmmss = createdAtDatetime.slice(11, 19).replace(/:/g, '')
+
+      const listProduct = order.listProduct.map(product => {
+        return {
+          proCode: '',
+          id: product.id,
+          name: product.name,
+          group: product.group,
+          brand: product.brand,
+          size: product.size,
+          flavour: product.flavour,
+          qty: product.qty,
+          unit: product.unit,
+          unitName: product.unitName,
+          price: product.price,
+          subtotal: product.subtotal,
+          discount: product.discount,
+          netTotal: product.netTotal
+        }
+      })
+
+      const listPromotion =
+        order.listPromotions?.flatMap(
+          promo =>
+            promo.listProduct?.map(product => ({
+              proCode: promo.proCode,
+              id: product.id,
+              name: product.name,
+              group: product.group,
+              brand: product.brand,
+              size: product.size,
+              flavour: product.flavour,
+              qty: product.qty,
+              unit: product.unit,
+              unitName: product.unitName,
+              qtyPcs: product.qtyPcs
+            })) || []
+        ) || []
+
+      const productIDS = [...listProduct, ...listPromotion].flat()
+        // console.log("conoBiList",conoBiList)
+      // console.log("createdAtDate", createdAtDate)
+      return productIDS
+        .filter(p => typeof p?.id === 'string' && p.id.trim() !== '')
+        .map(product => {
+
+          const existPowerBi = conoBiList.find(item => item === order.orderId)
+          
+          if (existPowerBi) return null
+
+          counterOrder++
+
+          const productDetail = productDetails.find(i => product.id === i.id)
+          const factorCtn =
+            productDetail?.listUnit?.find?.(i => i.unit === 'CTN')?.factor ?? 1
+          const factor =
+            productDetail?.listUnit?.find?.(i => i.unit === product?.unit)
+              ?.factor ?? 0
+          const MONTHS_EN = [
+            'January',
+            'February',
+            'March',
+            'April',
+            'May',
+            'June',
+            'July',
+            'August',
+            'September',
+            'October',
+            'November',
+            'December'
+          ]
+          const monthName = MONTHS_EN[Number(RLDT.slice(4, 6)) - 1]
+
+          let SALE_FOC = ''
+
+          let orderType = ''
+          if (order.type === 'refund') {
+            orderType = 'A34'
+            SALE_FOC = 'CN'
+          } else if (order.type === 'sale') {
+            orderType = 'A31'
+            if (product.proCode) {
+              SALE_FOC = 'FOC'
+            } else {
+              SALE_FOC = 'SALE'
+            }
+          } else if (order.type === 'change') {
+            orderType = 'B31'
+            SALE_FOC = 'CN'
+          }
+
+          const QTY_USC = factor * product.qty
+
+
+          return {
+            INVO: order.orderId,
+            ORDER_DATE: createdAtDate,
+            OLINE_DATE: createdAtDate,
+            OOLINE_TIME: createdAtDatetime,
+            COMP_NO: '410',
+            CONO: order?.orderNo || '',
+            RUNNO_BILL: `${counterOrder}`,
+            STATUS_BILL: order?.lowStatus || '11',
+            WHCODE: order.sale.warehouse,
+            ITEM_CODE: product.id,
+            ITEM_NAME: product.name,
+            ITEM_DES: product.name,
+            QTY_USC: QTY_USC,
+            QTY_PACK: product.qty,
+            UNIT_SHIP: product.unit,
+            PACK_SIZE: factor,
+            AMOUNT_DIS: product?.price || 0,
+            AMOUNT_FULL: product?.price || 0,
+            SUM_AMOUNT: product?.subtotal || 0,
+            SUM_AMOUNT2: product?.subtotal || 0,
+            CUS_CODE: order.store.storeId,
+            RUNNING_NO: '',
+            DUO_CODE: order.store.storeId,
+            CREATE_DATE: RLDT,
+            CREATE_TIME: hhmmss,
+            CO_TYPE: product.proCode,
+            DARIVERY_DATE: RLDT,
+            IMPORT_TYPE: 'MVXSECOFR',
+            CHANNEL: '103',
+            SALE_FOC: SALE_FOC,
+            CO_MONTH: monthName,
+            CO_YEAR: RLDT.slice(0, 4),
+            MT_ID: '',
+            SALE_CODE: order.sale.saleCode,
+            OOTYPE: orderType,
+            GROUP_TYPE: productDetail.groupCodeM3,
+            BRAND: productDetail.brandCode,
+            FLAVOUR: product.flavourCode,
+            CUS_NAME: order.store.name,
+            CUS_DESCRIPTION: order.store.name,
+            PROVINCE: store.province,
+            DISTRICT: store.district,
+            SHOP_TYPE: store.typeName,
+            CUS_AREA: store.area,
+            CUS_ZONE: store.zone,
+            PROVINCE_ZONE: store.zone,
+            PROVINCE_CODE: store.postCode,
+            QTY_CTN: factorCtn,
+            QTY: module.exports.to2(QTY_USC / factorCtn),
+            REMAIN_QTY: 0,
+            SALE_PLAYER: order.sale.salePayer,
+            SYS_STATUS: 'Y',
+            MODIFY_DATE: currentDate,
+            FOC_AMOUNT: 0,
+            ROUTE_ID: order.shipping?.shippingId || '',
+            ROUTE_NAME: '',
+            SHIPPING_PROVINCE: order.shipping?.postCode || '',
+            SHIPPING_NAME: order.shipping?.province || '',
+            DUO_NAME: order.store.name,
+            CUS_TEAM: `${order.store.zone}${store.area.slice(3, 4)}`
+          }
+        })
+        .filter(Boolean)
+    }
+  )
+
+  const allTransactions = [...tranFromOrder]
+
+
+  return allTransactions
 
 
 }
+
+
+
 
 
 exports.calculateStockSummary = calculateStockSummary;
 exports.getOrders = getOrders
 exports.getChange = getChange
 exports.getRefund = getRefund
+exports.dataPowerBi = dataPowerBi
 // module.exports = { calculateStockSummary };

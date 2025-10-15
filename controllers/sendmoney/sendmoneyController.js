@@ -34,7 +34,9 @@ exports.addSendMoney = async (req, res) => {
   const month = parseInt(date.slice(4, 6), 10)
   const day = parseInt(date.slice(6, 8), 10)
   const startOfMonthUTC = new Date(Date.UTC(year, month - 1, day - 1, 17, 0, 0))
-  const endOfMonthUTC = new Date(Date.UTC(year, month - 1, day, 16, 59, 59, 999));
+  const endOfMonthUTC = new Date(
+    Date.UTC(year, month - 1, day, 16, 59, 59, 999)
+  )
 
   const existData = await SendMoney.aggregate([
     { $match: { area: area } },
@@ -64,50 +66,43 @@ exports.addSendMoney = async (req, res) => {
 
   const periodStr = period()
 
-
-
-  const [dataRefund, dataOrderSale, dataOrderChange] =
-    await Promise.all([
-      Refund.find({
-        'store.area': area,
-        period: periodStr,
-        createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
-        type: 'refund',
-        status: { $nin: ['pending', 'canceled', 'reject'] }
-      }),
-      Order.find({
-        'store.area': area,
-        period: periodStr,
-        createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
-        type: 'sale',
-        status: { $nin: ['canceled', 'reject'] }
-      }),
-      Order.find({
-        'store.area': area,
-        period: periodStr,
-        createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
-        type: 'change',
-        status: { $nin: ['pending', 'canceled', 'reject'] }
-      })
-    ])
+  const [dataRefund, dataOrderSale, dataOrderChange] = await Promise.all([
+    Refund.find({
+      'store.area': area,
+      period: periodStr,
+      createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+      type: 'refund',
+      status: { $nin: ['pending', 'canceled', 'reject'] }
+    }),
+    Order.find({
+      'store.area': area,
+      period: periodStr,
+      createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+      type: 'sale',
+      status: { $nin: ['canceled', 'reject'] }
+    }),
+    Order.find({
+      'store.area': area,
+      period: periodStr,
+      createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+      type: 'change',
+      status: { $nin: ['pending', 'canceled', 'reject'] }
+    })
+  ])
 
   const refundSum = dataRefund.reduce((sum, item) => {
-    return sum + item.total;
-  }, 0);
+    return sum + item.total
+  }, 0)
 
   const saleSum = dataOrderSale.reduce((sum, item) => {
-    return sum + item.total;
-  }, 0);
+    return sum + item.total
+  }, 0)
 
   const changeSum = dataOrderChange.reduce((sum, item) => {
-    return sum + item.total;
-  }, 0);
-
+    return sum + item.total
+  }, 0)
 
   const sumTotalSale = saleSum + (changeSum - refundSum)
-
-
-
 
   if (existData.length == 0) {
     const different = sendmoney - sumTotalSale
@@ -121,7 +116,7 @@ exports.addSendMoney = async (req, res) => {
       different: to2(different)
     })
   } else {
-    const different = (existData[0].sendmoney + sendmoney) - sumTotalSale
+    const different = existData[0].sendmoney + sendmoney - sumTotalSale
     sendmoneyData = await SendMoney.findOneAndUpdate(
       { _id: existData[0]._id },
       {
@@ -722,7 +717,7 @@ exports.sendmoneyToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
   } else {
     return res.status(200).json({

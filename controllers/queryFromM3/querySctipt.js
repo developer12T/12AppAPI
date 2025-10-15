@@ -80,6 +80,86 @@ WHERE
 
 }
 
+
+exports.userQueryOne = async function (channel, area) {
+
+  const config = {
+    user: process.env.MS_SQL_USER,
+    password: process.env.MS_SQL_PASSWORD,
+    server: process.env.MS_SQL_SERVER,
+    database: process.env.MS_SQL_DATABASE,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  };
+  const hash = '$2b$10$DqTAeJ.dZ67XVLky203dn.77idSGjHqbOJ7ztOTeEpr1VeycWngua';
+
+  const areStr = area
+  await sql.connect(config);
+
+  let result = ''
+  if (channel == 'cash') {
+    result = await sql.query`
+SELECT
+    DA.Sale_Code as saleCode,
+    DA.Sale_Player as salePayer,
+    DA.Col_LoginName as username,
+    LEFT(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') - 1) AS firstName,
+    SUBSTRING(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') + 1, LEN(DA.Col_NameTH)) AS surName,
+    SUBSTRING(
+    REPLACE(CONVERT(VARCHAR(40), NEWID()), '-', ''),
+    1, 6
+) AS password,
+    SALE_MOBILE AS tel,
+    DA.ZONE AS zone,
+    DA.AREA AS area,
+    DA.WH AS warehouse,
+    'sale' AS role,
+    '1' AS status,
+    TRUCK_SIZE AS typeTruck,
+    TRUCK_NO as noTruck,
+    'https://apps.onetwotrading.co.th/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
+FROM 
+  [DATA_OMS].[dbo].[DATA_Area] AS DA
+WHERE 
+  DA.CHANNEL_NAME = 'Cash' AND 
+  DA.Sale_Code is not NULL AND
+  DA.Sale_Code != 'ว่าง'  AND
+  DA.AREA = ${areStr}
+  `
+  }
+  else if (channel == 'credit') {
+    result = await sql.query`
+SELECT
+    DA.Sale_Code as saleCode,
+    DA.Sale_Player as salePayer,
+    DA.Col_LoginName as username,
+    LEFT(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') - 1) AS firstName,
+    SUBSTRING(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') + 1, LEN(DA.Col_NameTH)) AS surName,
+    ${hash} AS password,
+    'TEL' AS tel,
+    DA.ZONE AS zone,
+    DA.AREA AS area,
+    DA.WH AS warehouse,
+    'sale' AS role,
+    '1' AS status,
+    'http://apps.onetwotrading.co.th/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
+FROM 
+  [DATA_OMS].[dbo].[DATA_Area] AS DA 
+WHERE 
+  DA.CHANNEL_NAME = 'Credit' AND 
+  DA.Sale_Code is not NULL AND
+  DA.Sale_Code != 'ว่าง'
+`
+  }
+
+  await sql.close();
+  return result.recordset
+
+}
+
+
 exports.userQueryManeger = async function (channel, area) {
 
   const config = {
@@ -844,7 +924,7 @@ LEFT JOIN m_prd_group gp ON a.GRP = gp.GRP_CODE
 }
 
 
-exports.routeQuery = async function (channel) {
+exports.routeQuery = async function (channel, area) {
 
   const config = {
     user: process.env.MS_SQL_USER,
@@ -861,8 +941,28 @@ exports.routeQuery = async function (channel) {
 
   let result = ''
   if (channel == 'cash') {
-    result = await sql.query`
- SELECT a.Area AS area, 
+    if (area) {
+      result = await sql.query`
+            SELECT a.Area AS area, 
+                    CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
+                    RIGHT(RouteSet, 2) AS day, 
+                    CONVERT(nvarchar(6), GETDATE(), 112) AS period, 
+                    a.StoreID AS storeId
+             FROM [DATA_OMS].[dbo].[DATA_StoreSet] a
+             LEFT JOIN [DATA_OMS].[dbo].[OCUSMA] ON StoreID = OKCUNO COLLATE Latin1_General_BIN
+             LEFT JOIN [dbo].[data_store] b ON StoreID = customerCode
+            WHERE 
+                store_status <> '90' 
+                AND 
+                LEFT(OKRGDT, 6) <> CONVERT(nvarchar(6), GETDATE(), 112)
+               AND a.Channel = '103'
+               AND a.Area = ${area}
+             ORDER BY a.Area, RouteSet
+        `
+
+    } else {
+      result = await sql.query`
+                  SELECT a.Area AS area, 
                     CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
                     RIGHT(RouteSet, 2) AS day, 
                     CONVERT(nvarchar(6), GETDATE(), 112) AS period, 
@@ -876,23 +976,9 @@ exports.routeQuery = async function (channel) {
                 LEFT(OKRGDT, 6) <> CONVERT(nvarchar(6), GETDATE(), 112)
                AND a.Channel = '103'
              ORDER BY a.Area, RouteSet
-        `
-  }
-  if (channel == 'credit') {
-    result = await sql.query`
+      `
+    }
 
-SELECT a.Area AS area, 
-                    CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
-                    RIGHT(RouteSet, 2) AS day, 
-                    CONVERT(nvarchar(6), GETDATE(), 112) AS period, 
-                    StoreID AS storeId
-             FROM [DATA_OMS].[dbo].[DATA_StoreSet] a
-             LEFT JOIN [DATA_OMS].[dbo].[OCUSMA] ON StoreID = OKCUNO COLLATE Latin1_General_BIN
-             LEFT JOIN [dbo].[store_credit] b ON StoreID = customerCode
-            WHERE a.Channel = '102'
-            ORDER BY a.Area, RouteSet
-
-    `
   }
   await sql.close();
   return result.recordset
@@ -953,7 +1039,7 @@ exports.routeQueryOne = async function (channel, RouteId) {
 }
 
 
-exports.dataPowerBiQuery = async function (channel) {
+exports.dataPowerBiQuery = async function (channel, column) {
 
   const config = {
     user: process.env.POWERBI_USER,
@@ -970,26 +1056,113 @@ exports.dataPowerBiQuery = async function (channel) {
 
   let result = ''
   if (channel == 'cash') {
+    const query = `
+      SELECT DISTINCT INVO 
+      FROM [dbo].[CO_ORDER_copy1]   
+      WHERE STATUS_BILL = '11' AND CHANNEL = '103'
+    `;
+    result = await sql.query(query)
+
+  }
+
+  await sql.close();
+
+
+  return result.recordset
+}
+
+
+exports.dataPowerBiQueryInsert = async function (channel, data) {
+
+  const config = {
+    user: process.env.POWERBI_USER,
+    password: process.env.POWERBI_PASSWORD,
+    server: process.env.POWERBI_HOST,
+    database: process.env.POWERBI_DATABASE,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  };
+  // console.log(RouteId)
+  await sql.connect(config);
+
+  for (const item of data) {
+    const request = new sql.Request()
+    for (let [key, value] of Object.entries(item)) {
+      request.input(key, value)
+    }
+
+    const query = `
+    INSERT INTO [dbo].[CO_ORDER_copy1] (
+      ${Object.keys(item).join(',')}
+    ) VALUES (
+      ${Object.keys(item).map(k => '@' + k).join(',')}
+    )
+  `
+    await request.query(query)
+  }
+
+}
+
+exports.dataPowerBiQueryDelete = async function (channel, cono) {
+  if (!cono || cono.length === 0) {
+    return;
+  }
+  const conoStr = cono.map(c => `'${c}'`).join(","); // =>  '1001','1002','1003'
+  const config = {
+    user: process.env.POWERBI_USER,
+    password: process.env.POWERBI_PASSWORD,
+    server: process.env.POWERBI_HOST,
+    database: process.env.POWERBI_DATABASE,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  };
+  // console.log(RouteId)
+  await sql.connect(config);
+
+  if (channel === 'cash') {
+    const query = `
+      DELETE FROM [dbo].[CO_ORDER_copy1]
+      WHERE INVO IN (${conoStr})
+      AND CHANNEL = '103'
+      AND STATUS_BILL = '11'
+    `;
+
+    const result = await sql.query(query);
+    await sql.close();
+    return result.recordset;
+  }
+}
+
+
+
+
+
+exports.dataM3Query = async function (channel) {
+
+  const config = {
+    user: process.env.M3_USER,
+    password: process.env.M3_PASSWORD,
+    server: process.env.M3_HOST,
+    database: process.env.M3_DATABASE,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  };
+  // console.log(RouteId)
+  await sql.connect(config);
+
+  let result = ''
+  if (channel == 'cash') {
     result = await sql.query`
-SELECT DISTINCT CONO FROM [dbo].[CO_ORDER]
+SELECT DISTINCT OACUOR FROM [MVXJDTA].[OOHEAD]
         `
   }
-  //   if (channel == 'credit') {
-  //     result = await sql.query`
 
-  // SELECT a.Area AS area, 
-  //                     CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
-  //                     RIGHT(RouteSet, 2) AS day, 
-  //                     CONVERT(nvarchar(6), GETDATE(), 112) AS period, 
-  //                     StoreID AS storeId
-  //              FROM [DATA_OMS].[dbo].[DATA_StoreSet] a
-  //              LEFT JOIN [DATA_OMS].[dbo].[OCUSMA] ON StoreID = OKCUNO COLLATE Latin1_General_BIN
-  //              LEFT JOIN [dbo].[store_credit] b ON StoreID = customerCode
-  //             WHERE a.Channel = '102'
-  //             ORDER BY a.Area, RouteSet
-
-  //     `
-  //   }
   await sql.close();
   return result.recordset
 }
@@ -999,10 +1172,7 @@ SELECT DISTINCT CONO FROM [dbo].[CO_ORDER]
 
 
 
-
-
-
-exports.stockQuery = async function (channel, period) {
+exports.stockQuery = async function (channel, period, wereHouse) {
 
   const year = period.slice(0, 4);   // "2025"
   const month = period.slice(4, 6);  // "09"
@@ -1024,7 +1194,19 @@ exports.stockQuery = async function (channel, period) {
   await sql.connect(config);
   let result = ''
   if (channel == 'cash') {
-    result = await sql.query`
+
+    if (wereHouse) {
+      `
+  SELECT WH, 
+  ITEM_CODE, 
+  SUM(ITEM_QTY) AS ITEM_QTY
+  FROM [dbo].[data_stock_van]
+  WHERE Stock_Date LIKE ${formatted} AND
+  WH = ${wereHouse}
+  GROUP BY WH, ITEM_CODE`
+
+    } else {
+      result = await sql.query`
   SELECT WH, 
   ITEM_CODE, 
   SUM(ITEM_QTY) AS ITEM_QTY
@@ -1032,6 +1214,12 @@ exports.stockQuery = async function (channel, period) {
   WHERE Stock_Date LIKE ${formatted}
   GROUP BY WH, ITEM_CODE
 `;
+
+
+    }
+
+
+
   }
   else if (channel == 'credit') {
     result = await sql.query`

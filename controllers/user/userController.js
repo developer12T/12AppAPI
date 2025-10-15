@@ -12,7 +12,7 @@ const bcrypt = require('bcrypt')
 const axios = require('axios')
 const userModel = require('../../models/cash/user')
 const { getModelsByChannel } = require('../../middleware/channel')
-const { userQuery, userQueryFilter, userQueryManeger } = require('../../controllers/queryFromM3/querySctipt');
+const { userQuery, userQueryFilter, userQueryManeger, userQueryOne } = require('../../controllers/queryFromM3/querySctipt');
 const user = require('../../models/cash/user');
 const { getSocket } = require('../../socket')
 const { encrypt, decrypt } = require('../../middleware/authen')
@@ -301,30 +301,40 @@ exports.addUser = async (req, res) => {
 }
 
 exports.addUserOne = async (req, res) => {
+  const { area } = req.body
   const channel = req.headers['x-channel']
   const { User } = getModelsByChannel(channel, res, userModel)
+  const tableData = await userQueryOne(channel, area);
 
-    const user = new User({
-      saleCode: req.body.saleCode,
-      salePayer: req.body.salePayer,
-      username: req.body.username,
-      firstName: req.body.firstName,
-      surName: req.body.surName,
-      password: req.body.password,
-      tel: req.body.tel,
-      zone: req.body.zone,
-      area: req.body.area,
-      warehouse: req.body.warehouse,
-      role: req.body.role,
-      status: req.body.status,
-      image: req.body.image
-    })
-    await user.save()
+  for (const sale of tableData) {
+    const encryptedPassword = encrypt(sale.password);
 
-  
+    await User.create({
+      saleCode: sale.saleCode,
+      salePayer: sale.salePayer,
+      username: sale.username,
+      firstName: sale.firstName,
+      surName: sale.surName,
+      password: encryptedPassword,
+      tel: sale.tel,
+      zone: sale.zone,
+      area: sale.area,
+      warehouse: sale.warehouse,
+      role: sale.role,
+      status: sale.status,
+      qrCodeImage: sale.qrCodeImage,
+      image: '',
+      typeTruck: sale.typeTruck,
+      noTruck: sale.noTruck
+    });
+  }
+
+
+
   res.status(200).json({
     status: 200,
-    message: 'Insert User Success'
+    message: 'Insert User Success',
+    data: tableData
   })
 }
 
@@ -333,6 +343,9 @@ exports.updateUserOne = async (req, res) => {
   const channel = req.headers['x-channel']
   const { User } = getModelsByChannel(channel, res, userModel)
   // const user = await User.findOne({saleCode:req.body.saleCode})
+
+
+
 
   if (!req.body.username) {
     return res.status(400).json({
