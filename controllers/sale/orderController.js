@@ -425,10 +425,10 @@ exports.checkout = async (req, res) => {
     //   ...calStock
     // })
 
-    await StockMovementLog.create({
-      ...calStock,
-      refOrderId: createdMovement._id
-    })
+    // await StockMovementLog.create({
+    //   ...calStock,
+    //   refOrderId: createdMovement._id
+    // })
     await newOrder.save()
     await PromotionShelf.findOneAndUpdate(
       { proShelfId: promotionshelf.proShelfId },
