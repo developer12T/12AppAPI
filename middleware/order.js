@@ -912,7 +912,7 @@ function yyyymmddToDdMmYyyy(dateString) {
 }
 
 
-const dataPowerBi = async (channel, conoBiList,status,startDate,endDate,currentDate) => {
+const dataPowerBi = async (channel, conoBiList, status, startDate, endDate, currentDate) => {
 
   const { Order } = getModelsByChannel(channel, null, orderModel)
   const { Product } = getModelsByChannel(channel, null, productModel)
@@ -1073,7 +1073,7 @@ const dataPowerBi = async (channel, conoBiList,status,startDate,endDate,currentD
       const store = storeData.find(i => i.storeId === order.store.storeId)
       let counterOrder = 0
 
-      // console.log(order)
+      // console.log(order.orderId)
       // ใช้งาน
       const RLDT = formatDateToThaiYYYYMMDD(order.createdAt)
 
@@ -1127,13 +1127,14 @@ const dataPowerBi = async (channel, conoBiList,status,startDate,endDate,currentD
         ) || []
 
       const productIDS = [...listProduct, ...listPromotion].flat()
-
+        // console.log("conoBiList",conoBiList)
       // console.log("createdAtDate", createdAtDate)
       return productIDS
         .filter(p => typeof p?.id === 'string' && p.id.trim() !== '')
         .map(product => {
-          const existPowerBi = conoBiList.find(item => item === order.orderNo)
 
+          const existPowerBi = conoBiList.find(item => item === order.orderId)
+          
           if (existPowerBi) return null
 
           counterOrder++
@@ -1179,6 +1180,7 @@ const dataPowerBi = async (channel, conoBiList,status,startDate,endDate,currentD
           }
 
           const QTY_USC = factor * product.qty
+
 
           return {
             INVO: order.orderId,

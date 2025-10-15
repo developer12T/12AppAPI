@@ -4,20 +4,24 @@ const morgan = require('morgan')
 const cors = require('cors')
 const routeIndex = require('./routes/index')
 const app = express()
+// require('dotenv').config()
 const {
   startCronJobErpApiCheck,
   startCronJobErpApiCheckDisribution,
   startCronJobDeleteCartDaily,
-  startCronJobreStoreStockDaily
+  startCronJobreStoreStockDaily,
+  startCronJobUpdateOrderPowerBI
+
 } = require('../12AppAPI/controllers/sale/conJob')
 
 
-if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
 
+if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
   startCronJobErpApiCheck()
   // startCronJobErpApiCheckDisribution()
   // startCronJobDeleteCartDaily()
   // startCronJobOrderToExcel()
+  startCronJobUpdateOrderPowerBI()
   startCronJobreStoreStockDaily()
 
 }

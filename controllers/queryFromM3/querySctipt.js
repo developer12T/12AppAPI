@@ -959,9 +959,9 @@ exports.routeQuery = async function (channel, area) {
                AND a.Area = ${area}
              ORDER BY a.Area, RouteSet
         `
-        
+
     } else {
-       result = await sql.query`
+      result = await sql.query`
                   SELECT a.Area AS area, 
                     CONVERT(nvarchar(6), GETDATE(), 112) + RouteSet AS id, 
                     RIGHT(RouteSet, 2) AS day, 
@@ -1056,8 +1056,13 @@ exports.dataPowerBiQuery = async function (channel, column) {
 
   let result = ''
   if (channel == 'cash') {
-    const query = `SELECT DISTINCT ${column} FROM [dbo].[CO_ORDER_copy1]`
+    const query = `
+      SELECT DISTINCT INVO 
+      FROM [dbo].[CO_ORDER_copy1]   
+      WHERE STATUS_BILL = '11' AND CHANNEL = '103'
+    `;
     result = await sql.query(query)
+
   }
 
   await sql.close();
@@ -1120,9 +1125,11 @@ exports.dataPowerBiQueryDelete = async function (channel, cono) {
 
   if (channel === 'cash') {
     const query = `
-    DELETE FROM [dbo].[CO_ORDER_copy1]
-    WHERE CONO IN (${conoStr})
-  `;
+      DELETE FROM [dbo].[CO_ORDER_copy1]
+      WHERE INVO IN (${conoStr})
+      AND CHANNEL = '103'
+      AND STATUS_BILL = '11'
+    `;
 
     const result = await sql.query(query);
     await sql.close();

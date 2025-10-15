@@ -31,7 +31,15 @@ const orderModel = require('../../models/cash/sale')
 const cartModel = require('../../models/cash/cart')
 const refundModel = require('../../models/cash/refund')
 const adjustStockModel = require('../../models/cash/stock')
+const storeModel = require('../../models/cash/store')
 
+const {
+  dataPowerBiQuery,
+  dataM3Query,
+  dataPowerBiQueryDelete,
+  dataPowerBiQueryInsert
+} = require('../../controllers/queryFromM3/querySctipt')
+const { formatDateTimeToThai, dataPowerBi } = require('../../middleware/order')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { create } = require('lodash')
 
@@ -1106,6 +1114,85 @@ async function reStoreStock (channel = 'cash') {
   }
 }
 
+async function updateOrderPowerBI(channel = 'cash') {
+
+  const now = new Date()
+  const thailandOffset = 7 * 60 // นาที
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000
+  const thailand = new Date(utc + thailandOffset * 60000)
+
+  const year = thailand.getFullYear()
+  const month = String(thailand.getMonth() + 1).padStart(2, '0')
+  const day = String(thailand.getDate()).padStart(2, '0')
+  const nextDay = String(thailand.getDate() + 1).padStart(2, '0')
+
+  const currentDate = `${year}${month}${day}`
+  const startDate = `${year}${month}${day}`
+  const endDate = `${year}${month}${nextDay}`
+  const status =''
+
+  const { Order } = getModelsByChannel(channel, null, orderModel)
+  const { Product } = getModelsByChannel(channel, null, productModel)
+  const { Refund } = getModelsByChannel(channel, null, refundModel)
+  const { Store } = getModelsByChannel(channel, null, storeModel)
+
+  const invoBi = await dataPowerBiQuery(channel, 'INVO')
+  const invoBiList = invoBi.flatMap(item => item.INVO)
+
+  const invoM3 = await dataM3Query(channel)
+  const invoM3List = invoM3.flatMap(item => item.OACUOR)
+
+
+  const allTransactions = await dataPowerBi(channel, invoBiList, status, startDate, endDate, currentDate)
+  await dataPowerBiQueryInsert(channel, allTransactions)
+
+  const invoBiAfter = await dataPowerBiQuery(channel, 'INVO')
+  const invoBiListAfter = invoBiAfter.flatMap(item => item.INVO)
+
+  let alreadyM3 = []
+  for (const item of invoBiListAfter) {
+
+    if (invoM3List.includes(item)) {
+      alreadyM3.push(item)
+
+
+    }
+  }
+
+  await dataPowerBiQueryDelete(channel, alreadyM3)
+
+
+
+
+}
+
+
+
+
+
+
+
+const startCronJobUpdateOrderPowerBI = () => {
+  cron.schedule(
+     '0 0 * * *', // 👉 00:00 AM (เวลาไทย)
+    async () => {
+      console.log(
+        'Running cron job startCronJobUpdateOrderPowerBI at 00:00 AM Thai time. Now:',
+        new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+      )
+      await updateOrderPowerBI()
+    },
+    {
+      timezone: 'Asia/Bangkok' // 👈 สำคัญมาก
+    }
+  )
+}
+
+
+
+
+
+
 const startCronJobErpApiCheck = () => {
   cron.schedule(
     '0 6 * * *', // 👉 6:00 AM (เวลาไทย)
@@ -1191,6 +1278,8 @@ const startCronJobreStoreStockDaily = () => {
 module.exports = {
   startCronJobErpApiCheck,
   // startCronJobOrderToExcel
+
+  startCronJobUpdateOrderPowerBI,
   startCronJobErpApiCheckDisribution,
   startCronJobDeleteCartDaily,
   startCronJobreStoreStockDaily
