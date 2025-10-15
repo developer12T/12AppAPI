@@ -339,6 +339,30 @@ exports.checkout = async (req, res) => {
   }
 }
 
+exports.addRemark = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { user, remark, orderId } = req.body
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+
+    await Distribution.updateOne(
+      { orderId: orderId },
+      {
+        $set: {
+          remarkWarehouse: {
+            remark: remark,
+            user: user
+          }
+        }
+      }
+    )
+    res.status(200).json({ status: '200', message: 'Update Success' })
+  } catch (error) {
+    console.error('Error saving store to MongoDB:', error)
+    res.status(500).json({ status: '500', message: 'Server Error' })
+  }
+}
+
 exports.getOrderCredit = async (req, res) => {
   try {
     const { type, area, period, zone, team, year, month, start, end } =
@@ -1097,6 +1121,7 @@ exports.getDetail = async (req, res) => {
         sendAddress: u.sendAddress,
         sendDate: u.sendDate,
         remark: u.remark,
+        remarkWarehouse: u.remarkWarehouse,
         listProduct: u.listProduct.map(p => {
           return {
             id: p.id,
