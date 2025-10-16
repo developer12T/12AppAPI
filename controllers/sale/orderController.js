@@ -23,6 +23,10 @@ const {
   getChange,
   getRefund
 } = require('../../middleware/order')
+
+const {
+  restock
+} = require('../../middleware/stock')
 const { Item } = require('../../models/item/itemlot')
 const { OOHEAD, ItemLotM3, OOLINE } = require('../../models/cash/master')
 const { Op, fn, col, where, literal } = require('sequelize')
@@ -484,6 +488,8 @@ exports.checkout = async (req, res) => {
       message: 'Checkout successful!',
       data: newOrder
     })
+
+    await restock(area, period,channel)
 
     // await transaction.commit()
     res.status(200).json({
