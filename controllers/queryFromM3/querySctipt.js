@@ -1094,7 +1094,7 @@ exports.dataPowerBiQueryInsert = async function (channel, data) {
     }
 
     const query = `
-    INSERT INTO [dbo].[CO_ORDER_copy1] (
+    INSERT INTO [dbo].[CO_ORDER] (
       ${Object.keys(item).join(',')}
     ) VALUES (
       ${Object.keys(item).map(k => '@' + k).join(',')}
@@ -1125,7 +1125,7 @@ exports.dataPowerBiQueryDelete = async function (channel, cono) {
 
   if (channel === 'cash') {
     const query = `
-      DELETE FROM [dbo].[CO_ORDER_copy1]
+      DELETE FROM [dbo].[CO_ORDER]
       WHERE INVO IN (${conoStr})
       AND CHANNEL = '103'
       AND STATUS_BILL = '11'
