@@ -161,7 +161,7 @@ exports.getDetailStore = async (req, res) => {
 
     const store = {
       ...storeData,
-      storeType: typeStores.type || []
+      storeType: typeStores?.type || []
     }
 
     // const io = getSocket()
@@ -766,9 +766,9 @@ exports.checkSimilarStores = async (req, res) => {
 
   const existingStores = await Store.find(
     {
-      zone: store.zone,
+      ...(store.zone ? { zone: store.zone } : {}), // เพิ่มเฉพาะถ้ามีค่า
       storeId: { $ne: storeId },
-      $expr: { $lte: [{ $strLenCP: '$storeId' }, 12] } // ≤ 12 ตัวอักษร
+      $expr: { $lte: [{ $strLenCP: '$storeId' }, 12] }
     },
     { _id: 0, __v: 0, idIndex: 0 }
   )
