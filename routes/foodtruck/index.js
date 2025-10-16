@@ -5,7 +5,7 @@ const noodleCartRoute = require('./noodleCartRoute')
 const router = express.Router()
 
 
-router.use('/foodtruck', noodleCartRoute)
+router.use('/noodleCart', noodleCartRoute)
 
 
 module.exports = router

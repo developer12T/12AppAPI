@@ -1,5 +1,5 @@
 // const storeModel = require('../../models/cash/store');
-const { dbCA, dbCR } = require('../config/db');
+const { dbCA, dbCR,dbPC } = require('../config/db');
 
 function getModelsByChannel(channel,res,model) {
     let conn;
@@ -10,6 +10,9 @@ function getModelsByChannel(channel,res,model) {
         break;
       case 'cash':
         conn = dbCA;
+        break;
+      case 'pc':
+        conn = dbPC;
         break;
       default:
           res.status(400).json({
