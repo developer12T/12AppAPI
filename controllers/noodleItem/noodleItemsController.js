@@ -9,7 +9,7 @@ const noodleItemModel = require("../../models/foodtruck/noodleItem");
 
 
 exports.addNoodleItem = async (req, res) => {
-  const { type, id, name, nameTh, groupCode, price } = req.body;
+  const { type, id, name, nameTH, groupCode, price } = req.body;
 
   const channel = req.headers["x-channel"];
 
@@ -19,7 +19,7 @@ exports.addNoodleItem = async (req, res) => {
     type: type,
     id: id,
     name: name,
-    nameTh: nameTh,
+    nameTH: nameTH,
     groupCode: groupCode,
     price: price,
   };

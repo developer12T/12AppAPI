@@ -6,7 +6,7 @@ const itemSchema = mongoose.Schema(
     type: { type: String },
     id: { type: String, require: true },
     name: { type: String, },
-    nameTh: { type: String },
+    nameTH: { type: String },
     groupCode: { type: String },
     price: { type: Number },
 
