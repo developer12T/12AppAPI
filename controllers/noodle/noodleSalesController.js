@@ -36,13 +36,13 @@ exports.checkout = async (req, res) => {
     const lastUpdate = orderTimestamps[storeId] || 0;
     const ONE_MINUTE = 60 * 1000;
 
-    if (now - lastUpdate < ONE_MINUTE) {
-      return res.status(429).json({
-        status: 429,
-        message:
-          "This order was updated less than 1 minute ago. Please try again later!",
-      });
-    }
+    // if (now - lastUpdate < ONE_MINUTE) {
+    //   return res.status(429).json({
+    //     status: 429,
+    //     message:
+    //       "This order was updated less than 1 minute ago. Please try again later!",
+    //   });
+    // }
     orderTimestamps[storeId] = now;
 
     const cart = await NoodleCart.findOne({ type, area, storeId });
@@ -63,6 +63,7 @@ exports.checkout = async (req, res) => {
     const noodleOrder = {
       type: type,
       orderId: orderId,
+      area: area,
       status: "pending",
       statusTH: "รอนำเข้า",
       listProduct: {

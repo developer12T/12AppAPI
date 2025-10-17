@@ -22,6 +22,7 @@ const noodleOrderSchema = new mongoose.Schema(
   {
     type: { type: String, require: true },
     orderId: { type: String, require: true, unique: true },
+    area : { type: String, require: true },
     status: {
       type: String,
       require: true,
