@@ -13,6 +13,7 @@ const stockModel = require('../models/cash/stock')
 const promotionModel = require('../models/cash/promotion')
 const campaignModel = require('../models/cash/campaign')
 const { getModelsByChannel } = require('../middleware/channel')
+const noodleSaleModel = require("../models/foodtruck/noodleSale");
 // const { sequelize, DataTypes } = require('../config/m3db')
 const { Op } = require('sequelize')
 
@@ -366,6 +367,38 @@ const generateOrderIdStoreLatLong = async (area, warehouse, channel, res) => {
       .padStart(4, '0')}`
 }
 
+const generateOrderIdFoodTruck = async (area,channel,res) => {
+  const currentYear = new Date().getFullYear() + 543
+  const currentMonth = (new Date().getMonth() + 1).toString().padStart(2, '0')
+  const { NoodleSales } = getModelsByChannel(channel, res, noodleSaleModel)
+
+  const latestOrder = await NoodleSales.findOne({
+    area: area,
+    createdAt: {
+      $gte: new Date(`${new Date().getFullYear()}-${currentMonth}-01`),
+      $lt: new Date(
+        `${new Date().getFullYear()}-${parseInt(currentMonth) + 1}-01`
+      )
+    }
+  })
+    .sort({ orderId: -1 })
+    .select('orderId')
+  // console.log("latestOrder",latestOrder)
+  let runningNumber = latestOrder
+    ? parseInt(latestOrder.orderId.slice(-4)) + 1
+    : 1
+
+  // console.log(latestOrder)
+
+  return `F${currentYear
+    .toString()
+    .slice(2, 4)}${currentMonth}${runningNumber
+      .toString()
+      .padStart(4, '0')}`
+}
+
+
+
 
 
 
@@ -379,5 +412,6 @@ module.exports = {
   generateStockId,
   generateCampaignId,
   generateDistributionIdCredit,
-  generateOrderIdStoreLatLong
+  generateOrderIdStoreLatLong,
+  generateOrderIdFoodTruck
 }
