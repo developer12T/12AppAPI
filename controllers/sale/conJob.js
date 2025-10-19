@@ -676,14 +676,14 @@ const startCronJobDeleteCartDaily = () => {
 
 const startCronJobreStoreStockDaily = () => {
   cron.schedule(
-    '30 21 * * *', // 21:30 ทุกวัน
-    // "* * * * *", // 👉 ทุก 5 นาที
+    // '30 21 * * *', // 21:30 ทุกวัน
+    "* * * * *", // 👉 ทุก 5 นาที
     async () => {
       console.log(
         "Running cron job reStoreStock at 21:30 Bangkok time. Now:",
         new Date().toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })
       );
-      await reStoreStock();
+      // await reStoreStock();
     },
     {
       timezone: "Asia/Bangkok", // 👈 สำคัญ
