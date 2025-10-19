@@ -4196,6 +4196,11 @@ exports.saleReport = async (req, res) => {
   const { Refund } = getModelsByChannel(channel, res, refundModel)
 
   if (role == 'sale' || role == '' || !role) {
+  if (!type) {
+    return res.status(200).json({
+      message:'type is require'
+    })
+  }
     let filterCreatedAt = {}
     let filterArea = {}
     if (area) {

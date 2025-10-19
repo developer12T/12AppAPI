@@ -4,7 +4,7 @@ const express = require('express')
 const {
     addNoodleCart,
     getCartDetailNew
-} = require('../../controllers/noodleCarts/noodleCartsController')
+} = require('../../controllers/noodle/noodleCartsController')
 
 
 const router = express.Router()
