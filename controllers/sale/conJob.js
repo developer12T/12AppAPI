@@ -625,8 +625,8 @@ const startCronJobUpdateOrderPowerBI = () => {
 
 const startCronJobErpApiCheck = () => {
   cron.schedule(
-    // '0 6 * * *', // 👉 6:00 AM (เวลาไทย)
-    "* * * * *",
+    '0 6 * * *', // 👉 6:00 AM (เวลาไทย)
+    // "* * * * *",
     async () => {
       console.log(
         "Running cron job startCronJobErpApiCheck at 6:00 AM Thai time. Now:",
