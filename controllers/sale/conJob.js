@@ -581,7 +581,7 @@ async function updateOrderPowerBI(channel = "cash") {
       endDate,
       currentDate
     );
-    // await dataPowerBiQueryInsert(channel, allTransactions)
+    await dataPowerBiQueryInsert(channel, allTransactions)
 
     const invoBiAfter = await dataPowerBiQuery(channel, "INVO");
     const invoBiListAfter = invoBiAfter.flatMap((item) => item.INVO);
@@ -593,7 +593,7 @@ async function updateOrderPowerBI(channel = "cash") {
       }
     }
 
-    // await dataPowerBiQueryDelete(channel, alreadyM3)
+    await dataPowerBiQueryDelete(channel, alreadyM3)
 
     fs.appendFileSync(
       logFile,
@@ -608,11 +608,12 @@ async function updateOrderPowerBI(channel = "cash") {
 
 const startCronJobUpdateOrderPowerBI = () => {
   cron.schedule(
-    "0 23 * * *", // 👉 00:00 AM (เวลาไทย)
+    "0 21 * * *", // 👉 00:00 AM (เวลาไทย)
+    // "*/3 * * * *",
 
     async () => {
       console.log(
-        "Running cron job startCronJobUpdateOrderPowerBI at 00:00 AM Thai time. Now:",
+        "Running cron job startCronJobUpdateOrderPowerBI at 21:00 AM Thai time. Now:",
         new Date().toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })
       );
       await updateOrderPowerBI();
@@ -625,11 +626,11 @@ const startCronJobUpdateOrderPowerBI = () => {
 
 const startCronJobErpApiCheck = () => {
   cron.schedule(
-    '0 6 * * *', // 👉 6:00 AM (เวลาไทย)
+    '0 8 * * *', // 👉 6:00 AM (เวลาไทย)
     // "* * * * *",
     async () => {
       console.log(
-        "Running cron job startCronJobErpApiCheck at 6:00 AM Thai time. Now:",
+        "Running cron job startCronJobErpApiCheck at 8:00 AM Thai time. Now:",
         new Date().toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })
       );
       await erpApiCheckOrderJob();
