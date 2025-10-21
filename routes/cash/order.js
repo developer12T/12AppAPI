@@ -37,7 +37,8 @@ const {
   updateAddressInOrder,
   updateSendmoney,
   updateOrderPowerBI,
-  updateUserSaleInOrder
+  updateUserSaleInOrder,
+  updateOrderDistribution
 } = require('../../controllers/sale/orderController')
 
 const router = express.Router()
@@ -48,6 +49,7 @@ router.post('/updateStatus', updateStatus)
 router.post('/checkout', checkout)
 router.post('/addSlip', addSlip)
 router.get('/reflashOrder', reflashOrder)
+router.get('/updateOrderDistribution', updateOrderDistribution)
 
 router.post('/addSlip', addSlip)
 router.post('/updateSendmoney', updateSendmoney)

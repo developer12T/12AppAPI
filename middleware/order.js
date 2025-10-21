@@ -4,9 +4,11 @@ const cartModel = require('../models/cash/cart')
 const storeModel = require('../models/cash/store')
 const productModel = require('../models/cash/product')
 const orderModel = require('../models/cash/sale')
+const DistributionModel = require('../models/cash/distribution')
 const refundModel = require('../models/cash/refund')
 const stockModel = require('../models/cash/stock')
 const nodemailer = require('nodemailer')
+const { ITEM_SERVER } = require('../config')
 require('dotenv').config()
 
 exports.updateRunningNumber = async (data, transaction) => {
@@ -138,7 +140,7 @@ module.exports.getPeriodFromDate = function (createdAt) {
   return `${year}${month}`
 }
 
-async function checkProductInStock(Stock, area, period, id) {
+async function checkProductInStock (Stock, area, period, id) {
   const stock = await Stock.findOne({
     area: area,
     period: period,
@@ -161,7 +163,6 @@ module.exports.updateStockMongo = async function (
 
   const { Stock } = getModelsByChannel(channel, '', stockModel)
   const { Product } = getModelsByChannel(channel, '', productModel)
-
 
   // console.log(id,unit,qty,area,period)
   if (!id || !unit || !area || !period) {
@@ -251,7 +252,7 @@ module.exports.updateStockMongo = async function (
     throw new Error('Invalid stock update type: ' + type)
 
   // Utility: Check enough balance before deduct
-  async function checkBalanceEnough(area, period, id, pcsNeed) {
+  async function checkBalanceEnough (area, period, id, pcsNeed) {
     const stockDoc = await Stock.findOne(
       { area, period, 'listProduct.productId': id },
       { 'listProduct.$': 1 }
@@ -611,8 +612,7 @@ module.exports.updateStockMongo = async function (
     } catch (err) {
       throw new Error('Error updating stock for rufundCanceled: ' + err.message)
     }
-  }
-  else if (type === 'reduceWithdraw') {
+  } else if (type === 'reduceWithdraw') {
     const found = await checkProductInStock(Stock, area, period, id)
     if (!found)
       throw new Error(
@@ -669,7 +669,7 @@ module.exports.sendEmail = async function ({ to, cc, subject, html }) {
     console.error('❌ Failed to send email:', err.message)
   }
 }
-function calculateStockSummary(productDetail, listUnitStock) {
+function calculateStockSummary (productDetail, listUnitStock) {
   const start = new Date(startDate)
   const end = new Date(endDate)
   const dates = []
@@ -685,41 +685,44 @@ function calculateStockSummary(productDetail, listUnitStock) {
   return dates
 }
 
-
-function calculateStockSummary(productDetail, listUnitStock) {
+function calculateStockSummary (productDetail, listUnitStock) {
   // helper เอา factor ของหน่วยจาก productDetail.listUnit
-  const getFactor = (unit) => {
-    const unitObj = productDetail.listUnit.find(item => item.unit === unit);
-    return unitObj ? Number(unitObj.factor) || 0 : 0;
-  };
+  const getFactor = unit => {
+    const unitObj = productDetail.listUnit.find(item => item.unit === unit)
+    return unitObj ? Number(unitObj.factor) || 0 : 0
+  }
 
   // รวมเป็น PCS ของแต่ละฟิลด์ ด้วย factor ของหน่วยนั้น ๆ
-  const sumPCS = (field) =>
+  const sumPCS = field =>
     listUnitStock.reduce((sum, u) => {
-      const factor = getFactor(u.unit);
-      const qty = Number(u?.[field]) || 0;
-      return sum + factor * qty;
-    }, 0);
+      const factor = getFactor(u.unit)
+      const qty = Number(u?.[field]) || 0
+      return sum + factor * qty
+    }, 0)
 
   // รวมค่าเป็น PCS
-  const totalStockPCS = sumPCS('stock');
-  const totalStockWithdrawPCS = sumPCS('withdraw');
-  const totalStockGoodPCS = sumPCS('good');
-  const totalStockDamagedPCS = sumPCS('damaged');
-  const totalStockSalePCS = sumPCS('sale');
-  const totalStockPromotionPCS = sumPCS('promotion');
-  const totalStockChangePCS = sumPCS('change');
-  const totalStockAdjustPCS = sumPCS('adjust');
-  const totalStockGivePCS = sumPCS('give');
-  const totalStockCartPCS = sumPCS('cart');
-  const totalStockChangePendingPCS = sumPCS('changePending');
+  const totalStockPCS = sumPCS('stock')
+  const totalStockWithdrawPCS = sumPCS('withdraw')
+  const totalStockGoodPCS = sumPCS('good')
+  const totalStockDamagedPCS = sumPCS('damaged')
+  const totalStockSalePCS = sumPCS('sale')
+  const totalStockPromotionPCS = sumPCS('promotion')
+  const totalStockChangePCS = sumPCS('change')
+  const totalStockAdjustPCS = sumPCS('adjust')
+  const totalStockGivePCS = sumPCS('give')
+  const totalStockCartPCS = sumPCS('cart')
+  const totalStockChangePendingPCS = sumPCS('changePending')
 
-
-
-  const inPCS = totalStockWithdrawPCS + totalStockGoodPCS;
-  const outPCS = totalStockSalePCS + totalStockPromotionPCS + totalStockChangePCS + totalStockAdjustPCS + totalStockGivePCS;
-  const stockWithInPCS = totalStockPCS + inPCS;
-  const balancePCS = stockWithInPCS - outPCS - totalStockCartPCS - totalStockChangePendingPCS;
+  const inPCS = totalStockWithdrawPCS + totalStockGoodPCS
+  const outPCS =
+    totalStockSalePCS +
+    totalStockPromotionPCS +
+    totalStockChangePCS +
+    totalStockAdjustPCS +
+    totalStockGivePCS
+  const stockWithInPCS = totalStockPCS + inPCS
+  const balancePCS =
+    stockWithInPCS - outPCS - totalStockCartPCS - totalStockChangePendingPCS
 
   // ผลลัพธ์หน่วย PCS
   const resultPCS = {
@@ -738,13 +741,12 @@ function calculateStockSummary(productDetail, listUnitStock) {
     in: inPCS,
     stockWithIn: stockWithInPCS,
     out: outPCS,
-    balance: balancePCS,
-  };
+    balance: balancePCS
+  }
 
   // แปลงเป็น CTN โดยปัดลง
-  const factorCTN = getFactor('CTN');
-  const toCTN = (pcs) =>
-    factorCTN > 0 ? Math.floor(pcs / factorCTN) : 0;
+  const factorCTN = getFactor('CTN')
+  const toCTN = pcs => (factorCTN > 0 ? Math.floor(pcs / factorCTN) : 0)
 
   const resultCTN = {
     unit: 'CTN',
@@ -762,29 +764,28 @@ function calculateStockSummary(productDetail, listUnitStock) {
     in: toCTN(inPCS),
     stockWithIn: toCTN(stockWithInPCS),
     out: toCTN(outPCS),
-    balance: toCTN(balancePCS),
-  };
+    balance: toCTN(balancePCS)
+  }
 
-  return [resultPCS, resultCTN];
+  return [resultPCS, resultCTN]
 }
 
 const getOrders = async (areaList, res, channel, type) => {
-
   const { Order } = getModelsByChannel(channel, null, orderModel)
 
   const match = {
     status: { $nin: ['canceled'] },
     type: { $in: ['sale'] },
     'store.area': { $ne: 'IT211' }
-  };
+  }
 
   if (type === 'area') {
     if (Array.isArray(areaList) && areaList.length > 0) {
-      match['store.area'] = { $in: areaList };
+      match['store.area'] = { $in: areaList }
     }
   } else if (type === 'zone') {
     if (Array.isArray(areaList) && areaList.length > 0) {
-      match['store.zone'] = { $in: areaList };
+      match['store.zone'] = { $in: areaList }
     }
   }
 
@@ -792,14 +793,14 @@ const getOrders = async (areaList, res, channel, type) => {
     { $match: match },
     {
       $addFields: {
-        zone: { $substr: ["$store.area", 0, 2] } // ✅ เอา 2 ตัวแรกจาก store.area
+        zone: { $substr: ['$store.area', 0, 2] } // ✅ เอา 2 ตัวแรกจาก store.area
       }
     },
     { $sort: { createdAt: 1, orderId: 1 } }
-  ]);
+  ])
 
-  return orders;
-};
+  return orders
+}
 
 const getChange = async (areaList, res, channel, type) => {
   const { Order } = getModelsByChannel(channel, null, orderModel)
@@ -807,24 +808,24 @@ const getChange = async (areaList, res, channel, type) => {
     status: { $nin: ['canceled', 'reject'] },
     type: { $in: ['change'] },
     'store.area': { $ne: 'IT211' }
-  };
+  }
   if (type === 'area') {
     if (Array.isArray(areaList) && areaList.length > 0) {
-      match['store.area'] = { $in: areaList };
+      match['store.area'] = { $in: areaList }
     }
   } else if (type === 'zone') {
     if (Array.isArray(areaList) && areaList.length > 0) {
-      match['store.zone'] = { $in: areaList };
+      match['store.zone'] = { $in: areaList }
     }
   }
 
   const orders = await Order.aggregate([
     { $match: match },
     { $sort: { createdAt: 1, orderId: 1 } }
-  ]);
+  ])
 
-  return orders;
-};
+  return orders
+}
 
 const getRefund = async (areaList, res, channel, type) => {
   const { Refund } = getModelsByChannel(channel, null, refundModel)
@@ -832,25 +833,25 @@ const getRefund = async (areaList, res, channel, type) => {
     status: { $nin: ['canceled', 'reject'] },
     type: { $in: ['refund'] },
     'store.area': { $ne: 'IT211' }
-  };
+  }
 
   if (type === 'area') {
     if (Array.isArray(areaList) && areaList.length > 0) {
-      match['store.area'] = { $in: areaList };
+      match['store.area'] = { $in: areaList }
     }
   } else if (type === 'zone') {
     if (Array.isArray(areaList) && areaList.length > 0) {
-      match['store.zone'] = { $in: areaList };
+      match['store.zone'] = { $in: areaList }
     }
   }
 
   const orders = await Refund.aggregate([
     { $match: match },
     { $sort: { createdAt: 1, orderId: 1 } }
-  ]);
+  ])
 
-  return orders;
-};
+  return orders
+}
 
 const distributionSendEmail = async (orderDetail, res, channel) => {
   const { User } = getModelsByChannel(channel, res, userModel)
@@ -886,12 +887,13 @@ const distributionSendEmail = async (orderDetail, res, channel) => {
           <p>
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${orderDetail.orderId}<br>
-            <strong>ประเภทการจัดส่ง:</strong> ${orderDetail.orderTypeName
-      }<br>
-            <strong>จัดส่ง:</strong> ${orderDetail.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
-      }<br>
-            <strong>สถานที่จัดส่ง:</strong> ${orderDetail.toWarehouse}-${orderDetail.shippingName
-      }<br>
+            <strong>ประเภทการจัดส่ง:</strong> ${orderDetail.orderTypeName}<br>
+            <strong>จัดส่ง:</strong> ${orderDetail.fromWarehouse}${
+      '-' + wereHouseName?.wh_name || ''
+    }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${orderDetail.toWarehouse}-${
+      orderDetail.shippingName
+    }<br>
             <strong>วันที่จัดส่ง:</strong> ${orderDetail.sendDate}<br>
             <strong>เขต:</strong> ${orderDetail.area}<br>
             <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -902,8 +904,7 @@ const distributionSendEmail = async (orderDetail, res, channel) => {
   })
 }
 
-
-function yyyymmddToDdMmYyyy(dateString) {
+function yyyymmddToDdMmYyyy (dateString) {
   // สมมติ dateString คือ '20250804'
   const year = dateString.slice(0, 4)
   const month = dateString.slice(4, 6)
@@ -911,14 +912,18 @@ function yyyymmddToDdMmYyyy(dateString) {
   return `${day}${month}${year}`
 }
 
-
-const dataPowerBi = async (channel, conoBiList, status, startDate, endDate, currentDate) => {
-
+const dataPowerBi = async (
+  channel,
+  conoBiList,
+  status,
+  startDate,
+  endDate,
+  currentDate
+) => {
   const { Order } = getModelsByChannel(channel, null, orderModel)
   const { Product } = getModelsByChannel(channel, null, productModel)
   const { Refund } = getModelsByChannel(channel, null, refundModel)
   const { Store } = getModelsByChannel(channel, null, storeModel)
-
 
   let statusArray = (status || '')
     .split(',')
@@ -1057,7 +1062,7 @@ const dataPowerBi = async (channel, conoBiList, status, startDate, endDate, curr
 
   const storeData = await Store.find({ storeId: { $in: storeIdList } })
 
-  function formatDateToThaiYYYYMMDD(date) {
+  function formatDateToThaiYYYYMMDD (date) {
     const d = new Date(date)
     d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1127,14 +1132,13 @@ const dataPowerBi = async (channel, conoBiList, status, startDate, endDate, curr
         ) || []
 
       const productIDS = [...listProduct, ...listPromotion].flat()
-        // console.log("conoBiList",conoBiList)
+      // console.log("conoBiList",conoBiList)
       // console.log("createdAtDate", createdAtDate)
       return productIDS
         .filter(p => typeof p?.id === 'string' && p.id.trim() !== '')
         .map(product => {
-
           const existPowerBi = conoBiList.find(item => item === order.orderId)
-          
+
           if (existPowerBi) return null
 
           counterOrder++
@@ -1180,7 +1184,6 @@ const dataPowerBi = async (channel, conoBiList, status, startDate, endDate, curr
           }
 
           const QTY_USC = factor * product.qty
-
 
           return {
             INVO: order.orderId,
@@ -1250,20 +1253,182 @@ const dataPowerBi = async (channel, conoBiList, status, startDate, endDate, curr
   )
 
   const allTransactions = [...tranFromOrder]
-
-
   return allTransactions
-
-
 }
 
+const dataWithdraw = async (channel, status, startDate, endDate) => {
+  const { Distribution } = getModelsByChannel(channel, null, DistributionModel)
+  const { Product } = getModelsByChannel(channel, null, productModel)
 
+  let statusArray = (status || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
 
+  if (statusArray.length === 0) {
+    statusArray = ['confirm'] // default
+  }
 
+  // console.log(statusArray)
 
-exports.calculateStockSummary = calculateStockSummary;
+  const startTH = new Date(
+    `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
+      6,
+      8
+    )}T00:00:00+07:00`
+  )
+  const endTH = new Date(
+    `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(
+      6,
+      8
+    )}T23:59:59.999+07:00`
+  )
+
+  const timestamp = startTH.getTime()
+
+  const modelWithdraw = await Distribution.aggregate([
+    {
+      $match: {
+        createdAt: {
+          $gte: startTH,
+          $lte: endTH
+        }
+      }
+    },
+    {
+      $match: {
+        status: { $nin: ['canceled'] },
+        status: { $in: statusArray },
+        type: { $in: ['withdraw'] },
+        area: { $ne: 'IT211' }
+      }
+    },
+    {
+      $addFields: {
+        createdAtThai: {
+          $dateAdd: {
+            startDate: '$createdAt',
+            unit: 'hour',
+            amount: 7
+          }
+        }
+      }
+    },
+    {
+      $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
+    }
+  ])
+
+  const productDetails = await Product.find()
+
+  function formatDateToThaiYYYYMMDD (date) {
+    const d = new Date(date)
+    d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
+
+    const yyyy = d.getFullYear()
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+
+    return `${yyyy}${mm}${dd}`
+  }
+
+  const tranFromOrder = [...modelWithdraw].flatMap(order => {
+    let counterOrder = 0
+    const RLDT = formatDateToThaiYYYYMMDD(order.createdAt)
+
+    const createdAtDate = `${RLDT.slice(0, 4)}-${RLDT.slice(4, 6)}-${RLDT.slice(
+      6,
+      8
+    )}`
+    const createdAtDatetime = new Date(
+      new Date(order.createdAt).getTime() + 7 * 3600 * 1000
+    )
+      .toISOString()
+      .replace('Z', '') // "2025-08-25T14:41:30.582"
+
+    const hhmmss = createdAtDatetime.slice(11, 19).replace(/:/g, '')
+
+    const listProduct = order.listProduct.map(product => {
+      return {
+        proCode: '',
+        id: product.id,
+        name: product.name,
+        group: product.group,
+        brand: product.brand,
+        size: product.size,
+        flavour: product.flavour,
+        qty: product.qty,
+        unit: product.unit,
+        unitName: product.unitName,
+        price: product.price,
+        subtotal: product.subtotal,
+        discount: product.discount,
+        receiveQty: product.receiveQty,
+        weightGross: product.weightGross,
+        qtyPcs: product.qtyPcs,
+        netTotal: product.netTotal
+      }
+    })
+
+    const productIDS = [...listProduct].flat()
+    return productIDS
+      .filter(p => typeof p?.id === 'string' && p.id.trim() !== '')
+      .map(product => {
+        // const existPowerBi = conoBiList.find(item => item === order.orderId)
+
+        // if (existPowerBi) return null
+
+        counterOrder++
+
+        const productDetail = productDetails.find(i => product.id === i.id)
+
+        const factorCtn =
+          productDetail?.listUnit?.find?.(i => i.unit === 'CTN')?.factor ?? 1
+
+        const factorPCS =
+          productDetail?.listUnit?.find?.(i => i.unit === 'PCS')?.factor ?? 1
+
+        return {
+          COMP_NO: '410',
+          WD_DATE: createdAtDate,
+          WD_TIME: hhmmss,
+          RECEIVE_TYPE: order.orderType,
+          WD_NO: order.orderId,
+          WD_STATUS: '99',
+          TO_WH: order.toWarehouse,
+          FROM_WH: order.fromWarehouse,
+          TOTAL_WEIGHT: order.receivetotalWeightGross.toFixed(2),
+          WD_LIST: order.listProduct.length,
+          ITEM_CODE: product.id,
+          ITEM_NAME: product.name,
+          ITEM_WEIGHT: product.weightGross,
+          PCS_QTY: product.qtyPcs,
+          SHIP_WD: product.unit,
+          RUNNING: timestamp,
+          ITEM_GROUP: productDetail.groupCodeM3,
+          ITEM_PRICE: product.price,
+          MODIFY_DATE: createdAtDatetime,
+          PCS_SHIP: factorCtn,
+          PICK_QTY: factorPCS,
+          WD_REMARK: '',
+          PICK_REMARK: order.remark,
+          WD_QTY: product.qty,
+          SHIP_QTY: product.receiveQty,
+          AREA: order.area,
+          TOTAL_PRICE: order.total
+        }
+      })
+      .filter(Boolean)
+  })
+
+  const allTransactions = [...tranFromOrder]
+  return allTransactions
+}
+
+exports.calculateStockSummary = calculateStockSummary
 exports.getOrders = getOrders
 exports.getChange = getChange
 exports.getRefund = getRefund
 exports.dataPowerBi = dataPowerBi
+exports.dataWithdraw = dataWithdraw
 // module.exports = { calculateStockSummary };

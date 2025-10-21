@@ -10,7 +10,8 @@ const {
   startCronJobErpApiCheckDisribution,
   startCronJobDeleteCartDaily,
   startCronJobreStoreStockDaily,
-  startCronJobUpdateOrderPowerBI
+  startCronJobUpdateOrderPowerBI,
+  startCronJobDistribution
 
 } = require('../12AppAPI/controllers/sale/conJob')
 
@@ -23,6 +24,7 @@ if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
   // startCronJobOrderToExcel()
   startCronJobUpdateOrderPowerBI()
   startCronJobreStoreStockDaily()
+  startCronJobDistribution()
 
 }
 
