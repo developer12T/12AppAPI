@@ -31,7 +31,8 @@ const {
   addPlace,
   getType,
   addAllPlace,
-  addWereHouse
+  addWereHouse,
+  getWareHouse
 } = require('../../controllers/distribution/placeController')
 
 const router = express.Router()
@@ -64,6 +65,7 @@ router.post('/addFromERPWithdraw', addFromERPWithdraw)
 router.post('/approveWithdraw', approveWithdraw)
 
 router.post('/addWereHouse', addWereHouse)
+router.get('/getWareHouse', getWareHouse)
 router.post('/saleConfirmWithdraw', saleConfirmWithdraw)
 
 router.post('/getReceiveQty', getReceiveQty)

@@ -281,3 +281,24 @@ exports.addWereHouse = async (req, res) => {
         res.status(500).json({ status: '500', message: error.message });
     }
 };
+
+exports.getWareHouse = async (req, res) => {
+    try {
+        const channel = req.headers['x-channel'];
+
+        const { WereHouse } = getModelsByChannel(channel, res, distributionModel);
+
+        const data = await WereHouse.find().select("wh_code wh_name -_id")
+
+        res.status(200).json({
+            status: '200',
+            message: 'Successfully get warehouse data',
+            data: data
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ status: '500', message: error.message });
+    }
+
+}
