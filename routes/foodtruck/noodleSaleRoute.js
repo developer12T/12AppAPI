@@ -4,7 +4,7 @@ const express = require('express')
 const {
     checkout,
 
-} = require('../../controllers/noodleSale/noodleSalesController')
+} = require('../../controllers/noodle/noodleSalesController')
 
 
 const router = express.Router()

@@ -1058,7 +1058,7 @@ exports.dataPowerBiQuery = async function (channel, column) {
   if (channel == 'cash') {
     const query = `
       SELECT DISTINCT INVO 
-      FROM [dbo].[CO_ORDER_copy1]   
+      FROM [dbo].[CO_ORDER]   
       WHERE STATUS_BILL = '11' AND CHANNEL = '103'
     `;
     result = await sql.query(query)
