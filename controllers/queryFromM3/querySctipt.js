@@ -1045,6 +1045,95 @@ exports.dataPowerBiQueryInsert = async function (channel, data) {
   }
 }
 
+
+
+exports.dataUpdateSendMoney = async function (
+  channel,
+  data,
+  primaryKeys = []
+) {
+  const config = {
+    host: process.env.MY_SQL_SERVER,
+    user: process.env.MY_SQL_USER,
+    password: process.env.MY_SQL_PASSWORD,
+    database: process.env.MY_SQL_DATABASE
+  }
+
+  const connection = await mysql.createConnection(config)
+
+  for (const item of data) {
+    // ถ้า primaryKey เป็น string เดี่ยว ให้แปลงเป็น array
+    const keysToFilter = Array.isArray(primaryKeys)
+      ? primaryKeys
+      : [primaryKeys]
+
+    // เอาฟิลด์ทั้งหมด ยกเว้น primaryKeys
+    const updateFields = Object.keys(item).filter(
+      k => !keysToFilter.includes(k)
+    )
+    const updateValues = updateFields.map(k => item[k])
+    const setClause = updateFields.map(k => `\`${k}\` = ?`).join(', ')
+
+    // WHERE condition
+    const whereClause = keysToFilter.map(k => `\`${k}\` = ?`).join(' AND ')
+    const whereValues = keysToFilter.map(k => item[k])
+
+    const query = `
+      UPDATE \`van_sendmoney\`
+      SET ${setClause}
+      WHERE ${whereClause}
+    `
+
+    await connection.execute(query, [...updateValues, ...whereValues])
+  }
+
+  await connection.end()
+}
+
+exports.dataUpdateTotalSale = async function (
+  channel,
+  data,
+  primaryKeys = []
+) {
+  const config = {
+    host: process.env.MY_SQL_SERVER,
+    user: process.env.MY_SQL_USER,
+    password: process.env.MY_SQL_PASSWORD,
+    database: process.env.MY_SQL_DATABASE
+  }
+
+  const connection = await mysql.createConnection(config)
+
+  for (const item of data) {
+    // ถ้า primaryKey เป็น string เดี่ยว ให้แปลงเป็น array
+    const keysToFilter = Array.isArray(primaryKeys)
+      ? primaryKeys
+      : [primaryKeys]
+
+    // เอาฟิลด์ทั้งหมด ยกเว้น primaryKeys
+    const updateFields = Object.keys(item).filter(
+      k => !keysToFilter.includes(k)
+    )
+    const updateValues = updateFields.map(k => item[k])
+    const setClause = updateFields.map(k => `\`${k}\` = ?`).join(', ')
+
+    // WHERE condition
+    const whereClause = keysToFilter.map(k => `\`${k}\` = ?`).join(' AND ')
+    const whereValues = keysToFilter.map(k => item[k])
+
+    const query = `
+      UPDATE \`van_sendmoneytransfer\`
+      SET ${setClause}
+      WHERE ${whereClause}
+    `
+
+    await connection.execute(query, [...updateValues, ...whereValues])
+  }
+
+  await connection.end()
+}
+
+
 exports.dataWithdrawInsert = async function (channel, data) {
   const config = {
     user: process.env.POWERBI_USER,

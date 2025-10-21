@@ -7,7 +7,8 @@ const {
   getSendMoney,
   getAllSendMoney,
   getSendMoneyForAcc,
-  sendmoneyToExcel
+  sendmoneyToExcel,
+  updateSendmoneyOld
 } = require('../../controllers/sendmoney/sendmoneyController')
 const router = express.Router()
 router.post('/addSendMoney', addSendMoney)
@@ -16,4 +17,5 @@ router.post('/getSendMoney', getSendMoney)
 router.get('/getAllSendMoney', getAllSendMoney)
 router.get('/getSendMoneyForAcc', getSendMoneyForAcc)
 router.get('/sendmoneyToExcel', sendmoneyToExcel)
+router.post('/updateSendmoneyOld', updateSendmoneyOld)
 module.exports = router
