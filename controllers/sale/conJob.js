@@ -1,14 +1,12 @@
-const cron = require("node-cron");
+const cron = require('node-cron')
 // const { erpApiCheckOrder,erpApiCheckDisributionM3 } = require('../../controllers/sale/orderController')
-const {
-  OrderToExcelConJob,
-} = require("../../controllers/sale/orderController");
-const { period, rangeDate } = require("../../utilities/datetime");
+const { OrderToExcelConJob } = require('../../controllers/sale/orderController')
+const { period, rangeDate } = require('../../utilities/datetime')
 const {
   to2,
   updateStockMongo,
-  calculateStockSummary,
-} = require("../../middleware/order");
+  calculateStockSummary
+} = require('../../middleware/order')
 
 const {
   Warehouse,
@@ -16,321 +14,316 @@ const {
   Balance,
   DisributionM3,
   OOHEAD,
-  OOLINE,
-} = require("../../models/cash/master");
-const fs = require("fs");
-const path = require("path");
-const { sequelize, DataTypes } = require("../../config/m3db");
-const { Op, fn, literal } = require("sequelize");
-const { getSocket } = require("../../socket");
+  OOLINE
+} = require('../../models/cash/master')
+const fs = require('fs')
+const path = require('path')
+const { sequelize, DataTypes } = require('../../config/m3db')
+const { Op, fn, literal } = require('sequelize')
+const { getSocket } = require('../../socket')
 
-const userModel = require("../../models/cash/user");
-const distributionModel = require("../../models/cash/distribution");
-const productModel = require("../../models/cash/product");
-const stockModel = require("../../models/cash/stock");
-const giveModel = require("../../models/cash/give");
-const orderModel = require("../../models/cash/sale");
-const cartModel = require("../../models/cash/cart");
-const refundModel = require("../../models/cash/refund");
-const adjustStockModel = require("../../models/cash/stock");
-const storeModel = require("../../models/cash/store");
+const userModel = require('../../models/cash/user')
+const distributionModel = require('../../models/cash/distribution')
+const productModel = require('../../models/cash/product')
+const stockModel = require('../../models/cash/stock')
+const giveModel = require('../../models/cash/give')
+const orderModel = require('../../models/cash/sale')
+const cartModel = require('../../models/cash/cart')
+const refundModel = require('../../models/cash/refund')
+const adjustStockModel = require('../../models/cash/stock')
+const storeModel = require('../../models/cash/store')
 
 const {
   dataPowerBiQuery,
   dataM3Query,
   dataPowerBiQueryDelete,
   dataPowerBiQueryInsert,
-} = require("../../controllers/queryFromM3/querySctipt");
-const { formatDateTimeToThai, dataPowerBi } = require("../../middleware/order");
-const { restock } = require("../../middleware/stock");
+  dataWithdrawInsert
+} = require('../../controllers/queryFromM3/querySctipt')
+const {
+  formatDateTimeToThai,
+  dataPowerBi,
+  dataWithdraw
+} = require('../../middleware/order')
+const { restock } = require('../../middleware/stock')
 
-const { getModelsByChannel } = require("../../middleware/channel");
-const { create } = require("lodash");
+const { getModelsByChannel } = require('../../middleware/channel')
+const { create } = require('lodash')
 
-const pathLog = "/controllers/sale/conjobLog/";
+const pathLog = '/controllers/sale/conjobLog/'
 
-async function erpApiCheckOrderJob(channel = "cash") {
+async function erpApiCheckOrderJob (channel = 'cash') {
   const logFile = path.join(
     process.cwd(),
     `${pathLog}startCronJobErpApiCheck.txt`
-  );
-  const now = new Date().toLocaleString("th-TH", { timeZone: "Asia/Bangkok" });
+  )
+  const now = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
   try {
-    const { Order } = getModelsByChannel(channel, null, orderModel);
-    const { Refund } = getModelsByChannel(channel, null, refundModel);
+    const { Order } = getModelsByChannel(channel, null, orderModel)
+    const { Refund } = getModelsByChannel(channel, null, refundModel)
     const { Distribution } = getModelsByChannel(
       channel,
       null,
       distributionModel
-    );
+    )
     // 2. Get pending orderIds ใน MongoDB
-    const inMongo = await Order.find({ status: "pending" }).select("orderId");
-    const inMongoRefund = await Refund.find({ status: "approved" }).select(
-      "orderId"
-    );
+    const inMongo = await Order.find({ status: 'pending' }).select('orderId')
+    const inMongoRefund = await Refund.find({ status: 'approved' }).select(
+      'orderId'
+    )
     // const inMongoRefund = await Refund.find({ status: 'pending' }).select(
     //   'orderId'
     // )
 
-    const orderIdsInMongo = inMongo.map((item) => item.orderId.toString());
-    const refundIdsInMongo = inMongoRefund.map((item) =>
-      item.orderId.toString()
-    );
+    const orderIdsInMongo = inMongo.map(item => item.orderId.toString())
+    const refundIdsInMongo = inMongoRefund.map(item => item.orderId.toString())
     // const refundIdsInMongo = inMongoRefund.map(item => item.orderId.toString())
 
     // 2) กันลิมิต MSSQL ด้วยการ chunk (เช่น ชุดละ 1000)
     const chunk = (arr, size) => {
-      const out = [];
+      const out = []
       for (let i = 0; i < arr.length; i += size)
-        out.push(arr.slice(i, i + size));
-      return out;
-    };
-    const idChunks = chunk(orderIdsInMongo, 1000);
-    const idChunksRefund = chunk(refundIdsInMongo, 1000);
+        out.push(arr.slice(i, i + size))
+      return out
+    }
+    const idChunks = chunk(orderIdsInMongo, 1000)
+    const idChunksRefund = chunk(refundIdsInMongo, 1000)
 
     // const matchedIdsRefund = inMongoRefund.filter(id => saleIds.includes(id))
-    let sales = [];
-    let refund = [];
+    let sales = []
+    let refund = []
 
     for (const ids of idChunks) {
       // 1) ดึงยอดจากตาราง Sale (SQL)
       const rows = await OOHEAD.findAll({
         attributes: [
-          "OACUOR",
-          [sequelize.fn("MAX", sequelize.col("OAORNO")), "OAORNO"],
-          [sequelize.fn("MAX", sequelize.col("OAORST")), "OAORST"],
-          [sequelize.fn("MAX", sequelize.col("OAORSL")), "OAORSL"],
+          'OACUOR',
+          [sequelize.fn('MAX', sequelize.col('OAORNO')), 'OAORNO'],
+          [sequelize.fn('MAX', sequelize.col('OAORST')), 'OAORST'],
+          [sequelize.fn('MAX', sequelize.col('OAORSL')), 'OAORSL']
         ],
         where: { OACUOR: { [Op.in]: ids } }, // ✅ เฉพาะที่มีใน Mongo
         // where: { OACUOR: '6808133120225' }, // หรือ { OACUOR: { [Op.in]: ids } }
-        group: ["OACUOR"],
-        raw: true,
-      });
-      sales = sales.concat(rows);
+        group: ['OACUOR'],
+        raw: true
+      })
+      sales = sales.concat(rows)
     }
 
     for (const ids of idChunksRefund) {
       // 1) ดึงยอดจากตาราง Sale (SQL)
       const rows = await OOHEAD.findAll({
         attributes: [
-          "OACUOR",
-          [sequelize.fn("MAX", sequelize.col("OAORNO")), "OAORNO"],
-          [sequelize.fn("MAX", sequelize.col("OAORST")), "OAORST"],
-          [sequelize.fn("MAX", sequelize.col("OAORSL")), "OAORSL"],
+          'OACUOR',
+          [sequelize.fn('MAX', sequelize.col('OAORNO')), 'OAORNO'],
+          [sequelize.fn('MAX', sequelize.col('OAORST')), 'OAORST'],
+          [sequelize.fn('MAX', sequelize.col('OAORSL')), 'OAORSL']
         ],
         where: { OACUOR: { [Op.in]: ids } }, // ✅ เฉพาะที่มีใน Mongo
         // where: { OACUOR: '6808133120225' }, // หรือ { OACUOR: { [Op.in]: ids } }
-        group: ["OACUOR"],
-        raw: true,
-      });
-      refund = refund.concat(rows);
+        group: ['OACUOR'],
+        raw: true
+      })
+      refund = refund.concat(rows)
     }
 
     // 2) ทำ map เพื่ออ้างอิงข้อมูลรายรายการ
     const saleById = new Map(
-      sales.map((r) => [
+      sales.map(r => [
         String(r.OACUOR),
         {
           lowStatus: String(r.OAORSL),
           heightStatus: String(r.OAORST),
-          orderNo: String(r.OAORNO),
-        },
+          orderNo: String(r.OAORNO)
+        }
       ])
-    );
+    )
 
     const refundById = new Map(
-      refund.map((r) => [
+      refund.map(r => [
         String(r.OACUOR),
         {
           lowStatus: String(r.OAORSL),
           heightStatus: String(r.OAORST),
-          orderNo: String(r.OAORNO),
-        },
+          orderNo: String(r.OAORNO)
+        }
       ])
-    );
-    const saleIdSet = new Set(sales.map((s) => String(s.OACUOR)));
-    const refundIdSet = new Set(refund.map((s) => String(s.OACUOR)));
+    )
+    const saleIdSet = new Set(sales.map(s => String(s.OACUOR)))
+    const refundIdSet = new Set(refund.map(s => String(s.OACUOR)))
     // 3. filter ให้เหลือเฉพาะที่อยู่ทั้งสองฝั่ง
-    const matchedIds = orderIdsInMongo.filter((id) => saleIdSet.has(id));
-    const refundMatchedIds = refundIdsInMongo.filter((id) =>
-      refundIdSet.has(id)
-    );
+    const matchedIds = orderIdsInMongo.filter(id => saleIdSet.has(id))
+    const refundMatchedIds = refundIdsInMongo.filter(id => refundIdSet.has(id))
 
-    const oaornoList = sales.map((r) => r.OACUOR).filter(Boolean);
-    const refundList = refund.map((r) => r.OACUOR).filter(Boolean);
+    const oaornoList = sales.map(r => r.OACUOR).filter(Boolean)
+    const refundList = refund.map(r => r.OACUOR).filter(Boolean)
 
     const lineAgg = await OOLINE.findAll({
-      attributes: ["OBCUOR", [fn("COUNT", literal("*")), "lineCount"]],
+      attributes: ['OBCUOR', [fn('COUNT', literal('*')), 'lineCount']],
       where: { OBCUOR: { [Op.in]: oaornoList } },
-      group: ["OBCUOR"],
-      raw: true,
-    });
+      group: ['OBCUOR'],
+      raw: true
+    })
 
     const refundLineAgg = await OOLINE.findAll({
-      attributes: ["OBCUOR", [fn("COUNT", literal("*")), "lineCount"]],
+      attributes: ['OBCUOR', [fn('COUNT', literal('*')), 'lineCount']],
       where: { OBCUOR: { [Op.in]: refundList } },
-      group: ["OBCUOR"],
-      raw: true,
-    });
+      group: ['OBCUOR'],
+      raw: true
+    })
 
-    console.log(lineAgg);
+    console.log(lineAgg)
 
     const lineCountByOBORNO = new Map(
-      lineAgg.map((r) => [String(r.OBCUOR), Number(r.lineCount) || 0])
-    );
+      lineAgg.map(r => [String(r.OBCUOR), Number(r.lineCount) || 0])
+    )
 
     const lineCountByOBORNORefund = new Map(
-      refundLineAgg.map((r) => [String(r.OBCUOR), Number(r.lineCount) || 0])
-    );
+      refundLineAgg.map(r => [String(r.OBCUOR), Number(r.lineCount) || 0])
+    )
 
-    console.log(lineCountByOBORNO);
+    console.log(lineCountByOBORNO)
 
     // 4) แปลงเป็น OACUOR -> lineCount (อาศัย OAORNO ของ sales)
     const lineCountByOACUOR = new Map(
-      sales.map((r) => [
+      sales.map(r => [
         String(r.OACUOR),
-        lineCountByOBORNO.get(String(r.OACUOR)) ?? 0,
+        lineCountByOBORNO.get(String(r.OACUOR)) ?? 0
       ])
-    );
+    )
 
     const lineCountByOACUORRefund = new Map(
-      sales.map((r) => [
+      sales.map(r => [
         String(r.OACUOR),
-        lineCountByOBORNORefund.get(String(r.OACUOR)) ?? 0,
+        lineCountByOBORNORefund.get(String(r.OACUOR)) ?? 0
       ])
-    );
+    )
 
-    console.log(lineCountByOACUOR);
+    console.log(lineCountByOACUOR)
 
     // 4. อัปเดตทุกตัวที่ match (วนทีละตัว)
-    let updatedCount = 0;
-    let updatedCountReufund = 0;
+    let updatedCount = 0
+    let updatedCountReufund = 0
 
     if (matchedIds.length) {
-      const ops = matchedIds.map((orderId) => ({
+      const ops = matchedIds.map(orderId => ({
         updateOne: {
           filter: { orderId },
           update: {
             $set: {
-              status: "completed",
-              statusTH: "สำเร็จ",
+              status: 'completed',
+              statusTH: 'สำเร็จ',
               updatedAt: new Date(),
               // เก็บ OACUOR ไว้ในเอกสารด้วย (ถ้าต้องการ)
               // oacuor: orderId,
               // ใส่ข้อมูลประกอบจากฝั่ง Sale (เช่นจำนวนแถวที่เจอ)
-              lowStatus: saleById.get(orderId)?.lowStatus ?? "",
-              heightStatus: saleById.get(orderId)?.heightStatus ?? "",
-              orderNo: saleById.get(orderId)?.orderNo ?? "",
+              lowStatus: saleById.get(orderId)?.lowStatus ?? '',
+              heightStatus: saleById.get(orderId)?.heightStatus ?? '',
+              orderNo: saleById.get(orderId)?.orderNo ?? '',
 
               // ✅ จำนวนบรรทัดจาก OOLINE
-              lineM3: lineCountByOACUOR.get(orderId) ?? 0,
-            },
-          },
-        },
-      }));
+              lineM3: lineCountByOACUOR.get(orderId) ?? 0
+            }
+          }
+        }
+      }))
 
-      const res = await Order.bulkWrite(ops, { ordered: false });
-      if (res.modifiedCount > 0) updatedCount++;
-      console.log("Order updated:", res.modifiedCount);
+      const res = await Order.bulkWrite(ops, { ordered: false })
+      if (res.modifiedCount > 0) updatedCount++
+      console.log('Order updated:', res.modifiedCount)
     }
 
     if (refundMatchedIds.length) {
-      const ops = refundMatchedIds.map((orderId) => ({
+      const ops = refundMatchedIds.map(orderId => ({
         updateOne: {
           filter: { orderId },
           update: {
             $set: {
-              status: "completed",
-              statusTH: "สำเร็จ",
+              status: 'completed',
+              statusTH: 'สำเร็จ',
               updatedAt: new Date(),
               // เก็บ OACUOR ไว้ในเอกสารด้วย (ถ้าต้องการ)
               // oacuor: orderId,
               // ใส่ข้อมูลประกอบจากฝั่ง Sale (เช่นจำนวนแถวที่เจอ)
-              lowStatus: refundById.get(orderId)?.lowStatus ?? "",
-              heightStatus: refundById.get(orderId)?.heightStatus ?? "",
-              orderNo: refundById.get(orderId)?.orderNo ?? "",
+              lowStatus: refundById.get(orderId)?.lowStatus ?? '',
+              heightStatus: refundById.get(orderId)?.heightStatus ?? '',
+              orderNo: refundById.get(orderId)?.orderNo ?? '',
 
               // ✅ จำนวนบรรทัดจาก OOLINE
-              lineM3: lineCountByOACUORRefund.get(orderId) ?? 0,
-            },
-          },
-        },
-      }));
-      const res = await Refund.bulkWrite(ops, { ordered: false });
-      if (res.modifiedCount > 0) updatedCountReufund++;
-      console.log("Refund updated:", res.modifiedCount);
+              lineM3: lineCountByOACUORRefund.get(orderId) ?? 0
+            }
+          }
+        }
+      }))
+      const res = await Refund.bulkWrite(ops, { ordered: false })
+      if (res.modifiedCount > 0) updatedCountReufund++
+      console.log('Refund updated:', res.modifiedCount)
     }
-    const summaryCount = updatedCount + updatedCountReufund;
+    const summaryCount = updatedCount + updatedCountReufund
 
-    const io = getSocket();
-    io.emit("order/statusOrderUpdated", {
+    const io = getSocket()
+    io.emit('order/statusOrderUpdated', {
       summaryCount,
-      updatedAt: new Date(),
-    });
+      updatedAt: new Date()
+    })
 
-    console.log(`Total updated Order: ${summaryCount}`);
-    fs.appendFileSync(logFile, `[${now}] ✅ Job completed successfully\n`);
-    return summaryCount;
+    console.log(`Total updated Order: ${summaryCount}`)
+    fs.appendFileSync(logFile, `[${now}] ✅ Job completed successfully\n`)
+    return summaryCount
   } catch (error) {
-    console.error("❌ Error in erpApiCheckOrderJob:", error);
-    fs.appendFileSync(logFile, `[${now}] ❌ Job failed: ${error.message}\n`);
-    return { error: true, message: error.message };
+    console.error('❌ Error in erpApiCheckOrderJob:', error)
+    fs.appendFileSync(logFile, `[${now}] ❌ Job failed: ${error.message}\n`)
+    return { error: true, message: error.message }
   }
 }
 
-async function erpApiCheckDisributionM3Job(channel = "cash") {
+async function erpApiCheckDisributionM3Job (channel = 'cash') {
   try {
-    const { Distribution } = getModelsByChannel(
-      channel,
-      null,
-      disributionModel
-    );
+    const { Distribution } = getModelsByChannel(channel, null, disributionModel)
 
     // 1. Get order numbers (MGTRNR) ที่มีใน DisributionM3
     const modelSale = await DisributionM3.findAll({
       attributes: [
-        "MGTRNR",
-        [sequelize.fn("COUNT", sequelize.col("MGTRNR")), "count"],
+        'MGTRNR',
+        [sequelize.fn('COUNT', sequelize.col('MGTRNR')), 'count']
       ],
-      group: ["MGTRNR"],
-    });
-    const distributionIds = modelSale.map((row) =>
-      row.get("MGTRNR").toString()
-    );
+      group: ['MGTRNR']
+    })
+    const distributionIds = modelSale.map(row => row.get('MGTRNR').toString())
 
     // 2. Get pending orderIds ใน MongoDB
-    const inMongo = await Distribution.find({ status: "pending" }).select(
-      "orderId"
-    );
-    const orderIdsInMongo = inMongo.map((item) => item.orderId.toString());
+    const inMongo = await Distribution.find({ status: 'pending' }).select(
+      'orderId'
+    )
+    const orderIdsInMongo = inMongo.map(item => item.orderId.toString())
 
     // 3. filter ให้เหลือเฉพาะที่อยู่ทั้งสองฝั่ง
-    const matchedIds = orderIdsInMongo.filter((id) =>
+    const matchedIds = orderIdsInMongo.filter(id =>
       distributionIds.includes(id)
-    );
+    )
 
     if (!matchedIds.length) {
-      console.log("No new order Distribution found in the M3 system");
-      return { updated: false, updatedCount: 0 };
+      console.log('No new order Distribution found in the M3 system')
+      return { updated: false, updatedCount: 0 }
     }
 
     // 4. อัปเดตทุกตัวที่ match (วนทีละตัว)
-    let updatedCount = 0;
+    let updatedCount = 0
     for (const orderId of matchedIds) {
       try {
         const result = await Distribution.updateOne(
           { orderId },
           {
             $set: {
-              status: "completed",
-              statusTH: "สำเร็จ",
-              updatedAt: new Date(),
-            },
+              status: 'completed',
+              statusTH: 'สำเร็จ',
+              updatedAt: new Date()
+            }
           }
-        );
-        if (result.modifiedCount > 0) updatedCount++;
+        )
+        if (result.modifiedCount > 0) updatedCount++
       } catch (err) {
-        console.error(`Error update orderId: ${orderId}`, err);
+        console.error(`Error update orderId: ${orderId}`, err)
       }
     }
 
@@ -352,58 +345,58 @@ async function erpApiCheckDisributionM3Job(channel = "cash") {
     //     message: 'New Update Data'
     //   });
     // });
-    const io = getSocket();
-    io.emit("order/statusWithdrawUpdated", {
+    const io = getSocket()
+    io.emit('order/statusWithdrawUpdated', {
       updatedCount,
-      updatedAt: new Date(),
-    });
+      updatedAt: new Date()
+    })
 
-    console.log(`Total updated Distribution: ${updatedCount}`);
-    return updatedCount;
+    console.log(`Total updated Distribution: ${updatedCount}`)
+    return updatedCount
   } catch (error) {
-    console.error("❌ Error in erpApiCheckDisributionM3Job:", error);
-    return { error: true, message: error.message };
+    console.error('❌ Error in erpApiCheckDisributionM3Job:', error)
+    return { error: true, message: error.message }
   }
 }
 
-async function DeleteCartDaily(channel = "cash") {
+async function DeleteCartDaily (channel = 'cash') {
   // เปิด session สำหรับ transaction
   // const session = await mongoose.startSession();
   // session.startTransaction();
 
   try {
-    const { Cart } = getModelsByChannel(channel, null, cartModel);
-    const { Stock } = getModelsByChannel(channel, null, stockModel);
-    const { Product } = getModelsByChannel(channel, null, productModel);
+    const { Cart } = getModelsByChannel(channel, null, cartModel)
+    const { Stock } = getModelsByChannel(channel, null, stockModel)
+    const { Product } = getModelsByChannel(channel, null, productModel)
 
     // ดึงข้อมูล cart ทั้งหมด (เช่นเดิม)
-    await Cart.deleteMany({ type: "withdraw" });
+    await Cart.deleteMany({ type: 'withdraw' })
 
-    const data = await Cart.find({});
+    const data = await Cart.find({})
     // .session(session);
     // console.log(data)
     // ดึงข้อมูล listProduct และ listPromotion
-    const listProduct = data.flatMap((sub) =>
-      sub.listProduct.map((item) => ({
+    const listProduct = data.flatMap(sub =>
+      sub.listProduct.map(item => ({
         storeId: sub.storeId,
         area: sub.area,
         id: item.id,
         unit: item.unit,
-        qty: item.qty,
+        qty: item.qty
       }))
-    );
+    )
 
-    const listPromotion = data.flatMap((sub) =>
-      sub.listPromotion.flatMap((item) =>
-        item.listProduct.map((y) => ({
+    const listPromotion = data.flatMap(sub =>
+      sub.listPromotion.flatMap(item =>
+        item.listProduct.map(y => ({
           storeId: sub.storeId,
           area: sub.area,
           id: y.id,
           unit: y.unit,
-          qty: y.qty,
+          qty: y.qty
         }))
       )
-    );
+    )
 
     for (const item of [...listProduct, ...listPromotion]) {
       // console.log(item)
@@ -413,10 +406,10 @@ async function DeleteCartDaily(channel = "cash") {
         item,
         item.area,
         period(),
-        "deleteCart",
+        'deleteCart',
         channel
-      );
-      if (updateResult) return;
+      )
+      if (updateResult) return
       // ดึง factor สำหรับแต่ละ unit
       // console.log("item ",item.storeId,item.area)
       // const factorPcsResult = await Product.aggregate([
@@ -490,88 +483,90 @@ async function DeleteCartDaily(channel = "cash") {
     }
 
     // ลบ Cart ทั้งหมด (ตามเงื่อนไขที่คุณต้องการ)
-    await Cart.deleteMany({});
+    await Cart.deleteMany({})
 
     // ถ้าทุกอย่างสำเร็จ, commit transaction
     // await session.commitTransaction();
     // session.endSession();
 
-    return { success: true };
+    return { success: true }
   } catch (error) {
     // ถ้าเกิด error, rollback ทุกอย่าง
     // await session.abortTransaction();
     // session.endSession();
-    console.error("❌ Error in DeleteCartDaily:", error);
-    return { error: true, message: error.message };
+    console.error('❌ Error in DeleteCartDaily:', error)
+    return { error: true, message: error.message }
   }
 }
 
-async function reStoreStock(channel = "cash") {
+async function reStoreStock (channel = 'cash') {
   const logFile = path.join(
     process.cwd(),
     `${pathLog}startCronJobreStoreStockDaily.txt`
-  );
-  const now = new Date().toLocaleString("th-TH", { timeZone: "Asia/Bangkok" });
+  )
+  const now = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
   try {
-    const periodstr = period();
-    const { Stock } = getModelsByChannel(channel, null, stockModel);
-    const { Product } = getModelsByChannel(channel, null, productModel);
-    const { Refund } = getModelsByChannel(channel, null, refundModel);
-    const { AdjustStock } = getModelsByChannel(channel, null, adjustStockModel);
+    const periodstr = period()
+    const { Stock } = getModelsByChannel(channel, null, stockModel)
+    const { Product } = getModelsByChannel(channel, null, productModel)
+    const { Refund } = getModelsByChannel(channel, null, refundModel)
+    const { AdjustStock } = getModelsByChannel(channel, null, adjustStockModel)
     const { Distribution } = getModelsByChannel(
       channel,
       null,
       distributionModel
-    );
-    const { Order } = getModelsByChannel(channel, null, orderModel);
-    const { Giveaway } = getModelsByChannel(channel, null, giveModel);
-    const { User } = getModelsByChannel(channel, null, userModel);
-    const { Cart } = getModelsByChannel(channel, null, cartModel);
+    )
+    const { Order } = getModelsByChannel(channel, null, orderModel)
+    const { Giveaway } = getModelsByChannel(channel, null, giveModel)
+    const { User } = getModelsByChannel(channel, null, userModel)
+    const { Cart } = getModelsByChannel(channel, null, cartModel)
 
-    await restock("", periodstr, channel);
+    await restock('', periodstr, channel)
 
-    console.log("ReStoreSucess");
-    fs.appendFileSync(logFile, `[${now}] ✅ Job completed ReStoreSucess\n`);
+    console.log('ReStoreSucess')
+    fs.appendFileSync(logFile, `[${now}] ✅ Job completed ReStoreSucess\n`)
   } catch (err) {
-    console.error(err);
-    fs.appendFileSync(logFile, `[${now}] ❌ Job failed: ${err.message}\n`);
+    console.error(err)
+    fs.appendFileSync(logFile, `[${now}] ❌ Job failed: ${err.message}\n`)
     // return res.status(500).json({ status: 500, message: err.message })
   }
 }
 
-async function updateOrderPowerBI(channel = "cash") {
+async function updateOrderPowerBI (channel = 'cash') {
   const logFile = path.join(
     process.cwd(),
     `${pathLog}startCronJobUpdateOrderPowerBI.txt`
-  );
-  const nowLog = new Date().toLocaleString("th-TH", { timeZone: "Asia/Bangkok" });
+  )
+  const nowLog = new Date().toLocaleString('th-TH', {
+    timeZone: 'Asia/Bangkok'
+  })
 
   try {
-    const now = new Date();
-    const thailandOffset = 7 * 60; // นาที
-    const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-    const thailand = new Date(utc + thailandOffset * 60000);
+    const now = new Date()
+    const thailandOffset = 7 * 60 // นาที
+    const utc = now.getTime() + now.getTimezoneOffset() * 60000
+    const thailand = new Date(utc + thailandOffset * 60000)
 
-    const year = thailand.getFullYear();
-    const month = String(thailand.getMonth() + 1).padStart(2, "0");
-    const day = String(thailand.getDate()).padStart(2, "0");
-    const nextDay = String(thailand.getDate() + 1).padStart(2, "0");
+    const year = thailand.getFullYear()
+    const month = String(thailand.getMonth() + 1).padStart(2, '0')
+    const day = String(thailand.getDate()).padStart(2, '0')
+    const nextDay = String(thailand.getDate() + 1).padStart(2, '0')
 
-    const currentDate = `${year}${month}${day}`;
-    const startDate = `${year}${month}${day}`;
-    const endDate = `${year}${month}${nextDay}`;
-    const status = "";
+    const currentDate = `${year}${month}${day}`
+    const startDate = `${year}${month}${day}`
+    const endDate = `${year}${month}${nextDay}`
+    const status = ''
 
-    const { Order } = getModelsByChannel(channel, null, orderModel);
-    const { Product } = getModelsByChannel(channel, null, productModel);
-    const { Refund } = getModelsByChannel(channel, null, refundModel);
-    const { Store } = getModelsByChannel(channel, null, storeModel);
+    const { Order } = getModelsByChannel(channel, null, orderModel)
+    const { Product } = getModelsByChannel(channel, null, productModel)
+    const { Refund } = getModelsByChannel(channel, null, refundModel)
+    const { Store } = getModelsByChannel(channel, null, storeModel)
 
-    const invoBi = await dataPowerBiQuery(channel, "INVO");
-    const invoBiList = invoBi.flatMap((item) => item.INVO);
+    const invoBi = await dataPowerBiQuery(channel, 'INVO')
+    const invoBiList = invoBi.flatMap(item => item.INVO)
 
-    const invoM3 = await dataM3Query(channel);
-    const invoM3List = invoM3.flatMap((item) => item.OACUOR);
+    const invoM3 = await dataM3Query(channel)
+    const invoM3List = invoM3.flatMap(item => item.OACUOR)
 
     const allTransactions = await dataPowerBi(
       channel,
@@ -580,88 +575,153 @@ async function updateOrderPowerBI(channel = "cash") {
       startDate,
       endDate,
       currentDate
-    );
-    // await dataPowerBiQueryInsert(channel, allTransactions)
+    )
+    await dataPowerBiQueryInsert(channel, allTransactions)
 
-    const invoBiAfter = await dataPowerBiQuery(channel, "INVO");
-    const invoBiListAfter = invoBiAfter.flatMap((item) => item.INVO);
+    const invoBiAfter = await dataPowerBiQuery(channel, 'INVO')
+    const invoBiListAfter = invoBiAfter.flatMap(item => item.INVO)
 
-    let alreadyM3 = [];
+    let alreadyM3 = []
     for (const item of invoBiListAfter) {
       if (invoM3List.includes(item)) {
-        alreadyM3.push(item);
+        alreadyM3.push(item)
       }
     }
 
-    // await dataPowerBiQueryDelete(channel, alreadyM3)
+    await dataPowerBiQueryDelete(channel, alreadyM3)
 
     fs.appendFileSync(
       logFile,
       `[${nowLog}] ✅ Job completed updatePowerBiSucess\n`
-    );
+    )
   } catch (err) {
-    console.error(err);
-    fs.appendFileSync(logFile, `[${nowLog}] ❌ Job failed: ${err.message}\n`);
+    console.error(err)
+    fs.appendFileSync(logFile, `[${nowLog}] ❌ Job failed: ${err.message}\n`)
     // return res.status(500).json({ status: 500, message: err.message })
   }
 }
 
 const startCronJobUpdateOrderPowerBI = () => {
   cron.schedule(
-    "0 23 * * *", // 👉 00:00 AM (เวลาไทย)
+    '0 21 * * *', // 👉 00:00 AM (เวลาไทย)
+    // "*/3 * * * *",
 
     async () => {
       console.log(
-        "Running cron job startCronJobUpdateOrderPowerBI at 00:00 AM Thai time. Now:",
-        new Date().toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })
-      );
-      await updateOrderPowerBI();
+        'Running cron job startCronJobUpdateOrderPowerBI at 21:00 AM Thai time. Now:',
+        new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+      )
+      await updateOrderPowerBI()
     },
     {
-      timezone: "Asia/Bangkok", // 👈 สำคัญมาก
+      timezone: 'Asia/Bangkok' // 👈 สำคัญมาก
     }
-  );
-};
+  )
+}
+
+async function updateOrderDistribution (channel = 'cash') {
+  try {
+    const logFile = path.join(
+      process.cwd(),
+      `${pathLog}startCronJobUpdateOrderDistribution.txt`
+    )
+    const nowLog = new Date().toLocaleString('th-TH', {
+      timeZone: 'Asia/Bangkok'
+    })
+
+    const now = new Date()
+    const thailandOffset = 7 * 60 // นาที
+    const utc = now.getTime() + now.getTimezoneOffset() * 60000
+    const thailand = new Date(utc + thailandOffset * 60000)
+
+    const year = thailand.getFullYear()
+    const month = String(thailand.getMonth() + 1).padStart(2, '0')
+    const day = String(thailand.getDate() - 1).padStart(2, '0')
+    const nextDay = String(thailand.getDate()).padStart(2, '0')
+
+    const currentDate = `${year}${month}${day}`
+    const startDate = `${year}${month}${day}`
+    // const startDate = `20250801`
+    const endDate = `${year}${month}${nextDay}`
+    // const endDate = `20250831`
+    const status = ''
+    const channel = 'cash'
+
+    const allTransactions = await dataWithdraw(
+      channel,
+      status,
+      startDate,
+      endDate
+    )
+    await dataWithdrawInsert(channel, allTransactions)
+    fs.appendFileSync(
+      logFile,
+      `[${nowLog}] ✅ Job completed updatePowerBiSucess\n`
+    )
+  } catch (error) {
+    console.error(err)
+    fs.appendFileSync(logFile, `[${nowLog}] ❌ Job failed: ${err.message}\n`)
+    // return res.status(500).json({ status: 500, message: err.message })
+  }
+}
+
+const startCronJobDistribution = () => {
+  cron.schedule(
+    '0 21 * * *', // 👉 00:00 AM (เวลาไทย)
+    // "*/3 * * * *",
+
+    async () => {
+      console.log(
+        'Running cron job startCronJobDistribution at 21:00 AM Thai time. Now:',
+        new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+      )
+      await updateOrderDistribution()
+    },
+    {
+      timezone: 'Asia/Bangkok' // 👈 สำคัญมาก
+    }
+  )
+}
 
 const startCronJobErpApiCheck = () => {
   cron.schedule(
-    '0 6 * * *', // 👉 6:00 AM (เวลาไทย)
+    '0 8 * * *', // 👉 6:00 AM (เวลาไทย)
     // "* * * * *",
     async () => {
       console.log(
-        "Running cron job startCronJobErpApiCheck at 6:00 AM Thai time. Now:",
-        new Date().toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })
-      );
-      await erpApiCheckOrderJob();
+        'Running cron job startCronJobErpApiCheck at 8:00 AM Thai time. Now:',
+        new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+      )
+      await erpApiCheckOrderJob()
     },
     {
-      timezone: "Asia/Bangkok", // 👈 สำคัญมาก
+      timezone: 'Asia/Bangkok' // 👈 สำคัญมาก
     }
-  );
-};
+  )
+}
 
 const startCronJobErpApiCheckDisribution = () => {
-  cron.schedule("*/10 * * * *", async () => {
+  cron.schedule('*/10 * * * *', async () => {
     console.log(
-      "Running cron job startCronJobErpApiCheckDisribution every 10 minutes"
-    );
-    await erpApiCheckDisributionM3Job();
-  });
-};
+      'Running cron job startCronJobErpApiCheckDisribution every 10 minutes'
+    )
+    await erpApiCheckDisributionM3Job()
+  })
+}
 
 const startCronJobDeleteCartDaily = () => {
   cron.schedule(
-    "0 0 * * *",
+    '0 0 * * *',
     async () => {
       // cron.schedule('*/1 * * * *', async () => {
-      console.log("Running cron job DeleteCartDaily at 00:00 (Asia/Bangkok)");
-      await DeleteCartDaily();
+      console.log('Running cron job DeleteCartDaily at 00:00 (Asia/Bangkok)')
+      await DeleteCartDaily()
     },
     {
-      timezone: "Asia/Bangkok",
+      timezone: 'Asia/Bangkok'
     }
-  );
-};
+  )
+}
 // const startCronJobreStoreStockDaily = () => {
 // cron.schedule(
 //   '* * * * *',  async () => {
@@ -680,16 +740,16 @@ const startCronJobreStoreStockDaily = () => {
     // "* * * * *", // 👉 ทุก 5 นาที
     async () => {
       console.log(
-        "Running cron job reStoreStock at 21:30 Bangkok time. Now:",
-        new Date().toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })
-      );
-      await reStoreStock();
+        'Running cron job reStoreStock at 21:30 Bangkok time. Now:',
+        new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+      )
+      await reStoreStock()
     },
     {
-      timezone: "Asia/Bangkok", // 👈 สำคัญ
+      timezone: 'Asia/Bangkok' // 👈 สำคัญ
     }
-  );
-};
+  )
+}
 
 // const startCronJobreStoreStockDaily = () => {
 //   cron.schedule(
@@ -714,5 +774,6 @@ module.exports = {
   startCronJobUpdateOrderPowerBI,
   startCronJobErpApiCheckDisribution,
   startCronJobDeleteCartDaily,
-  startCronJobreStoreStockDaily,
-};
+  startCronJobDistribution,
+  startCronJobreStoreStockDaily
+}

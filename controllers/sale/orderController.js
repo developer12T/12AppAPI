@@ -7,7 +7,8 @@ const {
   dataPowerBiQuery,
   dataM3Query,
   dataPowerBiQueryDelete,
-  dataPowerBiQueryInsert
+  dataPowerBiQueryInsert,
+  dataWithdrawInsert
 } = require('../../controllers/queryFromM3/querySctipt')
 const {
   period,
@@ -24,9 +25,7 @@ const {
   getRefund
 } = require('../../middleware/order')
 
-const {
-  restock
-} = require('../../middleware/stock')
+const { restock } = require('../../middleware/stock')
 const { Item } = require('../../models/item/itemlot')
 const { OOHEAD, ItemLotM3, OOLINE } = require('../../models/cash/master')
 const { Op, fn, col, where, literal } = require('sequelize')
@@ -71,7 +70,11 @@ const refundModel = require('../../models/cash/refund')
 const storeModel = require('../../models/cash/store')
 const targetProductModel = require('../../models/cash/targetProduct')
 const { getModelsByChannel } = require('../../middleware/channel')
-const { formatDateTimeToThai, dataPowerBi } = require('../../middleware/order')
+const {
+  formatDateTimeToThai,
+  dataPowerBi,
+  dataWithdraw
+} = require('../../middleware/order')
 
 const xlsx = require('xlsx')
 const path = require('path')
@@ -233,12 +236,12 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-        .map(item => item.price)
-        .reduce((sum, price) => sum + price, 0)
+          .map(item => item.price)
+          .reduce((sum, price) => sum + price, 0)
       : 0
 
     // ✅ ช่วยฟังก์ชัน: เช็คว่า createAt ตั้งแต่ Aug-2025 ขึ้นไปไหม
-    function isAug2025OrLater(createAt) {
+    function isAug2025OrLater (createAt) {
       if (!createAt) return false
 
       // case: "YYYYMM" เช่น "202508"
@@ -259,14 +262,14 @@ exports.checkout = async (req, res) => {
     // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-        storeData.address,
-        storeData.subDistrict && `ต.${storeData.subDistrict}`,
-        storeData.district && `อ.${storeData.district}`,
-        storeData.province && `จ.${storeData.province}`,
-        storeData.postCode
-      ]
-        .filter(Boolean)
-        .join(' ')
+          storeData.address,
+          storeData.subDistrict && `ต.${storeData.subDistrict}`,
+          storeData.district && `อ.${storeData.district}`,
+          storeData.province && `จ.${storeData.province}`,
+          storeData.postCode
+        ]
+          .filter(Boolean)
+          .join(' ')
       : storeData.address
 
     // const addressFinal = `${storeData.address} ต.${storeData.subDistrict} อ.${storeData.district} จ.${province} ${postCode}`
@@ -489,7 +492,7 @@ exports.checkout = async (req, res) => {
       data: newOrder
     })
 
-    await restock(area, period,channel)
+    await restock(area, period, channel)
 
     // await transaction.commit()
     res.status(200).json({
@@ -934,7 +937,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -1327,7 +1330,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromOrder = modelOrder.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1439,7 +1442,7 @@ exports.OrderToExcel = async (req, res) => {
 
   const tranFromChange = modelChange.flatMap(order => {
     let counterOrder = 0
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1704,7 +1707,7 @@ exports.OrderToExcel = async (req, res) => {
       message: 'Not Found Order'
     })
   }
-  function yyyymmddToDdMmYyyy(dateString) {
+  function yyyymmddToDdMmYyyy (dateString) {
     // สมมติ dateString คือ '20250804'
     const year = dateString.slice(0, 4)
     const month = dateString.slice(4, 6)
@@ -1746,7 +1749,7 @@ exports.OrderToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     }
   )
 
@@ -2499,7 +2502,7 @@ exports.getSummarybyArea = async (req, res) => {
 
       // console.log(dataRefund)
 
-      function groupByMonthAndSum(data) {
+      function groupByMonthAndSum (data) {
         return data.reduce((acc, item) => {
           // ดึงเดือนจาก createdAtThai (หรือใช้ createdAt ก็ได้ถ้าเป็น Date)
           const date = new Date(item.createdAt)
@@ -4196,11 +4199,11 @@ exports.saleReport = async (req, res) => {
   const { Refund } = getModelsByChannel(channel, res, refundModel)
 
   if (role == 'sale' || role == '' || !role) {
-  if (!type) {
-    return res.status(200).json({
-      message:'type is require'
-    })
-  }
+    if (!type) {
+      return res.status(200).json({
+        message: 'type is require'
+      })
+    }
     let filterCreatedAt = {}
     let filterArea = {}
     if (area) {
@@ -4743,28 +4746,28 @@ exports.checkOrderCancelM3 = async (req, res) => {
     const type = saleSet.has(id)
       ? 'Sale'
       : refundSet.has(id)
-        ? 'Refund'
-        : changeSet.has(id)
-          ? 'Change'
-          : ''
+      ? 'Refund'
+      : changeSet.has(id)
+      ? 'Change'
+      : ''
 
     const typeId =
       type === 'Sale'
         ? 'A31'
         : type === 'Refund'
-          ? 'A34'
-          : type === 'Change'
-            ? 'B31'
-            : ''
+        ? 'A34'
+        : type === 'Change'
+        ? 'B31'
+        : ''
 
     const statusTablet =
       type === 'Sale'
         ? saleStatusMap.get(id) ?? ''
         : type === 'Refund'
-          ? refundStatusMap.get(id) ?? ''
-          : type === 'Change'
-            ? changeStatusMap.get(id) ?? ''
-            : ''
+        ? refundStatusMap.get(id) ?? ''
+        : type === 'Change'
+        ? changeStatusMap.get(id) ?? ''
+        : ''
 
     return { orderId: id, type, typeId, statusTablet }
   })
@@ -4786,7 +4789,7 @@ exports.checkOrderCancelM3 = async (req, res) => {
     }
 
     // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => { })
+    fs.unlink(tempPath, () => {})
   })
 
   // res.status(200).json({
@@ -5284,8 +5287,14 @@ exports.orderPowerBI = async (req, res) => {
   const conoBi = await dataPowerBiQuery(channel)
   const conoBiList = conoBi.flatMap(item => item.CONO)
   // console.log(conoBiList)
-  const allTransactions = await dataPowerBi(channel, conoBiList, status, startDate, endDate, currentDate)
-
+  const allTransactions = await dataPowerBi(
+    channel,
+    conoBiList,
+    status,
+    startDate,
+    endDate,
+    currentDate
+  )
 
   if (excel == 'true') {
     const wb = xlsx.utils.book_new()
@@ -5319,7 +5328,7 @@ exports.orderPowerBI = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       }
     )
   } else {
@@ -5331,9 +5340,7 @@ exports.orderPowerBI = async (req, res) => {
   }
 }
 
-
 exports.updateOrderPowerBI = async (req, res) => {
-
   const now = new Date()
   const thailandOffset = 7 * 60 // นาที
   const utc = now.getTime() + now.getTimezoneOffset() * 60000
@@ -5347,7 +5354,7 @@ exports.updateOrderPowerBI = async (req, res) => {
   const currentDate = `${year}${month}${day}`
   const startDate = `${year}${month}${day}`
   const endDate = `${year}${month}${nextDay}`
-  const status =''
+  const status = ''
   // console.log(startDate)
   // console.log(endDate)
   const channel = 'cash'
@@ -5362,8 +5369,15 @@ exports.updateOrderPowerBI = async (req, res) => {
   const invoM3 = await dataM3Query(channel)
   const invoM3List = invoM3.flatMap(item => item.OACUOR)
 
+  const allTransactions = await dataPowerBi(
+    channel,
+    invoBiList,
+    status,
+    startDate,
+    endDate,
+    currentDate
+  )
 
-  const allTransactions = await dataPowerBi(channel, invoBiList, status, startDate, endDate, currentDate)
   await dataPowerBiQueryInsert(channel, allTransactions)
 
   const invoBiAfter = await dataPowerBiQuery(channel, 'INVO')
@@ -5371,11 +5385,8 @@ exports.updateOrderPowerBI = async (req, res) => {
 
   let alreadyM3 = []
   for (const item of invoBiListAfter) {
-
     if (invoM3List.includes(item)) {
       alreadyM3.push(item)
-
-
     }
   }
 
@@ -5388,6 +5399,50 @@ exports.updateOrderPowerBI = async (req, res) => {
   })
 }
 
+exports.updateOrderDistribution = async (req, res) => {
+  
+  try {
+    const now = new Date()
+    const thailandOffset = 7 * 60 // นาที
+    const utc = now.getTime() + now.getTimezoneOffset() * 60000
+    const thailand = new Date(utc + thailandOffset * 60000)
+
+    const year = thailand.getFullYear()
+    const month = String(thailand.getMonth() + 1).padStart(2, '0')
+    const day = String(thailand.getDate() - 1).padStart(2, '0')
+    const nextDay = String(thailand.getDate()).padStart(2, '0')
+
+    const currentDate = `${year}${month}${day}`
+    // const startDate = `${year}${month}${day}`
+    const startDate = `20250801`
+    // const endDate = `${year}${month}${nextDay}`
+    const endDate = `20250831`
+    const status = ''
+    const channel = 'cash'
+
+    const allTransactions = await dataWithdraw(
+      channel,
+      status,
+      startDate,
+      endDate
+    )
+    await dataWithdrawInsert(channel, allTransactions)
+
+    return res.status(200).json({
+      status: 200,
+      message: 'Sucess',
+      data: allTransactions
+    })
+  } catch (error) {
+    console.error('Error in updateOrderDistribution:', error)
+    res.status(500).json({
+      status: 500,
+      message: 'Internal server error',
+      error: error.message
+    })
+  }
+
+}
 
 exports.getTargetProduct = async (req, res) => {
   const { period, area, team, zone } = req.query
@@ -6003,7 +6058,7 @@ exports.getOrderExcelNew = async (req, res) => {
   dataGiveArray = sortProduct(dataGiveArray, 'productGroup')
 
   if (excel == 'true') {
-    function zeroToDash(value) {
+    function zeroToDash (value) {
       return value === 0 ? '-' : value
     }
     const dataSaleFinal = dataSaleArray.map(item => {
@@ -6095,7 +6150,7 @@ exports.getOrderExcelNew = async (req, res) => {
         }
       }
       // ลบไฟล์ทิ้งหลังจบ (สำเร็จหรือไม่ก็ตาม)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
   } else {
     return res.status(200).json({
@@ -6157,19 +6212,17 @@ exports.updateAddressInOrder = async (req, res) => {
     const storeData = await Store.findOne({ storeId: storeId })
     const dataOrder = await Order.find({ 'store.storeId': storeId })
 
-
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-        storeData.address,
-        storeData.subDistrict && `ต.${storeData.subDistrict}`,
-        storeData.district && `อ.${storeData.district}`,
-        storeData.province && `จ.${storeData.province}`,
-        storeData.postCode
-      ]
-        .filter(Boolean)
-        .join(' ')
+          storeData.address,
+          storeData.subDistrict && `ต.${storeData.subDistrict}`,
+          storeData.district && `อ.${storeData.district}`,
+          storeData.province && `จ.${storeData.province}`,
+          storeData.postCode
+        ]
+          .filter(Boolean)
+          .join(' ')
       : storeData.address
-
 
     for (i of dataOrder) {
       // await i.findOneAndUpdate(
@@ -6197,9 +6250,7 @@ exports.updateAddressInOrder = async (req, res) => {
   }
 }
 
-
 exports.addTarget = async (req, res) => {
-
   const { storeId } = req.body
   const channel = req.headers['x-channel']
   const { Order } = getModelsByChannel(channel, res, orderModel)
@@ -6213,27 +6264,25 @@ exports.addTarget = async (req, res) => {
     message: 'Sucess',
     data: dataOrder
   })
-
-
 }
 
 exports.updateUserSaleInOrder = async (req, res) => {
   try {
-    const { area, period } = req.body;
-    const channel = req.headers['x-channel'];
+    const { area, period } = req.body
+    const channel = req.headers['x-channel']
 
-    const { Order } = getModelsByChannel(channel, res, orderModel);
-    const { Refund } = getModelsByChannel(channel, res, refundModel);
-    const { Giveaway } = getModelsByChannel(channel, res, giveModel);
-    const { User } = getModelsByChannel(channel, res, userModel);
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+    const { Giveaway } = getModelsByChannel(channel, res, giveModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
 
-    const sale = await User.findOne({ area });
+    const sale = await User.findOne({ area })
 
     if (!sale) {
       return res.status(404).json({
         status: 404,
         message: `❌ ไม่พบ sale ในพื้นที่ ${area}`
-      });
+      })
     }
 
     const saleInfo = {
@@ -6242,7 +6291,7 @@ exports.updateUserSaleInOrder = async (req, res) => {
       name: `${sale.firstName} ${sale.surName}`,
       tel: sale.tel || '',
       warehouse: sale.warehouse
-    };
+    }
 
     const [orderResult, refundResult, giveawayResult] = await Promise.all([
       Order.updateMany(
@@ -6257,14 +6306,16 @@ exports.updateUserSaleInOrder = async (req, res) => {
         { period, 'store.area': area },
         { $set: { sale: saleInfo } }
       )
-    ]);
+    ])
 
     const totalUpdated =
       (orderResult.modifiedCount || 0) +
       (refundResult.modifiedCount || 0) +
-      (giveawayResult.modifiedCount || 0);
+      (giveawayResult.modifiedCount || 0)
 
-    console.log(`✅ อัปเดต Order:${orderResult.modifiedCount} | Refund:${refundResult.modifiedCount} | Giveaway:${giveawayResult.modifiedCount}`);
+    console.log(
+      `✅ อัปเดต Order:${orderResult.modifiedCount} | Refund:${refundResult.modifiedCount} | Giveaway:${giveawayResult.modifiedCount}`
+    )
 
     return res.status(200).json({
       status: 200,
@@ -6275,13 +6326,13 @@ exports.updateUserSaleInOrder = async (req, res) => {
         giveawayUpdated: giveawayResult.modifiedCount,
         totalUpdated
       }
-    });
+    })
   } catch (error) {
-    console.error('❌ updateUserSaleInOrder error:', error);
+    console.error('❌ updateUserSaleInOrder error:', error)
     return res.status(500).json({
       status: 500,
       message: 'Server error',
       error: error.message
-    });
+    })
   }
-};
+}

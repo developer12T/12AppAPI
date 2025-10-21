@@ -24,14 +24,16 @@ const {
   getOrderPending,
   approveWithdrawCredit,
   getOrder2,
-  addRemark
+  addRemark,
+  addOneWithdraw
 } = require('../../controllers/distribution/withdrawController')
 const {
   getPlace,
   addPlace,
   getType,
   addAllPlace,
-  addWereHouse
+  addWereHouse,
+  getWareHouse
 } = require('../../controllers/distribution/placeController')
 
 const router = express.Router()
@@ -64,6 +66,7 @@ router.post('/addFromERPWithdraw', addFromERPWithdraw)
 router.post('/approveWithdraw', approveWithdraw)
 
 router.post('/addWereHouse', addWereHouse)
+router.get('/getWareHouse', getWareHouse)
 router.post('/saleConfirmWithdraw', saleConfirmWithdraw)
 
 router.post('/getReceiveQty', getReceiveQty)
@@ -73,4 +76,5 @@ router.post('/withdrawCheckM3', withdrawCheckM3)
 router.post('/getWithdrawError', getWithdrawError)
 router.post('/UpdateWithdrawConjob', UpdateWithdrawConjob)
 router.post('/approveWithdrawCredit', approveWithdrawCredit)
+router.post('/addOneWithdraw', addOneWithdraw)
 module.exports = router

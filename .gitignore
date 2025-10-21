@@ -5,3 +5,4 @@
 .env
 .area_status
 .Order
+/controlllers/sale/conjobLog
