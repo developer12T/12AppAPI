@@ -26,7 +26,8 @@ const userSchema = mongoose.Schema({
   typeTruck: { type: String  },
   noTruck: { type: String  },
   createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
+  updatedAt: { type: Date, default: Date.now },
+  platformType: { type: String  },
 }, {
   timestamps: true
 })
