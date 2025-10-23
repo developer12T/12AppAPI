@@ -1,32 +1,21 @@
 const mongoose = require('mongoose')
-
-const npdSchema = mongoose.Schema({
-  period: { type: String },
-  qty: { type: Number, require: true },
-  unit: { type: String },
-  areaGet: { type: [String], default: [] },
+const { period } = require('../../utilities/datetime')
+const npdSchema = new mongoose.Schema({
+  area: { type: String, required: true },
+  period: { type: String, required: true },
+  npd: [
+    {
+      productId: { type: String, required: true },
+      qty: { type: Number, required: true },
+      unit: { type: String, default: 'CTN' }
+    }
+  ],
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 })
-
-const npdAreaSchema = mongoose.Schema({
-  period: { type: String },
-  // qty: { type: Number, require: true },
-  unit: { type: String },
-  // areaGet: { type: [String], default: [] },
-  perArea:[{
-    area: {type: String, require: true},
-    qty: { type: Number, require: true }
-  }],
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
-})
-
-
 
 module.exports = conn => {
   return {
-    Npd: conn.model('npd', npdSchema,'npd'),
-    NpdArea: conn.model('npdArea', npdAreaSchema,'npdAreas'),
+    Npd: conn.model('npd', npdSchema, 'npd')
   }
 }

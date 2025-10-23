@@ -27,7 +27,15 @@ const {
 
 const { restock } = require('../../middleware/stock')
 const { Item } = require('../../models/item/itemlot')
-const { OOHEAD, ItemLotM3, OOLINE } = require('../../models/cash/master')
+const {
+  OOHEAD,
+  ItemLotM3,
+  OOLINE,
+  DisributionM3,
+  MHDISL,
+  MHDISH,
+  MGHEA
+} = require('../../models/cash/master')
 const { Op, fn, col, where, literal } = require('sequelize')
 const { generateOrderId } = require('../../utilities/genetateId')
 const { sortProduct } = require('../../utilities/product')
@@ -3076,72 +3084,147 @@ exports.erpApiCheckOrder = async (req, res) => {
   }
 }
 
-// exports.erpApiCheckDisributionM3 = async (req, res) => {
-//   try {
-//     const channel = 'cash';
-//     const { Order } = getModelsByChannel(channel, res, orderModel);
-//     const { Disribution } = getModelsByChannel(channel, res, disributionModel);
+exports.erpApiCheckOrderDistrabution = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { Distribution } = getModelsByChannel(channel, res, disributionModel)
+    const year = 2025 // หรือใช้ new Date().getFullYear() ถ้าอยากให้ dynamic
+    const month = 9 // กันยายน (เดือน 9)
 
-//     // 1. ดึง orderId จาก DisributionM3
-//     const modelSale = await DisributionM3.findAll({
-//       attributes: [
-//         'MGTRNR',
-//         [sequelize.fn('COUNT', sequelize.col('MGTRNR')), 'count']
-//       ],
-//       group: ['MGTRNR']
-//     });
+    const startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0)) // 1 ก.ย. 00:00 UTC
+    const endDate = new Date(Date.UTC(year, month, 1, 0, 0, 0)) // 1 ต.ค. 00:00 UTC
 
-//     const orderIdList = modelSale.map(row => row.get('MGTRNR'));
+    const inMongo = await Distribution.find({
+      newTrip: 'true',
+      createdAt: {
+        $gte: startDate,
+        $lt: endDate
+      }
+    }).select('_id orderId listProduct') // ✅ include listProduct directly
 
-//     // 2. อัปเดต status: 'success' สำหรับ orderId ที่เจอ
-//     const updateResult = await Order.updateMany(
-//       { orderId: { $in: orderIdList } },
-//       { $set: { status: 'success' } }
-//     );
+    const chunk = (arr, size) => {
+      const out = []
+      for (let i = 0; i < arr.length; i += size)
+        out.push(arr.slice(i, i + size))
+      return out
+    }
 
-//     // 3. ถ้าไม่มีอะไรอัปเดตเลย → return
+    const orderIdsInMongo = inMongo.map(item => item.orderId.toString())
+    const idChunks = chunk(orderIdsInMongo, 1000)
 
-//     if (updateResult.modifiedCount === 0) {
-//       console.log('No new order Distribution found in the M3 system');
-//       return res.status(200).json({
-//         message: 'No new order Distribution found in the M3 system'
-//       });
-//     }
+    for (const ids of idChunks) {
+      // ✅ Fetch all matching DistributionM3 rows for the current batch
+      const rows = await DisributionM3.findAll({
+        where: { coNo: { [Op.in]: ids } },
+        raw: true
+      })
 
-//     console.log('✅ Updated Distribution Order IDs:', orderIdList);
+      for (const distributionTran of inMongo.filter(d =>
+        ids.includes(d.orderId)
+      )) {
+        const orderId = distributionTran.orderId
+        const row = rows.find(r => r.coNo === orderId)
+        if (!row) {
+          console.warn(`⚠️ Order ${orderId} not found in M3`)
+          continue
+        }
 
-//     // 4. Broadcast ให้ client อัปเดต
-//     // const io = getSocket();
-//     // const events = [
-//     //   'sale_getSummarybyArea',
-//     //   'sale_getSummarybyMonth',
-//     //   'sale_getSummarybyRoute',
-//     //   'sale_getSummaryItem',
-//     //   'sale_getSummarybyGroup',
-//     //   'sale_getRouteCheckinAll',
-//     //   'sale_getTimelineCheckin',
-//     //   'sale_routeTimeline'
-//     // ];
+        // ✅ ตรวจสอบสถานะสินค้ารับใน M3
+        const checkStatus = await MGLINE.findAll({
+          where: {
+            MRCONO: 410,
+            MRTRNR: orderId,
+            MRTRSH: '99'
+          },
+          raw: true
+        })
 
-//     // events.forEach(event => {
-//     //   io.emit(event, {
-//     //     status: 200,
-//     //     message: 'New Update Data',
-//     //     updatedCount: updateResult.modifiedCount
-//     //   });
-//     // });
+        const productIds = checkStatus.map(item => item.MRITNO)
 
-//     // 5. ตอบกลับ
-//     res.status(200).json({
-//       status: 200,
-//       message: 'Update status success',
-//       updatedCount: updateResult.modifiedCount
-//     });
-//   } catch (error) {
-//     console.error('❌ Error in erpApiCheckDisributionM3:', error);
-//     // res.status(500).json({ status: 500, message: 'Internal server error' });
-//   }
-// };
+        // ✅ ดึงข้อมูลรับสินค้าจากระบบ ERP
+        const Receive = await MHDISL.findAll({
+          where: {
+            coNo: orderId,
+            productId: { [Op.in]: productIds }
+          },
+          raw: true
+        })
+
+        const ReceiveQty = Object.values(
+          Receive.reduce((acc, cur) => {
+            const key = `${cur.coNo}_${
+              cur.withdrawUnit
+            }_${cur.productId.trim()}`
+            if (!acc[key]) {
+              acc[key] = { ...cur }
+            } else {
+              acc[key].qtyPcs += cur.qtyPcs
+              acc[key].weightGross += cur.weightGross
+              acc[key].weightNet += cur.weightNet
+            }
+            return acc
+          }, {})
+        )
+
+        let receivetotalQty = 0
+        let receivetotal = 0
+
+        for (const i of distributionTran.listProduct) {
+          const productIdTrimmed = String(i.id || '').trim()
+          const match = ReceiveQty.find(
+            r => String(r.productId || '').trim() === productIdTrimmed
+          )
+
+          if (match) {
+            const product = productDetail.find(
+              u => String(u.id || '').trim() === productIdTrimmed
+            )
+            i.receiveUnit = match.withdrawUnit || ''
+
+            if (!product || !Array.isArray(product.listUnit)) {
+              i.receiveQty = 0
+              continue
+            }
+
+            const unitFactor = product.listUnit.find(
+              u =>
+                String(u.unit || '').trim() ===
+                String(match.withdrawUnit || '').trim()
+            )
+
+            if (!unitFactor?.factor) {
+              i.receiveQty = 0
+              continue
+            }
+
+            const qty = match.qtyPcs / unitFactor.factor
+            receivetotalQty += qty
+            receivetotal += qty * (unitFactor?.price?.sale || 0)
+            i.receiveQty = qty
+          } else {
+            i.receiveUnit = ''
+            i.receiveQty = 0
+          }
+        }
+
+        // ✅ Update Distribution back to Mongo
+        await Distribution.updateOne(
+          { _id: distributionTran._id },
+          { $set: { listProduct: distributionTran.listProduct } }
+        )
+      }
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'Successful',
+      total: rows
+    })
+  } catch (error) {
+    console.error('[getSummarybyChoice ERROR]', error)
+    res.status(500).json({ status: 500, message: error.message })
+  }
+}
 
 exports.getSummarybyChoice = async (req, res) => {
   try {
@@ -5401,7 +5484,6 @@ exports.updateOrderPowerBI = async (req, res) => {
 }
 
 exports.updateOrderDistribution = async (req, res) => {
-
   try {
     const now = new Date()
     const thailandOffset = 7 * 60 // นาที
@@ -5442,7 +5524,6 @@ exports.updateOrderDistribution = async (req, res) => {
       error: error.message
     })
   }
-
 }
 
 exports.getTargetProduct = async (req, res) => {

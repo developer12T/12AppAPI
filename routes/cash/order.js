@@ -38,7 +38,8 @@ const {
   updateSendmoney,
   updateOrderPowerBI,
   updateUserSaleInOrder,
-  updateOrderDistribution
+  updateOrderDistribution,
+  erpApiCheckOrderDistrabution
 } = require('../../controllers/sale/orderController')
 
 const router = express.Router()
@@ -61,6 +62,7 @@ router.get('/getSummarybyMonth', getSummarybyMonth)
 router.get('/getSummarybyArea', getSummarybyArea)
 router.post('/getSummarybyGroup', getSummarybyGroup)
 router.get('/erpApiCheck', erpApiCheckOrder)
+router.get('/erpApiCheckOrderDistrabution', erpApiCheckOrderDistrabution)
 router.get('/updateCompletedOrder', updateCompletedOrder)
 // router.get('/erpApiCheckDisributionM3', erpApiCheckDisributionM3)
 
@@ -83,10 +85,9 @@ router.get('/orderPowerBI', orderPowerBI)
 
 router.get('/getTargetProduct', getTargetProduct)
 
-
 router.get('/getOrderExcelNew', getOrderExcelNew)
 router.post('/updatePaymentOrder', updatePaymentOrder)
-router.post('/updateAddressInOrder',updateAddressInOrder)
-router.post('/updateOrderPowerBI',updateOrderPowerBI)
+router.post('/updateAddressInOrder', updateAddressInOrder)
+router.post('/updateOrderPowerBI', updateOrderPowerBI)
 router.post('/updateUserSaleInOrder', updateUserSaleInOrder)
 module.exports = router
