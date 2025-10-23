@@ -3858,6 +3858,7 @@ exports.summaryDaily = async (req, res) => {
       const yr = dateTH.getFullYear()
       return `${day}/${mon}/${yr}`
     }
+
     const [dataSendmoney, dataRefund, dataOrderSale, dataOrderChange] =
       await Promise.all([
         // SendMoney.find({
@@ -5400,7 +5401,7 @@ exports.updateOrderPowerBI = async (req, res) => {
 }
 
 exports.updateOrderDistribution = async (req, res) => {
-  
+
   try {
     const now = new Date()
     const thailandOffset = 7 * 60 // นาที
@@ -5414,9 +5415,9 @@ exports.updateOrderDistribution = async (req, res) => {
 
     const currentDate = `${year}${month}${day}`
     // const startDate = `${year}${month}${day}`
-    const startDate = `20250801`
+    const startDate = `20251001`
     // const endDate = `${year}${month}${nextDay}`
-    const endDate = `20250831`
+    const endDate = `20251022`
     const status = ''
     const channel = 'cash'
 

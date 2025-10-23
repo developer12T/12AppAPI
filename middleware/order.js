@@ -9,6 +9,7 @@ const refundModel = require('../models/cash/refund')
 const stockModel = require('../models/cash/stock')
 const nodemailer = require('nodemailer')
 const { ITEM_SERVER } = require('../config')
+const { STATES } = require('mongoose')
 require('dotenv').config()
 
 exports.updateRunningNumber = async (data, transaction) => {
@@ -1266,7 +1267,7 @@ const dataWithdraw = async (channel, status, startDate, endDate) => {
     .filter(Boolean)
 
   if (statusArray.length === 0) {
-    statusArray = ['confirm'] // default
+    statusArray = ['confirm', 'onprocess', 'approved', 'canceled'] // default
   }
 
   // console.log(statusArray)
@@ -1297,7 +1298,7 @@ const dataWithdraw = async (channel, status, startDate, endDate) => {
     },
     {
       $match: {
-        status: { $nin: ['canceled'] },
+        // status: { $nin: ['canceled'] },
         status: { $in: statusArray },
         type: { $in: ['withdraw'] },
         area: { $ne: 'IT211' }
@@ -1388,6 +1389,25 @@ const dataWithdraw = async (channel, status, startDate, endDate) => {
         const factorPCS =
           productDetail?.listUnit?.find?.(i => i.unit === 'PCS')?.factor ?? 1
 
+        let WD_STATUS = ''
+        switch (order.status) {
+          case 'อนุมัติ':
+            WD_STATUS = '22'
+            break
+          case 'ยืนยันรับของ':
+            WD_STATUS = '99'
+            break
+          case 'กรุณากดรับสินค้า':
+            WD_STATUS = '99'
+            break
+          case 'รอศูนย์ดำเนินการ':
+            WD_STATUS = '22'
+            break
+          default:
+            WD_STATUS = '99'
+            break
+        }
+
         return {
           COMP_NO: '410',
           WD_DATE: createdAtDate,
@@ -1409,13 +1429,16 @@ const dataWithdraw = async (channel, status, startDate, endDate) => {
           ITEM_PRICE: product.price,
           MODIFY_DATE: createdAtDatetime,
           PCS_SHIP: factorCtn,
-          PICK_QTY: factorPCS,
+          PICK_QTY: product.qtyPcs,
           WD_REMARK: '',
           PICK_REMARK: order.remark,
           WD_QTY: product.qty,
           SHIP_QTY: product.receiveQty,
           AREA: order.area,
-          TOTAL_PRICE: order.total
+          TOTAL_PRICE: order.total,
+          STATUS: order.status,
+          STATUS_TH: order.statusTH,
+          IS_NEWTRIP: order.newTrip?.toUpperCase?.() || ''
         }
       })
       .filter(Boolean)
