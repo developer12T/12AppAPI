@@ -10,6 +10,7 @@ const npdSchema = new mongoose.Schema({
       unit: { type: String, default: 'CTN' }
     }
   ],
+  isReceived: { type: String, default: 'false' },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 })

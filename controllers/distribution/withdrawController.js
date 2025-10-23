@@ -234,22 +234,20 @@ exports.checkout = async (req, res) => {
       if (newtrip === true) {
         const getNpd = await Npd.findOne({
           period: period,
-
-          areaGet: { $in: [area] }
+          area:area,
         })
 
-        if (!getNpd) {
-          newOrder.newTrip = 'true'
+        if (getNpd.isReceived == 'false') {
+          // newOrder.newTrip = 'true'
 
-          const areaNpd = await NpdArea.findOne({period:period})
-          const areaNpdProduct = areaNpd.perArea.find(item => item.area === area)
-          console.log(areaNpdProduct.npd)
-          const productList = areaNpdProduct.npd.flatMap(item => item.productId)
+          const areaNpd = await Npd.findOne({period:period,area:area})
+          // console.log(areaNpdProduct.npd)
+          const productList = areaNpd.npd.flatMap(item => item.productId)
           const productNew = await Product.find({ id:{$in:productList} })
 
           let npdProduct = []
           // console.log(areaNpdProduct)
-          for (const row of areaNpdProduct.npd) {
+          for (const row of areaNpd.npd) {
             const productDetail = productNew.find(item => item.id === row.productId)
             // console.log(productDetail)
 
@@ -275,14 +273,14 @@ exports.checkout = async (req, res) => {
             npdProduct.push(data)
 
           }
-            console.log('npdProduct',npdProduct)
+            // console.log('npdProduct',npdProduct)
             newOrder.listProduct.push(...npdProduct)
 
             await Npd.findOneAndUpdate(
-              { period: period },
-              {
-                $push: { areaGet: area }
-              }
+              { period: period, area:area },
+               {$set :{
+                isReceived:'true'
+               }}
             )
           
         }
@@ -315,7 +313,7 @@ exports.checkout = async (req, res) => {
     // const createdMovement = await StockMovement.create({
     //   ...calStock
     // })
-    console.log(newOrder)
+    // console.log(newOrder)
 
 
     // await StockMovementLog.create({
@@ -323,8 +321,8 @@ exports.checkout = async (req, res) => {
     //   refOrderId: createdMovement._id
     // })
 
-    // await newOrder.save()
-    // await Cart.deleteOne({ type, area })
+    await newOrder.save()
+    await Cart.deleteOne({ type, area })
     await transaction.commit()
 
     const io = getSocket()
@@ -1843,12 +1841,12 @@ exports.approveWithdraw = async (req, res) => {
       )
 
       if (distributionData.newTrip === 'true') {
-        await Npd.findOneAndUpdate(
-          { period: distributionData.period },
-          {
-            $pull: { areaGet: distributionData.area }
-          }
-        )
+            await Npd.findOneAndUpdate(
+              { period: distributionData.period,area:distributionData.area },
+               {$set :{
+                isReceived:'false'
+               }}
+            )
       }
 
       await ApproveLogs.create({
