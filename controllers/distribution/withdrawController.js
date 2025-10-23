@@ -310,16 +310,15 @@ exports.checkout = async (req, res) => {
       product: productQty
     }
 
-    // const createdMovement = await StockMovement.create({
-    //   ...calStock
-    // })
-    // console.log(newOrder)
+    const createdMovement = await StockMovement.create({
+      ...calStock
+    })
 
 
-    // await StockMovementLog.create({
-    //   ...calStock,
-    //   refOrderId: createdMovement._id
-    // })
+    await StockMovementLog.create({
+      ...calStock,
+      refOrderId: createdMovement._id
+    })
 
     await newOrder.save()
     await Cart.deleteOne({ type, area })
@@ -1634,7 +1633,11 @@ exports.approveWithdraw = async (req, res) => {
     )
     const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
-    const { Stock } = getModelsByChannel(channel, res, stockModel)
+    const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
+      channel,
+      res,
+      stockModel
+    )
     const { Option } = getModelsByChannel(channel, res, optionsModel)
     const { Npd } = getModelsByChannel(channel, res, npdModel)
     const { User } = getModelsByChannel(channel, res, userModel)
@@ -1807,6 +1810,45 @@ exports.approveWithdraw = async (req, res) => {
         { new: true }
       )
 
+
+    const productQty = distributionData.listProduct.map(u => {
+      return {
+        id: u.id,
+        // lot: u.lot,
+        unit: u.unit,
+        qty: u.qty,
+        statusMovement: 'OUT'
+      }
+    })
+
+
+    const calStock = {
+      // storeId: refundOrder.store.storeId,
+      orderId: distributionData.orderId,
+      area: distributionData.area,
+      // saleCode: sale.saleCode,
+      period: distributionData.period,
+      warehouse: distributionData.fromWarehouse,
+      status: statusStr,
+      statusTH: statusThStr,
+      action: 'Withdraw',
+      type: 'Withdraw',
+      product: productQty
+    }
+
+
+      const createdMovement = await StockMovement.create({
+        ...calStock
+      })
+
+
+      await StockMovementLog.create({
+        ...calStock,
+        refOrderId: createdMovement._id
+      })
+
+
+      
       await ApproveLogs.create({
         module: 'approveWithdraw',
         user: user,
@@ -1848,6 +1890,42 @@ exports.approveWithdraw = async (req, res) => {
                }}
             )
       }
+
+    const productQty = distributionData.listProduct.map(u => {
+      return {
+        id: u.id,
+        // lot: u.lot,
+        unit: u.unit,
+        qty: u.qty,
+        statusMovement: 'OUT'
+      }
+    })
+
+
+    const calStock = {
+      // storeId: refundOrder.store.storeId,
+      orderId: distributionData.orderId,
+      area: distributionData.area,
+      // saleCode: sale.saleCode,
+      period: distributionData.period,
+      warehouse: distributionData.fromWarehouse,
+      status: statusStr,
+      statusTH: statusThStr,
+      action: 'Withdraw',
+      type: 'Withdraw',
+      product: productQty
+    }
+
+    const createdMovement = await StockMovement.create({
+      ...calStock
+    })
+
+
+    await StockMovementLog.create({
+      ...calStock,
+      refOrderId: createdMovement._id
+    })
+
 
       await ApproveLogs.create({
         module: 'approveWithdraw',
@@ -2028,6 +2106,11 @@ exports.saleConfirmWithdraw = async (req, res) => {
     const { Distribution } = getModelsByChannel(channel, res, distributionModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
+    const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
+      channel,
+      res,
+      stockModel
+    )
     // ===== debounce ตรงนี้ =====
     const now = Date.now()
     const lastUpdate = withdrawUpdateTimestamps[orderId] || 0
@@ -2182,33 +2265,8 @@ exports.saleConfirmWithdraw = async (req, res) => {
           }
         }
 
-        // receivetotal = receivetotal
-        // receivetotalQty = receivetotalQty
-        // receivetotalWeightGross = ReceiveWeight?.[0]?.weightGross || 0
-        // receivetotalWeightNet = ReceiveWeight?.[0]?.weightNet || 0
       }
 
-      // ✅ อัปเดตข้อมูลถ้า status เป็น approved
-      // if (distributionTran.status === 'approved') {
-      // // บันทึก listProduct ที่แก้ไขแล้ว
-
-      // ✅ อัปเดตสต๊อก
-      // const qtyproduct = [];
-
-      // for (const u of (distributionTran.listProduct ?? [])) {
-      //   if (!u || !u.id) continue;
-
-      //   const unit = (u.receiveUnit ?? '').trim();
-      //   const qty = Number(u.receiveQty);
-
-      //   if (!unit || !Number.isFinite(qty) || qty <= 0) continue;
-
-      //   qtyproduct.push({ id: u.id, unit, qty });
-      // }
-
-      // console.log(qtyproduct);
-
-      // console.log(distributionTran.listProduct)
 
       const qtyproduct = []
 
@@ -2274,6 +2332,42 @@ exports.saleConfirmWithdraw = async (req, res) => {
       io.emit('distribution/saleConfirmWithdraw', {
         status: 200,
         message: 'Confirm withdraw success'
+      })
+
+      const productQty = distributionData.listProduct.map(u => {
+      return {
+        id: u.id,
+        // lot: u.lot,
+        unit: u.receiveUnit,
+        qty: u.receiveQty,
+        statusMovement: 'OUT'
+      }
+    })
+
+
+    const calStock = {
+      // storeId: refundOrder.store.storeId,
+      orderId: distributionData.orderId,
+      area: distributionData.area,
+      // saleCode: sale.saleCode,
+      period: distributionData.period,
+      warehouse: distributionData.fromWarehouse,
+      status: 'confirm',
+      statusTH: 'รับสินค้าสำเร็จ',
+      action: 'Withdraw',
+      type: 'Withdraw',
+      product: productQty
+    }
+
+
+      const createdMovement = await StockMovement.create({
+        ...calStock
+      })
+
+
+      await StockMovementLog.create({
+        ...calStock,
+        refOrderId: createdMovement._id
       })
 
       await ApproveLogs.create({
