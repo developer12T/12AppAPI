@@ -44,7 +44,7 @@ const xlsx = require('xlsx')
 const path = require('path')
 const os = require('os')
 const fs = require('fs')
-const { orderBy } = require('lodash')
+const { orderBy, reduce } = require('lodash')
 
 exports.checkout = async (req, res) => {
   const transaction = await sequelize.transaction()
@@ -275,7 +275,8 @@ exports.checkout = async (req, res) => {
           }
             // console.log('npdProduct',npdProduct)
             newOrder.listProduct.push(...npdProduct)
-
+            const totalQtyNpd = items.reduce((sum, item) => sum + item.qty, 0)
+            newOrder.totalQty += totalQtyNpd
             await Npd.findOneAndUpdate(
               { period: period, area:area },
                {$set :{
