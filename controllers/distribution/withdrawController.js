@@ -238,7 +238,7 @@ exports.checkout = async (req, res) => {
         })
 
         if (getNpd.isReceived == 'false') {
-          // newOrder.newTrip = 'true'
+          newOrder.newTrip = 'true'
 
           const areaNpd = await Npd.findOne({period:period,area:area})
           // console.log(areaNpdProduct.npd)
