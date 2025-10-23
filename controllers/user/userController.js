@@ -501,6 +501,13 @@ exports.addUserManeger = async (req, res) => {
         update += 1;
       } else {
         // เพิ่มใหม่
+        let platformType = ''
+        if (m3.role == 'admin'){
+          platformType = 'ADMIN'
+        } else{
+          platformType = 'CASH'
+        }
+
         await User.create({
           saleCode: m3.saleCode,
           salePayer: m3.salePayer,
@@ -514,7 +521,7 @@ exports.addUserManeger = async (req, res) => {
           warehouse: m3.warehouse,
           role: m3.role,
           status: m3.status,
-          platformType: 'CASH'
+          platformType: platformType
         });
         addNew += 1;
       }
