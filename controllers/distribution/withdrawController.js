@@ -76,7 +76,7 @@ exports.checkout = async (req, res) => {
     const { Place } = getModelsByChannel(channel, res, distributionModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Distribution } = getModelsByChannel(channel, res, distributionModel)
-    const { Npd } = getModelsByChannel(channel, res, npdModel)
+    const { Npd,NpdArea } = getModelsByChannel(channel, res, npdModel)
     const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
       channel,
       res,
@@ -234,48 +234,62 @@ exports.checkout = async (req, res) => {
       newTrip: 'false'
     })
 
-    if (newtrip === true) {
-      const getNpd = await Npd.findOne({
-        period: period,
-        areaGet: { $in: [area] }
-      })
+      if (newtrip === true) {
+        const getNpd = await Npd.findOne({
+          period: period,
 
-      if (!getNpd) {
-        newOrder.newTrip = 'true'
-        const productNew = await Product.findOne({ type: 'new' })
-        const npd = await Npd.findOne({ period: period })
-        if (productNew && npd) {
-          factor = productNew.listUnit.find(item => item.unit === npd.unit)
-          qtyPcs = npd.qty * factor.factor
+          areaGet: { $in: [area] }
+        })
 
-          const npdProduct = {
-            id: productNew.id,
-            lot: '',
-            name: productNew.name,
-            group: productNew.group,
-            brand: productNew.brand,
-            size: productNew.size,
-            flavour: productNew.flavour,
-            qty: npd.qty,
-            unit: npd.unit,
-            qtyPcs: qtyPcs,
-            price: factor.price.sale,
-            total: factor.price.sale * npd.qty,
-            weightGross: parseFloat(productNew.weightGross.toFixed(2)),
-            weightNet: parseFloat(productNew.weightNet.toFixed(2))
-          }
+        if (!getNpd) {
+          newOrder.newTrip = 'true'
 
-          newOrder.listProduct.push(npdProduct)
-          // console.log(period,[area])
-          await Npd.findOneAndUpdate(
-            { period: period },
-            {
-              $push: { areaGet: area }
+          const areaNpd = await NpdArea.findOne({period:period})
+          const areaNpdProduct = areaNpd.perArea.find(item => item.area === area)
+          console.log(areaNpdProduct.npd)
+          const productList = areaNpdProduct.npd.flatMap(item => item.productId)
+          const productNew = await Product.find({ id:{$in:productList} })
+
+          let npdProduct = []
+          // console.log(areaNpdProduct)
+          for (const row of areaNpdProduct.npd) {
+            const productDetail = productNew.find(item => item.id === row.productId)
+            // console.log(productDetail)
+
+            const factor = productDetail.listUnit.find(item => item.unit === row.unit)
+            const qtyPcs = row.qty * factor.factor
+
+            const data = {
+              id: productDetail.id,
+              lot: '',
+              name: productDetail.name,
+              group: productDetail.group,
+              brand: productDetail.brand,
+              size: productDetail.size,
+              flavour: productDetail.flavour,
+              qty: row.qty,
+              unit: row.unit,
+              qtyPcs: qtyPcs,
+              price: factor.price.sale,
+              total: factor.price.sale * row.qty,
+              weightGross: parseFloat(productDetail.weightGross.toFixed(2)),
+              weightNet: parseFloat(productDetail.weightNet.toFixed(2))
             }
-          )
+            npdProduct.push(data)
+
+          }
+            console.log('npdProduct',npdProduct)
+            newOrder.listProduct.push(...npdProduct)
+
+            await Npd.findOneAndUpdate(
+              { period: period },
+              {
+                $push: { areaGet: area }
+              }
+            )
+          
         }
       }
-    }
 
     const productQty = newOrder.listProduct.map(u => {
       return {
@@ -301,17 +315,19 @@ exports.checkout = async (req, res) => {
       product: productQty
     }
 
-    const createdMovement = await StockMovement.create({
-      ...calStock
-    })
+    // const createdMovement = await StockMovement.create({
+    //   ...calStock
+    // })
+    console.log(newOrder)
 
-    await StockMovementLog.create({
-      ...calStock,
-      refOrderId: createdMovement._id
-    })
 
-    await newOrder.save()
-    await Cart.deleteOne({ type, area })
+    // await StockMovementLog.create({
+    //   ...calStock,
+    //   refOrderId: createdMovement._id
+    // })
+
+    // await newOrder.save()
+    // await Cart.deleteOne({ type, area })
     await transaction.commit()
 
     const io = getSocket()
