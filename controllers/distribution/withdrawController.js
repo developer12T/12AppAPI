@@ -1,7 +1,3 @@
-// const { Cart } = require('../../models/cash/cart')
-// const { User } = require('../../models/cash/user')
-// const { Product } = require('../../models/cash/product')
-// const { Distribution, Place } = require('../../models/cash/distribution')
 const {
   MHDISL,
   MHDISH,
@@ -23,6 +19,7 @@ const {
   formatDate,
   formatDateToYYYYMMDD
 } = require('../../utilities/datetime')
+const multer = require('multer')
 const cartModel = require('../../models/cash/cart')
 const productModel = require('../../models/cash/product')
 const distributionModel = require('../../models/cash/distribution')
@@ -242,7 +239,9 @@ exports.checkout = async (req, res) => {
 
       if (!getNpd) {
         newOrder.newTrip = 'true'
+
         const productNew = await Product.findOne({ type: 'new' })
+
         const npd = await Npd.findOne({ period: period })
         if (productNew && npd) {
           factor = productNew.listUnit.find(item => item.unit === npd.unit)
@@ -486,9 +485,9 @@ exports.getOrderCredit = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -708,9 +707,9 @@ exports.getOrder = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -875,9 +874,9 @@ exports.getOrder2 = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -1049,9 +1048,9 @@ exports.getOrderSup = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           newTrip: o.newTrip,
@@ -1507,7 +1506,8 @@ exports.addFromERPWithdraw = async (req, res) => {
 
 exports.addOneWithdraw = async (req, res) => {
   const channel = req.headers['x-channel']
-  const { Des_No,
+  const {
+    Des_No,
     Des_Name,
     Des_Date,
     Des_Area,
@@ -1515,19 +1515,20 @@ exports.addOneWithdraw = async (req, res) => {
     WH,
     ROUTE,
     WH1,
-    Dc_Email } = req.body
+    Dc_Email
+  } = req.body
   const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
 
   const data = {
-    Des_No:Des_No,
-    Des_Name:Des_Name,
-    Des_Date:Des_Date,
-    Des_Area:Des_Area,
-    ZType:ZType,
-    WH:WH,
-    ROUTE:ROUTE,
-    WH1:WH1,
-    Dc_Email:Dc_Email
+    Des_No: Des_No,
+    Des_Name: Des_Name,
+    Des_Date: Des_Date,
+    Des_Area: Des_Area,
+    ZType: ZType,
+    WH: WH,
+    ROUTE: ROUTE,
+    WH1: WH1,
+    Dc_Email: Dc_Email
   }
   await Withdraw.create(data)
 
@@ -1540,9 +1541,6 @@ exports.addOneWithdraw = async (req, res) => {
     data: data
   })
 }
-
-
-
 
 exports.cancelWithdraw = async (req, res) => {
   try {
@@ -1750,12 +1748,15 @@ exports.approveWithdraw = async (req, res) => {
           <p>
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName
-              }<br>
-            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
-              }<br>
-            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
-              }<br>
+            <strong>ประเภทการจัดส่ง:</strong> ${
+              distributionTran.orderTypeName
+            }<br>
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
+              '-' + wereHouseName?.wh_name || ''
+            }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
+              distributionTran.shippingName
+            }<br>
             <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
             <strong>เขต:</strong> ${distributionTran.area}<br>
             <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -1933,12 +1934,15 @@ exports.approveWithdrawCredit = async (req, res) => {
           <p>
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName
-              }<br>
-            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
-              }<br>
-            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
-              }<br>
+            <strong>ประเภทการจัดส่ง:</strong> ${
+              distributionTran.orderTypeName
+            }<br>
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
+              '-' + wereHouseName?.wh_name || ''
+            }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
+              distributionTran.shippingName
+            }<br>
             <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
             <strong>เขต:</strong> ${distributionTran.area}<br>
             <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -2111,8 +2115,9 @@ exports.saleConfirmWithdraw = async (req, res) => {
         const ReceiveQty = Object.values(
           Receive.reduce((acc, cur) => {
             // ใช้ key จาก coNo + withdrawUnit + productId (ถ้าอยากแยกตาม productId ด้วย)
-            const key = `${cur.coNo}_${cur.withdrawUnit
-              }_${cur.productId.trim()}`
+            const key = `${cur.coNo}_${
+              cur.withdrawUnit
+            }_${cur.productId.trim()}`
             if (!acc[key]) {
               acc[key] = { ...cur }
             } else {
@@ -2362,6 +2367,7 @@ exports.getReceiveQty = async (req, res) => {
       },
       raw: true
     })
+
     const productIds = checkStatus.flatMap(item => item.MRITNO)
 
     // ✅ ดึงข้อมูลรับสินค้าจากระบบ ERP
@@ -2565,7 +2571,7 @@ exports.withdrawToExcel = async (req, res) => {
 
     const tranFromOrder = modelWithdraw.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD(date) {
+      function formatDateToThaiYYYYMMDD (date) {
         const d = new Date(date)
         // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -2655,7 +2661,7 @@ exports.withdrawToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       }
     )
   } catch (error) {
@@ -2865,7 +2871,7 @@ exports.withdrawBackOrderToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
   }
 }
@@ -3043,4 +3049,54 @@ exports.UpdateWithdrawConjob = async (req, res) => {
     message: 'Update Sucess'
     // data: NotInM3
   })
+}
+
+exports.uploadNPDData = async (req, res) => {
+  try {
+    const now = new Date()
+    const period =
+      now.getFullYear().toString() + String(now.getMonth() + 1).padStart(2, '0')
+    const channel = req.headers['x-channel']
+    const { Npd } = getModelsByChannel(channel, res, npdModel)
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' })
+    }
+
+    // 1️⃣ Read Excel file
+    const workbook = xlsx.readFile(req.file.path)
+    console.log(req.file)
+
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    const rows = xlsx.utils.sheet_to_json(sheet, { defval: '' })
+
+    // 2️⃣ Transform rows → desired JSON structure
+    const formattedData = rows.map(row => {
+      const { area, ...products } = row
+      const npd = Object.keys(products).map(productId => ({
+        productId: productId.toString(),
+        qty: Number(products[productId]) || 0,
+        unit: 'CTN'
+      }))
+      return { area, period, npd }
+    })
+
+    // 3️⃣ Insert or update (upsert)
+    // for (const item of formattedData) {
+    //   const exists = await Npd.findOne({ area: item.area })
+    //   if (!exists) {
+    //     await Npd.create(item)
+    //   }
+    // }
+    await Npd.insertMany(formattedData)
+
+    // 4️⃣ Respond
+    return res.status(200).json({
+      message: 'Upload successful',
+      count: formattedData.length,
+      data: formattedData
+    })
+  } catch (error) {
+    console.error('Error uploading NPD data:', error)
+    return res.status(500).json({ message: error.message })
+  }
 }
