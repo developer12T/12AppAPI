@@ -1885,7 +1885,7 @@ exports.approveWithdraw = async (req, res) => {
 
       if (distributionData.newTrip === 'true') {
             await Npd.findOneAndUpdate(
-              { period: distributionData.period,area:distributionData.area },
+              { orderId: orderId, type: 'withdraw' },
                {$set :{
                 isReceived:'false'
                }}
