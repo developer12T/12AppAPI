@@ -69,6 +69,34 @@ WHERE
   DA.Sale_Code is not NULL AND
   DA.Sale_Code != 'ว่าง'
 `
+  } else if (channel == 'pc') {
+    result = await sql.query`
+SELECT
+    DA.Sale_Code as saleCode,
+    DA.Sale_Player as salePayer,
+    DA.Col_LoginName as username,
+    LEFT(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') - 1) AS firstName,
+    SUBSTRING(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') + 1, LEN(DA.Col_NameTH)) AS surName,
+    SUBSTRING(
+    REPLACE(CONVERT(VARCHAR(40), NEWID()), '-', ''),
+    1, 6
+) AS password,
+    SALE_MOBILE AS tel,
+    DA.ZONE AS zone,
+    DA.AREA AS area,
+    DA.WH AS warehouse,
+    'sale' AS role,
+    '1' AS status,
+    TRUCK_SIZE AS typeTruck,
+    TRUCK_NO as noTruck,
+    'https://apps.onetwotrading.co.th/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
+FROM 
+  [DATA_OMS].[dbo].[DATA_Area] AS DA
+WHERE 
+  DA.CHANNEL_NAME = 'PC' AND 
+  DA.Sale_Code is not NULL AND
+  DA.Sale_Code != 'ว่าง' 
+  `
   }
 
   await sql.close()
@@ -1045,13 +1073,7 @@ exports.dataPowerBiQueryInsert = async function (channel, data) {
   }
 }
 
-
-
-exports.dataUpdateSendMoney = async function (
-  channel,
-  data,
-  primaryKeys = []
-) {
+exports.dataUpdateSendMoney = async function (channel, data, primaryKeys = []) {
   const config = {
     host: process.env.MY_SQL_SERVER,
     user: process.env.MY_SQL_USER,
@@ -1090,11 +1112,7 @@ exports.dataUpdateSendMoney = async function (
   await connection.end()
 }
 
-exports.dataUpdateTotalSale = async function (
-  channel,
-  data,
-  primaryKeys = []
-) {
+exports.dataUpdateTotalSale = async function (channel, data, primaryKeys = []) {
   const config = {
     host: process.env.MY_SQL_SERVER,
     user: process.env.MY_SQL_USER,
@@ -1132,7 +1150,6 @@ exports.dataUpdateTotalSale = async function (
 
   await connection.end()
 }
-
 
 exports.dataWithdrawInsert = async function (channel, data) {
   const config = {

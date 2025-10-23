@@ -809,7 +809,7 @@ exports.updateSendmoneyOld = async (req, res) => {
     //   total: totalSaleUpdateData
     // })
 
-    await dataUpdateSendMoney('cash', sendMoneyUpdateData, ['DATE', 'WH'])
+    // await dataUpdateSendMoney('cash', sendMoneyUpdateData, ['DATE', 'WH'])
     await dataUpdateTotalSale('cash', totalSaleUpdateData, [
       'TRANSFER_DATE',
       'WH'
