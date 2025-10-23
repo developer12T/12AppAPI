@@ -246,6 +246,7 @@ exports.checkout = async (req, res) => {
           const productNew = await Product.find({ id:{$in:productList} })
 
           let npdProduct = []
+          let totalQtyNpd = 0
           // console.log(areaNpdProduct)
           for (const row of areaNpd.npd) {
             const productDetail = productNew.find(item => item.id === row.productId)
@@ -271,11 +272,10 @@ exports.checkout = async (req, res) => {
               weightNet: parseFloat(productDetail.weightNet.toFixed(2))
             }
             npdProduct.push(data)
-
+            totalQtyNpd += row.qty
           }
             // console.log('npdProduct',npdProduct)
             newOrder.listProduct.push(...npdProduct)
-            const totalQtyNpd = items.reduce((sum, item) => sum + item.qty, 0)
             newOrder.totalQty += totalQtyNpd
             await Npd.findOneAndUpdate(
               { period: period, area:area },
