@@ -113,6 +113,7 @@ exports.checkout = async (req, res) => {
     const shipping = shippingData.listAddress[0]
     // console.log(shipping)
     let fromWarehouse
+    let toWarehouse
     if (withdrawType === 'normal' || withdrawType === 'credit') {
       fromWarehouse = shipping.warehouse?.normal
     } else {
@@ -272,7 +273,8 @@ exports.checkout = async (req, res) => {
             total: factor.price.sale * row.qty,
             weightGross: parseFloat(productDetail.weightGross.toFixed(2)),
             weightNet: parseFloat(productDetail.weightNet.toFixed(2)),
-            isNPD: true
+            isNPD: true,
+            isBlind: true
           }
           npdProduct.push(data)
           totalQtyNpd += row.qty
@@ -1138,12 +1140,12 @@ exports.getDetail = async (req, res) => {
         remarkWarehouse: u.remarkWarehouse,
         listProduct: u.listProduct.map(p => {
           return {
-            id: p.isNPD ? 'xxxxxxxxxx' : p.id,
-            name: p.isNPD ? 'สินค้า NPD' : p.name,
-            group: p.isNPD ? 'NPD' : p.group,
-            brand: p.isNPD ? 'NPD' : p.brand,
-            size: p.isNPD ? 'NPD' : p.size,
-            flavour: p.isNPD ? 'NPD' : p.flavour,
+            id: p.isBlind ? 'xxxxxxxxxx' : p.id,
+            name: p.isBlind ? 'สินค้า NPD' : p.name,
+            group: p.isBlind ? 'NPD' : p.group,
+            brand: p.isBlind ? 'NPD' : p.brand,
+            size: p.isBlind ? 'NPD' : p.size,
+            flavour: p.isBlind ? 'NPD' : p.flavour,
             qty: p.qty,
             unit: p.unit,
             qtyPcs: p.qtyPcs,
@@ -1153,7 +1155,8 @@ exports.getDetail = async (req, res) => {
             weightNet: p.weightNet,
             receiveQty: p.receiveQty,
             _id: p._id,
-            isNPD: p.isNPD
+            isNPD: p.isNPD,
+            isBlind: p.isBlind
           }
         }),
         newTrip: u.newTrip,
@@ -1603,15 +1606,16 @@ exports.cancelWithdraw = async (req, res) => {
       { new: true }
     )
 
-      if (distributionData.newTrip === 'true') {
-            await Npd.findOneAndUpdate(
-              { area:distributionData.area, period:distributionData.period },
-               {$set :{
-                isReceived:'false'
-               }}
-            )
-      }
-
+    if (distributionData.newTrip === 'true') {
+      await Npd.findOneAndUpdate(
+        { area: distributionData.area, period: distributionData.period },
+        {
+          $set: {
+            isReceived: 'false'
+          }
+        }
+      )
+    }
 
     await ApproveLogs.create({
       module: 'cancelWithdraw',
