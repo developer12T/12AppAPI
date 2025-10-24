@@ -30,7 +30,7 @@ function exportUsersToXlsx(data, sheetName = 'Sheet1') {
 exports.getUser = async (req, res) => {
   try {
     const channel = req.headers['x-channel'];
-    const { User } = getModelsByChannel(channel, res, userModel);
+    const { User } = getModelsByChannel('user', res, userModel);
 
     const users = await User.find({})
       .select('-_id saleCode salePayer username firstName password surName tel zone area warehouse role qrCodeImage updatedAt')

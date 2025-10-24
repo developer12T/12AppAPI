@@ -44,7 +44,7 @@ const xlsx = require('xlsx')
 const path = require('path')
 const os = require('os')
 const fs = require('fs')
-const { orderBy } = require('lodash')
+const { orderBy, reduce } = require('lodash')
 
 exports.checkout = async (req, res) => {
   const transaction = await sequelize.transaction()
@@ -73,7 +73,7 @@ exports.checkout = async (req, res) => {
     const { Place } = getModelsByChannel(channel, res, distributionModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Distribution } = getModelsByChannel(channel, res, distributionModel)
-    const { Npd } = getModelsByChannel(channel, res, npdModel)
+    const { Npd,NpdArea } = getModelsByChannel(channel, res, npdModel)
     const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
       channel,
       res,
@@ -231,51 +231,62 @@ exports.checkout = async (req, res) => {
       newTrip: 'false'
     })
 
-    if (newtrip === true) {
-      const getNpd = await Npd.findOne({
-        period: period,
-        areaGet: { $in: [area] }
-      })
-
-      if (!getNpd) {
+      if (newtrip === true) {
+        const getNpd = await Npd.findOne({
+          period: period,
+          area:area,
+        })
         newOrder.newTrip = 'true'
+        if (getNpd.isReceived == 'false') {
+          
 
-        const productNew = await Product.findOne({ type: 'new' })
+          const areaNpd = await Npd.findOne({period:period,area:area})
+          // console.log(areaNpdProduct.npd)
+          const productList = areaNpd.npd.flatMap(item => item.productId)
+          const productNew = await Product.find({ id:{$in:productList} })
 
-        const npd = await Npd.findOne({ period: period })
-        if (productNew && npd) {
-          factor = productNew.listUnit.find(item => item.unit === npd.unit)
-          qtyPcs = npd.qty * factor.factor
+          let npdProduct = []
+          let totalQtyNpd = 0
+          // console.log(areaNpdProduct)
+          for (const row of areaNpd.npd) {
+            const productDetail = productNew.find(item => item.id === row.productId)
+            // console.log(productDetail)
 
-          const npdProduct = {
-            id: productNew.id,
-            lot: '',
-            name: productNew.name,
-            group: productNew.group,
-            brand: productNew.brand,
-            size: productNew.size,
-            flavour: productNew.flavour,
-            qty: npd.qty,
-            unit: npd.unit,
-            qtyPcs: qtyPcs,
-            price: factor.price.sale,
-            total: factor.price.sale * npd.qty,
-            weightGross: parseFloat(productNew.weightGross.toFixed(2)),
-            weightNet: parseFloat(productNew.weightNet.toFixed(2)),
-            isNPD: true
-          }
+            const factor = productDetail.listUnit.find(item => item.unit === row.unit)
+            const qtyPcs = row.qty * factor.factor
 
-          newOrder.listProduct.push(npdProduct)
-          // console.log(period,[area])
-          await Npd.findOneAndUpdate(
-            { period: period },
-            {
-              $push: { areaGet: area }
+            const data = {
+              id: productDetail.id,
+              lot: '',
+              name: productDetail.name,
+              group: productDetail.group,
+              brand: productDetail.brand,
+              size: productDetail.size,
+              flavour: productDetail.flavour,
+              qty: row.qty,
+              unit: row.unit,
+              qtyPcs: qtyPcs,
+              price: factor.price.sale,
+              total: factor.price.sale * row.qty,
+              weightGross: parseFloat(productDetail.weightGross.toFixed(2)),
+              weightNet: parseFloat(productDetail.weightNet.toFixed(2)),
+              isNPD:true
             }
-          )
+            npdProduct.push(data)
+            totalQtyNpd += row.qty
+          }
+            // console.log('npdProduct',npdProduct)
+            newOrder.listProduct.push(...npdProduct)
+            newOrder.totalQty += totalQtyNpd
+            await Npd.findOneAndUpdate(
+              { period: period, area:area },
+               {$set :{
+                isReceived:'true'
+               }}
+            )
+          
         }
       }
-    }
 
     const productQty = newOrder.listProduct.map(u => {
       return {
@@ -304,6 +315,7 @@ exports.checkout = async (req, res) => {
     const createdMovement = await StockMovement.create({
       ...calStock
     })
+
 
     await StockMovementLog.create({
       ...calStock,
@@ -1623,7 +1635,11 @@ exports.approveWithdraw = async (req, res) => {
     )
     const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
-    const { Stock } = getModelsByChannel(channel, res, stockModel)
+    const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
+      channel,
+      res,
+      stockModel
+    )
     const { Option } = getModelsByChannel(channel, res, optionsModel)
     const { Npd } = getModelsByChannel(channel, res, npdModel)
     const { User } = getModelsByChannel(channel, res, userModel)
@@ -1796,6 +1812,45 @@ exports.approveWithdraw = async (req, res) => {
         { new: true }
       )
 
+
+    const productQty = distributionData.listProduct.map(u => {
+      return {
+        id: u.id,
+        // lot: u.lot,
+        unit: u.unit,
+        qty: u.qty,
+        statusMovement: 'OUT'
+      }
+    })
+
+
+    const calStock = {
+      // storeId: refundOrder.store.storeId,
+      orderId: distributionData.orderId,
+      area: distributionData.area,
+      // saleCode: sale.saleCode,
+      period: distributionData.period,
+      warehouse: distributionData.fromWarehouse,
+      status: statusStr,
+      statusTH: statusThStr,
+      action: 'Withdraw',
+      type: 'Withdraw',
+      product: productQty
+    }
+
+
+      const createdMovement = await StockMovement.create({
+        ...calStock
+      })
+
+
+      await StockMovementLog.create({
+        ...calStock,
+        refOrderId: createdMovement._id
+      })
+
+
+      
       await ApproveLogs.create({
         module: 'approveWithdraw',
         user: user,
@@ -1830,13 +1885,49 @@ exports.approveWithdraw = async (req, res) => {
       )
 
       if (distributionData.newTrip === 'true') {
-        await Npd.findOneAndUpdate(
-          { period: distributionData.period },
-          {
-            $pull: { areaGet: distributionData.area }
-          }
-        )
+            await Npd.findOneAndUpdate(
+              { area:distributionData.area, period:distributionData.period },
+               {$set :{
+                isReceived:'false'
+               }}
+            )
       }
+
+    const productQty = distributionData.listProduct.map(u => {
+      return {
+        id: u.id,
+        // lot: u.lot,
+        unit: u.unit,
+        qty: u.qty,
+        statusMovement: 'OUT'
+      }
+    })
+
+
+    const calStock = {
+      // storeId: refundOrder.store.storeId,
+      orderId: distributionData.orderId,
+      area: distributionData.area,
+      // saleCode: sale.saleCode,
+      period: distributionData.period,
+      warehouse: distributionData.fromWarehouse,
+      status: statusStr,
+      statusTH: statusThStr,
+      action: 'Withdraw',
+      type: 'Withdraw',
+      product: productQty
+    }
+
+    const createdMovement = await StockMovement.create({
+      ...calStock
+    })
+
+
+    await StockMovementLog.create({
+      ...calStock,
+      refOrderId: createdMovement._id
+    })
+
 
       await ApproveLogs.create({
         module: 'approveWithdraw',
@@ -2017,6 +2108,11 @@ exports.saleConfirmWithdraw = async (req, res) => {
     const { Distribution } = getModelsByChannel(channel, res, distributionModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
+    const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
+      channel,
+      res,
+      stockModel
+    )
     // ===== debounce ตรงนี้ =====
     const now = Date.now()
     const lastUpdate = withdrawUpdateTimestamps[orderId] || 0
@@ -2173,33 +2269,8 @@ exports.saleConfirmWithdraw = async (req, res) => {
           }
         }
 
-        // receivetotal = receivetotal
-        // receivetotalQty = receivetotalQty
-        // receivetotalWeightGross = ReceiveWeight?.[0]?.weightGross || 0
-        // receivetotalWeightNet = ReceiveWeight?.[0]?.weightNet || 0
       }
 
-      // ✅ อัปเดตข้อมูลถ้า status เป็น approved
-      // if (distributionTran.status === 'approved') {
-      // // บันทึก listProduct ที่แก้ไขแล้ว
-
-      // ✅ อัปเดตสต๊อก
-      // const qtyproduct = [];
-
-      // for (const u of (distributionTran.listProduct ?? [])) {
-      //   if (!u || !u.id) continue;
-
-      //   const unit = (u.receiveUnit ?? '').trim();
-      //   const qty = Number(u.receiveQty);
-
-      //   if (!unit || !Number.isFinite(qty) || qty <= 0) continue;
-
-      //   qtyproduct.push({ id: u.id, unit, qty });
-      // }
-
-      // console.log(qtyproduct);
-
-      // console.log(distributionTran.listProduct)
 
       const qtyproduct = []
 
@@ -2265,6 +2336,42 @@ exports.saleConfirmWithdraw = async (req, res) => {
       io.emit('distribution/saleConfirmWithdraw', {
         status: 200,
         message: 'Confirm withdraw success'
+      })
+
+      const productQty = distributionData.listProduct.map(u => {
+      return {
+        id: u.id,
+        // lot: u.lot,
+        unit: u.receiveUnit,
+        qty: u.receiveQty,
+        statusMovement: 'OUT'
+      }
+    })
+
+
+    const calStock = {
+      // storeId: refundOrder.store.storeId,
+      orderId: distributionData.orderId,
+      area: distributionData.area,
+      // saleCode: sale.saleCode,
+      period: distributionData.period,
+      warehouse: distributionData.fromWarehouse,
+      status: 'confirm',
+      statusTH: 'รับสินค้าสำเร็จ',
+      action: 'Withdraw',
+      type: 'Withdraw',
+      product: productQty
+    }
+
+
+      const createdMovement = await StockMovement.create({
+        ...calStock
+      })
+
+
+      await StockMovementLog.create({
+        ...calStock,
+        refOrderId: createdMovement._id
       })
 
       await ApproveLogs.create({

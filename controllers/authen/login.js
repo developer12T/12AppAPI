@@ -36,7 +36,7 @@ exports.login = async (req, res) => {
     if (!passwordMatch) {
       return res.status(401).json({
         status: 401,
-        message: 'Invalid username or password'
+        message: 'Invalid password'
       });
     }
 
