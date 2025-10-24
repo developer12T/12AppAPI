@@ -69,6 +69,34 @@ WHERE
   DA.Sale_Code is not NULL AND
   DA.Sale_Code != 'ว่าง'
 `
+  } else if (channel == 'pc') {
+    result = await sql.query`
+SELECT
+    DA.Sale_Code as saleCode,
+    DA.Sale_Player as salePayer,
+    DA.Col_LoginName as username,
+    LEFT(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') - 1) AS firstName,
+    SUBSTRING(DA.Col_NameTH, CHARINDEX(' ', DA.Col_NameTH + ' ') + 1, LEN(DA.Col_NameTH)) AS surName,
+    SUBSTRING(
+    REPLACE(CONVERT(VARCHAR(40), NEWID()), '-', ''),
+    1, 6
+) AS password,
+    SALE_MOBILE AS tel,
+    DA.ZONE AS zone,
+    DA.AREA AS area,
+    DA.WH AS warehouse,
+    'sale' AS role,
+    '1' AS status,
+    TRUCK_SIZE AS typeTruck,
+    TRUCK_NO as noTruck,
+    'https://apps.onetwotrading.co.th/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
+FROM 
+  [DATA_OMS].[dbo].[DATA_Area] AS DA
+WHERE 
+  DA.CHANNEL_NAME = 'PC' AND 
+  DA.Sale_Code is not NULL AND
+  DA.Sale_Code != 'ว่าง' 
+  `
   }
 
   await sql.close()
@@ -1043,6 +1071,84 @@ exports.dataPowerBiQueryInsert = async function (channel, data) {
   `
     await request.query(query)
   }
+}
+
+exports.dataUpdateSendMoney = async function (channel, data, primaryKeys = []) {
+  const config = {
+    host: process.env.MY_SQL_SERVER,
+    user: process.env.MY_SQL_USER,
+    password: process.env.MY_SQL_PASSWORD,
+    database: process.env.MY_SQL_DATABASE
+  }
+
+  const connection = await mysql.createConnection(config)
+
+  for (const item of data) {
+    // ถ้า primaryKey เป็น string เดี่ยว ให้แปลงเป็น array
+    const keysToFilter = Array.isArray(primaryKeys)
+      ? primaryKeys
+      : [primaryKeys]
+
+    // เอาฟิลด์ทั้งหมด ยกเว้น primaryKeys
+    const updateFields = Object.keys(item).filter(
+      k => !keysToFilter.includes(k)
+    )
+    const updateValues = updateFields.map(k => item[k])
+    const setClause = updateFields.map(k => `\`${k}\` = ?`).join(', ')
+
+    // WHERE condition
+    const whereClause = keysToFilter.map(k => `\`${k}\` = ?`).join(' AND ')
+    const whereValues = keysToFilter.map(k => item[k])
+
+    const query = `
+      UPDATE \`van_sendmoney\`
+      SET ${setClause}
+      WHERE ${whereClause}
+    `
+
+    await connection.execute(query, [...updateValues, ...whereValues])
+  }
+
+  await connection.end()
+}
+
+exports.dataUpdateTotalSale = async function (channel, data, primaryKeys = []) {
+  const config = {
+    host: process.env.MY_SQL_SERVER,
+    user: process.env.MY_SQL_USER,
+    password: process.env.MY_SQL_PASSWORD,
+    database: process.env.MY_SQL_DATABASE
+  }
+
+  const connection = await mysql.createConnection(config)
+
+  for (const item of data) {
+    // ถ้า primaryKey เป็น string เดี่ยว ให้แปลงเป็น array
+    const keysToFilter = Array.isArray(primaryKeys)
+      ? primaryKeys
+      : [primaryKeys]
+
+    // เอาฟิลด์ทั้งหมด ยกเว้น primaryKeys
+    const updateFields = Object.keys(item).filter(
+      k => !keysToFilter.includes(k)
+    )
+    const updateValues = updateFields.map(k => item[k])
+    const setClause = updateFields.map(k => `\`${k}\` = ?`).join(', ')
+
+    // WHERE condition
+    const whereClause = keysToFilter.map(k => `\`${k}\` = ?`).join(' AND ')
+    const whereValues = keysToFilter.map(k => item[k])
+
+    const query = `
+      UPDATE \`van_sendmoneytransfer\`
+      SET ${setClause}
+      WHERE ${whereClause}
+    `
+
+    await connection.execute(query, [...updateValues, ...whereValues])
+  }
+
+  await connection.end()
 }
 
 exports.dataWithdrawInsert = async function (channel, data) {

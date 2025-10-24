@@ -9,10 +9,11 @@ const { encrypt, decrypt } = require('../../middleware/authen')
 
 exports.login = async (req, res) => {
   try {
-    const channel = req.headers['x-channel'];
-    const { User } = getModelsByChannel(channel, res, userModel);
+    const channel = req.headers['x-channel']
+    const { User } = getModelsByChannel('user', res, userModel);
 
     const data = await User.findOne({ username: req.body.username });
+
     if (!data) {
       return res.status(401).json({
         status: 401,
@@ -35,7 +36,7 @@ exports.login = async (req, res) => {
     if (!passwordMatch) {
       return res.status(401).json({
         status: 401,
-        message: 'Invalid username or password'
+        message: 'Invalid password'
       });
     }
 
@@ -67,7 +68,8 @@ exports.login = async (req, res) => {
         zone: data.zone,
         warehouse: data.warehouse,
         role: data.role,
-        token: token
+        token: token,
+        channel:channel
       }]
     });
 

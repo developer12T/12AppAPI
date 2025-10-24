@@ -1,4 +1,5 @@
 const express = require('express')
+const multer = require('multer')
 const {
   checkout,
   getOrder,
@@ -25,7 +26,8 @@ const {
   approveWithdrawCredit,
   getOrder2,
   addRemark,
-  addOneWithdraw
+  addOneWithdraw,
+  uploadNPDData
 } = require('../../controllers/distribution/withdrawController')
 const {
   getPlace,
@@ -37,6 +39,7 @@ const {
 } = require('../../controllers/distribution/placeController')
 
 const router = express.Router()
+const upload = multer({ dest: 'uploads/' })
 
 router.get('/get', getOrder)
 router.get('/get2', getOrder2)
@@ -53,6 +56,7 @@ router.get('/getType', getType)
 
 router.get('/place/get', getPlace)
 router.post('/place/add', addPlace)
+router.post('/uploadNPDData', upload.single('file'), uploadNPDData)
 
 router.post('/addRemark', addRemark)
 

@@ -30,7 +30,7 @@ function exportUsersToXlsx(data, sheetName = 'Sheet1') {
 exports.getUser = async (req, res) => {
   try {
     const channel = req.headers['x-channel'];
-    const { User } = getModelsByChannel(channel, res, userModel);
+    const { User } = getModelsByChannel('user', res, userModel);
 
     const users = await User.find({})
       .select('-_id saleCode salePayer username firstName password surName tel zone area warehouse role qrCodeImage updatedAt')
@@ -471,7 +471,7 @@ exports.addUserManeger = async (req, res) => {
     let update = 0;
     let addNew = 0;
 
-    const { User } = getModelsByChannel(channelHeader, res, userModel);
+    const { User } = getModelsByChannel('user', res, userModel);
 
     for (const m3 of tableData) {
       const encryptedPassword = encrypt('2020'); // 🔐 รหัสผ่านเริ่มต้น
@@ -501,6 +501,13 @@ exports.addUserManeger = async (req, res) => {
         update += 1;
       } else {
         // เพิ่มใหม่
+        let platformType = ''
+        if (m3.role == 'admin'){
+          platformType = 'ADMIN'
+        } else{
+          platformType = 'CASH'
+        }
+
         await User.create({
           saleCode: m3.saleCode,
           salePayer: m3.salePayer,
@@ -513,7 +520,8 @@ exports.addUserManeger = async (req, res) => {
           area: m3.area,
           warehouse: m3.warehouse,
           role: m3.role,
-          status: m3.status
+          status: m3.status,
+          platformType: platformType
         });
         addNew += 1;
       }
@@ -534,7 +542,9 @@ exports.addUserManeger = async (req, res) => {
 
 exports.addUserNew = async (req, res) => {
   const channel = req.headers['x-channel'];
-  const { User } = getModelsByChannel(channel, res, userModel);
+
+
+  const { User } = getModelsByChannel('user', res, userModel);
 
   const tableData = await userQuery(channel);
   const tableMap = new Map(tableData.map(item => [item.saleCode, item]));
@@ -585,7 +595,8 @@ exports.addUserNew = async (req, res) => {
         period: period(),
         image: '',
         typeTruck: sale.typeTruck,
-        noTruck: sale.noTruck
+        noTruck: sale.noTruck,
+        platformType: 'CASH'
       });
       await newUser.save();
       result.push(newUser);

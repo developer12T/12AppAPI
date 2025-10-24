@@ -297,11 +297,28 @@ exports.getStore = async (req, res) => {
       query.status = { $nin: ['10', '90'] }
     } // ถ้า type=all ไม่ต้อง filter createdAt เลย
 
-    if (area) {
-      query.area = area
-    } else if (zone) {
-      query.area = { $regex: `^${zone}`, $options: 'i' }
+    // if (area) {
+    //   query.area = area
+    // } else if (zone) {
+    //   query.area = { $regex: `^${zone}`, $options: 'i' }
+    // }
+    console.log(area.slice(0, 2))
+
+    switch (channel) {
+      case 'pc':
+        query.area = area.slice(0, 2)
+
+        break
+      default:
+        if (area) {
+          query.area = area
+        } else if (zone) {
+          query.area = { $regex: `^${zone}`, $options: 'i' }
+        }
+        break
     }
+
+    console.log(query)
 
     if (route) {
       query.route = route
@@ -363,6 +380,8 @@ exports.getStore = async (req, res) => {
     )
 
     let data = await Store.aggregate(pipeline)
+
+    console.log(pipeline)
 
     if (showMap === 'true') {
       data = data.map(item => ({
