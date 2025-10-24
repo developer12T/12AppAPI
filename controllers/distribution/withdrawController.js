@@ -261,7 +261,8 @@ exports.checkout = async (req, res) => {
             price: factor.price.sale,
             total: factor.price.sale * npd.qty,
             weightGross: parseFloat(productNew.weightGross.toFixed(2)),
-            weightNet: parseFloat(productNew.weightNet.toFixed(2))
+            weightNet: parseFloat(productNew.weightNet.toFixed(2)),
+            isNPD: true
           }
 
           newOrder.listProduct.push(npdProduct)
@@ -2048,6 +2049,7 @@ exports.saleConfirmWithdraw = async (req, res) => {
       const listProductId = distributionTran.listProduct
         .map(i => i.id)
         .filter(Boolean)
+
       productDetail = await Product.find({ id: { $in: listProductId } })
 
       if (
@@ -2059,6 +2061,7 @@ exports.saleConfirmWithdraw = async (req, res) => {
           message: 'No products found in withdrawal transaction.'
         })
       }
+
       const receiveQtyZero = []
 
       for (item of distributionTran.listProduct) {

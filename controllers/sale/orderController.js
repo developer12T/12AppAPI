@@ -34,7 +34,7 @@ const {
   DisributionM3,
   MHDISL,
   MHDISH,
-  MGHEA
+  MGLINE
 } = require('../../models/cash/master')
 const { Op, fn, col, where, literal } = require('sequelize')
 const { generateOrderId } = require('../../utilities/genetateId')
@@ -90,6 +90,7 @@ const os = require('os')
 const fs = require('fs')
 const target = require('../../models/cash/target')
 const product = require('../../models/cash/product')
+const { console } = require('inspector')
 
 const orderTimestamps = {}
 
@@ -3088,6 +3089,7 @@ exports.erpApiCheckOrderDistrabution = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
     const { Distribution } = getModelsByChannel(channel, res, disributionModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
     const year = 2025 // หรือใช้ new Date().getFullYear() ถ้าอยากให้ dynamic
     const month = 9 // กันยายน (เดือน 9)
 
@@ -3096,6 +3098,10 @@ exports.erpApiCheckOrderDistrabution = async (req, res) => {
 
     const inMongo = await Distribution.find({
       newTrip: 'true',
+      // orderId: 'W681042101',
+      status: {
+        $nin: ['canceled', 'rejected']
+      },
       createdAt: {
         $gte: startDate,
         $lt: endDate
@@ -3175,6 +3181,14 @@ exports.erpApiCheckOrderDistrabution = async (req, res) => {
             r => String(r.productId || '').trim() === productIdTrimmed
           )
 
+          const listProductId = distributionTran.listProduct
+            .map(i => i.id)
+            .filter(Boolean)
+
+          const productDetail = await Product.find({
+            id: { $in: listProductId }
+          })
+
           if (match) {
             const product = productDetail.find(
               u => String(u.id || '').trim() === productIdTrimmed
@@ -3208,20 +3222,26 @@ exports.erpApiCheckOrderDistrabution = async (req, res) => {
         }
 
         // ✅ Update Distribution back to Mongo
+
         await Distribution.updateOne(
           { _id: distributionTran._id },
-          { $set: { listProduct: distributionTran.listProduct } }
+          {
+            $set: {
+              listProduct: distributionTran.listProduct,
+              status: 'confirm',
+              statusTH:'ยืนยันรับของ',
+            }
+          }
         )
       }
     }
 
     res.status(200).json({
       status: 200,
-      message: 'Successful',
-      total: rows
+      message: 'Successful'
     })
   } catch (error) {
-    console.error('[getSummarybyChoice ERROR]', error)
+    console.error('[erpApiCheckOrderDistrabution]', error)
     res.status(500).json({ status: 500, message: error.message })
   }
 }
@@ -5497,9 +5517,9 @@ exports.updateOrderDistribution = async (req, res) => {
 
     const currentDate = `${year}${month}${day}`
     // const startDate = `${year}${month}${day}`
-    const startDate = `20251001`
+    const startDate = `20250901`
     // const endDate = `${year}${month}${nextDay}`
-    const endDate = `20251022`
+    const endDate = `20251023`
     const status = ''
     const channel = 'cash'
 

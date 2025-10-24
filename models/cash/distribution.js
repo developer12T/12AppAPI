@@ -103,7 +103,8 @@ const listProductDistribution = new mongoose.Schema({
   weightGross: { type: Number, require: true },
   weightNet: { type: Number, require: true },
   receiveUnit: { type: String, default: '' },
-  receiveQty: { type: Number, require: true, default: 0 }
+  receiveQty: { type: Number, require: true, default: 0 },
+  isNPD: { type: Boolean, default: false }
 })
 
 const distributionSchema = mongoose.Schema(

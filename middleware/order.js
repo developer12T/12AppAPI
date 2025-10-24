@@ -1301,7 +1301,8 @@ const dataWithdraw = async (channel, status, startDate, endDate) => {
         // status: { $nin: ['canceled'] },
         status: { $in: statusArray },
         type: { $in: ['withdraw'] },
-        area: { $ne: 'IT211' }
+        area: { $ne: 'IT211' },
+        withdrawType: { $ne: 'credit' }
       }
     },
     {
@@ -1390,7 +1391,7 @@ const dataWithdraw = async (channel, status, startDate, endDate) => {
           productDetail?.listUnit?.find?.(i => i.unit === 'PCS')?.factor ?? 1
 
         let WD_STATUS = ''
-        switch (order.status) {
+        switch (order.statusTH) {
           case 'อนุมัติ':
             WD_STATUS = '22'
             break
@@ -1414,7 +1415,7 @@ const dataWithdraw = async (channel, status, startDate, endDate) => {
           WD_TIME: hhmmss,
           RECEIVE_TYPE: order.orderType,
           WD_NO: order.orderId,
-          WD_STATUS: '99',
+          WD_STATUS: WD_STATUS,
           TO_WH: order.toWarehouse,
           FROM_WH: order.fromWarehouse,
           TOTAL_WEIGHT: order.receivetotalWeightGross.toFixed(2),
