@@ -1615,24 +1615,29 @@ exports.cancelApproveRefund = async (req, res) => {
             .json({ status: 500, message: 'Stock update error' })
         }
       }
-    }
 
-    for (const item of refundOrder.listProduct) {
-        const hasError = await updateStockMongo(
-          { id: item.id, unit: item.unit, qty: item.qty },
-          refundOrder.store.area,
-          refundOrder.period,
-          'reduceWithdraw',
-          channel,
-          res
-        )
-        if (hasError) {
-          return res
-            .status(500)
-            .json({ status: 500, message: 'Stock update error' })
-        }
+      for (const item of refundOrder.listProduct) {
+            if (item.condition === 'good') {
+              const hasError = await updateStockMongo(
+                { id: item.id, unit: item.unit, qty: item.qty },
+                refundOrder.store.area,
+                refundOrder.period,
+                'reduceWithdraw',
+                channel,
+                res
+              )
 
-    }
+              if (hasError) {
+                return res
+                  .status(500)
+                  .json({ status: 500, message: 'Stock update error' })
+              }
+            }
+          }
+
+       }
+
+    
 
     await Refund.findOneAndUpdate(
       { orderId },
