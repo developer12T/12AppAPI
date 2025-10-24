@@ -1588,11 +1588,16 @@ exports.cancelApproveRefund = async (req, res) => {
     let newOrderId = orderId
     if (status === 'canceled' || status === 'reject') {
       newOrderId = changeOrder.orderId
-      if (!/CC\d+$/.test(newOrderId)) {
-        let n = 1
-        while (await Order.exists({ orderId: `${changeOrder.orderId}CC${n}` }))
-          n++
-        newOrderId = `${changeOrder.orderId}CC${n}`
+      if (!/CC\d+$/.test(changeOrder.orderId)) {
+        const baseId = changeOrder.orderId // ล็อกฐานไว้ อย่าไปแก้ค่านี้
+        let counter = 1
+        newOrderId = `${baseId}CC${counter}`
+
+        // ใช้ exists() เร็วกว่า findOne เมื่อเช็คมี/ไม่มี
+        while (await Order.exists({ orderId: newOrderId })) {
+          counter += 1
+          newOrderId = `${baseId}CC${counter}` // ต่อกับ baseId เสมอ
+        }
       }
 
       for (const item of changeOrder.listProduct) {
@@ -1612,14 +1617,31 @@ exports.cancelApproveRefund = async (req, res) => {
       }
     }
 
+    for (const item of refundOrder.listProduct) {
+        const hasError = await updateStockMongo(
+          { id: item.id, unit: item.unit, qty: item.qty },
+          refundOrder.store.area,
+          refundOrder.period,
+          'reduceWithdraw',
+          channel,
+          res
+        )
+        if (hasError) {
+          return res
+            .status(500)
+            .json({ status: 500, message: 'Stock update error' })
+        }
+
+    }
+
     await Refund.findOneAndUpdate(
       { orderId },
       { $set: { status, statusTH } },
       { new: true }
     )
-    await Order.findOneAndUpdate(
-      { orderId: refundOrder.reference, type: 'change' },
-      { $set: { status, statusTH } },
+    const updatedOrder = await Order.findOneAndUpdate(
+      { reference: orderId },
+      { $set: { status, statusTH, orderId: newOrderId } },
       { new: true }
     )
 
