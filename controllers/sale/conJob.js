@@ -640,10 +640,10 @@ async function updateOrderDistribution (channel = 'cash') {
     const nextDay = String(thailand.getDate()).padStart(2, '0')
 
     const currentDate = `${year}${month}${day}`
-    const startDate = `${year}${month}${day}`
-    // const startDate = `20250801`
-    const endDate = `${year}${month}${nextDay}`
-    // const endDate = `20250831`
+    // const startDate = `${year}${month}${day}`
+    const startDate = `20250901`
+    // const endDate = `${year}${month}${nextDay}`
+    const endDate = `20250930`
     const status = ''
     const channel = 'cash'
 
@@ -664,6 +664,8 @@ async function updateOrderDistribution (channel = 'cash') {
     // return res.status(500).json({ status: 500, message: err.message })
   }
 }
+
+
 
 const startCronJobDistribution = () => {
   cron.schedule(
