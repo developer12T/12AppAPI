@@ -1560,7 +1560,7 @@ exports.cancelWithdraw = async (req, res) => {
     const channel = req.headers['x-channel']
     const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
     const { Distribution } = getModelsByChannel(channel, res, distributionModel)
-
+    const { Npd } = getModelsByChannel(channel, res, npdModel)
     const distributionTran = await Distribution.findOne({
       orderId: orderId,
       type: 'withdraw'
@@ -1598,6 +1598,16 @@ exports.cancelWithdraw = async (req, res) => {
       },
       { new: true }
     )
+
+      if (distributionData.newTrip === 'true') {
+            await Npd.findOneAndUpdate(
+              { area:distributionData.area, period:distributionData.period },
+               {$set :{
+                isReceived:'false'
+               }}
+            )
+      }
+
 
     await ApproveLogs.create({
       module: 'cancelWithdraw',
