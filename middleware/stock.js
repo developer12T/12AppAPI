@@ -589,7 +589,8 @@ exports.restock = async (area, period,channel,type) => {
     // console.log(area)
   }
 
-  if (type = 'update') {
+
+  if (type === 'update') {
     for (const item of results) {
       for (const i of item.data) {
         const filter = {
