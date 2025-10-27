@@ -13,7 +13,7 @@ const { rangeDate } = require("../utilities/datetime");
 const { calculateStockSummary } = require("./order");
 require("dotenv").config();
 
-exports.restock = async (area, period,channel) => {
+exports.restock = async (area, period,channel,type) => {
   const { startDate, endDate } = rangeDate(period);
 
   const { Stock } = getModelsByChannel(channel, null, stockModel);
@@ -65,7 +65,8 @@ exports.restock = async (area, period,channel) => {
     ]);
 
     const dataWithdraw = await Distribution.aggregate([
-      { $match: { status: "confirm", ...matchQuery } },
+  
+      { $match: { status: "confirm", ...matchQuery, newTrip:'false' } },
       {
         $project: {
           _id: 0,
@@ -589,55 +590,61 @@ exports.restock = async (area, period,channel) => {
     // console.log(area)
   }
 
-  for (const item of results) {
-    for (const i of item.data) {
-      const filter = {
-        area: item.area,
-        period: period,
-        "listProduct.productId": i.productId,
-      };
 
-      const update = {
-        $set: {
-          "listProduct.$[elem].stockInPcs": i.summaryQty.PCS.in,
-          "listProduct.$[elem].stockOutPcs": i.summaryQty.PCS.out,
-          "listProduct.$[elem].balancePcs": i.summaryQty.PCS.balance,
-          "listProduct.$[elem].stockInCtn": i.summaryQty.CTN.in,
-          "listProduct.$[elem].stockOutCtn": i.summaryQty.CTN.out,
-          "listProduct.$[elem].balanceCtn": i.summaryQty.CTN.balance,
-        },
-      };
+  if (type === 'update') {
+    for (const item of results) {
+      for (const i of item.data) {
+        const filter = {
+          area: item.area,
+          period: period,
+          "listProduct.productId": i.productId,
+        };
 
-      const options = {
-        arrayFilters: [{ "elem.productId": i.productId }],
-        new: true,
-      };
+        const update = {
+          $set: {
+            "listProduct.$[elem].stockInPcs": i.summaryQty.PCS.in,
+            "listProduct.$[elem].stockOutPcs": i.summaryQty.PCS.out,
+            "listProduct.$[elem].balancePcs": i.summaryQty.PCS.balance,
+            "listProduct.$[elem].stockInCtn": i.summaryQty.CTN.in,
+            "listProduct.$[elem].stockOutCtn": i.summaryQty.CTN.out,
+            "listProduct.$[elem].balanceCtn": i.summaryQty.CTN.balance,
+          },
+        };
 
-      // Try update first
-      const updatedDoc = await Stock.findOneAndUpdate(filter, update, options);
+        const options = {
+          arrayFilters: [{ "elem.productId": i.productId }],
+          new: true,
+        };
 
-      // If product not found in listProduct, push a new one
-      if (!updatedDoc) {
-        await Stock.updateOne(
-          { area: item.area, period: period },
-          {
-            $push: {
-              listProduct: {
-                productId: i.productId,
-                stockPcs: 0,
-                stockInPcs: i.summaryQty.PCS.in,
-                stockOutPcs: i.summaryQty.PCS.out,
-                balancePcs: i.summaryQty.PCS.balance,
-                stockCtn: 0,
-                stockInCtn: i.summaryQty.CTN.in,
-                stockOutCtn: i.summaryQty.CTN.out,
-                balanceCtn: i.summaryQty.CTN.balance,
+        // Try update first
+        const updatedDoc = await Stock.findOneAndUpdate(filter, update, options);
+
+        // If product not found in listProduct, push a new one
+        if (!updatedDoc) {
+          await Stock.updateOne(
+            { area: item.area, period: period },
+            {
+              $push: {
+                listProduct: {
+                  productId: i.productId,
+                  stockPcs: 0,
+                  stockInPcs: i.summaryQty.PCS.in,
+                  stockOutPcs: i.summaryQty.PCS.out,
+                  balancePcs: i.summaryQty.PCS.balance,
+                  stockCtn: 0,
+                  stockInCtn: i.summaryQty.CTN.in,
+                  stockOutCtn: i.summaryQty.CTN.out,
+                  balanceCtn: i.summaryQty.CTN.balance,
+                },
               },
-            },
-          }
-        );
+            }
+          );
+        }
       }
     }
   }
+
+
+
   return results
 };

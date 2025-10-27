@@ -501,7 +501,7 @@ exports.checkout = async (req, res) => {
       data: newOrder
     })
 
-    await restock(area, period, channel)
+    await restock(area, period, channel,'update')
 
     // await transaction.commit()
     res.status(200).json({
@@ -6438,3 +6438,5 @@ exports.updateUserSaleInOrder = async (req, res) => {
     })
   }
 }
+
+

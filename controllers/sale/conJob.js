@@ -521,7 +521,7 @@ async function reStoreStock (channel = 'cash') {
     const { User } = getModelsByChannel(channel, null, userModel)
     const { Cart } = getModelsByChannel(channel, null, cartModel)
 
-    await restock('', periodstr, channel)
+    await restock('', periodstr, channel,'update')
 
     console.log('ReStoreSucess')
     fs.appendFileSync(logFile, `[${now}] ✅ Job completed ReStoreSucess\n`)

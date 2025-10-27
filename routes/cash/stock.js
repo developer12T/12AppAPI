@@ -28,7 +28,8 @@ const {
   stockToExcelNew,
   addStockIt,
   stockToExcelSummary,
-  addStockByArea
+  addStockByArea,
+  checkStock
 } = require('../../controllers/stock/stockController')
 
 const router = express.Router()
@@ -69,4 +70,5 @@ router.post('/stockToExcelNew', stockToExcelNew)
 router.post('/addStockIt', addStockIt)
 router.post('/stockToExcelSummary', stockToExcelSummary)
 router.post('/addStockByArea', addStockByArea)
+router.post('/checkStock', checkStock)
 module.exports = router
