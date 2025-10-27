@@ -5215,7 +5215,7 @@ exports.addStockAllWithInOut = async (req, res) => {
         .json({ status: 400, message: 'period is required' })
     }
 
-    const results = await restock(area, period,channel)
+    const results = await restock(area, period,channel,'update')
 
     return res.status(200).json({
       status: 200,
