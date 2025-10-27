@@ -5458,7 +5458,7 @@ exports.checkStock = async (req, res) => {
     return res.json({
       status: 200,
       message: 'Stock check completed',
-      data: results
+      data: noMacthStock
     })
   } catch (error) {
     console.error('checkStock error:', error)

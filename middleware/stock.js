@@ -65,7 +65,8 @@ exports.restock = async (area, period,channel,type) => {
     ]);
 
     const dataWithdraw = await Distribution.aggregate([
-      { $match: { status: "confirm", ...matchQuery } },
+  
+      { $match: { status: "confirm", ...matchQuery, newTrip:'false' } },
       {
         $project: {
           _id: 0,

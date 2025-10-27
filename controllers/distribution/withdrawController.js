@@ -1769,7 +1769,12 @@ exports.approveWithdraw = async (req, res) => {
       const wereHouseName = await WereHouse.findOne({
         wh_code: distributionTran.fromWarehouse
       }).select('wh_name')
-
+      let type = ''
+      if (distributionTran.newTrip == 'true') {
+        type = 'เบิกต้นทริป'
+      } else {
+        type = 'เบิกระหว่างทริป'
+      }
       if (distributionTran.area != 'IT211') {
         if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
           sendEmail({
@@ -1780,7 +1785,7 @@ exports.approveWithdraw = async (req, res) => {
             html: `
           <h1>แจ้งการส่งใบขอเบิกผ่านทางอีเมล</h1>
           <p>
-            <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
+            <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh} ${type}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
             <strong>ประเภทการจัดส่ง:</strong> ${
               distributionTran.orderTypeName
