@@ -659,8 +659,8 @@ async function updateOrderDistribution (channel = 'cash') {
       `[${nowLog}] ✅ Job completed updatePowerBiSucess\n`
     )
   } catch (error) {
-    console.error(err)
-    fs.appendFileSync(logFile, `[${nowLog}] ❌ Job failed: ${err.message}\n`)
+    console.error(error)
+    fs.appendFileSync(logFile, `[${nowLog}] ❌ Job failed: ${error.message}\n`)
     // return res.status(500).json({ status: 500, message: err.message })
   }
 }
