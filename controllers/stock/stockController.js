@@ -5430,10 +5430,11 @@ exports.checkStock = async (req, res) => {
       for (const product of area.listProduct) {
         const resultProduct = resultArea.data.find(item => item.productId === product.productId)
 
-        const stockPcs    = resultProduct?.summaryQty?.PCS?.stock    ?? 0
-        const stockInPcs  = resultProduct?.summaryQty?.PCS?.in       ?? 0
-        const stockOutPcs = resultProduct?.summaryQty?.PCS?.out      ?? 0
-        const balancePcs  = resultProduct?.summaryQty?.PCS?.balance  ?? 0
+        console.log(resultProduct)
+        const stockPcs    = resultProduct?.summaryQty?.PCS?.stock || 0    
+        const stockInPcs  = resultProduct?.summaryQty?.PCS?.in || 0          
+        const stockOutPcs = resultProduct?.summaryQty?.PCS?.out || 0         
+        const balancePcs  = resultProduct?.summaryQty?.PCS?.balance|| 0     
 
         // console.log("balancePcs",balancePcs)
 
