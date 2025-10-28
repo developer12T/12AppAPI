@@ -38,11 +38,17 @@ SELECT
     '1' AS status,
     TRUCK_SIZE AS typeTruck,
     TRUCK_NO as noTruck,
-    'https://apps.onetwotrading.co.th/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
+    'https://apps.onetwotrading.co.th/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage,
+    case 
+     when CHANNEL_NAME = 'Cash' THEN 'CASH'
+     else CHANNEL_NAME 
+     end as platformType
+    
 FROM 
   [DATA_OMS].[dbo].[DATA_Area] AS DA
 WHERE 
-  DA.CHANNEL_NAME = 'Cash' AND 
+  DA.CHANNEL_NAME = 'Cash' OR 
+  DA.CHANNEL_NAME = 'PC' AND
   DA.Sale_Code is not NULL AND
   DA.Sale_Code != 'ว่าง' 
   `

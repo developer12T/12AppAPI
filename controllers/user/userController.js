@@ -596,7 +596,7 @@ exports.addUserNew = async (req, res) => {
         image: '',
         typeTruck: sale.typeTruck,
         noTruck: sale.noTruck,
-        platformType: 'CASH'
+        platformType: sale.platformType
       });
       await newUser.save();
       result.push(newUser);
