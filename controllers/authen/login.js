@@ -11,7 +11,7 @@ exports.login = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
     const { User } = getModelsByChannel('user', res, userModel);
-
+    console.log(getModelsByChannel('user', res, userModel))
     const data = await User.findOne({ username: req.body.username });
 
     if (!data) {
