@@ -16,6 +16,7 @@ const {
   OOHEAD,
   OOLINE
 } = require('../../models/cash/master')
+const { WithdrawCash } = require('../../models/cash/powerBi')
 const fs = require('fs')
 const path = require('path')
 const { sequelize, DataTypes } = require('../../config/m3db')
@@ -619,6 +620,117 @@ const startCronJobUpdateOrderPowerBI = () => {
   )
 }
 
+const startCronJobUpdatBIOrderDistribution = () => {
+  cron.schedule(
+    '0 21 * * *', // 👉 00:00 AM (เวลาไทย)
+    // "*/3 * * * *",
+
+    async () => {
+      console.log(
+        'Running cron job startCronJobUpdatBIOrderDistribution at 21:00 AM Thai time. Now:',
+        new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+      )
+      await updateStatusOrderDistribution()
+    },
+    {
+      timezone: 'Asia/Bangkok' // 👈 สำคัญมาก
+    }
+  )
+}
+
+const startCronJobUpdateOrderDistribution = () => {
+  cron.schedule(
+    '0 21 * * *', // 👉 00:00 AM (เวลาไทย)
+    // "*/3 * * * *",
+
+    async () => {
+      console.log(
+        'Running cron job startCronJobUpdateOrderDistribution at 21:00 AM Thai time. Now:',
+        new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+      )
+      await updateOrderDistribution()
+    },
+    {
+      timezone: 'Asia/Bangkok' // 👈 สำคัญมาก
+    }
+  )
+}
+
+async function updateStatusOrderDistribution (channel = 'cash') {
+  try {
+    const logFile = path.join(
+      process.cwd(),
+      `${pathLog}updateStatusOrderDistribution.txt`
+    )
+    const nowLog = new Date().toLocaleString('th-TH', {
+      timeZone: 'Asia/Bangkok'
+    })
+    const { Distribution } = getModelsByChannel(
+      channel,
+      null,
+      distributionModel
+    )
+    // ✅ 1. ดึงข้อมูลจาก WithdrawCash
+    const withdrawList = await WithdrawCash.findAll({
+      where: { WD_STATUS: '22' },
+      raw: true
+    })
+    // ✅ 2. สร้าง list WD_NO
+    const wdNos = [...new Set(withdrawList.map(i => i.WD_NO))]
+
+    // ✅ 3. ดึงข้อมูลจาก Distribution (Mongo)
+    const dataDis = await Distribution.find({
+      orderId: { $in: wdNos }
+    }).lean()
+
+    // ✅ 4. สร้าง map จาก Mongo เพื่อหาของเร็ว
+    // ✅ รวม dis + listProduct ลงใน Map
+    const disMap = new Map()
+    for (const dis of dataDis) {
+      if (!dis.listProduct) continue
+      disMap.set(dis.orderId, { dis, listProduct: dis.listProduct })
+    }
+
+    // ✅ 5. วนลูปอัปเดตแต่ละแถวใน WithdrawCash
+
+    // ✅ ใช้ตอนอัปเดต
+    for (const row of withdrawList) {
+      const data = disMap.get(row.WD_NO)
+      if (!data) continue
+
+      const { dis, listProduct } = data
+      const product = listProduct.find(p => p.id === row.ITEM_CODE)
+
+      if (product) {
+        await WithdrawCash.update(
+          {
+            WD_STATUS: dis.status == 'confirm' ? '99' : '22',
+            ITEM_WEIGHT: product.weightGross ?? 0,
+            TOTAL_WEIGHT: product.weightNet ?? 0,
+            SHIP_QTY: product.receiveQty ?? 0,
+            STATUS: dis.status ?? '',
+            STATUS_TH: dis.statusTH ?? ''
+          },
+          {
+            where: {
+              WD_NO: row.WD_NO,
+              ITEM_CODE: row.ITEM_CODE
+            }
+          }
+        )
+      }
+    }
+    fs.appendFileSync(
+      logFile,
+      `[${nowLog}] ✅ Job completed updatePowerBiSucess\n`
+    )
+  } catch (error) {
+    console.error(err)
+    fs.appendFileSync(logFile, `[${nowLog}] ❌ Job failed: ${err.message}\n`)
+    // return res.status(500).json({ status: 500, message: err.message })
+  }
+}
+
 async function updateOrderDistribution (channel = 'cash') {
   try {
     const logFile = path.join(
@@ -640,10 +752,10 @@ async function updateOrderDistribution (channel = 'cash') {
     const nextDay = String(thailand.getDate()).padStart(2, '0')
 
     const currentDate = `${year}${month}${day}`
-    // const startDate = `${year}${month}${day}`
-    const startDate = `20250901`
-    // const endDate = `${year}${month}${nextDay}`
-    const endDate = `20250930`
+    const startDate = `${year}${month}${day}`
+    // const startDate = `20250901`
+    const endDate = `${year}${month}${nextDay}`
+    // const endDate = `20250930`
     const status = ''
     const channel = 'cash'
 
@@ -664,8 +776,6 @@ async function updateOrderDistribution (channel = 'cash') {
     // return res.status(500).json({ status: 500, message: err.message })
   }
 }
-
-
 
 const startCronJobDistribution = () => {
   cron.schedule(
@@ -772,10 +882,11 @@ const startCronJobreStoreStockDaily = () => {
 module.exports = {
   startCronJobErpApiCheck,
   // startCronJobOrderToExcel
-
+  startCronJobUpdateOrderDistribution,
   startCronJobUpdateOrderPowerBI,
   startCronJobErpApiCheckDisribution,
   startCronJobDeleteCartDaily,
   startCronJobDistribution,
-  startCronJobreStoreStockDaily
+  startCronJobreStoreStockDaily,
+  startCronJobUpdatBIOrderDistribution
 }
