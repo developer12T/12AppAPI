@@ -113,7 +113,7 @@ exports.checkout = async (req, res) => {
     const shipping = shippingData.listAddress[0]
     // console.log(shipping)
     let fromWarehouse
-    let toWarehouse
+     let toWarehouse
     if (withdrawType === 'normal' || withdrawType === 'credit') {
       fromWarehouse = shipping.warehouse?.normal
     } else {
