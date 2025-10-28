@@ -1251,7 +1251,7 @@ exports.OrderToExcel = async (req, res) => {
   //   }
   // })
 
-  console.log(pipeline[3])
+  // console.log(pipeline[3])
 
   pipeline.push({
     $sort: { statusASC: 1, createdAt: -1 }
@@ -2486,7 +2486,7 @@ exports.getSummarybyArea = async (req, res) => {
         dataChange = await getChange(zoneList, res, channel, 'zone')
         dataRefund = await getRefund(zoneList, res, channel, 'zone')
 
-        console.log(zoneList)
+        // console.log(zoneList)
       } else {
         areaList = [...new Set(users.map(u => u.area))]
         dataOrder = await getOrders(areaList, res, channel, 'area')
