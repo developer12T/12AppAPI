@@ -234,7 +234,7 @@ exports.getPendingStore = async (req, res) => {
       }
     )
 
-    console.log(pipeline)
+    // console.log(pipeline)
 
     const data = await Store.aggregate(pipeline)
 
@@ -302,7 +302,7 @@ exports.getStore = async (req, res) => {
     // } else if (zone) {
     //   query.area = { $regex: `^${zone}`, $options: 'i' }
     // }
-    console.log(area.slice(0, 2))
+    // console.log(area.slice(0, 2))
 
     switch (channel) {
       case 'pc':
@@ -318,7 +318,7 @@ exports.getStore = async (req, res) => {
         break
     }
 
-    console.log(query)
+    // console.log(query)
 
     if (route) {
       query.route = route
@@ -381,7 +381,7 @@ exports.getStore = async (req, res) => {
 
     let data = await Store.aggregate(pipeline)
 
-    console.log(pipeline)
+    // console.log(pipeline)
 
     if (showMap === 'true') {
       data = data.map(item => ({
@@ -509,13 +509,13 @@ exports.addStore = async (req, res) => {
   const channel = req.headers['x-channel'] // 'credit' or 'cash'
   const { Store } = getModelsByChannel(channel, res, storeModel)
   const upload = getUploadMiddleware(channel)
-  console.log(upload)
+  // console.log(upload)
 
   upload(req, res, async err => {
     // if (err) {
     //   return res.status(400).json({ status: '400', message: err.message })
     // }
-    console.log(req.body)
+    // console.log(req.body)
 
     try {
       // if (!req.body.store) {

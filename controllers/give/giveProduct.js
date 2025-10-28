@@ -214,7 +214,7 @@ async function getStoreGive (giveId, area, channel, res) {
 
     const applicableTo = giveType.applicableTo
 
-    console.log(applicableTo)
+    // console.log(applicableTo)
 
     const hasApplicableFilters = Object.values(applicableTo).some(
       arr => arr.length > 0

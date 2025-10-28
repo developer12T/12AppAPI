@@ -473,7 +473,7 @@ exports.refundExcel = async (req, res) => {
     statusArray = ['pending', 'approved'] // default
   }
 
-  console.log(statusArray)
+  // console.log(statusArray)
 
   const { Order } = getModelsByChannel(channel, res, orderModel)
   const { Refund } = getModelsByChannel(channel, res, refundModel)
@@ -601,7 +601,7 @@ exports.refundExcel = async (req, res) => {
   const modelRefund = await Refund.aggregate(pipelineRefund)
 
   // console.log(modelChange)
-  console.log(modelRefund)
+  // console.log(modelRefund)
   // console.log()
 
   const tranFromChange = modelChange.flatMap(order => {

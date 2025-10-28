@@ -36,6 +36,7 @@ const {
   MHDISH,
   MGLINE
 } = require('../../models/cash/master')
+const { WithdrawCash } = require('../../models/cash/powerBi')
 const { Op, fn, col, where, literal } = require('sequelize')
 const { generateOrderId } = require('../../utilities/genetateId')
 const { sortProduct } = require('../../utilities/product')
@@ -63,7 +64,6 @@ const {
   applyPromotionUsage
 } = require('../promotion/calculate')
 const stockModel = require('../../models/cash/stock')
-const disributionModel = require('../../models/cash/distribution')
 const sendmoneyModel = require('../../models/cash/sendmoney')
 const orderModel = require('../../models/cash/sale')
 const cartModel = require('../../models/cash/cart')
@@ -1251,7 +1251,7 @@ exports.OrderToExcel = async (req, res) => {
   //   }
   // })
 
-  console.log(pipeline[3])
+  // console.log(pipeline[3])
 
   pipeline.push({
     $sort: { statusASC: 1, createdAt: -1 }
@@ -2486,7 +2486,7 @@ exports.getSummarybyArea = async (req, res) => {
         dataChange = await getChange(zoneList, res, channel, 'zone')
         dataRefund = await getRefund(zoneList, res, channel, 'zone')
 
-        console.log(zoneList)
+        // console.log(zoneList)
       } else {
         areaList = [...new Set(users.map(u => u.area))]
         dataOrder = await getOrders(areaList, res, channel, 'area')
@@ -3088,7 +3088,7 @@ exports.erpApiCheckOrder = async (req, res) => {
 exports.erpApiCheckOrderDistrabution = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
-    const { Distribution } = getModelsByChannel(channel, res, disributionModel)
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
     const year = 2025 // หรือใช้ new Date().getFullYear() ถ้าอยากให้ dynamic
     const month = 9 // กันยายน (เดือน 9)
@@ -3229,7 +3229,7 @@ exports.erpApiCheckOrderDistrabution = async (req, res) => {
             $set: {
               listProduct: distributionTran.listProduct,
               status: 'confirm',
-              statusTH:'ยืนยันรับของ',
+              statusTH: 'ยืนยันรับของ'
             }
           }
         )
@@ -5503,6 +5503,75 @@ exports.updateOrderPowerBI = async (req, res) => {
   })
 }
 
+exports.updateStatusOrderDistribution = async (req, res) => {
+  try {
+    const channel = 'cash'
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+    // ✅ 1. ดึงข้อมูลจาก WithdrawCash
+    const withdrawList = await WithdrawCash.findAll({
+      where: { WD_STATUS: '22' },
+      raw: true
+    })
+    // ✅ 2. สร้าง list WD_NO
+    const wdNos = [...new Set(withdrawList.map(i => i.WD_NO))]
+
+    // ✅ 3. ดึงข้อมูลจาก Distribution (Mongo)
+    const dataDis = await Distribution.find({
+      orderId: { $in: wdNos }
+    }).lean()
+
+    // ✅ 4. สร้าง map จาก Mongo เพื่อหาของเร็ว
+    // ✅ รวม dis + listProduct ลงใน Map
+    const disMap = new Map()
+    for (const dis of dataDis) {
+      if (!dis.listProduct) continue
+      disMap.set(dis.orderId, { dis, listProduct: dis.listProduct })
+    }
+
+    // ✅ 5. วนลูปอัปเดตแต่ละแถวใน WithdrawCash
+
+    // ✅ ใช้ตอนอัปเดต
+    for (const row of withdrawList) {
+      const data = disMap.get(row.WD_NO)
+      if (!data) continue
+
+      const { dis, listProduct } = data
+      const product = listProduct.find(p => p.id === row.ITEM_CODE)
+
+      if (product) {
+        await WithdrawCash.update(
+          {
+            WD_STATUS: dis.status == 'confirm' ? '99' : '22',
+            ITEM_WEIGHT: product.weightGross ?? 0,
+            TOTAL_WEIGHT: product.weightNet ?? 0,
+            SHIP_QTY: product.receiveQty ?? 0,
+            STATUS: dis.status ?? '',
+            STATUS_TH: dis.statusTH ?? ''
+          },
+          {
+            where: {
+              WD_NO: row.WD_NO,
+              ITEM_CODE: row.ITEM_CODE
+            }
+          }
+        )
+      }
+    }
+    return res.status(200).json({
+      status: 200,
+      message: 'Sucess'
+      // data: data
+    })
+  } catch (error) {
+    console.error('Error in updateStatusOrderDistribution:', error)
+    res.status(500).json({
+      status: 500,
+      message: 'Internal server error',
+      error: error.message
+    })
+  }
+}
+
 exports.updateOrderDistribution = async (req, res) => {
   try {
     const now = new Date()
@@ -5517,9 +5586,9 @@ exports.updateOrderDistribution = async (req, res) => {
 
     const currentDate = `${year}${month}${day}`
     // const startDate = `${year}${month}${day}`
-    const startDate = `20250901`
+    const startDate = `20251023`
     // const endDate = `${year}${month}${nextDay}`
-    const endDate = `20251023`
+    const endDate = `20251026`
     const status = ''
     const channel = 'cash'
 

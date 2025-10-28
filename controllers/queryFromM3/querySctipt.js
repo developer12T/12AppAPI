@@ -38,11 +38,17 @@ SELECT
     '1' AS status,
     TRUCK_SIZE AS typeTruck,
     TRUCK_NO as noTruck,
-    'https://apps.onetwotrading.co.th/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
+    'https://apps.onetwotrading.co.th/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage,
+    case 
+     when CHANNEL_NAME = 'Cash' THEN 'CASH'
+     else CHANNEL_NAME 
+     end as platformType
+    
 FROM 
   [DATA_OMS].[dbo].[DATA_Area] AS DA
 WHERE 
-  DA.CHANNEL_NAME = 'Cash' AND 
+  DA.CHANNEL_NAME = 'Cash' OR 
+  DA.CHANNEL_NAME = 'PC' AND
   DA.Sale_Code is not NULL AND
   DA.Sale_Code != 'ว่าง' 
   `
@@ -759,90 +765,64 @@ exports.productQuery = async function (channel) {
 
   const connection = await mysql.createConnection(config)
 
-  let result = ''
+  let priceType = ''
+  let openType = ''
   if (channel === 'cash') {
-    ;[result] = await connection.execute(`
-SELECT 
-ITNO AS id,
-NAME_BILL as name,
-GRP as GRP_CODE,
--- g.GRP_DESC as \`group\`,
-gp.GRP_DESC as \`group\`,
-GREPORT AS groupCodeM3,
-gM3.GRP_DESC AS groupM3,
-Brand as BRAND_CODE,
-BRAND_DESC as brand,
-WEIGHT AS size,
-FLAVOUR as FLAVOUR_CODE,
-FAV_DESC as flavour,
-case 
-when IS_OPEN = 'Y' then "ไม่แถม"
-when IS_OPEN = 'N' then "แถม"
-WHEN LEFT(ITNO, 2) = '60' THEN 'พรีเมียม'
-END AS type ,
-CTN_Gross,
-CTN_Net,
-IS_OPEN as statusSale,
-IS_OPEN3 as statusRefund,
-IS_OPEN4 as statusRefundDamage,
-IS_OPEN5 as statusWithdraw,
-unit_cal as unit ,
-UNIT_CODE as nameEng,
-UNIT_DESC as nameThai,
-price as pricePerUnitSale ,
-price3 as pricePerUnitRefund ,
-price3 as pricePerUnitRefundDamage ,
-price5 as pricePerUnitChange 
-
-from m_product a
-LEFT JOIN c_group g ON a.GRP = g.GRP_CODE
-LEFT JOIN item_group_report gM3 ON a.GREPORT = gM3.GRP_CODE
-LEFT JOIN m_unit u ON a.unit_cal = u.UNIT_CODE_BC
-LEFT JOIN ca_factor c ON a.ITNO = c.itemcode 
-LEFT JOIN m_flavour f ON a.FLAVOUR = f.FAV_CODE 
-LEFT JOIN c_brand b ON a.Brand = b.BRAND_CODE
-LEFT JOIN m_prd_group gp ON a.GRP = gp.GRP_CODE
-
-
-`)
+    priceType = 'PRICE'
+    openType = 'IS_OPEN'
+  } else if (channel === 'credit') {
+    priceType = 'PRICE'
+    openType = 'IS_OPEN'
+  } else if (channel === 'pc'){
+    priceType = 'PRICE2'
+    openType = 'IS_OPEN2'
   }
-  if (channel === 'credit') {
-    ;[result] = await connection.execute(`
-  SELECT 
-    CP.ITNO as id,
-    CP.NAME_BILL as name,
-    CP.GRP as GRP_CODE,
-    CG.GRP_DESC AS \`group\`,
-    CP.BRAND AS BRAND_CODE,
-    CB.BRAND_DESC AS brand,
-    CP.WEIGHT AS size,
-    CP.FLAVOUR AS FLAVOUR_CODE,
-    CF.FAV_DESC as flavour,
-    '' as type,
-    CFA.CTN_Gross,
-    CFA.CTN_Net,
-    'Y' as statusSale,
-    'Y' as statusWithdraw,
-    'Y' as statusRefund,
-    CU.UNIT_CODE_BC AS unit,  
-    CP.UNIT  as nameEng,
-    CU.UNIT_DESC as nameThai,
-    CP.PRICE AS pricePerUnitSale,
-    CP.PRICE AS pricePerUnitRefund,
-    CP.PRICE AS pricePerUnitChange
-  FROM c_product as CP
-  JOIN (
-    SELECT UNIT_CODE, UNIT_DESC, UNIT_CODE_BC
-    FROM c_unit
-    WHERE UNIT_DESC IN ('ผืน', 'ชุด', 'หีบ')
-  ) AS CU ON CP.UNIT = CU.UNIT_CODE
-  LEFT JOIN ca_factor CFA ON CP.ITNO = CFA.itemcode
-  LEFT JOIN c_flavour CF ON CP.FLAVOUR = CF.FAV_CODE
-  LEFT JOIN c_group CG ON CP.GRP = CG.GRP_CODE
-  LEFT JOIN c_brand CB ON CP.brand = CB.BRAND_CODE
-  WHERE CP.UNIT = 'CTN' OR CP.NAME_STD LIKE '%ผ้า%'
-`)
-  }
+  const id = (name) => connection.escapeId(name)
+  const query = `
+      SELECT 
+      ITNO AS id,
+      NAME_BILL as name,
+      GRP as GRP_CODE,
+      -- g.GRP_DESC as \`group\`,
+      gp.GRP_DESC as \`group\`,
+      GREPORT AS groupCodeM3,
+      gM3.GRP_DESC AS groupM3,
+      Brand as BRAND_CODE,
+      BRAND_DESC as brand,
+      WEIGHT AS size,
+      FLAVOUR as FLAVOUR_CODE,
+      FAV_DESC as flavour,
+      case 
+      when IS_OPEN = 'Y' then "ไม่แถม"
+      when IS_OPEN = 'N' then "แถม"
+      WHEN LEFT(ITNO, 2) = '60' THEN 'พรีเมียม'
+      END AS type ,
+      CTN_Gross,
+      CTN_Net,
+      ${id(openType)} as statusSale,
+      IS_OPEN3 as statusRefund,
+      IS_OPEN4 as statusRefundDamage,
+      IS_OPEN5 as statusWithdraw,
+      unit_cal as unit ,
+      UNIT_CODE as nameEng,
+      UNIT_DESC as nameThai,
+      ${id(priceType)} as pricePerUnitSale ,
+      price3 as pricePerUnitRefund ,
+      price3 as pricePerUnitRefundDamage ,
+      price5 as pricePerUnitChange 
+      from m_product a
+      LEFT JOIN c_group g ON a.GRP = g.GRP_CODE
+      LEFT JOIN item_group_report gM3 ON a.GREPORT = gM3.GRP_CODE
+      LEFT JOIN m_unit u ON a.unit_cal = u.UNIT_CODE_BC
+      LEFT JOIN ca_factor c ON a.ITNO = c.itemcode 
+      LEFT JOIN m_flavour f ON a.FLAVOUR = f.FAV_CODE 
+      LEFT JOIN c_brand b ON a.Brand = b.BRAND_CODE
+      LEFT JOIN m_prd_group gp ON a.GRP = gp.GRP_CODE
+      `
+  // console.log(query)
+  
+  const [result] = await connection.execute(query, [channel])
+
 
   const returnArr = []
 

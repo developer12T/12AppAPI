@@ -113,7 +113,7 @@ exports.checkout = async (req, res) => {
     const shipping = shippingData.listAddress[0]
     // console.log(shipping)
     let fromWarehouse
-    let toWarehouse
+     let toWarehouse
     if (withdrawType === 'normal' || withdrawType === 'credit') {
       fromWarehouse = shipping.warehouse?.normal
     } else {
@@ -3184,7 +3184,7 @@ exports.uploadNPDData = async (req, res) => {
 
     // 1️⃣ Read Excel file
     const workbook = xlsx.readFile(req.file.path)
-    console.log(req.file)
+    // console.log(req.file)
 
     const sheet = workbook.Sheets[workbook.SheetNames[0]]
     const rows = xlsx.utils.sheet_to_json(sheet, { defval: '' })
