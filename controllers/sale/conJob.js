@@ -522,7 +522,7 @@ async function reStoreStock (channel = 'cash') {
     const { User } = getModelsByChannel(channel, null, userModel)
     const { Cart } = getModelsByChannel(channel, null, cartModel)
 
-    await restock('', periodstr, channel)
+    await restock('', periodstr, channel,'update')
 
     console.log('ReStoreSucess')
     fs.appendFileSync(logFile, `[${now}] ✅ Job completed ReStoreSucess\n`)
@@ -771,8 +771,8 @@ async function updateOrderDistribution (channel = 'cash') {
       `[${nowLog}] ✅ Job completed updatePowerBiSucess\n`
     )
   } catch (error) {
-    console.error(err)
-    fs.appendFileSync(logFile, `[${nowLog}] ❌ Job failed: ${err.message}\n`)
+    console.error(error)
+    fs.appendFileSync(logFile, `[${nowLog}] ❌ Job failed: ${error.message}\n`)
     // return res.status(500).json({ status: 500, message: err.message })
   }
 }

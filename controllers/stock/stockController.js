@@ -47,7 +47,7 @@ const {
   calculateStockSummary
 } = require('../../middleware/order')
 const { getSocket } = require('../../socket')
-const { group } = require('console')
+const { group, error } = require('console')
 const fetchArea = async warehouse => {
   try {
     const WarehouseData = await Warehouse.findAll({
@@ -5215,7 +5215,7 @@ exports.addStockAllWithInOut = async (req, res) => {
         .json({ status: 400, message: 'period is required' })
     }
 
-    const results = await restock(area, period,channel)
+    const results = await restock(area, period, channel, 'update')
 
     return res.status(200).json({
       status: 200,
@@ -5406,3 +5406,91 @@ exports.addStockByArea = async (req, res) => {
   })
 }
 
+exports.checkStock = async (req, res) => {
+  try {
+    const { area, period } = req.body
+    const channel = req.headers['x-channel']
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
+    if (!period) {
+      return res
+        .status(400)
+        .json({ status: 400, message: 'period is required' })
+    }
+
+    // ต้องแน่ใจว่า channel มีค่าหรือประกาศก่อน
+    const results = await restock(area, period, channel)
+    const stockData = await Stock.find({ period: period })
+
+    let noMacthStock = []
+
+    for (const area of stockData) {
+      const resultArea = results.find(item => item.area === area.area)
+      if (!resultArea) continue // กัน null
+
+      for (const product of area.listProduct) {
+        const resultProduct = resultArea.data.find(item => item.productId === product.productId)
+
+        // console.log(resultProduct)
+        const stockPcs = resultProduct?.summaryQty?.PCS?.stock || 0
+        const stockInPcs = resultProduct?.summaryQty?.PCS?.in || 0
+        const stockOutPcs = resultProduct?.summaryQty?.PCS?.out || 0
+        const balancePcs = resultProduct?.summaryQty?.PCS?.balance || 0
+
+        // console.log("balancePcs",balancePcs)
+
+
+        if (
+          stockPcs == 0 &&
+          stockInPcs == 0 &&
+          stockOutPcs == 0 &&
+          balancePcs == 0
+        ) {
+          // ✅ ถ้าทั้งหมดเป็น 0 — ข้าม
+        } else {
+          const checkStatus = (found, expected) => {
+            if (found > expected) return 'เกิน'
+            if (found < expected) return 'ขาด'
+            return 'ตรง'
+          }
+
+          const status = {
+            stockPcs: checkStatus(product.stockPcs, stockPcs),
+            stockInPcs: checkStatus(product.stockInPcs, stockInPcs),
+            stockOutPcs: checkStatus(product.stockOutPcs, stockOutPcs),
+            balancePcs: checkStatus(product.balancePcs, balancePcs),
+          }
+
+          // ✅ ตรวจว่ามีค่าที่ไม่ตรงอย่างน้อย 1 ช่อง
+          const isAllMatched = Object.values(status).every(s => s === 'ตรง')
+
+          if (!isAllMatched) {
+            noMacthStock.push({
+              area: area.area,
+              productId: product.productId,
+              expected: { stockPcs, stockInPcs, stockOutPcs, balancePcs },
+              found: product,
+              status
+            })
+          }
+        }
+
+
+      }
+    }
+
+
+
+    return res.json({
+      status: 200,
+      message: 'Stock check completed',
+      data: noMacthStock
+    })
+  } catch (error) {
+    console.error('checkStock error:', error)
+    return res.status(500).json({
+      status: 500,
+      message: 'Internal Server Error',
+      error: error.message
+    })
+  }
+}
