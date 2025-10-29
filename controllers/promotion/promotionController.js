@@ -890,3 +890,43 @@ exports.deletePromotion = async (req, res) => {
   }
 }
 
+exports.getReward = async (req, res) => {
+  try {
+    const { proId } = req.body
+    const channel = req.headers['x-channel']
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const promotion = await Promotion.findOne({ proId })
+
+
+    const rewards = promotion.rewards
+
+    const rewardFilters = rewards.map(r => ({
+      ...(r.productId ? { id: r.productId } : {}),
+      ...(r.productGroup ? { group: r.productGroup } : {}),
+      ...(r.productFlavour ? { flavour: r.productFlavour } : {}),
+      ...(r.productBrand ? { brand: r.productBrand } : {}),
+      ...(r.productSize ? { size: r.productSize } : {}),
+    }));
+
+    const product = await Product.find({
+      $or: rewardFilters,
+      statusSale:'Y'
+    });
+
+
+  res.status(200).json({
+    status:200,
+    message:'sucess',
+    rewardFilters:product
+  })
+
+
+  } catch (error) {
+    console.error('deletePromotion error:', error)
+    return res.status(500).json({
+      status: 500,
+      message: 'Internal server error'
+    })
+  }
+}

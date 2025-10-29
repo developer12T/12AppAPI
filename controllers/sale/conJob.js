@@ -522,7 +522,7 @@ async function reStoreStock (channel = 'cash') {
     const { User } = getModelsByChannel(channel, null, userModel)
     const { Cart } = getModelsByChannel(channel, null, cartModel)
 
-    await restock('', periodstr, channel,'update')
+    await restock('', periodstr, channel, 'update')
 
     console.log('ReStoreSucess')
     fs.appendFileSync(logFile, `[${now}] ✅ Job completed ReStoreSucess\n`)
@@ -657,14 +657,16 @@ const startCronJobUpdateOrderDistribution = () => {
 }
 
 async function updateStatusOrderDistribution (channel = 'cash') {
-  try {
-    const logFile = path.join(
-      process.cwd(),
-      `${pathLog}updateStatusOrderDistribution.txt`
-    )
-    const nowLog = new Date().toLocaleString('th-TH', {
+  const logFile = path.join(
+    process.cwd(),
+    `${pathLog}updateStatusOrderDistribution.txt`
+  )
+
+  const nowLog = new Date().toLocaleString('th-TH', {
       timeZone: 'Asia/Bangkok'
     })
+  try {
+
     const { Distribution } = getModelsByChannel(
       channel,
       null,
@@ -732,14 +734,16 @@ async function updateStatusOrderDistribution (channel = 'cash') {
 }
 
 async function updateOrderDistribution (channel = 'cash') {
-  try {
-    const logFile = path.join(
-      process.cwd(),
-      `${pathLog}startCronJobUpdateOrderDistribution.txt`
-    )
-    const nowLog = new Date().toLocaleString('th-TH', {
+  const logFile = path.join(
+    process.cwd(),
+    `${pathLog}startCronJobUpdateOrderDistribution.txt`
+  )
+
+  const nowLog = new Date().toLocaleString('th-TH', {
       timeZone: 'Asia/Bangkok'
     })
+  try {
+
 
     const now = new Date()
     const thailandOffset = 7 * 60 // นาที
