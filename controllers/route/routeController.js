@@ -1894,41 +1894,45 @@ exports.getRouteEffectiveAll = async (req, res) => {
 
   let count = 0
 
-  const routesTranFrom = routes.map(u => {
-    const percentVisit = u.percentVisit || 0
-    const percentEffective = u.percentEffective || 0
 
-    const storeAll = u.storeAll || 0
-    const storePending = u.storePending || 0
-    const storeSell = u.storeSell || 0
-    const storeNotSell = u.storeNotSell || 0
-    const storeCheckInNotSell = u.storeCheckInNotSell || 0 // ✅ แก้ชื่อจาก storehCeckInNotSell
+  // 🔹 กรองวันที่ไม่ใช่ 25 หรือ 26 ก่อน
+  const excludedDays = ['25', '26'];
 
-    totalVisit += percentVisit
-    totalEffective += percentEffective
+  const routesTranFrom = routes
+    .filter(route => !excludedDays.includes(route.day))
+    .map(u => {
+      const percentVisit = Number(u.percentVisit) || 0;
+      const percentEffective = Number(u.percentEffective) || 0;
+      const storeAll = Number(u.storeAll) || 0;
+      const storePending = Number(u.storePending) || 0;
+      const storeSell = Number(u.storeSell) || 0;
+      const storeNotSell = Number(u.storeNotSell) || 0;
+      const storeCheckInNotSell = Number(u.storeCheckInNotSell) || 0; // ✅ ชื่อถูกแล้ว
 
-    totalStoreAll += storeAll
-    totalStorePending += storePending
-    totalStoreSell += storeSell
-    totalStoreNotSell += storeNotSell
-    totalStoreCheckInNotSell += storeCheckInNotSell
+      totalVisit += percentVisit;
+      totalEffective += percentEffective;
+      totalStoreAll += storeAll;
+      totalStorePending += storePending;
+      totalStoreSell += storeSell;
+      totalStoreNotSell += storeNotSell;
+      totalStoreCheckInNotSell += storeCheckInNotSell;
+      count++;
 
-    count++
+      return {
+        area: u.area,
+        percentVisit,
+        percentEffective,
+        storeAll,
+        storePending,
+        storeSell,
+        storeNotSell,
+        storeCheckInNotSell,
+      };
+    });
 
-    return {
-      area: u.area,
-      percentVisit,
-      percentEffective,
-      storeAll,
-      storePending,
-      storeSell,
-      storeNotSell,
-      storeCheckInNotSell
-    }
-  })
-
-  const percentVisitAvg = count > 0 ? totalVisit / count : 0
-  const percentEffectiveAvg = count > 0 ? totalEffective / count : 0
+  // ✅ สรุปค่าเฉลี่ย
+  const percentVisitAvg = count > 0 ? totalVisit / count : 0;
+  const percentEffectiveAvg = count > 0 ? totalEffective / count : 0;
 
   // const io = getSocket()
   // io.emit('route/getRouteEffectiveAll', {});
