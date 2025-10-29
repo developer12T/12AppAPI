@@ -661,10 +661,12 @@ async function updateStatusOrderDistribution (channel = 'cash') {
     process.cwd(),
     `${pathLog}updateStatusOrderDistribution.txt`
   )
-  try {
-    const nowLog = new Date().toLocaleString('th-TH', {
+
+  const nowLog = new Date().toLocaleString('th-TH', {
       timeZone: 'Asia/Bangkok'
     })
+  try {
+
     const { Distribution } = getModelsByChannel(
       channel,
       null,
@@ -736,10 +738,12 @@ async function updateOrderDistribution (channel = 'cash') {
     process.cwd(),
     `${pathLog}startCronJobUpdateOrderDistribution.txt`
   )
-  try {
-    const nowLog = new Date().toLocaleString('th-TH', {
+
+  const nowLog = new Date().toLocaleString('th-TH', {
       timeZone: 'Asia/Bangkok'
     })
+  try {
+
 
     const now = new Date()
     const thailandOffset = 7 * 60 // นาที
