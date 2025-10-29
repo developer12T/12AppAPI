@@ -914,11 +914,32 @@ exports.getReward = async (req, res) => {
       statusSale:'Y'
     });
 
+    const urlImage = '/images/products/'
+    const data = product.map(item => {
+
+
+      return {
+        id:item.id,
+        name:item.name,
+        groupCode:item.groupCode,
+        group:item.group,
+        groupCodeM3:item.groupCodeM3,
+        groupM3:item.groupM3,
+        brandCode:item.brandCode,
+        brand:item.brand,
+        size:item.size,
+        flavourCode:item.flavourCode,
+        flavour:item.flavour,
+        url:`${urlImage}${item.id}.webp`
+      }
+    })
+
+
 
   res.status(200).json({
     status:200,
     message:'sucess',
-    rewardFilters:product
+    data:data
   })
 
 

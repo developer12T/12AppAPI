@@ -1719,6 +1719,7 @@ exports.getRouteEffective = async (req, res) => {
       route: u.id.slice(-3),
       storeAll: u.storeAll,
       storePending: u.storePending,
+      storePending: u.storeSell + u.storeNotSell + u.storeCheckInNotSell,
       storeSell: u.storeSell,
       storeNotSell: u.storeNotSell,
       storeCheckInNotSell: u.storeCheckInNotSell,
@@ -1731,6 +1732,40 @@ exports.getRouteEffective = async (req, res) => {
       totalqty: totalQtyCtnSum
     }
   })
+  const totalStore = routesTranFrom.reduce((sum, item) => sum + item.storeAll, 0);
+  const totalPending = routesTranFrom.reduce((sum, item) => sum + item.storePending, 0);
+  const totalSell = routesTranFrom.reduce((sum, item) => sum + item.storeSell, 0);
+  const totalNotSell = routesTranFrom.reduce((sum, item) => sum + item.storeNotSell, 0);
+  const totalCheckInNotSell = routesTranFrom.reduce((sum, item) => sum + item.storeCheckInNotSell, 0);
+  const totalStoreTotal = routesTranFrom.reduce((sum, item) => sum + item.storeTotal, 0);
+  const totalPercentComplete = routesTranFrom.reduce((sum, item) => sum + item.totalPercentComplete, 0);
+  const totalComplete = routesTranFrom.reduce((sum, item) => sum + item.complete, 0);
+  const totalPercentVisit = routesTranFrom.reduce((sum, item) => sum + item.percentVisit, 0);
+  // const totalPercentEffective 
+
+
+  const totalRoute = {
+    routeId:'Total',
+    route:'',
+    storeAll:totalStore,
+    storePending:totalPending,
+    storeSell:totalSell,
+    storeNotSell:totalNotSell,
+    storeCheckInNotSell:totalCheckInNotSell,
+    storeTotal:totalStoreTotal,
+    percentComplete:totalPercentComplete,
+    complete:totalComplete,
+    percentVisit:totalPercentVisit,
+    percentEffective:"",
+    summary:"",
+    totalqty:""
+  }
+
+  console.log(totalStore)
+
+
+
+
 
   // const io = getSocket()
   // io.emit('route/getRouteEffective', {});
