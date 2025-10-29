@@ -10,7 +10,7 @@ const upload = multer({ storage: multer.memoryStorage() }).array(
   1
 )
 const mongoose = require('mongoose')
-
+const xlsx = require('xlsx')
 const sql = require('mssql')
 const {
   routeQuery,
@@ -26,6 +26,10 @@ const { getModelsByChannel } = require('../../middleware/channel')
 const path = require('path')
 const { group } = require('console')
 const { formatDateTimeToThai } = require('../../middleware/order')
+const fs = require('fs')
+const os = require('os')
+
+
 
 exports.getRoute = async (req, res) => {
   try {
@@ -1571,7 +1575,7 @@ exports.getRouteProvince = async (req, res) => {
 }
 
 exports.getRouteEffective = async (req, res) => {
-  const { area, team, period } = req.body
+  const { area, team, period, excel } = req.body
 
   const channel = req.headers['x-channel']
 
@@ -1732,21 +1736,31 @@ exports.getRouteEffective = async (req, res) => {
       totalqty: totalQtyCtnSum
     }
   })
-  const totalStore = routesTranFrom.reduce((sum, item) => sum + item.storeAll, 0);
-  const totalPending = routesTranFrom.reduce((sum, item) => sum + item.storePending, 0);
-  const totalSell = routesTranFrom.reduce((sum, item) => sum + item.storeSell, 0);
-  const totalNotSell = routesTranFrom.reduce((sum, item) => sum + item.storeNotSell, 0);
-  const totalCheckInNotSell = routesTranFrom.reduce((sum, item) => sum + item.storeCheckInNotSell, 0);
-  const totalStoreTotal = routesTranFrom.reduce((sum, item) => sum + item.storeTotal, 0);
-  const totalPercentComplete = routesTranFrom.reduce((sum, item) => sum + item.totalPercentComplete, 0);
-  const totalComplete = routesTranFrom.reduce((sum, item) => sum + item.complete, 0);
-  const totalPercentVisit = routesTranFrom.reduce((sum, item) => sum + item.percentVisit, 0);
-  // const totalPercentEffective 
+const excludedRoutes = ['R25', 'R26'];
 
+const filteredRoutes = routesTranFrom.filter(
+  item => !excludedRoutes.includes(item.route)
+);
+
+  // ใช้ reduce กับ filteredRoutes
+  const totalStore = filteredRoutes.reduce((sum, item) => sum + item.storeAll, 0);
+  const totalPending = filteredRoutes.reduce((sum, item) => sum + item.storePending, 0);
+  const totalSell = filteredRoutes.reduce((sum, item) => sum + item.storeSell, 0);
+  const totalNotSell = filteredRoutes.reduce((sum, item) => sum + item.storeNotSell, 0);
+  const totalCheckInNotSell = filteredRoutes.reduce((sum, item) => sum + item.storeCheckInNotSell, 0);
+  const totalStoreTotal = filteredRoutes.reduce((sum, item) => sum + item.storeTotal, 0);
+  const totalPercentComplete = filteredRoutes.reduce((sum, item) => sum + item.percentComplete, 0);
+  const totalComplete = filteredRoutes.reduce((sum, item) => sum + item.complete, 0);
+  const totalPercentVisit =
+    filteredRoutes.reduce((sum, item) => sum + item.percentVisit, 0) / filteredRoutes.length;
+  const totalPercentEffective =
+    filteredRoutes.reduce((sum, item) => sum + item.percentEffective, 0) / filteredRoutes.length;
+  const totalSummary = filteredRoutes.reduce((sum, item) => sum + item.summary, 0);
+  const totalQty = filteredRoutes.reduce((sum, item) => sum + item.totalqty, 0);
 
   const totalRoute = {
     routeId:'Total',
-    route:'',
+    route:'Total (ไม่นับ R25, R26)',
     storeAll:totalStore,
     storePending:totalPending,
     storeSell:totalSell,
@@ -1756,25 +1770,65 @@ exports.getRouteEffective = async (req, res) => {
     percentComplete:totalPercentComplete,
     complete:totalComplete,
     percentVisit:totalPercentVisit,
-    percentEffective:"",
-    summary:"",
-    totalqty:""
+    percentEffective:totalPercentEffective,
+    summary:totalSummary,
+    totalqty:totalQty
   }
 
-  console.log(totalStore)
-
-
-
+  routesTranFrom.push(totalRoute)
 
 
   // const io = getSocket()
   // io.emit('route/getRouteEffective', {});
+  if (excel === 'true'){
+
+    const dataExcel = routesTranFrom.map(item => {
+      return {
+        Route:item.route,
+        ร้านทั้งหมด	:item.storeAll,
+        รอเยี่ยม	:item.storePending,
+        ซื้อ	:item.storeSell,
+        เยี่ยม: item.storeCheckInNotSell + item.storeNotSell,
+        ขาย: item.summary,
+        ยอดหีบ : item.totalqty ,
+        เปอร์เซ็นต์การเข้าเยี่ยม:item.percentVisit,
+        เปอร์เซ็นต์การขายได้:item.percentEffective
+      }
+    })
+
+
+
+
+    const wb = xlsx.utils.book_new()
+    const ws = xlsx.utils.json_to_sheet(dataExcel)
+    xlsx.utils.book_append_sheet(wb, ws, `getRouteEffective_${period}`)
+
+    const tempPath = path.join(os.tmpdir(), `getRouteEffective_${period}.xlsx`)
+    xlsx.writeFile(wb, tempPath)
+
+    res.download(tempPath, `getRouteEffective_${period}.xlsx`, err => {
+      if (err) {
+        console.error('❌ Download error:', err)
+        // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+        if (!res.headersSent) {
+          res.status(500).send('Download failed')
+        }
+      }
+
+      // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+      fs.unlink(tempPath, () => {})
+    })
+
+  } else {
 
   res.status(200).json({
     status: 200,
     message: 'successful',
     data: routesTranFrom
   })
+  }
+
+
 }
 
 exports.getRouteEffectiveAll = async (req, res) => {
