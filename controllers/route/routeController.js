@@ -1901,7 +1901,7 @@ exports.getRouteEffectiveAll = async (req, res) => {
   let sumVisit = 0
   let count = 0
 
-  console.log(routes)
+  // console.log(routes)
   // 🔹 กรองวันที่ไม่ใช่ 25 หรือ 26 ก่อน
   const excludedDays = ['25', '26'];
 
@@ -1913,7 +1913,7 @@ exports.getRouteEffectiveAll = async (req, res) => {
       const storeAll = Number(u.storeAll) || 0;
       const storePending = Number(u.storePending) || 0;
       const storeSell = Number(u.storeSell) || 0;
-      const storeNotSell = Number(u.storeNotSell) || 0;
+      const storeNotSell = Number(u.storeNotSell + u.storeCheckInNotSell) || 0;
       const storeCheckInNotSell = Number(u.storeCheckInNotSell) || 0; // ✅ ชื่อถูกแล้ว
       const visit = Number(u.storeTotal) || 0;
       // const 

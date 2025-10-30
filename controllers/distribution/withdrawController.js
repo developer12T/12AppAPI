@@ -57,7 +57,9 @@ exports.checkout = async (req, res) => {
       sendDate,
       note,
       period,
-      newtrip
+      newtrip,
+      wereHouse,
+      routeWithdraw,
     } = req.body
 
     const today = new Date()
@@ -100,10 +102,29 @@ exports.checkout = async (req, res) => {
         .json({ status: 404, message: 'Sale user not found!' })
     }
 
-    const shippingData = await Place.findOne(
+
+    let shippingData = {}
+    if (channel === 'pc') {
+     shippingData = await Place.findOne(
+      { area, 
+        // 'listAddress.shippingId': shippingId,
+        'listAddress.warehouse.normal' : wereHouse,
+        'listAddress.shippingId' : routeWithdraw,
+       },
+      { 'listAddress.$': 1 }
+    )
+
+
+    } else {
+     shippingData = await Place.findOne(
       { area, 'listAddress.shippingId': shippingId },
       { 'listAddress.$': 1 }
     )
+
+    }
+
+
+
 
     if (!shippingData || !shippingData.listAddress.length) {
       return res
