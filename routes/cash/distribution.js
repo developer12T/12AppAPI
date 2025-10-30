@@ -35,7 +35,8 @@ const {
   getType,
   addAllPlace,
   addWereHouse,
-  getWareHouse
+  getWareHouse,
+  getRouteWithdraw
 } = require('../../controllers/distribution/placeController')
 
 const router = express.Router()
@@ -81,4 +82,5 @@ router.post('/getWithdrawError', getWithdrawError)
 router.post('/UpdateWithdrawConjob', UpdateWithdrawConjob)
 router.post('/approveWithdrawCredit', approveWithdrawCredit)
 router.post('/addOneWithdraw', addOneWithdraw)
+router.get('/getRouteWithdraw', getRouteWithdraw)
 module.exports = router

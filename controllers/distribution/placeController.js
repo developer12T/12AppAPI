@@ -302,3 +302,33 @@ exports.getWareHouse = async (req, res) => {
     }
 
 }
+
+exports.getRouteWithdraw = async (req,res) => {
+    try {
+
+        const { WH, Des_Area } = req.query 
+        const channel = req.headers['x-channel'];
+
+        const { Withdraw } = getModelsByChannel(channel, res, distributionModel);
+
+                
+        let query = {}
+        if (WH) query.WH = WH
+        if (Des_Area) query.Des_Area = Des_Area
+
+        const data = await Withdraw.find(query)
+
+        res.status(200).json({
+            status: '200',
+            message: 'Successfully get Withdraw data',
+            data: data
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ status: '500', message: error.message });
+    }
+
+
+
+}
