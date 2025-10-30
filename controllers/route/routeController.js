@@ -9,6 +9,7 @@ const upload = multer({ storage: multer.memoryStorage() }).array(
   'checkInImage',
   1
 )
+const { to2 } = require('../../middleware/order')
 const mongoose = require('mongoose')
 const xlsx = require('xlsx')
 const sql = require('mssql')
@@ -1723,7 +1724,6 @@ exports.getRouteEffective = async (req, res) => {
       route: u.id.slice(-3),
       storeAll: u.storeAll,
       storePending: u.storePending,
-      storePending: u.storeSell + u.storeNotSell + u.storeCheckInNotSell,
       storeSell: u.storeSell,
       storeNotSell: u.storeNotSell,
       storeCheckInNotSell: u.storeCheckInNotSell,
@@ -1741,6 +1741,8 @@ const excludedRoutes = ['R25', 'R26'];
 const filteredRoutes = routesTranFrom.filter(
   item => !excludedRoutes.includes(item.route)
 );
+
+  console.log(filteredRoutes)
 
   // ใช้ reduce กับ filteredRoutes
   const totalStore = filteredRoutes.reduce((sum, item) => sum + item.storeAll, 0);
@@ -1761,18 +1763,18 @@ const filteredRoutes = routesTranFrom.filter(
   const totalRoute = {
     routeId:'Total',
     route:'Total (ไม่นับ R25, R26)',
-    storeAll:totalStore,
-    storePending:totalPending,
-    storeSell:totalSell,
-    storeNotSell:totalNotSell,
-    storeCheckInNotSell:totalCheckInNotSell,
-    storeTotal:totalStoreTotal,
-    percentComplete:totalPercentComplete,
-    complete:totalComplete,
-    percentVisit:totalPercentVisit,
-    percentEffective:totalPercentEffective,
-    summary:totalSummary,
-    totalqty:totalQty
+    storeAll:to2(totalStore),
+    storePending:to2(totalPending),
+    storeSell:to2(totalSell),
+    storeNotSell:to2(totalNotSell),
+    storeCheckInNotSell:to2(totalCheckInNotSell),
+    storeTotal:to2(totalStoreTotal),
+    percentComplete:to2(totalPercentComplete),
+    complete:to2(totalComplete),
+    percentVisit:to2(totalPercentVisit),
+    percentEffective:to2(totalPercentEffective),
+    summary:to2(totalSummary),
+    totalqty:to2(totalQty)
   }
 
   routesTranFrom.push(totalRoute)
@@ -1891,10 +1893,10 @@ exports.getRouteEffectiveAll = async (req, res) => {
   let totalStoreSell = 0
   let totalStoreNotSell = 0
   let totalStoreCheckInNotSell = 0
-
+  let sumVisit = 0
   let count = 0
 
-
+  console.log(routes)
   // 🔹 กรองวันที่ไม่ใช่ 25 หรือ 26 ก่อน
   const excludedDays = ['25', '26'];
 
@@ -1908,6 +1910,9 @@ exports.getRouteEffectiveAll = async (req, res) => {
       const storeSell = Number(u.storeSell) || 0;
       const storeNotSell = Number(u.storeNotSell) || 0;
       const storeCheckInNotSell = Number(u.storeCheckInNotSell) || 0; // ✅ ชื่อถูกแล้ว
+      const visit = Number(u.storeTotal) || 0;
+      // const 
+
 
       totalVisit += percentVisit;
       totalEffective += percentEffective;
@@ -1916,6 +1921,7 @@ exports.getRouteEffectiveAll = async (req, res) => {
       totalStoreSell += storeSell;
       totalStoreNotSell += storeNotSell;
       totalStoreCheckInNotSell += storeCheckInNotSell;
+      sumVisit += visit
       count++;
 
       return {
@@ -1923,6 +1929,7 @@ exports.getRouteEffectiveAll = async (req, res) => {
         percentVisit,
         percentEffective,
         storeAll,
+        visit,
         storePending,
         storeSell,
         storeNotSell,
@@ -1941,13 +1948,17 @@ exports.getRouteEffectiveAll = async (req, res) => {
     status: 200,
     message: 'sucess',
     // data: routesTranFrom
-    visit: percentVisitAvg,
-    effective: percentEffectiveAvg,
-    totalStoreAll: totalStoreAll,
-    totalStorePending: totalStorePending,
-    totalStoreSell: totalStoreSell,
-    totalStoreNotSell: totalStoreNotSell,
-    totalStoreCheckInNotSell: totalStoreCheckInNotSell
+    visit: to2(percentVisitAvg),
+    effective: to2(percentEffectiveAvg),
+    totalStoreAll: to2(totalStoreAll),
+
+    totalStorePending: to2(totalStorePending),
+    // totalStorePending: to2(totalStoreAll - sumVisit),
+
+    totalStoreSell: to2(totalStoreSell),
+    totalStoreNotSell: to2(totalStoreNotSell),
+    // totalStoreCheckInNotSell: to2(totalStoreCheckInNotSell)
+    totalStoreCheckInNotSell: to2(sumVisit)
   })
 }
 
