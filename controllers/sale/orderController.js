@@ -90,7 +90,6 @@ const os = require('os')
 const fs = require('fs')
 const target = require('../../models/cash/target')
 const product = require('../../models/cash/product')
-const { console } = require('inspector')
 
 const orderTimestamps = {}
 
@@ -150,11 +149,13 @@ exports.checkout = async (req, res) => {
     orderTimestamps[storeId] = now
 
     const cart = await Cart.findOne({ type, area, storeId })
+
+
     if (!cart || cart.listProduct.length === 0) {
       return res.status(404).json({ status: 404, message: 'Cart is empty!' })
     }
     const sale = await User.findOne({ area }).select(
-      'firstName surName warehouse tel saleCode salePayer'
+      'firstName surName warehouse tel saleCode salePayer area zone'
     )
     if (!sale) {
       return res
@@ -311,8 +312,8 @@ exports.checkout = async (req, res) => {
         address: addressFinal,
         taxId: storeData.taxId,
         tel: storeData.tel,
-        area: storeData.area,
-        zone: storeData.zone
+        area: sale.area,
+        zone: sale.zone
       },
       // shipping,
       // address,

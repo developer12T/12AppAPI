@@ -11,8 +11,26 @@ exports.login = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
     const { User } = getModelsByChannel('user', res, userModel);
-    console.log(getModelsByChannel('user', res, userModel))
-    const data = await User.findOne({ username: req.body.username });
+    // console.log(getModelsByChannel('user', res, userModel))
+
+    let data = {}
+
+    let channelStr = ''
+
+    if (channel === 'cash') {
+      channelStr = 'CASH'
+    } else if (channel === 'pc') {
+      channelStr = 'PC'
+    }
+
+
+    if (!channel) {
+      data = await User.findOne({ username: req.body.username });
+    } else {
+      data = await User.findOne({ username: req.body.username,platformType:channelStr });
+    }
+
+    
 
     if (!data) {
       return res.status(401).json({
