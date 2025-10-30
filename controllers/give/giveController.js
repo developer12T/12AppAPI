@@ -49,7 +49,7 @@ exports.addGiveType = async (req, res) => {
     const channel = req.headers['x-channel']
     const { Givetype } = getModelsByChannel(channel, res, giveawaysModel)
 
-    if (!name || !type || !remark || !dept) {
+    if (!name || !type || !dept) {
       return res
         .status(400)
         .json({ status: 400, message: 'Missing required fields!' })
