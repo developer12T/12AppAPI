@@ -255,7 +255,7 @@ exports.checkout = async (req, res) => {
     }
 
     const sale = await User.findOne({ area }).select(
-      'firstName surName warehouse tel saleCode salePayer'
+      'firstName surName warehouse tel saleCode salePayer area zone'
     )
     if (!sale) {
       return res
@@ -272,11 +272,15 @@ exports.checkout = async (req, res) => {
         .json({ status: 404, message: 'Give type not found!' })
     }
 
-    const storeData =
-      (await Store.findOne({
-        storeId: cart.storeId,
-        area: cart.area
-      }).lean()) || {}
+    let storeData = {}
+
+    if (channel === 'pc') {
+      storeData =
+        (await Store.findOne({
+          storeId: cart.storeId,
+          area: cart.area,
+        }).lean()) || {}
+    }
 
     function isAug2025OrLater (createAt) {
       if (!createAt) return false
@@ -337,8 +341,8 @@ exports.checkout = async (req, res) => {
         address: addressFinal,
         taxId: storeData.taxId,
         tel: storeData.tel,
-        area: storeData.area,
-        zone: storeData.zone
+        area: sale.area,
+        zone: sale.zone
       },
       note,
       latitude,
