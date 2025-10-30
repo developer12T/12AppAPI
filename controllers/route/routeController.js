@@ -1742,7 +1742,7 @@ const filteredRoutes = routesTranFrom.filter(
   item => !excludedRoutes.includes(item.route)
 );
 
-  console.log(filteredRoutes)
+  // console.log(filteredRoutes)
 
   // ใช้ reduce กับ filteredRoutes
   const totalStore = filteredRoutes.reduce((sum, item) => sum + item.storeAll, 0);
@@ -1777,13 +1777,15 @@ const filteredRoutes = routesTranFrom.filter(
     totalqty:to2(totalQty)
   }
 
-  routesTranFrom.push(totalRoute)
+  
 
 
   // const io = getSocket()
   // io.emit('route/getRouteEffective', {});
   if (excel === 'true'){
 
+
+    routesTranFrom.push(totalRoute)
     const dataExcel = routesTranFrom.map(item => {
       return {
         area:area,
@@ -1828,7 +1830,8 @@ const filteredRoutes = routesTranFrom.filter(
   res.status(200).json({
     status: 200,
     message: 'successful',
-    data: routesTranFrom
+    data: routesTranFrom,
+    total:totalRoute
   })
   }
 
