@@ -661,10 +661,11 @@ async function updateStatusOrderDistribution (channel = 'cash') {
     process.cwd(),
     `${pathLog}updateStatusOrderDistribution.txt`
   )
+
+  const nowLog = new Date().toLocaleString('th-TH', {
+    timeZone: 'Asia/Bangkok'
+  })
   try {
-    const nowLog = new Date().toLocaleString('th-TH', {
-      timeZone: 'Asia/Bangkok'
-    })
     const now = new Date()
     const currentMonth = now.getMonth() + 1 // (0-based, so add 1)
     const currentYear = now.getFullYear()
@@ -747,11 +748,11 @@ async function updateOrderDistribution (channel = 'cash') {
     process.cwd(),
     `${pathLog}startCronJobUpdateOrderDistribution.txt`
   )
-  try {
-    const nowLog = new Date().toLocaleString('th-TH', {
-      timeZone: 'Asia/Bangkok'
-    })
 
+  const nowLog = new Date().toLocaleString('th-TH', {
+    timeZone: 'Asia/Bangkok'
+  })
+  try {
     const now = new Date()
     const thailandOffset = 7 * 60 // นาที
     const utc = now.getTime() + now.getTimezoneOffset() * 60000

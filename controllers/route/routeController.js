@@ -9,8 +9,9 @@ const upload = multer({ storage: multer.memoryStorage() }).array(
   'checkInImage',
   1
 )
+const { to2 } = require('../../middleware/order')
 const mongoose = require('mongoose')
-
+const xlsx = require('xlsx')
 const sql = require('mssql')
 const {
   routeQuery,
@@ -26,6 +27,10 @@ const { getModelsByChannel } = require('../../middleware/channel')
 const path = require('path')
 const { group } = require('console')
 const { formatDateTimeToThai } = require('../../middleware/order')
+const fs = require('fs')
+const os = require('os')
+
+
 
 exports.getRoute = async (req, res) => {
   try {
@@ -1571,7 +1576,7 @@ exports.getRouteProvince = async (req, res) => {
 }
 
 exports.getRouteEffective = async (req, res) => {
-  const { area, team, period } = req.body
+  const { area, team, period, excel } = req.body
 
   const channel = req.headers['x-channel']
 
@@ -1731,15 +1736,101 @@ exports.getRouteEffective = async (req, res) => {
       totalqty: totalQtyCtnSum
     }
   })
+const excludedRoutes = ['R25', 'R26'];
+
+const filteredRoutes = routesTranFrom.filter(
+  item => !excludedRoutes.includes(item.route)
+);
+
+  console.log(filteredRoutes)
+
+  // ใช้ reduce กับ filteredRoutes
+  const totalStore = filteredRoutes.reduce((sum, item) => sum + item.storeAll, 0);
+  const totalPending = filteredRoutes.reduce((sum, item) => sum + item.storePending, 0);
+  const totalSell = filteredRoutes.reduce((sum, item) => sum + item.storeSell, 0);
+  const totalNotSell = filteredRoutes.reduce((sum, item) => sum + item.storeNotSell, 0);
+  const totalCheckInNotSell = filteredRoutes.reduce((sum, item) => sum + item.storeCheckInNotSell, 0);
+  const totalStoreTotal = filteredRoutes.reduce((sum, item) => sum + item.storeTotal, 0);
+  const totalPercentComplete = filteredRoutes.reduce((sum, item) => sum + item.percentComplete, 0);
+  const totalComplete = filteredRoutes.reduce((sum, item) => sum + item.complete, 0);
+  const totalPercentVisit =
+    filteredRoutes.reduce((sum, item) => sum + item.percentVisit, 0) / filteredRoutes.length;
+  const totalPercentEffective =
+    filteredRoutes.reduce((sum, item) => sum + item.percentEffective, 0) / filteredRoutes.length;
+  const totalSummary = filteredRoutes.reduce((sum, item) => sum + item.summary, 0);
+  const totalQty = filteredRoutes.reduce((sum, item) => sum + item.totalqty, 0);
+
+  const totalRoute = {
+    routeId:'Total',
+    route:'Total (ไม่นับ R25, R26)',
+    storeAll:to2(totalStore),
+    storePending:to2(totalPending),
+    storeSell:to2(totalSell),
+    storeNotSell:to2(totalNotSell),
+    storeCheckInNotSell:to2(totalCheckInNotSell),
+    storeTotal:to2(totalStoreTotal),
+    percentComplete:to2(totalPercentComplete),
+    complete:to2(totalComplete),
+    percentVisit:to2(totalPercentVisit),
+    percentEffective:to2(totalPercentEffective),
+    summary:to2(totalSummary),
+    totalqty:to2(totalQty)
+  }
+
+  routesTranFrom.push(totalRoute)
+
 
   // const io = getSocket()
   // io.emit('route/getRouteEffective', {});
+  if (excel === 'true'){
+
+    const dataExcel = routesTranFrom.map(item => {
+      return {
+        Route:item.route,
+        ร้านทั้งหมด	:item.storeAll,
+        รอเยี่ยม	:item.storePending,
+        ซื้อ	:item.storeSell,
+        เยี่ยม: item.storeCheckInNotSell + item.storeNotSell,
+        ขาย: item.summary,
+        ยอดหีบ : item.totalqty ,
+        เปอร์เซ็นต์การเข้าเยี่ยม:item.percentVisit,
+        เปอร์เซ็นต์การขายได้:item.percentEffective
+      }
+    })
+
+
+
+
+    const wb = xlsx.utils.book_new()
+    const ws = xlsx.utils.json_to_sheet(dataExcel)
+    xlsx.utils.book_append_sheet(wb, ws, `getRouteEffective_${period}`)
+
+    const tempPath = path.join(os.tmpdir(), `getRouteEffective_${period}.xlsx`)
+    xlsx.writeFile(wb, tempPath)
+
+    res.download(tempPath, `getRouteEffective_${period}.xlsx`, err => {
+      if (err) {
+        console.error('❌ Download error:', err)
+        // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+        if (!res.headersSent) {
+          res.status(500).send('Download failed')
+        }
+      }
+
+      // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+      fs.unlink(tempPath, () => {})
+    })
+
+  } else {
 
   res.status(200).json({
     status: 200,
     message: 'successful',
     data: routesTranFrom
   })
+  }
+
+
 }
 
 exports.getRouteEffectiveAll = async (req, res) => {
@@ -1802,44 +1893,53 @@ exports.getRouteEffectiveAll = async (req, res) => {
   let totalStoreSell = 0
   let totalStoreNotSell = 0
   let totalStoreCheckInNotSell = 0
-
+  let sumVisit = 0
   let count = 0
 
-  const routesTranFrom = routes.map(u => {
-    const percentVisit = u.percentVisit || 0
-    const percentEffective = u.percentEffective || 0
+  console.log(routes)
+  // 🔹 กรองวันที่ไม่ใช่ 25 หรือ 26 ก่อน
+  const excludedDays = ['25', '26'];
 
-    const storeAll = u.storeAll || 0
-    const storePending = u.storePending || 0
-    const storeSell = u.storeSell || 0
-    const storeNotSell = u.storeNotSell || 0
-    const storeCheckInNotSell = u.storeCheckInNotSell || 0 // ✅ แก้ชื่อจาก storehCeckInNotSell
+  const routesTranFrom = routes
+    .filter(route => !excludedDays.includes(route.day))
+    .map(u => {
+      const percentVisit = Number(u.percentVisit) || 0;
+      const percentEffective = Number(u.percentEffective) || 0;
+      const storeAll = Number(u.storeAll) || 0;
+      const storePending = Number(u.storePending) || 0;
+      const storeSell = Number(u.storeSell) || 0;
+      const storeNotSell = Number(u.storeNotSell) || 0;
+      const storeCheckInNotSell = Number(u.storeCheckInNotSell) || 0; // ✅ ชื่อถูกแล้ว
+      const visit = Number(u.storeTotal) || 0;
+      // const 
 
-    totalVisit += percentVisit
-    totalEffective += percentEffective
 
-    totalStoreAll += storeAll
-    totalStorePending += storePending
-    totalStoreSell += storeSell
-    totalStoreNotSell += storeNotSell
-    totalStoreCheckInNotSell += storeCheckInNotSell
+      totalVisit += percentVisit;
+      totalEffective += percentEffective;
+      totalStoreAll += storeAll;
+      totalStorePending += storePending;
+      totalStoreSell += storeSell;
+      totalStoreNotSell += storeNotSell;
+      totalStoreCheckInNotSell += storeCheckInNotSell;
+      sumVisit += visit
+      count++;
 
-    count++
+      return {
+        area: u.area,
+        percentVisit,
+        percentEffective,
+        storeAll,
+        visit,
+        storePending,
+        storeSell,
+        storeNotSell,
+        storeCheckInNotSell,
+      };
+    });
 
-    return {
-      area: u.area,
-      percentVisit,
-      percentEffective,
-      storeAll,
-      storePending,
-      storeSell,
-      storeNotSell,
-      storeCheckInNotSell
-    }
-  })
-
-  const percentVisitAvg = count > 0 ? totalVisit / count : 0
-  const percentEffectiveAvg = count > 0 ? totalEffective / count : 0
+  // ✅ สรุปค่าเฉลี่ย
+  const percentVisitAvg = count > 0 ? totalVisit / count : 0;
+  const percentEffectiveAvg = count > 0 ? totalEffective / count : 0;
 
   // const io = getSocket()
   // io.emit('route/getRouteEffectiveAll', {});
@@ -1848,13 +1948,17 @@ exports.getRouteEffectiveAll = async (req, res) => {
     status: 200,
     message: 'sucess',
     // data: routesTranFrom
-    visit: percentVisitAvg,
-    effective: percentEffectiveAvg,
-    totalStoreAll: totalStoreAll,
-    totalStorePending: totalStorePending,
-    totalStoreSell: totalStoreSell,
-    totalStoreNotSell: totalStoreNotSell,
-    totalStoreCheckInNotSell: totalStoreCheckInNotSell
+    visit: to2(percentVisitAvg),
+    effective: to2(percentEffectiveAvg),
+    totalStoreAll: to2(totalStoreAll),
+
+    totalStorePending: to2(totalStorePending),
+    // totalStorePending: to2(totalStoreAll - sumVisit),
+
+    totalStoreSell: to2(totalStoreSell),
+    totalStoreNotSell: to2(totalStoreNotSell),
+    // totalStoreCheckInNotSell: to2(totalStoreCheckInNotSell)
+    totalStoreCheckInNotSell: to2(sumVisit)
   })
 }
 

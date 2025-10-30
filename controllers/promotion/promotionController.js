@@ -890,3 +890,64 @@ exports.deletePromotion = async (req, res) => {
   }
 }
 
+exports.getReward = async (req, res) => {
+  try {
+    const { proId } = req.body
+    const channel = req.headers['x-channel']
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const promotion = await Promotion.findOne({ proId })
+
+
+    const rewards = promotion.rewards
+
+    const rewardFilters = rewards.map(r => ({
+      ...(r.productId ? { id: r.productId } : {}),
+      ...(r.productGroup ? { group: r.productGroup } : {}),
+      ...(r.productFlavour ? { flavour: r.productFlavour } : {}),
+      ...(r.productBrand ? { brand: r.productBrand } : {}),
+      ...(r.productSize ? { size: r.productSize } : {}),
+    }));
+
+    const product = await Product.find({
+      $or: rewardFilters,
+      statusSale:'Y'
+    });
+
+    const urlImage = '/images/products/'
+    const data = product.map(item => {
+
+
+      return {
+        id:item.id,
+        name:item.name,
+        groupCode:item.groupCode,
+        group:item.group,
+        groupCodeM3:item.groupCodeM3,
+        groupM3:item.groupM3,
+        brandCode:item.brandCode,
+        brand:item.brand,
+        size:item.size,
+        flavourCode:item.flavourCode,
+        flavour:item.flavour,
+        url:`${urlImage}${item.id}.webp`
+      }
+    })
+
+
+
+  res.status(200).json({
+    status:200,
+    message:'sucess',
+    data:data
+  })
+
+
+  } catch (error) {
+    console.error('deletePromotion error:', error)
+    return res.status(500).json({
+      status: 500,
+      message: 'Internal server error'
+    })
+  }
+}

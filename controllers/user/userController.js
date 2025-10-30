@@ -12,10 +12,10 @@ const bcrypt = require('bcrypt')
 const axios = require('axios')
 const userModel = require('../../models/cash/user')
 const { getModelsByChannel } = require('../../middleware/channel')
-const { userQuery, userQueryFilter, userQueryManeger, userQueryOne } = require('../../controllers/queryFromM3/querySctipt');
+const { userQuery, userQueryFilter, userQueryManeger, userQueryOne, userPcSample } = require('../../controllers/queryFromM3/querySctipt');
 const user = require('../../models/cash/user');
 const { getSocket } = require('../../socket')
-const { encrypt, decrypt } = require('../../middleware/authen')
+const { encrypt, decrypt } = require('../../middleware/authen');
 
 
 function exportUsersToXlsx(data, sheetName = 'Sheet1') {
@@ -846,4 +846,22 @@ exports.getTeam = async (req, res) => {
     data: dataUser
   })
 
+}
+
+exports.addUserPcSample = async (req, res) => {
+
+  const channel = 'user'
+  const { User } = getModelsByChannel(channel, res, userModel);
+
+  const data =  await userPcSample(channel)
+
+  for (const item of data){
+    await User.create(item);
+  }
+
+  res.status(200).json({
+    status:201,
+    message:'Sucess',
+    data:data
+  })
 }
