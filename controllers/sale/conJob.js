@@ -663,10 +663,12 @@ async function updateStatusOrderDistribution (channel = 'cash') {
   )
 
   const nowLog = new Date().toLocaleString('th-TH', {
-      timeZone: 'Asia/Bangkok'
-    })
+    timeZone: 'Asia/Bangkok'
+  })
   try {
-
+    const now = new Date()
+    const currentMonth = now.getMonth() + 1 // (0-based, so add 1)
+    const currentYear = now.getFullYear()
     const { Distribution } = getModelsByChannel(
       channel,
       null,
@@ -674,7 +676,13 @@ async function updateStatusOrderDistribution (channel = 'cash') {
     )
     // ✅ 1. ดึงข้อมูลจาก WithdrawCash
     const withdrawList = await WithdrawCash.findAll({
-      where: { WD_STATUS: '22' },
+      where: {
+        WD_STATUS: '22',
+        [Op.and]: [
+          where(fn('MONTH', col('WD_DATE')), currentMonth),
+          where(fn('YEAR', col('WD_DATE')), currentYear)
+        ]
+      },
       raw: true
     })
     // ✅ 2. สร้าง list WD_NO
@@ -711,7 +719,9 @@ async function updateStatusOrderDistribution (channel = 'cash') {
             TOTAL_WEIGHT: product.weightNet ?? 0,
             SHIP_QTY: product.receiveQty ?? 0,
             STATUS: dis.status ?? '',
-            STATUS_TH: dis.statusTH ?? ''
+            STATUS_TH: dis.statusTH ?? '',
+            REMARK_WAREHOUSE: dis.remarkWarehouse?.remark ?? '',
+            IS_NPD: product.isNPD ? 'TRUE' : 'FALSE'
           },
           {
             where: {
@@ -740,11 +750,9 @@ async function updateOrderDistribution (channel = 'cash') {
   )
 
   const nowLog = new Date().toLocaleString('th-TH', {
-      timeZone: 'Asia/Bangkok'
-    })
+    timeZone: 'Asia/Bangkok'
+  })
   try {
-
-
     const now = new Date()
     const thailandOffset = 7 * 60 // นาที
     const utc = now.getTime() + now.getTimezoneOffset() * 60000

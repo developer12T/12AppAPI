@@ -46,6 +46,16 @@ const WithdrawCash = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false,
       field: 'STATUS_TH'
+    },
+    REMARK_WAREHOUSE: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'REMARK_WAREHOUSE'
+    },
+    IS_NPD: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'IS_NPD'
     }
   },
   {
@@ -57,7 +67,6 @@ const WithdrawCash = sequelize.define(
   }
 )
 
-
 module.exports = {
-  WithdrawCash,
+  WithdrawCash
 }
