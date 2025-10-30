@@ -501,7 +501,7 @@ exports.checkout = async (req, res) => {
       data: newOrder
     })
 
-    await restock(area, period, channel,'update')
+    await restock(area, period, channel, 'update')
 
     // await transaction.commit()
     res.status(200).json({
@@ -5507,9 +5507,18 @@ exports.updateStatusOrderDistribution = async (req, res) => {
   try {
     const channel = 'cash'
     const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+    const currentMonth = dayjs().month() + 1 // เดือนปัจจุบัน (1–12)
+    const currentYear = dayjs().year()
+
     // ✅ 1. ดึงข้อมูลจาก WithdrawCash
     const withdrawList = await WithdrawCash.findAll({
-      where: { WD_STATUS: '22' },
+      where: {
+        WD_STATUS: '99',
+        [Op.and]: [
+          where(fn('MONTH', col('WD_DATE')), currentMonth),
+          where(fn('YEAR', col('WD_DATE')), currentYear)
+        ]
+      },
       raw: true
     })
     // ✅ 2. สร้าง list WD_NO
@@ -5539,14 +5548,15 @@ exports.updateStatusOrderDistribution = async (req, res) => {
       const product = listProduct.find(p => p.id === row.ITEM_CODE)
 
       if (product) {
+    
         await WithdrawCash.update(
           {
             WD_STATUS: dis.status == 'confirm' ? '99' : '22',
             ITEM_WEIGHT: product.weightGross ?? 0,
             TOTAL_WEIGHT: product.weightNet ?? 0,
             SHIP_QTY: product.receiveQty ?? 0,
-            STATUS: dis.status ?? '',
-            STATUS_TH: dis.statusTH ?? ''
+            REMARK_WAREHOUSE: dis.remarkWarehouse?.remark ?? '',
+            IS_NPD: product.isNPD ? 'TRUE' : 'FALSE'
           },
           {
             where: {
@@ -5588,7 +5598,7 @@ exports.updateOrderDistribution = async (req, res) => {
     // const startDate = `${year}${month}${day}`
     const startDate = `20251023`
     // const endDate = `${year}${month}${nextDay}`
-    const endDate = `20251026`
+    const endDate = `20251030`
     const status = ''
     const channel = 'cash'
 
@@ -6507,5 +6517,3 @@ exports.updateUserSaleInOrder = async (req, res) => {
     })
   }
 }
-
-

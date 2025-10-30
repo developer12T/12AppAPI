@@ -306,7 +306,12 @@ exports.getStore = async (req, res) => {
 
     switch (channel) {
       case 'pc':
-        query.area = area.slice(0, 2)
+        // query.area = area.slice(0, 2)
+        if (area) {
+          query.area = area
+        } else if (zone) {
+          query.area = { $regex: `^${zone}`, $options: 'i' }
+        }
 
         break
       default:
