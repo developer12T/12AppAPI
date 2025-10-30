@@ -231,11 +231,18 @@ exports.checkout = async (req, res) => {
 
     const orderId = await generateOrderId(area, sale.warehouse, channel, res)
 
-    const storeData =
-      (await Store.findOne({
-        storeId: cart.storeId,
-        area: cart.area
-      }).lean()) || {}
+    let storeData = {}
+
+    if (channel === 'pc') {
+      storeData =
+        (await Store.findOne({
+          storeId: cart.storeId,
+          area: cart.area,
+        }).lean()) || {}
+    }
+
+
+
 
     const promotionshelf =
       (await PromotionShelf.find({
