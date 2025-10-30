@@ -122,29 +122,26 @@ exports.userPcSample = async function (channel, area) {
 
   const query = `
         SELECT
-        SALECODE as saleCode,
-        SALE_PAYER as salePayer,
-        SALE_USERNAME as username,
-        SUBSTRING_INDEX(SALE_NAME, ' ', 1) AS firstName,
-      TRIM(SUBSTRING_INDEX(SALE_NAME, ' ', -1)) AS surName,
-        '24e6b727065bbc15f1cf8d576c32fd53' AS password,
-    --     SALE_MOBILE AS tel,
-        '' AS tel,
-        SALE_ZONE AS zone,
-        SALE_AREA AS area,
-        SALE_WH AS warehouse,
-        'sale' AS role,
-        '1' AS status,
-    --     TRUCK_SIZE AS typeTruck,
-        '' AS typeTruck,
-    --     TRUCK_NO as noTruck,
-        '' as noTruck,
-        CONCAT('https://apps.onetwotrading.co.th/images/qrcode/',SALE_AREA,'.jpg') AS qrCodeImage,
-    --     case 
-    --      when CHANNEL_NAME = 'Cash' THEN 'CASH'
-    --      else CHANNEL_NAME 
-    --      end as platformType
-        SALE_CH as platformType
+              TRIM(REPLACE(REPLACE(REPLACE(SALECODE, '\r', ''), '\n', ''), '\t', '')) AS saleCode,
+  TRIM(REPLACE(REPLACE(REPLACE(SALE_PAYER, '\r', ''), '\n', ''), '\t', '')) AS salePayer,
+  TRIM(REPLACE(REPLACE(REPLACE(SALE_USERNAME, '\r', ''), '\n', ''), '\t', '')) AS username,
+  SUBSTRING_INDEX(TRIM(REPLACE(REPLACE(REPLACE(SALE_NAME, '\r', ''), '\n', ''), '\t', '')), ' ', 1) AS firstName,
+  TRIM(SUBSTRING_INDEX(TRIM(REPLACE(REPLACE(REPLACE(SALE_NAME, '\r', ''), '\n', ''), '\t', '')), ' ', -1)) AS surName,
+  '24e6b727065bbc15f1cf8d576c32fd53' AS password,
+  '' AS tel,
+  TRIM(REPLACE(REPLACE(REPLACE(SALE_ZONE, '\r', ''), '\n', ''), '\t', '')) AS zone,
+  TRIM(REPLACE(REPLACE(REPLACE(SALE_AREA, '\r', ''), '\n', ''), '\t', '')) AS area,
+  TRIM(REPLACE(REPLACE(REPLACE(SALE_WH, '\r', ''), '\n', ''), '\t', '')) AS warehouse,
+  'sale' AS role,
+  '1' AS status,
+  '' AS typeTruck,
+  '' AS noTruck,
+  CONCAT(
+    'https://apps.onetwotrading.co.th/images/qrcode/',
+    TRIM(REPLACE(REPLACE(REPLACE(SALE_AREA, '\r', ''), '\n', ''), '\t', '')),
+    '.jpg'
+  ) AS qrCodeImage,
+  TRIM(REPLACE(REPLACE(REPLACE(SALE_CH, '\r', ''), '\n', ''), '\t', '')) AS platformType
     FROM 
       vancash.p_sale
     -- WHERE 
