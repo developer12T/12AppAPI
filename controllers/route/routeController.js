@@ -1786,11 +1786,13 @@ const filteredRoutes = routesTranFrom.filter(
 
     const dataExcel = routesTranFrom.map(item => {
       return {
+        area:area,
         Route:item.route,
         ร้านทั้งหมด	:item.storeAll,
         รอเยี่ยม	:item.storePending,
         ซื้อ	:item.storeSell,
         เยี่ยม: item.storeCheckInNotSell + item.storeNotSell,
+        รอเยี่ยม : item.storeAll - item.storeTotal  , 
         ขาย: item.summary,
         ยอดหีบ : item.totalqty ,
         เปอร์เซ็นต์การเข้าเยี่ยม:item.percentVisit,
