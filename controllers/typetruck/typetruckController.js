@@ -24,7 +24,9 @@ const { getModelsByChannel } = require('../../middleware/channel')
 const { Item } = require('../../models/cash/master')
 
 exports.utilize = async (req, res) => {
-  const { area, period, typetruck } = req.body
+  try {
+    
+const { area, period, typetruck } = req.body
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
   const { Typetrucks } = getModelsByChannel(channel, res, typeTruckModel)
@@ -149,4 +151,13 @@ exports.utilize = async (req, res) => {
     message: 'utilize fetched successfully!',
     data: data
   })
+
+  } catch (error) {
+    res.status(500).json({
+      status:500,
+      message:'error from server',
+      error:error
+    })
+  }
+  
 }

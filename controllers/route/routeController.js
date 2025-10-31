@@ -1577,7 +1577,6 @@ exports.getRouteProvince = async (req, res) => {
 
 exports.getRouteEffective = async (req, res) => {
   const { area, team, period, excel } = req.body
-
   const channel = req.headers['x-channel']
 
   const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
@@ -1585,258 +1584,195 @@ exports.getRouteEffective = async (req, res) => {
   const { Order } = getModelsByChannel(channel, res, orderModel)
   const { Product } = getModelsByChannel(channel, res, productModel)
 
-  let query = {}
+
+  let query = { period }
+
+  // ✅ ถ้ามี area — ดึงเฉพาะ area นั้น
+  // ❌ ถ้าไม่มี area — ดึงทุก area ยกเว้น IT211
   if (area) {
-    query = { area: area }
+    query.area = area
   } else {
-    query = {}
+    query.area = { $ne: 'IT211' }
   }
 
-  let routes = await Route.find({ ...query, period: period }).populate(
-    'listStore.storeInfo',
-    'storeId name address typeName taxId tel'
-  )
+  let routes = await Route.find({
+  ...query,
+  period,
+    area: { $ne: 'IT211' } // ✅ exclude area 'IT211'
+  }).populate('listStore.storeInfo', 'storeId name address typeName taxId tel')
 
-  // console.log("routes",routes)
-  if (routes.length == 0) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found route'
-    })
+  if (!routes.length) {
+    return res.status(404).json({ status: 404, message: 'Not found route' })
   }
 
+  // 🧩 สร้าง team code ถ้ามี
   if (team) {
-    routes = routes.map(item => {
-      const teamStr = item.area.substring(0, 2) + item.area.charAt(3)
-      return {
-        id: item.id,
-        period: item.period,
-        area: item.area,
-        team: teamStr,
-        day: item.day,
-        listStore: item.listStore,
-        storeAll: item.storeAll,
-        storePending: item.storePending,
-        storeSell: item.storeSell,
-        storeNotSell: item.storeNotSell,
-        storeCheckInNotSell: item.storeCheckInNotSell,
-        storeTotal: item.storeTotal,
-        percentComplete: item.percentComplete,
-        complete: item.complete,
-        percentVisit: item.percentVisit,
-        percentEffective: item.percentEffective
-      }
-    })
-    // console.log(routes)
-    routes = routes.filter(item => item.team === team)
-    // console.log(routes)
+    routes = routes
+      .map(item => ({
+        ...item.toObject(),
+        team: item.area.substring(0, 2) + item.area.charAt(3),
+      }))
+      .filter(item => item.team === team)
   }
-  // console.log(routes)
-  const orderIdList = routes.flatMap(u =>
-    (u.listStore || []).flatMap(i =>
-      (i.listOrder || []).map(order => order.orderId)
-    )
+
+  // 🧩 ดึง order ทั้งหมดจากทุก route
+  const orderIdList = routes.flatMap(r =>
+    r.listStore.flatMap(s => s.listOrder?.map(o => o.orderId) || [])
   )
   const orderDetail = await Order.find({ orderId: { $in: orderIdList } })
-  // console.log(orderDetail)
-  const productId = orderDetail.flatMap(u => u.listProduct.map(i => i.id))
 
-  const productFactor = await Product.aggregate([
-    {
-      $match: {
-        id: { $in: productId }
-      }
-    },
-    { $unwind: { path: '$listUnit', preserveNullAndEmptyArrays: true } },
+  // ✅ ใช้ Map เพื่อ lookup order เร็วขึ้น
+  const orderMap = new Map(orderDetail.map(o => [o.orderId, o]))
+
+  // 🧩 เตรียม product factor (ใช้ aggregate แล้วแปลงเป็น map)
+  const productIds = orderDetail.flatMap(o => o.listProduct.map(p => p.id))
+  const productFactors = await Product.aggregate([
+    { $match: { id: { $in: productIds } } },
+    { $unwind: '$listUnit' },
     {
       $project: {
         _id: 0,
-        productId: '$id',
+        id: '$id',
         unit: '$listUnit.unit',
-        factor: '$listUnit.factor'
-      }
-    }
+        factor: '$listUnit.factor',
+      },
+    },
   ])
 
-  // console.log(productFactor)
-
-  const orderQty = orderDetail.map(i =>
-    i.listProduct.map(product => {
-      const qty = productFactor.find(
-        u => u.productId === product.id && u.unit == product.unit
-      )
-      const factorPcs = product.qty * qty.factor
-      const factorCtn = productFactor.find(
-        u => u.productId === product.id && u.unit == 'CTN'
-      )
-      // console.log(factorCtn)
-      const qtyCtn = Math.floor(factorPcs / factorCtn.factor)
-
-      return {
-        id: product.id,
-        factorPcs: factorPcs,
-        factorCtn: factorCtn.factor,
-        // factor : factorCtn.factor ,
-        qtyCtn: qtyCtn
-      }
-    })
-  )
-
-  const routesTranFrom = routes.map(u => {
-    const totalSummary =
-      u.listStore
-        ?.flatMap(
-          i =>
-            i.listOrder?.map(order => {
-              const detail = orderDetail.find(d => d.orderId === order.orderId)
-              return detail?.total || 0
-            }) || []
-        )
-        .reduce((sum, val) => sum + val, 0) || 0
-
-    const totalQty =
-      u.listStore?.flatMap(
-        store =>
-          store.listOrder?.flatMap(order => {
-            const matchedOrder = orderDetail.find(
-              d => d.orderId === order.orderId
-            )
-            if (!matchedOrder) return []
-
-            return matchedOrder.listProduct
-              .map(product => {
-                const flatOrderQty = orderQty.flat()
-                const qty = flatOrderQty.find(q => q.id === product.id)
-                // console.log(qty)
-                return qty
-              })
-              .filter(Boolean)
-          }) || []
-      ) || []
-
-    const totalQtyCtnSum = totalQty.reduce(
-      (sum, item) => sum + (item.qtyCtn || 0),
-      0
-    )
-
-    return {
-      routeId: u.id,
-      route: u.id.slice(-3),
-      storeAll: u.storeAll,
-      storePending: u.storePending,
-      storeSell: u.storeSell,
-      storeNotSell: u.storeNotSell,
-      storeCheckInNotSell: u.storeCheckInNotSell,
-      storeTotal: u.storeTotal,
-      percentComplete: u.percentComplete,
-      complete: u.complete,
-      percentVisit: u.percentVisit,
-      percentEffective: u.percentEffective,
-      summary: totalSummary,
-      totalqty: totalQtyCtnSum
-    }
-  })
-const excludedRoutes = ['R25', 'R26'];
-
-const filteredRoutes = routesTranFrom.filter(
-  item => !excludedRoutes.includes(item.route)
-);
-
-  // console.log(filteredRoutes)
-
-  // ใช้ reduce กับ filteredRoutes
-  const totalStore = filteredRoutes.reduce((sum, item) => sum + item.storeAll, 0);
-  const totalPending = filteredRoutes.reduce((sum, item) => sum + item.storePending, 0);
-  const totalSell = filteredRoutes.reduce((sum, item) => sum + item.storeSell, 0);
-  const totalNotSell = filteredRoutes.reduce((sum, item) => sum + item.storeNotSell, 0);
-  const totalCheckInNotSell = filteredRoutes.reduce((sum, item) => sum + item.storeCheckInNotSell, 0);
-  const totalStoreTotal = filteredRoutes.reduce((sum, item) => sum + item.storeTotal, 0);
-  const totalPercentComplete = filteredRoutes.reduce((sum, item) => sum + item.percentComplete, 0);
-  const totalComplete = filteredRoutes.reduce((sum, item) => sum + item.complete, 0);
-  const totalPercentVisit =
-    filteredRoutes.reduce((sum, item) => sum + item.percentVisit, 0) / filteredRoutes.length;
-  const totalPercentEffective =
-    filteredRoutes.reduce((sum, item) => sum + item.percentEffective, 0) / filteredRoutes.length;
-  const totalSummary = filteredRoutes.reduce((sum, item) => sum + item.summary, 0);
-  const totalQty = filteredRoutes.reduce((sum, item) => sum + item.totalqty, 0);
-
-  const totalRoute = {
-    routeId:'Total',
-    route:'Total (ไม่นับ R25, R26)',
-    storeAll:to2(totalStore),
-    storePending:to2(totalPending),
-    storeSell:to2(totalSell),
-    storeNotSell:to2(totalNotSell),
-    storeCheckInNotSell:to2(totalCheckInNotSell),
-    storeTotal:to2(totalStoreTotal),
-    percentComplete:to2(totalPercentComplete),
-    complete:to2(totalComplete),
-    percentVisit:to2(totalPercentVisit),
-    percentEffective:to2(totalPercentEffective),
-    summary:to2(totalSummary),
-    totalqty:to2(totalQty)
+  // ✅ เก็บเป็น Map ของ Map เช่น factorMap.get(productId).get(unit)
+  const factorMap = new Map()
+  for (const f of productFactors) {
+    if (!factorMap.has(f.id)) factorMap.set(f.id, new Map())
+    factorMap.get(f.id).set(f.unit, f.factor)
   }
 
-  
+  // 🚀 คำนวณ summary / qty รวมเร็วขึ้น (ไม่ต้อง find ซ้ำ)
+  const routesTranFrom = routes.map(r => {
+    let totalSummary = 0
+    let totalQtyCtnSum = 0
 
+    for (const s of r.listStore) {
+      for (const o of s.listOrder || []) {
+        const order = orderMap.get(o.orderId)
+        if (!order) continue
+        
+        totalSummary += order.total || 0
 
-  // const io = getSocket()
-  // io.emit('route/getRouteEffective', {});
-  if (excel === 'true'){
+        for (const p of order.listProduct || []) {
+          const factorUnit = factorMap.get(p.id)
+          if (!factorUnit) continue
 
-
-    routesTranFrom.push(totalRoute)
-    const dataExcel = routesTranFrom.map(item => {
-      return {
-        area:area,
-        Route:item.route,
-        ร้านทั้งหมด	:item.storeAll,
-        รอเยี่ยม	:item.storePending,
-        ซื้อ	:item.storeSell,
-        เยี่ยม: item.storeCheckInNotSell + item.storeNotSell,
-        รอเยี่ยม : item.storeAll - item.storeTotal  , 
-        ขาย: item.summary,
-        ยอดหีบ : item.totalqty ,
-        เปอร์เซ็นต์การเข้าเยี่ยม:item.percentVisit,
-        เปอร์เซ็นต์การขายได้:item.percentEffective
-      }
-    })
-
-
-
-
-    const wb = xlsx.utils.book_new()
-    const ws = xlsx.utils.json_to_sheet(dataExcel)
-    xlsx.utils.book_append_sheet(wb, ws, `getRouteEffective_${period}`)
-
-    const tempPath = path.join(os.tmpdir(), `getRouteEffective_${period}.xlsx`)
-    xlsx.writeFile(wb, tempPath)
-
-    res.download(tempPath, `getRouteEffective_${period}.xlsx`, err => {
-      if (err) {
-        console.error('❌ Download error:', err)
-        // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
-        if (!res.headersSent) {
-          res.status(500).send('Download failed')
+          const factorPcs = (p.qty || 0) * (factorUnit.get(p.unit) || 1)
+          const factorCtn = factorUnit.get('CTN') || 1
+          totalQtyCtnSum += Math.floor(factorPcs / factorCtn)
         }
       }
+    }
 
-      // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
-    })
-
-  } else {
-
-  res.status(200).json({
-    status: 200,
-    message: 'successful',
-    data: routesTranFrom,
-    total:totalRoute
+    return {
+      area: r.area,
+      routeId: r.id,
+      route: r.id.slice(-3),
+      storeAll: r.storeAll,
+      storePending: r.storePending,
+      storeSell: r.storeSell,
+      storeNotSell: r.storeNotSell,
+      storeCheckInNotSell: r.storeCheckInNotSell,
+      storeTotal: r.storeTotal,
+      percentVisit: r.percentVisit,
+      percentEffective: r.percentEffective,
+      summary: totalSummary,
+      totalqty: totalQtyCtnSum,
+    }
   })
+
+  // ❌ ตัด R25 / R26
+  const excludedRoutes = ['R25', 'R26']
+  const filteredRoutes = routesTranFrom.filter(r => !excludedRoutes.includes(r.route))
+
+  // ✅ Group routes by area
+  const groupedByArea = filteredRoutes.reduce((acc, cur) => {
+    if (!acc[cur.area]) acc[cur.area] = []
+    acc[cur.area].push(cur)
+    return acc
+  }, {})
+
+  // ✅ สร้าง totalRoute สำหรับแต่ละ area
+  const totalByArea = Object.keys(groupedByArea).map(areaKey => {
+    const routesInArea = groupedByArea[areaKey]
+    const totalRoute = routesInArea.reduce(
+      (acc, cur) => {
+        acc.storeAll += cur.storeAll
+        acc.storePending += cur.storePending
+        acc.storeSell += cur.storeSell
+        acc.storeNotSell += cur.storeNotSell
+        acc.storeCheckInNotSell += cur.storeCheckInNotSell
+        acc.storeTotal += cur.storeTotal
+        acc.summary += cur.summary
+        acc.totalqty += cur.totalqty
+        acc.percentVisit += cur.percentVisit
+        acc.percentEffective += cur.percentEffective
+        return acc
+      },
+      {
+        area: areaKey,
+        routeId: 'Total',
+        route: `Total (${areaKey})`,
+        storeAll: 0,
+        storePending: 0,
+        storeSell: 0,
+        storeNotSell: 0,
+        storeCheckInNotSell: 0,
+        storeTotal: 0,
+        summary: 0,
+        totalqty: 0,
+        percentVisit: 0,
+        percentEffective: 0,
+      }
+    )
+
+    const len = routesInArea.length || 1
+    totalRoute.percentVisit = (totalRoute.percentVisit / len).toFixed(2)
+    totalRoute.percentEffective = (totalRoute.percentEffective / len).toFixed(2)
+    return totalRoute
+  })
+
+
+  // 📊 ถ้า export Excel
+  if (excel === 'true') {
+    const xlsxData = [...filteredRoutes, ...totalByArea].map(r => ({
+      Area: r.area || area,
+      Route: r.route,
+      ร้านทั้งหมด: r.storeAll,
+      รอเยี่ยม: r.storePending,
+      ซื้อ: r.storeSell,
+      เยี่ยม: r.storeCheckInNotSell + r.storeNotSell,
+      ขาย: r.summary,
+      ยอดหีบ: r.totalqty,
+      เปอร์เซ็นต์การเข้าเยี่ยม: r.percentVisit,
+      เปอร์เซ็นต์การขายได้: r.percentEffective,
+    }))
+
+    const wb = xlsx.utils.book_new()
+    const ws = xlsx.utils.json_to_sheet(xlsxData)
+    xlsx.utils.book_append_sheet(wb, ws, `getRouteEffective_${period}`)
+    const filePath = path.join(os.tmpdir(), `getRouteEffective_${period}.xlsx`)
+    xlsx.writeFile(wb, filePath)
+    res.download(filePath, err => {
+      fs.unlink(filePath, () => {})
+      if (err) console.error(err)
+    })
+  } else {
+    res.json({
+      status: 200,
+      data: filteredRoutes,
+      totalByArea,
+      
+    })
   }
-
-
 }
+
+
 
 exports.getRouteEffectiveAll = async (req, res) => {
   const { zone, area, team, period, day } = req.query
