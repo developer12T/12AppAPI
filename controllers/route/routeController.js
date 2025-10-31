@@ -105,7 +105,7 @@ exports.getRoute = async (req, res) => {
         const storeInfo = item.storeInfo?.toObject
           ? item.storeInfo.toObject()
           : item.storeInfo || {}
-          
+
         const type = storeTypeMap.get(storeInfo.storeId)
         // console.log(item)
         return {
@@ -1388,663 +1388,748 @@ exports.routeTimeline = async (req, res) => {
 }
 
 exports.updateAndAddRoute = async (req, res) => {
-  const channel = req.headers['x-channel']
+  try {
+    const channel = req.headers['x-channel']
 
-  const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { Route } = getModelsByChannel(channel, res, routeModel)
 
-  let pathPhp = ''
-  switch (channel) {
-    case 'cash':
-      pathPhp = 'ca_api/ca_route.php'
-      break
-    case 'credit':
-      pathPhp = 'cr_api/cr_route.php'
-      break
-    default:
-      break
-  }
-  const response = await axios.post(
-    `http://58.181.206.159:9814/apps_api/${pathPhp}`
-  )
-  if (!response.data || !Array.isArray(response.data)) {
-    return res.status(400).json({
-      status: '400',
-      message: 'Invalid response data from external API'
+    let pathPhp = ''
+    switch (channel) {
+      case 'cash':
+        pathPhp = 'ca_api/ca_route.php'
+        break
+      case 'credit':
+        pathPhp = 'cr_api/cr_route.php'
+        break
+      default:
+        break
+    }
+    const response = await axios.post(
+      `http://58.181.206.159:9814/apps_api/${pathPhp}`
+    )
+    if (!response.data || !Array.isArray(response.data)) {
+      return res.status(400).json({
+        status: '400',
+        message: 'Invalid response data from external API'
+      })
+    }
+
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const route = await Route.find({ period: period() })
+    const routeMap = new Map(route.map(route => [route.id, route]))
+
+    let routeId
+    const latestRoute = route.sort((a, b) => b.id.localeCompare(a.id))[0]
+
+    if (!latestRoute) {
+      routeId = `${period()}${response.data.area}R01`
+      // console.log('route', routeId)
+      // console.log('period', period())
+    } else {
+      const prefix = latestRoute.id.slice(0, 6)
+      const subfix = (parseInt(latestRoute.id.slice(7)) + 1)
+        .toString()
+        .padStart(2, '0')
+      routeId = prefix + subfix
+    }
+
+    for (const storeList of response.data) {
+      // try {
+      const existingRoute = routeMap.get(storeList.id)
+      // console.log(existingRoute)
+      if (existingRoute) {
+        for (const list of storeList.storeInfo || []) {
+          const store = await Store.findOne({ storeId: list })
+          // if (!store) {
+          //   console.warn(`Store with storeId ${list} not found`)
+          //   continue
+          // }
+
+          const storeExists = existingRoute.listStore.some(
+            store => store.storeInfo.toString() === store._id.toString()
+          )
+          if (!storeExists) {
+            const newData = {
+              storeInfo: store._id,
+              note: '',
+              image: '',
+              latitude: '',
+              longtitude: '',
+              status: 0,
+              statusText: 'รอเยี่ยม',
+              listOrder: [],
+              date: ''
+            }
+            existingRoute.listStore.push(newData)
+          }
+        }
+
+        await existingRoute.save()
+        // console.log('existingRoute')
+      } else {
+        const listStore = []
+
+        for (const storeId of storeList.listStore || []) {
+          const idStore = storeId.storeInfo
+          const store = await Store.findOne({ storeId: idStore })
+          if (store) {
+            // console.log(store)
+            listStore.push({
+              storeInfo: store._id,
+              latitude: '',
+              longtitude: '',
+              status: 0,
+              statusText: 'รอเยี่ยม',
+              note: '',
+              date: '',
+              listOrder: []
+            })
+          }
+          // else {
+          //   console.warn(`Store with storeId ${storeId} not found`)
+          // }
+        }
+
+        const data = {
+          id: storeList.id,
+          area: storeList.area,
+          period: period(),
+          day: storeList.day,
+          listStore
+        }
+        await Route.create(data)
+        // console.log("data",data)
+      }
+    }
+
+    res.status(200).json({
+      status: '200',
+      message: 'Add Route Successfully'
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
 
-  const { Store } = getModelsByChannel(channel, res, storeModel)
-  const route = await Route.find({ period: period() })
-  const routeMap = new Map(route.map(route => [route.id, route]))
-
-  let routeId
-  const latestRoute = route.sort((a, b) => b.id.localeCompare(a.id))[0]
-
-  if (!latestRoute) {
-    routeId = `${period()}${response.data.area}R01`
-    // console.log('route', routeId)
-    // console.log('period', period())
-  } else {
-    const prefix = latestRoute.id.slice(0, 6)
-    const subfix = (parseInt(latestRoute.id.slice(7)) + 1)
-      .toString()
-      .padStart(2, '0')
-    routeId = prefix + subfix
-  }
-
-  for (const storeList of response.data) {
-    // try {
-    const existingRoute = routeMap.get(storeList.id)
-    // console.log(existingRoute)
-    if (existingRoute) {
-      for (const list of storeList.storeInfo || []) {
-        const store = await Store.findOne({ storeId: list })
-        // if (!store) {
-        //   console.warn(`Store with storeId ${list} not found`)
-        //   continue
-        // }
-
-        const storeExists = existingRoute.listStore.some(
-          store => store.storeInfo.toString() === store._id.toString()
-        )
-        if (!storeExists) {
-          const newData = {
-            storeInfo: store._id,
-            note: '',
-            image: '',
-            latitude: '',
-            longtitude: '',
-            status: 0,
-            statusText: 'รอเยี่ยม',
-            listOrder: [],
-            date: ''
-          }
-          existingRoute.listStore.push(newData)
-        }
-      }
-
-      await existingRoute.save()
-      // console.log('existingRoute')
-    } else {
-      const listStore = []
-
-      for (const storeId of storeList.listStore || []) {
-        const idStore = storeId.storeInfo
-        const store = await Store.findOne({ storeId: idStore })
-        if (store) {
-          // console.log(store)
-          listStore.push({
-            storeInfo: store._id,
-            latitude: '',
-            longtitude: '',
-            status: 0,
-            statusText: 'รอเยี่ยม',
-            note: '',
-            date: '',
-            listOrder: []
-          })
-        }
-        // else {
-        //   console.warn(`Store with storeId ${storeId} not found`)
-        // }
-      }
-
-      const data = {
-        id: storeList.id,
-        area: storeList.area,
-        period: period(),
-        day: storeList.day,
-        listStore
-      }
-      await Route.create(data)
-      // console.log("data",data)
-    }
-  }
-
-  res.status(200).json({
-    status: '200',
-    message: 'Add Route Successfully'
-  })
 }
 
 exports.getRouteProvince = async (req, res) => {
-  const { area, period } = req.body
+  try {
+    const { area, period } = req.body
 
-  const channel = req.headers['x-channel']
+    const channel = req.headers['x-channel']
 
-  const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { Route } = getModelsByChannel(channel, res, routeModel)
 
-  const route = await Route.aggregate([
-    {
-      $match: {
-        area: area,
-        period: period,
-        listStore: { $ne: null, $not: { $size: 0 } }
+    const route = await Route.aggregate([
+      {
+        $match: {
+          area: area,
+          period: period,
+          listStore: { $ne: null, $not: { $size: 0 } }
+        }
+      },
+      { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          storeObjId: { $toObjectId: '$listStore.storeInfo' }
+        }
+      },
+      {
+        $lookup: {
+          from: 'stores',
+          localField: 'storeObjId',
+          foreignField: '_id',
+          as: 'storeDetail'
+        }
+      },
+      {
+        $project: {
+          storeDetail: 1
+        }
+      },
+      {
+        $group: {
+          _id: '$storeDetail.province'
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          province: '$_id'
+        }
       }
-    },
-    { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
-    {
-      $addFields: {
-        storeObjId: { $toObjectId: '$listStore.storeInfo' }
-      }
-    },
-    {
-      $lookup: {
-        from: 'stores',
-        localField: 'storeObjId',
-        foreignField: '_id',
-        as: 'storeDetail'
-      }
-    },
-    {
-      $project: {
-        storeDetail: 1
-      }
-    },
-    {
-      $group: {
-        _id: '$storeDetail.province'
-      }
-    },
-    {
-      $project: {
-        _id: 0,
-        province: '$_id'
-      }
+    ])
+
+    if (route.length == 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found province this area'
+      })
     }
-  ])
 
-  if (route.length == 0) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found province this area'
+    const result = route
+      .flatMap(item => item.province)
+      .filter(p => p && p.trim() !== '')
+
+    // const io = getSocket()
+    // io.emit('route/getRouteProvince', {});
+
+    res.status(200).json({
+      status: 200,
+      message: 'successful',
+      data: result
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
 
-  const result = route
-    .flatMap(item => item.province)
-    .filter(p => p && p.trim() !== '')
-
-  // const io = getSocket()
-  // io.emit('route/getRouteProvince', {});
-
-  res.status(200).json({
-    status: 200,
-    message: 'successful',
-    data: result
-  })
 }
 
 exports.getRouteEffective = async (req, res) => {
-  const { area, team, period, excel } = req.body
-  const channel = req.headers['x-channel']
+  try {
+    const { area, team, period, excel } = req.body
+    const channel = req.headers['x-channel']
 
-  const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
-  const { Route } = getModelsByChannel(channel, res, routeModel)
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-  const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
 
 
-  let query = { period }
+    let query = { period }
 
-  // ✅ ถ้ามี area — ดึงเฉพาะ area นั้น
-  // ❌ ถ้าไม่มี area — ดึงทุก area ยกเว้น IT211
-  if (area) {
-    query.area = area
-  } else {
-    query.area = { $ne: 'IT211' }
-  }
+    // ✅ ถ้ามี area — ดึงเฉพาะ area นั้น
+    // ❌ ถ้าไม่มี area — ดึงทุก area ยกเว้น IT211
+    if (area) {
+      query.area = area
+    } else {
+      query.area = { $ne: 'IT211' }
+    }
 
-  let routes = await Route.find({
-  ...query,
-  period,
-    area: { $ne: 'IT211' } // ✅ exclude area 'IT211'
-  }).populate('listStore.storeInfo', 'storeId name address typeName taxId tel')
+    let routes = await Route.find({
+      ...query,
+      period,
+      area: { $ne: 'IT211' } // ✅ exclude area 'IT211'
+    }).populate('listStore.storeInfo', 'storeId name address typeName taxId tel')
 
-  if (!routes.length) {
-    return res.status(404).json({ status: 404, message: 'Not found route' })
-  }
+    if (!routes.length) {
+      return res.status(404).json({ status: 404, message: 'Not found route' })
+    }
 
-  // 🧩 สร้าง team code ถ้ามี
-  if (team) {
-    routes = routes
-      .map(item => ({
-        ...item.toObject(),
-        team: item.area.substring(0, 2) + item.area.charAt(3),
-      }))
-      .filter(item => item.team === team)
-  }
+    // 🧩 สร้าง team code ถ้ามี
+    if (team) {
+      routes = routes
+        .map(item => ({
+          ...item.toObject(),
+          team: item.area.substring(0, 2) + item.area.charAt(3),
+        }))
+        .filter(item => item.team === team)
+    }
 
-  // 🧩 ดึง order ทั้งหมดจากทุก route
-  const orderIdList = routes.flatMap(r =>
-    r.listStore.flatMap(s => s.listOrder?.map(o => o.orderId) || [])
-  )
-  const orderDetail = await Order.find({ orderId: { $in: orderIdList } })
+    // 🧩 ดึง order ทั้งหมดจากทุก route
+    const orderIdList = routes.flatMap(r =>
+      r.listStore.flatMap(s => s.listOrder?.map(o => o.orderId) || [])
+    )
+    const orderDetail = await Order.find({ orderId: { $in: orderIdList } })
 
-  // ✅ ใช้ Map เพื่อ lookup order เร็วขึ้น
-  const orderMap = new Map(orderDetail.map(o => [o.orderId, o]))
+    // ✅ ใช้ Map เพื่อ lookup order เร็วขึ้น
+    const orderMap = new Map(orderDetail.map(o => [o.orderId, o]))
 
-  // 🧩 เตรียม product factor (ใช้ aggregate แล้วแปลงเป็น map)
-  const productIds = orderDetail.flatMap(o => o.listProduct.map(p => p.id))
-  const productFactors = await Product.aggregate([
-    { $match: { id: { $in: productIds } } },
-    { $unwind: '$listUnit' },
-    {
-      $project: {
-        _id: 0,
-        id: '$id',
-        unit: '$listUnit.unit',
-        factor: '$listUnit.factor',
+    // 🧩 เตรียม product factor (ใช้ aggregate แล้วแปลงเป็น map)
+    const productIds = orderDetail.flatMap(o => o.listProduct.map(p => p.id))
+    const productFactors = await Product.aggregate([
+      { $match: { id: { $in: productIds } } },
+      { $unwind: '$listUnit' },
+      {
+        $project: {
+          _id: 0,
+          id: '$id',
+          unit: '$listUnit.unit',
+          factor: '$listUnit.factor',
+        },
       },
-    },
-  ])
+    ])
 
-  // ✅ เก็บเป็น Map ของ Map เช่น factorMap.get(productId).get(unit)
-  const factorMap = new Map()
-  for (const f of productFactors) {
-    if (!factorMap.has(f.id)) factorMap.set(f.id, new Map())
-    factorMap.get(f.id).set(f.unit, f.factor)
-  }
+    // ✅ เก็บเป็น Map ของ Map เช่น factorMap.get(productId).get(unit)
+    const factorMap = new Map()
+    for (const f of productFactors) {
+      if (!factorMap.has(f.id)) factorMap.set(f.id, new Map())
+      factorMap.get(f.id).set(f.unit, f.factor)
+    }
 
-  // 🚀 คำนวณ summary / qty รวมเร็วขึ้น (ไม่ต้อง find ซ้ำ)
-  const routesTranFrom = routes.map(r => {
-    let totalSummary = 0
-    let totalQtyCtnSum = 0
+    // 🚀 คำนวณ summary / qty รวมเร็วขึ้น (ไม่ต้อง find ซ้ำ)
+    const routesTranFrom = routes.map(r => {
+      let totalSummary = 0
+      let totalQtyCtnSum = 0
 
-    for (const s of r.listStore) {
-      for (const o of s.listOrder || []) {
-        const order = orderMap.get(o.orderId)
-        if (!order) continue
-        
-        totalSummary += order.total || 0
+      for (const s of r.listStore) {
+        for (const o of s.listOrder || []) {
+          const order = orderMap.get(o.orderId)
+          if (!order) continue
 
-        for (const p of order.listProduct || []) {
-          const factorUnit = factorMap.get(p.id)
-          if (!factorUnit) continue
+          totalSummary += order.total || 0
 
-          const factorPcs = (p.qty || 0) * (factorUnit.get(p.unit) || 1)
-          const factorCtn = factorUnit.get('CTN') || 1
-          totalQtyCtnSum += Math.floor(factorPcs / factorCtn)
+          for (const p of order.listProduct || []) {
+            const factorUnit = factorMap.get(p.id)
+            if (!factorUnit) continue
+
+            const factorPcs = (p.qty || 0) * (factorUnit.get(p.unit) || 1)
+            const factorCtn = factorUnit.get('CTN') || 1
+            totalQtyCtnSum += Math.floor(factorPcs / factorCtn)
+          }
         }
       }
-    }
 
-    return {
-      area: r.area,
-      routeId: r.id,
-      route: r.id.slice(-3),
-      storeAll: r.storeAll,
-      storePending: r.storePending,
-      storeSell: r.storeSell,
-      storeNotSell: r.storeNotSell,
-      storeCheckInNotSell: r.storeCheckInNotSell,
-      storeTotal: r.storeTotal,
-      percentVisit: r.percentVisit,
-      percentEffective: r.percentEffective,
-      summary: totalSummary,
-      totalqty: totalQtyCtnSum,
-    }
-  })
-
-  // ❌ ตัด R25 / R26
-  const excludedRoutes = ['R25', 'R26']
-  const filteredRoutes = routesTranFrom.filter(r => !excludedRoutes.includes(r.route))
-
-  // ✅ Group routes by area
-  const groupedByArea = filteredRoutes.reduce((acc, cur) => {
-    if (!acc[cur.area]) acc[cur.area] = []
-    acc[cur.area].push(cur)
-    return acc
-  }, {})
-
-  // ✅ สร้าง totalRoute สำหรับแต่ละ area
-  const totalByArea = Object.keys(groupedByArea).map(areaKey => {
-    const routesInArea = groupedByArea[areaKey]
-    const totalRoute = routesInArea.reduce(
-      (acc, cur) => {
-        acc.storeAll += cur.storeAll
-        acc.storePending += cur.storePending
-        acc.storeSell += cur.storeSell
-        acc.storeNotSell += cur.storeNotSell
-        acc.storeCheckInNotSell += cur.storeCheckInNotSell
-        acc.storeTotal += cur.storeTotal
-        acc.summary += cur.summary
-        acc.totalqty += cur.totalqty
-        acc.percentVisit += cur.percentVisit
-        acc.percentEffective += cur.percentEffective
-        return acc
-      },
-      {
-        area: areaKey,
-        routeId: 'Total',
-        route: `Total (${areaKey})`,
-        storeAll: 0,
-        storePending: 0,
-        storeSell: 0,
-        storeNotSell: 0,
-        storeCheckInNotSell: 0,
-        storeTotal: 0,
-        summary: 0,
-        totalqty: 0,
-        percentVisit: 0,
-        percentEffective: 0,
+      return {
+        area: r.area,
+        routeId: r.id,
+        route: r.id.slice(-3),
+        storeAll: r.storeAll,
+        storePending: r.storePending,
+        storeSell: r.storeSell,
+        storeNotSell: r.storeNotSell,
+        storeCheckInNotSell: r.storeCheckInNotSell,
+        storeTotal: r.storeTotal,
+        percentVisit: r.percentVisit,
+        percentEffective: r.percentEffective,
+        summary: totalSummary,
+        totalqty: totalQtyCtnSum,
       }
-    )
-
-    const len = routesInArea.length || 1
-    totalRoute.percentVisit = (totalRoute.percentVisit / len).toFixed(2)
-    totalRoute.percentEffective = (totalRoute.percentEffective / len).toFixed(2)
-    return totalRoute
-  })
-
-
-  // 📊 ถ้า export Excel
-  if (excel === 'true') {
-    const xlsxData = [...filteredRoutes, ...totalByArea].map(r => ({
-      Area: r.area || area,
-      Route: r.route,
-      ร้านทั้งหมด: r.storeAll,
-      รอเยี่ยม: r.storePending,
-      ซื้อ: r.storeSell,
-      เยี่ยม: r.storeCheckInNotSell + r.storeNotSell,
-      ขาย: r.summary,
-      ยอดหีบ: r.totalqty,
-      เปอร์เซ็นต์การเข้าเยี่ยม: r.percentVisit,
-      เปอร์เซ็นต์การขายได้: r.percentEffective,
-    }))
-
-    const wb = xlsx.utils.book_new()
-    const ws = xlsx.utils.json_to_sheet(xlsxData)
-    xlsx.utils.book_append_sheet(wb, ws, `getRouteEffective_${period}`)
-    const filePath = path.join(os.tmpdir(), `getRouteEffective_${period}.xlsx`)
-    xlsx.writeFile(wb, filePath)
-    res.download(filePath, err => {
-      fs.unlink(filePath, () => {})
-      if (err) console.error(err)
     })
-  } else {
-    res.json({
-      status: 200,
-      data: filteredRoutes,
-      totalByArea,
-      
+
+    // ❌ ตัด R25 / R26
+    const excludedRoutes = ['R25', 'R26']
+    const filteredRoutes = routesTranFrom.filter(r => !excludedRoutes.includes(r.route))
+
+    // ✅ Group routes by area
+    const groupedByArea = filteredRoutes.reduce((acc, cur) => {
+      if (!acc[cur.area]) acc[cur.area] = []
+      acc[cur.area].push(cur)
+      return acc
+    }, {})
+
+    // ✅ สร้าง totalRoute สำหรับแต่ละ area
+    const totalByArea = Object.keys(groupedByArea).map(areaKey => {
+      const routesInArea = groupedByArea[areaKey]
+      const totalRoute = routesInArea.reduce(
+        (acc, cur) => {
+          acc.storeAll += cur.storeAll
+          acc.storePending += cur.storePending
+          acc.storeSell += cur.storeSell
+          acc.storeNotSell += cur.storeNotSell
+          acc.storeCheckInNotSell += cur.storeCheckInNotSell
+          acc.storeTotal += cur.storeTotal
+          acc.summary += cur.summary
+          acc.totalqty += cur.totalqty
+          acc.percentVisit += cur.percentVisit
+          acc.percentEffective += cur.percentEffective
+          return acc
+        },
+        {
+          area: areaKey,
+          routeId: 'Total',
+          route: `Total (${areaKey})`,
+          storeAll: 0,
+          storePending: 0,
+          storeSell: 0,
+          storeNotSell: 0,
+          storeCheckInNotSell: 0,
+          storeTotal: 0,
+          summary: 0,
+          totalqty: 0,
+          percentVisit: 0,
+          percentEffective: 0,
+        }
+      )
+
+      const len = routesInArea.length || 1
+      totalRoute.percentVisit = (totalRoute.percentVisit / len).toFixed(2)
+      totalRoute.percentEffective = (totalRoute.percentEffective / len).toFixed(2)
+      return totalRoute
+    })
+
+
+    // 📊 ถ้า export Excel
+    if (excel === 'true') {
+      const xlsxData = [...filteredRoutes, ...totalByArea].map(r => ({
+        Area: r.area || area,
+        Route: r.route,
+        ร้านทั้งหมด: r.storeAll,
+        รอเยี่ยม: r.storePending,
+        ซื้อ: r.storeSell,
+        เยี่ยม: r.storeCheckInNotSell + r.storeNotSell,
+        ขาย: r.summary,
+        ยอดหีบ: r.totalqty,
+        เปอร์เซ็นต์การเข้าเยี่ยม: r.percentVisit,
+        เปอร์เซ็นต์การขายได้: r.percentEffective,
+      }))
+
+      const wb = xlsx.utils.book_new()
+      const ws = xlsx.utils.json_to_sheet(xlsxData)
+      xlsx.utils.book_append_sheet(wb, ws, `getRouteEffective_${period}`)
+      const filePath = path.join(os.tmpdir(), `getRouteEffective_${period}.xlsx`)
+      xlsx.writeFile(wb, filePath)
+      res.download(filePath, err => {
+        fs.unlink(filePath, () => { })
+        if (err) console.error(err)
+      })
+    } else {
+      res.json({
+        status: 200,
+        data: filteredRoutes,
+        totalByArea,
+
+      })
+    }
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
+
 }
 
 
 
 exports.getRouteEffectiveAll = async (req, res) => {
-  const { zone, area, team, period, day } = req.query
+  try {
+    const { zone, area, team, period, day } = req.query
 
-  const query = {}
-  if (area) query.area = area
-  if (period) query.period = period
-  if (day) query.day = day
+    const query = {}
+    if (area) query.area = area
+    if (period) query.period = period
+    if (day) query.day = day
 
-  const channel = req.headers['x-channel']
-  const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
-  const { Route } = getModelsByChannel(channel, res, routeModel)
-  const { Order } = getModelsByChannel(channel, res, orderModel)
+    const channel = req.headers['x-channel']
+    const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
 
-  let routes = await Route.find(query).populate(
-    'listStore.storeInfo',
-    'storeId name address typeName taxId tel'
-  )
+    let routes = await Route.find(query).populate(
+      'listStore.storeInfo',
+      'storeId name address typeName taxId tel'
+    )
 
-  if (zone) {
-    routes = routes.filter(u => u.area.slice(0, 2) === zone)
+    if (zone) {
+      routes = routes.filter(u => u.area.slice(0, 2) === zone)
+      // console.log(routes)
+    }
+
+    if (routes.length == 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found route'
+      })
+    }
+    if (team) {
+      routes = routes.map(item => {
+        const teamStr = item.area.substring(0, 2) + item.area.charAt(3)
+        return {
+          id: item.id,
+          period: item.period,
+          area: item.area,
+          team: teamStr,
+          day: item.day,
+          listStore: item.listStore,
+          storeAll: item.storeAll,
+          storePending: item.storePending,
+          storeSell: item.storeSell,
+          storeNotSell: item.storeNotSell,
+          storeCheckInNotSell: item.storeCheckInNotSell,
+          storeTotal: item.storeTotal,
+          percentComplete: item.percentComplete,
+          complete: item.complete,
+          percentVisit: item.percentVisit,
+          percentEffective: item.percentEffective
+        }
+      })
+    }
+
+    let totalVisit = 0
+    let totalEffective = 0
+    let totalStoreAll = 0
+    let totalStorePending = 0
+    let totalStoreSell = 0
+    let totalStoreNotSell = 0
+    let totalStoreCheckInNotSell = 0
+    let sumVisit = 0
+    let count = 0
+
     // console.log(routes)
-  }
+    // 🔹 กรองวันที่ไม่ใช่ 25 หรือ 26 ก่อน
+    const excludedDays = ['25', '26'];
 
-  if (routes.length == 0) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found route'
+    const routesTranFrom = routes
+      .filter(route => !excludedDays.includes(route.day))
+      .map(u => {
+        const percentVisit = Number(u.percentVisit) || 0;
+        const percentEffective = Number(u.percentEffective) || 0;
+        const storeAll = Number(u.storeAll) || 0;
+        const storePending = Number(u.storePending) || 0;
+        const storeSell = Number(u.storeSell) || 0;
+        const storeNotSell = Number(u.storeNotSell + u.storeCheckInNotSell) || 0;
+        const storeCheckInNotSell = Number(u.storeCheckInNotSell) || 0; // ✅ ชื่อถูกแล้ว
+        const visit = Number(u.storeTotal) || 0;
+        // const 
+
+
+        totalVisit += percentVisit;
+        totalEffective += percentEffective;
+        totalStoreAll += storeAll;
+        totalStorePending += storePending;
+        totalStoreSell += storeSell;
+        totalStoreNotSell += storeNotSell;
+        totalStoreCheckInNotSell += storeCheckInNotSell;
+        sumVisit += visit
+        count++;
+
+        return {
+          area: u.area,
+          percentVisit,
+          percentEffective,
+          storeAll,
+          visit,
+          storePending,
+          storeSell,
+          storeNotSell,
+          storeCheckInNotSell,
+        };
+      });
+
+    // ✅ สรุปค่าเฉลี่ย
+    const percentVisitAvg = count > 0 ? totalVisit / count : 0;
+    const percentEffectiveAvg = count > 0 ? totalEffective / count : 0;
+
+    // const io = getSocket()
+    // io.emit('route/getRouteEffectiveAll', {});
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      // data: routesTranFrom
+      visit: to2(percentVisitAvg),
+      effective: to2(percentEffectiveAvg),
+      totalStoreAll: to2(totalStoreAll),
+
+      totalStorePending: to2(totalStorePending),
+      // totalStorePending: to2(totalStoreAll - sumVisit),
+
+      totalStoreSell: to2(totalStoreSell),
+      totalStoreNotSell: to2(totalStoreNotSell),
+      // totalStoreCheckInNotSell: to2(totalStoreCheckInNotSell)
+      totalStoreCheckInNotSell: to2(sumVisit)
     })
-  }
-  if (team) {
-    routes = routes.map(item => {
-      const teamStr = item.area.substring(0, 2) + item.area.charAt(3)
-      return {
-        id: item.id,
-        period: item.period,
-        area: item.area,
-        team: teamStr,
-        day: item.day,
-        listStore: item.listStore,
-        storeAll: item.storeAll,
-        storePending: item.storePending,
-        storeSell: item.storeSell,
-        storeNotSell: item.storeNotSell,
-        storeCheckInNotSell: item.storeCheckInNotSell,
-        storeTotal: item.storeTotal,
-        percentComplete: item.percentComplete,
-        complete: item.complete,
-        percentVisit: item.percentVisit,
-        percentEffective: item.percentEffective
-      }
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
+
   }
 
-  let totalVisit = 0
-  let totalEffective = 0
-  let totalStoreAll = 0
-  let totalStorePending = 0
-  let totalStoreSell = 0
-  let totalStoreNotSell = 0
-  let totalStoreCheckInNotSell = 0
-  let sumVisit = 0
-  let count = 0
-
-  // console.log(routes)
-  // 🔹 กรองวันที่ไม่ใช่ 25 หรือ 26 ก่อน
-  const excludedDays = ['25', '26'];
-
-  const routesTranFrom = routes
-    .filter(route => !excludedDays.includes(route.day))
-    .map(u => {
-      const percentVisit = Number(u.percentVisit) || 0;
-      const percentEffective = Number(u.percentEffective) || 0;
-      const storeAll = Number(u.storeAll) || 0;
-      const storePending = Number(u.storePending) || 0;
-      const storeSell = Number(u.storeSell) || 0;
-      const storeNotSell = Number(u.storeNotSell + u.storeCheckInNotSell) || 0;
-      const storeCheckInNotSell = Number(u.storeCheckInNotSell) || 0; // ✅ ชื่อถูกแล้ว
-      const visit = Number(u.storeTotal) || 0;
-      // const 
-
-
-      totalVisit += percentVisit;
-      totalEffective += percentEffective;
-      totalStoreAll += storeAll;
-      totalStorePending += storePending;
-      totalStoreSell += storeSell;
-      totalStoreNotSell += storeNotSell;
-      totalStoreCheckInNotSell += storeCheckInNotSell;
-      sumVisit += visit
-      count++;
-
-      return {
-        area: u.area,
-        percentVisit,
-        percentEffective,
-        storeAll,
-        visit,
-        storePending,
-        storeSell,
-        storeNotSell,
-        storeCheckInNotSell,
-      };
-    });
-
-  // ✅ สรุปค่าเฉลี่ย
-  const percentVisitAvg = count > 0 ? totalVisit / count : 0;
-  const percentEffectiveAvg = count > 0 ? totalEffective / count : 0;
-
-  // const io = getSocket()
-  // io.emit('route/getRouteEffectiveAll', {});
-
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    // data: routesTranFrom
-    visit: to2(percentVisitAvg),
-    effective: to2(percentEffectiveAvg),
-    totalStoreAll: to2(totalStoreAll),
-
-    totalStorePending: to2(totalStorePending),
-    // totalStorePending: to2(totalStoreAll - sumVisit),
-
-    totalStoreSell: to2(totalStoreSell),
-    totalStoreNotSell: to2(totalStoreNotSell),
-    // totalStoreCheckInNotSell: to2(totalStoreCheckInNotSell)
-    totalStoreCheckInNotSell: to2(sumVisit)
-  })
 }
 
 exports.getAreaInRoute = async (req, res) => {
-  const { period } = req.query
-  const channel = req.headers['x-channel']
-  const { Route } = getModelsByChannel(channel, res, routeModel)
+  try {
+    const { period } = req.query
+    const channel = req.headers['x-channel']
+    const { Route } = getModelsByChannel(channel, res, routeModel)
 
-  const routes = await Route.aggregate([
-    {
-      $match: { period: period }
-    },
-    {
-      $addFields: {
-        area2: { $substrCP: ['$area', 0, 2] }
+    const routes = await Route.aggregate([
+      {
+        $match: { period: period }
+      },
+      {
+        $addFields: {
+          area2: { $substrCP: ['$area', 0, 2] }
+        }
+      },
+      {
+        $group: {
+          _id: '$area2'
+        }
+      },
+      {
+        $project: {
+          zone: '$_id',
+          _id: 0
+        }
+      },
+      {
+        $sort: { zone: 1 }
       }
-    },
-    {
-      $group: {
-        _id: '$area2'
-      }
-    },
-    {
-      $project: {
-        zone: '$_id',
-        _id: 0
-      }
-    },
-    {
-      $sort: { zone: 1 }
+    ])
+
+    if (routes.length == 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found route'
+      })
     }
-  ])
 
-  if (routes.length == 0) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found route'
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: routes
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
 
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: routes
-  })
 }
 
 exports.getZoneInRoute = async (req, res) => {
-  const { zone, period, team } = req.query
-  const channel = req.headers['x-channel']
-  const { Route } = getModelsByChannel(channel, res, routeModel)
+  try {
+    const { zone, period, team } = req.query
+    const channel = req.headers['x-channel']
+    const { Route } = getModelsByChannel(channel, res, routeModel)
 
-  const pipeline = [
-    {
-      $match: { period: period }
-    },
-    {
-      $addFields: {
-        area2: { $substrCP: ['$area', 0, 2] },
-        team3: {
-          $concat: [
-            { $substrCP: ['$area', 0, 2] }, // "BE"
-            { $substrCP: ['$area', 3, 1] } // "1" → from "212" (character at index 3)
-          ]
+    const pipeline = [
+      {
+        $match: { period: period }
+      },
+      {
+        $addFields: {
+          area2: { $substrCP: ['$area', 0, 2] },
+          team3: {
+            $concat: [
+              { $substrCP: ['$area', 0, 2] }, // "BE"
+              { $substrCP: ['$area', 3, 1] } // "1" → from "212" (character at index 3)
+            ]
+          }
         }
       }
+    ]
+
+    if (zone && zone.length) {
+      const zoneArray = typeof zone === 'string' ? zone.split(',') : zone
+      pipeline.push({
+        $match: { area2: { $in: zoneArray } }
+      })
     }
-  ]
 
-  if (zone && zone.length) {
-    const zoneArray = typeof zone === 'string' ? zone.split(',') : zone
-    pipeline.push({
-      $match: { area2: { $in: zoneArray } }
-    })
-  }
-
-  if (team && team.length) {
-    pipeline.push({
-      $match: { team3: team }
-    })
-  }
-
-  pipeline.push(
-    {
-      $group: { _id: '$area' }
-    },
-    {
-      $project: { area: '$_id', _id: 0 }
-    },
-    {
-      $sort: { area: 1 }
+    if (team && team.length) {
+      pipeline.push({
+        $match: { team3: team }
+      })
     }
-  )
 
-  const routes = await Route.aggregate(pipeline)
+    pipeline.push(
+      {
+        $group: { _id: '$area' }
+      },
+      {
+        $project: { area: '$_id', _id: 0 }
+      },
+      {
+        $sort: { area: 1 }
+      }
+    )
 
-  if (routes.length == 0) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found zone'
+    const routes = await Route.aggregate(pipeline)
+
+    if (routes.length == 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found zone'
+      })
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: routes
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
 
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: routes
-  })
 }
 
 exports.getRouteByArea = async (req, res) => {
-  const { area, period } = req.query
-  const channel = req.headers['x-channel']
-  const { Route } = getModelsByChannel(channel, res, routeModel)
+  try {
+    const { area, period } = req.query
+    const channel = req.headers['x-channel']
+    const { Route } = getModelsByChannel(channel, res, routeModel)
 
-  const match = {}
-  if (period) match.period = period
-  if (area) match.area = area
+    const match = {}
+    if (period) match.period = period
+    if (area) match.area = area
 
-  const data = await Route.aggregate([
-    { $match: match },
-    {
-      $project: {
-        routeId: '$id',
-        route: { $concat: ['R', '$day'] },
-        day: '$day',
-        _id: 0
+    const data = await Route.aggregate([
+      { $match: match },
+      {
+        $project: {
+          routeId: '$id',
+          route: { $concat: ['R', '$day'] },
+          day: '$day',
+          _id: 0
+        }
       }
+    ])
+    if (data.length == 0) {
+      return res.status(404).message({
+        status: 404,
+        message: 'Not found route'
+      })
     }
-  ])
-  if (data.length == 0) {
-    return res.status(404).message({
-      status: 404,
-      message: 'Not found route'
+
+    // const io = getSocket()
+    // io.emit('route/getRouteByArea', {});
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
 
-  // const io = getSocket()
-  // io.emit('route/getRouteByArea', {});
-
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: data
-  })
 }
 
 exports.checkRouteStore = async (req, res) => {
@@ -2272,137 +2357,173 @@ exports.polylineRoute = async (req, res) => {
 }
 
 exports.addRouteIt = async (req, res) => {
-  const { period } = req.body
-  const channel = req.headers['x-channel']
-  const { Route } = getModelsByChannel(channel, res, routeModel)
-  const { Store } = getModelsByChannel(channel, res, storeModel)
+  try {
+    const { period } = req.body
+    const channel = req.headers['x-channel']
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
-  const now = new Date()
-  const startOfDay = new Date(now.setHours(0, 0, 0, 0) - 7 * 60 * 60 * 1000)
-  const endOfDay = new Date(now.setHours(23, 59, 59, 999) - 7 * 60 * 60 * 1000)
+    const now = new Date()
+    const startOfDay = new Date(now.setHours(0, 0, 0, 0) - 7 * 60 * 60 * 1000)
+    const endOfDay = new Date(now.setHours(23, 59, 59, 999) - 7 * 60 * 60 * 1000)
 
-  const dataStore = await Store.find({
-    area: 'IT211',
-    status: { $ne: '90' },
-    createdAt: { $gte: startOfDay, $lt: endOfDay }
-  })
-
-  let route = []
-
-  for (let i = 1; i <= 1; i++) {
-    const idx2 = String(i).padStart(2, '0') // "01".."25"
-    const data = {
-      id: `${period}IT211R${idx2}`,
-      period: period,
+    const dataStore = await Store.find({
       area: 'IT211',
-      day: i,
-      listStore: dataStore.map(item => {
-        return {
-          storeInfo: item._id,
-          note: '',
-          image: '',
-          latitude: '',
-          longtitude: '',
-          status: 0,
-          statusText: 'รอเยี่ยม',
-          listOrder: [],
-          date: ''
-        }
-      })
-    }
-    route.push(data)
-  }
+      status: { $ne: '90' },
+      createdAt: { $gte: startOfDay, $lt: endOfDay }
+    })
 
-  Route.create(route)
+    let route = []
 
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: route
-  })
-}
-
-exports.addStoreOneToRoute = async (req, res) => {
-  const { storeId, routeId } = req.body
-  const channel = req.headers['x-channel']
-  const { Route } = getModelsByChannel(channel, res, routeModel)
-  const { Store } = getModelsByChannel(channel, res, storeModel)
-
-  const storeData = await Store.findOne({ storeId: storeId })
-
-  for (const i of routeId) {
-    const routeData = await Route.findOne({ id: i }) // ถ้า id เป็น unique
-
-    if (!routeData) continue // ตรวจสอบว่ามีข้อมูลจริง
-
-    const newData = {
-      storeInfo: storeData._id,
-      note: '',
-      image: '',
-      latitude: '',
-      longtitude: '',
-      status: 0,
-      statusText: 'รอเยี่ยม',
-      listOrder: [],
-      date: ''
-    }
-
-    routeData.listStore.push(newData)
-
-    await routeData.save() // สำคัญ: บันทึกกลับเข้า MongoDB
-  }
-
-  res.status(200).json({
-    status: 200,
-    message: 'sucess'
-    // data: newData
-  })
-}
-
-exports.getLatLongStore = async (req, res) => {
-  const { storeId } = req.body
-  const channel = req.headers['x-channel']
-  const { Route } = getModelsByChannel(channel, res, routeModel)
-  const { Store } = getModelsByChannel(channel, res, storeModel)
-
-  const storeData = await Store.findOne({ storeId: storeId }).select('_id area')
-
-  const routeData = await Route.aggregate([
-    { $unwind: '$listStore' },
-    {
-      $match: {
-        'listStore.storeInfo': String(storeData._id)
+    for (let i = 1; i <= 1; i++) {
+      const idx2 = String(i).padStart(2, '0') // "01".."25"
+      const data = {
+        id: `${period}IT211R${idx2}`,
+        period: period,
+        area: 'IT211',
+        day: i,
+        listStore: dataStore.map(item => {
+          return {
+            storeInfo: item._id,
+            note: '',
+            image: '',
+            latitude: '',
+            longtitude: '',
+            status: 0,
+            statusText: 'รอเยี่ยม',
+            listOrder: [],
+            date: ''
+          }
+        })
       }
-    }
-  ])
-
-  let data = []
-  for (const i of routeData) {
-    if (i.listStore.status === '0') {
-      continue
-    }
-    dataTran = {
-      id: i.id,
-      period: i.period,
-      lat: i.listStore.latitude,
-      long: i.listStore.longtitude
+      route.push(data)
     }
 
-    data.push(dataTran)
-  }
+    Route.create(route)
 
-  if (data.length === 0) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found Lat Long'
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: route
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
 
-  res.status(200).json({
-    status: 200,
-    message: 'Sucess',
-    data: data
-  })
+}
+
+exports.addStoreOneToRoute = async (req, res) => {
+  try {
+    const { storeId, routeId } = req.body
+    const channel = req.headers['x-channel']
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const storeData = await Store.findOne({ storeId: storeId })
+
+    for (const i of routeId) {
+      const routeData = await Route.findOne({ id: i }) // ถ้า id เป็น unique
+
+      if (!routeData) continue // ตรวจสอบว่ามีข้อมูลจริง
+
+      const newData = {
+        storeInfo: storeData._id,
+        note: '',
+        image: '',
+        latitude: '',
+        longtitude: '',
+        status: 0,
+        statusText: 'รอเยี่ยม',
+        listOrder: [],
+        date: ''
+      }
+
+      routeData.listStore.push(newData)
+
+      await routeData.save() // สำคัญ: บันทึกกลับเข้า MongoDB
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess'
+      // data: newData
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
+}
+
+exports.getLatLongStore = async (req, res) => {
+  try {
+    const { storeId } = req.body
+    const channel = req.headers['x-channel']
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const storeData = await Store.findOne({ storeId: storeId }).select('_id area')
+
+    const routeData = await Route.aggregate([
+      { $unwind: '$listStore' },
+      {
+        $match: {
+          'listStore.storeInfo': String(storeData._id)
+        }
+      }
+    ])
+
+    let data = []
+    for (const i of routeData) {
+      if (i.listStore.status === '0') {
+        continue
+      }
+      dataTran = {
+        id: i.id,
+        period: i.period,
+        lat: i.listStore.latitude,
+        long: i.listStore.longtitude
+      }
+
+      data.push(dataTran)
+    }
+
+    if (data.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found Lat Long'
+      })
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'Sucess',
+      data: data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
 }
 
 exports.addRadius = async (req, res) => {
@@ -2443,78 +2564,89 @@ exports.getRadius = async (req, res) => {
 }
 
 exports.updateRouteAllStore = async (req, res) => {
+  try {
+    const { storeId } = req.body
+    const channel = req.headers['x-channel']
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
-  const { storeId } = req.body
-  const channel = req.headers['x-channel']
-  const { Route } = getModelsByChannel(channel, res, routeModel)
-  const { Store } = getModelsByChannel(channel, res, storeModel)
+    const storeData = await Store.find({
+      area: { $nin: ['IT211', null, ''] }
+    })
+      .select('_id storeId')
+      .lean()
 
-  const storeData = await Store.find({
-    area: { $nin: ['IT211', null, ''] }
-  })
-    .select('_id storeId')
-    .lean()
+    let dataFinal = []
+    const BATCH = 20;                 // ปรับตามแรงเครื่อง/DB
+    let loopCount = 0;
 
-  let dataFinal = []
-  const BATCH = 20;                 // ปรับตามแรงเครื่อง/DB
-  let loopCount = 0;
+    for (let i = 0; i < storeData.length; i += BATCH) {
+      const chunk = storeData.slice(i, i + BATCH);
 
-  for (let i = 0; i < storeData.length; i += BATCH) {
-    const chunk = storeData.slice(i, i + BATCH);
+      await Promise.all(chunk.map(async (item) => {
+        loopCount++;
 
-    await Promise.all(chunk.map(async (item) => {
-      loopCount++;
-
-      const latest = await Route.aggregate([
-        // { $match: { period } }, // ถ้ามีก็เปิดได้
-        { $unwind: '$listStore' },
-        {
-          $match: {
-            'listStore.storeInfo': String(item._id),
-            'listStore.status': { $ne: '0' }
+        const latest = await Route.aggregate([
+          // { $match: { period } }, // ถ้ามีก็เปิดได้
+          { $unwind: '$listStore' },
+          {
+            $match: {
+              'listStore.storeInfo': String(item._id),
+              'listStore.status': { $ne: '0' }
+            }
+          },
+          { $sort: { 'listStore.date': -1 } },
+          { $limit: 1 },
+          {
+            $project: {
+              day: { $concat: ['R', { $toString: '$day' }] },
+              period: 1,
+              lat: '$listStore.latitude',
+              long: '$listStore.longtitude',
+              date: '$listStore.date'
+            }
           }
-        },
-        { $sort: { 'listStore.date': -1 } },
-        { $limit: 1 },
-        {
-          $project: {
-            day: { $concat: ['R', { $toString: '$day' }] },
-            period: 1,
-            lat: '$listStore.latitude',
-            long: '$listStore.longtitude',
-            date: '$listStore.date'
-          }
-        }
-      ]);
+        ]);
 
-      if (latest.length === 0) return;
+        if (latest.length === 0) return;
 
-      const dataUpdated = await Store.findOneAndUpdate(
-        { storeId: item.storeId },
-        {
-          $set: {
-            route: latest[0].day,
-            latitude: latest[0].lat,
-            longtitude: latest[0].long
-          }
-        },
-        { new: true, runValidators: true }
-      );
+        const dataUpdated = await Store.findOneAndUpdate(
+          { storeId: item.storeId },
+          {
+            $set: {
+              route: latest[0].day,
+              latitude: latest[0].lat,
+              longtitude: latest[0].long
+            }
+          },
+          { new: true, runValidators: true }
+        );
 
-      dataFinal.push(dataUpdated);
-    }));
+        dataFinal.push(dataUpdated);
+      }));
 
-    console.log(`processed ${Math.min(i + BATCH, storeData.length)} / ${storeData.length}`);
+      console.log(`processed ${Math.min(i + BATCH, storeData.length)} / ${storeData.length}`);
+    }
+
+    console.log(`total loop: ${loopCount}`);
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'Sucess',
+      data: dataFinal
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
 
-  console.log(`total loop: ${loopCount}`);
-
-
-  res.status(200).json({
-    status: 200,
-    message: 'Sucess',
-    data: dataFinal
-  })
 
 }
 

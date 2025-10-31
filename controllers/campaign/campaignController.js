@@ -154,15 +154,29 @@ exports.addCampaign = [
 
 exports.getCampaign = async (req, res) => {
 
-  const channel = req.headers['x-channel'];
-  const { Campaign } = getModelsByChannel(channel, res, campaignModel);
-  const data = await Campaign.find()
+  try {
+    const channel = req.headers['x-channel'];
+    const { Campaign } = getModelsByChannel(channel, res, campaignModel);
+    const data = await Campaign.find()
 
 
 
-  res.status(200).json({
-    status: 200,
-    message: 'Campaign added successfully',
-    data: data
-  });
+    res.status(200).json({
+      status: 200,
+      message: 'Campaign added successfully',
+      data: data
+    });
+  } catch (error) {
+    console.error('❌ Error', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
+
+
 }

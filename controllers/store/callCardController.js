@@ -389,147 +389,159 @@ exports.updateGooglemap = async (req, res) => {
 
 
 exports.addVisit = async (req, res) => {
-  const { area, period, storeId, googlemap } = req.body;
-  const channel = req.headers['x-channel'];
-  const { CallCard } = getModelsByChannel(channel, res, callCardModel);
-  const { Order } = getModelsByChannel(channel, res, saleModel);
-  const { Stock } = getModelsByChannel(channel, res, modelStock);
-  const { Product } = getModelsByChannel(channel, res, modelProduct);
-  const { SendMoney } = getModelsByChannel(channel, res, modelSendMoney);
-  const modelOrder = await Order.aggregate([
-    {
-      $match: {
-        'store.storeId': storeId,
-        'store.area': area,
-        period: period
-      }
-    },
-    {
-      $addFields: {
-        createdAtFormatted: {
-          $dateToString: {
-            format: "%d/%m/%Y",
-            date: "$createdAt"
+  try {
+    const { area, period, storeId, googlemap } = req.body;
+    const channel = req.headers['x-channel'];
+    const { CallCard } = getModelsByChannel(channel, res, callCardModel);
+    const { Order } = getModelsByChannel(channel, res, saleModel);
+    const { Stock } = getModelsByChannel(channel, res, modelStock);
+    const { Product } = getModelsByChannel(channel, res, modelProduct);
+    const { SendMoney } = getModelsByChannel(channel, res, modelSendMoney);
+    const modelOrder = await Order.aggregate([
+      {
+        $match: {
+          'store.storeId': storeId,
+          'store.area': area,
+          period: period
+        }
+      },
+      {
+        $addFields: {
+          createdAtFormatted: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$createdAt"
+            }
           }
         }
+      },
+    ]);
+
+    const dataTran = await Promise.all(modelOrder.map(async i => {
+      const dataStock = await Stock.findOne({ area, period });
+
+      const group = {};
+
+      for (const item of i.listProduct) {
+        const productStock = dataStock?.listProduct.find(u => u.productId === item.id);
+        const productDetail = await Product.findOne({ id: item.id });
+        const factorObj = productDetail?.listUnit?.find(u => u.unit === item.unit);
+        const factor = factorObj?.factor ?? 1;
+        const qtyPcs = (item.qty ?? 0) * factor;
+
+        const key = item.id;
+
+        if (!group[key]) {
+          group[key] = {
+            productId: item.id,
+            productName: item.name,
+            stock: productStock?.balancePcs ?? 0,
+            lot: '',
+            order: 0,
+          };
+        }
+
+        group[key].order += qtyPcs;
+
       }
-    },
-  ]);
 
-  const dataTran = await Promise.all(modelOrder.map(async i => {
-    const dataStock = await Stock.findOne({ area, period });
+      const listProduct = Object.values(group);
 
-    const group = {};
+      const [day, month, year] = i.createdAtFormatted.split('/');
+      const date = new Date(`${year}-${month}-${day}`);
 
-    for (const item of i.listProduct) {
-      const productStock = dataStock?.listProduct.find(u => u.productId === item.id);
-      const productDetail = await Product.findOne({ id: item.id });
-      const factorObj = productDetail?.listUnit?.find(u => u.unit === item.unit);
-      const factor = factorObj?.factor ?? 1;
-      const qtyPcs = (item.qty ?? 0) * factor;
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
 
-      const key = item.id;
-
-      if (!group[key]) {
-        group[key] = {
-          productId: item.id,
-          productName: item.name,
-          stock: productStock?.balancePcs ?? 0,
-          lot: '',
-          order: 0,
-        };
-      }
-
-      group[key].order += qtyPcs;
-
-    }
-
-    const listProduct = Object.values(group);
-
-    const [day, month, year] = i.createdAtFormatted.split('/');
-    const date = new Date(`${year}-${month}-${day}`);
-
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const sendmoney = await SendMoney.findOne({
-      dateAt: {
-        $gte: startOfDay,
-        $lte: endOfDay
-      }
-    });
-    return {
-      date: i.createdAtFormatted,
-      listProduct,
-      summaryOrder: listProduct.reduce((total, item) => total + (item.order ?? 0), 0),
-      summaryCN: 0,
-      summarySendmoney: sendmoney?.sendmoney || 0
-    };
-  }));
-
-  function formatDateToThaiString(date) {
-    // +7 ชั่วโมง
-    const thDate = new Date(date.getTime() + 7 * 60 * 60 * 1000);
-    const day = String(thDate.getDate()).padStart(2, '0');
-    const month = String(thDate.getMonth() + 1).padStart(2, '0');
-    const year = thDate.getFullYear();
-    return `${day}/${month}/${year}`;
-  }
-
-
-  const { startDate, endDate } = rangeDate(period)
-  const tranObj = Object.fromEntries(dataTran.map(e => [e.date, e]));
-
-  const data = [];
-  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-    const dateStr = formatDateToThaiString(new Date(d));
-
-    // ถ้ามีข้อมูลใน dataTran ใช้ข้อมูลจริง, ถ้าไม่มี ใส่ค่า default
-    if (tranObj[dateStr]) {
-      data.push(tranObj[dateStr]);
-    } else {
-      data.push({
-        date: dateStr,
-        listProduct: [],
-        summaryOrder: 0,
-        summaryCN: 0,
-        summarySendmoney: 0
+      const sendmoney = await SendMoney.findOne({
+        dateAt: {
+          $gte: startOfDay,
+          $lte: endOfDay
+        }
       });
+      return {
+        date: i.createdAtFormatted,
+        listProduct,
+        summaryOrder: listProduct.reduce((total, item) => total + (item.order ?? 0), 0),
+        summaryCN: 0,
+        summarySendmoney: sendmoney?.sendmoney || 0
+      };
+    }));
+
+    function formatDateToThaiString(date) {
+      // +7 ชั่วโมง
+      const thDate = new Date(date.getTime() + 7 * 60 * 60 * 1000);
+      const day = String(thDate.getDate()).padStart(2, '0');
+      const month = String(thDate.getMonth() + 1).padStart(2, '0');
+      const year = thDate.getFullYear();
+      return `${day}/${month}/${year}`;
     }
-  }
-  const summaryOrder = data.reduce((total, item) => total + (item.summaryOrder ?? 0), 0)
-  const summaryCN = data.reduce((total, item) => total + (item.summaryCN ?? 0), 0)
-  const summarySendmoney = data.reduce((total, item) => total + (item.summarySendmoney ?? 0), 0)
 
 
-  const CallCardData = await CallCard.findOneAndUpdate(
-    { area: area, period: period, storeId: storeId },
-    {
-      $set: {
-        visit: data,
-        summaryOrder: summaryOrder,
-        summaryCN: summaryCN,
-        summarySendmoney: summarySendmoney
+    const { startDate, endDate } = rangeDate(period)
+    const tranObj = Object.fromEntries(dataTran.map(e => [e.date, e]));
+
+    const data = [];
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+      const dateStr = formatDateToThaiString(new Date(d));
+
+      // ถ้ามีข้อมูลใน dataTran ใช้ข้อมูลจริง, ถ้าไม่มี ใส่ค่า default
+      if (tranObj[dateStr]) {
+        data.push(tranObj[dateStr]);
+      } else {
+        data.push({
+          date: dateStr,
+          listProduct: [],
+          summaryOrder: 0,
+          summaryCN: 0,
+          summarySendmoney: 0
+        });
       }
-    },
-    { new: true }
-  );
-
-  const io = getSocket()
-  io.emit('store/addVisit', {});
+    }
+    const summaryOrder = data.reduce((total, item) => total + (item.summaryOrder ?? 0), 0)
+    const summaryCN = data.reduce((total, item) => total + (item.summaryCN ?? 0), 0)
+    const summarySendmoney = data.reduce((total, item) => total + (item.summarySendmoney ?? 0), 0)
 
 
+    const CallCardData = await CallCard.findOneAndUpdate(
+      { area: area, period: period, storeId: storeId },
+      {
+        $set: {
+          visit: data,
+          summaryOrder: summaryOrder,
+          summaryCN: summaryCN,
+          summarySendmoney: summarySendmoney
+        }
+      },
+      { new: true }
+    );
 
-  res.status(200).json({
-    status: 200,
-    message: 'Sucess',
-    // data: data,
-    // summaryOrder: data.reduce((total, item) => total + (item.summaryOrder ?? 0), 0),
-    // summaryCN: data.reduce((total, item) => total + (item.summaryCN ?? 0), 0),
-    // summarySendmoney: data.reduce((total, item) => total + (item.summarySendmoney ?? 0), 0),
-    CallCardData
-  })
+    const io = getSocket()
+    io.emit('store/addVisit', {});
+
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'Sucess',
+      // data: data,
+      // summaryOrder: data.reduce((total, item) => total + (item.summaryOrder ?? 0), 0),
+      // summaryCN: data.reduce((total, item) => total + (item.summaryCN ?? 0), 0),
+      // summarySendmoney: data.reduce((total, item) => total + (item.summarySendmoney ?? 0), 0),
+      CallCardData
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
 
 }

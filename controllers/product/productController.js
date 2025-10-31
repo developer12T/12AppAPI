@@ -375,7 +375,7 @@ exports.getFilters = async (req, res) => {
       sensitivity: 'base'
     })
 
-    function cleanList (list) {
+    function cleanList(list) {
       const arr = Array.isArray(list) ? list : []
       const filtered = arr
         .map(v => (typeof v === 'string' ? v.trim() : v))
@@ -387,7 +387,7 @@ exports.getFilters = async (req, res) => {
 
     const firstAttr = attributes[0] ?? {} // ปลอดภัยกว่า attributes.length เช็คทีเดียว
 
-    function sortSizesAscGFirst (list) {
+    function sortSizesAscGFirst(list) {
       const UNIT_PRIORITY = { G: 0, KG: 1, L: 2 } // อยากให้ L ไปท้ายสุดกว่าก็ปรับเลขได้
       const coll = new Intl.Collator('th-TH', {
         numeric: true,
@@ -719,147 +719,183 @@ exports.addFromERP = async (req, res) => {
   }
 }
 exports.addFromERPnew = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const result = await productQuery(channel)
+  try {
+    const channel = req.headers['x-channel']
+    const result = await productQuery(channel)
 
-  const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
 
-  // if (!result || !Array.isArray(result)) {
-  //   return res.status(400).json({
-  //     status: 400,
-  //     message: 'Invalid response data from external API'
-  //   })
-  // }
-  // console.log(result)
-  data = []
+    // if (!result || !Array.isArray(result)) {
+    //   return res.status(400).json({
+    //     status: 400,
+    //     message: 'Invalid response data from external API'
+    //   })
+    // }
+    // console.log(result)
+    data = []
 
-  for (const listProduct of result) {
-    const productId = listProduct.id
+    for (const listProduct of result) {
+      const productId = listProduct.id
 
-    const existingProduct = await Product.findOne({ id: productId })
-    if (existingProduct) {
-      // console.log(`Product ID ${productId} already exists. Skipping.`)
-      continue
-    }
-    const itemConvertResponse = await axios.post(
-      'http://192.168.2.97:8383/M3API/ItemManage/Item/getItemConvertItemcode',
-      { itcode: productId }
-    )
+      const existingProduct = await Product.findOne({ id: productId })
+      if (existingProduct) {
+        // console.log(`Product ID ${productId} already exists. Skipping.`)
+        continue
+      }
+      const itemConvertResponse = await axios.post(
+        'http://192.168.2.97:8383/M3API/ItemManage/Item/getItemConvertItemcode',
+        { itcode: productId }
+      )
 
-    // console.log("itemConvertResponse",itemConvertResponse)
-    const unitData = itemConvertResponse.data
-    // console.log(JSON.stringify(listProduct, null, 2));
+      // console.log("itemConvertResponse",itemConvertResponse)
+      const unitData = itemConvertResponse.data
+      // console.log(JSON.stringify(listProduct, null, 2));
 
-    const listUnit = listProduct.unitList
-      .map(unit => {
-        // console.log(unit)
-        const matchingUnit = unitData[0]?.type.find(u => u.unit === unit.unit)
+      const listUnit = listProduct.unitList
+        .map(unit => {
+          // console.log(unit)
+          const matchingUnit = unitData[0]?.type.find(u => u.unit === unit.unit)
 
-        return {
-          unit: unit.unit,
-          name: unit.name,
-          factor: matchingUnit ? matchingUnit.factor : 1,
-          price: {
-            sale: unit.pricePerUnitSale,
-            refund: unit.pricePerUnitRefund,
-            refundDmg: unit.pricePerUnitRefundDamage,
-            change: unit.pricePerUnitChange
+          return {
+            unit: unit.unit,
+            name: unit.name,
+            factor: matchingUnit ? matchingUnit.factor : 1,
+            price: {
+              sale: unit.pricePerUnitSale,
+              refund: unit.pricePerUnitRefund,
+              refundDmg: unit.pricePerUnitRefundDamage,
+              change: unit.pricePerUnitChange
+            }
           }
-        }
-      })
-      .sort((a, b) => b.factor - a.factor)
-    // console.log("listProduct.weightGross", listProduct.weightGross.length);
+        })
+        .sort((a, b) => b.factor - a.factor)
+      // console.log("listProduct.weightGross", listProduct.weightGross.length);
 
-    const newProduct = new Product({
-      id: listProduct.id,
-      name: listProduct.name,
-      groupCode: listProduct.groupCode,
-      group: listProduct.group,
-      groupCodeM3: listProduct.groupCodeM3,
-      groupM3: listProduct.groupM3,
-      brandCode: listProduct.brandCode,
-      brand: listProduct.brand,
-      size: listProduct.size,
-      flavourCode: listProduct.flavourCode,
-      flavour: listProduct.flavour,
-      type: listProduct.type,
-      weightGross: listProduct.weightGross ?? 0,
-      weightNet: listProduct.weightNet ?? 0,
-      statusSale: listProduct.statusSale,
-      statusRefund: listProduct.statusRefund,
-      statusRefundDmg: listProduct.statusRefundDamage,
-      statusWithdraw: listProduct.statusWithdraw,
-      listUnit: listUnit
+      const newProduct = new Product({
+        id: listProduct.id,
+        name: listProduct.name,
+        groupCode: listProduct.groupCode,
+        group: listProduct.group,
+        groupCodeM3: listProduct.groupCodeM3,
+        groupM3: listProduct.groupM3,
+        brandCode: listProduct.brandCode,
+        brand: listProduct.brand,
+        size: listProduct.size,
+        flavourCode: listProduct.flavourCode,
+        flavour: listProduct.flavour,
+        type: listProduct.type,
+        weightGross: listProduct.weightGross ?? 0,
+        weightNet: listProduct.weightNet ?? 0,
+        statusSale: listProduct.statusSale,
+        statusRefund: listProduct.statusRefund,
+        statusRefundDmg: listProduct.statusRefundDamage,
+        statusWithdraw: listProduct.statusWithdraw,
+        listUnit: listUnit
+      })
+      // console.log(newProduct)
+      await newProduct.save()
+      data.push(newProduct)
+    }
+
+    const io = getSocket()
+    io.emit('product/addFromERPnew', {})
+
+    res.status(200).json({
+      status: 200,
+      message: 'Products added successfully',
+      data: data
     })
-    // console.log(newProduct)
-    await newProduct.save()
-    data.push(newProduct)
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
 
-  const io = getSocket()
-  io.emit('product/addFromERPnew', {})
-
-  res.status(200).json({
-    status: 200,
-    message: 'Products added successfully',
-    data: data
-  })
 }
 
 exports.groupProductId = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { Product } = getModelsByChannel(channel, res, productModel)
-  const data = await Product.aggregate([
-    {
-      $group: {
-        _id: {
-          id: '$id',
-          name: '$name'
+  try {
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const data = await Product.aggregate([
+      {
+        $group: {
+          _id: {
+            id: '$id',
+            name: '$name'
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          id: '$_id.id',
+          name: '$_id.name'
         }
       }
-    },
-    {
-      $project: {
-        _id: 0,
-        id: '$_id.id',
-        name: '$_id.name'
-      }
-    }
-  ])
+    ])
 
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: data
-  })
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
 }
 
 exports.groupBrandId = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { Product } = getModelsByChannel(channel, res, productModel)
-  const data = await Product.aggregate([
-    {
-      $group: {
-        _id: {
-          id: '$brandCode',
-          name: '$brand'
+  try {
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const data = await Product.aggregate([
+      {
+        $group: {
+          _id: {
+            id: '$brandCode',
+            name: '$brand'
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          brandId: '$_id.id',
+          brandName: '$_id.name'
         }
       }
-    },
-    {
-      $project: {
-        _id: 0,
-        brandId: '$_id.id',
-        brandName: '$_id.name'
-      }
-    }
-  ])
+    ])
 
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: data
-  })
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
 }
 
 exports.groupSize = async (req, res) => {
@@ -966,456 +1002,578 @@ exports.groupSize = async (req, res) => {
 }
 
 exports.groupFlavourId = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { Product } = getModelsByChannel(channel, res, productModel)
-  const data = await Product.aggregate([
-    {
-      $group: {
-        _id: {
-          id: '$flavourCode',
-          name: '$flavour'
+  try {
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const data = await Product.aggregate([
+      {
+        $group: {
+          _id: {
+            id: '$flavourCode',
+            name: '$flavour'
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          flavourId: '$_id.id',
+          flavourName: '$_id.name'
+        }
+      },
+      {
+        $sort: {
+          flavourName: 1
         }
       }
-    },
-    {
-      $project: {
-        _id: 0,
-        flavourId: '$_id.id',
-        flavourName: '$_id.name'
-      }
-    },
-    {
-      $sort: {
-        flavourName: 1
-      }
-    }
-  ])
+    ])
 
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: data
-  })
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
 }
 
 exports.groupByFilter = async (req, res) => {
-  const { size, brand, flavour, unit } = req.body
-  const channel = req.headers['x-channel']
-  const { Product } = getModelsByChannel(channel, res, productModel)
+  try {
+    const { size, brand, flavour, unit } = req.body
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
 
-  let query = {}
-  if (size) query.size = size
-  if (brand) query.brand = brand
-  if (flavour) query.flavour = flavour
+    let query = {}
+    if (size) query.size = size
+    if (brand) query.brand = brand
+    if (flavour) query.flavour = flavour
 
-  let queryUnit = {}
-  if (unit) queryUnit['listUnit.name'] = unit
+    let queryUnit = {}
+    if (unit) queryUnit['listUnit.name'] = unit
 
-  const dataProduct = await Product.aggregate([
-    { $match: query },
-    { $unwind: { path: '$listUnit' } },
-    { $match: queryUnit },
-    { $match: { group: { $nin: ['', null] } } },
-    {
-      $group: {
-        _id: '$group'
+    const dataProduct = await Product.aggregate([
+      { $match: query },
+      { $unwind: { path: '$listUnit' } },
+      { $match: queryUnit },
+      { $match: { group: { $nin: ['', null] } } },
+      {
+        $group: {
+          _id: '$group'
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          group: '$_id'
+        }
+      },
+      {
+        $sort: {
+          group: 1
+        }
       }
-    },
-    {
-      $project: {
-        _id: 0,
-        group: '$_id'
-      }
-    },
-    {
-      $sort: {
-        group: 1
-      }
+    ])
+
+    if (dataProduct.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found group'
+      })
     }
-  ])
 
-  if (dataProduct.length === 0) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found group'
+    // console.log(dataProduct)
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: dataProduct
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
 
-  // console.log(dataProduct)
-
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: dataProduct
-  })
 }
 
 exports.flavourByFilter = async (req, res) => {
-  const { size, brand, group, unit } = req.body
-  const channel = req.headers['x-channel']
-  const { Product } = getModelsByChannel(channel, res, productModel)
+  try {
+    const { size, brand, group, unit } = req.body
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
 
-  let query = {}
-  if (size) query.size = size
-  if (brand) query.brand = brand
-  if (group) query.group = group
+    let query = {}
+    if (size) query.size = size
+    if (brand) query.brand = brand
+    if (group) query.group = group
 
-  let queryUnit = {}
-  if (unit) queryUnit['listUnit.name'] = unit
+    let queryUnit = {}
+    if (unit) queryUnit['listUnit.name'] = unit
 
-  const dataProduct = await Product.aggregate([
-    { $match: query },
-    { $unwind: { path: '$listUnit' } },
-    { $match: queryUnit },
-    { $match: { flavour: { $nin: ['', null] } } },
-    {
-      $group: {
-        _id: '$flavour'
+    const dataProduct = await Product.aggregate([
+      { $match: query },
+      { $unwind: { path: '$listUnit' } },
+      { $match: queryUnit },
+      { $match: { flavour: { $nin: ['', null] } } },
+      {
+        $group: {
+          _id: '$flavour'
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          flavour: '$_id'
+        }
+      },
+      {
+        $sort: {
+          flavour: 1
+        }
       }
-    },
-    {
-      $project: {
-        _id: 0,
-        flavour: '$_id'
-      }
-    },
-    {
-      $sort: {
-        flavour: 1
-      }
+    ])
+
+    if (dataProduct.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found flavour'
+      })
     }
-  ])
 
-  if (dataProduct.length === 0) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found flavour'
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: dataProduct
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
 
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: dataProduct
-  })
 }
 
 exports.sizeByFilter = async (req, res) => {
-  const { flavour, brand, group, unit } = req.body
-  const channel = req.headers['x-channel']
-  const { Product } = getModelsByChannel(channel, res, productModel)
+  try {
+    const { flavour, brand, group, unit } = req.body
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
 
-  let query = {}
-  if (flavour) query.flavour = flavour
-  if (brand) query.brand = brand
-  if (group) query.group = group
+    let query = {}
+    if (flavour) query.flavour = flavour
+    if (brand) query.brand = brand
+    if (group) query.group = group
 
-  let queryUnit = {}
-  if (unit) queryUnit['listUnit.name'] = unit
+    let queryUnit = {}
+    if (unit) queryUnit['listUnit.name'] = unit
 
-  const dataProduct = await Product.aggregate([
-    { $match: query },
-    { $unwind: { path: '$listUnit' } },
-    { $match: queryUnit },
-    { $match: { size: { $nin: ['', null] } } },
-    {
-      $group: {
-        _id: '$size'
+    const dataProduct = await Product.aggregate([
+      { $match: query },
+      { $unwind: { path: '$listUnit' } },
+      { $match: queryUnit },
+      { $match: { size: { $nin: ['', null] } } },
+      {
+        $group: {
+          _id: '$size'
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          size: '$_id'
+        }
+      },
+      {
+        $sort: {
+          size: 1
+        }
       }
-    },
-    {
-      $project: {
-        _id: 0,
-        size: '$_id'
-      }
-    },
-    {
-      $sort: {
-        size: 1
-      }
+    ])
+
+    if (dataProduct.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found size'
+      })
     }
-  ])
 
-  if (dataProduct.length === 0) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found size'
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: dataProduct
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
 
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: dataProduct
-  })
 }
 
 exports.brandByFilter = async (req, res) => {
-  const { flavour, size, group, unit } = req.body
-  const channel = req.headers['x-channel']
-  const { Product } = getModelsByChannel(channel, res, productModel)
+  try {
+    const { flavour, size, group, unit } = req.body
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
 
-  let query = {}
-  if (flavour) query.flavour = flavour
-  if (size) query.size = size
-  if (group) query.group = group
+    let query = {}
+    if (flavour) query.flavour = flavour
+    if (size) query.size = size
+    if (group) query.group = group
 
-  let queryUnit = {}
-  if (unit) queryUnit['listUnit.name'] = unit
+    let queryUnit = {}
+    if (unit) queryUnit['listUnit.name'] = unit
 
-  const dataProduct = await Product.aggregate([
-    { $match: query },
-    { $unwind: { path: '$listUnit' } },
-    { $match: queryUnit },
-    { $match: { brand: { $nin: ['', null] } } },
-    {
-      $group: {
-        _id: '$brand'
+    const dataProduct = await Product.aggregate([
+      { $match: query },
+      { $unwind: { path: '$listUnit' } },
+      { $match: queryUnit },
+      { $match: { brand: { $nin: ['', null] } } },
+      {
+        $group: {
+          _id: '$brand'
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          brand: '$_id'
+        }
+      },
+      {
+        $sort: {
+          brand: 1
+        }
       }
-    },
-    {
-      $project: {
-        _id: 0,
-        brand: '$_id'
-      }
-    },
-    {
-      $sort: {
-        brand: 1
-      }
+    ])
+
+    if (dataProduct.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found brand'
+      })
     }
-  ])
 
-  if (dataProduct.length === 0) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found brand'
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: dataProduct
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
 
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: dataProduct
-  })
 }
 
 exports.unitByFilter = async (req, res) => {
-  const { flavour, brand, group, size } = req.body
-  const channel = req.headers['x-channel']
-  const { Product } = getModelsByChannel(channel, res, productModel)
+  try {
+    const { flavour, brand, group, size } = req.body
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
 
-  let query = {}
-  if (flavour) query.flavour = flavour
-  if (brand) query.brand = brand
-  if (group) query.group = group
-  if (size) query.size = size
-  // let queryUnit = {};
-  // if (unit) queryUnit['listUnit.name'] = unit;
+    let query = {}
+    if (flavour) query.flavour = flavour
+    if (brand) query.brand = brand
+    if (group) query.group = group
+    if (size) query.size = size
+    // let queryUnit = {};
+    // if (unit) queryUnit['listUnit.name'] = unit;
 
-  const dataProduct = await Product.aggregate([
-    { $match: query },
-    { $unwind: { path: '$listUnit' } },
-    // { $match: queryUnit },
-    { $match: { 'listUnit.unit': { $nin: ['', null] } } },
-    {
-      $group: {
-        _id: '$listUnit.unit'
+    const dataProduct = await Product.aggregate([
+      { $match: query },
+      { $unwind: { path: '$listUnit' } },
+      // { $match: queryUnit },
+      { $match: { 'listUnit.unit': { $nin: ['', null] } } },
+      {
+        $group: {
+          _id: '$listUnit.unit'
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          unit: '$_id'
+        }
+      },
+      {
+        $sort: {
+          unit: 1
+        }
       }
-    },
-    {
-      $project: {
-        _id: 0,
-        unit: '$_id'
-      }
-    },
-    {
-      $sort: {
-        unit: 1
-      }
+    ])
+
+    if (dataProduct.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found unit'
+      })
     }
-  ])
 
-  if (dataProduct.length === 0) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found unit'
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: dataProduct
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
 
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: dataProduct
-  })
 }
 
 exports.addProductimage = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { Product } = getModelsByChannel(channel, res, productModel)
+  try {
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
 
-  const productIds = await Product.find().select('id -_id')
+    const productIds = await Product.find().select('id -_id')
 
-  // อัปเดตแต่ละ product ทีละรายการ (ถ้าต้องการใช้ id เองใน URL)
-  for (const product of productIds) {
-    const id = product.id
-    await Product.updateMany(
-      { id: id },
-      {
-        $set: {
-          image: `https://apps.onetwotrading.co.th/images/products/${id}.webp`
+    // อัปเดตแต่ละ product ทีละรายการ (ถ้าต้องการใช้ id เองใน URL)
+    for (const product of productIds) {
+      const id = product.id
+      await Product.updateMany(
+        { id: id },
+        {
+          $set: {
+            image: `https://apps.onetwotrading.co.th/images/products/${id}.webp`
+          }
         }
-      }
-    )
+      )
+    }
+
+    const io = getSocket()
+    io.emit('product/addProductimage', {})
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess'
+      // data: productId
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
 
-  const io = getSocket()
-  io.emit('product/addProductimage', {})
-
-  res.status(200).json({
-    status: 200,
-    message: 'sucess'
-    // data: productId
-  })
 }
 
 exports.productUpdatePrice = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { Product } = getModelsByChannel(channel, res, productModel)
+  try {
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
 
-  const productData = await Product.find().select('id')
+    const productData = await Product.find().select('id')
 
-  const productId = productData.flatMap(item => item.id)
+    const productId = productData.flatMap(item => item.id)
 
-  const product96 = await productQuery(channel)
-  // console.log(product96)
-  const data = []
-  for (item of product96) {
-    for (unit of item.unitList) {
-      const dataTran = await Product.findOneAndUpdate(
-        {
-          id: item.id,
-          'listUnit.unit': unit.unit
-        },
-        {
-          $set: {
-            'listUnit.$.price.sale': unit.pricePerUnitSale,
-            'listUnit.$.price.refund': unit.pricePerUnitRefund,
-            'listUnit.$.price.refundDmg': unit.pricePerUnitRefundDamage,
-            'listUnit.$.price.change': unit.pricePerUnitChange
-          }
-        },
-        { new: true }
-      )
-      // console.log(dataTran)
-      data.push(dataTran)
-    }
-  }
-
-  res.status(200).json({
-    status: 200,
-    message: 'success',
-    data: data
-  })
-}
-
-exports.productCheckPrice = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { excel } = req.body
-  const { Product } = getModelsByChannel(channel, res, productModel)
-  const { ProductUAT } = getModelsByChannel(channel, res, productUATModel)
-
-  const productUatData = await ProductUAT.find()
-  const productPrdData = await Product.find()
-
-  const dataSet = new Set()
-  const data = []
-  for (const item of productPrdData) {
-    const uatDetail = productUatData.find(o => o.id === item.id)
-
-    for (const unit of item.listUnit) {
-      const uatDetailUnit = uatDetail?.listUnit.find(o => o.unit === unit.unit)
-      const salePrd = unit.price.sale
-      const saleUat = uatDetailUnit?.price?.sale
-
-      if (salePrd !== saleUat) {
-        dataSet.add(item.id)
-
-        const dataTran = {
-          id: item.id,
-          name: item.name,
-          group: item.group,
-          brand: item.brand,
-          flavour: item.flavour,
-          type: item.type,
-          unit: unit.unit,
-          unitName: unit.name,
-          saleOld: saleUat,
-          sale: salePrd
-        }
+    const product96 = await productQuery(channel)
+    // console.log(product96)
+    const data = []
+    for (item of product96) {
+      for (unit of item.unitList) {
+        const dataTran = await Product.findOneAndUpdate(
+          {
+            id: item.id,
+            'listUnit.unit': unit.unit
+          },
+          {
+            $set: {
+              'listUnit.$.price.sale': unit.pricePerUnitSale,
+              'listUnit.$.price.refund': unit.pricePerUnitRefund,
+              'listUnit.$.price.refundDmg': unit.pricePerUnitRefundDamage,
+              'listUnit.$.price.change': unit.pricePerUnitChange
+            }
+          },
+          { new: true }
+        )
+        // console.log(dataTran)
         data.push(dataTran)
       }
     }
-  }
 
-  if (excel == true) {
-    const wb = xlsx.utils.book_new()
-    const ws = xlsx.utils.json_to_sheet(data)
-    xlsx.utils.book_append_sheet(wb, ws, `productCheckPrice`)
-
-    const tempPath = path.join(os.tmpdir(), `productCheckPrice.xlsx`)
-    xlsx.writeFile(wb, tempPath)
-
-    res.download(tempPath, `productCheckPrice.xlsx`, err => {
-      if (err) {
-        console.error('❌ Download error:', err)
-        // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
-        if (!res.headersSent) {
-          res.status(500).send('Download failed')
-        }
-      }
-
-      // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
-    })
-  } else {
     res.status(200).json({
       status: 200,
       message: 'success',
       data: data
     })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
+
+}
+
+exports.productCheckPrice = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { excel } = req.body
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { ProductUAT } = getModelsByChannel(channel, res, productUATModel)
+
+    const productUatData = await ProductUAT.find()
+    const productPrdData = await Product.find()
+
+    const dataSet = new Set()
+    const data = []
+    for (const item of productPrdData) {
+      const uatDetail = productUatData.find(o => o.id === item.id)
+
+      for (const unit of item.listUnit) {
+        const uatDetailUnit = uatDetail?.listUnit.find(o => o.unit === unit.unit)
+        const salePrd = unit.price.sale
+        const saleUat = uatDetailUnit?.price?.sale
+
+        if (salePrd !== saleUat) {
+          dataSet.add(item.id)
+
+          const dataTran = {
+            id: item.id,
+            name: item.name,
+            group: item.group,
+            brand: item.brand,
+            flavour: item.flavour,
+            type: item.type,
+            unit: unit.unit,
+            unitName: unit.name,
+            saleOld: saleUat,
+            sale: salePrd
+          }
+          data.push(dataTran)
+        }
+      }
+    }
+
+    if (excel == true) {
+      const wb = xlsx.utils.book_new()
+      const ws = xlsx.utils.json_to_sheet(data)
+      xlsx.utils.book_append_sheet(wb, ws, `productCheckPrice`)
+
+      const tempPath = path.join(os.tmpdir(), `productCheckPrice.xlsx`)
+      xlsx.writeFile(wb, tempPath)
+
+      res.download(tempPath, `productCheckPrice.xlsx`, err => {
+        if (err) {
+          console.error('❌ Download error:', err)
+          // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+          if (!res.headersSent) {
+            res.status(500).send('Download failed')
+          }
+        }
+
+        // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+        fs.unlink(tempPath, () => { })
+      })
+    } else {
+      res.status(200).json({
+        status: 200,
+        message: 'success',
+        data: data
+      })
+    }
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+
+  }
+
 }
 
 exports.checkPriceProductOrder = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { Product } = getModelsByChannel(channel, res, productModel)
-  const { ProductUAT } = getModelsByChannel(channel, res, productUATModel)
+  try {
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { ProductUAT } = getModelsByChannel(channel, res, productUATModel)
 
-  const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
 
-  const dataProduct = await Product.find()
-  const dataProductUAT = await ProductUAT.find()
-  const orderData = await Order.find({ period: '202510' })
+    const dataProduct = await Product.find()
+    const dataProductUAT = await ProductUAT.find()
+    const orderData = await Order.find({ period: '202510' })
 
-  let productId = []
+    let productId = []
 
-  for (item of orderData) {
-    for (i of item.listProduct) {
-      const product = dataProduct.find(o => o.id === i.id)
-      // const productUAT = dataProductUAT.find(o => o.id === i.id)
-      const productUnit = product.listUnit.find(o => o.unit === i.unit)
-      // const productUATUnit = product.listUnit.find(o => o.unit === i.unit)
+    for (item of orderData) {
+      for (i of item.listProduct) {
+        const product = dataProduct.find(o => o.id === i.id)
+        // const productUAT = dataProductUAT.find(o => o.id === i.id)
+        const productUnit = product.listUnit.find(o => o.unit === i.unit)
+        // const productUATUnit = product.listUnit.find(o => o.unit === i.unit)
 
-      if (i.price != productUnit.price.sale) {
-        productId.push(i.id)
+        if (i.price != productUnit.price.sale) {
+          productId.push(i.id)
+        }
       }
     }
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: productId
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+
   }
 
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: productId
-  })
 }
