@@ -58,8 +58,9 @@ exports.checkout = async (req, res) => {
       note,
       period,
       newtrip,
-      wereHouse,
-      routeWithdraw,
+      // wereHouse,
+      // routeWithdraw,
+      Des_No
     } = req.body
 
     const today = new Date()
@@ -74,7 +75,7 @@ exports.checkout = async (req, res) => {
     const { User } = getModelsByChannel(channel, res, userModel)
     const { Place } = getModelsByChannel(channel, res, distributionModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
-    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+    const { Distribution, Withdraw } = getModelsByChannel(channel, res, distributionModel)
     const { Npd, NpdArea } = getModelsByChannel(channel, res, npdModel)
     const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
       channel,
@@ -105,40 +106,73 @@ exports.checkout = async (req, res) => {
 
     let shippingData = {}
     if (channel === 'pc') {
-     shippingData = await Place.findOne(
-      { area, 
-        // 'listAddress.shippingId': shippingId,
-        'listAddress.warehouse.normal' : wereHouse,
-        'listAddress.shippingId' : routeWithdraw,
-       },
-      { 'listAddress.$': 1 }
-    )
-
+      shippingData = await Withdraw.findOne({
+        Des_No: Des_No,
+      }
+      )
 
     } else {
-     shippingData = await Place.findOne(
-      { area, 'listAddress.shippingId': shippingId },
-      { 'listAddress.$': 1 }
-    )
+      shippingData = await Place.findOne(
+        { area, 'listAddress.shippingId': shippingId },
+        { 'listAddress.$': 1 }
+      )
 
     }
 
 
 
 
-    if (!shippingData || !shippingData.listAddress.length) {
+    if (!shippingData) {
       return res
         .status(404)
         .json({ status: 404, message: 'Shipping address not found!' })
     }
-    const shipping = shippingData.listAddress[0]
+
     // console.log(shipping)
     let fromWarehouse
-     let toWarehouse
-    if (withdrawType === 'normal' || withdrawType === 'credit') {
-      fromWarehouse = shipping.warehouse?.normal
+    let toWarehouse
+
+
+    let shipping = {}
+    if (channel === 'pc') {
+
+      let typeNameTH = ''
+      let shippingId = ''
+      let route = ''
+      let name = ''
+      if (shippingData.ZType === 'T05') {
+        typeNameTH = 'ส่งสินค้า'
+        shippingId = shippingData.Des_No
+        route = shippingData.Des_Area
+        name = shippingData.Des_Name
+      } else if (shippingData.ZType === 'T04') {
+        typeNameTH = shippingData.Des_Name
+        shippingId = shippingData.Des_Area
+        route = shippingData.ROUTE
+      }
+
+      shipping = {
+        type:shippingData.ZType,
+        typeNameTH:typeNameTH,
+        shippingId:shippingId,
+        route:route,
+        name:name,
+        address:""
+      }
+
+      if (withdrawType === 'normal' || withdrawType === 'credit') {
+        fromWarehouse = shippingData?.WH
+      } else {
+        fromWarehouse = shippingData?.WH1
+      }
     } else {
-      fromWarehouse = shipping.warehouse?.clearance
+      shipping = shippingData.listAddress[0]
+
+      if (withdrawType === 'normal' || withdrawType === 'credit') {
+        fromWarehouse = shipping.warehouse?.normal
+      } else {
+        fromWarehouse = shipping.warehouse?.clearance
+      }
     }
 
     if (!fromWarehouse) {
@@ -347,8 +381,8 @@ exports.checkout = async (req, res) => {
       refOrderId: createdMovement._id
     })
 
-    await newOrder.save()
-    await Cart.deleteOne({ type, area })
+    // await newOrder.save()
+    // await Cart.deleteOne({ type, area })
     await transaction.commit()
 
     const io = getSocket()
@@ -523,9 +557,9 @@ exports.getOrderCredit = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-                fullname: `${userData.firstName} ${userData.surName}`,
-                tel: `${userData.tel}`
-              }
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -745,9 +779,9 @@ exports.getOrder = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-                fullname: `${userData.firstName} ${userData.surName}`,
-                tel: `${userData.tel}`
-              }
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -912,9 +946,9 @@ exports.getOrder2 = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-                fullname: `${userData.firstName} ${userData.surName}`,
-                tel: `${userData.tel}`
-              }
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -1086,9 +1120,9 @@ exports.getOrderSup = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-                fullname: `${userData.firstName} ${userData.surName}`,
-                tel: `${userData.tel}`
-              }
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
             : null,
           orderId: o.orderId,
           newTrip: o.newTrip,
@@ -1808,15 +1842,12 @@ exports.approveWithdraw = async (req, res) => {
           <p>
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh} ${type}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-            <strong>ประเภทการจัดส่ง:</strong> ${
-              distributionTran.orderTypeName
-            }<br>
-            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
-              '-' + wereHouseName?.wh_name || ''
-            }<br>
-            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
-              distributionTran.shippingName
-            }<br>
+            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName
+              }<br>
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
+              }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
+              }<br>
             <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
             <strong>เขต:</strong> ${distributionTran.area}<br>
             <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -2062,15 +2093,12 @@ exports.approveWithdrawCredit = async (req, res) => {
           <p>
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-            <strong>ประเภทการจัดส่ง:</strong> ${
-              distributionTran.orderTypeName
-            }<br>
-            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
-              '-' + wereHouseName?.wh_name || ''
-            }<br>
-            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
-              distributionTran.shippingName
-            }<br>
+            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName
+              }<br>
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
+              }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
+              }<br>
             <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
             <strong>เขต:</strong> ${distributionTran.area}<br>
             <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -2250,9 +2278,8 @@ exports.saleConfirmWithdraw = async (req, res) => {
         const ReceiveQty = Object.values(
           Receive.reduce((acc, cur) => {
             // ใช้ key จาก coNo + withdrawUnit + productId (ถ้าอยากแยกตาม productId ด้วย)
-            const key = `${cur.coNo}_${
-              cur.withdrawUnit
-            }_${cur.productId.trim()}`
+            const key = `${cur.coNo}_${cur.withdrawUnit
+              }_${cur.productId.trim()}`
             if (!acc[key]) {
               acc[key] = { ...cur }
             } else {
@@ -2712,7 +2739,7 @@ exports.withdrawToExcel = async (req, res) => {
 
     const tranFromOrder = modelWithdraw.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD (date) {
+      function formatDateToThaiYYYYMMDD(date) {
         const d = new Date(date)
         // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -2802,7 +2829,7 @@ exports.withdrawToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => {})
+        fs.unlink(tempPath, () => { })
       }
     )
   } catch (error) {
@@ -3012,7 +3039,7 @@ exports.withdrawBackOrderToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
+      fs.unlink(tempPath, () => { })
     })
   }
 }
