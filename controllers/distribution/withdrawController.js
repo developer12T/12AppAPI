@@ -152,12 +152,12 @@ exports.checkout = async (req, res) => {
       }
 
       shipping = {
-        type:shippingData.ZType,
-        typeNameTH:typeNameTH,
-        shippingId:shippingId,
-        route:route,
-        name:name,
-        address:""
+        type: shippingData.ZType,
+        typeNameTH: typeNameTH,
+        shippingId: shippingId,
+        route: route,
+        name: name,
+        address: ""
       }
 
       if (withdrawType === 'normal' || withdrawType === 'credit') {
@@ -1297,323 +1297,388 @@ exports.updateStatus = async (req, res) => {
 }
 
 exports.updateStockWithdraw = async (req, res) => {
-  const { orderId, status } = req.body
-  const channel = req.headers['x-channel']
-  const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
-    channel,
-    res,
-    stockModel
-  )
+  try {
 
-  const stockmovements = await StockMovement.findOne({
-    orderId: orderId,
-    status: status
-  })
+    const { orderId, status } = req.body
+    const channel = req.headers['x-channel']
+    const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
+      channel,
+      res,
+      stockModel
+    )
 
-  const productId = stockmovements.product.flatMap(u => u.productId)
+    const stockmovements = await StockMovement.findOne({
+      orderId: orderId,
+      status: status
+    })
 
-  const stock = await Stock.aggregate([
-    { $match: { area: stockmovements.area, period: stockmovements.period } },
-    { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
-    { $match: { 'listProduct.productId': { $in: productId } } },
-    // { $match : { "listProduct.available.lot": u.lot } },
-    {
-      $project: {
-        _id: 0,
-        productId: '$listProduct.productId',
-        sumQtyPcs: '$listProduct.sumQtyPcs',
-        sumQtyCtn: '$listProduct.sumQtyCtn',
-        sumQtyPcsStockIn: '$listProduct.sumQtyPcsStockIn',
-        sumQtyCtnStockIn: '$listProduct.sumQtyCtnStockIn',
-        sumQtyPcsStockOut: '$listProduct.sumQtyPcsStockOut',
-        sumQtyCtnStockOut: '$listProduct.sumQtyCtnStockOut',
-        available: '$listProduct.available'
+    const productId = stockmovements.product.flatMap(u => u.productId)
+
+    const stock = await Stock.aggregate([
+      { $match: { area: stockmovements.area, period: stockmovements.period } },
+      { $unwind: { path: '$listProduct', preserveNullAndEmptyArrays: true } },
+      { $match: { 'listProduct.productId': { $in: productId } } },
+      // { $match : { "listProduct.available.lot": u.lot } },
+      {
+        $project: {
+          _id: 0,
+          productId: '$listProduct.productId',
+          sumQtyPcs: '$listProduct.sumQtyPcs',
+          sumQtyCtn: '$listProduct.sumQtyCtn',
+          sumQtyPcsStockIn: '$listProduct.sumQtyPcsStockIn',
+          sumQtyCtnStockIn: '$listProduct.sumQtyCtnStockIn',
+          sumQtyPcsStockOut: '$listProduct.sumQtyPcsStockOut',
+          sumQtyCtnStockOut: '$listProduct.sumQtyCtnStockOut',
+          available: '$listProduct.available'
+        }
       }
-    }
-  ])
+    ])
 
-  let listProductWithDraw = []
-  let updateLot = []
+    let listProductWithDraw = []
+    let updateLot = []
 
-  for (const stockDetail of stock) {
-    for (const lot of stockDetail.available) {
-      const calDetails = calStock.product.filter(
-        u => u.productId === stockDetail.productId && u.lot === lot.lot
+    for (const stockDetail of stock) {
+      for (const lot of stockDetail.available) {
+        const calDetails = calStock.product.filter(
+          u => u.productId === stockDetail.productId && u.lot === lot.lot
+        )
+
+        let pcsQty = 0
+        let ctnQty = 0
+
+        for (const cal of calDetails) {
+          if (cal.unit === 'PCS' || cal.unit === 'BOT') {
+            pcsQty += cal.qty || 0
+          }
+          if (cal.unit === 'CTN') {
+            ctnQty += cal.qty || 0
+          }
+        }
+        checkQtyPcs = lot.qtyPcs + pcsQty
+        checkQtyCtn = lot.qtyCtn + ctnQty
+
+        updateLot.push({
+          productId: stockDetail.productId,
+          location: lot.location,
+          lot: lot.lot,
+          qtyPcs: Math.checkQtyPcs,
+          qtyPcsStockIn: lot.qtyPcsStockIn + pcsQty,
+          qtyPcsStockOut: lot.qtyPcsStockOut,
+          qtyCtn: Math.checkQtyCtn,
+          qtyCtnStockIn: lot.qtyCtnStockIn + ctnQty,
+          qtyCtnStockOut: lot.qtyCtnStockOut
+        })
+      }
+
+      const relatedLots = updateLot.filter(
+        u => u.productId === stockDetail.productId
       )
-
-      let pcsQty = 0
-      let ctnQty = 0
-
-      for (const cal of calDetails) {
-        if (cal.unit === 'PCS' || cal.unit === 'BOT') {
-          pcsQty += cal.qty || 0
-        }
-        if (cal.unit === 'CTN') {
-          ctnQty += cal.qty || 0
-        }
-      }
-      checkQtyPcs = lot.qtyPcs + pcsQty
-      checkQtyCtn = lot.qtyCtn + ctnQty
-
-      updateLot.push({
+      listProductWithDraw.push({
         productId: stockDetail.productId,
-        location: lot.location,
-        lot: lot.lot,
-        qtyPcs: Math.checkQtyPcs,
-        qtyPcsStockIn: lot.qtyPcsStockIn + pcsQty,
-        qtyPcsStockOut: lot.qtyPcsStockOut,
-        qtyCtn: Math.checkQtyCtn,
-        qtyCtnStockIn: lot.qtyCtnStockIn + ctnQty,
-        qtyCtnStockOut: lot.qtyCtnStockOut
+        sumQtyPcs: relatedLots.reduce((total, item) => total + item.qtyPcs, 0),
+        sumQtyCtn: relatedLots.reduce((total, item) => total + item.qtyCtn, 0),
+        sumQtyPcsStockIn: relatedLots.reduce(
+          (total, item) => total + item.qtyPcsStockIn,
+          0
+        ),
+        sumQtyCtnStockIn: relatedLots.reduce(
+          (total, item) => total + item.qtyCtnStockIn,
+          0
+        ),
+        sumQtyPcsStockOut: relatedLots.reduce(
+          (total, item) => total + item.qtyPcsStockOut,
+          0
+        ),
+        sumQtyCtnStockOut: relatedLots.reduce(
+          (total, item) => total + item.qtyCtnStockOut,
+          0
+        ),
+        available: relatedLots.map(({ id, ...rest }) => rest)
       })
     }
+    // console.log("listProductWithDraw:\n", JSON.stringify(listProductWithDraw, null, 2));
+    for (const updated of listProductWithDraw) {
+      await Stock.findOneAndUpdate(
+        { area: area, period: stockmovements.period },
+        {
+          $set: {
+            'listProduct.$[product].sumQtyPcs': updated.sumQtyPcs,
+            'listProduct.$[product].sumQtyCtn': updated.sumQtyCtn,
+            'listProduct.$[product].sumQtyPcsStockIn': updated.sumQtyPcsStockIn,
+            'listProduct.$[product].sumQtyCtnStockIn': updated.sumQtyCtnStockIn,
+            'listProduct.$[product].sumQtyPcsStockOut': updated.sumQtyPcsStockOut,
+            'listProduct.$[product].sumQtyCtnStockOut': updated.sumQtyCtnStockOut,
+            'listProduct.$[product].available': updated.available
+          }
+        },
+        { arrayFilters: [{ 'product.productId': updated.productId }], new: true }
+      )
+    }
 
-    const relatedLots = updateLot.filter(
-      u => u.productId === stockDetail.productId
-    )
-    listProductWithDraw.push({
-      productId: stockDetail.productId,
-      sumQtyPcs: relatedLots.reduce((total, item) => total + item.qtyPcs, 0),
-      sumQtyCtn: relatedLots.reduce((total, item) => total + item.qtyCtn, 0),
-      sumQtyPcsStockIn: relatedLots.reduce(
-        (total, item) => total + item.qtyPcsStockIn,
-        0
-      ),
-      sumQtyCtnStockIn: relatedLots.reduce(
-        (total, item) => total + item.qtyCtnStockIn,
-        0
-      ),
-      sumQtyPcsStockOut: relatedLots.reduce(
-        (total, item) => total + item.qtyPcsStockOut,
-        0
-      ),
-      sumQtyCtnStockOut: relatedLots.reduce(
-        (total, item) => total + item.qtyCtnStockOut,
-        0
-      ),
-      available: relatedLots.map(({ id, ...rest }) => rest)
+    const io = getSocket()
+    io.emit('distribution/updateStockWithdraw', {})
+
+    res.status(200).json({
+      status: 200,
+      message: 'successfully',
+      stock
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-  // console.log("listProductWithDraw:\n", JSON.stringify(listProductWithDraw, null, 2));
-  for (const updated of listProductWithDraw) {
-    await Stock.findOneAndUpdate(
-      { area: area, period: stockmovements.period },
-      {
-        $set: {
-          'listProduct.$[product].sumQtyPcs': updated.sumQtyPcs,
-          'listProduct.$[product].sumQtyCtn': updated.sumQtyCtn,
-          'listProduct.$[product].sumQtyPcsStockIn': updated.sumQtyPcsStockIn,
-          'listProduct.$[product].sumQtyCtnStockIn': updated.sumQtyCtnStockIn,
-          'listProduct.$[product].sumQtyPcsStockOut': updated.sumQtyPcsStockOut,
-          'listProduct.$[product].sumQtyCtnStockOut': updated.sumQtyCtnStockOut,
-          'listProduct.$[product].available': updated.available
-        }
-      },
-      { arrayFilters: [{ 'product.productId': updated.productId }], new: true }
-    )
-  }
 
-  const io = getSocket()
-  io.emit('distribution/updateStockWithdraw', {})
 
-  res.status(200).json({
-    status: 200,
-    message: 'successfully',
-    stock
-  })
 }
 
 exports.insertWithdrawToErp = async (req, res) => {
-  const { area, period } = req.body
-  const channel = req.headers['x-channel']
-  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
-  const distributionData = await Distribution.find({ area: area })
 
-  let data = []
-  for (const item of distributionData) {
-    const sendDate = new Date(item.sendDate) // สร้าง Date object
-    const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '') // "20250222"
-    const MGNUGL = item.listProduct.map(i => i.id)
-    const uniqueCount = new Set(MGNUGL).size
+  try {
 
-    const dataTran = {
-      Hcase: 0,
-      orderNo: item.orderId,
-      statusLow: '22',
-      statusHigh: '22',
-      orderType: item.orderType,
-      tranferDate: formattedDate,
-      warehouse: item.fromWarehouse,
-      towarehouse: item.toWarehouse,
-      routeCode: item.shippingRoute,
-      addressCode: item.shippingId,
-      location: '',
-      MGNUGL: uniqueCount,
-      MGDEPT: '',
-      remark: '',
-      item: item.listProduct.map(u => {
-        return {
-          itemCode: u.id,
-          itemStatus: '22',
-          MRWHLO: item.fromWarehouse,
-          itemQty: u.qty,
-          itemUnit: u.unit,
-          toLocation: '',
-          itemLot: '',
-          location: '',
-          itemLocation: ''
-        }
-      })
+    const { area, period } = req.body
+    const channel = req.headers['x-channel']
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+    const distributionData = await Distribution.find({ area: area })
+
+    let data = []
+    for (const item of distributionData) {
+      const sendDate = new Date(item.sendDate) // สร้าง Date object
+      const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '') // "20250222"
+      const MGNUGL = item.listProduct.map(i => i.id)
+      const uniqueCount = new Set(MGNUGL).size
+
+      const dataTran = {
+        Hcase: 0,
+        orderNo: item.orderId,
+        statusLow: '22',
+        statusHigh: '22',
+        orderType: item.orderType,
+        tranferDate: formattedDate,
+        warehouse: item.fromWarehouse,
+        towarehouse: item.toWarehouse,
+        routeCode: item.shippingRoute,
+        addressCode: item.shippingId,
+        location: '',
+        MGNUGL: uniqueCount,
+        MGDEPT: '',
+        remark: '',
+        item: item.listProduct.map(u => {
+          return {
+            itemCode: u.id,
+            itemStatus: '22',
+            MRWHLO: item.fromWarehouse,
+            itemQty: u.qty,
+            itemUnit: u.unit,
+            toLocation: '',
+            itemLot: '',
+            location: '',
+            itemLocation: ''
+          }
+        })
+      }
+      data.push(dataTran)
     }
-    data.push(dataTran)
+
+    const response = await axios.post(
+      `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
+      data
+    )
+
+    const io = getSocket()
+    io.emit('distribution/insertWithdrawToErp', {
+      status: 200,
+      message: 'successfully',
+      data
+    })
+
+    res.status(200).json({
+      status: 200,
+      message: 'successfully',
+      data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
 
-  const response = await axios.post(
-    `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
-    data
-  )
-
-  const io = getSocket()
-  io.emit('distribution/insertWithdrawToErp', {
-    status: 200,
-    message: 'successfully',
-    data
-  })
-
-  res.status(200).json({
-    status: 200,
-    message: 'successfully',
-    data
-  })
 }
 
 exports.insertOneWithdrawToErp = async (req, res) => {
-  const { orderId } = req.body
-  const channel = req.headers['x-channel']
-  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
-  const distributionData = await Distribution.find({ orderId: orderId })
 
-  let data = []
-  for (const item of distributionData) {
-    const sendDate = new Date(item.sendDate)
-    const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '')
-    const MGNUGL = item.listProduct.map(i => i.id)
-    const uniqueCount = new Set(MGNUGL).size
+  try {
+    const { orderId } = req.body
+    const channel = req.headers['x-channel']
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+    const distributionData = await Distribution.find({ orderId: orderId })
 
-    const dataTran = {
-      Hcase: 1,
-      orderNo: item.orderId,
-      statusLow: '22',
-      statusHigh: '22',
-      orderType: item.orderType,
-      tranferDate: formattedDate,
-      warehouse: item.fromWarehouse,
-      towarehouse: item.toWarehouse,
-      routeCode: item.shippingRoute,
-      addressCode: item.shippingId,
-      location: '',
-      MGNUGL: uniqueCount,
-      MGDEPT: '',
-      remark: '',
-      items: item.listProduct.map(u => {
-        return {
-          itemCode: u.id,
-          itemStatus: '22',
-          MRWHLO: item.fromWarehouse,
-          itemQty: u.qty,
-          itemUnit: u.unit,
-          toLocation: '',
-          itemLot: '',
-          location: '',
-          itemLocation: ''
-        }
-      })
+    let data = []
+    for (const item of distributionData) {
+      const sendDate = new Date(item.sendDate)
+      const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '')
+      const MGNUGL = item.listProduct.map(i => i.id)
+      const uniqueCount = new Set(MGNUGL).size
+
+      const dataTran = {
+        Hcase: 1,
+        orderNo: item.orderId,
+        statusLow: '22',
+        statusHigh: '22',
+        orderType: item.orderType,
+        tranferDate: formattedDate,
+        warehouse: item.fromWarehouse,
+        towarehouse: item.toWarehouse,
+        routeCode: item.shippingRoute,
+        addressCode: item.shippingId,
+        location: '',
+        MGNUGL: uniqueCount,
+        MGDEPT: '',
+        remark: '',
+        items: item.listProduct.map(u => {
+          return {
+            itemCode: u.id,
+            itemStatus: '22',
+            MRWHLO: item.fromWarehouse,
+            itemQty: u.qty,
+            itemUnit: u.unit,
+            toLocation: '',
+            itemLot: '',
+            location: '',
+            itemLocation: ''
+          }
+        })
+      }
+      data.push(dataTran)
     }
-    data.push(dataTran)
+
+    const response = await axios.post(
+      `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
+      data
+    )
+
+    const io = getSocket()
+    io.emit('distribution/insertOneWithdrawToErp', {
+      status: 200,
+      message: 'successfully',
+      data
+    })
+
+    res.status(200).json({
+      status: 200,
+      message: 'successfully',
+      data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
 
-  const response = await axios.post(
-    `${process.env.API_URL_12ERP}/distribution/insertdistribution`,
-    data
-  )
-
-  const io = getSocket()
-  io.emit('distribution/insertOneWithdrawToErp', {
-    status: 200,
-    message: 'successfully',
-    data
-  })
-
-  res.status(200).json({
-    status: 200,
-    message: 'successfully',
-    data
-  })
 }
 
 exports.addFromERPWithdraw = async (req, res) => {
-  const channel = req.headers['x-channel']
 
-  const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
-  const result = await withdrawQuery(channel)
-  // console.log(result)
-  for (const item of result) {
-    const existWithdraw = await Withdraw.findOne({ Des_No: item.Des_No })
-    if (existWithdraw) {
-      await Withdraw.findOneAndUpdate({ Des_No: item.Des_No }, item, {
-        new: true
-      })
-    } else {
-      await Withdraw.create(item)
+  try {
+    const channel = req.headers['x-channel']
+
+    const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
+    const result = await withdrawQuery(channel)
+    // console.log(result)
+    for (const item of result) {
+      const existWithdraw = await Withdraw.findOne({ Des_No: item.Des_No })
+      if (existWithdraw) {
+        await Withdraw.findOneAndUpdate({ Des_No: item.Des_No }, item, {
+          new: true
+        })
+      } else {
+        await Withdraw.create(item)
+      }
     }
+
+    const io = getSocket()
+    io.emit('distribution/addFromERPWithdraw', {})
+
+    res.status(200).json({
+      status: 200,
+      message: 'successfully',
+      data: result
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
-
-  const io = getSocket()
-  io.emit('distribution/addFromERPWithdraw', {})
-
-  res.status(200).json({
-    status: 200,
-    message: 'successfully',
-    data: result
-  })
 }
 
 exports.addOneWithdraw = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const {
-    Des_No,
-    Des_Name,
-    Des_Date,
-    Des_Area,
-    ZType,
-    WH,
-    ROUTE,
-    WH1,
-    Dc_Email
-  } = req.body
-  const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
+  try {
+    const channel = req.headers['x-channel']
+    const {
+      Des_No,
+      Des_Name,
+      Des_Date,
+      Des_Area,
+      ZType,
+      WH,
+      ROUTE,
+      WH1,
+      Dc_Email
+    } = req.body
+    const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
 
-  const data = {
-    Des_No: Des_No,
-    Des_Name: Des_Name,
-    Des_Date: Des_Date,
-    Des_Area: Des_Area,
-    ZType: ZType,
-    WH: WH,
-    ROUTE: ROUTE,
-    WH1: WH1,
-    Dc_Email: Dc_Email
+    const data = {
+      Des_No: Des_No,
+      Des_Name: Des_Name,
+      Des_Date: Des_Date,
+      Des_Area: Des_Area,
+      ZType: ZType,
+      WH: WH,
+      ROUTE: ROUTE,
+      WH1: WH1,
+      Dc_Email: Dc_Email
+    }
+    await Withdraw.create(data)
+
+    const io = getSocket()
+    io.emit('distribution/addOneWithdraw', {})
+
+    res.status(200).json({
+      status: 200,
+      message: 'successfully',
+      data: data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
-  await Withdraw.create(data)
 
-  const io = getSocket()
-  io.emit('distribution/addOneWithdraw', {})
-
-  res.status(200).json({
-    status: 200,
-    message: 'successfully',
-    data: data
-  })
 }
 
 exports.cancelWithdraw = async (req, res) => {
@@ -2970,253 +3035,315 @@ exports.updateReciveFix = async (req, res) => {
 }
 
 exports.withdrawBackOrderToExcel = async (req, res) => {
-  const { excel, period } = req.query
 
-  const channel = req.headers['x-channel']
-  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+  try {
+    const { excel, period } = req.query
 
-  const dataDist = await Distribution.find({
-    status: 'confirm',
-    area: { $ne: 'IT211' },
-    period: period
-  }).sort({ createdAt: 1 })
+    const channel = req.headers['x-channel']
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
-  let dataExcel = []
-  for (const item of dataDist) {
-    for (const product of item.listProduct) {
-      const diff = product.qty - product.receiveQty
-      // แปลง createdAt เป็น UTC+7 และ format วันที่ไทย
-      const createdAtUtc = new Date(item.createdAt)
-      createdAtUtc.setHours(createdAtUtc.getHours() + 7)
-      const createdthaiDay = createdAtUtc.getDate()
-      const createdthaiMonth = createdAtUtc.getMonth() + 1
-      const createdthaiYear = createdAtUtc.getFullYear() + 543
-      const createdAtThai = `${createdthaiDay}/${createdthaiMonth}/${createdthaiYear}`
+    const dataDist = await Distribution.find({
+      status: 'confirm',
+      area: { $ne: 'IT211' },
+      period: period
+    }).sort({ createdAt: 1 })
 
-      // คำนวณระยะห่างเป็นวัน
-      const created = new Date(item.createdAt)
-      const sendDate = new Date(item.sendDate)
-      const diffMs = sendDate - created
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    let dataExcel = []
+    for (const item of dataDist) {
+      for (const product of item.listProduct) {
+        const diff = product.qty - product.receiveQty
+        // แปลง createdAt เป็น UTC+7 และ format วันที่ไทย
+        const createdAtUtc = new Date(item.createdAt)
+        createdAtUtc.setHours(createdAtUtc.getHours() + 7)
+        const createdthaiDay = createdAtUtc.getDate()
+        const createdthaiMonth = createdAtUtc.getMonth() + 1
+        const createdthaiYear = createdAtUtc.getFullYear() + 543
+        const createdAtThai = `${createdthaiDay}/${createdthaiMonth}/${createdthaiYear}`
 
-      const data = {
-        เลขที่เอกสาร: item.orderId,
-        เขตการขาย: item.area,
-        วันที่เบิก: createdAtThai,
-        ระยะเวลาเบิก: diffDays,
-        รหัสสินค้า: product.id,
-        ชื่อสินค้า: product.name,
-        เบิก: product.qty,
-        ได้รับ: product.receiveQty == 0 ? '-' : product.receiveQty,
-        ไม่ได้รับ: diff,
-        มูลค่าที่ไม่ได้รับ: (diff * product.price).toLocaleString()
-      }
-      dataExcel.push(data)
-    }
-  }
+        // คำนวณระยะห่างเป็นวัน
+        const created = new Date(item.createdAt)
+        const sendDate = new Date(item.sendDate)
+        const diffMs = sendDate - created
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
 
-  if (!excel) {
-    res.status(200).json({
-      status: 200,
-      message: 'sucess',
-      data: dataExcel
-    })
-  } else {
-    const wb = xlsx.utils.book_new()
-    const ws = xlsx.utils.json_to_sheet(dataExcel)
-    xlsx.utils.book_append_sheet(wb, ws, `backOrder`)
-
-    const tempPath = path.join(os.tmpdir(), `backOrder.xlsx`)
-    xlsx.writeFile(wb, tempPath)
-
-    res.download(tempPath, `backOrder.xlsx`, err => {
-      if (err) {
-        console.error('❌ Download error:', err)
-        // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
-        if (!res.headersSent) {
-          res.status(500).send('Download failed')
+        const data = {
+          เลขที่เอกสาร: item.orderId,
+          เขตการขาย: item.area,
+          วันที่เบิก: createdAtThai,
+          ระยะเวลาเบิก: diffDays,
+          รหัสสินค้า: product.id,
+          ชื่อสินค้า: product.name,
+          เบิก: product.qty,
+          ได้รับ: product.receiveQty == 0 ? '-' : product.receiveQty,
+          ไม่ได้รับ: diff,
+          มูลค่าที่ไม่ได้รับ: (diff * product.price).toLocaleString()
         }
+        dataExcel.push(data)
       }
+    }
 
-      // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+    if (!excel) {
+      res.status(200).json({
+        status: 200,
+        message: 'sucess',
+        data: dataExcel
+      })
+    } else {
+      const wb = xlsx.utils.book_new()
+      const ws = xlsx.utils.json_to_sheet(dataExcel)
+      xlsx.utils.book_append_sheet(wb, ws, `backOrder`)
+
+      const tempPath = path.join(os.tmpdir(), `backOrder.xlsx`)
+      xlsx.writeFile(wb, tempPath)
+
+      res.download(tempPath, `backOrder.xlsx`, err => {
+        if (err) {
+          console.error('❌ Download error:', err)
+          // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+          if (!res.headersSent) {
+            res.status(500).send('Download failed')
+          }
+        }
+
+        // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+        fs.unlink(tempPath, () => { })
+      })
+    }
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
+
+
 }
 
 exports.withdrawUpdateMGTRDT = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+  try {
+    const channel = req.headers['x-channel']
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
-  const withdrawData = await Distribution.find({
-    status: ['approved', 'confirm']
-  })
+    const withdrawData = await Distribution.find({
+      status: ['approved', 'confirm']
+    })
 
-  const withdrawTran = withdrawData.map(item => {
-    createdAtThai = toThaiTime(item.createdAt)
-    return {
-      orderId: item.orderId,
-      createdAt: item.createdAt,
-      createdAtThai: createdAtThai,
-      MGTRDT_NEW: formatDateToYYYYMMDD(createdAtThai)
+    const withdrawTran = withdrawData.map(item => {
+      createdAtThai = toThaiTime(item.createdAt)
+      return {
+        orderId: item.orderId,
+        createdAt: item.createdAt,
+        createdAtThai: createdAtThai,
+        MGTRDT_NEW: formatDateToYYYYMMDD(createdAtThai)
+      }
+    })
+
+    let m3 = []
+
+    for (i of withdrawTran) {
+      const row = await DisributionM3.findOne({ where: { coNo: i.orderId } })
+
+      if (row) {
+        row.MGTRDT = i.MGTRDT_NEW
+        await row.save() // บันทึกการเปลี่ยนแปลง
+        m3.push(row)
+      }
     }
-  })
 
-  let m3 = []
+    res.status(200).json({
+      status: 200,
+      message: 'Update Sucess',
+      data: withdrawTran
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
 
-  for (i of withdrawTran) {
-    const row = await DisributionM3.findOne({ where: { coNo: i.orderId } })
-
-    if (row) {
-      row.MGTRDT = i.MGTRDT_NEW
-      await row.save() // บันทึกการเปลี่ยนแปลง
-      m3.push(row)
-    }
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
 
-  res.status(200).json({
-    status: 200,
-    message: 'Update Sucess',
-    data: withdrawTran
-  })
 }
 
 exports.withdrawCheckM3 = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+  try {
+    const channel = req.headers['x-channel']
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
-  const withdrawData = await Distribution.find({
-    status: ['approved', 'confirm'],
-    withdrawType: { $ne: 'credit' },
-    area: { $ne: 'IT211' }
-  })
+    const withdrawData = await Distribution.find({
+      status: ['approved', 'confirm'],
+      withdrawType: { $ne: 'credit' },
+      area: { $ne: 'IT211' }
+    })
 
-  const withdrawTran = withdrawData.map(item => {
-    createdAtThai = toThaiTime(item.createdAt)
-    return {
-      orderId: item.orderId,
-      createdAt: item.createdAt,
-      createdAtThai: createdAtThai,
-      MGTRDT_NEW: formatDateToYYYYMMDD(createdAtThai)
+    const withdrawTran = withdrawData.map(item => {
+      createdAtThai = toThaiTime(item.createdAt)
+      return {
+        orderId: item.orderId,
+        createdAt: item.createdAt,
+        createdAtThai: createdAtThai,
+        MGTRDT_NEW: formatDateToYYYYMMDD(createdAtThai)
+      }
+    })
+
+    let NotInM3 = []
+
+    for (i of withdrawTran) {
+      const row = await DisributionM3.findOne({ where: { coNo: i.orderId } })
+      if (!row) {
+        NotInM3.push(i.orderId)
+      }
     }
-  })
 
-  let NotInM3 = []
+    res.status(200).json({
+      status: 200,
+      message: 'fetch Sucess',
+      data: NotInM3
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
 
-  for (i of withdrawTran) {
-    const row = await DisributionM3.findOne({ where: { coNo: i.orderId } })
-    if (!row) {
-      NotInM3.push(i.orderId)
-    }
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
 
-  res.status(200).json({
-    status: 200,
-    message: 'fetch Sucess',
-    data: NotInM3
-  })
 }
 
 exports.getWithdrawError = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+  try {
+    const channel = req.headers['x-channel']
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
-  const withdrawData = await Distribution.find({
-    status: ['approved', 'confirm'],
-    withdrawType: { $ne: 'credit' },
-    area: { $ne: 'IT211' }
-  })
-
-  let data = []
-
-  for (item of withdrawData) {
-    let typeError = ''
-    const mgHead = await DisributionM3.findOne({
-      where: { coNo: item.orderId }
+    const withdrawData = await Distribution.find({
+      status: ['approved', 'confirm'],
+      withdrawType: { $ne: 'credit' },
+      area: { $ne: 'IT211' }
     })
-    const countProduct = item.listProduct.length
 
-    if (mgHead) {
-      if (countProduct === parseInt(item.lineM3)) {
-        typeError = 'สินค้าครบ'
+    let data = []
+
+    for (item of withdrawData) {
+      let typeError = ''
+      const mgHead = await DisributionM3.findOne({
+        where: { coNo: item.orderId }
+      })
+      const countProduct = item.listProduct.length
+
+      if (mgHead) {
+        if (countProduct === parseInt(item.lineM3)) {
+          typeError = 'สินค้าครบ'
+        } else {
+          typeError = 'สินค้าไม่ครบ'
+        }
       } else {
-        typeError = 'สินค้าไม่ครบ'
+        typeError = 'ไม่เข้าระบบ M3'
       }
-    } else {
-      typeError = 'ไม่เข้าระบบ M3'
+
+      const dataTran = {
+        orderId: item.orderId,
+        orderType: item.orderType,
+        newTrip: item.newTrip,
+        orderTypeName: item.orderTypeName,
+        withdrawType: item.withdrawType,
+        area: item.area,
+        fromWarehouse: item.fromWarehouse,
+        toWarehouse: item.toWarehouse,
+        shippingId: item.shippingId,
+        shippingRoute: item.shippingRoute,
+        shippingName: item.shippingName,
+        sendAddress: item.sendAddress,
+        sendDate: item.sendDate,
+        remark: item.remark,
+        status: item.status,
+        statusTH: item.statusTH,
+        period: item.period,
+        createdAt: toThaiTime(item.createdAt),
+        updatedAt: toThaiTime(item.updatedAt),
+        listProduct: countProduct,
+        lineM3: item.lineM3 || '0',
+        heightStatus: item.heightStatus || '0',
+        lowStatus: item.lowStatus || '0',
+        typeError: typeError
+      }
+      data.push(dataTran)
     }
 
-    const dataTran = {
-      orderId: item.orderId,
-      orderType: item.orderType,
-      newTrip: item.newTrip,
-      orderTypeName: item.orderTypeName,
-      withdrawType: item.withdrawType,
-      area: item.area,
-      fromWarehouse: item.fromWarehouse,
-      toWarehouse: item.toWarehouse,
-      shippingId: item.shippingId,
-      shippingRoute: item.shippingRoute,
-      shippingName: item.shippingName,
-      sendAddress: item.sendAddress,
-      sendDate: item.sendDate,
-      remark: item.remark,
-      status: item.status,
-      statusTH: item.statusTH,
-      period: item.period,
-      createdAt: toThaiTime(item.createdAt),
-      updatedAt: toThaiTime(item.updatedAt),
-      listProduct: countProduct,
-      lineM3: item.lineM3 || '0',
-      heightStatus: item.heightStatus || '0',
-      lowStatus: item.lowStatus || '0',
-      typeError: typeError
-    }
-    data.push(dataTran)
+    res.status(200).json({
+      status: 200,
+      message: 'fetch Sucess',
+      data: data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
 
-  res.status(200).json({
-    status: 200,
-    message: 'fetch Sucess',
-    data: data
-  })
 }
 
 exports.UpdateWithdrawConjob = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+  try {
+    const channel = req.headers['x-channel']
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
-  const withdrawData = await Distribution.find({
-    // status: ['approved', 'confirm'],
-    withdrawType: { $ne: 'credit' },
-    area: { $ne: 'IT211' }
-  })
+    const withdrawData = await Distribution.find({
+      // status: ['approved', 'confirm'],
+      withdrawType: { $ne: 'credit' },
+      area: { $ne: 'IT211' }
+    })
 
-  for (i of withdrawData) {
-    const mgHead = await DisributionM3.findOne({ where: { coNo: i.orderId } })
-    if (mgHead) {
-      const count = await MGLINE.count({ where: { MRTRNR: i.orderId } })
-      const lowStatus = mgHead.MGTRSL
-      const highStatus = mgHead.MGTRSH
+    for (i of withdrawData) {
+      const mgHead = await DisributionM3.findOne({ where: { coNo: i.orderId } })
+      if (mgHead) {
+        const count = await MGLINE.count({ where: { MRTRNR: i.orderId } })
+        const lowStatus = mgHead.MGTRSL
+        const highStatus = mgHead.MGTRSH
 
-      await Distribution.updateOne(
-        { orderId: i.orderId },
-        {
-          $set: {
-            lineM3: count,
-            lowStatus: lowStatus,
-            heightStatus: highStatus
+        await Distribution.updateOne(
+          { orderId: i.orderId },
+          {
+            $set: {
+              lineM3: count,
+              lowStatus: lowStatus,
+              heightStatus: highStatus
+            }
           }
-        }
-      )
+        )
+      }
     }
+
+    res.status(200).json({
+      status: 200,
+      message: 'Update Sucess'
+      // data: NotInM3
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
 
-  res.status(200).json({
-    status: 200,
-    message: 'Update Sucess'
-    // data: NotInM3
-  })
 }
 
 exports.uploadNPDData = async (req, res) => {
