@@ -1577,3 +1577,142 @@ exports.checkPriceProductOrder = async (req, res) => {
   }
 
 }
+
+
+exports.getProductPage = async (req ,res) => {
+  try {
+    const { type, group, area, period, brand, size, flavour, limit, page,  } = req.body
+    const channel = req.headers['x-channel']
+
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+
+    const parseArrayParam = param => {
+      if (!param) return []
+      try {
+        return typeof param === 'string' ? JSON.parse(param) : param
+      } catch {
+        return param.split(',')
+      }
+    }
+
+    const parseGram = sizeStr => {
+      const match = sizeStr.match(/^([\d.]+)(?:-[A-Z])?\s*(KG|G|g|kg)?/i)
+      if (!match) return 0
+      const value = parseFloat(match[1])
+      const unit = (match[2] || 'G').toUpperCase()
+      return unit === 'KG' ? value * 1000 : value
+    }
+
+    let products = []
+    let stock = []
+
+ 
+      if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
+        return res.status(400).json({
+          status: '400',
+          message: 'Invalid type! Required: sale, refund, or withdraw.'
+        })
+      }
+
+      const groupArray = parseArrayParam(group)
+      const brandArray = parseArrayParam(brand)
+      const sizeArray = parseArrayParam(size)
+      const flavourArray = parseArrayParam(flavour)
+
+      const filter = {
+        ...(type === 'sale' && { statusSale: 'Y' }),
+        ...(type === 'refund' && { statusRefund: 'Y' }),
+        ...(type === 'withdraw' && { statusWithdraw: 'Y' })
+      }
+
+      const andConditions = []
+      if (groupArray.length) andConditions.push({ group: { $in: groupArray } })
+      if (brandArray.length) andConditions.push({ brand: { $in: brandArray } })
+      if (sizeArray.length) andConditions.push({ size: { $in: sizeArray } })
+      if (flavourArray.length)
+        andConditions.push({ flavour: { $in: flavourArray } })
+      if (andConditions.length) filter.$and = andConditions
+
+        // products = await Product.find(filter).lean()
+        
+        const pageNum = Math.max(parseInt(page, 10) || 1, 1)
+        const perPage = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100)
+
+
+        products = await Product.find(filter)
+        .skip((pageNum - 1) * perPage)
+        .limit(perPage)
+        .lean()
+      
+
+      // console.log(products)
+
+        stock = await Stock.aggregate([
+          {
+            $match: {
+              period: period,
+              area: area
+            }
+          },
+          { $unwind: '$listProduct' },
+          {
+            $group: {
+              _id: '$listProduct.productId',
+              balanceCtn: { $sum: '$listProduct.balanceCtn' },
+              balancePcs: { $sum: '$listProduct.balancePcs' }
+            }
+          }
+        ])
+      
+  
+
+    if (!products.length) {
+      return res
+        .status(404)
+        .json({ status: '404', message: 'No products found!' })
+    }
+    // console.log(products)
+    const data = products
+      .map(product => {
+        const stockMatch = stock.find(s => s._id === product.id) || {}
+        let listUnit = product.listUnit || []
+        // console.log(stockMatch)
+        if (type === 'sale') {
+          listUnit = listUnit.map(u => ({ ...u, price: u.price?.sale }))
+        } else if (type === 'refund') {
+          listUnit = listUnit.map(u => ({ ...u, price: u.price?.refund }))
+        } else if (type === 'withdraw') {
+          listUnit = listUnit
+            // .filter(u => u.unit === 'CTN') // ✅ เฉพาะ CTN
+            .map(u => ({
+              ...u,
+              price: u.price?.sale
+            }))
+        }
+
+        return {
+          ...product,
+          listUnit,
+          qtyCtn: stockMatch.balanceCtn || 0,
+          qtyPcs: stockMatch.balancePcs || 0
+        }
+      })
+      .sort((a, b) => {
+        if (a.groupCode < b.groupCode) return -1
+        if (a.groupCode > b.groupCode) return 1
+        return parseGram(a.size) - parseGram(b.size)
+      })
+
+
+    res.status(200).json({
+      status: '200',
+      message: 'Products fetched successfully!',
+      data
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '501', message: error.message })
+  }
+}
