@@ -3286,7 +3286,7 @@ exports.getStorePage = async (req, res) => {
       type = 'all',
       route,
       page = 1,
-      limit = 20,
+      limit,
       q // optional search text
     } = req.query
 
