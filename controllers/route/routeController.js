@@ -1619,12 +1619,12 @@ exports.getRouteEffective = async (req, res) => {
     } else {
       query.area = { $ne: 'IT211' }
     }
-
+    
     let routes = await Route.find({
       ...query,
-      period,
-      area: { $ne: 'IT211' } // ✅ exclude area 'IT211'
     }).populate('listStore.storeInfo', 'storeId name address typeName taxId tel')
+
+    // console.log(routes)
 
     if (!routes.length) {
       return res.status(404).json({ status: 404, message: 'Not found route' })
@@ -1762,22 +1762,30 @@ exports.getRouteEffective = async (req, res) => {
       return totalRoute
     })
 
+    totalByArea.sort((a, b) => a.percentVisit - b.percentVisit)
 
     // 📊 ถ้า export Excel
     if (excel === 'true') {
-      const xlsxData = [...filteredRoutes, ...totalByArea].map(r => ({
+
+      if (area) {
+        mergeData = [...filteredRoutes, ...totalByArea]
+      } else {
+        mergeData = [...totalByArea]
+      }
+      const xlsxData = mergeData.map(r => ({
         Area: r.area || area,
         Route: r.route,
         ร้านทั้งหมด: r.storeAll,
-        รอเยี่ยม: r.storePending,
+        เยี่ยมแล้ว: r.storeTotal,
         ซื้อ: r.storeSell,
-        เยี่ยม: r.storeCheckInNotSell + r.storeNotSell,
+        ไม่ซื้อ: r.storeCheckInNotSell + r.storeNotSell,
+        รอเยี่ยม	:  r.storeAll - r.storeTotal , 
         ขาย: r.summary,
         ยอดหีบ: r.totalqty,
         เปอร์เซ็นต์การเข้าเยี่ยม: r.percentVisit,
         เปอร์เซ็นต์การขายได้: r.percentEffective,
       }))
-
+      console.log(xlsxData)
       const wb = xlsx.utils.book_new()
       const ws = xlsx.utils.json_to_sheet(xlsxData)
       xlsx.utils.book_append_sheet(wb, ws, `getRouteEffective_${period}`)
