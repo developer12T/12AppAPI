@@ -90,7 +90,6 @@ const os = require('os')
 const fs = require('fs')
 const target = require('../../models/cash/target')
 const product = require('../../models/cash/product')
-const { console } = require('inspector')
 
 const orderTimestamps = {}
 
@@ -150,11 +149,13 @@ exports.checkout = async (req, res) => {
     orderTimestamps[storeId] = now
 
     const cart = await Cart.findOne({ type, area, storeId })
+
+
     if (!cart || cart.listProduct.length === 0) {
       return res.status(404).json({ status: 404, message: 'Cart is empty!' })
     }
     const sale = await User.findOne({ area }).select(
-      'firstName surName warehouse tel saleCode salePayer'
+      'firstName surName warehouse tel saleCode salePayer area zone'
     )
     if (!sale) {
       return res
@@ -231,11 +232,18 @@ exports.checkout = async (req, res) => {
 
     const orderId = await generateOrderId(area, sale.warehouse, channel, res)
 
-    const storeData =
-      (await Store.findOne({
-        storeId: cart.storeId,
-        area: cart.area
-      }).lean()) || {}
+    let storeData = {}
+
+    if (channel === 'pc') {
+      storeData =
+        (await Store.findOne({
+          storeId: cart.storeId,
+          area: cart.area,
+        }).lean()) || {}
+    }
+
+
+
 
     const promotionshelf =
       (await PromotionShelf.find({
@@ -245,12 +253,12 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-          .map(item => item.price)
-          .reduce((sum, price) => sum + price, 0)
+        .map(item => item.price)
+        .reduce((sum, price) => sum + price, 0)
       : 0
 
     // ✅ ช่วยฟังก์ชัน: เช็คว่า createAt ตั้งแต่ Aug-2025 ขึ้นไปไหม
-    function isAug2025OrLater (createAt) {
+    function isAug2025OrLater(createAt) {
       if (!createAt) return false
 
       // case: "YYYYMM" เช่น "202508"
@@ -271,14 +279,14 @@ exports.checkout = async (req, res) => {
     // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-          storeData.address,
-          storeData.subDistrict && `ต.${storeData.subDistrict}`,
-          storeData.district && `อ.${storeData.district}`,
-          storeData.province && `จ.${storeData.province}`,
-          storeData.postCode
-        ]
-          .filter(Boolean)
-          .join(' ')
+        storeData.address,
+        storeData.subDistrict && `ต.${storeData.subDistrict}`,
+        storeData.district && `อ.${storeData.district}`,
+        storeData.province && `จ.${storeData.province}`,
+        storeData.postCode
+      ]
+        .filter(Boolean)
+        .join(' ')
       : storeData.address
 
     // const addressFinal = `${storeData.address} ต.${storeData.subDistrict} อ.${storeData.district} จ.${province} ${postCode}`
@@ -304,8 +312,8 @@ exports.checkout = async (req, res) => {
         address: addressFinal,
         taxId: storeData.taxId,
         tel: storeData.tel,
-        area: storeData.area,
-        zone: storeData.zone
+        area: sale.area,
+        zone: sale.zone
       },
       // shipping,
       // address,
@@ -501,7 +509,7 @@ exports.checkout = async (req, res) => {
       data: newOrder
     })
 
-    await restock(area, period, channel,'update')
+    await restock(area, period, channel, 'update')
 
     // await transaction.commit()
     res.status(200).json({
@@ -946,7 +954,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -1093,131 +1101,153 @@ exports.addSlip = async (req, res) => {
 }
 
 exports.OrderToExcel = async (req, res) => {
-  const { channel } = req.query
-  let { startDate, endDate } = req.query
-  const { area, team, zone } = req.query
+  try {
+    const { channel } = req.query
+    let { startDate, endDate } = req.query
+    const { area, team, zone } = req.query
 
-  // console.log(channel, date)
-  let statusArray = (req.query.status || '')
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean)
+    // console.log(channel, date)
+    let statusArray = (req.query.status || '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
 
-  if (statusArray.length === 0) {
-    statusArray = ['pending'] // default
-  }
-  // ,'approved','completed'
-  // console.log(statusArray)
-  // if (!date || date === 'null') {
-  //   const today = new Date()
-  //   const year = today.getFullYear()
-  //   const month = String(today.getMonth() + 1).padStart(2, '0') // เดือนเริ่มที่ 0
-  //   const day = String(today.getDate()).padStart(2, '0')
-
-  //   date = `${year}${month}${day}`
-  //   // console.log('📅 date:', date)
-  // }
-
-  // const channel = 'cash';
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-  const { Refund } = getModelsByChannel(channel, res, refundModel)
-
-  // const modelOrder = await Order.find({
-  //   orderId: { $not: /CC/ },
-  // })
-
-  // ช่วงเวลา "ไทย" ที่ผู้ใช้เลือก
-
-  if (!/^\d{8}$/.test(startDate)) {
-    const nowTH = new Date(
-      new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })
-    )
-    const y = nowTH.getFullYear()
-    const m = String(nowTH.getMonth() + 1).padStart(2, '0')
-    const d = String(nowTH.getDate()).padStart(2, '0') // ← ใช้ getDate() ไม่ใช่ getDay()
-    startDate = `${y}${m}${d}` // YYYYMMDD
-    endDate = `${y}${m}${d}` // YYYYMMDD
-  }
-  const startTH = new Date(
-    `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
-      6,
-      8
-    )}T00:00:00+07:00`
-  )
-  const endTH = new Date(
-    `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(
-      6,
-      8
-    )}T23:59:59.999+07:00`
-  )
-
-  // console.log(startTH, endTH)
-
-  let query = {
-    createdAt: {
-      $gte: startTH,
-      $lte: endTH
-    },
-    status: { $nin: ['canceled'] },
-    status: { $in: statusArray },
-    type: { $in: ['sale'] },
-    'store.area': { $ne: 'IT211' }
-  }
-
-  // Order Change
-  let queryChange = {
-    createdAt: {
-      $gte: startTH,
-      $lte: endTH
-    },
-    'store.area': { $ne: 'IT211' },
-    status: { $in: statusArray },
-    status: { $nin: ['canceled', 'pending', 'reject'] },
-    type: { $in: ['change'] }
-  }
-
-  let queryRefund = {
-    status: { $in: statusArray },
-    status: { $nin: ['canceled', 'reject', 'pending'] },
-    'store.area': { $ne: 'IT211' },
-    createdAt: {
-      $gte: startTH,
-      $lte: endTH
+    if (statusArray.length === 0) {
+      statusArray = ['pending'] // default
     }
-  }
+    // ,'approved','completed'
+    // console.log(statusArray)
+    // if (!date || date === 'null') {
+    //   const today = new Date()
+    //   const year = today.getFullYear()
+    //   const month = String(today.getMonth() + 1).padStart(2, '0') // เดือนเริ่มที่ 0
+    //   const day = String(today.getDate()).padStart(2, '0')
 
-  if (area) {
-    query['store.area'] = area
-    queryChange['store.area'] = area
-    queryRefund['store.area'] = area
-  } else if (zone) {
-    query['store.area'] = { $regex: `^${zone}`, $options: 'i' }
-    queryChange['store.area'] = { $regex: `^${zone}`, $options: 'i' }
-    queryRefund['store.area'] = { $regex: `^${zone}`, $options: 'i' }
-  }
+    //   date = `${year}${month}${day}`
+    //   // console.log('📅 date:', date)
+    // }
 
-  const pipeline = [
-    {
-      $match: query
-    },
-    {
-      $addFields: {
-        createdAtThai: {
-          $dateAdd: {
-            startDate: '$createdAt',
-            unit: 'hour',
-            amount: 7
-          }
-        },
-        team3: {
-          $concat: [
-            { $substrCP: ['$store.area', 0, 2] },
-            { $substrCP: ['$store.area', 3, 1] }
-          ]
-        }
+    // const channel = 'cash';
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+
+    // const modelOrder = await Order.find({
+    //   orderId: { $not: /CC/ },
+    // })
+
+    // ช่วงเวลา "ไทย" ที่ผู้ใช้เลือก
+
+    if (!/^\d{8}$/.test(startDate)) {
+      const nowTH = new Date(
+        new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })
+      )
+      const y = nowTH.getFullYear()
+      const m = String(nowTH.getMonth() + 1).padStart(2, '0')
+      const d = String(nowTH.getDate()).padStart(2, '0') // ← ใช้ getDate() ไม่ใช่ getDay()
+      startDate = `${y}${m}${d}` // YYYYMMDD
+      endDate = `${y}${m}${d}` // YYYYMMDD
+    }
+    const startTH = new Date(
+      `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
+        6,
+        8
+      )}T00:00:00+07:00`
+    )
+    const endTH = new Date(
+      `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(
+        6,
+        8
+      )}T23:59:59.999+07:00`
+    )
+
+    // console.log(startTH, endTH)
+
+    let query = {
+      createdAt: {
+        $gte: startTH,
+        $lte: endTH
+      },
+      status: { $nin: ['canceled'] },
+      status: { $in: statusArray },
+      type: { $in: ['sale'] },
+      'store.area': { $ne: 'IT211' }
+    }
+
+    // Order Change
+    let queryChange = {
+      createdAt: {
+        $gte: startTH,
+        $lte: endTH
+      },
+      'store.area': { $ne: 'IT211' },
+      status: { $in: statusArray },
+      status: { $nin: ['canceled', 'pending', 'reject'] },
+      type: { $in: ['change'] }
+    }
+
+    let queryRefund = {
+      status: { $in: statusArray },
+      status: { $nin: ['canceled', 'reject', 'pending'] },
+      'store.area': { $ne: 'IT211' },
+      createdAt: {
+        $gte: startTH,
+        $lte: endTH
       }
     }
-    // {
+
+    if (area) {
+      query['store.area'] = area
+      queryChange['store.area'] = area
+      queryRefund['store.area'] = area
+    } else if (zone) {
+      query['store.area'] = { $regex: `^${zone}`, $options: 'i' }
+      queryChange['store.area'] = { $regex: `^${zone}`, $options: 'i' }
+      queryRefund['store.area'] = { $regex: `^${zone}`, $options: 'i' }
+    }
+
+    const pipeline = [
+      {
+        $match: query
+      },
+      {
+        $addFields: {
+          createdAtThai: {
+            $dateAdd: {
+              startDate: '$createdAt',
+              unit: 'hour',
+              amount: 7
+            }
+          },
+          team3: {
+            $concat: [
+              { $substrCP: ['$store.area', 0, 2] },
+              { $substrCP: ['$store.area', 3, 1] }
+            ]
+          }
+        }
+      }
+      // {
+      //   $project: {
+      //     // ดึงเฉพาะที่ต้องใช้
+      //     createdAt: 1,
+      //     orderId: 1,
+      //     sale: 1,
+      //     store: 1,
+      //     // team3: 1,
+      //     listProduct: 1,
+      //     listPromotions: 1
+      //   }
+      // }
+    ]
+    if (team) {
+      pipeline.push({
+        $match: {
+          team3: { $regex: `^${team}`, $options: 'i' }
+        }
+      })
+    }
+
+    // pipeline.push({
     //   $project: {
     //     // ดึงเฉพาะที่ต้องใช้
     //     createdAt: 1,
@@ -1228,154 +1258,113 @@ exports.OrderToExcel = async (req, res) => {
     //     listProduct: 1,
     //     listPromotions: 1
     //   }
-    // }
-  ]
-  if (team) {
+    // })
+
+    // console.log(pipeline[3])
+
     pipeline.push({
-      $match: {
-        team3: { $regex: `^${team}`, $options: 'i' }
-      }
+      $sort: { statusASC: 1, createdAt: -1 }
     })
-  }
 
-  // pipeline.push({
-  //   $project: {
-  //     // ดึงเฉพาะที่ต้องใช้
-  //     createdAt: 1,
-  //     orderId: 1,
-  //     sale: 1,
-  //     store: 1,
-  //     // team3: 1,
-  //     listProduct: 1,
-  //     listPromotions: 1
-  //   }
-  // })
+    const modelOrder = await Order.aggregate(pipeline)
+    // console.log(modelOrder)
 
-  // console.log(pipeline[3])
-
-  pipeline.push({
-    $sort: { statusASC: 1, createdAt: -1 }
-  })
-
-  const modelOrder = await Order.aggregate(pipeline)
-  // console.log(modelOrder)
-
-  const pipelineChange = [
-    {
-      $match: queryChange
-    },
-    {
-      $addFields: {
-        createdAtThai: {
-          $dateAdd: {
-            startDate: '$createdAt',
-            unit: 'hour',
-            amount: 7
+    const pipelineChange = [
+      {
+        $match: queryChange
+      },
+      {
+        $addFields: {
+          createdAtThai: {
+            $dateAdd: {
+              startDate: '$createdAt',
+              unit: 'hour',
+              amount: 7
+            }
+          },
+          team3: {
+            $concat: [
+              { $substrCP: ['$store.area', 0, 2] }, // "BE"
+              { $substrCP: ['$store.area', 3, 1] } // "1" → from "212" (character at index 3)
+            ]
           }
-        },
-        team3: {
-          $concat: [
-            { $substrCP: ['$store.area', 0, 2] }, // "BE"
-            { $substrCP: ['$store.area', 3, 1] } // "1" → from "212" (character at index 3)
-          ]
         }
+      },
+      {
+        $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
       }
-    },
-    {
-      $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
-    }
-  ]
+    ]
 
-  if (team) {
+    if (team) {
+      pipelineChange.push({
+        $match: {
+          team3: { $regex: `^${team}`, $options: 'i' }
+        }
+      })
+    }
+
     pipelineChange.push({
-      $match: {
-        team3: { $regex: `^${team}`, $options: 'i' }
-      }
+      $sort: { statusASC: 1, createdAt: -1 }
     })
-  }
 
-  pipelineChange.push({
-    $sort: { statusASC: 1, createdAt: -1 }
-  })
+    const modelChange = await Order.aggregate(pipelineChange)
 
-  const modelChange = await Order.aggregate(pipelineChange)
-
-  const pipelineRefund = [
-    {
-      $match: queryRefund
-    },
-    {
-      $addFields: {
-        createdAtThai: {
-          $dateAdd: {
-            startDate: '$createdAt',
-            unit: 'hour',
-            amount: 7
+    const pipelineRefund = [
+      {
+        $match: queryRefund
+      },
+      {
+        $addFields: {
+          createdAtThai: {
+            $dateAdd: {
+              startDate: '$createdAt',
+              unit: 'hour',
+              amount: 7
+            }
+          },
+          team3: {
+            $concat: [
+              { $substrCP: ['$store.area', 0, 2] },
+              { $substrCP: ['$store.area', 3, 1] }
+            ]
           }
-        },
-        team3: {
-          $concat: [
-            { $substrCP: ['$store.area', 0, 2] },
-            { $substrCP: ['$store.area', 3, 1] }
-          ]
         }
       }
-    }
-  ]
+    ]
 
-  if (team) {
+    if (team) {
+      pipelineRefund.push({
+        $match: {
+          team3: { $regex: `^${team}`, $options: 'i' }
+        }
+      })
+    }
+
     pipelineRefund.push({
-      $match: {
-        team3: { $regex: `^${team}`, $options: 'i' }
-      }
-    })
-  }
-
-  pipelineRefund.push({
-    $sort: { statusASC: 1, createdAt: -1 }
-  })
-
-  const modelRefund = await Refund.aggregate(pipelineRefund)
-
-  const tranFromOrder = modelOrder.flatMap(order => {
-    let counterOrder = 0
-    function formatDateToThaiYYYYMMDD (date) {
-      const d = new Date(date)
-      d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
-
-      const yyyy = d.getFullYear()
-      const mm = String(d.getMonth() + 1).padStart(2, '0')
-      const dd = String(d.getDate()).padStart(2, '0')
-
-      return `${yyyy}${mm}${dd}`
-    }
-    // console.log(order.createdAtThai)
-    // ใช้งาน
-    const RLDT = formatDateToThaiYYYYMMDD(order.createdAt)
-
-    const listProduct = order.listProduct.map(product => {
-      return {
-        proCode: '',
-        id: product.id,
-        name: product.name,
-        group: product.group,
-        brand: product.brand,
-        size: product.size,
-        flavour: product.flavour,
-        qty: product.qty,
-        unit: product.unit,
-        unitName: product.unitName,
-        price: product.price,
-        subtotal: product.subtotal,
-        discount: product.discount,
-        netTotal: product.netTotal
-      }
+      $sort: { statusASC: 1, createdAt: -1 }
     })
 
-    const listPromotion = order.listPromotions.map(promo =>
-      promo.listProduct.map(product => {
+    const modelRefund = await Refund.aggregate(pipelineRefund)
+
+    const tranFromOrder = modelOrder.flatMap(order => {
+      let counterOrder = 0
+      function formatDateToThaiYYYYMMDD(date) {
+        const d = new Date(date)
+        d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
+
+        const yyyy = d.getFullYear()
+        const mm = String(d.getMonth() + 1).padStart(2, '0')
+        const dd = String(d.getDate()).padStart(2, '0')
+
+        return `${yyyy}${mm}${dd}`
+      }
+      // console.log(order.createdAtThai)
+      // ใช้งาน
+      const RLDT = formatDateToThaiYYYYMMDD(order.createdAt)
+
+      const listProduct = order.listProduct.map(product => {
         return {
-          proCode: promo.proCode,
+          proCode: '',
           id: product.id,
           name: product.name,
           group: product.group,
@@ -1385,301 +1374,63 @@ exports.OrderToExcel = async (req, res) => {
           qty: product.qty,
           unit: product.unit,
           unitName: product.unitName,
-          qtyPcs: product.qtyPcs
+          price: product.price,
+          subtotal: product.subtotal,
+          discount: product.discount,
+          netTotal: product.netTotal
         }
       })
-    )
 
-    const productIDS = [...listProduct, ...listPromotion].flat()
-
-    // console.log("productIDS",productIDS)
-    return productIDS.map(product => {
-      counterOrder++
-
-      // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
-
-      return {
-        // AREA: order.store.area,
-        CUNO: order.store.storeId,
-        FACI: 'F10',
-        WHLO: order.sale.warehouse,
-        ORNO: '',
-        OAORTP: 'A31',
-        RLDT: RLDT,
-        ADID: '',
-        CUOR: order.orderId,
-        OAOREF: '',
-        OBITNO: product.id,
-        OBBANO: '',
-        OBALUN: product.unit,
-        OBORQA: `${product.qty}`,
-        OBSAPR: `${product.price || 0}`,
-        OBSPUN: product.unit,
-        OBWHSL: '',
-        ROUT: '',
-        OBPONR: `${counterOrder}`,
-        OBDIA2: `${product.discount || 0}`,
-        OBRSCD: '',
-        OBCMNO: '',
-        OBPIDE: product.proCode,
-        OBSMCD: order.sale.saleCode,
-        OAORDT: RLDT,
-        OAODAM: '0',
-        OECRID: '',
-        OECRAM: '',
-        OECRID2: '',
-        OECRAM2: '',
-        OECRID3: '',
-        OECRAM3: '',
-        OECRID4: '',
-        OECRAM4: '',
-        OECRID5: '',
-        OECRAM5: '',
-        OARESP: '',
-        OAYREF: '',
-        OATEL2: '',
-        OAWCON: '',
-        OAFRE1: '',
-        OATXAP: '',
-        OATXAP2: '',
-        OBDIA1: '',
-        OBDIA3: '',
-        OBDIA4: ''
-      }
-    })
-  })
-
-  const tranFromChange = modelChange.flatMap(order => {
-    let counterOrder = 0
-    function formatDateToThaiYYYYMMDD (date) {
-      const d = new Date(date)
-      d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
-
-      const yyyy = d.getFullYear()
-      const mm = String(d.getMonth() + 1).padStart(2, '0')
-      const dd = String(d.getDate()).padStart(2, '0')
-
-      return `${yyyy}${mm}${dd}`
-    }
-
-    // ใช้งาน
-    const RLDT = formatDateToThaiYYYYMMDD(order.createdAt)
-
-    const listProduct = order.listProduct.map(product => {
-      return {
-        proCode: '',
-        id: product.id,
-        name: product.name,
-        group: product.group,
-        brand: product.brand,
-        size: product.size,
-        flavour: product.flavour,
-        qty: product.qty,
-        unit: product.unit,
-        unitName: product.unitName,
-        price: product.price,
-        subtotal: product.subtotal,
-        discount: product.discount,
-        netTotal: product.netTotal
-      }
-    })
-
-    const productIDS = [...listProduct].flat()
-
-    // console.log("productIDS",productIDS)
-    return productIDS.map(product => {
-      counterOrder++
-
-      // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
-
-      return {
-        AREA: order.store.area,
-        CUNO: order.store.storeId,
-        FACI: 'F10',
-        WHLO: order.sale.warehouse,
-        ORNO: '',
-        OAORTP: 'B31',
-        RLDT: RLDT,
-        ADID: '',
-        CUOR: order.orderId,
-        OAOREF: '',
-        OBITNO: product.id,
-        OBBANO: '',
-        OBALUN: product.unit,
-        OBORQA: `${product.qty}`,
-        OBSAPR: `${product.price || 0}`,
-        OBSPUN: product.unit,
-        OBWHSL: '',
-        ROUT: '',
-        OBPONR: `${counterOrder}`,
-        OBDIA2: `${product.discount || 0}`,
-        OBRSCD: '',
-        OBCMNO: '',
-        OBPIDE: product.proCode,
-        OBSMCD: order.sale.saleCode,
-        OAORDT: RLDT,
-        OAODAM: '0',
-        OECRID: '',
-        OECRAM: '',
-        OECRID2: '',
-        OECRAM2: '',
-        OECRID3: '',
-        OECRAM3: '',
-        OECRID4: '',
-        OECRAM4: '',
-        OECRID5: '',
-        OECRAM5: '',
-        OARESP: '',
-        OAYREF: '',
-        OATEL2: '',
-        OAWCON: '',
-        OAFRE1: '',
-        OATXAP: '',
-        OATXAP2: '',
-        OBDIA1: '',
-        OBDIA3: '',
-        OBDIA4: ''
-      }
-    })
-  })
-
-  // const currentYear = new Date().getFullYear()
-  // const years = [
-  //   // currentYear +1
-  //   currentYear, // ปีปัจจุบัน
-  //   currentYear - 1, // ปีก่อน
-  //   currentYear - 2, // ย้อนหลัง 2 ปี
-  //   currentYear + 1 // ย้อนหลัง 2 ปี
-  // ]
-
-  // รวบรวม itemCode ทั้งหมดจาก refund
-  const refundItems = modelRefund.flatMap(o => o.listProduct.map(p => p.id))
-  // console.log(refundItems)
-  const uniqueCodes = [...new Set(refundItems)]
-
-  // ปีที่ยอมรับ
-  const currentYear = new Date().getFullYear()
-  const years = [currentYear, currentYear - 1, currentYear - 2, currentYear + 1]
-
-  // ดึงล็อตรวดเดียวจาก MSSQL (Sequelize)
-  const lotRows = await ItemLotM3.findAll({
-    where: {
-      itemCode: { [Op.in]: uniqueCodes },
-      expireDate: { [Op.or]: years.map(y => ({ [Op.like]: `${y}%` })) },
-      [Op.and]: [literal('LEN(LTRIM(RTRIM([LMBANO]))) = 16')]
-    },
-    attributes: ['itemCode', 'lot'], // แค่นี้พอ
-    raw: true
-  })
-
-  // ทำ map เพื่อ lookup เร็ว O(1)
-  const lotMap = new Map()
-  for (const r of lotRows) {
-    const code = (r.itemCode || '').trim() // <<<<<< สำคัญ
-    const lot = (r.lot || '').trim()
-    const curr = lotMap.get(code)
-
-    // ถ้ายังไม่มี หรือ lot นี้ใหม่กว่า ให้ทับ
-    if (!curr || lot > curr) {
-      // ตัวเลขความยาวเท่ากัน เปรียบเทียบ string ได้
-      lotMap.set(code, lot)
-    }
-  }
-
-  // console.log('uniqueCodes', uniqueCodes)
-  // console.log('lotRows', lotRows)
-  // console.log('lotMap', lotMap)
-
-  // --- สร้าง tranFromRefund ให้แบน ---
-  const tranFromRefundNested = await Promise.all(
-    modelRefund.map(async order => {
-      let counterOrder = 0
-
-      const formatDateToThaiYYYYMMDD = date => {
-        const d = new Date(date)
-        d.setHours(d.getHours() + 7)
-        const yyyy = d.getFullYear()
-        const mm = String(d.getMonth() + 1).padStart(2, '0')
-        const dd = String(d.getDate()).padStart(2, '0')
-        return `${yyyy}${mm}${dd}`
-      }
-
-      const RLDT = formatDateToThaiYYYYMMDD(order.createdAt)
-
-      const listProduct = await Promise.all(
-        order.listProduct
-          // .filter(p => p.condition === 'good')
-          .map(async p => {
-            // const lotData = await Item.findAll({
-            //   where: {
-            //     itemCode: p.id,
-            //     expireDate: { [Op.like]: `23%` },
-            //     [Op.and]: [{ lot: { [Op.regexp]: '^[0-9]{16}$' } }]
-            //   }
-            // })
-            // const lotData = await Item.findOne({
-            //   where: {
-            //     itemCode: p.id,
-            //     expireDate: {
-            //       [Op.or]: years.map(y => ({ [Op.like]: `${y}%` }))
-            //     },
-            //     // date: {
-            //     //   [Op.like]: `${p.expireDate.slice(0, 4)}%`
-            //     // },
-            //     // lot: { [Op.like]: `${p.expireDate.slice(2, 4)}%` },
-            //     [Op.and]: [
-            //       literal('LEN(LTRIM(RTRIM([Lot]))) = 16') // ความยาว 16 ตัวอักษร
-            //       // literal("LTRIM(RTRIM([Lot])) NOT LIKE '%[^0-9]%'") // ไม่มีตัวที่ไม่ใช่ตัวเลข
-            //     ]
-            //   }
-            // })
-            return {
-              proCode: '',
-              id: p.id,
-              name: p.name,
-              group: p.group,
-              brand: p.brand,
-              size: p.size,
-              flavour: p.flavour,
-              qty: p.qty,
-              unit: p.unit,
-              unitName: p.unitName,
-              price: p.price,
-              subtotal: p.subtotal,
-              discount: p.discount,
-              netTotal: p.netTotal,
-              lotNo: lotMap.get(p.id) || ''
-              // lotNo: lotData?.lot || null
-            }
-          })
+      const listPromotion = order.listPromotions.map(promo =>
+        promo.listProduct.map(product => {
+          return {
+            proCode: promo.proCode,
+            id: product.id,
+            name: product.name,
+            group: product.group,
+            brand: product.brand,
+            size: product.size,
+            flavour: product.flavour,
+            qty: product.qty,
+            unit: product.unit,
+            unitName: product.unitName,
+            qtyPcs: product.qtyPcs
+          }
+        })
       )
 
-      return listProduct.map(product => {
+      const productIDS = [...listProduct, ...listPromotion].flat()
+
+      // console.log("productIDS",productIDS)
+      return productIDS.map(product => {
         counterOrder++
+
+        // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
+
         return {
-          AREA: order.store.area,
+          // AREA: order.store.area,
           CUNO: order.store.storeId,
           FACI: 'F10',
           WHLO: order.sale.warehouse,
           ORNO: '',
-          OAORTP: 'A34', // << คืนของ
+          OAORTP: 'A31',
           RLDT: RLDT,
           ADID: '',
           CUOR: order.orderId,
           OAOREF: '',
           OBITNO: product.id,
-          OBBANO: product.lotNo ?? '', // อย่าใช้ ${} ในอ็อบเจ็กต์
+          OBBANO: '',
           OBALUN: product.unit,
-          OBORQA: `-${product.qty}`,
-          OBSAPR: `${product.price}`,
+          OBORQA: `${product.qty}`,
+          OBSAPR: `${product.price || 0}`,
           OBSPUN: product.unit,
-          OBWHSL: 'CS0001',
+          OBWHSL: '',
           ROUT: '',
           OBPONR: `${counterOrder}`,
           OBDIA2: `${product.discount || 0}`,
           OBRSCD: '',
           OBCMNO: '',
-          OBPIDE: '',
+          OBPIDE: product.proCode,
           OBSMCD: order.sale.saleCode,
           OAORDT: RLDT,
           OAODAM: '0',
@@ -1706,66 +1457,335 @@ exports.OrderToExcel = async (req, res) => {
         }
       })
     })
-  )
 
-  const tranFromRefund = tranFromRefundNested.flat()
+    const tranFromChange = modelChange.flatMap(order => {
+      let counterOrder = 0
+      function formatDateToThaiYYYYMMDD(date) {
+        const d = new Date(date)
+        d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
-  if (tranFromOrder.length == 0) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not Found Order'
-    })
-  }
-  function yyyymmddToDdMmYyyy (dateString) {
-    // สมมติ dateString คือ '20250804'
-    const year = dateString.slice(0, 4)
-    const month = dateString.slice(4, 6)
-    const day = dateString.slice(6, 8)
-    return `${day}${month}${year}`
-  }
+        const yyyy = d.getFullYear()
+        const mm = String(d.getMonth() + 1).padStart(2, '0')
+        const dd = String(d.getDate()).padStart(2, '0')
 
-  // รวม Order + Refund ให้เป็นชุดข้อมูลเดียว
-  const allTransactions = [
-    ...tranFromOrder,
-    ...tranFromChange,
-    ...tranFromRefund
-  ]
-
-  const wb = xlsx.utils.book_new()
-  const ws = xlsx.utils.json_to_sheet(allTransactions)
-  xlsx.utils.book_append_sheet(
-    wb,
-    ws,
-    `ESP${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}`
-  )
-
-  const tempPath = path.join(
-    os.tmpdir(),
-    `CA_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}.xlsx`
-  )
-  xlsx.writeFile(wb, tempPath)
-
-  res.download(
-    tempPath,
-    `CA_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}.xlsx`,
-    err => {
-      if (err) {
-        console.error('❌ Download error:', err)
-        // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
-        if (!res.headersSent) {
-          res.status(500).send('Download failed')
-        }
+        return `${yyyy}${mm}${dd}`
       }
 
-      // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
-    }
-  )
+      // ใช้งาน
+      const RLDT = formatDateToThaiYYYYMMDD(order.createdAt)
 
-  // res.status(200).json({
-  //   status:200,
-  //   OBSAPR:sum(OBSAPR)
-  // })
+      const listProduct = order.listProduct.map(product => {
+        return {
+          proCode: '',
+          id: product.id,
+          name: product.name,
+          group: product.group,
+          brand: product.brand,
+          size: product.size,
+          flavour: product.flavour,
+          qty: product.qty,
+          unit: product.unit,
+          unitName: product.unitName,
+          price: product.price,
+          subtotal: product.subtotal,
+          discount: product.discount,
+          netTotal: product.netTotal
+        }
+      })
+
+      const productIDS = [...listProduct].flat()
+
+      // console.log("productIDS",productIDS)
+      return productIDS.map(product => {
+        counterOrder++
+
+        // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
+
+        return {
+          AREA: order.store.area,
+          CUNO: order.store.storeId,
+          FACI: 'F10',
+          WHLO: order.sale.warehouse,
+          ORNO: '',
+          OAORTP: 'B31',
+          RLDT: RLDT,
+          ADID: '',
+          CUOR: order.orderId,
+          OAOREF: '',
+          OBITNO: product.id,
+          OBBANO: '',
+          OBALUN: product.unit,
+          OBORQA: `${product.qty}`,
+          OBSAPR: `${product.price || 0}`,
+          OBSPUN: product.unit,
+          OBWHSL: '',
+          ROUT: '',
+          OBPONR: `${counterOrder}`,
+          OBDIA2: `${product.discount || 0}`,
+          OBRSCD: '',
+          OBCMNO: '',
+          OBPIDE: product.proCode,
+          OBSMCD: order.sale.saleCode,
+          OAORDT: RLDT,
+          OAODAM: '0',
+          OECRID: '',
+          OECRAM: '',
+          OECRID2: '',
+          OECRAM2: '',
+          OECRID3: '',
+          OECRAM3: '',
+          OECRID4: '',
+          OECRAM4: '',
+          OECRID5: '',
+          OECRAM5: '',
+          OARESP: '',
+          OAYREF: '',
+          OATEL2: '',
+          OAWCON: '',
+          OAFRE1: '',
+          OATXAP: '',
+          OATXAP2: '',
+          OBDIA1: '',
+          OBDIA3: '',
+          OBDIA4: ''
+        }
+      })
+    })
+
+    // const currentYear = new Date().getFullYear()
+    // const years = [
+    //   // currentYear +1
+    //   currentYear, // ปีปัจจุบัน
+    //   currentYear - 1, // ปีก่อน
+    //   currentYear - 2, // ย้อนหลัง 2 ปี
+    //   currentYear + 1 // ย้อนหลัง 2 ปี
+    // ]
+
+    // รวบรวม itemCode ทั้งหมดจาก refund
+    const refundItems = modelRefund.flatMap(o => o.listProduct.map(p => p.id))
+    // console.log(refundItems)
+    const uniqueCodes = [...new Set(refundItems)]
+
+    // ปีที่ยอมรับ
+    const currentYear = new Date().getFullYear()
+    const years = [currentYear, currentYear - 1, currentYear - 2, currentYear + 1]
+
+    // ดึงล็อตรวดเดียวจาก MSSQL (Sequelize)
+    const lotRows = await ItemLotM3.findAll({
+      where: {
+        itemCode: { [Op.in]: uniqueCodes },
+        expireDate: { [Op.or]: years.map(y => ({ [Op.like]: `${y}%` })) },
+        [Op.and]: [literal('LEN(LTRIM(RTRIM([LMBANO]))) = 16')]
+      },
+      attributes: ['itemCode', 'lot'], // แค่นี้พอ
+      raw: true
+    })
+
+    // ทำ map เพื่อ lookup เร็ว O(1)
+    const lotMap = new Map()
+    for (const r of lotRows) {
+      const code = (r.itemCode || '').trim() // <<<<<< สำคัญ
+      const lot = (r.lot || '').trim()
+      const curr = lotMap.get(code)
+
+      // ถ้ายังไม่มี หรือ lot นี้ใหม่กว่า ให้ทับ
+      if (!curr || lot > curr) {
+        // ตัวเลขความยาวเท่ากัน เปรียบเทียบ string ได้
+        lotMap.set(code, lot)
+      }
+    }
+
+    // console.log('uniqueCodes', uniqueCodes)
+    // console.log('lotRows', lotRows)
+    // console.log('lotMap', lotMap)
+
+    // --- สร้าง tranFromRefund ให้แบน ---
+    const tranFromRefundNested = await Promise.all(
+      modelRefund.map(async order => {
+        let counterOrder = 0
+
+        const formatDateToThaiYYYYMMDD = date => {
+          const d = new Date(date)
+          d.setHours(d.getHours() + 7)
+          const yyyy = d.getFullYear()
+          const mm = String(d.getMonth() + 1).padStart(2, '0')
+          const dd = String(d.getDate()).padStart(2, '0')
+          return `${yyyy}${mm}${dd}`
+        }
+
+        const RLDT = formatDateToThaiYYYYMMDD(order.createdAt)
+
+        const listProduct = await Promise.all(
+          order.listProduct
+            // .filter(p => p.condition === 'good')
+            .map(async p => {
+              // const lotData = await Item.findAll({
+              //   where: {
+              //     itemCode: p.id,
+              //     expireDate: { [Op.like]: `23%` },
+              //     [Op.and]: [{ lot: { [Op.regexp]: '^[0-9]{16}$' } }]
+              //   }
+              // })
+              // const lotData = await Item.findOne({
+              //   where: {
+              //     itemCode: p.id,
+              //     expireDate: {
+              //       [Op.or]: years.map(y => ({ [Op.like]: `${y}%` }))
+              //     },
+              //     // date: {
+              //     //   [Op.like]: `${p.expireDate.slice(0, 4)}%`
+              //     // },
+              //     // lot: { [Op.like]: `${p.expireDate.slice(2, 4)}%` },
+              //     [Op.and]: [
+              //       literal('LEN(LTRIM(RTRIM([Lot]))) = 16') // ความยาว 16 ตัวอักษร
+              //       // literal("LTRIM(RTRIM([Lot])) NOT LIKE '%[^0-9]%'") // ไม่มีตัวที่ไม่ใช่ตัวเลข
+              //     ]
+              //   }
+              // })
+              return {
+                proCode: '',
+                id: p.id,
+                name: p.name,
+                group: p.group,
+                brand: p.brand,
+                size: p.size,
+                flavour: p.flavour,
+                qty: p.qty,
+                unit: p.unit,
+                unitName: p.unitName,
+                price: p.price,
+                subtotal: p.subtotal,
+                discount: p.discount,
+                netTotal: p.netTotal,
+                lotNo: lotMap.get(p.id) || ''
+                // lotNo: lotData?.lot || null
+              }
+            })
+        )
+
+        return listProduct.map(product => {
+          counterOrder++
+          return {
+            AREA: order.store.area,
+            CUNO: order.store.storeId,
+            FACI: 'F10',
+            WHLO: order.sale.warehouse,
+            ORNO: '',
+            OAORTP: 'A34', // << คืนของ
+            RLDT: RLDT,
+            ADID: '',
+            CUOR: order.orderId,
+            OAOREF: '',
+            OBITNO: product.id,
+            OBBANO: product.lotNo ?? '', // อย่าใช้ ${} ในอ็อบเจ็กต์
+            OBALUN: product.unit,
+            OBORQA: `-${product.qty}`,
+            OBSAPR: `${product.price}`,
+            OBSPUN: product.unit,
+            OBWHSL: 'CS0001',
+            ROUT: '',
+            OBPONR: `${counterOrder}`,
+            OBDIA2: `${product.discount || 0}`,
+            OBRSCD: '',
+            OBCMNO: '',
+            OBPIDE: '',
+            OBSMCD: order.sale.saleCode,
+            OAORDT: RLDT,
+            OAODAM: '0',
+            OECRID: '',
+            OECRAM: '',
+            OECRID2: '',
+            OECRAM2: '',
+            OECRID3: '',
+            OECRAM3: '',
+            OECRID4: '',
+            OECRAM4: '',
+            OECRID5: '',
+            OECRAM5: '',
+            OARESP: '',
+            OAYREF: '',
+            OATEL2: '',
+            OAWCON: '',
+            OAFRE1: '',
+            OATXAP: '',
+            OATXAP2: '',
+            OBDIA1: '',
+            OBDIA3: '',
+            OBDIA4: ''
+          }
+        })
+      })
+    )
+
+    const tranFromRefund = tranFromRefundNested.flat()
+
+    if (tranFromOrder.length == 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not Found Order'
+      })
+    }
+    function yyyymmddToDdMmYyyy(dateString) {
+      // สมมติ dateString คือ '20250804'
+      const year = dateString.slice(0, 4)
+      const month = dateString.slice(4, 6)
+      const day = dateString.slice(6, 8)
+      return `${day}${month}${year}`
+    }
+
+    // รวม Order + Refund ให้เป็นชุดข้อมูลเดียว
+    const allTransactions = [
+      ...tranFromOrder,
+      ...tranFromChange,
+      ...tranFromRefund
+    ]
+
+    const wb = xlsx.utils.book_new()
+    const ws = xlsx.utils.json_to_sheet(allTransactions)
+    xlsx.utils.book_append_sheet(
+      wb,
+      ws,
+      `ESP${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}`
+    )
+
+    const tempPath = path.join(
+      os.tmpdir(),
+      `CA_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}.xlsx`
+    )
+    xlsx.writeFile(wb, tempPath)
+
+    res.download(
+      tempPath,
+      `CA_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}.xlsx`,
+      err => {
+        if (err) {
+          console.error('❌ Download error:', err)
+          // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+          if (!res.headersSent) {
+            res.status(500).send('Download failed')
+          }
+        }
+
+        // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+        fs.unlink(tempPath, () => { })
+      }
+    )
+
+    // res.status(200).json({
+    //   status:200,
+    //   OBSAPR:sum(OBSAPR)
+    // })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
 }
 
 exports.getAllOrder = async (req, res) => {
@@ -2511,7 +2531,7 @@ exports.getSummarybyArea = async (req, res) => {
 
       // console.log(dataRefund)
 
-      function groupByMonthAndSum (data) {
+      function groupByMonthAndSum(data) {
         return data.reduce((acc, item) => {
           // ดึงเดือนจาก createdAtThai (หรือใช้ createdAt ก็ได้ถ้าเป็น Date)
           const date = new Date(item.createdAt)
@@ -3158,9 +3178,8 @@ exports.erpApiCheckOrderDistrabution = async (req, res) => {
 
         const ReceiveQty = Object.values(
           Receive.reduce((acc, cur) => {
-            const key = `${cur.coNo}_${
-              cur.withdrawUnit
-            }_${cur.productId.trim()}`
+            const key = `${cur.coNo}_${cur.withdrawUnit
+              }_${cur.productId.trim()}`
             if (!acc[key]) {
               acc[key] = { ...cur }
             } else {
@@ -3357,580 +3376,640 @@ exports.getSummarybyChoice = async (req, res) => {
 }
 
 exports.getSaleSummaryByStore = async (req, res) => {
-  const { routeId } = req.body
-  const channel = req.headers['x-channel']
-  const { Route } = getModelsByChannel(channel, res, routeModel)
+  try {
+    const { routeId } = req.body
+    const channel = req.headers['x-channel']
+    const { Route } = getModelsByChannel(channel, res, routeModel)
 
-  const routeData = await Route.aggregate([
-    {
-      $match: {
-        id: routeId
-      }
-    },
-    { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
-    {
-      $unwind: {
-        path: '$listStore.listOrder',
-        preserveNullAndEmptyArrays: true
-      }
-    },
+    const routeData = await Route.aggregate([
+      {
+        $match: {
+          id: routeId
+        }
+      },
+      { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
+      {
+        $unwind: {
+          path: '$listStore.listOrder',
+          preserveNullAndEmptyArrays: true
+        }
+      },
 
-    {
-      $addFields: {
-        storeObjId: { $toObjectId: '$listStore.storeInfo' }
-      }
-    },
-    {
-      $lookup: {
-        from: 'stores',
-        localField: 'storeObjId',
-        foreignField: '_id',
-        as: 'storeDetail'
-      }
-    },
+      {
+        $addFields: {
+          storeObjId: { $toObjectId: '$listStore.storeInfo' }
+        }
+      },
+      {
+        $lookup: {
+          from: 'stores',
+          localField: 'storeObjId',
+          foreignField: '_id',
+          as: 'storeDetail'
+        }
+      },
 
-    {
-      $lookup: {
-        from: 'orders',
-        localField: 'listStore.listOrder.orderId',
-        foreignField: 'orderId',
-        as: 'order'
-      }
-    },
-    {
-      $project: {
-        storeId: { $arrayElemAt: ['$storeDetail.storeId', 0] },
-        storeName: { $arrayElemAt: ['$storeDetail.name', 0] },
-        orderId: {
-          $ifNull: ['$listStore.listOrder.orderId', '']
-        },
-        status: '$listStore.statusText',
-        sum: {
-          $ifNull: [{ $arrayElemAt: ['$order.total', 0] }, 0]
-        },
-        phone: { $arrayElemAt: ['$storeDetail.tel', 0] },
-        mapLink: {
-          $concat: [
-            'https://maps.google.com/?q=',
-            { $toString: { $arrayElemAt: ['$storeDetail.latitude', 0] } },
-            ',',
-            { $toString: { $arrayElemAt: ['$storeDetail.longtitude', 0] } }
-          ]
-        },
-        imageLink: '$listStore.image',
-        datetime: {
-          $cond: {
-            if: { $ne: ['$listStore.listOrder.date', null] },
-            then: {
-              $dateToString: {
-                date: {
-                  $dateAdd: {
-                    startDate: '$listStore.listOrder.date',
-                    unit: 'hour',
-                    amount: 7
-                  }
-                },
-                format: '%Y-%m-%d %H:%M:%S',
-                timezone: 'Asia/Bangkok'
-              }
-            },
-            else: ''
+      {
+        $lookup: {
+          from: 'orders',
+          localField: 'listStore.listOrder.orderId',
+          foreignField: 'orderId',
+          as: 'order'
+        }
+      },
+      {
+        $project: {
+          storeId: { $arrayElemAt: ['$storeDetail.storeId', 0] },
+          storeName: { $arrayElemAt: ['$storeDetail.name', 0] },
+          orderId: {
+            $ifNull: ['$listStore.listOrder.orderId', '']
+          },
+          status: '$listStore.statusText',
+          sum: {
+            $ifNull: [{ $arrayElemAt: ['$order.total', 0] }, 0]
+          },
+          phone: { $arrayElemAt: ['$storeDetail.tel', 0] },
+          mapLink: {
+            $concat: [
+              'https://maps.google.com/?q=',
+              { $toString: { $arrayElemAt: ['$storeDetail.latitude', 0] } },
+              ',',
+              { $toString: { $arrayElemAt: ['$storeDetail.longtitude', 0] } }
+            ]
+          },
+          imageLink: '$listStore.image',
+          datetime: {
+            $cond: {
+              if: { $ne: ['$listStore.listOrder.date', null] },
+              then: {
+                $dateToString: {
+                  date: {
+                    $dateAdd: {
+                      startDate: '$listStore.listOrder.date',
+                      unit: 'hour',
+                      amount: 7
+                    }
+                  },
+                  format: '%Y-%m-%d %H:%M:%S',
+                  timezone: 'Asia/Bangkok'
+                }
+              },
+              else: ''
+            }
           }
         }
       }
-    }
-  ])
+    ])
 
-  // const io = getSocket()
-  // io.emit('order/getSaleSummaryByStore', {});
+    // const io = getSocket()
+    // io.emit('order/getSaleSummaryByStore', {});
 
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: routeData
-  })
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: routeData
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
 }
 
 exports.getGroup = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { Product } = getModelsByChannel(channel, res, productModel)
-  const product = await Product.aggregate([
-    // {
-    // $match: {
-    //   groupM3: { $nin: ['', null] }
-    // }
-    // },
-    {
-      $group: {
-        _id: {
-          groupCode: '$groupCode',
-          group: '$group'
+  try {
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const product = await Product.aggregate([
+      // {
+      // $match: {
+      //   groupM3: { $nin: ['', null] }
+      // }
+      // },
+      {
+        $group: {
+          _id: {
+            groupCode: '$groupCode',
+            group: '$group'
+          }
         }
+      },
+      {
+        $project: {
+          _id: 0,
+          groupCode: '$_id.groupCode',
+          group: '$_id.group'
+        }
+      },
+      {
+        $sort: { groupCode: 1 } // ✅ เรียงตาม groupCode
       }
-    },
-    {
-      $project: {
-        _id: 0,
-        groupCode: '$_id.groupCode',
-        group: '$_id.group'
-      }
-    },
-    {
-      $sort: { groupCode: 1 } // ✅ เรียงตาม groupCode
-    }
-  ])
+    ])
 
-  res.status(200).json({
-    message: 'Success',
-    data: product
-  })
+    res.status(200).json({
+      message: 'Success',
+      data: product
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
 }
 
 exports.getSummaryProduct = async (req, res) => {
-  const { zone } = req.query
+  try {
+    const { zone } = req.query
 
-  const channel = req.headers['x-channel']
+    const channel = req.headers['x-channel']
 
-  const { Route } = getModelsByChannel(channel, res, routeModel)
-  const { Product } = getModelsByChannel(channel, res, productModel)
-  const { User } = getModelsByChannel(channel, res, userModel)
-  const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
-  const route = await Route.aggregate([
-    {
-      $addFields: {
-        shortArea: { $substr: ['$area', 0, 2] }
-      }
-    },
-    {
-      $match: {
-        shortArea: zone
-      }
-    },
-    { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
-    {
-      $unwind: {
-        path: '$listStore.listOrder',
-        preserveNullAndEmptyArrays: true
-      }
-    },
-    {
-      $addFields: {
-        storeObjId: { $toObjectId: '$listStore.storeInfo' }
-      }
-    },
-    {
-      $lookup: {
-        from: 'orders',
-        localField: 'listStore.listOrder.orderId',
-        foreignField: 'orderId',
-        as: 'order'
-      }
-    },
-    {
-      $match: {
-        $expr: { $gt: [{ $size: '$order' }, 0] }
-      }
-    },
-    {
-      $project: {
-        order: 1
-      }
-    },
-    { $unwind: { path: '$order', preserveNullAndEmptyArrays: true } },
-    {
-      $unwind: { path: '$order.listProduct', preserveNullAndEmptyArrays: true }
-    },
-    {
-      $project: {
-        _id: 0,
-        store: '$order.store.storeId',
-        area: '$order.store.area',
-        productId: '$order.listProduct.id',
-        group: '$order.listProduct.group',
-        size: '$order.listProduct.size',
-        unit: '$order.listProduct.unit',
-        qty: '$order.listProduct.qty'
-      }
-    }
-  ])
-
-  // console.log("route",route)
-
-  const productId = route.flatMap(u => u.productId)
-
-  const productFactor = await Product.aggregate([
-    {
-      $match: {
-        id: { $in: productId }
-      }
-    },
-    { $unwind: { path: '$listUnit', preserveNullAndEmptyArrays: true } },
-    {
-      $project: {
-        _id: 0,
-        productId: '$id',
-        group: '$listUnit.group',
-        size: '$listUnit.size',
-        unit: '$listUnit.unit',
-        factor: '$listUnit.factor'
-      }
-    }
-  ])
-
-  const productQty = route.map(u => {
-    const qty =
-      productFactor.find(
-        i => i.productId === u.productId && i.unit == u.unit
-      ) || {}
-    const factorPcs = u.qty * qty.factor
-    const factorCtn =
-      productFactor.find(i => i.productId === u.productId && i.unit == 'CTN') ||
-      {}
-    const qtyCtn = Math.floor(factorPcs / factorCtn.factor)
-
-    return {
-      store: u.store,
-      area: u.area,
-      productId: u.productId,
-      group: u.group,
-      size: u.size,
-      unit: 'CTN',
-      qty: qtyCtn
-    }
-  })
-
-  const grouped = []
-
-  productQty.forEach(item => {
-    const existing = grouped.find(
-      g =>
-        g.store === item.store &&
-        g.area === item.area &&
-        g.productId === item.productId &&
-        g.group === item.group &&
-        g.size === item.size &&
-        g.unit === item.unit
-    )
-
-    if (existing) {
-      existing.qty += item.qty
-    } else {
-      grouped.push({ ...item })
-    }
-  })
-  const product = await Product.aggregate([
-    {
-      $addFields: {
-        groupSize: {
-          $concat: ['$group', ' ', '$size']
+    const route = await Route.aggregate([
+      {
+        $addFields: {
+          shortArea: { $substr: ['$area', 0, 2] }
+        }
+      },
+      {
+        $match: {
+          shortArea: zone
+        }
+      },
+      { $unwind: { path: '$listStore', preserveNullAndEmptyArrays: true } },
+      {
+        $unwind: {
+          path: '$listStore.listOrder',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $addFields: {
+          storeObjId: { $toObjectId: '$listStore.storeInfo' }
+        }
+      },
+      {
+        $lookup: {
+          from: 'orders',
+          localField: 'listStore.listOrder.orderId',
+          foreignField: 'orderId',
+          as: 'order'
+        }
+      },
+      {
+        $match: {
+          $expr: { $gt: [{ $size: '$order' }, 0] }
+        }
+      },
+      {
+        $project: {
+          order: 1
+        }
+      },
+      { $unwind: { path: '$order', preserveNullAndEmptyArrays: true } },
+      {
+        $unwind: { path: '$order.listProduct', preserveNullAndEmptyArrays: true }
+      },
+      {
+        $project: {
+          _id: 0,
+          store: '$order.store.storeId',
+          area: '$order.store.area',
+          productId: '$order.listProduct.id',
+          group: '$order.listProduct.group',
+          size: '$order.listProduct.size',
+          unit: '$order.listProduct.unit',
+          qty: '$order.listProduct.qty'
         }
       }
-    },
-    {
-      $group: {
-        _id: {
+    ])
+
+    // console.log("route",route)
+
+    const productId = route.flatMap(u => u.productId)
+
+    const productFactor = await Product.aggregate([
+      {
+        $match: {
+          id: { $in: productId }
+        }
+      },
+      { $unwind: { path: '$listUnit', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 0,
           productId: '$id',
-          groupCode: '$groupSize'
+          group: '$listUnit.group',
+          size: '$listUnit.size',
+          unit: '$listUnit.unit',
+          factor: '$listUnit.factor'
         }
       }
-    },
-    {
-      $project: {
-        _id: 0,
-        productId: '$_id.productId',
-        groupSize: '$_id.groupCode'
-      }
-    }
-  ])
+    ])
 
-  const area = await User.aggregate([
-    {
-      $addFields: {
-        shortArea: { $substr: ['$area', 0, 2] }
-      }
-    },
-    {
-      $match: {
-        shortArea: zone
-      }
-    },
-    {
-      $group: {
-        _id: '$area'
-      }
-    },
-    {
-      $project: {
-        _id: 0,
-        area: '$_id'
-      }
-    }
-  ])
+    const productQty = route.map(u => {
+      const qty =
+        productFactor.find(
+          i => i.productId === u.productId && i.unit == u.unit
+        ) || {}
+      const factorPcs = u.qty * qty.factor
+      const factorCtn =
+        productFactor.find(i => i.productId === u.productId && i.unit == 'CTN') ||
+        {}
+      const qtyCtn = Math.floor(factorPcs / factorCtn.factor)
 
-  if (area.length == 0) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found zone'
+      return {
+        store: u.store,
+        area: u.area,
+        productId: u.productId,
+        group: u.group,
+        size: u.size,
+        unit: 'CTN',
+        qty: qtyCtn
+      }
+    })
+
+    const grouped = []
+
+    productQty.forEach(item => {
+      const existing = grouped.find(
+        g =>
+          g.store === item.store &&
+          g.area === item.area &&
+          g.productId === item.productId &&
+          g.group === item.group &&
+          g.size === item.size &&
+          g.unit === item.unit
+      )
+
+      if (existing) {
+        existing.qty += item.qty
+      } else {
+        grouped.push({ ...item })
+      }
+    })
+    const product = await Product.aggregate([
+      {
+        $addFields: {
+          groupSize: {
+            $concat: ['$group', ' ', '$size']
+          }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            productId: '$id',
+            groupCode: '$groupSize'
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          productId: '$_id.productId',
+          groupSize: '$_id.groupCode'
+        }
+      }
+    ])
+
+    const area = await User.aggregate([
+      {
+        $addFields: {
+          shortArea: { $substr: ['$area', 0, 2] }
+        }
+      },
+      {
+        $match: {
+          shortArea: zone
+        }
+      },
+      {
+        $group: {
+          _id: '$area'
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          area: '$_id'
+        }
+      }
+    ])
+
+    if (area.length == 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found zone'
+      })
+    }
+
+    const result = area.map(({ area }) => {
+      return product.map(product => ({
+        ...product,
+        area
+      }))
+    })
+
+    // ถ้าอยากให้เป็น flat array (ไม่เป็นกลุ่ม area): ใช้ .flat()
+    const areaProduct = result.flat()
+
+    const countStore = []
+
+    grouped.forEach(item => {
+      const existing = countStore.find(
+        g =>
+          g.store === item.store &&
+          g.area === item.area &&
+          g.productId === item.productId &&
+          g.unit === item.unit
+      )
+      if (existing) {
+        existing.count += 1 // เพิ่มจำนวนที่เจอซ้ำ
+      } else {
+        countStore.push({
+          store: item.store,
+          area: item.area,
+          productId: item.productId,
+          unit: item.unit,
+          count: 1 // เริ่มต้นนับเป็น 1
+        })
+      }
+    })
+
+    const constStoreOnArea = await Store.aggregate([
+      {
+        $match: {
+          status: { $ne: 'delete' }
+        }
+      },
+      {
+        $group: {
+          _id: '$area',
+          storeIds: { $addToSet: '$storeId' } // เก็บ storeId ที่ไม่ซ้ำใน array
+        }
+      },
+      {
+        $project: {
+          area: '$_id',
+          constStore: { $size: '$storeIds' }, // นับจำนวน storeId ที่ไม่ซ้ำ
+          _id: 0
+        }
+      }
+    ])
+
+    const productTran = areaProduct.map(item => {
+      const productDetail = grouped.find(
+        u => u.productId == item.productId && u.area == item.area
+      )
+      // if (productDetail && productDetail.qty > 1) {
+      //   console.log(item.groupSize)
+      //   console.log('item', productDetail)
+      // }
+
+      const storeCount = countStore.find(
+        u => u.productId == item.productId && u.area == item.area
+      )
+      const allStoreCount = constStoreOnArea.find(u => u.area == item.area)
+
+      const percentStore = allStoreCount?.constStore
+        ? (((storeCount?.count || 0) / allStoreCount.constStore) * 100).toFixed(2)
+        : 0
+
+      return {
+        // productId: item.productId,
+        area: item.area,
+        [`TRAGET ${item.groupSize}`]: 0,
+        [`SELL ${item.groupSize}`]: productDetail?.qty || 0,
+        [`PERCENT ${item.groupSize}`]: 0,
+        [`TRAGET_STORE ${item.groupSize}`]: 0,
+        [`STORE ${item.groupSize}`]: storeCount?.count || 0,
+        [`PERCENT_STORE ${item.groupSize}`]: Number(percentStore)
+      }
+    })
+
+    const areaId = [...new Set(productTran.map(u => u.area))].map(area => ({
+      area
+    }))
+
+    const data = areaId.map(item => {
+      const productDetail = productTran.filter(u => u.area === item.area)
+
+      const mergedDetail = productDetail.reduce((acc, curr) => {
+        const { area, ...rest } = curr
+
+        return { ...acc, ...rest }
+      }, {})
+
+      return {
+        area: item.area,
+        ...mergedDetail
+      }
+    })
+
+    const summaryTarget = productTran.reduce((sum, item) => {
+      const key = Object.keys(item).find(
+        k => k.startsWith('TRAGET ') && !k.includes('TRAGET STORE')
+      )
+      return sum + (item[key] || 0)
+    }, 0)
+
+    const summarySell = productTran.reduce((sum, item) => {
+      const key = Object.keys(item).find(k => k.startsWith('SELL '))
+      return sum + (item[key] || 0)
+    }, 0)
+
+    const summaryPercent = productTran.reduce((sum, item) => {
+      const key = Object.keys(item).find(
+        k => k.startsWith('PERCENT ') && !k.includes('PERCENT STORE')
+      )
+      return sum + (item[key] || 0)
+    }, 0)
+
+    const summaryTargetStore = productTran.reduce((sum, item) => {
+      const key = Object.keys(item).find(k => k.startsWith('TRAGET STORE '))
+      return sum + (item[key] || 0)
+    }, 0)
+
+    const summaryStore = productTran.reduce((sum, item) => {
+      const key = Object.keys(item).find(k => k.startsWith('STORE '))
+      return sum + (item[key] || 0)
+    }, 0)
+
+    const totalStoreCount = productTran.reduce((sum, item) => {
+      const key = Object.keys(item).find(k => k.startsWith('STORE '))
+      return sum + (item[key] || 0)
+    }, 0)
+
+    const totalAllStoreCount = constStoreOnArea.reduce((sum, item) => {
+      return sum + (item.constStore || 0)
+    }, 0)
+
+    const summaryPercentStore =
+      totalAllStoreCount > 0
+        ? Number(((totalStoreCount / totalAllStoreCount) * 100).toFixed(2))
+        : 0
+
+    const dataTran = {
+      data,
+      summaryTarget: summaryTarget,
+      summarySell: summarySell,
+      summaryPercent: summaryPercent,
+      summaryTargetStore: summaryTargetStore,
+      summaryStore: summaryStore,
+      summaryPercentStore: summaryPercentStore
+    }
+
+    // const io = getSocket()
+    // io.emit('order/getSummaryProduct', {});
+
+    res.status(200).json({
+      status: 200,
+      message: 'Success',
+      ...dataTran
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
 
-  const result = area.map(({ area }) => {
-    return product.map(product => ({
-      ...product,
-      area
-    }))
-  })
-
-  // ถ้าอยากให้เป็น flat array (ไม่เป็นกลุ่ม area): ใช้ .flat()
-  const areaProduct = result.flat()
-
-  const countStore = []
-
-  grouped.forEach(item => {
-    const existing = countStore.find(
-      g =>
-        g.store === item.store &&
-        g.area === item.area &&
-        g.productId === item.productId &&
-        g.unit === item.unit
-    )
-    if (existing) {
-      existing.count += 1 // เพิ่มจำนวนที่เจอซ้ำ
-    } else {
-      countStore.push({
-        store: item.store,
-        area: item.area,
-        productId: item.productId,
-        unit: item.unit,
-        count: 1 // เริ่มต้นนับเป็น 1
-      })
-    }
-  })
-
-  const constStoreOnArea = await Store.aggregate([
-    {
-      $match: {
-        status: { $ne: 'delete' }
-      }
-    },
-    {
-      $group: {
-        _id: '$area',
-        storeIds: { $addToSet: '$storeId' } // เก็บ storeId ที่ไม่ซ้ำใน array
-      }
-    },
-    {
-      $project: {
-        area: '$_id',
-        constStore: { $size: '$storeIds' }, // นับจำนวน storeId ที่ไม่ซ้ำ
-        _id: 0
-      }
-    }
-  ])
-
-  const productTran = areaProduct.map(item => {
-    const productDetail = grouped.find(
-      u => u.productId == item.productId && u.area == item.area
-    )
-    // if (productDetail && productDetail.qty > 1) {
-    //   console.log(item.groupSize)
-    //   console.log('item', productDetail)
-    // }
-
-    const storeCount = countStore.find(
-      u => u.productId == item.productId && u.area == item.area
-    )
-    const allStoreCount = constStoreOnArea.find(u => u.area == item.area)
-
-    const percentStore = allStoreCount?.constStore
-      ? (((storeCount?.count || 0) / allStoreCount.constStore) * 100).toFixed(2)
-      : 0
-
-    return {
-      // productId: item.productId,
-      area: item.area,
-      [`TRAGET ${item.groupSize}`]: 0,
-      [`SELL ${item.groupSize}`]: productDetail?.qty || 0,
-      [`PERCENT ${item.groupSize}`]: 0,
-      [`TRAGET_STORE ${item.groupSize}`]: 0,
-      [`STORE ${item.groupSize}`]: storeCount?.count || 0,
-      [`PERCENT_STORE ${item.groupSize}`]: Number(percentStore)
-    }
-  })
-
-  const areaId = [...new Set(productTran.map(u => u.area))].map(area => ({
-    area
-  }))
-
-  const data = areaId.map(item => {
-    const productDetail = productTran.filter(u => u.area === item.area)
-
-    const mergedDetail = productDetail.reduce((acc, curr) => {
-      const { area, ...rest } = curr
-
-      return { ...acc, ...rest }
-    }, {})
-
-    return {
-      area: item.area,
-      ...mergedDetail
-    }
-  })
-
-  const summaryTarget = productTran.reduce((sum, item) => {
-    const key = Object.keys(item).find(
-      k => k.startsWith('TRAGET ') && !k.includes('TRAGET STORE')
-    )
-    return sum + (item[key] || 0)
-  }, 0)
-
-  const summarySell = productTran.reduce((sum, item) => {
-    const key = Object.keys(item).find(k => k.startsWith('SELL '))
-    return sum + (item[key] || 0)
-  }, 0)
-
-  const summaryPercent = productTran.reduce((sum, item) => {
-    const key = Object.keys(item).find(
-      k => k.startsWith('PERCENT ') && !k.includes('PERCENT STORE')
-    )
-    return sum + (item[key] || 0)
-  }, 0)
-
-  const summaryTargetStore = productTran.reduce((sum, item) => {
-    const key = Object.keys(item).find(k => k.startsWith('TRAGET STORE '))
-    return sum + (item[key] || 0)
-  }, 0)
-
-  const summaryStore = productTran.reduce((sum, item) => {
-    const key = Object.keys(item).find(k => k.startsWith('STORE '))
-    return sum + (item[key] || 0)
-  }, 0)
-
-  const totalStoreCount = productTran.reduce((sum, item) => {
-    const key = Object.keys(item).find(k => k.startsWith('STORE '))
-    return sum + (item[key] || 0)
-  }, 0)
-
-  const totalAllStoreCount = constStoreOnArea.reduce((sum, item) => {
-    return sum + (item.constStore || 0)
-  }, 0)
-
-  const summaryPercentStore =
-    totalAllStoreCount > 0
-      ? Number(((totalStoreCount / totalAllStoreCount) * 100).toFixed(2))
-      : 0
-
-  const dataTran = {
-    data,
-    summaryTarget: summaryTarget,
-    summarySell: summarySell,
-    summaryPercent: summaryPercent,
-    summaryTargetStore: summaryTargetStore,
-    summaryStore: summaryStore,
-    summaryPercentStore: summaryPercentStore
-  }
-
-  // const io = getSocket()
-  // io.emit('order/getSummaryProduct', {});
-
-  res.status(200).json({
-    status: 200,
-    message: 'Success',
-    ...dataTran
-  })
 }
 
 exports.getProductLimit = async (req, res) => {
-  const { storeId, area, type } = req.query
-  const channel = req.headers['x-channel']
-  const { Cart } = getModelsByChannel(channel, res, cartModel)
-  const { User } = getModelsByChannel(channel, res, userModel)
-  const { Product } = getModelsByChannel(channel, res, productModel)
-  const { Sendmoney } = getModelsByChannel(channel, res, sendmoneyModel)
-  const { PromotionLimit } = getModelsByChannel(channel, res, promotionModel)
-  const cart = await Cart.findOne({ type, area, storeId })
-  if (!cart || cart.listProduct.length === 0) {
-    return res.status(404).json({ status: 404, message: 'Cart is empty!' })
-  }
-
-  const productLimit = cart.listPromotion.map(item => {
-    return {
-      proId: item.proId
+  try {
+    const { storeId, area, type } = req.query
+    const channel = req.headers['x-channel']
+    const { Cart } = getModelsByChannel(channel, res, cartModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Sendmoney } = getModelsByChannel(channel, res, sendmoneyModel)
+    const { PromotionLimit } = getModelsByChannel(channel, res, promotionModel)
+    const cart = await Cart.findOne({ type, area, storeId })
+    if (!cart || cart.listProduct.length === 0) {
+      return res.status(404).json({ status: 404, message: 'Cart is empty!' })
     }
-  })
-  let productLimitList = []
-  for (const i of productLimit) {
-    const productLimitDetail = await PromotionLimit.findOne({ proId: i.proId })
-    productLimitList.push(productLimitDetail)
-  }
 
-  res.status(200).json({
-    status: 200,
-    message: productLimitList
-  })
-}
+    const productLimit = cart.listPromotion.map(item => {
+      return {
+        proId: item.proId
+      }
+    })
+    let productLimitList = []
+    for (const i of productLimit) {
+      const productLimitDetail = await PromotionLimit.findOne({ proId: i.proId })
+      productLimitList.push(productLimitDetail)
+    }
 
-exports.summaryAllProduct = async (req, res) => {
-  const { area, period } = req.query
-  const channel = req.headers['x-channel']
-  const { Product } = getModelsByChannel(channel, res, productModel)
-  const { Stock } = getModelsByChannel(channel, res, stockModel)
+    res.status(200).json({
+      status: 200,
+      message: productLimitList
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
 
-  const dataStock = await Stock.findOne({
-    area: area,
-    period: period
-  })
-
-  if (dataStock == 0) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found Stock'
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
 
-  const productId = dataStock.listProduct.flatMap(item => item.productId)
+}
 
-  const dataProduct = await Product.aggregate([
-    {
-      $match: {
-        id: { $in: productId }
-      }
-    },
-    { $unwind: '$listUnit' },
-    {
-      $project: {
-        _id: 0,
-        id: 1,
-        listUnit: 1
-      }
+exports.summaryAllProduct = async (req, res) => {
+  try {
+    const { area, period } = req.query
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
+
+    const dataStock = await Stock.findOne({
+      area: area,
+      period: period
+    })
+
+    if (dataStock == 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found Stock'
+      })
     }
-  ])
 
-  let sumPrice = 0
+    const productId = dataStock.listProduct.flatMap(item => item.productId)
 
-  for (const item of dataStock.listProduct) {
-    const getPcs =
-      dataProduct.find(
-        u => u.id == item.productId && u.listUnit.unit == 'PCS'
-      ) || {}
-    // const getCtn = dataProduct.find(u => u.id == item.productId && u.listUnit.unit == 'CTN') || {}
-    if (getPcs && getPcs.listUnit && getPcs.listUnit.price.sale) {
-      sumPrice += item.balancePcs * getPcs.listUnit.price.sale
+    const dataProduct = await Product.aggregate([
+      {
+        $match: {
+          id: { $in: productId }
+        }
+      },
+      { $unwind: '$listUnit' },
+      {
+        $project: {
+          _id: 0,
+          id: 1,
+          listUnit: 1
+        }
+      }
+    ])
+
+    let sumPrice = 0
+
+    for (const item of dataStock.listProduct) {
+      const getPcs =
+        dataProduct.find(
+          u => u.id == item.productId && u.listUnit.unit == 'PCS'
+        ) || {}
+      // const getCtn = dataProduct.find(u => u.id == item.productId && u.listUnit.unit == 'CTN') || {}
+      if (getPcs && getPcs.listUnit && getPcs.listUnit.price.sale) {
+        sumPrice += item.balancePcs * getPcs.listUnit.price.sale
+      }
+      // if (getCtn && getCtn.listUnit && getCtn.listUnit.price.sale) {
+      //   sumPrice += item.balanceCtn * getCtn.listUnit.price.sale;
+      // }
     }
-    // if (getCtn && getCtn.listUnit && getCtn.listUnit.price.sale) {
-    //   sumPrice += item.balanceCtn * getCtn.listUnit.price.sale;
-    // }
+
+    // const io = getSocket()
+    // io.emit('order/summaryAllProduct', {});
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: sumPrice
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
 
-  // const io = getSocket()
-  // io.emit('order/summaryAllProduct', {});
-
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: sumPrice
-  })
 }
 
 exports.summaryDaily = async (req, res) => {
@@ -4297,78 +4376,107 @@ exports.summaryMonthlyByZone = async (req, res) => {
 }
 
 exports.saleReport = async (req, res) => {
-  const { area, type, date, role } = req.query
-  const channel = req.headers['x-channel']
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-  const { Refund } = getModelsByChannel(channel, res, refundModel)
+  try {
+    const { area, type, date, role } = req.query
+    const channel = req.headers['x-channel']
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
 
-  if (role == 'sale' || role == '' || !role) {
-    if (!type) {
-      return res.status(200).json({
-        message: 'type is require'
-      })
-    }
-    let filterCreatedAt = {}
-    let filterArea = {}
-    if (area) {
-      filterArea = { 'store.area': area }
-    }
+    if (role == 'sale' || role == '' || !role) {
+      if (!type) {
+        return res.status(200).json({
+          message: 'type is require'
+        })
+      }
+      let filterCreatedAt = {}
+      let filterArea = {}
+      if (area) {
+        filterArea = { 'store.area': area }
+      }
 
-    if (date) {
-      const year = Number(date.substring(0, 4))
-      const month = Number(date.substring(4, 6)) - 1
-      const day = Number(date.substring(6, 8))
-      // เวลาตาม timezone ไทย
-      const startDateUTC = new Date(Date.UTC(year, month, day, 0, 0, 0)) // 2025-08-01T17:00:00Z
-      const endDateUTC = new Date(Date.UTC(year, month, day + 1, 0, 0, 0) - 1) // 2025-08-02T16:59:59.999Z
-      // เทียบโดย "เพิ่ม +7 ชั่วโมงที่ createdAt" ก่อน แล้วค่อยเทียบกับช่วงเวลาไทย
-      filterCreatedAt = {
-        $expr: {
-          $and: [
-            {
-              $gte: [
-                {
-                  $dateAdd: { startDate: '$createdAt', unit: 'hour', amount: 7 }
-                },
-                startDateUTC
-              ]
-            },
-            {
-              $lt: [
-                {
-                  $dateAdd: { startDate: '$createdAt', unit: 'hour', amount: 7 }
-                },
-                endDateUTC
-              ]
-            }
-          ]
+      if (date) {
+        const year = Number(date.substring(0, 4))
+        const month = Number(date.substring(4, 6)) - 1
+        const day = Number(date.substring(6, 8))
+        // เวลาตาม timezone ไทย
+        const startDateUTC = new Date(Date.UTC(year, month, day, 0, 0, 0)) // 2025-08-01T17:00:00Z
+        const endDateUTC = new Date(Date.UTC(year, month, day + 1, 0, 0, 0) - 1) // 2025-08-02T16:59:59.999Z
+        // เทียบโดย "เพิ่ม +7 ชั่วโมงที่ createdAt" ก่อน แล้วค่อยเทียบกับช่วงเวลาไทย
+        filterCreatedAt = {
+          $expr: {
+            $and: [
+              {
+                $gte: [
+                  {
+                    $dateAdd: { startDate: '$createdAt', unit: 'hour', amount: 7 }
+                  },
+                  startDateUTC
+                ]
+              },
+              {
+                $lt: [
+                  {
+                    $dateAdd: { startDate: '$createdAt', unit: 'hour', amount: 7 }
+                  },
+                  endDateUTC
+                ]
+              }
+            ]
+          }
         }
       }
-    }
 
-    const dataOrder = await Order.find({
-      ...filterArea,
-      ...filterCreatedAt,
-      status: { $ne: 'canceled' }
-    })
-
-    const dataRefund = await Refund.find({
-      ...filterArea,
-      ...filterCreatedAt,
-      status: { $nin: ['pending', 'canceled', 'reject'] }
-    })
-
-    if (dataOrder.length === 0) {
-      return res.status(404).json({
-        status: 404,
-        message: 'Not found Order'
+      const dataOrder = await Order.find({
+        ...filterArea,
+        ...filterCreatedAt,
+        status: { $ne: 'canceled' }
       })
-    }
-    const order = ['sale', 'change', 'refund']
 
-    if (type === 'sale') {
-      data = [...dataOrder, ...dataRefund]
-        .map(item => {
+      const dataRefund = await Refund.find({
+        ...filterArea,
+        ...filterCreatedAt,
+        status: { $nin: ['pending', 'canceled', 'reject'] }
+      })
+
+      if (dataOrder.length === 0) {
+        return res.status(404).json({
+          status: 404,
+          message: 'Not found Order'
+        })
+      }
+      const order = ['sale', 'change', 'refund']
+
+      if (type === 'sale') {
+        data = [...dataOrder, ...dataRefund]
+          .map(item => {
+            let paymentMethodTH = ''
+            if (item.paymentMethod === 'cash') {
+              paymentMethodTH = 'เงินสด'
+            } else if (item.paymentMethod === 'qr') {
+              paymentMethodTH = 'QR Payment'
+            } else {
+              paymentMethodTH = item.paymentMethod
+            }
+
+            // เช็คว่าเป็น refund หรือไม่
+            const isRefund = item.type === 'refund'
+            const totalWithSign = isRefund ? -Math.abs(item.total) : item.total
+
+            return {
+              type: item.type,
+              orderId: item.orderId,
+              saleCode: item.sale.saleCode,
+              saleName: item.sale.name,
+              storeId: item.store.storeId,
+              storeName: item.store.name,
+              storeTaxId: item.store.taxId,
+              total: totalWithSign,
+              paymentMethod: paymentMethodTH ? paymentMethodTH : item.reference
+            }
+          })
+          .sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type))
+      } else if (type === 'refund') {
+        data = [...dataRefund].map(item => {
           let paymentMethodTH = ''
           if (item.paymentMethod === 'cash') {
             paymentMethodTH = 'เงินสด'
@@ -4391,1125 +4499,1201 @@ exports.saleReport = async (req, res) => {
             storeName: item.store.name,
             storeTaxId: item.store.taxId,
             total: totalWithSign,
-            paymentMethod: paymentMethodTH ? paymentMethodTH : item.reference
+            paymentMethod: paymentMethodTH
           }
         })
-        .sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type))
-    } else if (type === 'refund') {
-      data = [...dataRefund].map(item => {
-        let paymentMethodTH = ''
-        if (item.paymentMethod === 'cash') {
-          paymentMethodTH = 'เงินสด'
-        } else if (item.paymentMethod === 'qr') {
-          paymentMethodTH = 'QR Payment'
-        } else {
-          paymentMethodTH = item.paymentMethod
+      }
+      // summary ตาม type
+      const summary = data.reduce((acc, cur) => {
+        if (!acc[cur.type]) {
+          acc[cur.type] = { count: 0, total: 0 }
         }
+        acc[cur.type].count += 1
+        acc[cur.type].total += cur.total
+        return acc
+      }, {})
 
-        // เช็คว่าเป็น refund หรือไม่
-        const isRefund = item.type === 'refund'
-        const totalWithSign = isRefund ? -Math.abs(item.total) : item.total
+      // รวมทั้งหมด
+      const grandTotal = data.reduce((sum, cur) => sum + cur.total, 0)
 
-        return {
-          type: item.type,
-          orderId: item.orderId,
-          saleCode: item.sale.saleCode,
-          saleName: item.sale.name,
-          storeId: item.store.storeId,
-          storeName: item.store.name,
-          storeTaxId: item.store.taxId,
-          total: totalWithSign,
-          paymentMethod: paymentMethodTH
+      res.status(200).json({
+        status: 200,
+        message: 'sucess',
+        data: data,
+        grandTotal: grandTotal,
+        summary: summary
+      })
+    } else if (role == 'supervisor') {
+      const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+      let areaQuery = {}
+      if (area) {
+        if (area.length == 2) {
+          areaQuery.zone = area.slice(0, 2)
+        } else if (area.length == 5) {
+          areaQuery.area = area
         }
+      }
+
+      const sendMoneyData = await SendMoney.aggregate([
+        {
+          $addFields: {
+            zone: { $substrBytes: ['$area', 0, 2] }
+          }
+        },
+        {
+          $match: {
+            ...areaQuery
+          }
+        }
+      ])
+
+      // const io = getSocket()
+      // io.emit('order/saleReport', {});
+
+      res.status(200).json({
+        status: 200
+        // sendMoneyData
       })
     }
-    // summary ตาม type
-    const summary = data.reduce((acc, cur) => {
-      if (!acc[cur.type]) {
-        acc[cur.type] = { count: 0, total: 0 }
-      }
-      acc[cur.type].count += 1
-      acc[cur.type].total += cur.total
-      return acc
-    }, {})
+  } catch (error) {
+    console.error('❌ Error:', error)
 
-    // รวมทั้งหมด
-    const grandTotal = data.reduce((sum, cur) => sum + cur.total, 0)
-
-    res.status(200).json({
-      status: 200,
-      message: 'sucess',
-      data: data,
-      grandTotal: grandTotal,
-      summary: summary
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
-  } else if (role == 'supervisor') {
-    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
-    let areaQuery = {}
-    if (area) {
-      if (area.length == 2) {
-        areaQuery.zone = area.slice(0, 2)
-      } else if (area.length == 5) {
-        areaQuery.area = area
-      }
-    }
+  }
 
-    const sendMoneyData = await SendMoney.aggregate([
+}
+
+exports.getSummary18SKU = async (req, res) => {
+  try {
+    const { zone, area, team } = req.query
+    const channel = req.headers['x-channel']
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+
+    const matchStage = {}
+    if (zone) matchStage['store.zone'] = zone
+    if (area) matchStage['store.area'] = area
+    if (team) matchStage['team'] = team
+    // console.log(team)
+    const dataOrder = await Order.aggregate([
+      { $match: { status: { $ne: 'canceled' } } },
       {
         $addFields: {
-          zone: { $substrBytes: ['$area', 0, 2] }
+          team: {
+            $concat: [
+              { $substr: ['$store.area', 0, 2] }, // 2 ตัวแรก
+              { $substr: ['$store.area', 3, 1] } // ตัวที่ 4 (index เริ่ม 0)
+            ]
+          }
+        }
+      },
+      { $match: matchStage },
+      { $match: { team: { $ne: '' } } },
+      { $unwind: '$listProduct' },
+      { $replaceRoot: { newRoot: '$listProduct' } }
+    ])
+
+    // console.log(dataOrder)
+    const productlist = dataOrder.map(item => item.id) // หรือ flatMap ถ้าเป็น array
+    const productId = [...new Set(productlist)]
+    const productData = await Product.find({ id: { $in: productId } })
+
+    const emptyGroup = await Product.aggregate([
+      {
+        $match: {
+          group: { $nin: ['สินค้าช่วยระบาย'] },
+          groupCodeM3: { $nin: [''] }
         }
       },
       {
+        $group: {
+          _id: {
+            groupCode: '$groupCode',
+            group: '$group',
+            groupCodeM3: '$groupCode'
+          }
+        }
+      },
+      { $replaceRoot: { newRoot: '$_id' } },
+      {
+        $addFields: {
+          summaryQty: 0,
+          summary: 0
+        }
+      }
+    ])
+    // console.log(emptyGroup)
+
+    data = []
+    for (const item of dataOrder) {
+      const productDetail = productData.find(i => item.id === i.id)
+      const unit = productDetail.listUnit.find(u => item.unit === u.unit)
+      const factorPcs = unit.factor
+      dataTran = {
+        groupCode: productDetail.groupCode,
+        // groupCodeM3: productDetail.groupCodeM3,
+        group: productDetail.group,
+        summaryQty: item.qty * factorPcs,
+        summary: item.netTotal
+      }
+      data.push(dataTran)
+    }
+
+    const mergedGroup = emptyGroup.map(group => {
+      const groupItems = data.filter(
+        item =>
+          item.groupCode === group.groupCode &&
+          item.group === group.group &&
+          item.groupCode === group.groupCode
+      )
+      const summaryQtySum = groupItems.reduce((sum, i) => sum + i.summaryQty, 0)
+      const summarySum = groupItems.reduce((sum, i) => sum + i.summary, 0)
+
+      return {
+        ...group,
+        summaryQty: Number(summaryQtySum.toFixed(2)),
+        summary: Number(summarySum.toFixed(2))
+      }
+    })
+
+    const sortedMergedGroup = mergedGroup.sort((a, b) => {
+      if (!a.groupCodeM3) return 1
+      if (!b.groupCodeM3) return -1
+      return a.groupCodeM3.localeCompare(b.groupCodeM3, undefined, {
+        numeric: true
+      })
+    })
+
+    //  const io = getSocket()
+    //   io.emit('order/getSummary18SKU', {});
+
+    res.status(200).json({
+      status: 200,
+      // data: data,
+      data: sortedMergedGroup
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
+}
+
+exports.reportCheckin = async (req, res) => {
+  try {
+    const { zone, area, period } = req.body
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    let match = {}
+    if (zone) {
+      match['store.zone'] = zone
+    }
+
+    if (area) {
+      match['store.area'] = area
+    }
+
+    const dataOrder = await Order.aggregate([
+      { $match: match },
+      {
         $match: {
-          ...areaQuery
+          period: period
+        }
+      },
+      {
+        $project: {
+          store: 1,
+          listProduct: 1, // เอา listProduct หลักออกมา
+          promotionProducts: {
+            $reduce: {
+              input: '$listPromotions',
+              initialValue: [],
+              in: {
+                $concatArrays: ['$$value', '$$this.listProduct']
+              }
+            }
+          },
+          createdAt: 1
         }
       }
     ])
 
-    // const io = getSocket()
-    // io.emit('order/saleReport', {});
+    const { startDate, endDate } = rangeDate(period)
 
-    res.status(200).json({
-      status: 200
-      // sendMoneyData
-    })
-  }
-}
-
-exports.getSummary18SKU = async (req, res) => {
-  const { zone, area, team } = req.query
-  const channel = req.headers['x-channel']
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-  const { Product } = getModelsByChannel(channel, res, productModel)
-
-  const matchStage = {}
-  if (zone) matchStage['store.zone'] = zone
-  if (area) matchStage['store.area'] = area
-  if (team) matchStage['team'] = team
-  // console.log(team)
-  const dataOrder = await Order.aggregate([
-    { $match: { status: { $ne: 'canceled' } } },
-    {
-      $addFields: {
-        team: {
-          $concat: [
-            { $substr: ['$store.area', 0, 2] }, // 2 ตัวแรก
-            { $substr: ['$store.area', 3, 1] } // ตัวที่ 4 (index เริ่ม 0)
-          ]
-        }
-      }
-    },
-    { $match: matchStage },
-    { $match: { team: { $ne: '' } } },
-    { $unwind: '$listProduct' },
-    { $replaceRoot: { newRoot: '$listProduct' } }
-  ])
-
-  // console.log(dataOrder)
-  const productlist = dataOrder.map(item => item.id) // หรือ flatMap ถ้าเป็น array
-  const productId = [...new Set(productlist)]
-  const productData = await Product.find({ id: { $in: productId } })
-
-  const emptyGroup = await Product.aggregate([
-    {
-      $match: {
-        group: { $nin: ['สินค้าช่วยระบาย'] },
-        groupCodeM3: { $nin: [''] }
-      }
-    },
-    {
-      $group: {
-        _id: {
-          groupCode: '$groupCode',
-          group: '$group',
-          groupCodeM3: '$groupCode'
-        }
-      }
-    },
-    { $replaceRoot: { newRoot: '$_id' } },
-    {
-      $addFields: {
-        summaryQty: 0,
-        summary: 0
-      }
-    }
-  ])
-  // console.log(emptyGroup)
-
-  data = []
-  for (const item of dataOrder) {
-    const productDetail = productData.find(i => item.id === i.id)
-    const unit = productDetail.listUnit.find(u => item.unit === u.unit)
-    const factorPcs = unit.factor
-    dataTran = {
-      groupCode: productDetail.groupCode,
-      // groupCodeM3: productDetail.groupCodeM3,
-      group: productDetail.group,
-      summaryQty: item.qty * factorPcs,
-      summary: item.netTotal
-    }
-    data.push(dataTran)
-  }
-
-  const mergedGroup = emptyGroup.map(group => {
-    const groupItems = data.filter(
-      item =>
-        item.groupCode === group.groupCode &&
-        item.group === group.group &&
-        item.groupCode === group.groupCode
-    )
-    const summaryQtySum = groupItems.reduce((sum, i) => sum + i.summaryQty, 0)
-    const summarySum = groupItems.reduce((sum, i) => sum + i.summary, 0)
-
-    return {
-      ...group,
-      summaryQty: Number(summaryQtySum.toFixed(2)),
-      summary: Number(summarySum.toFixed(2))
-    }
-  })
-
-  const sortedMergedGroup = mergedGroup.sort((a, b) => {
-    if (!a.groupCodeM3) return 1
-    if (!b.groupCodeM3) return -1
-    return a.groupCodeM3.localeCompare(b.groupCodeM3, undefined, {
-      numeric: true
-    })
-  })
-
-  //  const io = getSocket()
-  //   io.emit('order/getSummary18SKU', {});
-
-  res.status(200).json({
-    status: 200,
-    // data: data,
-    data: sortedMergedGroup
-  })
-}
-
-exports.reportCheckin = async (req, res) => {
-  const { zone, area, period } = req.body
-  const channel = req.headers['x-channel']
-  const { Store } = getModelsByChannel(channel, res, storeModel)
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-  const { Product } = getModelsByChannel(channel, res, productModel)
-  let match = {}
-  if (zone) {
-    match['store.zone'] = zone
-  }
-
-  if (area) {
-    match['store.area'] = area
-  }
-
-  const dataOrder = await Order.aggregate([
-    { $match: match },
-    {
-      $match: {
-        period: period
-      }
-    },
-    {
-      $project: {
-        store: 1,
-        listProduct: 1, // เอา listProduct หลักออกมา
-        promotionProducts: {
-          $reduce: {
-            input: '$listPromotions',
-            initialValue: [],
-            in: {
-              $concatArrays: ['$$value', '$$this.listProduct']
-            }
-          }
-        },
-        createdAt: 1
-      }
-    }
-  ])
-
-  const { startDate, endDate } = rangeDate(period)
-
-  const dates = generateDateList(startDate, endDate)
-  const areaAll = await Store.aggregate([
-    {
-      $match: {
-        area: { $ne: null, $ne: '' }
-      }
-    },
-    {
-      $group: {
-        _id: '$area'
-      }
-    },
-    {
-      $sort: { _id: 1 }
-    }
-  ])
-
-  const saleProductId = dataOrder.flatMap(i =>
-    i.listProduct.map(item => item.id)
-  )
-  const promoProductId = dataOrder.flatMap(i =>
-    i.promotionProducts.map(item => item.id)
-  )
-
-  const productIdUnique = [...new Set([...saleProductId, ...promoProductId])]
-
-  const productList = await Product.find({ id: { $in: productIdUnique } })
-
-  const newDataOrder = dataOrder.map(order => {
-    const newListProduct = (order.listProduct || []).map(item => {
-      const productDetail = productList.find(i => i.id === item.id)
-      const productUnit =
-        productDetail?.listUnit.find(i => i.unit === item.unit)?.factor || 1
-      const productUnitCtn =
-        productDetail?.listUnit.find(i => i.unit === 'CTN')?.factor || 0
-      const qtyPcs = item.qty * productUnit
-      const qtyCtn =
-        productUnitCtn > 0 ? Math.floor(qtyPcs / productUnitCtn) : 0
-
-      return {
-        ...item,
-        qtyCtn
-      }
-    })
-
-    const newPromotionProducts = (order.promotionProducts || []).map(item => {
-      const productDetail = productList.find(i => i.id === item.id)
-      const productUnit =
-        productDetail?.listUnit.find(i => i.unit === item.unit)?.factor || 1
-      const productUnitCtn =
-        productDetail?.listUnit.find(i => i.unit === 'CTN')?.factor || 0
-      const qtyPcs = item.qty * productUnit
-      const qtyCtn =
-        productUnitCtn > 0 ? Math.floor(qtyPcs / productUnitCtn) : 0
-
-      return {
-        ...item,
-        qtyCtn
-      }
-    })
-
-    return {
-      ...order,
-      listProduct: newListProduct,
-      promotionProducts: newPromotionProducts
-    }
-  })
-
-  // console.log(newDataOrder)
-
-  const areaList = areaAll.map(item => item._id)
-  for (const i of dates) {
-    const orderDetails = newDataOrder.filter(item => {
-      const itemDateStr = new Date(item.createdAt).toISOString().slice(0, 10)
-      return itemDateStr === i
-    })
-
-    const daily = {
-      date: i,
-      areas: orderDetails.map(u => u.area === areaList)
-    }
-
-    // console.log(daily)
-  }
-
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: newDataOrder
-  })
-}
-
-exports.OrderZeroDiff = async (req, res) => {
-  const { area, period } = req.body
-  const channel = req.headers['x-channel']
-  const { Store } = getModelsByChannel(channel, res, storeModel)
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-  const { Product } = getModelsByChannel(channel, res, productModel)
-  const { Stock } = getModelsByChannel(channel, res, stockModel)
-
-  const stockData = await Stock.findOne({
-    area: area,
-    period: period,
-    'listProduct.balancePcs': { $lt: 0 }
-  })
-
-  // console.log(stockData)
-
-  const negProductIds = (stockData.listProduct ?? [])
-    .filter(it => Number(it.balancePcs) < 0)
-    .map(it => it.productId ?? it.id)
-    .filter(Boolean)
-
-  // console.log(negProductIds)
-
-  const orderData = await Order.find({
-    'store.area': area,
-    period: period
-  }).lean()
-
-  // proDiff = orderData.map()
-
-  // const orderDiff = []
-
-  // for (i of negProductIds){
-  //   const data = orderData.map(item => item.listProduct.find(u => u.id === i))
-
-  //   console.log(data)
-
-  // }
-
-  res.status(200).json({
-    status: 200,
-    message: 'Sucess',
-    data: negProductIds
-  })
-}
-
-exports.checkOrderCancelM3 = async (req, res) => {
-  const { period } = req.body
-  const channel = req.headers['x-channel']
-  const { Store } = getModelsByChannel(channel, res, storeModel)
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-  const { Refund } = getModelsByChannel(channel, res, refundModel)
-  const { Product } = getModelsByChannel(channel, res, productModel)
-  const { Stock } = getModelsByChannel(channel, res, stockModel)
-
-  const orderCC = await Order.aggregate([
-    {
-      $match: {
-        period,
-        type: 'sale',
-        status: 'canceled',
-        'store.area': { $ne: 'IT211' }
-      }
-    },
-    {
-      $project: {
-        _id: 0,
-        status: 1, // << เพิ่ม
-        orderId: {
-          $cond: [
-            { $eq: [{ $strLenCP: '$orderId' }, 16] },
-            {
-              $substrCP: [
-                '$orderId',
-                0,
-                { $subtract: [{ $strLenCP: '$orderId' }, 3] }
-              ]
-            },
-            '$orderId'
-          ]
-        }
-      }
-    }
-  ])
-
-  const refundCC = await Refund.aggregate([
-    {
-      $match: {
-        period,
-        type: 'refund',
-        status: { $in: ['canceled', 'reject'] },
-        'store.area': { $ne: 'IT211' }
-      }
-    },
-    { $project: { _id: 0, orderId: 1, reference: 1, status: 1 } } // << ส่ง status ด้วย
-  ])
-
-  const refundIdCCs = refundCC.map(x => String(x.orderId).trim())
-  const changeIdCCS = refundCC.map(x => String(x.reference).trim())
-  const orderIdCCs = orderCC.map(x => String(x.orderId).trim())
-
-  const saleSet = new Set(orderIdCCs)
-  const refundSet = new Set(refundIdCCs)
-  const changeSet = new Set(changeIdCCS)
-
-  // map: id -> status (จาก Mongo)
-  const saleStatusMap = new Map(
-    orderCC.map(x => [String(x.orderId).trim(), x.status || ''])
-  )
-  const refundStatusMap = new Map(
-    refundCC.map(x => [String(x.orderId).trim(), x.status || ''])
-  )
-  // ถ้ามี collection ของ change เอง ค่อยเติม changeStatusMap ภายหลัง
-  const changeStatusMap = new Map()
-
-  const allCC = [...new Set([...refundIdCCs, ...orderIdCCs, ...changeIdCCS])]
-
-  const orderM3 = await OOHEAD.findAll({
-    where: { OACUOR: { [Op.in]: allCC } },
-    attributes: { exclude: ['id'] },
-    raw: true
-  })
-
-  const data = (orderM3 ?? []).map(item => {
-    const id = String(item.OACUOR).trim()
-
-    const type = saleSet.has(id)
-      ? 'Sale'
-      : refundSet.has(id)
-      ? 'Refund'
-      : changeSet.has(id)
-      ? 'Change'
-      : ''
-
-    const typeId =
-      type === 'Sale'
-        ? 'A31'
-        : type === 'Refund'
-        ? 'A34'
-        : type === 'Change'
-        ? 'B31'
-        : ''
-
-    const statusTablet =
-      type === 'Sale'
-        ? saleStatusMap.get(id) ?? ''
-        : type === 'Refund'
-        ? refundStatusMap.get(id) ?? ''
-        : type === 'Change'
-        ? changeStatusMap.get(id) ?? ''
-        : ''
-
-    return { orderId: id, type, typeId, statusTablet }
-  })
-
-  const wb = xlsx.utils.book_new()
-  const ws = xlsx.utils.json_to_sheet(data)
-  xlsx.utils.book_append_sheet(wb, ws, `orderM3CC${period}`)
-
-  const tempPath = path.join(os.tmpdir(), `orderM3CC${period}.xlsx`)
-  xlsx.writeFile(wb, tempPath)
-
-  res.download(tempPath, `orderM3CC${period}.xlsx`, err => {
-    if (err) {
-      console.error('❌ Download error:', err)
-      // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
-      if (!res.headersSent) {
-        res.status(500).send('Download failed')
-      }
-    }
-
-    // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => {})
-  })
-
-  // res.status(200).json({
-  //   status: 200,
-  //   message: 'Sucess',
-  //   data: data
-  // })
-}
-
-exports.getTarget = async (req, res) => {
-  const { area } = req.query
-  let { startDate, endDate } = req.query
-  const channel = req.headers['x-channel']
-  const { Store } = getModelsByChannel(channel, res, storeModel)
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-  const { Refund } = getModelsByChannel(channel, res, refundModel)
-  const { Product } = getModelsByChannel(channel, res, productModel)
-  const { Stock, AdjustStock } = getModelsByChannel(channel, res, stockModel)
-  const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
-  const { Giveaway } = getModelsByChannel(channel, res, giveModel)
-  const { Target } = getModelsByChannel(channel, res, targetModel)
-
-  const { Distribution, WereHouse } = getModelsByChannel(
-    channel,
-    res,
-    distributionModel
-  )
-  const product = await Product.find()
-
-  if (!/^\d{8}$/.test(startDate)) {
-    const nowTH = new Date(
-      new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })
-    )
-    const y = nowTH.getFullYear()
-    const m = String(nowTH.getMonth() + 1).padStart(2, '0')
-    const d = String(nowTH.getDate()).padStart(2, '0') // ← ใช้ getDate() ไม่ใช่ getDay()
-    startDate = `${y}${m}${d}` // YYYYMMDD
-    endDate = `${y}${m}${d}` // YYYYMMDD
-  }
-
-  const startTH = new Date(
-    `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
-      6,
-      8
-    )}T00:00:00+07:00`
-  )
-  const endTH = new Date(
-    `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(
-      6,
-      8
-    )}T23:59:59.999+07:00`
-  )
-
-  const period = `${startDate.slice(0, 4)}${startDate.slice(4, 6)}`
-
-  const [
-    dataSendmoney,
-    dataRefund,
-    dataOrderSale,
-    dataOrderChange,
-    dataGive,
-    datawithdraw,
-    dataAdjustStock,
-    dataTarget
-  ] = await Promise.all([
-    // SendMoney.find({
-    //   area: area,
-    //   dateAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
-    // }),
-    SendMoney.aggregate([
+    const dates = generateDateList(startDate, endDate)
+    const areaAll = await Store.aggregate([
       {
         $match: {
-          area: area,
-          dateAt: { $gte: startTH, $lte: endTH }
+          area: { $ne: null, $ne: '' }
         }
       },
       {
-        $addFields: {
-          createdAt: '$dateAt'
+        $group: {
+          _id: '$area'
+        }
+      },
+      {
+        $sort: { _id: 1 }
+      }
+    ])
+
+    const saleProductId = dataOrder.flatMap(i =>
+      i.listProduct.map(item => item.id)
+    )
+    const promoProductId = dataOrder.flatMap(i =>
+      i.promotionProducts.map(item => item.id)
+    )
+
+    const productIdUnique = [...new Set([...saleProductId, ...promoProductId])]
+
+    const productList = await Product.find({ id: { $in: productIdUnique } })
+
+    const newDataOrder = dataOrder.map(order => {
+      const newListProduct = (order.listProduct || []).map(item => {
+        const productDetail = productList.find(i => i.id === item.id)
+        const productUnit =
+          productDetail?.listUnit.find(i => i.unit === item.unit)?.factor || 1
+        const productUnitCtn =
+          productDetail?.listUnit.find(i => i.unit === 'CTN')?.factor || 0
+        const qtyPcs = item.qty * productUnit
+        const qtyCtn =
+          productUnitCtn > 0 ? Math.floor(qtyPcs / productUnitCtn) : 0
+
+        return {
+          ...item,
+          qtyCtn
+        }
+      })
+
+      const newPromotionProducts = (order.promotionProducts || []).map(item => {
+        const productDetail = productList.find(i => i.id === item.id)
+        const productUnit =
+          productDetail?.listUnit.find(i => i.unit === item.unit)?.factor || 1
+        const productUnitCtn =
+          productDetail?.listUnit.find(i => i.unit === 'CTN')?.factor || 0
+        const qtyPcs = item.qty * productUnit
+        const qtyCtn =
+          productUnitCtn > 0 ? Math.floor(qtyPcs / productUnitCtn) : 0
+
+        return {
+          ...item,
+          qtyCtn
+        }
+      })
+
+      return {
+        ...order,
+        listProduct: newListProduct,
+        promotionProducts: newPromotionProducts
+      }
+    })
+
+    // console.log(newDataOrder)
+
+    const areaList = areaAll.map(item => item._id)
+    for (const i of dates) {
+      const orderDetails = newDataOrder.filter(item => {
+        const itemDateStr = new Date(item.createdAt).toISOString().slice(0, 10)
+        return itemDateStr === i
+      })
+
+      const daily = {
+        date: i,
+        areas: orderDetails.map(u => u.area === areaList)
+      }
+
+      // console.log(daily)
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: newDataOrder
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
+}
+
+exports.OrderZeroDiff = async (req, res) => {
+  try {
+    const { area, period } = req.body
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
+
+    const stockData = await Stock.findOne({
+      area: area,
+      period: period,
+      'listProduct.balancePcs': { $lt: 0 }
+    })
+
+    // console.log(stockData)
+
+    const negProductIds = (stockData.listProduct ?? [])
+      .filter(it => Number(it.balancePcs) < 0)
+      .map(it => it.productId ?? it.id)
+      .filter(Boolean)
+
+    // console.log(negProductIds)
+
+    const orderData = await Order.find({
+      'store.area': area,
+      period: period
+    }).lean()
+
+    // proDiff = orderData.map()
+
+    // const orderDiff = []
+
+    // for (i of negProductIds){
+    //   const data = orderData.map(item => item.listProduct.find(u => u.id === i))
+
+    //   console.log(data)
+
+    // }
+
+    res.status(200).json({
+      status: 200,
+      message: 'Sucess',
+      data: negProductIds
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
+}
+
+exports.checkOrderCancelM3 = async (req, res) => {
+  try {
+    const { period } = req.body
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
+
+    const orderCC = await Order.aggregate([
+      {
+        $match: {
+          period,
+          type: 'sale',
+          status: 'canceled',
+          'store.area': { $ne: 'IT211' }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          status: 1, // << เพิ่ม
+          orderId: {
+            $cond: [
+              { $eq: [{ $strLenCP: '$orderId' }, 16] },
+              {
+                $substrCP: [
+                  '$orderId',
+                  0,
+                  { $subtract: [{ $strLenCP: '$orderId' }, 3] }
+                ]
+              },
+              '$orderId'
+            ]
+          }
         }
       }
-    ]),
+    ])
 
-    Refund.find({
-      'store.area': area,
-      createdAt: { $gte: startTH, $lte: endTH },
-      type: 'refund',
-      status: { $nin: ['pending', 'canceled', 'reject'] }
-    }),
+    const refundCC = await Refund.aggregate([
+      {
+        $match: {
+          period,
+          type: 'refund',
+          status: { $in: ['canceled', 'reject'] },
+          'store.area': { $ne: 'IT211' }
+        }
+      },
+      { $project: { _id: 0, orderId: 1, reference: 1, status: 1 } } // << ส่ง status ด้วย
+    ])
 
-    Order.find({
-      'store.area': area,
-      createdAt: { $gte: startTH, $lte: endTH },
-      type: 'sale',
-      status: { $nin: ['canceled', 'reject'] }
-    }),
-    Order.find({
-      'store.area': area,
-      createdAt: { $gte: startTH, $lte: endTH },
-      type: 'change',
-      status: { $nin: ['pending', 'canceled', 'reject'] }
-    }),
-    Giveaway.find({
-      'store.area': area,
-      createdAt: { $gte: startTH, $lte: endTH },
-      type: 'give',
-      status: { $nin: ['canceled', 'reject'] }
-    }),
-    Distribution.find({
-      area: area,
-      createdAt: { $gte: startTH, $lte: endTH },
-      type: 'withdraw',
-      status: { $nin: ['pending', 'canceled', 'reject'] }
-    }),
-    AdjustStock.find({
-      area: area,
-      createdAt: { $gte: startTH, $lte: endTH },
-      type: 'adjuststock',
-      status: { $nin: ['pending', 'canceled', 'reject'] }
-    }),
-    Target.findOne({
-      TG_AREA: area,
-      TG_PERIOD: period
-      // createdAt: { $gte:startTH, $lte: endTH },
+    const refundIdCCs = refundCC.map(x => String(x.orderId).trim())
+    const changeIdCCS = refundCC.map(x => String(x.reference).trim())
+    const orderIdCCs = orderCC.map(x => String(x.orderId).trim())
+
+    const saleSet = new Set(orderIdCCs)
+    const refundSet = new Set(refundIdCCs)
+    const changeSet = new Set(changeIdCCS)
+
+    // map: id -> status (จาก Mongo)
+    const saleStatusMap = new Map(
+      orderCC.map(x => [String(x.orderId).trim(), x.status || ''])
+    )
+    const refundStatusMap = new Map(
+      refundCC.map(x => [String(x.orderId).trim(), x.status || ''])
+    )
+    // ถ้ามี collection ของ change เอง ค่อยเติม changeStatusMap ภายหลัง
+    const changeStatusMap = new Map()
+
+    const allCC = [...new Set([...refundIdCCs, ...orderIdCCs, ...changeIdCCS])]
+
+    const orderM3 = await OOHEAD.findAll({
+      where: { OACUOR: { [Op.in]: allCC } },
+      attributes: { exclude: ['id'] },
+      raw: true
     })
-  ])
 
-  // console.log(dataTarget)
+    const data = (orderM3 ?? []).map(item => {
+      const id = String(item.OACUOR).trim()
 
-  const totalSendmoney = (dataSendmoney ?? []).reduce(
-    (sum, item) => sum + (Number(item?.sendmoney) || 0),
-    0
-  )
+      const type = saleSet.has(id)
+        ? 'Sale'
+        : refundSet.has(id)
+          ? 'Refund'
+          : changeSet.has(id)
+            ? 'Change'
+            : ''
 
-  const salePcs = Object.values(
-    (dataOrderSale || [])
-      .flatMap(order =>
-        (order.listProduct || []).map(i => {
+      const typeId =
+        type === 'Sale'
+          ? 'A31'
+          : type === 'Refund'
+            ? 'A34'
+            : type === 'Change'
+              ? 'B31'
+              : ''
+
+      const statusTablet =
+        type === 'Sale'
+          ? saleStatusMap.get(id) ?? ''
+          : type === 'Refund'
+            ? refundStatusMap.get(id) ?? ''
+            : type === 'Change'
+              ? changeStatusMap.get(id) ?? ''
+              : ''
+
+      return { orderId: id, type, typeId, statusTablet }
+    })
+
+    const wb = xlsx.utils.book_new()
+    const ws = xlsx.utils.json_to_sheet(data)
+    xlsx.utils.book_append_sheet(wb, ws, `orderM3CC${period}`)
+
+    const tempPath = path.join(os.tmpdir(), `orderM3CC${period}.xlsx`)
+    xlsx.writeFile(wb, tempPath)
+
+    res.download(tempPath, `orderM3CC${period}.xlsx`, err => {
+      if (err) {
+        console.error('❌ Download error:', err)
+        // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+        if (!res.headersSent) {
+          res.status(500).send('Download failed')
+        }
+      }
+
+      // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+      fs.unlink(tempPath, () => { })
+    })
+
+    // res.status(200).json({
+    //   status: 200,
+    //   message: 'Sucess',
+    //   data: data
+    // })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
+}
+
+exports.getTarget = async (req, res) => {
+  try {
+    const { area } = req.query
+    let { startDate, endDate } = req.query
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Stock, AdjustStock } = getModelsByChannel(channel, res, stockModel)
+    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+    const { Giveaway } = getModelsByChannel(channel, res, giveModel)
+    const { Target } = getModelsByChannel(channel, res, targetModel)
+
+    const { Distribution, WereHouse } = getModelsByChannel(
+      channel,
+      res,
+      distributionModel
+    )
+    const product = await Product.find()
+
+    if (!/^\d{8}$/.test(startDate)) {
+      const nowTH = new Date(
+        new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })
+      )
+      const y = nowTH.getFullYear()
+      const m = String(nowTH.getMonth() + 1).padStart(2, '0')
+      const d = String(nowTH.getDate()).padStart(2, '0') // ← ใช้ getDate() ไม่ใช่ getDay()
+      startDate = `${y}${m}${d}` // YYYYMMDD
+      endDate = `${y}${m}${d}` // YYYYMMDD
+    }
+
+    const startTH = new Date(
+      `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
+        6,
+        8
+      )}T00:00:00+07:00`
+    )
+    const endTH = new Date(
+      `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(
+        6,
+        8
+      )}T23:59:59.999+07:00`
+    )
+
+    const period = `${startDate.slice(0, 4)}${startDate.slice(4, 6)}`
+
+    const [
+      dataSendmoney,
+      dataRefund,
+      dataOrderSale,
+      dataOrderChange,
+      dataGive,
+      datawithdraw,
+      dataAdjustStock,
+      dataTarget
+    ] = await Promise.all([
+      // SendMoney.find({
+      //   area: area,
+      //   dateAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+      // }),
+      SendMoney.aggregate([
+        {
+          $match: {
+            area: area,
+            dateAt: { $gte: startTH, $lte: endTH }
+          }
+        },
+        {
+          $addFields: {
+            createdAt: '$dateAt'
+          }
+        }
+      ]),
+
+      Refund.find({
+        'store.area': area,
+        createdAt: { $gte: startTH, $lte: endTH },
+        type: 'refund',
+        status: { $nin: ['pending', 'canceled', 'reject'] }
+      }),
+
+      Order.find({
+        'store.area': area,
+        createdAt: { $gte: startTH, $lte: endTH },
+        type: 'sale',
+        status: { $nin: ['canceled', 'reject'] }
+      }),
+      Order.find({
+        'store.area': area,
+        createdAt: { $gte: startTH, $lte: endTH },
+        type: 'change',
+        status: { $nin: ['pending', 'canceled', 'reject'] }
+      }),
+      Giveaway.find({
+        'store.area': area,
+        createdAt: { $gte: startTH, $lte: endTH },
+        type: 'give',
+        status: { $nin: ['canceled', 'reject'] }
+      }),
+      Distribution.find({
+        area: area,
+        createdAt: { $gte: startTH, $lte: endTH },
+        type: 'withdraw',
+        status: { $nin: ['pending', 'canceled', 'reject'] }
+      }),
+      AdjustStock.find({
+        area: area,
+        createdAt: { $gte: startTH, $lte: endTH },
+        type: 'adjuststock',
+        status: { $nin: ['pending', 'canceled', 'reject'] }
+      }),
+      Target.findOne({
+        TG_AREA: area,
+        TG_PERIOD: period
+        // createdAt: { $gte:startTH, $lte: endTH },
+      })
+    ])
+
+    // console.log(dataTarget)
+
+    const totalSendmoney = (dataSendmoney ?? []).reduce(
+      (sum, item) => sum + (Number(item?.sendmoney) || 0),
+      0
+    )
+
+    const salePcs = Object.values(
+      (dataOrderSale || [])
+        .flatMap(order =>
+          (order.listProduct || []).map(i => {
+            const factor =
+              product
+                .find(u => u.id === i.id)
+                ?.listUnit.find(u => u.unit === i.unit)?.factor ?? 1
+
+            return {
+              id: i.id,
+              qtyPcs: (i.qty || 0) * factor,
+              sale: i.netTotal || 0
+            }
+          })
+        )
+        .reduce((acc, cur) => {
+          if (!acc[cur.id]) acc[cur.id] = { id: cur.id, qtyPcs: 0, sale: 0 }
+          acc[cur.id].qtyPcs += cur.qtyPcs
+          acc[cur.id].sale += cur.sale
+          return acc
+        }, {})
+    )
+    let sale = 0
+    let saleQty = 0
+
+    for (const item of salePcs) {
+      const factorCtn =
+        product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
+          ?.factor ?? 1
+
+      const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
+      saleQty += saleCtn
+      sale += item.sale
+    }
+
+    const goodPcs = Object.values(
+      (dataRefund || [])
+        .flatMap(o => o.listProduct || [])
+        .filter(i => i.condition === 'good') // เลือกเฉพาะ good
+        .map(i => {
+          const meta = (product || []).find(u => String(u.id) === String(i.id))
+          const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
+          return {
+            id: i.id,
+            qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
+            sale: Number(i.total) || 0
+          }
+        })
+        .reduce((acc, cur) => {
+          acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
+          acc[cur.id].qtyPcs += cur.qtyPcs
+          acc[cur.id].sale += cur.sale
+          return acc
+        }, {})
+    )
+
+    let good = 0
+    let goodQty = 0
+
+    for (const item of goodPcs) {
+      const factorCtn =
+        product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
+          ?.factor ?? 1
+
+      const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
+      goodQty += saleCtn
+      good += item.sale
+    }
+
+    const damagedPcs = Object.values(
+      (dataRefund || [])
+        .flatMap(o => o.listProduct || [])
+        .filter(i => i.condition === 'damaged') // เลือกเฉพาะ good
+        .map(i => {
+          const meta = (product || []).find(u => String(u.id) === String(i.id))
+          const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
+          return {
+            id: i.id,
+            qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
+            sale: Number(i.total) || 0
+          }
+        })
+        .reduce((acc, cur) => {
+          acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
+          acc[cur.id].qtyPcs += cur.qtyPcs
+          acc[cur.id].sale += cur.sale
+          return acc
+        }, {})
+    )
+
+    let damaged = 0
+    let damagedQty = 0
+
+    for (const item of damagedPcs) {
+      const factorCtn =
+        product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
+          ?.factor ?? 1
+
+      const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
+      damagedQty += saleCtn
+      damaged += item.sale
+    }
+
+    const refundPcs = Object.values(
+      (dataRefund || [])
+        .flatMap(o => o.listProduct || [])
+        .map(i => {
+          const meta = (product || []).find(u => String(u.id) === String(i.id))
+          const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
+          return {
+            id: i.id,
+            qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
+            sale: Number(i.total) || 0
+          }
+        })
+        .reduce((acc, cur) => {
+          acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
+          acc[cur.id].qtyPcs += cur.qtyPcs
+          acc[cur.id].sale += cur.sale
+          return acc
+        }, {})
+    )
+
+    let refund = 0
+    let refundQty = 0
+
+    for (const item of refundPcs) {
+      const factorCtn =
+        product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
+          ?.factor ?? 1
+
+      const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
+      refundQty += saleCtn
+      refund += item.sale
+    }
+
+    const changePcs = Object.values(
+      (dataOrderChange || [])
+        .flatMap(o => o.listProduct || [])
+        .map(i => {
+          const meta = (product || []).find(u => String(u.id) === String(i.id))
+          const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
+          return {
+            id: i.id,
+            qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
+            sale: Number(i.netTotal) || 0
+          }
+        })
+        .reduce((acc, cur) => {
+          acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
+          acc[cur.id].qtyPcs += cur.qtyPcs
+          acc[cur.id].sale += cur.sale
+          return acc
+        }, {})
+    )
+
+    let change = 0
+    let changeQty = 0
+
+    for (const item of changePcs) {
+      const factorCtn =
+        product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
+          ?.factor ?? 1
+
+      const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
+      changeQty += saleCtn
+      change += item.sale
+    }
+
+    const givePcs = Object.values(
+      (dataGive || [])
+        .flatMap(o => o.listProduct || [])
+        .map(i => {
+          const meta = (product || []).find(u => String(u.id) === String(i.id))
+          const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
+          return {
+            id: i.id,
+            qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
+            sale: Number(i.total) || 0
+          }
+        })
+        .reduce((acc, cur) => {
+          acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
+          acc[cur.id].qtyPcs += cur.qtyPcs
+          acc[cur.id].sale += cur.sale
+          return acc
+        }, {})
+    )
+
+    let give = 0
+    let giveQty = 0
+
+    for (const item of givePcs) {
+      const factorCtn =
+        product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
+          ?.factor ?? 1
+
+      const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
+      giveQty += saleCtn
+      give += item.sale
+    }
+
+    const withdrawPcs = Object.values(
+      (datawithdraw || [])
+        .flatMap(o => o.listProduct || [])
+        .map(i => {
+          const meta = (product || []).find(u => String(u.id) === String(i.id))
+          const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
+          return {
+            id: i.id,
+            qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
+            sale: Number(i.total) || 0
+          }
+        })
+        .reduce((acc, cur) => {
+          acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
+          acc[cur.id].qtyPcs += cur.qtyPcs
+          acc[cur.id].sale += cur.sale
+          return acc
+        }, {})
+    )
+
+    let withdraw = 0
+    let withdrawQty = 0
+
+    for (const item of withdrawPcs) {
+      const factorCtn =
+        product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
+          ?.factor ?? 1
+
+      const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
+      withdrawQty += saleCtn
+      withdraw += item.sale
+    }
+
+    const recievePcs = Object.values(
+      (datawithdraw || [])
+        .flatMap(o => o.listProduct || [])
+        .map(i => {
+          const meta = (product || []).find(u => String(u.id) === String(i.id))
+          const factor = meta?.listUnit?.find(u => u.unit === 'CTN')?.factor ?? 1
+          // const salePrice = meta?.listUnit?.find(u => u.unit ===  'BOT'||'PCS').price.sale
+          // console.log(i.receiveQty)
+          return {
+            id: i.id,
+            qtyPcs: (Number(i.receiveQty) || 0) * (Number(factor) || 1)
+            // sale: Number(i.receiveQty) * salePrice || 0
+          }
+        })
+        .reduce((acc, cur) => {
+          acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
+          acc[cur.id].qtyPcs += cur.qtyPcs
+          // acc[cur.id].sale += cur.sale
+          return acc
+        }, {})
+    )
+
+    let recieve = 0
+    let recieveQty = 0
+
+    for (const item of recievePcs) {
+      const factorCtn =
+        product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
+          ?.factor ?? 1
+
+      const sale =
+        product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
+          ?.price.sale ?? 0
+
+      const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
+
+      const priceCtn = saleCtn * sale
+
+      recieveQty += saleCtn
+      recieve += priceCtn
+    }
+
+    const adjustPcs = Object.values(
+      (dataAdjustStock || [])
+        .flatMap(o => o.listProduct || [])
+        .map(i => {
+          const meta = (product || []).find(u => String(u.id) === String(i.id))
           const factor =
-            product
-              .find(u => u.id === i.id)
-              ?.listUnit.find(u => u.unit === i.unit)?.factor ?? 1
+            meta?.listUnit?.find(u => u.unit === i.receiveUnit)?.factor ?? 1
 
           return {
             id: i.id,
-            qtyPcs: (i.qty || 0) * factor,
-            sale: i.netTotal || 0
+            qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
+            sale: Number(i.price) || 0
           }
         })
-      )
-      .reduce((acc, cur) => {
-        if (!acc[cur.id]) acc[cur.id] = { id: cur.id, qtyPcs: 0, sale: 0 }
-        acc[cur.id].qtyPcs += cur.qtyPcs
-        acc[cur.id].sale += cur.sale
-        return acc
-      }, {})
-  )
-  let sale = 0
-  let saleQty = 0
+        .reduce((acc, cur) => {
+          acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
+          acc[cur.id].qtyPcs += cur.qtyPcs
+          acc[cur.id].sale += cur.sale
+          return acc
+        }, {})
+    )
 
-  for (const item of salePcs) {
-    const factorCtn =
-      product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
-        ?.factor ?? 1
+    let adjustStock = 0
+    let adjustStockQty = 0
 
-    const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
-    saleQty += saleCtn
-    sale += item.sale
+    for (const item of adjustPcs) {
+      const factorCtn =
+        product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
+          ?.factor ?? 1
+
+      const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
+      adjustStockQty += saleCtn
+      adjustStock += item.sale
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'Sucess',
+      sale: to2(sale + (change - refund)),
+      saleQty: saleQty,
+      good: to2(good),
+      goodQty: goodQty,
+      damaged: to2(damaged),
+      damagedQty: damagedQty,
+      refund: to2(refund),
+      refundQty: refundQty,
+      change: to2(change),
+      changeQty: changeQty,
+      give: to2(give),
+      giveQty: giveQty,
+      withdraw: to2(withdraw),
+      withdrawQty: withdrawQty,
+      recieve: to2(recieve),
+      recieveQty: recieveQty,
+      adjustStock: to2(adjustStock),
+      adjustStockQty: adjustStockQty,
+      target: parseFloat(dataTarget?.TG_AMOUNT ?? 0),
+      targetPercent:
+        to2((sale * 100) / parseFloat(dataTarget?.TG_AMOUNT * 1.07 ?? 0) ?? 0) ??
+        0
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
 
-  const goodPcs = Object.values(
-    (dataRefund || [])
-      .flatMap(o => o.listProduct || [])
-      .filter(i => i.condition === 'good') // เลือกเฉพาะ good
-      .map(i => {
-        const meta = (product || []).find(u => String(u.id) === String(i.id))
-        const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
-        return {
-          id: i.id,
-          qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
-          sale: Number(i.total) || 0
-        }
-      })
-      .reduce((acc, cur) => {
-        acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
-        acc[cur.id].qtyPcs += cur.qtyPcs
-        acc[cur.id].sale += cur.sale
-        return acc
-      }, {})
-  )
-
-  let good = 0
-  let goodQty = 0
-
-  for (const item of goodPcs) {
-    const factorCtn =
-      product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
-        ?.factor ?? 1
-
-    const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
-    goodQty += saleCtn
-    good += item.sale
-  }
-
-  const damagedPcs = Object.values(
-    (dataRefund || [])
-      .flatMap(o => o.listProduct || [])
-      .filter(i => i.condition === 'damaged') // เลือกเฉพาะ good
-      .map(i => {
-        const meta = (product || []).find(u => String(u.id) === String(i.id))
-        const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
-        return {
-          id: i.id,
-          qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
-          sale: Number(i.total) || 0
-        }
-      })
-      .reduce((acc, cur) => {
-        acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
-        acc[cur.id].qtyPcs += cur.qtyPcs
-        acc[cur.id].sale += cur.sale
-        return acc
-      }, {})
-  )
-
-  let damaged = 0
-  let damagedQty = 0
-
-  for (const item of damagedPcs) {
-    const factorCtn =
-      product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
-        ?.factor ?? 1
-
-    const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
-    damagedQty += saleCtn
-    damaged += item.sale
-  }
-
-  const refundPcs = Object.values(
-    (dataRefund || [])
-      .flatMap(o => o.listProduct || [])
-      .map(i => {
-        const meta = (product || []).find(u => String(u.id) === String(i.id))
-        const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
-        return {
-          id: i.id,
-          qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
-          sale: Number(i.total) || 0
-        }
-      })
-      .reduce((acc, cur) => {
-        acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
-        acc[cur.id].qtyPcs += cur.qtyPcs
-        acc[cur.id].sale += cur.sale
-        return acc
-      }, {})
-  )
-
-  let refund = 0
-  let refundQty = 0
-
-  for (const item of refundPcs) {
-    const factorCtn =
-      product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
-        ?.factor ?? 1
-
-    const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
-    refundQty += saleCtn
-    refund += item.sale
-  }
-
-  const changePcs = Object.values(
-    (dataOrderChange || [])
-      .flatMap(o => o.listProduct || [])
-      .map(i => {
-        const meta = (product || []).find(u => String(u.id) === String(i.id))
-        const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
-        return {
-          id: i.id,
-          qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
-          sale: Number(i.netTotal) || 0
-        }
-      })
-      .reduce((acc, cur) => {
-        acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
-        acc[cur.id].qtyPcs += cur.qtyPcs
-        acc[cur.id].sale += cur.sale
-        return acc
-      }, {})
-  )
-
-  let change = 0
-  let changeQty = 0
-
-  for (const item of changePcs) {
-    const factorCtn =
-      product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
-        ?.factor ?? 1
-
-    const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
-    changeQty += saleCtn
-    change += item.sale
-  }
-
-  const givePcs = Object.values(
-    (dataGive || [])
-      .flatMap(o => o.listProduct || [])
-      .map(i => {
-        const meta = (product || []).find(u => String(u.id) === String(i.id))
-        const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
-        return {
-          id: i.id,
-          qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
-          sale: Number(i.total) || 0
-        }
-      })
-      .reduce((acc, cur) => {
-        acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
-        acc[cur.id].qtyPcs += cur.qtyPcs
-        acc[cur.id].sale += cur.sale
-        return acc
-      }, {})
-  )
-
-  let give = 0
-  let giveQty = 0
-
-  for (const item of givePcs) {
-    const factorCtn =
-      product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
-        ?.factor ?? 1
-
-    const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
-    giveQty += saleCtn
-    give += item.sale
-  }
-
-  const withdrawPcs = Object.values(
-    (datawithdraw || [])
-      .flatMap(o => o.listProduct || [])
-      .map(i => {
-        const meta = (product || []).find(u => String(u.id) === String(i.id))
-        const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
-        return {
-          id: i.id,
-          qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
-          sale: Number(i.total) || 0
-        }
-      })
-      .reduce((acc, cur) => {
-        acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
-        acc[cur.id].qtyPcs += cur.qtyPcs
-        acc[cur.id].sale += cur.sale
-        return acc
-      }, {})
-  )
-
-  let withdraw = 0
-  let withdrawQty = 0
-
-  for (const item of withdrawPcs) {
-    const factorCtn =
-      product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
-        ?.factor ?? 1
-
-    const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
-    withdrawQty += saleCtn
-    withdraw += item.sale
-  }
-
-  const recievePcs = Object.values(
-    (datawithdraw || [])
-      .flatMap(o => o.listProduct || [])
-      .map(i => {
-        const meta = (product || []).find(u => String(u.id) === String(i.id))
-        const factor = meta?.listUnit?.find(u => u.unit === 'CTN')?.factor ?? 1
-        // const salePrice = meta?.listUnit?.find(u => u.unit ===  'BOT'||'PCS').price.sale
-        // console.log(i.receiveQty)
-        return {
-          id: i.id,
-          qtyPcs: (Number(i.receiveQty) || 0) * (Number(factor) || 1)
-          // sale: Number(i.receiveQty) * salePrice || 0
-        }
-      })
-      .reduce((acc, cur) => {
-        acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
-        acc[cur.id].qtyPcs += cur.qtyPcs
-        // acc[cur.id].sale += cur.sale
-        return acc
-      }, {})
-  )
-
-  let recieve = 0
-  let recieveQty = 0
-
-  for (const item of recievePcs) {
-    const factorCtn =
-      product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
-        ?.factor ?? 1
-
-    const sale =
-      product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
-        ?.price.sale ?? 0
-
-    const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
-
-    const priceCtn = saleCtn * sale
-
-    recieveQty += saleCtn
-    recieve += priceCtn
-  }
-
-  const adjustPcs = Object.values(
-    (dataAdjustStock || [])
-      .flatMap(o => o.listProduct || [])
-      .map(i => {
-        const meta = (product || []).find(u => String(u.id) === String(i.id))
-        const factor =
-          meta?.listUnit?.find(u => u.unit === i.receiveUnit)?.factor ?? 1
-
-        return {
-          id: i.id,
-          qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
-          sale: Number(i.price) || 0
-        }
-      })
-      .reduce((acc, cur) => {
-        acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
-        acc[cur.id].qtyPcs += cur.qtyPcs
-        acc[cur.id].sale += cur.sale
-        return acc
-      }, {})
-  )
-
-  let adjustStock = 0
-  let adjustStockQty = 0
-
-  for (const item of adjustPcs) {
-    const factorCtn =
-      product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
-        ?.factor ?? 1
-
-    const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
-    adjustStockQty += saleCtn
-    adjustStock += item.sale
-  }
-
-  res.status(200).json({
-    status: 200,
-    message: 'Sucess',
-    sale: to2(sale + (change - refund)),
-    saleQty: saleQty,
-    good: to2(good),
-    goodQty: goodQty,
-    damaged: to2(damaged),
-    damagedQty: damagedQty,
-    refund: to2(refund),
-    refundQty: refundQty,
-    change: to2(change),
-    changeQty: changeQty,
-    give: to2(give),
-    giveQty: giveQty,
-    withdraw: to2(withdraw),
-    withdrawQty: withdrawQty,
-    recieve: to2(recieve),
-    recieveQty: recieveQty,
-    adjustStock: to2(adjustStock),
-    adjustStockQty: adjustStockQty,
-    target: parseFloat(dataTarget?.TG_AMOUNT ?? 0),
-    targetPercent:
-      to2((sale * 100) / parseFloat(dataTarget?.TG_AMOUNT * 1.07 ?? 0) ?? 0) ??
-      0
-  })
 }
 
 exports.orderPowerBI = async (req, res) => {
-  let { startDate, endDate, excel, status } = req.query
+  try {
+    let { startDate, endDate, excel, status } = req.query
 
-  const now = new Date()
-  const thailandOffset = 7 * 60 // นาที
-  const utc = now.getTime() + now.getTimezoneOffset() * 60000
-  const thailand = new Date(utc + thailandOffset * 60000)
+    const now = new Date()
+    const thailandOffset = 7 * 60 // นาที
+    const utc = now.getTime() + now.getTimezoneOffset() * 60000
+    const thailand = new Date(utc + thailandOffset * 60000)
 
-  const year = thailand.getFullYear()
-  const month = String(thailand.getMonth() + 1).padStart(2, '0')
-  const day = String(thailand.getDate()).padStart(2, '0')
-  const currentDate = `${year}${month}${day}`
+    const year = thailand.getFullYear()
+    const month = String(thailand.getMonth() + 1).padStart(2, '0')
+    const day = String(thailand.getDate()).padStart(2, '0')
+    const currentDate = `${year}${month}${day}`
 
-  const channel = 'cash'
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-  const { Product } = getModelsByChannel(channel, res, productModel)
-  const { Refund } = getModelsByChannel(channel, res, refundModel)
-  const { Store } = getModelsByChannel(channel, res, storeModel)
+    const channel = 'cash'
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
-  const conoBi = await dataPowerBiQuery(channel)
-  const conoBiList = conoBi.flatMap(item => item.CONO)
-  // console.log(conoBiList)
-  const allTransactions = await dataPowerBi(
-    channel,
-    conoBiList,
-    status,
-    startDate,
-    endDate,
-    currentDate
-  )
-
-  if (excel == 'true') {
-    const wb = xlsx.utils.book_new()
-    const ws = xlsx.utils.json_to_sheet(allTransactions)
-    xlsx.utils.book_append_sheet(
-      wb,
-      ws,
-      `powerBi${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}`
+    const conoBi = await dataPowerBiQuery(channel)
+    const conoBiList = conoBi.flatMap(item => item.CONO)
+    // console.log(conoBiList)
+    const allTransactions = await dataPowerBi(
+      channel,
+      conoBiList,
+      status,
+      startDate,
+      endDate,
+      currentDate
     )
 
-    const tempPath = path.join(
-      os.tmpdir(),
-      `powerBi${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(
-        endDate
-      )}.xlsx`
-    )
-    xlsx.writeFile(wb, tempPath)
+    if (excel == 'true') {
+      const wb = xlsx.utils.book_new()
+      const ws = xlsx.utils.json_to_sheet(allTransactions)
+      xlsx.utils.book_append_sheet(
+        wb,
+        ws,
+        `powerBi${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}`
+      )
 
-    res.download(
-      tempPath,
-      `powerBi${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(
-        endDate
-      )}.xlsx`,
-      err => {
-        if (err) {
-          console.error('❌ Download error:', err)
-          // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
-          if (!res.headersSent) {
-            res.status(500).send('Download failed')
+      const tempPath = path.join(
+        os.tmpdir(),
+        `powerBi${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(
+          endDate
+        )}.xlsx`
+      )
+      xlsx.writeFile(wb, tempPath)
+
+      res.download(
+        tempPath,
+        `powerBi${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(
+          endDate
+        )}.xlsx`,
+        err => {
+          if (err) {
+            console.error('❌ Download error:', err)
+            // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+            if (!res.headersSent) {
+              res.status(500).send('Download failed')
+            }
           }
-        }
 
-        // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => {})
-      }
-    )
-  } else {
-    return res.status(200).json({
-      status: 200,
-      message: 'Sucess',
-      data: allTransactions
+          // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+          fs.unlink(tempPath, () => { })
+        }
+      )
+    } else {
+      return res.status(200).json({
+        status: 200,
+        message: 'Sucess',
+        data: allTransactions
+      })
+    }
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
+
 }
 
 exports.updateOrderPowerBI = async (req, res) => {
-  const now = new Date()
-  const thailandOffset = 7 * 60 // นาที
-  const utc = now.getTime() + now.getTimezoneOffset() * 60000
-  const thailand = new Date(utc + thailandOffset * 60000)
+  try {
+    const now = new Date()
+    const thailandOffset = 7 * 60 // นาที
+    const utc = now.getTime() + now.getTimezoneOffset() * 60000
+    const thailand = new Date(utc + thailandOffset * 60000)
 
-  const year = thailand.getFullYear()
-  const month = String(thailand.getMonth() + 1).padStart(2, '0')
-  const day = String(thailand.getDate()).padStart(2, '0')
-  const nextDay = String(thailand.getDate() + 1).padStart(2, '0')
+    const year = thailand.getFullYear()
+    const month = String(thailand.getMonth() + 1).padStart(2, '0')
+    const day = String(thailand.getDate()).padStart(2, '0')
+    const nextDay = String(thailand.getDate() + 1).padStart(2, '0')
 
-  const currentDate = `${year}${month}${day}`
-  const startDate = `${year}${month}${day}`
-  const endDate = `${year}${month}${nextDay}`
-  const status = ''
-  // console.log(startDate)
-  // console.log(endDate)
-  const channel = 'cash'
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-  const { Product } = getModelsByChannel(channel, res, productModel)
-  const { Refund } = getModelsByChannel(channel, res, refundModel)
-  const { Store } = getModelsByChannel(channel, res, storeModel)
+    const currentDate = `${year}${month}${day}`
+    const startDate = `${year}${month}${day}`
+    const endDate = `${year}${month}${nextDay}`
+    const status = ''
+    // console.log(startDate)
+    // console.log(endDate)
+    const channel = 'cash'
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
-  const invoBi = await dataPowerBiQuery(channel, 'INVO')
-  const invoBiList = invoBi.flatMap(item => item.INVO)
+    const invoBi = await dataPowerBiQuery(channel, 'INVO')
+    const invoBiList = invoBi.flatMap(item => item.INVO)
 
-  const invoM3 = await dataM3Query(channel)
-  const invoM3List = invoM3.flatMap(item => item.OACUOR)
+    const invoM3 = await dataM3Query(channel)
+    const invoM3List = invoM3.flatMap(item => item.OACUOR)
 
-  const allTransactions = await dataPowerBi(
-    channel,
-    invoBiList,
-    status,
-    startDate,
-    endDate,
-    currentDate
-  )
+    const allTransactions = await dataPowerBi(
+      channel,
+      invoBiList,
+      status,
+      startDate,
+      endDate,
+      currentDate
+    )
 
-  await dataPowerBiQueryInsert(channel, allTransactions)
+    await dataPowerBiQueryInsert(channel, allTransactions)
 
-  const invoBiAfter = await dataPowerBiQuery(channel, 'INVO')
-  const invoBiListAfter = invoBiAfter.flatMap(item => item.INVO)
+    const invoBiAfter = await dataPowerBiQuery(channel, 'INVO')
+    const invoBiListAfter = invoBiAfter.flatMap(item => item.INVO)
 
-  let alreadyM3 = []
-  for (const item of invoBiListAfter) {
-    if (invoM3List.includes(item)) {
-      alreadyM3.push(item)
+    let alreadyM3 = []
+    for (const item of invoBiListAfter) {
+      if (invoM3List.includes(item)) {
+        alreadyM3.push(item)
+      }
     }
+
+    await dataPowerBiQueryDelete(channel, alreadyM3)
+
+    return res.status(200).json({
+      status: 200,
+      message: 'Sucess',
+      data: alreadyM3
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
 
-  await dataPowerBiQueryDelete(channel, alreadyM3)
-
-  return res.status(200).json({
-    status: 200,
-    message: 'Sucess',
-    data: alreadyM3
-  })
 }
 
 exports.updateStatusOrderDistribution = async (req, res) => {
   try {
     const channel = 'cash'
     const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+    const currentMonth = dayjs().month() + 1 // เดือนปัจจุบัน (1–12)
+    const currentYear = dayjs().year()
+
     // ✅ 1. ดึงข้อมูลจาก WithdrawCash
     const withdrawList = await WithdrawCash.findAll({
-      where: { WD_STATUS: '22' },
+      where: {
+        WD_STATUS: '99',
+        [Op.and]: [
+          where(fn('MONTH', col('WD_DATE')), currentMonth),
+          where(fn('YEAR', col('WD_DATE')), currentYear)
+        ]
+      },
       raw: true
     })
     // ✅ 2. สร้าง list WD_NO
@@ -5539,14 +5723,15 @@ exports.updateStatusOrderDistribution = async (req, res) => {
       const product = listProduct.find(p => p.id === row.ITEM_CODE)
 
       if (product) {
+
         await WithdrawCash.update(
           {
             WD_STATUS: dis.status == 'confirm' ? '99' : '22',
             ITEM_WEIGHT: product.weightGross ?? 0,
             TOTAL_WEIGHT: product.weightNet ?? 0,
             SHIP_QTY: product.receiveQty ?? 0,
-            STATUS: dis.status ?? '',
-            STATUS_TH: dis.statusTH ?? ''
+            REMARK_WAREHOUSE: dis.remarkWarehouse?.remark ?? '',
+            IS_NPD: product.isNPD ? 'TRUE' : 'FALSE'
           },
           {
             where: {
@@ -5588,7 +5773,7 @@ exports.updateOrderDistribution = async (req, res) => {
     // const startDate = `${year}${month}${day}`
     const startDate = `20251023`
     // const endDate = `${year}${month}${nextDay}`
-    const endDate = `20251026`
+    const endDate = `20251030`
     const status = ''
     const channel = 'cash'
 
@@ -5616,253 +5801,64 @@ exports.updateOrderDistribution = async (req, res) => {
 }
 
 exports.getTargetProduct = async (req, res) => {
-  const { period, area, team, zone } = req.query
-  const channel = req.headers['x-channel']
-  const { Store } = getModelsByChannel(channel, res, storeModel)
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-  const { Refund } = getModelsByChannel(channel, res, refundModel)
-  const { Product } = getModelsByChannel(channel, res, productModel)
-  const { Stock, AdjustStock } = getModelsByChannel(channel, res, stockModel)
-  const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
-  const { Giveaway } = getModelsByChannel(channel, res, giveModel)
-  const { Target } = getModelsByChannel(channel, res, targetModel)
-  const { targetProduct } = getModelsByChannel(channel, res, targetProductModel)
+  try {
+    const { period, area, team, zone } = req.query
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Stock, AdjustStock } = getModelsByChannel(channel, res, stockModel)
+    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+    const { Giveaway } = getModelsByChannel(channel, res, giveModel)
+    const { Target } = getModelsByChannel(channel, res, targetModel)
+    const { targetProduct } = getModelsByChannel(channel, res, targetProductModel)
 
-  const query = { period }
-  if (area) query.area = area
+    const query = { period }
+    if (area) query.area = area
 
-  const targetProductData = await targetProduct.find(query).lean()
+    const targetProductData = await targetProduct.find(query).lean()
 
-  // กันกรณี grp_target เป็น undefined/null แล้วทำ flatMap พัง
-  const listGroupM3 = [
-    ...new Set(targetProductData.flatMap(item => item.grp_target ?? []))
-  ]
+    // กันกรณี grp_target เป็น undefined/null แล้วทำ flatMap พัง
+    const listGroupM3 = [
+      ...new Set(targetProductData.flatMap(item => item.grp_target ?? []))
+    ]
 
-  const productData = await Product.find().lean()
+    const productData = await Product.find().lean()
 
-  // ใช้ $lt แทน $lte (แนะนำให้กำหนด endOfMonthUTC = วันแรกของเดือนถัดไป 00:00:00Z)
-  const baseFilter = { period }
+    // ใช้ $lt แทน $lte (แนะนำให้กำหนด endOfMonthUTC = วันแรกของเดือนถัดไป 00:00:00Z)
+    const baseFilter = { period }
 
-  if (area) baseFilter['store.area'] = area
+    if (area) baseFilter['store.area'] = area
 
-  const teamFilter = {}
-  if (team) teamFilter['team3'] = team
+    const teamFilter = {}
+    if (team) teamFilter['team3'] = team
 
-  const zoneFilter = {}
-  if (zone) zoneFilter['store.zone'] = zone
+    const zoneFilter = {}
+    if (zone) zoneFilter['store.zone'] = zone
 
-  const [dataRefund, dataOrderSale, dataOrderChange] = await Promise.all([
-    Refund.aggregate([
-      {
-        $addFields: {
-          team3: {
-            $concat: [
-              { $substrCP: ['$store.area', 0, 2] },
-              { $substrCP: ['$store.area', 3, 1] }
-            ]
+    const [dataRefund, dataOrderSale, dataOrderChange] = await Promise.all([
+      Refund.aggregate([
+        {
+          $addFields: {
+            team3: {
+              $concat: [
+                { $substrCP: ['$store.area', 0, 2] },
+                { $substrCP: ['$store.area', 3, 1] }
+              ]
+            }
+          }
+        },
+        {
+          $match: {
+            ...baseFilter,
+            ...teamFilter,
+            ...zoneFilter,
+            type: 'refund',
+            status: { $nin: ['pending', 'canceled', 'reject'] }
           }
         }
-      },
-      {
-        $match: {
-          ...baseFilter,
-          ...teamFilter,
-          ...zoneFilter,
-          type: 'refund',
-          status: { $nin: ['pending', 'canceled', 'reject'] }
-        }
-      }
-    ]),
-    Order.aggregate([
-      {
-        $addFields: {
-          team3: {
-            $concat: [
-              { $substrCP: ['$store.area', 0, 2] },
-              { $substrCP: ['$store.area', 3, 1] }
-            ]
-          }
-        }
-      },
-      {
-        $match: {
-          ...baseFilter,
-          ...teamFilter,
-          ...zoneFilter,
-          type: 'sale',
-          status: { $nin: ['canceled', 'reject'] }
-        }
-      }
-    ]),
-    Order.aggregate([
-      {
-        $addFields: {
-          team3: {
-            $concat: [
-              { $substrCP: ['$store.area', 0, 2] },
-              { $substrCP: ['$store.area', 3, 1] }
-            ]
-          }
-        }
-      },
-      {
-        $match: {
-          ...baseFilter,
-          ...teamFilter,
-          ...zoneFilter,
-          type: 'change',
-          status: { $nin: ['pending', 'canceled', 'reject'] }
-        }
-      }
-    ])
-  ])
-
-  const orderSaleTran = [...dataOrderChange, ...dataOrderSale].flatMap(item =>
-    item.listProduct.map(i => {
-      const productDetail = productData.find(o => o.id === i.id)
-      const factor = productDetail.listUnit.find(o => o.unit === i.unit).factor
-      const factorCtn = productDetail.listUnit.find(
-        o => o.unit === 'CTN'
-      ).factor
-      const groupM3 = productDetail.groupCodeM3
-      const groupNameM3 = productDetail.groupM3
-      return {
-        ...i,
-        area: item.store.area,
-        groupM3,
-        groupNameM3,
-        qtyPcs: i.qty * factor,
-        factorCtn: factorCtn
-      }
-    })
-  )
-
-  const orderSaleTranMerged = Object.values(
-    orderSaleTran.reduce((acc, cur) => {
-      const key = `${cur.id}_${cur.area}` // ใช้ id + unit เป็น key
-      if (!acc[key]) {
-        acc[key] = { ...cur }
-      } else {
-        acc[key].qty += cur.qty || 0
-        acc[key].qtyPcs += cur.qtyPcs || 0
-        acc[key].subtotal += cur.subtotal || 0
-      }
-      return acc
-    }, {})
-  )
-
-  const orderSaleTranMergedCtn = orderSaleTranMerged.map(item => {
-    return {
-      ...item,
-      qtyCtn: Math.floor(item.qtyPcs / item.factorCtn)
-    }
-  })
-
-  let areaList = []
-  if (area) {
-    areaList = [area]
-  } else {
-    areaList = [...new Set(targetProductData.flatMap(item => item.area ?? []))]
-  }
-  // console.log(areaList)
-
-  let data = []
-  for (const i of areaList) {
-    // console.log(i)
-    const orderArea = orderSaleTranMergedCtn.filter(item => item.area === i)
-
-    for (const u of orderArea) {
-      const targetDetail = targetProductData.find(
-        item =>
-          item.area === i &&
-          item.period === period &&
-          item.grp_target === u.groupM3
-      )
-      // console.log(u.area)
-      dataTran = {
-        id: targetDetail.id,
-        period: period,
-        area: i,
-        groupCode: u.groupM3,
-        group: u.groupNameM3,
-        targetQty: targetDetail.tg,
-        targetAll: targetDetail.all_amt_target,
-        actualCtn: u.qtyCtn,
-        actual: u.subtotal,
-        unit: 'THB'
-      }
-      data.push(dataTran)
-    }
-  }
-
-  const dataFinal = Object.values(
-    data.reduce((acc, cur) => {
-      const key = `${cur.groupCode}_${cur.area}` // ใช้ id + unit เป็น key
-      if (!acc[key]) {
-        acc[key] = { ...cur }
-      } else {
-        acc[key].actualCtn += cur.actualCtn || 0
-        acc[key].actual += cur.actual || 0
-      }
-      return acc
-    }, {})
-  )
-
-  const result = dataFinal.map(item => ({
-    id: item.id,
-    period: item.period,
-    area: item.area,
-    groupCode: item.groupCode,
-    group: item.group,
-    targetQty: item.targetQty,
-    targetAll: item.targetAll,
-    actualCtn: item.actualCtn ?? 0,
-    actual: to2(item.actual ?? 0),
-    unit: item.unit
-  }))
-
-  // เรียงตาม area ก่อน แล้ว groupCode ต่อ
-  result.sort((a, b) => {
-    // 1) เทียบ area ก่อน
-    const areaCmp = String(a.area).localeCompare(String(b.area), undefined, {
-      numeric: true,
-      sensitivity: 'base'
-    })
-    if (areaCmp !== 0) return areaCmp
-
-    // 2) ถ้า area เท่ากัน ค่อยเทียบ groupCode
-    return String(a.groupCode).localeCompare(String(b.groupCode), undefined, {
-      numeric: true,
-      sensitivity: 'base'
-    })
-  })
-
-  res.status(200).json({
-    status: 200,
-    message: 'Sucess',
-    data: result
-  })
-}
-
-exports.getOrderExcelNew = async (req, res) => {
-  const { period, area, team, zone, excel, type } = req.query
-  const channel = req.headers['x-channel']
-
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-  const { Refund } = getModelsByChannel(channel, res, refundModel)
-  const { Product } = getModelsByChannel(channel, res, productModel)
-  const { Giveaway } = getModelsByChannel(channel, res, giveModel)
-  const baseFilter = {}
-  if (area) baseFilter['store.area'] = area
-
-  const teamFilter = {}
-  if (team) teamFilter['team3'] = team
-
-  const zoneFilter = {}
-  if (zone) zoneFilter['store.zone'] = zone
-
-  const [dataOrderSale, dataOrderChange, dataOrderRefund, dataOrderGive] =
-    await Promise.all([
+      ]),
       Order.aggregate([
         {
           $addFields: {
@@ -5879,7 +5875,6 @@ exports.getOrderExcelNew = async (req, res) => {
             ...baseFilter,
             ...teamFilter,
             ...zoneFilter,
-            period: period,
             type: 'sale',
             status: { $nin: ['canceled', 'reject'] }
           }
@@ -5901,439 +5896,653 @@ exports.getOrderExcelNew = async (req, res) => {
             ...baseFilter,
             ...teamFilter,
             ...zoneFilter,
-            period: period,
             type: 'change',
             status: { $nin: ['pending', 'canceled', 'reject'] }
-          }
-        }
-      ]),
-      Refund.aggregate([
-        {
-          $addFields: {
-            team3: {
-              $concat: [
-                { $substrCP: ['$store.area', 0, 2] },
-                { $substrCP: ['$store.area', 3, 1] }
-              ]
-            }
-          }
-        },
-        {
-          $match: {
-            ...baseFilter,
-            ...teamFilter,
-            ...zoneFilter,
-            period: period,
-            type: 'refund',
-            status: { $nin: ['pending', 'canceled', 'reject'] }
-          }
-        }
-      ]),
-      Giveaway.aggregate([
-        {
-          $addFields: {
-            team3: {
-              $concat: [
-                { $substrCP: ['$store.area', 0, 2] },
-                { $substrCP: ['$store.area', 3, 1] }
-              ]
-            }
-          }
-        },
-        {
-          $match: {
-            ...baseFilter,
-            ...teamFilter,
-            ...zoneFilter,
-            period: period,
-            type: 'give',
-            status: { $nin: ['canceled', 'reject'] }
           }
         }
       ])
     ])
 
-  const dataOrderPro = dataOrderSale.flatMap(item =>
-    (item.listPromotions ?? []).map(promo => ({
-      ...promo,
-      orderId: item.orderId,
-      type: 'pro'
+    const orderSaleTran = [...dataOrderChange, ...dataOrderSale].flatMap(item =>
+      item.listProduct.map(i => {
+        const productDetail = productData.find(o => o.id === i.id)
+        const factor = productDetail.listUnit.find(o => o.unit === i.unit).factor
+        const factorCtn = productDetail.listUnit.find(
+          o => o.unit === 'CTN'
+        ).factor
+        const groupM3 = productDetail.groupCodeM3
+        const groupNameM3 = productDetail.groupM3
+        return {
+          ...i,
+          area: item.store.area,
+          groupM3,
+          groupNameM3,
+          qtyPcs: i.qty * factor,
+          factorCtn: factorCtn
+        }
+      })
+    )
+
+    const orderSaleTranMerged = Object.values(
+      orderSaleTran.reduce((acc, cur) => {
+        const key = `${cur.id}_${cur.area}` // ใช้ id + unit เป็น key
+        if (!acc[key]) {
+          acc[key] = { ...cur }
+        } else {
+          acc[key].qty += cur.qty || 0
+          acc[key].qtyPcs += cur.qtyPcs || 0
+          acc[key].subtotal += cur.subtotal || 0
+        }
+        return acc
+      }, {})
+    )
+
+    const orderSaleTranMergedCtn = orderSaleTranMerged.map(item => {
+      return {
+        ...item,
+        qtyCtn: Math.floor(item.qtyPcs / item.factorCtn)
+      }
+    })
+
+    let areaList = []
+    if (area) {
+      areaList = [area]
+    } else {
+      areaList = [...new Set(targetProductData.flatMap(item => item.area ?? []))]
+    }
+    // console.log(areaList)
+
+    let data = []
+    for (const i of areaList) {
+      // console.log(i)
+      const orderArea = orderSaleTranMergedCtn.filter(item => item.area === i)
+
+      for (const u of orderArea) {
+        const targetDetail = targetProductData.find(
+          item =>
+            item.area === i &&
+            item.period === period &&
+            item.grp_target === u.groupM3
+        )
+        // console.log(u.area)
+        dataTran = {
+          id: targetDetail.id,
+          period: period,
+          area: i,
+          groupCode: u.groupM3,
+          group: u.groupNameM3,
+          targetQty: targetDetail.tg,
+          targetAll: targetDetail.all_amt_target,
+          actualCtn: u.qtyCtn,
+          actual: u.subtotal,
+          unit: 'THB'
+        }
+        data.push(dataTran)
+      }
+    }
+
+    const dataFinal = Object.values(
+      data.reduce((acc, cur) => {
+        const key = `${cur.groupCode}_${cur.area}` // ใช้ id + unit เป็น key
+        if (!acc[key]) {
+          acc[key] = { ...cur }
+        } else {
+          acc[key].actualCtn += cur.actualCtn || 0
+          acc[key].actual += cur.actual || 0
+        }
+        return acc
+      }, {})
+    )
+
+    const result = dataFinal.map(item => ({
+      id: item.id,
+      period: item.period,
+      area: item.area,
+      groupCode: item.groupCode,
+      group: item.group,
+      targetQty: item.targetQty,
+      targetAll: item.targetAll,
+      actualCtn: item.actualCtn ?? 0,
+      actual: to2(item.actual ?? 0),
+      unit: item.unit
     }))
-  )
 
-  let dataSale = []
-  const productData = await Product.find()
+    // เรียงตาม area ก่อน แล้ว groupCode ต่อ
+    result.sort((a, b) => {
+      // 1) เทียบ area ก่อน
+      const areaCmp = String(a.area).localeCompare(String(b.area), undefined, {
+        numeric: true,
+        sensitivity: 'base'
+      })
+      if (areaCmp !== 0) return areaCmp
 
-  for (const i of [...dataOrderSale, ...dataOrderPro]) {
-    // console.log(i)
-    for (const item of i.listProduct ?? []) {
-      if (!item.id || item.id.trim() === '' || item.unit == '') {
-        continue
-      }
-
-      const productDetail = productData.find(o => o.id === item.id)
-      const units = productDetail?.listUnit ?? []
-      const unitCtn = units.find(u => u.unit === 'CTN') ?? {}
-      const unitBag = units.find(u => ['BAG', 'PAC'].includes(u.unit)) ?? {}
-      const unitPcs = units.find(u => ['BOT', 'PCS'].includes(u.unit)) ?? {}
-
-      let ctnQty = 0
-      let ctnPrice = 0
-      let bagQty = 0
-      let bagPrice = 0
-      let pcsQty = 0
-      let pcsPrice = 0
-
-      if (item.unit === 'CTN') {
-        // logic สำหรับ CTN
-        ctnQty = item.qty
-        ctnPrice = item.price
-        factor = unitCtn.factor
-      } else if (item.unit === 'BAG' || item.unit === 'PAC') {
-        // logic สำหรับ BAG หรือ PAC
-        bagQty = item.qty
-        bagPrice = item.price
-        factor = unitBag.factor
-      } else if (item.unit === 'BOT' || item.unit === 'PCS') {
-        // logic สำหรับ BOT หรือ PCS
-        pcsQty = item.qty
-        pcsPrice = item.price
-        factor = unitPcs.factor
-      }
-
-      // if (i.type === 'pro') {
-      //   typedetail = 'Promotion'
-      // } else {
-      //   typedetail = 'Sale'
-      // }
-      // console.log(item.id)
-      const dataTran = {
-        // orderId: i.orderId,
-        productId: item.id,
-        productName: item.name,
-        productGroup: productDetail.groupCodeM3,
-        size: productDetail.size,
-        ctnQty,
-        ctnPrice: ctnPrice ?? 0,
-        bagQty,
-        bagPrice: bagPrice ?? 0,
-        pcsQty,
-        pcsPrice: pcsPrice ?? 0,
-        sumPrice: item.subtotal ?? 0,
-        sumPcs: (factor ?? 1) * item.qty
-        // type: typedetail
-      }
-      dataSale.push(dataTran)
-    }
-  }
-
-  let dataSaleArray = Object.values(
-    dataSale.reduce((acc, curr) => {
-      const key = `${curr.productId}`
-      if (acc[key]) {
-        acc[key] = {
-          ...curr,
-          ctnQty: (acc[key].ctnQty || 0) + (curr.ctnQty || 0),
-          ctnPrice: (acc[key].ctnPrice || 0) + (curr.ctnPrice || 0),
-          bagQty: (acc[key].bagQty || 0) + (curr.bagQty || 0),
-          bagPrice: (acc[key].bagPrice || 0) + (curr.bagPrice || 0),
-          pcsQty: (acc[key].pcsQty || 0) + (curr.pcsQty || 0),
-          pcsPrice: (acc[key].pcsPrice || 0) + (curr.pcsPrice || 0),
-          sumPrice: (acc[key].sumPrice || 0) + (curr.sumPrice || 0),
-          sumPcs: (acc[key].sumPcs || 0) + (curr.sumPcs || 0)
-        }
-      } else {
-        acc[key] = { ...curr }
-      }
-      return acc
-    }, {})
-  )
-
-  let dataRefundChangeTran = []
-
-  // for (const i of [...dataOrderChange, ...dataOrderRefund]) {
-  for (const i of [...dataOrderChange, ...dataOrderRefund]) {
-    if (i.type === 'change') {
-      typedetail = 'change'
-    } else {
-      typedetail = 'refund'
-    }
-
-    for (const item of i.listProduct ?? []) {
-      if (!item.id || item.id.trim() === '') {
-        continue
-      }
-
-      const productDetail = productData.find(o => o.id === item.id)
-      const units = productDetail?.listUnit ?? []
-      const unitCtn = units.find(u => u.unit === 'CTN') ?? {}
-      const unitBag = units.find(u => ['BAG', 'PAC'].includes(u.unit)) ?? {}
-      const unitPcs = units.find(u => ['BOT', 'PCS'].includes(u.unit)) ?? {}
-
-      let ctnQty = 0
-      let ctnPrice = 0
-      let bagQty = 0
-      let bagPrice = 0
-      let pcsQty = 0
-      let pcsPrice = 0
-
-      if (item.unit === 'CTN') {
-        // logic สำหรับ CTN
-        ctnQty = item.qty
-        ctnPrice = item.price
-        factor = unitCtn.factor
-      } else if (item.unit === 'BAG' || item.unit === 'PAC') {
-        // logic สำหรับ BAG หรือ PAC
-        bagQty = item.qty
-        bagPrice = item.price
-        factor = unitBag.factor
-      } else if (item.unit === 'BOT' || item.unit === 'PCS') {
-        // logic สำหรับ BOT หรือ PCS
-        pcsQty = item.qty
-        pcsPrice = item.price
-        factor = unitPcs.factor
-      }
-
-      if (typedetail === 'change') {
-        sumPrice = item.subtotal
-      } else {
-        sumPrice = item.total
-      }
-
-      const dataTran = {
-        // orderId: i.orderId,
-        productId: item.id,
-        productName: item.name,
-        productGroup: productDetail.groupCodeM3,
-        size: productDetail.size,
-        ctnQty,
-        ctnPrice: ctnPrice ?? 0,
-        bagQty,
-        bagPrice: bagPrice ?? 0,
-        pcsQty,
-        pcsPrice: pcsPrice ?? 0,
-        sumPrice: sumPrice,
-        sumPcs: (factor ?? 1) * item.qty,
-        type: typedetail,
-        refundType: item.condition ?? ''
-        // ref: i.reference ?? ''
-      }
-      dataRefundChangeTran.push(dataTran)
-    }
-  }
-
-  let dataRefundChange = Object.values(
-    dataRefundChangeTran.reduce((acc, curr) => {
-      const key = `${curr.productId}_${curr.type}_${curr.refundType}`
-      if (acc[key]) {
-        acc[key] = {
-          ...curr,
-          ctnQty: (acc[key].ctnQty || 0) + (curr.ctnQty || 0),
-          ctnPrice: (acc[key].ctnPrice || 0) + (curr.ctnPrice || 0),
-          bagQty: (acc[key].bagQty || 0) + (curr.bagQty || 0),
-          bagPrice: (acc[key].bagPrice || 0) + (curr.bagPrice || 0),
-          pcsQty: (acc[key].pcsQty || 0) + (curr.pcsQty || 0),
-          pcsPrice: (acc[key].pcsPrice || 0) + (curr.pcsPrice || 0),
-          sumPrice: (acc[key].sumPrice || 0) + (curr.sumPrice || 0),
-          sumPcs: (acc[key].sumPcs || 0) + (curr.sumPcs || 0)
-        }
-      } else {
-        acc[key] = { ...curr }
-      }
-      return acc
-    }, {})
-  )
-
-  const dataGive = []
-
-  for (const i of [...dataOrderGive]) {
-    for (const item of i.listProduct ?? []) {
-      if (!item.id || item.id.trim() === '') {
-        continue
-      }
-
-      const productDetail = productData.find(o => o.id === item.id)
-      const units = productDetail?.listUnit ?? []
-      const unitCtn = units.find(u => u.unit === 'CTN') ?? {}
-      const unitBag = units.find(u => ['BAG', 'PAC'].includes(u.unit)) ?? {}
-      const unitPcs = units.find(u => ['BOT', 'PCS'].includes(u.unit)) ?? {}
-
-      let ctnQty = 0
-      let ctnPrice = 0
-      let bagQty = 0
-      let bagPrice = 0
-      let pcsQty = 0
-      let pcsPrice = 0
-
-      if (item.unit === 'CTN') {
-        // logic สำหรับ CTN
-        ctnQty = item.qty
-        ctnPrice = item.price
-        factor = unitCtn.factor
-      } else if (item.unit === 'BAG' || item.unit === 'PAC') {
-        // logic สำหรับ BAG หรือ PAC
-        bagQty = item.qty
-        bagPrice = item.price
-        factor = unitBag.factor
-      } else if (item.unit === 'BOT' || item.unit === 'PCS') {
-        // logic สำหรับ BOT หรือ PCS
-        pcsQty = item.qty
-        pcsPrice = item.price
-        factor = unitPcs.factor
-      }
-
-      const dataTran = {
-        // orderId: i.orderId,
-        productId: item.id,
-        productName: item.name,
-        productGroup: productDetail.groupCodeM3,
-        size: productDetail.size,
-        ctnQty,
-        ctnPrice: ctnPrice ?? 0,
-        bagQty,
-        bagPrice: bagPrice ?? 0,
-        pcsQty,
-        pcsPrice: pcsPrice ?? 0,
-        sumPrice: item.total,
-        sumPcs: (factor ?? 1) * item.qty,
-        type: i.type
-      }
-      dataGive.push(dataTran)
-    }
-  }
-
-  let dataGiveArray = Object.values(
-    dataGive.reduce((acc, curr) => {
-      const key = `${curr.productId}`
-      if (acc[key]) {
-        acc[key] = {
-          ...curr,
-          ctnQty: (acc[key].ctnQty || 0) + (curr.ctnQty || 0),
-          ctnPrice: (acc[key].ctnPrice || 0) + (curr.ctnPrice || 0),
-          bagQty: (acc[key].bagQty || 0) + (curr.bagQty || 0),
-          bagPrice: (acc[key].bagPrice || 0) + (curr.bagPrice || 0),
-          pcsQty: (acc[key].pcsQty || 0) + (curr.pcsQty || 0),
-          pcsPrice: (acc[key].pcsPrice || 0) + (curr.pcsPrice || 0),
-          sumPrice: (acc[key].sumPrice || 0) + (curr.sumPrice || 0),
-          sumPcs: (acc[key].sumPcs || 0) + (curr.sumPcs || 0)
-        }
-      } else {
-        acc[key] = { ...curr }
-      }
-      return acc
-    }, {})
-  )
-
-  dataSaleArray = sortProduct(dataSaleArray, 'productGroup')
-  dataRefundChange = sortProduct(dataRefundChange, 'productGroup')
-  dataGiveArray = sortProduct(dataGiveArray, 'productGroup')
-
-  if (excel == 'true') {
-    function zeroToDash (value) {
-      return value === 0 ? '-' : value
-    }
-    const dataSaleFinal = dataSaleArray.map(item => {
-      return {
-        // invoice: item.orderId,
-        รหัสสินค้า: item.productId,
-        รายละเอียดสินค้า: item.productName,
-        หีบ: zeroToDash(item.ctnQty),
-        ราคาหีบ: zeroToDash(item.ctnPrice),
-        'ถุง/แพ็ค': zeroToDash(item.bagQty),
-        ราคาถุง: zeroToDash(item.bagPrice),
-        'ซอง/ขวด': zeroToDash(item.pcsQty),
-        ราคาซอง: zeroToDash(item.pcsPrice),
-        จำนวนเงิน: zeroToDash(item.sumPrice),
-        จำนวนรวมชิ้น: zeroToDash(item.sumPcs)
-        // ประเภทรายการ: item.type
-      }
+      // 2) ถ้า area เท่ากัน ค่อยเทียบ groupCode
+      return String(a.groupCode).localeCompare(String(b.groupCode), undefined, {
+        numeric: true,
+        sensitivity: 'base'
+      })
     })
 
-    const dataRefundFinal = dataRefundChange.map(item => {
-      return {
-        // invoice: item.orderId,
-        รหัสสินค้า: item.productId,
-        รายละเอียดสินค้า: item.productName,
-        หีบ: zeroToDash(item.ctnQty),
-        ราคาหีบ: zeroToDash(item.ctnPrice),
-        'ถุง/แพ็ค': zeroToDash(item.bagQty),
-        ราคาถุง: zeroToDash(item.bagPrice),
-        'ซอง/ขวด': zeroToDash(item.pcsQty),
-        ราคาซอง: zeroToDash(item.pcsPrice),
-        จำนวนเงิน: zeroToDash(item.sumPrice),
-        จำนวนรวมชิ้น: zeroToDash(item.sumPcs),
-        ประเภทรายการ: item.type,
-        ประเภทการคืน: item.refundType
-        // ref: item.ref
-      }
-    })
-
-    const dataGiveFinal = dataGiveArray.map(item => {
-      return {
-        // invoice: item.orderId,
-        รหัสสินค้า: item.productId,
-        รายละเอียดสินค้า: item.productName,
-        หีบ: zeroToDash(item.ctnQty),
-        ราคาหีบ: zeroToDash(item.ctnPrice),
-        'ถุง/แพ็ค': zeroToDash(item.bagQty),
-        ราคาถุง: zeroToDash(item.bagPrice),
-        'ซอง/ขวด': zeroToDash(item.pcsQty),
-        ราคาซอง: zeroToDash(item.pcsPrice),
-        จำนวนเงิน: zeroToDash(item.sumPrice),
-        จำนวนรวมชิ้น: zeroToDash(item.sumPcs),
-        ประเภทรายการ: item.type
-      }
-    })
-
-    const parts = [area, team, zone].filter(v => v) // เก็บเฉพาะค่าที่ truthy (ไม่ว่าง/null/undefined)
-    const fileName = `CheckOrderProduct_${parts.join('_')}.xlsx`
-    const tempPath = path.join(os.tmpdir(), fileName)
-
-    const wb = xlsx.utils.book_new()
-
-    // ✅ สร้าง 2 sheet แยก
-    const wsSale = xlsx.utils.json_to_sheet(dataSaleFinal)
-    const wsRefund = xlsx.utils.json_to_sheet(dataRefundFinal)
-    const wsGive = xlsx.utils.json_to_sheet(dataGiveFinal)
-    // ✅ เพิ่มเข้า workbook เป็น 2 ชีต
-
-    if (type === 'sale') {
-      xlsx.utils.book_append_sheet(wb, wsSale, `Sale`)
-    } else if (type === 'refund') {
-      xlsx.utils.book_append_sheet(wb, wsRefund, `Refund`)
-    } else if (type === 'give') {
-      xlsx.utils.book_append_sheet(wb, wsGive, `Give`)
-    } else {
-      xlsx.utils.book_append_sheet(wb, wsSale, `Sale`)
-      xlsx.utils.book_append_sheet(wb, wsRefund, `Refund`)
-      xlsx.utils.book_append_sheet(wb, wsGive, `Give`)
-    }
-
-    // ✅ เขียนไฟล์ไปยัง tempPath (ต้องเขียนที่เดียวกับที่กำลังจะดาวน์โหลด)
-    xlsx.writeFile(wb, tempPath)
-
-    // ✅ ส่งไฟล์ให้ดาวน์โหลด แล้วค่อยลบทิ้ง
-    res.download(tempPath, fileName, err => {
-      if (err) {
-        console.error('❌ Download error:', err)
-        if (!res.headersSent) {
-          res.status(500).send('Download failed')
-        }
-      }
-      // ลบไฟล์ทิ้งหลังจบ (สำเร็จหรือไม่ก็ตาม)
-      fs.unlink(tempPath, () => {})
-    })
-  } else {
-    return res.status(200).json({
+    res.status(200).json({
       status: 200,
       message: 'Sucess',
-      data: {
-        dataSaleArray,
-        dataRefundChange,
-        dataGiveArray
-      }
+      data: result
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
+
+}
+
+exports.getOrderExcelNew = async (req, res) => {
+  try {
+    const { period, area, team, zone, excel, type } = req.query
+    const channel = req.headers['x-channel']
+
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Giveaway } = getModelsByChannel(channel, res, giveModel)
+    const baseFilter = {}
+    if (area) baseFilter['store.area'] = area
+
+    const teamFilter = {}
+    if (team) teamFilter['team3'] = team
+
+    const zoneFilter = {}
+    if (zone) zoneFilter['store.zone'] = zone
+
+    const [dataOrderSale, dataOrderChange, dataOrderRefund, dataOrderGive] =
+      await Promise.all([
+        Order.aggregate([
+          {
+            $addFields: {
+              team3: {
+                $concat: [
+                  { $substrCP: ['$store.area', 0, 2] },
+                  { $substrCP: ['$store.area', 3, 1] }
+                ]
+              }
+            }
+          },
+          {
+            $match: {
+              ...baseFilter,
+              ...teamFilter,
+              ...zoneFilter,
+              period: period,
+              type: 'sale',
+              status: { $nin: ['canceled', 'reject'] }
+            }
+          }
+        ]),
+        Order.aggregate([
+          {
+            $addFields: {
+              team3: {
+                $concat: [
+                  { $substrCP: ['$store.area', 0, 2] },
+                  { $substrCP: ['$store.area', 3, 1] }
+                ]
+              }
+            }
+          },
+          {
+            $match: {
+              ...baseFilter,
+              ...teamFilter,
+              ...zoneFilter,
+              period: period,
+              type: 'change',
+              status: { $nin: ['pending', 'canceled', 'reject'] }
+            }
+          }
+        ]),
+        Refund.aggregate([
+          {
+            $addFields: {
+              team3: {
+                $concat: [
+                  { $substrCP: ['$store.area', 0, 2] },
+                  { $substrCP: ['$store.area', 3, 1] }
+                ]
+              }
+            }
+          },
+          {
+            $match: {
+              ...baseFilter,
+              ...teamFilter,
+              ...zoneFilter,
+              period: period,
+              type: 'refund',
+              status: { $nin: ['pending', 'canceled', 'reject'] }
+            }
+          }
+        ]),
+        Giveaway.aggregate([
+          {
+            $addFields: {
+              team3: {
+                $concat: [
+                  { $substrCP: ['$store.area', 0, 2] },
+                  { $substrCP: ['$store.area', 3, 1] }
+                ]
+              }
+            }
+          },
+          {
+            $match: {
+              ...baseFilter,
+              ...teamFilter,
+              ...zoneFilter,
+              period: period,
+              type: 'give',
+              status: { $nin: ['canceled', 'reject'] }
+            }
+          }
+        ])
+      ])
+
+    const dataOrderPro = dataOrderSale.flatMap(item =>
+      (item.listPromotions ?? []).map(promo => ({
+        ...promo,
+        orderId: item.orderId,
+        type: 'pro'
+      }))
+    )
+
+    let dataSale = []
+    const productData = await Product.find()
+
+    for (const i of [...dataOrderSale, ...dataOrderPro]) {
+      // console.log(i)
+      for (const item of i.listProduct ?? []) {
+        if (!item.id || item.id.trim() === '' || item.unit == '') {
+          continue
+        }
+
+        const productDetail = productData.find(o => o.id === item.id)
+        const units = productDetail?.listUnit ?? []
+        const unitCtn = units.find(u => u.unit === 'CTN') ?? {}
+        const unitBag = units.find(u => ['BAG', 'PAC'].includes(u.unit)) ?? {}
+        const unitPcs = units.find(u => ['BOT', 'PCS'].includes(u.unit)) ?? {}
+
+        let ctnQty = 0
+        let ctnPrice = 0
+        let bagQty = 0
+        let bagPrice = 0
+        let pcsQty = 0
+        let pcsPrice = 0
+
+        if (item.unit === 'CTN') {
+          // logic สำหรับ CTN
+          ctnQty = item.qty
+          ctnPrice = item.price
+          factor = unitCtn.factor
+        } else if (item.unit === 'BAG' || item.unit === 'PAC') {
+          // logic สำหรับ BAG หรือ PAC
+          bagQty = item.qty
+          bagPrice = item.price
+          factor = unitBag.factor
+        } else if (item.unit === 'BOT' || item.unit === 'PCS') {
+          // logic สำหรับ BOT หรือ PCS
+          pcsQty = item.qty
+          pcsPrice = item.price
+          factor = unitPcs.factor
+        }
+
+        // if (i.type === 'pro') {
+        //   typedetail = 'Promotion'
+        // } else {
+        //   typedetail = 'Sale'
+        // }
+        // console.log(item.id)
+        const dataTran = {
+          // orderId: i.orderId,
+          productId: item.id,
+          productName: item.name,
+          productGroup: productDetail.groupCodeM3,
+          size: productDetail.size,
+          ctnQty,
+          ctnPrice: ctnPrice ?? 0,
+          bagQty,
+          bagPrice: bagPrice ?? 0,
+          pcsQty,
+          pcsPrice: pcsPrice ?? 0,
+          sumPrice: item.subtotal ?? 0,
+          sumPcs: (factor ?? 1) * item.qty
+          // type: typedetail
+        }
+        dataSale.push(dataTran)
+      }
+    }
+
+    let dataSaleArray = Object.values(
+      dataSale.reduce((acc, curr) => {
+        const key = `${curr.productId}`
+        if (acc[key]) {
+          acc[key] = {
+            ...curr,
+            ctnQty: (acc[key].ctnQty || 0) + (curr.ctnQty || 0),
+            ctnPrice: (acc[key].ctnPrice || 0) + (curr.ctnPrice || 0),
+            bagQty: (acc[key].bagQty || 0) + (curr.bagQty || 0),
+            bagPrice: (acc[key].bagPrice || 0) + (curr.bagPrice || 0),
+            pcsQty: (acc[key].pcsQty || 0) + (curr.pcsQty || 0),
+            pcsPrice: (acc[key].pcsPrice || 0) + (curr.pcsPrice || 0),
+            sumPrice: (acc[key].sumPrice || 0) + (curr.sumPrice || 0),
+            sumPcs: (acc[key].sumPcs || 0) + (curr.sumPcs || 0)
+          }
+        } else {
+          acc[key] = { ...curr }
+        }
+        return acc
+      }, {})
+    )
+
+    let dataRefundChangeTran = []
+
+    // for (const i of [...dataOrderChange, ...dataOrderRefund]) {
+    for (const i of [...dataOrderChange, ...dataOrderRefund]) {
+      if (i.type === 'change') {
+        typedetail = 'change'
+      } else {
+        typedetail = 'refund'
+      }
+
+      for (const item of i.listProduct ?? []) {
+        if (!item.id || item.id.trim() === '') {
+          continue
+        }
+
+        const productDetail = productData.find(o => o.id === item.id)
+        const units = productDetail?.listUnit ?? []
+        const unitCtn = units.find(u => u.unit === 'CTN') ?? {}
+        const unitBag = units.find(u => ['BAG', 'PAC'].includes(u.unit)) ?? {}
+        const unitPcs = units.find(u => ['BOT', 'PCS'].includes(u.unit)) ?? {}
+
+        let ctnQty = 0
+        let ctnPrice = 0
+        let bagQty = 0
+        let bagPrice = 0
+        let pcsQty = 0
+        let pcsPrice = 0
+
+        if (item.unit === 'CTN') {
+          // logic สำหรับ CTN
+          ctnQty = item.qty
+          ctnPrice = item.price
+          factor = unitCtn.factor
+        } else if (item.unit === 'BAG' || item.unit === 'PAC') {
+          // logic สำหรับ BAG หรือ PAC
+          bagQty = item.qty
+          bagPrice = item.price
+          factor = unitBag.factor
+        } else if (item.unit === 'BOT' || item.unit === 'PCS') {
+          // logic สำหรับ BOT หรือ PCS
+          pcsQty = item.qty
+          pcsPrice = item.price
+          factor = unitPcs.factor
+        }
+
+        if (typedetail === 'change') {
+          sumPrice = item.subtotal
+        } else {
+          sumPrice = item.total
+        }
+
+        const dataTran = {
+          // orderId: i.orderId,
+          productId: item.id,
+          productName: item.name,
+          productGroup: productDetail.groupCodeM3,
+          size: productDetail.size,
+          ctnQty,
+          ctnPrice: ctnPrice ?? 0,
+          bagQty,
+          bagPrice: bagPrice ?? 0,
+          pcsQty,
+          pcsPrice: pcsPrice ?? 0,
+          sumPrice: sumPrice,
+          sumPcs: (factor ?? 1) * item.qty,
+          type: typedetail,
+          refundType: item.condition ?? ''
+          // ref: i.reference ?? ''
+        }
+        dataRefundChangeTran.push(dataTran)
+      }
+    }
+
+    let dataRefundChange = Object.values(
+      dataRefundChangeTran.reduce((acc, curr) => {
+        const key = `${curr.productId}_${curr.type}_${curr.refundType}`
+        if (acc[key]) {
+          acc[key] = {
+            ...curr,
+            ctnQty: (acc[key].ctnQty || 0) + (curr.ctnQty || 0),
+            ctnPrice: (acc[key].ctnPrice || 0) + (curr.ctnPrice || 0),
+            bagQty: (acc[key].bagQty || 0) + (curr.bagQty || 0),
+            bagPrice: (acc[key].bagPrice || 0) + (curr.bagPrice || 0),
+            pcsQty: (acc[key].pcsQty || 0) + (curr.pcsQty || 0),
+            pcsPrice: (acc[key].pcsPrice || 0) + (curr.pcsPrice || 0),
+            sumPrice: (acc[key].sumPrice || 0) + (curr.sumPrice || 0),
+            sumPcs: (acc[key].sumPcs || 0) + (curr.sumPcs || 0)
+          }
+        } else {
+          acc[key] = { ...curr }
+        }
+        return acc
+      }, {})
+    )
+
+    const dataGive = []
+
+    for (const i of [...dataOrderGive]) {
+      for (const item of i.listProduct ?? []) {
+        if (!item.id || item.id.trim() === '') {
+          continue
+        }
+
+        const productDetail = productData.find(o => o.id === item.id)
+        const units = productDetail?.listUnit ?? []
+        const unitCtn = units.find(u => u.unit === 'CTN') ?? {}
+        const unitBag = units.find(u => ['BAG', 'PAC'].includes(u.unit)) ?? {}
+        const unitPcs = units.find(u => ['BOT', 'PCS'].includes(u.unit)) ?? {}
+
+        let ctnQty = 0
+        let ctnPrice = 0
+        let bagQty = 0
+        let bagPrice = 0
+        let pcsQty = 0
+        let pcsPrice = 0
+
+        if (item.unit === 'CTN') {
+          // logic สำหรับ CTN
+          ctnQty = item.qty
+          ctnPrice = item.price
+          factor = unitCtn.factor
+        } else if (item.unit === 'BAG' || item.unit === 'PAC') {
+          // logic สำหรับ BAG หรือ PAC
+          bagQty = item.qty
+          bagPrice = item.price
+          factor = unitBag.factor
+        } else if (item.unit === 'BOT' || item.unit === 'PCS') {
+          // logic สำหรับ BOT หรือ PCS
+          pcsQty = item.qty
+          pcsPrice = item.price
+          factor = unitPcs.factor
+        }
+
+        const dataTran = {
+          // orderId: i.orderId,
+          productId: item.id,
+          productName: item.name,
+          productGroup: productDetail.groupCodeM3,
+          size: productDetail.size,
+          ctnQty,
+          ctnPrice: ctnPrice ?? 0,
+          bagQty,
+          bagPrice: bagPrice ?? 0,
+          pcsQty,
+          pcsPrice: pcsPrice ?? 0,
+          sumPrice: item.total,
+          sumPcs: (factor ?? 1) * item.qty,
+          type: i.type
+        }
+        dataGive.push(dataTran)
+      }
+    }
+
+    let dataGiveArray = Object.values(
+      dataGive.reduce((acc, curr) => {
+        const key = `${curr.productId}`
+        if (acc[key]) {
+          acc[key] = {
+            ...curr,
+            ctnQty: (acc[key].ctnQty || 0) + (curr.ctnQty || 0),
+            ctnPrice: (acc[key].ctnPrice || 0) + (curr.ctnPrice || 0),
+            bagQty: (acc[key].bagQty || 0) + (curr.bagQty || 0),
+            bagPrice: (acc[key].bagPrice || 0) + (curr.bagPrice || 0),
+            pcsQty: (acc[key].pcsQty || 0) + (curr.pcsQty || 0),
+            pcsPrice: (acc[key].pcsPrice || 0) + (curr.pcsPrice || 0),
+            sumPrice: (acc[key].sumPrice || 0) + (curr.sumPrice || 0),
+            sumPcs: (acc[key].sumPcs || 0) + (curr.sumPcs || 0)
+          }
+        } else {
+          acc[key] = { ...curr }
+        }
+        return acc
+      }, {})
+    )
+
+    dataSaleArray = sortProduct(dataSaleArray, 'productGroup')
+    dataRefundChange = sortProduct(dataRefundChange, 'productGroup')
+    dataGiveArray = sortProduct(dataGiveArray, 'productGroup')
+
+    if (excel == 'true') {
+      function zeroToDash(value) {
+        return value === 0 ? '-' : value
+      }
+      const dataSaleFinal = dataSaleArray.map(item => {
+        return {
+          // invoice: item.orderId,
+          รหัสสินค้า: item.productId,
+          รายละเอียดสินค้า: item.productName,
+          หีบ: zeroToDash(item.ctnQty),
+          ราคาหีบ: zeroToDash(item.ctnPrice),
+          'ถุง/แพ็ค': zeroToDash(item.bagQty),
+          ราคาถุง: zeroToDash(item.bagPrice),
+          'ซอง/ขวด': zeroToDash(item.pcsQty),
+          ราคาซอง: zeroToDash(item.pcsPrice),
+          จำนวนเงิน: zeroToDash(item.sumPrice),
+          จำนวนรวมชิ้น: zeroToDash(item.sumPcs)
+          // ประเภทรายการ: item.type
+        }
+      })
+
+      const dataRefundFinal = dataRefundChange.map(item => {
+        return {
+          // invoice: item.orderId,
+          รหัสสินค้า: item.productId,
+          รายละเอียดสินค้า: item.productName,
+          หีบ: zeroToDash(item.ctnQty),
+          ราคาหีบ: zeroToDash(item.ctnPrice),
+          'ถุง/แพ็ค': zeroToDash(item.bagQty),
+          ราคาถุง: zeroToDash(item.bagPrice),
+          'ซอง/ขวด': zeroToDash(item.pcsQty),
+          ราคาซอง: zeroToDash(item.pcsPrice),
+          จำนวนเงิน: zeroToDash(item.sumPrice),
+          จำนวนรวมชิ้น: zeroToDash(item.sumPcs),
+          ประเภทรายการ: item.type,
+          ประเภทการคืน: item.refundType
+          // ref: item.ref
+        }
+      })
+
+      const dataGiveFinal = dataGiveArray.map(item => {
+        return {
+          // invoice: item.orderId,
+          รหัสสินค้า: item.productId,
+          รายละเอียดสินค้า: item.productName,
+          หีบ: zeroToDash(item.ctnQty),
+          ราคาหีบ: zeroToDash(item.ctnPrice),
+          'ถุง/แพ็ค': zeroToDash(item.bagQty),
+          ราคาถุง: zeroToDash(item.bagPrice),
+          'ซอง/ขวด': zeroToDash(item.pcsQty),
+          ราคาซอง: zeroToDash(item.pcsPrice),
+          จำนวนเงิน: zeroToDash(item.sumPrice),
+          จำนวนรวมชิ้น: zeroToDash(item.sumPcs),
+          ประเภทรายการ: item.type
+        }
+      })
+
+      const parts = [area, team, zone].filter(v => v) // เก็บเฉพาะค่าที่ truthy (ไม่ว่าง/null/undefined)
+      const fileName = `CheckOrderProduct_${parts.join('_')}.xlsx`
+      const tempPath = path.join(os.tmpdir(), fileName)
+
+      const wb = xlsx.utils.book_new()
+
+      // ✅ สร้าง 2 sheet แยก
+      const wsSale = xlsx.utils.json_to_sheet(dataSaleFinal)
+      const wsRefund = xlsx.utils.json_to_sheet(dataRefundFinal)
+      const wsGive = xlsx.utils.json_to_sheet(dataGiveFinal)
+      // ✅ เพิ่มเข้า workbook เป็น 2 ชีต
+
+      if (type === 'sale') {
+        xlsx.utils.book_append_sheet(wb, wsSale, `Sale`)
+      } else if (type === 'refund') {
+        xlsx.utils.book_append_sheet(wb, wsRefund, `Refund`)
+      } else if (type === 'give') {
+        xlsx.utils.book_append_sheet(wb, wsGive, `Give`)
+      } else {
+        xlsx.utils.book_append_sheet(wb, wsSale, `Sale`)
+        xlsx.utils.book_append_sheet(wb, wsRefund, `Refund`)
+        xlsx.utils.book_append_sheet(wb, wsGive, `Give`)
+      }
+
+      // ✅ เขียนไฟล์ไปยัง tempPath (ต้องเขียนที่เดียวกับที่กำลังจะดาวน์โหลด)
+      xlsx.writeFile(wb, tempPath)
+
+      // ✅ ส่งไฟล์ให้ดาวน์โหลด แล้วค่อยลบทิ้ง
+      res.download(tempPath, fileName, err => {
+        if (err) {
+          console.error('❌ Download error:', err)
+          if (!res.headersSent) {
+            res.status(500).send('Download failed')
+          }
+        }
+        // ลบไฟล์ทิ้งหลังจบ (สำเร็จหรือไม่ก็ตาม)
+        fs.unlink(tempPath, () => { })
+      })
+    } else {
+      return res.status(200).json({
+        status: 200,
+        message: 'Sucess',
+        data: {
+          dataSaleArray,
+          dataRefundChange,
+          dataGiveArray
+        }
+      })
+    }
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
 }
 
 exports.updatePaymentOrder = async (req, res) => {
@@ -6385,14 +6594,14 @@ exports.updateAddressInOrder = async (req, res) => {
 
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-          storeData.address,
-          storeData.subDistrict && `ต.${storeData.subDistrict}`,
-          storeData.district && `อ.${storeData.district}`,
-          storeData.province && `จ.${storeData.province}`,
-          storeData.postCode
-        ]
-          .filter(Boolean)
-          .join(' ')
+        storeData.address,
+        storeData.subDistrict && `ต.${storeData.subDistrict}`,
+        storeData.district && `อ.${storeData.district}`,
+        storeData.province && `จ.${storeData.province}`,
+        storeData.postCode
+      ]
+        .filter(Boolean)
+        .join(' ')
       : storeData.address
 
     for (i of dataOrder) {
@@ -6422,19 +6631,31 @@ exports.updateAddressInOrder = async (req, res) => {
 }
 
 exports.addTarget = async (req, res) => {
-  const { storeId } = req.body
-  const channel = req.headers['x-channel']
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-  const { Store } = getModelsByChannel(channel, res, storeModel)
+  try {
+    const { storeId } = req.body
+    const channel = req.headers['x-channel']
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
-  // const storeData = await Store.findOne({ storeId: storeId })
-  // const dataOrder = await Order.find({ 'store.storeId': storeId })
+    // const storeData = await Store.findOne({ storeId: storeId })
+    // const dataOrder = await Order.find({ 'store.storeId': storeId })
 
-  res.status(200).json({
-    status: 200,
-    message: 'Sucess',
-    data: dataOrder
-  })
+    res.status(200).json({
+      status: 200,
+      message: 'Sucess',
+      data: dataOrder
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
 }
 
 exports.updateUserSaleInOrder = async (req, res) => {
@@ -6507,5 +6728,3 @@ exports.updateUserSaleInOrder = async (req, res) => {
     })
   }
 }
-
-

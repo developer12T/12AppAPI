@@ -306,7 +306,12 @@ exports.getStore = async (req, res) => {
 
     switch (channel) {
       case 'pc':
-        query.area = area.slice(0, 2)
+        // query.area = area.slice(0, 2)
+        if (area) {
+          query.area = area
+        } else if (zone) {
+          query.area = { $regex: `^${zone}`, $options: 'i' }
+        }
 
         break
       default:
@@ -772,90 +777,102 @@ exports.addStore = async (req, res) => {
 // }
 
 exports.checkSimilarStores = async (req, res) => {
-  const { storeId } = req.params
-  const channel = req.headers['x-channel']
-  const { Store } = getModelsByChannel(channel, res, storeModel)
-  const store = await Store.findOne({ storeId })
-  // console.log(store.zone)
-  // const existingStores = await Store.find(
-  //   { storeId: { $ne: storeId } },
-  //   { _id: 0, __v: 0, idIndex: 0 },
-  //   { zone: store.zone }
-  // )
+  try {
+    const { storeId } = req.params
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const store = await Store.findOne({ storeId })
+    // console.log(store.zone)
+    // const existingStores = await Store.find(
+    //   { storeId: { $ne: storeId } },
+    //   { _id: 0, __v: 0, idIndex: 0 },
+    //   { zone: store.zone }
+    // )
 
-  const existingStores = await Store.find(
-    {
-      ...(store.zone ? { zone: store.zone } : {}), // เพิ่มเฉพาะถ้ามีค่า
-      storeId: { $ne: storeId },
-      $expr: { $lte: [{ $strLenCP: '$storeId' }, 12] }
-    },
-    { _id: 0, __v: 0, idIndex: 0 }
-  )
+    const existingStores = await Store.find(
+      {
+        ...(store.zone ? { zone: store.zone } : {}), // เพิ่มเฉพาะถ้ามีค่า
+        storeId: { $ne: storeId },
+        $expr: { $lte: [{ $strLenCP: '$storeId' }, 12] }
+      },
+      { _id: 0, __v: 0, idIndex: 0 }
+    )
 
-  // console.log(existingStores.length)
-  // 1. กำหนด weight ของแต่ละ field (ค่า sum ต้องไม่จำเป็นต้องรวมกันเท่ากับ 100)
-  const fieldsToCheck = [
-    { field: 'name', weight: 2 },
-    { field: 'taxId', weight: 4 },
-    { field: 'tel', weight: 3 },
-    { field: 'address', weight: 2 }
-    // { field: 'district', weight: 0.5 },
-    // { field: 'subDistrict', weight: 0.5 },
-    // { field: 'province', weight: 0.5 },
-    // { field: 'postCode', weight: 0.5 },
-    // { field: 'latitude', weight: 4 },
-    // { field: 'longtitude', weight: 4 }
-  ]
+    // console.log(existingStores.length)
+    // 1. กำหนด weight ของแต่ละ field (ค่า sum ต้องไม่จำเป็นต้องรวมกันเท่ากับ 100)
+    const fieldsToCheck = [
+      { field: 'name', weight: 2 },
+      { field: 'taxId', weight: 4 },
+      { field: 'tel', weight: 3 },
+      { field: 'address', weight: 2 }
+      // { field: 'district', weight: 0.5 },
+      // { field: 'subDistrict', weight: 0.5 },
+      // { field: 'province', weight: 0.5 },
+      // { field: 'postCode', weight: 0.5 },
+      // { field: 'latitude', weight: 4 },
+      // { field: 'longtitude', weight: 4 }
+    ]
 
-  const totalWeight = fieldsToCheck.reduce((sum, cur) => sum + cur.weight, 0)
+    const totalWeight = fieldsToCheck.reduce((sum, cur) => sum + cur.weight, 0)
 
-  const similarStores = existingStores
-    .map(existingStore => {
-      let weightedSimilarity = 0
-      fieldsToCheck.forEach(({ field, weight }) => {
-        const similarity = calculateSimilarity(
-          store[field]?.toString() || '',
-          existingStore[field]?.toString() || ''
-        )
-        weightedSimilarity += similarity * weight
+    const similarStores = existingStores
+      .map(existingStore => {
+        let weightedSimilarity = 0
+        fieldsToCheck.forEach(({ field, weight }) => {
+          const similarity = calculateSimilarity(
+            store[field]?.toString() || '',
+            existingStore[field]?.toString() || ''
+          )
+          weightedSimilarity += similarity * weight
+        })
+
+        // Average, normalized by total weight
+        const averageSimilarity = weightedSimilarity / totalWeight
+
+        return {
+          store: existingStore,
+          similarity: averageSimilarity
+        }
       })
+      .filter(result => result.similarity > 75) // threshold
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, 3)
 
-      // Average, normalized by total weight
-      const averageSimilarity = weightedSimilarity / totalWeight
+    if (similarStores.length > 0) {
+      const sanitizedStores = similarStores.map(item => ({
+        store: Object.fromEntries(
+          Object.entries(item.store._doc || item.store).filter(
+            ([key]) => key !== '_id'
+          )
+        ),
+        similarity: item.similarity.toFixed(2)
+      }))
 
-      return {
-        store: existingStore,
-        similarity: averageSimilarity
-      }
+      // const io = getSocket()
+      // io.emit('store/check', {});
+
+      return res.status(200).json({
+        status: '200',
+        message: 'similar store',
+        data: sanitizedStores
+      })
+    }
+    return res.status(204).json({
+      status: '204',
+      message: 'Do not have similar store',
+      data: []
     })
-    .filter(result => result.similarity > 75) // threshold
-    .sort((a, b) => b.similarity - a.similarity)
-    .slice(0, 3)
+  } catch (error) {
+    console.error('❌ Error:', error)
 
-  if (similarStores.length > 0) {
-    const sanitizedStores = similarStores.map(item => ({
-      store: Object.fromEntries(
-        Object.entries(item.store._doc || item.store).filter(
-          ([key]) => key !== '_id'
-        )
-      ),
-      similarity: item.similarity.toFixed(2)
-    }))
-
-    // const io = getSocket()
-    // io.emit('store/check', {});
-
-    return res.status(200).json({
-      status: '200',
-      message: 'similar store',
-      data: sanitizedStores
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-  return res.status(204).json({
-    status: '204',
-    message: 'Do not have similar store',
-    data: []
-  })
+
 }
 exports.editStore = async (req, res) => {
   const { storeId } = req.params
@@ -1415,224 +1432,249 @@ exports.insertStoreToM3 = async (req, res) => {
 }
 
 exports.updateStoreStatus = async (req, res) => {
-  const { storeId, status, user } = req.body
-  const channel = req.headers['x-channel']
-  const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
-  const { User } = getModelsByChannel(channel, res, userModel)
-  const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
-  const store = await Store.findOne({ storeId: storeId })
-  // console.log(store)
-  if (!store) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found store'
-    })
-  }
-  const storeZone = store.area.substring(0, 2)
-  const maxRunningAll = await RunningNumber.findOne({ zone: storeZone }).select(
-    'last'
-  )
-
-  // console.log(maxRunningAll)
-
-  const oldId = maxRunningAll
-  // console.log(oldId, 'oldId')
-  const newId = oldId.last.replace(/\d+$/, n =>
-    String(+n + 1).padStart(n.length, '0')
-  )
-
-  // console.log(newId, 'newId')
-
-  // console.log("oldId",oldId)
-  if (status === '20') {
-    await RunningNumber.findOneAndUpdate(
-      { zone: store.zone },
-      { $set: { last: newId } },
-      { new: true }
-    )
-    await Store.findOneAndUpdate(
-      { _id: store._id },
-      {
-        $set: {
-          storeId: newId,
-          status: status,
-          updatedDate: Date(),
-          'approve.dateAction': new Date(),
-          'approve.appPerson': user
-        }
-      },
-      { new: true }
-    )
-
-    const item = await Store.findOne({ storeId: newId, area: store.area })
-    // const item = await Store.findOne({ storeId: storeId, area: store.area })
-    const dataUser = await User.findOne({ area: store.area, role: 'sale' })
-
-    if (!item) {
+  try {
+    const { storeId, status, user } = req.body
+    const channel = req.headers['x-channel']
+    const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
+    const store = await Store.findOne({ storeId: storeId })
+    // console.log(store)
+    if (!store) {
       return res.status(404).json({
-        json: 404,
-        message: 'Not found Store'
+        status: 404,
+        message: 'Not found store'
       })
     }
+    const storeZone = store.area.substring(0, 2)
+    const maxRunningAll = await RunningNumber.findOne({ zone: storeZone }).select(
+      'last'
+    )
 
-    // if (!item.postCode) {
-    //   return res.status(404).json({
-    //     json: 404,
-    //     message: 'Not found postCode'
-    //   })
-    // }
+    // console.log(maxRunningAll)
 
-    // console.log((item.province ?? '').substring(0, 35))
-    const dataTran = {
-      Hcase: 1,
-      customerNo: item.storeId,
-      customerStatus: item.status ?? '',
-      customerName: item.name ?? '',
-      customerChannel: '103',
-      customerCoType: item.type ?? '',
-      customerAddress1: (
-        item.address +
+    const oldId = maxRunningAll
+    // console.log(oldId, 'oldId')
+    const newId = oldId.last.replace(/\d+$/, n =>
+      String(+n + 1).padStart(n.length, '0')
+    )
+
+    // console.log(newId, 'newId')
+
+    // console.log("oldId",oldId)
+    if (status === '20') {
+      await RunningNumber.findOneAndUpdate(
+        { zone: store.zone },
+        { $set: { last: newId } },
+        { new: true }
+      )
+      await Store.findOneAndUpdate(
+        { _id: store._id },
+        {
+          $set: {
+            storeId: newId,
+            status: status,
+            updatedDate: Date(),
+            'approve.dateAction': new Date(),
+            'approve.appPerson': user
+          }
+        },
+        { new: true }
+      )
+
+      const item = await Store.findOne({ storeId: newId, area: store.area })
+      // const item = await Store.findOne({ storeId: storeId, area: store.area })
+      const dataUser = await User.findOne({ area: store.area, role: 'sale' })
+
+      if (!item) {
+        return res.status(404).json({
+          json: 404,
+          message: 'Not found Store'
+        })
+      }
+
+      // if (!item.postCode) {
+      //   return res.status(404).json({
+      //     json: 404,
+      //     message: 'Not found postCode'
+      //   })
+      // }
+
+      // console.log((item.province ?? '').substring(0, 35))
+      const dataTran = {
+        Hcase: 1,
+        customerNo: item.storeId,
+        customerStatus: item.status ?? '',
+        customerName: item.name ?? '',
+        customerChannel: '103',
+        customerCoType: item.type ?? '',
+        customerAddress1: (
+          item.address +
           item.subDistrict +
           item.subDistrict +
           item.province +
           item.postCode ?? ''
-      ).substring(0, 35),
-      customerAddress2: (
-        item.address +
+        ).substring(0, 35),
+        customerAddress2: (
+          item.address +
           item.subDistrict +
           item.subDistrict +
           item.province +
           item.postCode ?? ''
-      ).substring(35, 70),
-      customerAddress3: (
-        item.address +
+        ).substring(35, 70),
+        customerAddress3: (
+          item.address +
           item.subDistrict +
           item.subDistrict +
           item.province +
           item.postCode ?? ''
-      ).substring(70, 105),
-      customerAddress4: '',
-      customerPoscode: (item.postCode ?? '').substring(0, 35),
-      customerPhone: item.tel ?? '',
-      warehouse: dataUser.warehouse ?? '',
-      OKSDST: item.zone ?? '',
-      saleTeam: dataUser.area.slice(0, 2) + dataUser.area[3],
-      OKCFC1: item.area ?? '',
-      OKCFC3: item.route ?? '',
-      OKCFC6: item.type ?? '',
-      salePayer: dataUser.salePayer ?? '',
-      creditLimit: '000',
-      taxno: item.taxId ?? '',
-      saleCode: dataUser.saleCode ?? '',
-      saleZone: dataUser.zone ?? '',
-      OKFRE1: item.postCode,
-      OKECAR: item.postCode.slice(0, 2),
-      OKCFC4: item.area ?? '',
-      OKTOWN: item.province,
-      shippings: item.shippingAddress.map(u => {
-        return {
-          shippingAddress1: (u.address ?? '').substring(0, 35),
-          shippingAddress2: u.district ?? '',
-          shippingAddress3: u.subDistrict ?? '',
-          shippingAddress4: u.province ?? '',
-          shippingPoscode: u.postCode ?? '',
-          shippingPhone: item.tel ?? '',
-          shippingRoute: u.postCode,
-          OPGEOX: u.latitude,
-          OPGEOY: u.longtitude
-        }
-      })
-    }
+        ).substring(70, 105),
+        customerAddress4: '',
+        customerPoscode: (item.postCode ?? '').substring(0, 35),
+        customerPhone: item.tel ?? '',
+        warehouse: dataUser.warehouse ?? '',
+        OKSDST: item.zone ?? '',
+        saleTeam: dataUser.area.slice(0, 2) + dataUser.area[3],
+        OKCFC1: item.area ?? '',
+        OKCFC3: item.route ?? '',
+        OKCFC6: item.type ?? '',
+        salePayer: dataUser.salePayer ?? '',
+        creditLimit: '000',
+        taxno: item.taxId ?? '',
+        saleCode: dataUser.saleCode ?? '',
+        saleZone: dataUser.zone ?? '',
+        OKFRE1: item.postCode,
+        OKECAR: item.postCode.slice(0, 2),
+        OKCFC4: item.area ?? '',
+        OKTOWN: item.province,
+        shippings: item.shippingAddress.map(u => {
+          return {
+            shippingAddress1: (u.address ?? '').substring(0, 35),
+            shippingAddress2: u.district ?? '',
+            shippingAddress3: u.subDistrict ?? '',
+            shippingAddress4: u.province ?? '',
+            shippingPoscode: u.postCode ?? '',
+            shippingPhone: item.tel ?? '',
+            shippingRoute: u.postCode,
+            OPGEOX: u.latitude,
+            OPGEOY: u.longtitude
+          }
+        })
+      }
 
-    // console.log(dataTran)
+      // console.log(dataTran)
 
-    if (item.area != 'IT211') {
-      try {
-        const response = await axios.post(
-          `${process.env.API_URL_12ERP}/customer/insert`,
-          dataTran
-        )
+      if (item.area != 'IT211') {
+        try {
+          const response = await axios.post(
+            `${process.env.API_URL_12ERP}/customer/insert`,
+            dataTran
+          )
 
-        // ส่งกลับไปให้ client ที่เรียก Express API
-        return res.status(response.status).json(response.data)
-      } catch (error) {
-        if (error.response) {
-          // หาก ERP ส่ง 400 หรือ 500 หรืออื่นๆ กลับมา
-          return res.status(error.response.status).json({
-            message: error.response.data?.message || 'Request Failed',
-            data: error.response.data
-          })
+          // ส่งกลับไปให้ client ที่เรียก Express API
+          return res.status(response.status).json(response.data)
+        } catch (error) {
+          if (error.response) {
+            // หาก ERP ส่ง 400 หรือ 500 หรืออื่นๆ กลับมา
+            return res.status(error.response.status).json({
+              message: error.response.data?.message || 'Request Failed',
+              data: error.response.data
+            })
+          }
         }
       }
+
+      const io = getSocket()
+      // io.emit('store/updateStoreStatus', {
+      //   status: 'success',
+      //   data: newId
+      // })
+
+      //   return res.status(500).json({
+      //     message: 'Internal Server Error',
+      //     error: error.message
+      //   })
+      // }
+      await ApproveLogs.create({
+        module: 'approveStore',
+        user: user,
+        status: 'approved',
+        id: item.storeId
+      })
+
+      return res.status(200).json({
+        status: 200,
+        message: 'update Store Status sucess',
+        storeId: item.storeId
+      })
+    } else {
+      await Store.findOneAndUpdate(
+        { _id: store._id },
+        {
+          $set: {
+            status: status,
+            updatedDate: Date(),
+            'approve.dateAction': new Date(),
+            'approve.appPerson': user
+          }
+        },
+        { new: true }
+      )
+
+      await ApproveLogs.create({
+        module: 'approveStore',
+        user: user,
+        status: 'rejected',
+        id: item.storeId
+      })
+
+      res.status(200).json({
+        status: 200,
+        message: 'Reject Store successful'
+      })
     }
+  } catch (error) {
+    console.error('❌ Error:', error)
 
-    const io = getSocket()
-    // io.emit('store/updateStoreStatus', {
-    //   status: 'success',
-    //   data: newId
-    // })
-
-    //   return res.status(500).json({
-    //     message: 'Internal Server Error',
-    //     error: error.message
-    //   })
-    // }
-    await ApproveLogs.create({
-      module: 'approveStore',
-      user: user,
-      status: 'approved',
-      id: item.storeId
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
 
-    return res.status(200).json({
-      status: 200,
-      message: 'update Store Status sucess',
-      storeId: item.storeId
-    })
-  } else {
-    await Store.findOneAndUpdate(
-      { _id: store._id },
-      {
-        $set: {
-          status: status,
-          updatedDate: Date(),
-          'approve.dateAction': new Date(),
-          'approve.appPerson': user
-        }
-      },
-      { new: true }
-    )
-
-    await ApproveLogs.create({
-      module: 'approveStore',
-      user: user,
-      status: 'rejected',
-      id: item.storeId
-    })
-
-    res.status(200).json({
-      status: 200,
-      message: 'Reject Store successful'
-    })
   }
+
 }
 
 exports.rejectStore = async (req, res) => {
-  const { storeId, area } = req.body
+  try {
+    const { storeId, area } = req.body
 
-  const channel = req.headers['x-channel'] // 'credit' or 'cash'
+    const channel = req.headers['x-channel'] // 'credit' or 'cash'
 
-  const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
-  const result = await Store.updateOne(
-    { storeId: storeId },
-    { $set: { status: '15', updatedDate: Date() } }
-  )
-  res.status(200).json({
-    status: 200,
-    message: 'Reject Success',
-    data: result
-  })
+    const result = await Store.updateOne(
+      { storeId: storeId },
+      { $set: { status: '15', updatedDate: Date() } }
+    )
+    res.status(200).json({
+      status: 200,
+      message: 'Reject Success',
+      data: result
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
 }
 
 exports.updateStoreStatusNoNewId = async (req, res) => {
@@ -1694,223 +1736,259 @@ exports.updateStoreStatusNoNewId = async (req, res) => {
 }
 
 exports.addAndUpdateStore = async (req, res) => {
-  const channel = req.headers['x-channel']
+  try {
+    const channel = req.headers['x-channel']
 
-  const { Store } = getModelsByChannel(channel, res, storeModel)
-  let pathPhp = ''
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    let pathPhp = ''
 
-  switch (channel) {
-    case 'cash':
-      pathPhp = 'ca_api/ca_customer.php'
-      break
-    case 'credit':
-      pathPhp = 'cr_api/cr_customer.php'
-      break
-    default:
-      break
-  }
-  // area = ['NS121','SH101']
-  // area = 'NS121'
-  const response = await axios.post(
-    `http://58.181.206.159:9814/apps_api/${pathPhp}`
-    // {
-    //   area:area
-    // }
-  )
-
-  // console.log(response.data)
-  const storeMongo = await Store.find()
-  let update = 0
-  let addNew = 0
-  for (const splitData of response.data) {
-    const approveData = {
-      dateSend: new Date(),
-      dateAction: new Date(),
-      appPerson: 'system'
+    switch (channel) {
+      case 'cash':
+        pathPhp = 'ca_api/ca_customer.php'
+        break
+      case 'credit':
+        pathPhp = 'cr_api/cr_customer.php'
+        break
+      default:
+        break
     }
-    const poliAgree = {
-      status: 'Agree',
-      date: new Date()
-    }
-    const m3 = {
-      storeId: splitData.storeId,
-      name: splitData.name,
-      taxId: splitData.taxId,
-      tel: splitData.tel,
-      route: splitData.route,
-      type: splitData.type,
-      typeName: splitData.typeName,
-      address: splitData.address,
-      district: splitData.district,
-      subDistrict: splitData.subDistrict,
-      province: splitData.province,
-      provinceCode: splitData.provinceCode,
-      'postCode ': splitData.postCode,
-      zone: splitData.zone,
-      area: splitData.area,
-      latitude: splitData.latitude,
-      longtitude: splitData.longtitude,
-      lineId: '',
-      'note ': '',
-      approve: approveData,
-      status: '20',
-      policyConsent: poliAgree,
-      imageList: [],
-      shippingAddress: splitData.shippingAddress,
-      checkIn: {},
-      createdAt: splitData.createdAt,
-      updatedDate: Date()
-    }
+    // area = ['NS121','SH101']
+    // area = 'NS121'
+    const response = await axios.post(
+      `http://58.181.206.159:9814/apps_api/${pathPhp}`
+      // {
+      //   area:area
+      // }
+    )
 
-    const storeInMongo = storeMongo.find(id => id.storeId == m3.storeId)
+    // console.log(response.data)
+    const storeMongo = await Store.find()
+    let update = 0
+    let addNew = 0
+    for (const splitData of response.data) {
+      const approveData = {
+        dateSend: new Date(),
+        dateAction: new Date(),
+        appPerson: 'system'
+      }
+      const poliAgree = {
+        status: 'Agree',
+        date: new Date()
+      }
+      const m3 = {
+        storeId: splitData.storeId,
+        name: splitData.name,
+        taxId: splitData.taxId,
+        tel: splitData.tel,
+        route: splitData.route,
+        type: splitData.type,
+        typeName: splitData.typeName,
+        address: splitData.address,
+        district: splitData.district,
+        subDistrict: splitData.subDistrict,
+        province: splitData.province,
+        provinceCode: splitData.provinceCode,
+        'postCode ': splitData.postCode,
+        zone: splitData.zone,
+        area: splitData.area,
+        latitude: splitData.latitude,
+        longtitude: splitData.longtitude,
+        lineId: '',
+        'note ': '',
+        approve: approveData,
+        status: '20',
+        policyConsent: poliAgree,
+        imageList: [],
+        shippingAddress: splitData.shippingAddress,
+        checkIn: {},
+        createdAt: splitData.createdAt,
+        updatedDate: Date()
+      }
 
-    if (storeInMongo) {
-      const includedKeys = ['route', 'zone', 'area']
+      const storeInMongo = storeMongo.find(id => id.storeId == m3.storeId)
 
-      const hasChanged = includedKeys.some(key => m3[key] !== storeInMongo[key])
+      if (storeInMongo) {
+        const includedKeys = ['route', 'zone', 'area']
 
-      if (hasChanged) {
-        await Store.updateOne(
-          { storeId: m3.storeId },
-          {
-            $set: {
-              route: m3.route,
-              zone: m3.zone,
-              area: m3.area
+        const hasChanged = includedKeys.some(key => m3[key] !== storeInMongo[key])
+
+        if (hasChanged) {
+          await Store.updateOne(
+            { storeId: m3.storeId },
+            {
+              $set: {
+                route: m3.route,
+                zone: m3.zone,
+                area: m3.area
+              }
             }
-          }
-        )
-        update += 1
-      }
-    } else {
-      await Store.create(m3)
-      addNew += 1
-    }
-  }
-  res.status(200).json({
-    status: 200,
-    message: `Insert And Update Success`,
-    Update: update,
-    Add: addNew
-  })
-}
-
-exports.createRunningNumber = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
-
-  let type = ''
-  let running = ''
-  if (channel == 'cash') {
-    type = '101'
-    running = 'V'
-  } else if (channel == 'credit') {
-    type = '103'
-  }
-
-  const zoneId = await Store.aggregate([
-    {
-      $match: {
-        zone: { $ne: null, $nin: ['', null] }
-      }
-    },
-    {
-      $group: {
-        _id: '$zone'
+          )
+          update += 1
+        }
+      } else {
+        await Store.create(m3)
+        addNew += 1
       }
     }
-  ])
+    res.status(200).json({
+      status: 200,
+      message: `Insert And Update Success`,
+      Update: update,
+      Add: addNew
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
 
-  // console.log(zoneId)
-
-  const maxRunningAll = await Store.aggregate([
-    {
-      $match: {
-        zone: { $ne: null, $nin: ['', null] }
-      }
-    },
-    {
-      $group: {
-        _id: '$zone',
-        maxStoreId: { $max: '$storeId' }
-      }
-    }
-  ])
-
-  const data = zoneId.map(u => {
-    const maxRunning = maxRunningAll.find(m => m._id === u._id)
-    return {
-      zone: u._id,
-      type: type,
-      name: channel,
-      // start: `${running}${u._id}2500000`,
-      // last: `${running}${u._id}2500000`
-      start: maxRunning.maxStoreId,
-      last: maxRunning.maxStoreId
-    }
-  })
-
-  for (const runing of data) {
-    const exists = await RunningNumber.findOne({ zone: runing.zone })
-
-    if (!exists) {
-      await RunningNumber.create(runing)
-    }
-  }
-
-  res.status(200).json({
-    status: 200,
-    message: data
-  })
-}
-
-exports.updateRunningNumber = async (req, res) => {
-  const { storeId } = req.body
-  const channel = req.headers['x-channel']
-  const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
-  const store = await Store.findOne({ storeId: storeId })
-
-  if (!store) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found store'
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
 
-  const maxRunningAll = await Store.aggregate([
-    {
-      $match: {
-        zone: store.zone
+}
+
+exports.createRunningNumber = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
+
+    let type = ''
+    let running = ''
+    if (channel == 'cash') {
+      type = '101'
+      running = 'V'
+    } else if (channel == 'credit') {
+      type = '103'
+    }
+
+    const zoneId = await Store.aggregate([
+      {
+        $match: {
+          zone: { $ne: null, $nin: ['', null] }
+        }
+      },
+      {
+        $group: {
+          _id: '$zone'
+        }
       }
-    },
-    {
-      $group: {
-        _id: '$zone',
-        maxStoreId: { $max: '$storeId' }
+    ])
+
+    // console.log(zoneId)
+
+    const maxRunningAll = await Store.aggregate([
+      {
+        $match: {
+          zone: { $ne: null, $nin: ['', null] }
+        }
+      },
+      {
+        $group: {
+          _id: '$zone',
+          maxStoreId: { $max: '$storeId' }
+        }
+      }
+    ])
+
+    const data = zoneId.map(u => {
+      const maxRunning = maxRunningAll.find(m => m._id === u._id)
+      return {
+        zone: u._id,
+        type: type,
+        name: channel,
+        // start: `${running}${u._id}2500000`,
+        // last: `${running}${u._id}2500000`
+        start: maxRunning.maxStoreId,
+        last: maxRunning.maxStoreId
+      }
+    })
+
+    for (const runing of data) {
+      const exists = await RunningNumber.findOne({ zone: runing.zone })
+
+      if (!exists) {
+        await RunningNumber.create(runing)
       }
     }
-  ])
-  const oldId = maxRunningAll.flatMap(u => u.maxStoreId)
-  const newId = oldId[0].replace(/\d+$/, n =>
-    String(+n + 1).padStart(n.length, '0')
-  )
 
-  await Store.findOneAndUpdate(
-    { storeId: storeId },
-    { $set: { storeId: newId, status: '20', updatedDate: Date() } },
-    { new: true }
-  )
+    res.status(200).json({
+      status: 200,
+      message: data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
 
-  await RunningNumber.findOneAndUpdate(
-    { zone: store.zone },
-    { $set: { last: newId } },
-    { new: true }
-  )
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
 
-  res.status(200).json({
-    status: 200,
-    message: 'Update storeId successful'
-  })
+}
+
+exports.updateRunningNumber = async (req, res) => {
+  try {
+    const { storeId } = req.body
+    const channel = req.headers['x-channel']
+    const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
+    const store = await Store.findOne({ storeId: storeId })
+
+    if (!store) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found store'
+      })
+    }
+
+    const maxRunningAll = await Store.aggregate([
+      {
+        $match: {
+          zone: store.zone
+        }
+      },
+      {
+        $group: {
+          _id: '$zone',
+          maxStoreId: { $max: '$storeId' }
+        }
+      }
+    ])
+    const oldId = maxRunningAll.flatMap(u => u.maxStoreId)
+    const newId = oldId[0].replace(/\d+$/, n =>
+      String(+n + 1).padStart(n.length, '0')
+    )
+
+    await Store.findOneAndUpdate(
+      { storeId: storeId },
+      { $set: { storeId: newId, status: '20', updatedDate: Date() } },
+      { new: true }
+    )
+
+    await RunningNumber.findOneAndUpdate(
+      { zone: store.zone },
+      { $set: { last: newId } },
+      { new: true }
+    )
+
+    res.status(200).json({
+      status: 200,
+      message: 'Update storeId successful'
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
 }
 
 exports.addBueatyStore = async (req, res) => {
@@ -1948,279 +2026,375 @@ exports.addBueatyStore = async (req, res) => {
 }
 
 exports.getBueatyStore = async (req, res) => {
-  const channel = req.headers['x-channel']
+  try {
+    const channel = req.headers['x-channel']
 
-  const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
+    const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
 
-  const storeBueaty = await TypeStore.aggregate([
-    {
-      $lookup: {
-        from: 'stores',
-        localField: 'storeId',
-        foreignField: 'storeId',
-        as: 'storeDetail'
+    const storeBueaty = await TypeStore.aggregate([
+      {
+        $lookup: {
+          from: 'stores',
+          localField: 'storeId',
+          foreignField: 'storeId',
+          as: 'storeDetail'
+        }
       }
-    }
-  ])
+    ])
 
-  res.status(200).json({
-    status: 200,
-    message: storeBueaty
-  })
+    res.status(200).json({
+      status: 200,
+      message: storeBueaty
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
 }
 
 exports.addStoreArray = async (req, res) => {
-  const { storeId } = req.body
-  const channel = req.headers['x-channel']
-  const { Store } = getModelsByChannel(channel, res, storeModel)
-  const result = await storeQueryFilter(channel, storeId)
+  try {
+    const { storeId } = req.body
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const result = await storeQueryFilter(channel, storeId)
 
-  const insertedStores = []
-  const existingStores = []
+    const insertedStores = []
+    const existingStores = []
 
-  for (const item of result) {
-    const storeInDb = await Store.findOne({ storeId: item.storeId })
+    for (const item of result) {
+      const storeInDb = await Store.findOne({ storeId: item.storeId })
 
-    if (!storeInDb) {
-      await Store.create(item)
-      insertedStores.push({
-        idStore: item.storeId,
-        name: item.name
-      })
-    } else {
-      existingStores.push({
-        idStore: item.storeId,
-        name: item.name
-      })
-    }
-  }
-
-  const io = getSocket()
-  io.emit('store/addStoreArray', {})
-
-  res.status(200).json({
-    status: 200,
-    message: 'Store sync completed',
-    inserted: insertedStores,
-    alreadyExists: existingStores
-  })
-}
-
-exports.updateStoreArray = async (req, res) => {
-  const { storeId } = req.body
-  const channel = req.headers['x-channel']
-  const { Store } = getModelsByChannel(channel, res, storeModel)
-  const result = await storeQueryFilter(channel, storeId)
-
-  const updatedStores = []
-  const unchangedStores = []
-
-  for (const item of result) {
-    const storeInDb = await Store.findOne({ storeId: item.storeId })
-
-    if (storeInDb) {
-      const isChanged = Object.keys(item).some(key => {
-        return item[key] !== storeInDb[key]
-      })
-
-      if (isChanged) {
-        await Store.updateOne({ storeId: item.storeId }, { $set: item })
-        updatedStores.push({
+      if (!storeInDb) {
+        await Store.create(item)
+        insertedStores.push({
           idStore: item.storeId,
           name: item.name
         })
       } else {
-        unchangedStores.push({
+        existingStores.push({
           idStore: item.storeId,
           name: item.name
         })
       }
     }
-  }
-  const io = getSocket()
-  io.emit('store/updateStoreArray', {})
 
-  res.status(200).json({
-    status: 200,
-    message: 'Store update check completed',
-    updated: updatedStores,
-    unchanged: unchangedStores
-  })
+    const io = getSocket()
+    io.emit('store/addStoreArray', {})
+
+    res.status(200).json({
+      status: 200,
+      message: 'Store sync completed',
+      inserted: insertedStores,
+      alreadyExists: existingStores
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
+}
+
+exports.updateStoreArray = async (req, res) => {
+  try {
+    const { storeId } = req.body
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const result = await storeQueryFilter(channel, storeId)
+
+    const updatedStores = []
+    const unchangedStores = []
+
+    for (const item of result) {
+      const storeInDb = await Store.findOne({ storeId: item.storeId })
+
+      if (storeInDb) {
+        const isChanged = Object.keys(item).some(key => {
+          return item[key] !== storeInDb[key]
+        })
+
+        if (isChanged) {
+          await Store.updateOne({ storeId: item.storeId }, { $set: item })
+          updatedStores.push({
+            idStore: item.storeId,
+            name: item.name
+          })
+        } else {
+          unchangedStores.push({
+            idStore: item.storeId,
+            name: item.name
+          })
+        }
+      }
+    }
+    const io = getSocket()
+    io.emit('store/updateStoreArray', {})
+
+    res.status(200).json({
+      status: 200,
+      message: 'Store update check completed',
+      updated: updatedStores,
+      unchanged: unchangedStores
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
 }
 
 exports.deleteStoreArray = async (req, res) => {
-  const { storeId } = req.body
-  const channel = req.headers['x-channel']
-  const { Store } = getModelsByChannel(channel, res, storeModel)
+  try {
+    const { storeId } = req.body
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
-  const storeToDelete = await Store.find({ storeId: { $in: storeId } })
-  const deletedStoreId = storeToDelete.map(store => store.storeId)
+    const storeToDelete = await Store.find({ storeId: { $in: storeId } })
+    const deletedStoreId = storeToDelete.map(store => store.storeId)
 
-  await Store.deleteMany({ storeId: { $in: storeId } })
+    await Store.deleteMany({ storeId: { $in: storeId } })
 
-  const io = getSocket()
-  io.emit('store/deleteStoreArray', {
-    status: 200,
-    message: 'Deleted successfully',
-    deletedStore: deletedStoreId
-  })
+    const io = getSocket()
+    io.emit('store/deleteStoreArray', {
+      status: 200,
+      message: 'Deleted successfully',
+      deletedStore: deletedStoreId
+    })
 
-  res.status(200).json({
-    status: 200,
-    message: 'Deleted successfully',
-    deletedStore: deletedStoreId
-  })
+    res.status(200).json({
+      status: 200,
+      message: 'Deleted successfully',
+      deletedStore: deletedStoreId
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
 }
 
 exports.addTypeStore = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const result = await groupStoreType()
-  const { StoreType } = getModelsByChannel(channel, res, storeModel)
-  for (const item of result) {
-    const exist = await StoreType.findOne({ id: item.id })
-    if (!exist) {
-      await StoreType.create(item)
+  try {
+    const channel = req.headers['x-channel']
+    const result = await groupStoreType()
+    const { StoreType } = getModelsByChannel(channel, res, storeModel)
+    for (const item of result) {
+      const exist = await StoreType.findOne({ id: item.id })
+      if (!exist) {
+        await StoreType.create(item)
+      }
     }
+
+    res.status(200).json({
+      status: 200,
+      message: 'successfully',
+      deletedStore: result
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
 
-  res.status(200).json({
-    status: 200,
-    message: 'successfully',
-    deletedStore: result
-  })
 }
 
 exports.getTypeStore = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { StoreType } = getModelsByChannel(channel, res, storeModel)
-  const storeType = await StoreType.find().select('id name status -_id')
+  try {
+    const channel = req.headers['x-channel']
+    const { StoreType } = getModelsByChannel(channel, res, storeModel)
+    const storeType = await StoreType.find().select('id name status -_id')
 
-  res.status(200).json({
-    status: 200,
-    message: 'successfully',
-    data: storeType
-  })
+    res.status(200).json({
+      status: 200,
+      message: 'successfully',
+      data: storeType
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
 }
 
 exports.insertStoreToErpOne = async (req, res) => {
-  const { storeId, area } = req.body
-  const channel = req.headers['x-channel']
-  const { Store } = getModelsByChannel(channel, res, storeModel)
-  const { User } = getModelsByChannel(channel, res, userModel)
-  const item = await Store.findOne({ storeId: storeId, area: area })
-  const dataUser = await User.findOne({ area: area, role: 'sale' })
-
-  if (!item) {
-    return res.status(404).json({
-      json: 404,
-      message: 'Not found Store'
-    })
-  }
-
-  if (!item.postCode) {
-    return res.status(404).json({
-      json: 404,
-      message: 'Not found postCode'
-    })
-  }
-
-  // console.log(item)
-  const dataTran = {
-    Hcase: 1,
-    customerNo: item.storeId,
-    customerStatus: item.status,
-    customerName: item.name,
-    customerChannel: '103',
-    customerCoType: item.type,
-    customerAddress1: item.address,
-    customerAddress2: item.subDistrict,
-    customerAddress3: item.district,
-    customerAddress4: item.province,
-    customerPoscode: item.postCode,
-    customerPhone: item.tel,
-    warehouse: dataUser.warehouse,
-    OKSDST: item.zone,
-    saleTeam: dataUser.area.slice(0, 2) + dataUser.area[3],
-    OKCFC1: item.area,
-    OKCFC3: item.route,
-    OKCFC6: item.type,
-    salePayer: dataUser.salePayer,
-    creditLimit: '000',
-    taxno: item.taxId,
-    saleCode: dataUser.saleCode,
-    saleZone: dataUser.zone,
-    shippings: item.shippingAddress.map(u => {
-      return {
-        shippingAddress1: u.address,
-        shippingAddress2: u.district,
-        shippingAddress3: u.subDistrict,
-        shippingAddress4: u.province ?? '',
-        shippingPoscode: u.postCode,
-        shippingPhone: item.tel,
-        shippingRoute: item.postCode,
-        OPGEOX: u.latitude,
-        OPGEOY: u.longtitude
-      }
-    })
-  }
-
-  // console.log(dataTran)
   try {
-    const response = await axios.post(
-      `${process.env.API_URL_12ERP}/customer/insert`,
-      dataTran
-    )
+    const { storeId, area } = req.body
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const item = await Store.findOne({ storeId: storeId, area: area })
+    const dataUser = await User.findOne({ area: area, role: 'sale' })
 
-    // ส่งกลับไปให้ client ที่เรียก Express API
-    return res.status(response.status).json(response.data)
-  } catch (error) {
-    if (error.response) {
-      // หาก ERP ส่ง 400 หรือ 500 หรืออื่นๆ กลับมา
-      return res.status(error.response.status).json({
-        message: error.response.data?.message || 'Request Failed',
-        data: error.response.data
+    if (!item) {
+      return res.status(404).json({
+        json: 404,
+        message: 'Not found Store'
       })
     }
 
-    // กรณีอื่นๆ ที่ไม่ใช่ response จาก ERP เช่น network error
-    return res.status(500).json({
-      message: 'Internal Server Error',
-      error: error.message
+    if (!item.postCode) {
+      return res.status(404).json({
+        json: 404,
+        message: 'Not found postCode'
+      })
+    }
+
+    // console.log(item)
+    const dataTran = {
+      Hcase: 1,
+      customerNo: item.storeId,
+      customerStatus: item.status,
+      customerName: item.name,
+      customerChannel: '103',
+      customerCoType: item.type,
+      customerAddress1: item.address,
+      customerAddress2: item.subDistrict,
+      customerAddress3: item.district,
+      customerAddress4: item.province,
+      customerPoscode: item.postCode,
+      customerPhone: item.tel,
+      warehouse: dataUser.warehouse,
+      OKSDST: item.zone,
+      saleTeam: dataUser.area.slice(0, 2) + dataUser.area[3],
+      OKCFC1: item.area,
+      OKCFC3: item.route,
+      OKCFC6: item.type,
+      salePayer: dataUser.salePayer,
+      creditLimit: '000',
+      taxno: item.taxId,
+      saleCode: dataUser.saleCode,
+      saleZone: dataUser.zone,
+      shippings: item.shippingAddress.map(u => {
+        return {
+          shippingAddress1: u.address,
+          shippingAddress2: u.district,
+          shippingAddress3: u.subDistrict,
+          shippingAddress4: u.province ?? '',
+          shippingPoscode: u.postCode,
+          shippingPhone: item.tel,
+          shippingRoute: item.postCode,
+          OPGEOX: u.latitude,
+          OPGEOY: u.longtitude
+        }
+      })
+    }
+
+    // console.log(dataTran)
+    try {
+      const response = await axios.post(
+        `${process.env.API_URL_12ERP}/customer/insert`,
+        dataTran
+      )
+
+      // ส่งกลับไปให้ client ที่เรียก Express API
+      return res.status(response.status).json(response.data)
+    } catch (error) {
+      if (error.response) {
+        // หาก ERP ส่ง 400 หรือ 500 หรืออื่นๆ กลับมา
+        return res.status(error.response.status).json({
+          message: error.response.data?.message || 'Request Failed',
+          data: error.response.data
+        })
+      }
+
+      // กรณีอื่นๆ ที่ไม่ใช่ response จาก ERP เช่น network error
+      return res.status(500).json({
+        message: 'Internal Server Error',
+        error: error.message
+      })
+    }
+
+    // res.status(200).json({
+    //   status: 200,
+    //   message: 'successfully',
+    //   data: dataTran
+    // })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
 
-  // res.status(200).json({
-  //   status: 200,
-  //   message: 'successfully',
-  //   data: dataTran
-  // })
 }
 
 exports.getShipping = async (req, res) => {
-  const { storeId } = req.body
-  // console.log(storeId)
-  const channel = req.headers['x-channel']
-  const { Store } = getModelsByChannel(channel, res, storeModel)
+  try {
+    const { storeId } = req.body
+    // console.log(storeId)
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
-  const dataStore = await Store.findOne({ storeId: storeId }).select(
-    'shippingAddress'
-  )
+    const dataStore = await Store.findOne({ storeId: storeId }).select(
+      'shippingAddress'
+    )
 
-  if (!dataStore) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found store'
+    if (!dataStore) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found store'
+      })
+    }
+
+    // const io = getSocket()
+    // io.emit('store/getShipping', {});
+
+    return res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: dataStore.shippingAddress
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
 
-  // const io = getSocket()
-  // io.emit('store/getShipping', {});
-
-  return res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: dataStore.shippingAddress
-  })
 }
 
 exports.addShippingInStore = async (req, res) => {
@@ -2587,7 +2761,7 @@ exports.storeToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
+      fs.unlink(tempPath, () => { })
     })
   } catch (err) {
     console.error(err)
@@ -2596,34 +2770,46 @@ exports.storeToExcel = async (req, res) => {
 }
 
 exports.updateStatusM3ToMongo = async (req, res) => {
-  const { storeId } = req.body
-  const channel = req.headers['x-channel']
-  const { Store } = getModelsByChannel(channel, res, storeModel)
+  try {
+    const { storeId } = req.body
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
-  const storeData = await Store.findOne({ storeId: storeId })
-  const storeDataM3 = await Customer.findOne({
-    where: { customerNo: storeId }
-  })
-
-  if (storeData) {
-    await Store.findOneAndUpdate(
-      { storeId: storeId }, // filter
-      { $set: { route: storeDataM3.OKCFC3 } }, // update
-      { new: true } // optional: คืนค่าที่อัปเดตแล้ว (default คืนค่าก่อนอัปเดต)
-    )
-
-    return res.status(200).json({
-      status: 200,
-      message: 'success',
-      data: storeUpdated
+    const storeData = await Store.findOne({ storeId: storeId })
+    const storeDataM3 = await Customer.findOne({
+      where: { customerNo: storeId }
     })
-  } else {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found store'
-      // data: storeUpdated
+
+    if (storeData) {
+      await Store.findOneAndUpdate(
+        { storeId: storeId }, // filter
+        { $set: { route: storeDataM3.OKCFC3 } }, // update
+        { new: true } // optional: คืนค่าที่อัปเดตแล้ว (default คืนค่าก่อนอัปเดต)
+      )
+
+      return res.status(200).json({
+        status: 200,
+        message: 'success',
+        data: storeUpdated
+      })
+    } else {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found store'
+        // data: storeUpdated
+      })
+    }
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
+
 }
 
 exports.addLatLong = async (req, res) => {
@@ -2813,236 +2999,284 @@ exports.getLatLongOrderPending = async (req, res) => {
 }
 
 exports.getLatLongOrder = async (req, res) => {
-  const { storeId, zone, team, area } = req.query
+  try {
+    const { storeId, zone, team, area } = req.query
 
-  const channel = req.headers['x-channel'] // 'credit' or 'cash'
-  const { Store } = getModelsByChannel(channel, res, storeModel)
-  const { User } = getModelsByChannel(channel, res, userModel)
-  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+    const channel = req.headers['x-channel'] // 'credit' or 'cash'
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
 
-  let matchStage = {}
+    let matchStage = {}
 
-  if (storeId) {
-    matchStage.storeId = storeId
-  } else {
-    if (zone) {
-      matchStage.zone = zone
-    } else if (team) {
-      matchStage.team3 = team
-    } else if (area) {
-      matchStage.area = area
+    if (storeId) {
+      matchStage.storeId = storeId
+    } else {
+      if (zone) {
+        matchStage.zone = zone
+      } else if (team) {
+        matchStage.team3 = team
+      } else if (area) {
+        matchStage.area = area
+      }
     }
+
+    // console.log(matchStage)
+
+    const StoreLatLongData = await StoreLatLong.aggregate([
+      {
+        $addFields: {
+          team3: {
+            $concat: [
+              { $substrCP: ['$area', 0, 2] },
+              { $substrCP: ['$area', 3, 1] }
+            ]
+          },
+          zone: {
+            $substrCP: ['$area', 0, 2]
+          }
+        }
+      },
+      { $match: matchStage },
+      { $sort: { createdAt: -1 } }
+    ])
+
+    const data = StoreLatLongData.map(item => {
+      return {
+        orderId: item.orderId,
+        storeId: item.storeId,
+        name: item.name,
+        area: item.area,
+        zone: item.zone,
+        typeName: item.typeName,
+        address: item.address,
+        latitude: item.latitude,
+        longtitude: item.longtitude,
+        latitudeOld: item.latitudeOld,
+        longtitudeOld: item.longtitudeOld,
+        imageList: item.imageList.map(i => {
+          return {
+            name: i.name,
+            path: i.path
+          }
+        }),
+        approve: item.appPerson,
+        status: item.status,
+        statusTH: item.statusTH,
+        createdAt: toThaiTime(item.createdAt)
+      }
+    })
+
+    return res.status(200).json({
+      status: '200',
+      message: 'StoreLatLong added successfully',
+      data: data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
 
-  // console.log(matchStage)
-
-  const StoreLatLongData = await StoreLatLong.aggregate([
-    {
-      $addFields: {
-        team3: {
-          $concat: [
-            { $substrCP: ['$area', 0, 2] },
-            { $substrCP: ['$area', 3, 1] }
-          ]
-        },
-        zone: {
-          $substrCP: ['$area', 0, 2]
-        }
-      }
-    },
-    { $match: matchStage },
-    { $sort: { createdAt: -1 } }
-  ])
-
-  const data = StoreLatLongData.map(item => {
-    return {
-      orderId: item.orderId,
-      storeId: item.storeId,
-      name: item.name,
-      area: item.area,
-      zone: item.zone,
-      typeName: item.typeName,
-      address: item.address,
-      latitude: item.latitude,
-      longtitude: item.longtitude,
-      latitudeOld: item.latitudeOld,
-      longtitudeOld: item.longtitudeOld,
-      imageList: item.imageList.map(i => {
-        return {
-          name: i.name,
-          path: i.path
-        }
-      }),
-      approve: item.appPerson,
-      status: item.status,
-      statusTH: item.statusTH,
-      createdAt: toThaiTime(item.createdAt)
-    }
-  })
-
-  return res.status(200).json({
-    status: '200',
-    message: 'StoreLatLong added successfully',
-    data: data
-  })
 }
 
 exports.getLatLongOrderDetail = async (req, res) => {
-  const { orderId } = req.query
-  const channel = req.headers['x-channel'] // 'credit' or 'cash'
-  const { Store } = getModelsByChannel(channel, res, storeModel)
-  const { User } = getModelsByChannel(channel, res, userModel)
-  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+  try {
+    const { orderId } = req.query
+    const channel = req.headers['x-channel'] // 'credit' or 'cash'
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
 
-  const StoreLatLongData = await StoreLatLong.findOne({ orderId })
-  // console.log(orderId)
+    const StoreLatLongData = await StoreLatLong.findOne({ orderId })
+    // console.log(orderId)
 
-  const data = {
-    orderId: StoreLatLongData.orderId,
-    storeId: StoreLatLongData.storeId,
-    name: StoreLatLongData.name,
-    area: StoreLatLongData.area,
-    zone: StoreLatLongData.zone,
-    latitude: StoreLatLongData.latitude,
-    longtitude: StoreLatLongData.longtitude,
-    imageList: StoreLatLongData.imageList.map(i => ({
-      name: i.name,
-      path: i.path
-    })),
-    approve: StoreLatLongData.appPerson,
-    status: StoreLatLongData.status,
-    statusTH: StoreLatLongData.statusTH,
-    createdAt: toThaiTime(StoreLatLongData.createdAt)
+    const data = {
+      orderId: StoreLatLongData.orderId,
+      storeId: StoreLatLongData.storeId,
+      name: StoreLatLongData.name,
+      area: StoreLatLongData.area,
+      zone: StoreLatLongData.zone,
+      latitude: StoreLatLongData.latitude,
+      longtitude: StoreLatLongData.longtitude,
+      imageList: StoreLatLongData.imageList.map(i => ({
+        name: i.name,
+        path: i.path
+      })),
+      approve: StoreLatLongData.appPerson,
+      status: StoreLatLongData.status,
+      statusTH: StoreLatLongData.statusTH,
+      createdAt: toThaiTime(StoreLatLongData.createdAt)
+    }
+
+    return res.status(200).json({
+      status: '200',
+      message: 'StoreLatLong added successfully',
+      data: data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
 
-  return res.status(200).json({
-    status: '200',
-    message: 'StoreLatLong added successfully',
-    data: data
-  })
 }
 
 exports.approveLatLongStore = async (req, res) => {
-  const { orderId, status, user } = req.body
-  let statusStr = status === true ? 'approved' : 'rejected'
-  let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ'
-  const channel = req.headers['x-channel']
-  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
-  const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
-  const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
+  try {
+    const { orderId, status, user } = req.body
+    let statusStr = status === true ? 'approved' : 'rejected'
+    let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ'
+    const channel = req.headers['x-channel']
+    const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+    const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
+    const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
 
-  // console.log(orderId)
+    // console.log(orderId)
 
-  const storeLatLongData = await StoreLatLong.findOne({
-    orderId: orderId
-  })
+    const storeLatLongData = await StoreLatLong.findOne({
+      orderId: orderId
+    })
 
-  if (!storeLatLongData) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found order'
+    if (!storeLatLongData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found order'
+      })
+    }
+
+    if (storeLatLongData.status !== 'pending') {
+      return res.status(409).json({
+        status: 409,
+        message: 'Order is not pending'
+      })
+    }
+
+    if (statusStr === 'approved') {
+      // const storeData = await Store.findOne({ storeId: storeLatLongData.storeId })
+
+      await StoreLatLong.findOneAndUpdate(
+        { orderId: storeLatLongData.orderId },
+        {
+          $set: {
+            status: statusStr,
+            statusTH: statusThStr,
+            'approve.dateAction': new Date(),
+            'approve.appPerson': user
+          }
+        }
+      )
+
+      await Store.findOneAndUpdate(
+        { storeId: storeLatLongData.storeId },
+        {
+          $set: {
+            latitude: storeLatLongData.latitude,
+            longtitude: storeLatLongData.longtitude
+          }
+        }
+      )
+    } else {
+      await StoreLatLong.findOneAndUpdate(
+        { orderId: storeLatLongData.orderId },
+        {
+          $set: {
+            status: statusStr,
+            statusTH: statusThStr,
+            'approve.dateAction': new Date(),
+            'approve.appPerson': user
+          }
+        }
+      )
+    }
+
+    await ApproveLogs.create({
+      module: 'approveLatLongStore',
+      user: user,
+      status: statusStr,
+      id: orderId
+    })
+
+    res.status(201).json({
+      status: 201,
+      message: 'Update status sucess'
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
 
-  if (storeLatLongData.status !== 'pending') {
-    return res.status(409).json({
-      status: 409,
-      message: 'Order is not pending'
-    })
-  }
-
-  if (statusStr === 'approved') {
-    // const storeData = await Store.findOne({ storeId: storeLatLongData.storeId })
-
-    await StoreLatLong.findOneAndUpdate(
-      { orderId: storeLatLongData.orderId },
-      {
-        $set: {
-          status: statusStr,
-          statusTH: statusThStr,
-          'approve.dateAction': new Date(),
-          'approve.appPerson': user
-        }
-      }
-    )
-
-    await Store.findOneAndUpdate(
-      { storeId: storeLatLongData.storeId },
-      {
-        $set: {
-          latitude: storeLatLongData.latitude,
-          longtitude: storeLatLongData.longtitude
-        }
-      }
-    )
-  } else {
-    await StoreLatLong.findOneAndUpdate(
-      { orderId: storeLatLongData.orderId },
-      {
-        $set: {
-          status: statusStr,
-          statusTH: statusThStr,
-          'approve.dateAction': new Date(),
-          'approve.appPerson': user
-        }
-      }
-    )
-  }
-
-  await ApproveLogs.create({
-    module: 'approveLatLongStore',
-    user: user,
-    status: statusStr,
-    id: orderId
-  })
-
-  res.status(201).json({
-    status: 201,
-    message: 'Update status sucess'
-  })
 }
 
 exports.canceledOrderLatLongStore = async (req, res) => {
-  const { orderId, status, user } = req.body
-  const channel = req.headers['x-channel']
-  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
-  const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
-  const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
+  try {
+    const { orderId, status, user } = req.body
+    const channel = req.headers['x-channel']
+    const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+    const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
+    const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
 
-  const storeLatLongData = await StoreLatLong.findOne({
-    orderId: orderId
-  })
+    const storeLatLongData = await StoreLatLong.findOne({
+      orderId: orderId
+    })
 
-  if (!storeLatLongData) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found order'
+    if (!storeLatLongData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found order'
+      })
+    }
+
+    await StoreLatLong.findOneAndUpdate(
+      { orderId: storeLatLongData.orderId },
+      {
+        $set: {
+          status: status,
+          statusTH: 'ยกเลิก',
+          'approve.dateAction': new Date(),
+          'approve.appPerson': user
+        }
+      }
+    )
+
+    await ApproveLogs.create({
+      module: 'canceledOrderLatLongStore',
+      user: user,
+      status: status,
+      id: orderId
+    })
+
+    res.status(201).json({
+      status: 201,
+      message: 'Update status sucess'
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
 
-  await StoreLatLong.findOneAndUpdate(
-    { orderId: storeLatLongData.orderId },
-    {
-      $set: {
-        status: status,
-        statusTH: 'ยกเลิก',
-        'approve.dateAction': new Date(),
-        'approve.appPerson': user
-      }
-    }
-  )
-
-  await ApproveLogs.create({
-    module: 'canceledOrderLatLongStore',
-    user: user,
-    status: status,
-    id: orderId
-  })
-
-  res.status(201).json({
-    status: 201,
-    message: 'Update status sucess'
-  })
 }
 
 exports.getStorePage = async (req, res) => {
@@ -3052,7 +3286,7 @@ exports.getStorePage = async (req, res) => {
       type = 'all',
       route,
       page = 1,
-      limit = 20,
+      limit,
       q // optional search text
     } = req.query
 
@@ -3113,245 +3347,293 @@ exports.getStorePage = async (req, res) => {
 }
 
 exports.updateStoreAddressIt = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { Store } = getModelsByChannel(channel, res, storeModel)
+  try {
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
-  const storeData = await Store.find({ area: 'IT211' })
+    const storeData = await Store.find({ area: 'IT211' })
 
-  let data = []
-  for (item of storeData) {
-    const shippingAddress = [
-      {
-        default: '1',
-        shippingId: 'shippingId',
-        address: 'address',
-        district: 'district',
-        subDistrict: 'subDistrict',
-        province: 'province',
-        latitude: 'latitude',
-        longtitude: 'longtitude'
-      }
-    ]
-
-    const updateData = await Store.findOneAndUpdate(
-      { storeId: item.storeId },
-      {
-        $set: {
-          shippingAddress: shippingAddress,
-          zone: 'IT',
-          type: '0'
+    let data = []
+    for (item of storeData) {
+      const shippingAddress = [
+        {
+          default: '1',
+          shippingId: 'shippingId',
+          address: 'address',
+          district: 'district',
+          subDistrict: 'subDistrict',
+          province: 'province',
+          latitude: 'latitude',
+          longtitude: 'longtitude'
         }
-      }
-    )
+      ]
 
-    data.push(updateData)
+      const updateData = await Store.findOneAndUpdate(
+        { storeId: item.storeId },
+        {
+          $set: {
+            shippingAddress: shippingAddress,
+            zone: 'IT',
+            type: '0'
+          }
+        }
+      )
+
+      data.push(updateData)
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
 
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: data
-  })
 }
 
 exports.checkRangeLatLong = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+  try {
+    const channel = req.headers['x-channel']
+    const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
 
-  const dataStoreLatLong = await StoreLatLong.find({ status: 'approved' })
+    const dataStoreLatLong = await StoreLatLong.find({ status: 'approved' })
 
-  function calculateDistance (lat1, lon1, lat2, lon2) {
-    const R = 6371 // รัศมีโลก (กิโลเมตร)
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371 // รัศมีโลก (กิโลเมตร)
 
-    const dLat = deg2rad(lat2 - lat1)
-    const dLon = deg2rad(lon2 - lon1)
+      const dLat = deg2rad(lat2 - lat1)
+      const dLon = deg2rad(lon2 - lon1)
 
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(deg2rad(lat1)) *
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(deg2rad(lat1)) *
         Math.cos(deg2rad(lat2)) *
         Math.sin(dLon / 2) *
         Math.sin(dLon / 2)
 
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 
-    return R * c // ระยะทาง (กิโลเมตร)
-  }
-
-  function deg2rad (deg) {
-    return deg * (Math.PI / 180)
-  }
-
-  let data = []
-
-  for (const item of dataStoreLatLong) {
-    const rangeKm = calculateDistance(
-      parseFloat(item.latitudeOld),
-      parseFloat(item.longtitudeOld),
-      parseFloat(item.latitude),
-      parseFloat(item.longtitude)
-    )
-
-    const rangeMeter = rangeKm * 1000 // แปลงเป็นเมตร
-    const dateThai = toThaiTime(item.createdAt)
-    const dataTran = {
-      orderId: item.orderId,
-      storeId: item.storeId,
-      name: item.name,
-      area: item.area,
-      rangeKm: rangeKm.toFixed(2), // กิโลเมตร (ทศนิยม 2 ตำแหน่ง)
-      rangeMeter: Math.round(rangeMeter), // เมตร (ปัดเศษเป็นจำนวนเต็ม)
-      date: dateThai
+      return R * c // ระยะทาง (กิโลเมตร)
     }
 
-    // console.log(dataTran);
-    data.push(dataTran)
-  }
+    function deg2rad(deg) {
+      return deg * (Math.PI / 180)
+    }
 
-  const wb = xlsx.utils.book_new()
-  const ws = xlsx.utils.json_to_sheet(data)
-  xlsx.utils.book_append_sheet(wb, ws, `StoreLatLongCheck`)
+    let data = []
 
-  const tempPath = path.join(os.tmpdir(), `StoreLatLongCheck.xlsx`)
-  xlsx.writeFile(wb, tempPath)
+    for (const item of dataStoreLatLong) {
+      const rangeKm = calculateDistance(
+        parseFloat(item.latitudeOld),
+        parseFloat(item.longtitudeOld),
+        parseFloat(item.latitude),
+        parseFloat(item.longtitude)
+      )
 
-  res.download(tempPath, `StoreLatLongCheck.xlsx`, err => {
-    if (err) {
-      console.error('❌ Download error:', err)
-      // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
-      if (!res.headersSent) {
-        res.status(500).send('Download failed')
+      const rangeMeter = rangeKm * 1000 // แปลงเป็นเมตร
+      const dateThai = toThaiTime(item.createdAt)
+      const dataTran = {
+        orderId: item.orderId,
+        storeId: item.storeId,
+        name: item.name,
+        area: item.area,
+        rangeKm: rangeKm.toFixed(2), // กิโลเมตร (ทศนิยม 2 ตำแหน่ง)
+        rangeMeter: Math.round(rangeMeter), // เมตร (ปัดเศษเป็นจำนวนเต็ม)
+        date: dateThai
       }
+
+      // console.log(dataTran);
+      data.push(dataTran)
     }
 
-    // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-    fs.unlink(tempPath, () => {})
-  })
+    const wb = xlsx.utils.book_new()
+    const ws = xlsx.utils.json_to_sheet(data)
+    xlsx.utils.book_append_sheet(wb, ws, `StoreLatLongCheck`)
 
-  // res.status(200).json({
-  //   status: 200,
-  //   message: 'sucess',
-  //   data: data
-  // })
+    const tempPath = path.join(os.tmpdir(), `StoreLatLongCheck.xlsx`)
+    xlsx.writeFile(wb, tempPath)
+
+    res.download(tempPath, `StoreLatLongCheck.xlsx`, err => {
+      if (err) {
+        console.error('❌ Download error:', err)
+        // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+        if (!res.headersSent) {
+          res.status(500).send('Download failed')
+        }
+      }
+
+      // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+      fs.unlink(tempPath, () => { })
+    })
+
+    // res.status(200).json({
+    //   status: 200,
+    //   message: 'sucess',
+    //   data: data
+    // })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
 }
 
 exports.checkNewStoreLatLong = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { Store } = getModelsByChannel(channel, res, storeModel)
-  const { Route } = getModelsByChannel(channel, res, routeModel)
-  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
-  const { Order } = getModelsByChannel(channel, res, orderModel)
+  try {
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
 
-  const dataStoreLatLong = await StoreLatLong.find({ status: 'approved' })
+    const dataStoreLatLong = await StoreLatLong.find({ status: 'approved' })
 
-  const storeData = await Store.find({
-    createdAt: {
-      $gte: new Date('2025-06-30T17:00:00.000Z'), // ✅ ใช้ new Date แทน ISODate
-      $lt: new Date('2025-09-30T17:00:00.000Z')
-    },
-    area: { $ne: 'IT211' }
-  })
+    const storeData = await Store.find({
+      createdAt: {
+        $gte: new Date('2025-06-30T17:00:00.000Z'), // ✅ ใช้ new Date แทน ISODate
+        $lt: new Date('2025-09-30T17:00:00.000Z')
+      },
+      area: { $ne: 'IT211' }
+    })
 
-  const storeIds = storeData.map(s => s._id.toString())
+    const storeIds = storeData.map(s => s._id.toString())
 
-  const dataRoute = await Route.aggregate([
-    { $unwind: '$listStore' },
-    {
-      $match: {
-        'listStore.storeInfo': { $in: storeIds },
-        period: '202510'
-      }
-    },
-    { $group: { _id: '$_id', doc: { $first: '$$ROOT' } } },
-    { $replaceRoot: { newRoot: '$doc' } }
-  ])
+    const dataRoute = await Route.aggregate([
+      { $unwind: '$listStore' },
+      {
+        $match: {
+          'listStore.storeInfo': { $in: storeIds },
+          period: '202510'
+        }
+      },
+      { $group: { _id: '$_id', doc: { $first: '$$ROOT' } } },
+      { $replaceRoot: { newRoot: '$doc' } }
+    ])
 
-  const storeIdTran = dataRoute
-    .filter(item => item.listStore.status !== '0') // ✅ เอาเฉพาะที่ status != '0'
-    .map(
-      item =>
-        new ObjectId(
-          typeof item.listStore.storeInfo === 'object'
-            ? item.listStore.storeInfo._id
-            : item.listStore.storeInfo
-        )
-    )
+    const storeIdTran = dataRoute
+      .filter(item => item.listStore.status !== '0') // ✅ เอาเฉพาะที่ status != '0'
+      .map(
+        item =>
+          new ObjectId(
+            typeof item.listStore.storeInfo === 'object'
+              ? item.listStore.storeInfo._id
+              : item.listStore.storeInfo
+          )
+      )
 
-  const idList = storeIdTran.map(id => id.toString())
+    const idList = storeIdTran.map(id => id.toString())
 
-  const data = storeData.filter(item => idList.includes(item._id.toString()))
+    const data = storeData.filter(item => idList.includes(item._id.toString()))
 
-  const storeOrder = data.flatMap(item => item.storeId)
+    const storeOrder = data.flatMap(item => item.storeId)
 
-  const orderData = await Order.find({
-    type: 'sale',
-    routeId: { $ne: '' },
-    period: '202510',
-    'store.storeId': { $in: storeOrder }
-  })
+    const orderData = await Order.find({
+      type: 'sale',
+      routeId: { $ne: '' },
+      period: '202510',
+      'store.storeId': { $in: storeOrder }
+    })
 
-  const latLong = dataStoreLatLong.flatMap(item => item.storeId)
+    const latLong = dataStoreLatLong.flatMap(item => item.storeId)
 
-  const missingStore = storeOrder.filter(id => !latLong.includes(id))
+    const missingStore = storeOrder.filter(id => !latLong.includes(id))
 
-  const existingStore = storeOrder.filter(id => latLong.includes(id))
+    const existingStore = storeOrder.filter(id => latLong.includes(id))
 
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    missingStore: missingStore,
-    existingStore: existingStore
-  })
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      missingStore: missingStore,
+      existingStore: existingStore
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
 }
 
 exports.updateAreaStore = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { Store } = getModelsByChannel(channel, res, storeModel)
-  const { Route } = getModelsByChannel(channel, res, routeModel)
-  const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
-  const { Order } = getModelsByChannel(channel, res, orderModel)
+  try {
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
 
-  const result = await routeQuery(channel)
+    const result = await routeQuery(channel)
 
-  // ดึงค่า storeId ทั้งหมดออกมา (flatten)
-  const storeIds = result.flatMap(item => item.storeId)
+    // ดึงค่า storeId ทั้งหมดออกมา (flatten)
+    const storeIds = result.flatMap(item => item.storeId)
 
-  // หาค่าที่ซ้ำกัน
-  const duplicates = storeIds.filter(
-    (id, index, self) => self.indexOf(id) !== index
-  )
+    // หาค่าที่ซ้ำกัน
+    const duplicates = storeIds.filter(
+      (id, index, self) => self.indexOf(id) !== index
+    )
 
-  // ลบค่าซ้ำซ้ำออกให้เหลือแค่ตัวเดียวต่อ id
-  const uniqueDuplicates = [...new Set(duplicates)]
+    // ลบค่าซ้ำซ้ำออกให้เหลือแค่ตัวเดียวต่อ id
+    const uniqueDuplicates = [...new Set(duplicates)]
 
-  if (uniqueDuplicates.length > 0) {
-    console.log('⚠️ เจอ storeId ซ้ำ:', uniqueDuplicates)
-  } else {
-    console.log('✅ ไม่มี storeId ซ้ำ')
+    if (uniqueDuplicates.length > 0) {
+      console.log('⚠️ เจอ storeId ซ้ำ:', uniqueDuplicates)
+    } else {
+      console.log('✅ ไม่มี storeId ซ้ำ')
+    }
+
+    // const storeId = [
+    //   ...new Set(result.flatMap(item =>
+    //     item.storeId.map(id => id.toString())
+    //   ))
+    // ];
+    // const storeData = await Store.find({storeId:{$in:storeId}})
+
+    // for (item of result) {
+
+    //   await Store.findOneAndUpdate(
+    //     {storeId:item.storeId},
+    //     {$set:{
+    //       area:itemarea
+    //     }}
+
+    //   )
+
+    // }
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: result
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
 
-  // const storeId = [
-  //   ...new Set(result.flatMap(item =>
-  //     item.storeId.map(id => id.toString())
-  //   ))
-  // ];
-  // const storeData = await Store.find({storeId:{$in:storeId}})
-
-  // for (item of result) {
-
-  //   await Store.findOneAndUpdate(
-  //     {storeId:item.storeId},
-  //     {$set:{
-  //       area:itemarea
-  //     }}
-
-  //   )
-
-  // }
-
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: result
-  })
 }

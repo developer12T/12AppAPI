@@ -49,7 +49,7 @@ exports.addGiveType = async (req, res) => {
     const channel = req.headers['x-channel']
     const { Givetype } = getModelsByChannel(channel, res, giveawaysModel)
 
-    if (!name || !type || !remark || !dept) {
+    if (!name || !type || !dept) {
       return res
         .status(400)
         .json({ status: 400, message: 'Missing required fields!' })
@@ -255,7 +255,7 @@ exports.checkout = async (req, res) => {
     }
 
     const sale = await User.findOne({ area }).select(
-      'firstName surName warehouse tel saleCode salePayer'
+      'firstName surName warehouse tel saleCode salePayer area zone'
     )
     if (!sale) {
       return res
@@ -272,13 +272,17 @@ exports.checkout = async (req, res) => {
         .json({ status: 404, message: 'Give type not found!' })
     }
 
-    const storeData =
-      (await Store.findOne({
-        storeId: cart.storeId,
-        area: cart.area
-      }).lean()) || {}
+    let storeData = {}
 
-    function isAug2025OrLater (createAt) {
+    if (channel === 'pc') {
+      storeData =
+        (await Store.findOne({
+          storeId: cart.storeId,
+          area: cart.area,
+        }).lean()) || {}
+    }
+
+    function isAug2025OrLater(createAt) {
       if (!createAt) return false
 
       // case: "YYYYMM" เช่น "202508"
@@ -299,14 +303,14 @@ exports.checkout = async (req, res) => {
     // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-          storeData.address,
-          storeData.subDistrict && `ต.${storeData.subDistrict}`,
-          storeData.district && `อ.${storeData.district}`,
-          storeData.province && `จ.${storeData.province}`,
-          storeData.postCode
-        ]
-          .filter(Boolean)
-          .join(' ')
+        storeData.address,
+        storeData.subDistrict && `ต.${storeData.subDistrict}`,
+        storeData.district && `อ.${storeData.district}`,
+        storeData.province && `จ.${storeData.province}`,
+        storeData.postCode
+      ]
+        .filter(Boolean)
+        .join(' ')
       : storeData.address
 
     const orderId = await generateGiveawaysId(
@@ -337,8 +341,8 @@ exports.checkout = async (req, res) => {
         address: addressFinal,
         taxId: storeData.taxId,
         tel: storeData.tel,
-        area: storeData.area,
-        zone: storeData.zone
+        area: sale.area,
+        zone: sale.zone
       },
       note,
       latitude,
@@ -598,33 +602,57 @@ exports.getDetail = async (req, res) => {
 }
 
 exports.getGiveaways = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { Givetype } = getModelsByChannel(channel, res, giveawaysModel)
-  let data = await Givetype.find().sort({ createdAt: -1 })
+  try {
+    const channel = req.headers['x-channel']
+    const { Givetype } = getModelsByChannel(channel, res, giveawaysModel)
+    let data = await Givetype.find().sort({ createdAt: -1 })
 
-  // const io = getSocket()
-  // io.emit('give/getGiveaways', {});
+    // const io = getSocket()
+    // io.emit('give/getGiveaways', {});
 
-  res.status(200).json({
-    status: 200,
-    message: 'successful!',
-    data: data
-  })
+    res.status(200).json({
+      status: 200,
+      message: 'successful!',
+      data: data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
 }
 
 exports.getGiveawaysDetail = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { Givetype } = getModelsByChannel(channel, res, giveawaysModel)
-  let data = await Givetype.findOne({ giveId: req.params.giveId })
+  try {
+    const channel = req.headers['x-channel']
+    const { Givetype } = getModelsByChannel(channel, res, giveawaysModel)
+    let data = await Givetype.findOne({ giveId: req.params.giveId })
 
-  // const io = getSocket()
-  // io.emit('give/getGiveawaysDetail', {});
+    // const io = getSocket()
+    // io.emit('give/getGiveawaysDetail', {});
 
-  res.status(200).json({
-    status: 200,
-    message: 'successful!',
-    data: data
-  })
+    res.status(200).json({
+      status: 200,
+      message: 'successful!',
+      data: data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
 }
 
 exports.addimageGive = async (req, res) => {
@@ -864,229 +892,242 @@ exports.updateStatus = async (req, res) => {
 }
 
 exports.giveToExcel = async (req, res) => {
-  const { channel, startDate, endDate, giveName, area, team, zone } = req.query
+  try {
+    const { channel, startDate, endDate, giveName, area, team, zone } = req.query
 
-  // console.log(channel, date)
-  let statusArray = (req.query.status || '')
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean)
+    // console.log(channel, date)
+    let statusArray = (req.query.status || '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
 
-  if (statusArray.length === 0) {
-    statusArray = ['pending'] // default
-  }
-  // ,'approved','completed'
-  // if (!date || date === 'null') {
-  //   const today = new Date()
-  //   const year = today.getFullYear()
-  //   const month = String(today.getMonth() + 1).padStart(2, '0') // เดือนเริ่มที่ 0
-  //   const day = String(today.getDate()).padStart(2, '0')
-
-  //   date = `${year}${month}${day}`
-  //   // console.log('📅 date:', date)
-  // }
-
-  // const start = new Date(
-  //   `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00`
-  // )
-  // const end = new Date(
-  //   `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T23:59:59.999`
-  // )
-
-  // const channel = 'cash';
-  const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel)
-
-  // const modelOrder = await Order.find({
-  //   orderId: { $not: /CC/ },
-  // })
-
-  // ช่วงเวลา "ไทย" ที่ผู้ใช้เลือก
-  const startTH = new Date(
-    `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
-      6,
-      8
-    )}T00:00:00+07:00`
-  )
-  const endTH = new Date(
-    `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(
-      6,
-      8
-    )}T23:59:59.999+07:00`
-  )
-  // let query = {}
-
-  let query = {
-    status: { $nin: ['canceled', 'competed'] },
-    status: { $in: statusArray },
-    type: { $in: ['give'] },
-    'store.area': { $ne: 'IT211' },
-    createdAt: {
-      $gte: startTH,
-      $lte: endTH
+    if (statusArray.length === 0) {
+      statusArray = ['pending'] // default
     }
-  }
+    // ,'approved','completed'
+    // if (!date || date === 'null') {
+    //   const today = new Date()
+    //   const year = today.getFullYear()
+    //   const month = String(today.getMonth() + 1).padStart(2, '0') // เดือนเริ่มที่ 0
+    //   const day = String(today.getDate()).padStart(2, '0')
 
-  if (area) {
-    query['store.area'] = area
-  } else if (zone) {
-    query['store.area'] = { $regex: `^${zone}`, $options: 'i' }
-  }
+    //   date = `${year}${month}${day}`
+    //   // console.log('📅 date:', date)
+    // }
 
-  if (giveName) {
-    query['giveInfo.name'] = giveName
-  }
+    // const start = new Date(
+    //   `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00`
+    // )
+    // const end = new Date(
+    //   `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T23:59:59.999`
+    // )
 
-  console.log(query)
+    // const channel = 'cash';
+    const { Giveaway } = getModelsByChannel(channel, res, giveawaysModel)
 
-  const pipeline = [
-    {
-      $match: query
-    },
-    {
-      $addFields: {
-        createdAtThai: {
-          $dateAdd: {
-            startDate: '$createdAt',
-            unit: 'hour',
-            amount: 7
+    // const modelOrder = await Order.find({
+    //   orderId: { $not: /CC/ },
+    // })
+
+    // ช่วงเวลา "ไทย" ที่ผู้ใช้เลือก
+    const startTH = new Date(
+      `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
+        6,
+        8
+      )}T00:00:00+07:00`
+    )
+    const endTH = new Date(
+      `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(
+        6,
+        8
+      )}T23:59:59.999+07:00`
+    )
+    // let query = {}
+
+    let query = {
+      status: { $nin: ['canceled', 'competed'] },
+      status: { $in: statusArray },
+      type: { $in: ['give'] },
+      'store.area': { $ne: 'IT211' },
+      createdAt: {
+        $gte: startTH,
+        $lte: endTH
+      }
+    }
+
+    if (area) {
+      query['store.area'] = area
+    } else if (zone) {
+      query['store.area'] = { $regex: `^${zone}`, $options: 'i' }
+    }
+
+    if (giveName) {
+      query['giveInfo.name'] = giveName
+    }
+
+    console.log(query)
+
+    const pipeline = [
+      {
+        $match: query
+      },
+      {
+        $addFields: {
+          createdAtThai: {
+            $dateAdd: {
+              startDate: '$createdAt',
+              unit: 'hour',
+              amount: 7
+            }
+          },
+          team3: {
+            $concat: [
+              { $substrCP: ['$store.area', 0, 2] },
+              { $substrCP: ['$store.area', 3, 1] }
+            ]
           }
-        },
-        team3: {
-          $concat: [
-            { $substrCP: ['$store.area', 0, 2] },
-            { $substrCP: ['$store.area', 3, 1] }
-          ]
         }
       }
-    }
-  ]
+    ]
 
-  if (team) {
-    pipeline.push({
-      $match: {
-        team3: { $regex: `^${team}`, $options: 'i' }
-      }
-    })
-  }
-
-  // pipeline.push({
-  //   $sort: { statusASC: 1, createdAt: -1 }
-  // })
-
-  const giveOrder = await Giveaway.aggregate(pipeline)
-
-  function formatDateToThaiYYYYMMDD (date) {
-    const d = new Date(date)
-    // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
-
-    const yyyy = d.getFullYear()
-    const mm = String(d.getMonth() + 1).padStart(2, '0')
-    const dd = String(d.getDate()).padStart(2, '0')
-
-    return `${yyyy}${mm}${dd}`
-  }
-
-  function getCurrentTimeFormatted () {
-    const now = new Date()
-    const hours = String(now.getHours()).padStart(2, '0')
-    const minutes = String(now.getMinutes()).padStart(2, '0')
-    const seconds = String(now.getSeconds()).padStart(2, '0')
-    return `${hours}${minutes}${seconds}`
-  }
-
-  const dataTran = giveOrder.map(item => {
-    const TRDT = formatDateToThaiYYYYMMDD(item.createdAt)
-    const TRTM = new Date(item.createdAt).getTime()
-
-    const listProduct = item.listProduct.map(o => {
-      return {
-        CONO: '',
-        WHLO: item.sale.warehouse,
-        TWLO: item.sale.warehouse,
-        ADID: item.store.area,
-        WHSL: '',
-        RIDN: '',
-        TRTP: item.giveInfo.type,
-        RORC: '0',
-        RORN: `${item.orderId}`,
-        DEPT: `${item.giveInfo.dept}`,
-        TRDT: `${TRDT}`,
-        TRTM: `${getCurrentTimeFormatted()}`,
-        RIDT: '',
-        RITM: '',
-        REMK: item.giveInfo.remark,
-        RPDT: '',
-        RPTM: '',
-        RESP: 'MVXSECOFR',
-        ITNO: `${o.id}`,
-        TRQT: `${o.qtyPcs}`,
-        TWSL: '',
-        BANO: '',
-        RSCD: '',
-        TRPR: '0',
-        BREF: '',
-        BRE2: '',
-        REFE: '',
-        ROUT: ''
-      }
-    })
-    return [...listProduct]
-  })
-
-  const data = dataTran.flatMap(item => item)
-
-  function yyyymmddToDdMmYyyy (dateString) {
-    // สมมติ dateString คือ '20250804'
-    const year = dateString.slice(0, 4)
-    const month = dateString.slice(4, 6)
-    const day = dateString.slice(6, 8)
-    return `${day}${month}${year}`
-  }
-
-  const wb = xlsx.utils.book_new()
-  const ws = xlsx.utils.json_to_sheet(data)
-  xlsx.utils.book_append_sheet(wb, ws, `ESP${yyyymmddToDdMmYyyy(startDate)}`)
-
-  const tempPath = path.join(
-    os.tmpdir(),
-    `${yyyymmddToDdMmYyyy(startDate)}.xlsx`
-  )
-  // xlsx.writeFile(wb, tempPath)
-
-  xlsx.writeFile(wb, tempPath, {
-    bookType: 'xlsx', // Excel 2007+
-    bookSST: true, // shared strings table (helps older 2007)
-    compression: true // smaller file, widely supported
-  })
-
-  // proper MIME for xlsx (Excel 2007+)
-  res.setHeader(
-    'Content-Type',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-  )
-
-  res.download(
-    tempPath,
-    `CA_GIVE_${yyyymmddToDdMmYyyy(startDate)}.xlsx`,
-    err => {
-      if (err) {
-        console.error('❌ Download error:', err)
-        // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
-        if (!res.headersSent) {
-          res.status(500).send('Download failed')
+    if (team) {
+      pipeline.push({
+        $match: {
+          team3: { $regex: `^${team}`, $options: 'i' }
         }
-      }
-
-      // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
+      })
     }
-  )
 
-  // return res.status(200).json({
-  //   status: 200,
-  //   message: `Sucess`,
-  //   data: data
-  // })
+    // pipeline.push({
+    //   $sort: { statusASC: 1, createdAt: -1 }
+    // })
+
+    const giveOrder = await Giveaway.aggregate(pipeline)
+
+    function formatDateToThaiYYYYMMDD(date) {
+      const d = new Date(date)
+      // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
+
+      const yyyy = d.getFullYear()
+      const mm = String(d.getMonth() + 1).padStart(2, '0')
+      const dd = String(d.getDate()).padStart(2, '0')
+
+      return `${yyyy}${mm}${dd}`
+    }
+
+    function getCurrentTimeFormatted() {
+      const now = new Date()
+      const hours = String(now.getHours()).padStart(2, '0')
+      const minutes = String(now.getMinutes()).padStart(2, '0')
+      const seconds = String(now.getSeconds()).padStart(2, '0')
+      return `${hours}${minutes}${seconds}`
+    }
+
+    const dataTran = giveOrder.map(item => {
+      const TRDT = formatDateToThaiYYYYMMDD(item.createdAt)
+      const TRTM = new Date(item.createdAt).getTime()
+
+      const listProduct = item.listProduct.map(o => {
+        return {
+          CONO: '',
+          WHLO: item.sale.warehouse,
+          TWLO: item.sale.warehouse,
+          ADID: item.store.area,
+          WHSL: '',
+          RIDN: '',
+          TRTP: item.giveInfo.type,
+          RORC: '0',
+          RORN: `${item.orderId}`,
+          DEPT: `${item.giveInfo.dept}`,
+          TRDT: `${TRDT}`,
+          TRTM: `${getCurrentTimeFormatted()}`,
+          RIDT: '',
+          RITM: '',
+          REMK: item.giveInfo.remark,
+          RPDT: '',
+          RPTM: '',
+          RESP: 'MVXSECOFR',
+          ITNO: `${o.id}`,
+          TRQT: `${o.qtyPcs}`,
+          TWSL: '',
+          BANO: '',
+          RSCD: '',
+          TRPR: '0',
+          BREF: '',
+          BRE2: '',
+          REFE: '',
+          ROUT: ''
+        }
+      })
+      return [...listProduct]
+    })
+
+    const data = dataTran.flatMap(item => item)
+
+    function yyyymmddToDdMmYyyy(dateString) {
+      // สมมติ dateString คือ '20250804'
+      const year = dateString.slice(0, 4)
+      const month = dateString.slice(4, 6)
+      const day = dateString.slice(6, 8)
+      return `${day}${month}${year}`
+    }
+
+    const wb = xlsx.utils.book_new()
+    const ws = xlsx.utils.json_to_sheet(data)
+    xlsx.utils.book_append_sheet(wb, ws, `ESP${yyyymmddToDdMmYyyy(startDate)}`)
+
+    const tempPath = path.join(
+      os.tmpdir(),
+      `${yyyymmddToDdMmYyyy(startDate)}.xlsx`
+    )
+    // xlsx.writeFile(wb, tempPath)
+
+    xlsx.writeFile(wb, tempPath, {
+      bookType: 'xlsx', // Excel 2007+
+      bookSST: true, // shared strings table (helps older 2007)
+      compression: true // smaller file, widely supported
+    })
+
+    // proper MIME for xlsx (Excel 2007+)
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+
+    res.download(
+      tempPath,
+      `CA_GIVE_${yyyymmddToDdMmYyyy(startDate)}.xlsx`,
+      err => {
+        if (err) {
+          console.error('❌ Download error:', err)
+          // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+          if (!res.headersSent) {
+            res.status(500).send('Download failed')
+          }
+        }
+
+        // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+        fs.unlink(tempPath, () => { })
+      }
+    )
+
+    // return res.status(200).json({
+    //   status: 200,
+    //   message: `Sucess`,
+    //   data: data
+    // })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+
+  }
+
 }
 
 exports.fixOrderIdsGive = async (req, res) => {

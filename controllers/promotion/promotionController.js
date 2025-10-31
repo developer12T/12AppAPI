@@ -573,290 +573,374 @@ exports.updateCartPromotion = async (req, res) => {
 }
 
 exports.getPromotionDetail = async (req, res) => {
-  const { proId } = req.query
-  const channel = req.headers['x-channel']
-  const { Promotion } = getModelsByChannel(channel, res, promotionModel)
+  try {
+    const { proId } = req.query
+    const channel = req.headers['x-channel']
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel)
 
-  const data = await Promotion.findOne({ proId: proId })
+    const data = await Promotion.findOne({ proId: proId })
 
-  if (data.length == 0) {
-    return res.status(404).json({
+    if (data.length == 0) {
+      return res.status(404).json({
+        status: 200,
+        message: 'Not Found Promotion'
+      })
+    }
+
+    // const io = getSocket()
+    // io.emit('promotion/getPromotionDetail', {});
+
+    res.status(200).json({
       status: 200,
-      message: 'Not Found Promotion'
+      message: 'sucess',
+      data: data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
 
-  // const io = getSocket()
-  // io.emit('promotion/getPromotionDetail', {});
-
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: data
-  })
 }
 
 exports.getPromotion = async (req, res) => {
-  const channel = req.headers['x-channel'] // 'credit' or 'cash'
-  const { Promotion } = getModelsByChannel(channel, res, promotionModel)
+  try {
+    const channel = req.headers['x-channel'] // 'credit' or 'cash'
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel)
 
-  const data = await Promotion.find({ status: 'active' })
-    .sort({ proId: 1 });
+    const data = await Promotion.find({ status: 'active' })
+      .sort({ proId: 1 });
 
-  if (data.length == 0) {
-    return res.status(404).json({
+    if (data.length == 0) {
+      return res.status(404).json({
+        status: 200,
+        message: 'Not Found Promotion'
+      })
+    }
+
+    res.status(200).json({
       status: 200,
-      message: 'Not Found Promotion'
+      message: 'sucess',
+      data: data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
 
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: data
-  })
 }
 
 exports.addPromotionLimit = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { PromotionLimit } = getModelsByChannel(channel, res, promotionModel)
-  const {
-    name,
-    description,
-    proType,
-    proCode,
-    coupon,
-    startDate,
-    endDate,
-    giftItem,
-    limitTotal,
-    condition,
-    tracking,
-    status
-  } = req.body
+  try {
+    const channel = req.headers['x-channel']
+    const { PromotionLimit } = getModelsByChannel(channel, res, promotionModel)
+    const {
+      name,
+      description,
+      proType,
+      proCode,
+      coupon,
+      startDate,
+      endDate,
+      giftItem,
+      limitTotal,
+      condition,
+      tracking,
+      status
+    } = req.body
 
-  if (!name || !proType) {
-    return res
-      .status(400)
-      .json({ status: 400, message: 'Missing required fields!' })
+    if (!name || !proType) {
+      return res
+        .status(400)
+        .json({ status: 400, message: 'Missing required fields!' })
+    }
+
+    const proId = await generatePromotionId(channel, res)
+
+    const newPromotionLimit = new PromotionLimit({
+      proId,
+      name,
+      description,
+      proType,
+      proCode,
+      coupon,
+      startDate,
+      endDate,
+      giftItem,
+      limitTotal,
+      condition,
+      tracking,
+      status
+    })
+
+    await newPromotionLimit.save()
+
+    const io = getSocket()
+    io.emit('promotion/addPromotionLimit', {})
+
+    res.status(201).json({
+      status: 201,
+      message: 'Promotion created successfully!',
+      data: newPromotionLimit
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
 
-  const proId = await generatePromotionId(channel, res)
-
-  const newPromotionLimit = new PromotionLimit({
-    proId,
-    name,
-    description,
-    proType,
-    proCode,
-    coupon,
-    startDate,
-    endDate,
-    giftItem,
-    limitTotal,
-    condition,
-    tracking,
-    status
-  })
-
-  await newPromotionLimit.save()
-
-  const io = getSocket()
-  io.emit('promotion/addPromotionLimit', {})
-
-  res.status(201).json({
-    status: 201,
-    message: 'Promotion created successfully!',
-    data: newPromotionLimit
-  })
 }
 
 exports.updatePromotionLimit = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { PromotionLimit } = getModelsByChannel(channel, res, promotionModel)
-  const {
-    proId,
-    name,
-    description,
-    proType,
-    proCode,
-    coupon,
-    startDate,
-    endDate,
-    giftItem,
-    limitTotal,
-    condition,
-    tracking,
-    status
-  } = req.body
+  try {
+    const channel = req.headers['x-channel']
+    const { PromotionLimit } = getModelsByChannel(channel, res, promotionModel)
+    const {
+      proId,
+      name,
+      description,
+      proType,
+      proCode,
+      coupon,
+      startDate,
+      endDate,
+      giftItem,
+      limitTotal,
+      condition,
+      tracking,
+      status
+    } = req.body
 
-  const existing = await PromotionLimit.findOne({ proId })
+    const existing = await PromotionLimit.findOne({ proId })
 
-  if (!existing) {
-    return res.status(404).json({ status: 404, message: 'Promotion not found' })
+    if (!existing) {
+      return res.status(404).json({ status: 404, message: 'Promotion not found' })
+    }
+
+    await PromotionLimit.updateOne(
+      { proId },
+      {
+        $set: {
+          name,
+          description,
+          proType,
+          proCode,
+          coupon,
+          startDate,
+          endDate,
+          giftItem,
+          limitTotal,
+          condition,
+          tracking,
+          status
+        }
+      }
+    )
+
+    const io = getSocket()
+    io.emit('promotion/updatePromotionLimit', {})
+
+    return res.status(200).json({ status: 200, message: 'Updated successfully' })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
 
-  await PromotionLimit.updateOne(
-    { proId },
-    {
-      $set: {
-        name,
-        description,
-        proType,
-        proCode,
-        coupon,
-        startDate,
-        endDate,
-        giftItem,
-        limitTotal,
-        condition,
-        tracking,
-        status
-      }
-    }
-  )
-
-  const io = getSocket()
-  io.emit('promotion/updatePromotionLimit', {})
-
-  return res.status(200).json({ status: 200, message: 'Updated successfully' })
 }
 
 exports.addQuota = async (req, res) => {
-  const {
-    quotaId,
-    detail,
-    proCode,
-    quota,
-    applicableTo,
-    conditions,
-    rewards,
-    discounts,
-    validFrom,
-    validTo
-  } = req.body
+  try {
+    const {
+      quotaId,
+      detail,
+      proCode,
+      quota,
+      applicableTo,
+      conditions,
+      rewards,
+      discounts,
+      validFrom,
+      validTo
+    } = req.body
 
-  const channel = req.headers['x-channel']
-  const { Quota } = getModelsByChannel(channel, res, promotionModel)
+    const channel = req.headers['x-channel']
+    const { Quota } = getModelsByChannel(channel, res, promotionModel)
 
-  const exitQuota = await Quota.findOne({ quotaId: quotaId })
-  if (exitQuota) {
-    return res.status(400).json({
-      status: 400,
-      message: 'This quotaId already in database'
+    const exitQuota = await Quota.findOne({ quotaId: quotaId })
+    if (exitQuota) {
+      return res.status(400).json({
+        status: 400,
+        message: 'This quotaId already in database'
+      })
+    }
+
+    const data = await Quota.create({
+      quotaId: quotaId,
+      detail: detail,
+      proCode: proCode,
+      quota: quota,
+      applicableTo: applicableTo,
+      conditions: conditions,
+      rewards: rewards,
+      discounts: discounts,
+      validFrom: validFrom,
+      validTo: validTo
+    })
+
+    const io = getSocket()
+    io.emit('promotion/addQuota', {})
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
 
-  const data = await Quota.create({
-    quotaId: quotaId,
-    detail: detail,
-    proCode: proCode,
-    quota: quota,
-    applicableTo: applicableTo,
-    conditions: conditions,
-    rewards: rewards,
-    discounts: discounts,
-    validFrom: validFrom,
-    validTo: validTo
-  })
-
-  const io = getSocket()
-  io.emit('promotion/addQuota', {})
-
-  res.status(200).json({
-    status: 200,
-    message: 'sucess',
-    data: data
-  })
 }
 
 exports.updateQuota = async (req, res) => {
-  const {
-    quotaId,
-    detail,
-    proCode,
-    id,
-    quotaGroup,
-    quotaWeight,
-    quota,
-    quotaUse,
-    rewards,
-    area,
-    zone,
-    ExpDate
-  } = req.body
+  try {
+    const {
+      quotaId,
+      detail,
+      proCode,
+      id,
+      quotaGroup,
+      quotaWeight,
+      quota,
+      quotaUse,
+      rewards,
+      area,
+      zone,
+      ExpDate
+    } = req.body
 
-  const channel = req.headers['x-channel']
-  const { Quota } = getModelsByChannel(channel, res, promotionModel)
+    const channel = req.headers['x-channel']
+    const { Quota } = getModelsByChannel(channel, res, promotionModel)
 
-  const exitQuota = await Quota.findOne({ quotaId: quotaId })
-  if (!exitQuota) {
-    return res.status(404).json({
-      status: 404,
-      message: 'This quotaId not found'
+    const exitQuota = await Quota.findOne({ quotaId: quotaId })
+    if (!exitQuota) {
+      return res.status(404).json({
+        status: 404,
+        message: 'This quotaId not found'
+      })
+    }
+
+    const data = await Quota.updateOne(
+      { quotaId: quotaId },
+      {
+        $set: {
+          detail: detail,
+          proCode: proCode,
+          id: id,
+          quotaGroup: quotaGroup,
+          quotaWeight: quotaWeight,
+          quota: quota,
+          quotaUse: quotaUse,
+          rewards: rewards,
+          area: area,
+          zone: zone,
+          ExpDate: ExpDate
+        }
+      }
+    )
+
+    const io = getSocket()
+    io.emit('promotion/updateQuota', {})
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess'
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
 
-  const data = await Quota.updateOne(
-    { quotaId: quotaId },
-    {
-      $set: {
-        detail: detail,
-        proCode: proCode,
-        id: id,
-        quotaGroup: quotaGroup,
-        quotaWeight: quotaWeight,
-        quota: quota,
-        quotaUse: quotaUse,
-        rewards: rewards,
-        area: area,
-        zone: zone,
-        ExpDate: ExpDate
-      }
-    }
-  )
-
-  const io = getSocket()
-  io.emit('promotion/updateQuota', {})
-
-  res.status(200).json({
-    status: 200,
-    message: 'sucess'
-  })
 }
 
 exports.addPromotionShelf = async (req, res) => {
-  const { proShelfId, period, storeId, price } = req.body
+  try {
+    const { proShelfId, period, storeId, price } = req.body
 
-  const channel = req.headers['x-channel']
-  const { PromotionShelf } = getModelsByChannel(channel, res, promotionModel)
+    const channel = req.headers['x-channel']
+    const { PromotionShelf } = getModelsByChannel(channel, res, promotionModel)
 
-  const dataExist = await PromotionShelf.findOne({
-    proShelfId: proShelfId,
-    storeId: storeId,
-    period: period
-  })
-  if (dataExist) {
-    return res.status(400).json({
-      status: 400,
-      message: 'already in database'
+    const dataExist = await PromotionShelf.findOne({
+      proShelfId: proShelfId,
+      storeId: storeId,
+      period: period
+    })
+    if (dataExist) {
+      return res.status(400).json({
+        status: 400,
+        message: 'already in database'
+      })
+    }
+    const data = await PromotionShelf.create({
+      proShelfId: proShelfId,
+      storeId: storeId,
+      period: period,
+      price: price
+    })
+
+    const io = getSocket()
+    io.emit('promotion/addPromotionShelf', {})
+
+    res.status(200).json({
+      status: 200,
+      message: 'addPromotionShelf',
+      data: data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-  const data = await PromotionShelf.create({
-    proShelfId: proShelfId,
-    storeId: storeId,
-    period: period,
-    price: price
-  })
 
-  const io = getSocket()
-  io.emit('promotion/addPromotionShelf', {})
-
-  res.status(200).json({
-    status: 200,
-    message: 'addPromotionShelf',
-    data: data
-  })
 }
 
 exports.deletePromotion = async (req, res) => {
@@ -911,7 +995,7 @@ exports.getReward = async (req, res) => {
 
     const product = await Product.find({
       $or: rewardFilters,
-      statusSale:'Y'
+      statusSale: 'Y'
     });
 
     const urlImage = '/images/products/'
@@ -919,28 +1003,28 @@ exports.getReward = async (req, res) => {
 
 
       return {
-        id:item.id,
-        name:item.name,
-        groupCode:item.groupCode,
-        group:item.group,
-        groupCodeM3:item.groupCodeM3,
-        groupM3:item.groupM3,
-        brandCode:item.brandCode,
-        brand:item.brand,
-        size:item.size,
-        flavourCode:item.flavourCode,
-        flavour:item.flavour,
-        url:`${urlImage}${item.id}.webp`
+        id: item.id,
+        name: item.name,
+        groupCode: item.groupCode,
+        group: item.group,
+        groupCodeM3: item.groupCodeM3,
+        groupM3: item.groupM3,
+        brandCode: item.brandCode,
+        brand: item.brand,
+        size: item.size,
+        flavourCode: item.flavourCode,
+        flavour: item.flavour,
+        url: `${urlImage}${item.id}.webp`
       }
     })
 
 
 
-  res.status(200).json({
-    status:200,
-    message:'sucess',
-    data:data
-  })
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: data
+    })
 
 
   } catch (error) {

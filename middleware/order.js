@@ -1368,7 +1368,8 @@ const dataWithdraw = async (channel, status, startDate, endDate) => {
         receiveQty: product.receiveQty,
         weightGross: product.weightGross,
         qtyPcs: product.qtyPcs,
-        netTotal: product.netTotal
+        netTotal: product.netTotal,
+        isNPD: product.isNPD
       }
     })
 
@@ -1439,7 +1440,9 @@ const dataWithdraw = async (channel, status, startDate, endDate) => {
           TOTAL_PRICE: order.total,
           STATUS: order.status,
           STATUS_TH: order.statusTH,
-          IS_NEWTRIP: order.newTrip?.toUpperCase?.() || ''
+          IS_NEWTRIP: order.newTrip?.toUpperCase?.() || '',
+          IS_NPD: product.isNPD ? 'TRUE' : 'FALSE',
+          REMARK_WAREHOUSE: order.remarkWarehouse?.remark  || ''
         }
       })
       .filter(Boolean)

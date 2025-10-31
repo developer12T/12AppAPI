@@ -109,6 +109,55 @@ WHERE
   return result.recordset
 }
 
+exports.userPcSample = async function (channel, area) {
+
+  const config = {
+    host: process.env.MY_SQL_SERVER,
+    user: process.env.MY_SQL_USER,
+    password: process.env.MY_SQL_PASSWORD,
+    database: process.env.MY_SQL_DATABASE
+  }
+
+  const connection = await mysql.createConnection(config)
+
+  const query = `
+        SELECT
+              TRIM(REPLACE(REPLACE(REPLACE(SALECODE, '\r', ''), '\n', ''), '\t', '')) AS saleCode,
+  TRIM(REPLACE(REPLACE(REPLACE(SALE_PAYER, '\r', ''), '\n', ''), '\t', '')) AS salePayer,
+  TRIM(REPLACE(REPLACE(REPLACE(SALE_USERNAME, '\r', ''), '\n', ''), '\t', '')) AS username,
+  SUBSTRING_INDEX(TRIM(REPLACE(REPLACE(REPLACE(SALE_NAME, '\r', ''), '\n', ''), '\t', '')), ' ', 1) AS firstName,
+  TRIM(SUBSTRING_INDEX(TRIM(REPLACE(REPLACE(REPLACE(SALE_NAME, '\r', ''), '\n', ''), '\t', '')), ' ', -1)) AS surName,
+  '24e6b727065bbc15f1cf8d576c32fd53' AS password,
+  '' AS tel,
+  TRIM(REPLACE(REPLACE(REPLACE(SALE_ZONE, '\r', ''), '\n', ''), '\t', '')) AS zone,
+  TRIM(REPLACE(REPLACE(REPLACE(SALE_AREA, '\r', ''), '\n', ''), '\t', '')) AS area,
+  TRIM(REPLACE(REPLACE(REPLACE(SALE_WH, '\r', ''), '\n', ''), '\t', '')) AS warehouse,
+  'sale' AS role,
+  '1' AS status,
+  '' AS typeTruck,
+  '' AS noTruck,
+  CONCAT(
+    'https://apps.onetwotrading.co.th/images/qrcode/',
+    TRIM(REPLACE(REPLACE(REPLACE(SALE_AREA, '\r', ''), '\n', ''), '\t', '')),
+    '.jpg'
+  ) AS qrCodeImage,
+  TRIM(REPLACE(REPLACE(REPLACE(SALE_CH, '\r', ''), '\n', ''), '\t', '')) AS platformType
+    FROM 
+      vancash.p_sale
+    -- WHERE 
+    --   DA.CHANNEL_NAME = 'Cash' OR 
+    --   DA.Sale_Code is not NULL AND
+    --   DA.Sale_Code != 'ว่าง' 
+        `
+    // console.log(query)
+    
+    const [result] = await connection.execute(query, [channel])
+
+  return result
+}
+
+
+
 exports.userQueryOne = async function (channel, area) {
   const config = {
     user: process.env.MS_SQL_USER,

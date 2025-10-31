@@ -24,13 +24,15 @@ const { getModelsByChannel } = require('../../middleware/channel')
 const { Item } = require('../../models/cash/master')
 
 exports.utilize = async (req, res) => {
-  const { area, period, typetruck } = req.body
+  try {
+    
+const { area, period, typetruck } = req.body
   const channel = req.headers['x-channel']
   const { Product } = getModelsByChannel(channel, res, productModel)
   const { Typetrucks } = getModelsByChannel(channel, res, typeTruckModel)
   const { Stock } = getModelsByChannel(channel, res, stockModel)
   const { Distribution } = getModelsByChannel(channel, res, DistributionModel)
-
+    
   const dataStock = await Stock.findOne({ area: area, period: period })
   if (!dataStock) {
     return res.status(404).json({
@@ -149,4 +151,16 @@ exports.utilize = async (req, res) => {
     message: 'utilize fetched successfully!',
     data: data
   })
+
+} catch (error) {
+  console.error('❌ Error in getRouteEffective:', error)
+
+  res.status(500).json({
+    status: 500,
+    message: 'error from server',
+    error: error.message || error.toString(), // ✅ ป้องกัน circular object
+    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+  })
+}
+  
 }

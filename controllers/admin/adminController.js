@@ -370,13 +370,25 @@ exports.reportCheckExcel = async (req, res) => {
 }
 
 exports.createPowerPoint = async (req, res) => {
-  const file = req.file
-  if (!file) {
-    return res.status(400).json({ status: 400, message: 'No file uploaded' })
-  }
-  res.status(200).json({
-    status: 200,
-    message: 'Create powerPoint file',
-    file: file
+  try {
+    const file = req.file
+    if (!file) {
+      return res.status(400).json({ status: 400, message: 'No file uploaded' })
+    }
+    res.status(200).json({
+      status: 200,
+      message: 'Create powerPoint file',
+      file: file
+    })
+  } catch (error) {
+  console.error('❌ Error:', error)
+ 
+  res.status(500).json({
+    status: 500,
+    message: 'error from server',
+    error: error.message || error.toString(), // ✅ ป้องกัน circular object
+    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
   })
+  }
+
 }

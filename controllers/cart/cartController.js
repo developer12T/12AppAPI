@@ -1123,81 +1123,103 @@ exports.autoDeleteCart = async (req, res) => {
 }
 
 exports.getCountCart = async (req, res) => {
+  try {
+    const { zone } = req.query
+    const channel = req.headers['x-channel']
+    const { Cart } = getModelsByChannel(channel, res, cartModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
 
-  const { zone } = req.query
-  const channel = req.headers['x-channel']
-  const { Cart } = getModelsByChannel(channel, res, cartModel)
-  const { User } = getModelsByChannel(channel, res, userModel)
+    const userZones = await User.aggregate([
+      { $match: { role: 'sale', zone: { $ne: 'IT' } } }, // เงื่อนไข role = sale
+      { $group: { _id: '$zone' } }, // รวมกลุ่มตาม zone
+      { $project: { _id: 0, zone: '$_id' } } // คืนค่า zone
+    ]);
 
-  const userZones = await User.aggregate([
-    { $match: { role: 'sale', zone: { $ne: 'IT' } } }, // เงื่อนไข role = sale
-    { $group: { _id: '$zone' } }, // รวมกลุ่มตาม zone
-    { $project: { _id: 0, zone: '$_id' } } // คืนค่า zone
-  ]);
-
-  const cartData = await Cart.aggregate([
-    {
-      $match: {
-        type: {
-          $in: ['sale', 'refund', 'give']
+    const cartData = await Cart.aggregate([
+      {
+        $match: {
+          type: {
+            $in: ['sale', 'refund', 'give']
+          }
         }
       }
-    }
-    ,
-    {
-      $addFields: {
-        zone: { $substr: ["$area", 0, 2] } // เอา 2 ตัวแรกจาก area
+      ,
+      {
+        $addFields: {
+          zone: { $substr: ["$area", 0, 2] } // เอา 2 ตัวแรกจาก area
+        }
+      }
+    ]);
+
+    let data = []
+
+
+    if (zone) {
+      const areaFilter = cartData.filter(o => o.zone === zone)
+      data = areaFilter
+    } else {
+      for (item of userZones) {
+        const count = cartData.filter(o => o.zone === item.zone).length;
+        const areaFilter = cartData.filter(o => o.zone === item.zone)
+        const dataTram = {
+          zone: item.zone,
+          count: count,
+          // cart : areaFilter
+        }
+        data.push(dataTram)
       }
     }
-  ]);
 
-  let data = []
+    res.status(200).json({
+      status: 200,
+      message: 'Fetch data cart',
+      data: data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
 
-
-  if (zone) {
-    const areaFilter = cartData.filter(o => o.zone === zone)
-    data = areaFilter
-  } else {
-    for (item of userZones) {
-      const count = cartData.filter(o => o.zone === item.zone).length;
-      const areaFilter = cartData.filter(o => o.zone === item.zone)
-      const dataTram = {
-        zone: item.zone,
-        count: count,
-        // cart : areaFilter
-      }
-      data.push(dataTram)
-    }
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
 
-  res.status(200).json({
-    status: 200,
-    message: 'Fetch data cart',
-    data: data
-  })
 
 
 }
 
 exports.getCartDetail = async (req, res) => {
 
-  const { area, storeId } = req.query
-  const channel = req.headers['x-channel']
-  const { Cart } = getModelsByChannel(channel, res, cartModel)
-  const { User } = getModelsByChannel(channel, res, userModel)
+  try {
+    const { area, storeId } = req.query
+    const channel = req.headers['x-channel']
+    const { Cart } = getModelsByChannel(channel, res, cartModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
 
-  const cartData = await Cart.findOne({
-    storeId: storeId,
-    area: area,
-    type: { $in: ['sale', 'refund', 'give'] }
-  })
+    const cartData = await Cart.findOne({
+      storeId: storeId,
+      area: area,
+      type: { $in: ['sale', 'refund', 'give'] }
+    })
 
 
-  res.status(200).json({
-    status: 200,
-    message: 'Fetch data cart',
-    data: cartData || []
-  })
+    res.status(200).json({
+      status: 200,
+      message: 'Fetch data cart',
+      data: cartData || []
+    })
 
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
 
 }
