@@ -128,7 +128,7 @@ exports.checkout = async (req, res) => {
         area: cart.area
       }).lean()) || {}
 
-    function isAug2025OrLater (createAt) {
+    function isAug2025OrLater(createAt) {
       if (!createAt) return false
 
       // case: "YYYYMM" เช่น "202508"
@@ -149,14 +149,14 @@ exports.checkout = async (req, res) => {
     // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-          storeData.address,
-          storeData.subDistrict && `ต.${storeData.subDistrict}`,
-          storeData.district && `อ.${storeData.district}`,
-          storeData.province && `จ.${storeData.province}`,
-          storeData.postCode
-        ]
-          .filter(Boolean)
-          .join(' ')
+        storeData.address,
+        storeData.subDistrict && `ต.${storeData.subDistrict}`,
+        storeData.district && `อ.${storeData.district}`,
+        storeData.province && `จ.${storeData.province}`,
+        storeData.postCode
+      ]
+        .filter(Boolean)
+        .join(' ')
       : storeData.address
 
     const summary = await summaryRefund(cart, channel, res)
@@ -460,370 +460,217 @@ exports.checkout = async (req, res) => {
 }
 
 exports.refundExcel = async (req, res) => {
-  const { channel } = req.query
-  let { startDate, endDate } = req.query
-  const { area, team, zone } = req.query
+  try {
+    const { channel } = req.query
+    let { startDate, endDate } = req.query
+    const { area, team, zone } = req.query
 
-  let statusArray = (req.query.status || '')
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean)
+    let statusArray = (req.query.status || '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
 
-  if (statusArray.length === 0) {
-    statusArray = ['pending', 'approved'] // default
-  }
+    if (statusArray.length === 0) {
+      statusArray = ['pending', 'approved'] // default
+    }
 
-  // console.log(statusArray)
+    // console.log(statusArray)
 
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-  const { Refund } = getModelsByChannel(channel, res, refundModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
 
-  if (!/^\d{8}$/.test(startDate)) {
-    const nowTH = new Date(
-      new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })
+    if (!/^\d{8}$/.test(startDate)) {
+      const nowTH = new Date(
+        new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })
+      )
+      const y = nowTH.getFullYear()
+      const m = String(nowTH.getMonth() + 1).padStart(2, '0')
+      const d = String(nowTH.getDate()).padStart(2, '0') // ← ใช้ getDate() ไม่ใช่ getDay()
+      startDate = `${y}${m}${d}` // YYYYMMDD
+      endDate = `${y}${m}${d}` // YYYYMMDD
+    }
+
+    const startTH = new Date(
+      `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
+        6,
+        8
+      )}T00:00:00+07:00`
     )
-    const y = nowTH.getFullYear()
-    const m = String(nowTH.getMonth() + 1).padStart(2, '0')
-    const d = String(nowTH.getDate()).padStart(2, '0') // ← ใช้ getDate() ไม่ใช่ getDay()
-    startDate = `${y}${m}${d}` // YYYYMMDD
-    endDate = `${y}${m}${d}` // YYYYMMDD
-  }
+    const endTH = new Date(
+      `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(
+        6,
+        8
+      )}T23:59:59.999+07:00`
+    )
 
-  const startTH = new Date(
-    `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
-      6,
-      8
-    )}T00:00:00+07:00`
-  )
-  const endTH = new Date(
-    `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(
-      6,
-      8
-    )}T23:59:59.999+07:00`
-  )
+    let queryRefund = {
+      createdAt: {
+        $gte: startTH,
+        $lte: endTH
+      },
+      status: { $nin: ['canceled', 'reject'] },
+      status: { $in: statusArray },
+      'store.area': { $ne: 'IT211' }
+    }
 
-  let queryRefund = {
-    createdAt: {
-      $gte: startTH,
-      $lte: endTH
-    },
-    status: { $nin: ['canceled', 'reject'] },
-    status: { $in: statusArray },
-    'store.area': { $ne: 'IT211' }
-  }
+    let queryChange = {
+      createdAt: {
+        $gte: startTH,
+        $lte: endTH
+      },
+      'store.area': { $ne: 'IT211' },
+      status: { $in: statusArray },
+      status: { $nin: ['canceled', 'reject'] },
+      type: { $in: ['change'] }
+    }
 
-  let queryChange = {
-    createdAt: {
-      $gte: startTH,
-      $lte: endTH
-    },
-    'store.area': { $ne: 'IT211' },
-    status: { $in: statusArray },
-    status: { $nin: ['canceled', 'reject'] },
-    type: { $in: ['change'] }
-  }
+    if (area) {
+      queryRefund['store.area'] = area
+      queryChange['store.area'] = area
+    } else if (zone) {
+      queryRefund['store.area'] = { $regex: `^${zone}`, $options: 'i' }
+      queryChange['store.area'] = { $regex: `^${zone}`, $options: 'i' }
+    }
 
-  if (area) {
-    queryRefund['store.area'] = area
-    queryChange['store.area'] = area
-  } else if (zone) {
-    queryRefund['store.area'] = { $regex: `^${zone}`, $options: 'i' }
-    queryChange['store.area'] = { $regex: `^${zone}`, $options: 'i' }
-  }
-
-  const pipelineChange = [
-    {
-      $match: queryChange
-    },
-    {
-      $addFields: {
-        createdAtThai: {
-          $dateAdd: {
-            startDate: '$createdAt',
-            unit: 'hour',
-            amount: 7
+    const pipelineChange = [
+      {
+        $match: queryChange
+      },
+      {
+        $addFields: {
+          createdAtThai: {
+            $dateAdd: {
+              startDate: '$createdAt',
+              unit: 'hour',
+              amount: 7
+            }
+          },
+          team3: {
+            $concat: [
+              { $substrCP: ['$store.area', 0, 2] },
+              { $substrCP: ['$store.area', 3, 1] }
+            ]
           }
-        },
-        team3: {
-          $concat: [
-            { $substrCP: ['$store.area', 0, 2] },
-            { $substrCP: ['$store.area', 3, 1] }
-          ]
         }
+      },
+
+      {
+        $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
       }
-    },
+    ]
 
-    {
-      $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
-    }
-  ]
-
-  const pipelineRefund = [
-    {
-      $match: queryRefund
-    },
-    {
-      $addFields: {
-        createdAtThai: {
-          $dateAdd: {
-            startDate: '$createdAt',
-            unit: 'hour',
-            amount: 7
+    const pipelineRefund = [
+      {
+        $match: queryRefund
+      },
+      {
+        $addFields: {
+          createdAtThai: {
+            $dateAdd: {
+              startDate: '$createdAt',
+              unit: 'hour',
+              amount: 7
+            }
+          },
+          team3: {
+            $concat: [
+              { $substrCP: ['$store.area', 0, 2] },
+              { $substrCP: ['$store.area', 3, 1] }
+            ]
           }
-        },
-        team3: {
-          $concat: [
-            { $substrCP: ['$store.area', 0, 2] },
-            { $substrCP: ['$store.area', 3, 1] }
-          ]
         }
+      },
+      {
+        $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
       }
-    },
-    {
-      $sort: { createdAt: 1, orderId: 1 } // เรียงจากน้อยไปมาก (ASC) ถ้าอยากให้ใหม่สุดอยู่บน ใช้ -1
-    }
-  ]
+    ]
 
-  if (team) {
-    pipelineChange.push({
-      $match: {
-        team3: { $regex: `^${team}`, $options: 'i' }
-      }
-    })
-    pipelineRefund.push({
-      $match: {
-        team3: { $regex: `^${team}`, $options: 'i' }
-      }
-    })
-  }
-
-  const modelChange = await Order.aggregate(pipelineChange)
-  const modelRefund = await Refund.aggregate(pipelineRefund)
-
-  // console.log(modelChange)
-  // console.log(modelRefund)
-  // console.log()
-
-  const tranFromChange = modelChange.flatMap(order => {
-    let counterOrder = 0
-    function formatDateToThaiYYYYMMDD (date) {
-      const d = new Date(date)
-      d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
-
-      const yyyy = d.getFullYear()
-      const mm = String(d.getMonth() + 1).padStart(2, '0')
-      const dd = String(d.getDate()).padStart(2, '0')
-
-      return `${yyyy}${mm}${dd}`
+    if (team) {
+      pipelineChange.push({
+        $match: {
+          team3: { $regex: `^${team}`, $options: 'i' }
+        }
+      })
+      pipelineRefund.push({
+        $match: {
+          team3: { $regex: `^${team}`, $options: 'i' }
+        }
+      })
     }
 
-    // ใช้งาน
-    const RLDT = formatDateToThaiYYYYMMDD(order.createdAt)
+    const modelChange = await Order.aggregate(pipelineChange)
+    const modelRefund = await Refund.aggregate(pipelineRefund)
 
-    const listProduct = order.listProduct.map(product => {
-      return {
-        proCode: '',
-        id: product.id,
-        name: product.name,
-        group: product.group,
-        brand: product.brand,
-        size: product.size,
-        flavour: product.flavour,
-        qty: product.qty,
-        unit: product.unit,
-        unitName: product.unitName,
-        price: product.price,
-        subtotal: product.subtotal,
-        discount: product.discount,
-        netTotal: product.netTotal
-      }
-    })
+    // console.log(modelChange)
+    // console.log(modelRefund)
+    // console.log()
 
-    const productIDS = [...listProduct].flat()
-
-    // console.log("productIDS",productIDS)
-    return productIDS.map(product => {
-      counterOrder++
-
-      // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
-
-      return {
-        CUNO: order.store.storeId,
-        FACI: 'F10',
-        WHLO: order.sale.warehouse,
-        ORNO: '',
-        OAORTP: 'B31',
-        RLDT: RLDT,
-        ADID: '',
-        CUOR: order.orderId,
-        OAOREF: '',
-        OBITNO: product.id,
-        OBBANO: '',
-        OBALUN: product.unit,
-        OBORQA: `${product.qty}`,
-        OBSAPR: `${product.price || 0}`,
-        OBSPUN: product.unit,
-        OBWHSL: '',
-        ROUT: '',
-        OBPONR: `${counterOrder}`,
-        OBDIA2: `${product.discount || 0}`,
-        OBRSCD: '',
-        OBCMNO: '',
-        OBPIDE: product.proCode,
-        OBSMCD: order.sale.saleCode,
-        OAORDT: RLDT,
-        OAODAM: '0',
-        OECRID: '',
-        OECRAM: '',
-        OECRID2: '',
-        OECRAM2: '',
-        OECRID3: '',
-        OECRAM3: '',
-        OECRID4: '',
-        OECRAM4: '',
-        OECRID5: '',
-        OECRAM5: '',
-        OARESP: '',
-        OAYREF: '',
-        OATEL2: '',
-        OAWCON: '',
-        OAFRE1: '',
-        OATXAP: '',
-        OATXAP2: '',
-        OBDIA1: '',
-        OBDIA3: '',
-        OBDIA4: ''
-      }
-    })
-  })
-
-  // รวบรวม itemCode ทั้งหมดจาก refund
-  const refundItems = modelRefund.flatMap(o => o.listProduct.map(p => p.id))
-  // console.log(refundItems)
-  const uniqueCodes = [...new Set(refundItems)]
-
-  // ปีที่ยอมรับ
-  const currentYear = new Date().getFullYear()
-  const years = [currentYear, currentYear - 1, currentYear - 2, currentYear + 1]
-
-  // ดึงล็อตรวดเดียวจาก MSSQL (Sequelize)
-  const lotRows = await ItemLotM3.findAll({
-    where: {
-      itemCode: { [Op.in]: uniqueCodes },
-      expireDate: { [Op.or]: years.map(y => ({ [Op.like]: `${y}%` })) },
-      [Op.and]: [literal('LEN(LTRIM(RTRIM([LMBANO]))) = 16')]
-    },
-    attributes: ['itemCode', 'lot'], // แค่นี้พอ
-    raw: true
-  })
-
-  // ทำ map เพื่อ lookup เร็ว O(1)
-  const lotMap = new Map()
-  for (const r of lotRows) {
-    const code = (r.itemCode || '').trim() // <<<<<< สำคัญ
-    const lot = (r.lot || '').trim()
-    const curr = lotMap.get(code)
-
-    // ถ้ายังไม่มี หรือ lot นี้ใหม่กว่า ให้ทับ
-    if (!curr || lot > curr) {
-      // ตัวเลขความยาวเท่ากัน เปรียบเทียบ string ได้
-      lotMap.set(code, lot)
-    }
-  }
-
-  // console.log('uniqueCodes', uniqueCodes)
-  // console.log('lotRows', lotRows)
-  // console.log('lotMap', lotMap)
-
-  // --- สร้าง tranFromRefund ให้แบน ---
-  const tranFromRefundNested = await Promise.all(
-    modelRefund.map(async order => {
+    const tranFromChange = modelChange.flatMap(order => {
       let counterOrder = 0
-
-      const formatDateToThaiYYYYMMDD = date => {
+      function formatDateToThaiYYYYMMDD(date) {
         const d = new Date(date)
-        d.setHours(d.getHours() + 7)
+        d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
+
         const yyyy = d.getFullYear()
         const mm = String(d.getMonth() + 1).padStart(2, '0')
         const dd = String(d.getDate()).padStart(2, '0')
+
         return `${yyyy}${mm}${dd}`
       }
 
+      // ใช้งาน
       const RLDT = formatDateToThaiYYYYMMDD(order.createdAt)
 
-      const listProduct = await Promise.all(
-        order.listProduct
-          // .filter(p => p.condition === 'good')
-          .map(async p => {
-            // const lotData = await Item.findAll({
-            //   where: {
-            //     itemCode: p.id,
-            //     expireDate: { [Op.like]: `23%` },
-            //     [Op.and]: [{ lot: { [Op.regexp]: '^[0-9]{16}$' } }]
-            //   }
-            // })
-            // const lotData = await Item.findOne({
-            //   where: {
-            //     itemCode: p.id,
-            //     expireDate: {
-            //       [Op.or]: years.map(y => ({ [Op.like]: `${y}%` }))
-            //     },
-            //     // date: {
-            //     //   [Op.like]: `${p.expireDate.slice(0, 4)}%`
-            //     // },
-            //     // lot: { [Op.like]: `${p.expireDate.slice(2, 4)}%` },
-            //     [Op.and]: [
-            //       literal('LEN(LTRIM(RTRIM([Lot]))) = 16') // ความยาว 16 ตัวอักษร
-            //       // literal("LTRIM(RTRIM([Lot])) NOT LIKE '%[^0-9]%'") // ไม่มีตัวที่ไม่ใช่ตัวเลข
-            //     ]
-            //   }
-            // })
-            return {
-              proCode: '',
-              id: p.id,
-              name: p.name,
-              group: p.group,
-              brand: p.brand,
-              size: p.size,
-              flavour: p.flavour,
-              qty: p.qty,
-              unit: p.unit,
-              unitName: p.unitName,
-              price: p.price,
-              subtotal: p.subtotal,
-              discount: p.discount,
-              netTotal: p.netTotal,
-              lotNo: lotMap.get(p.id) || ''
-              // lotNo: lotData?.lot || null
-            }
-          })
-      )
+      const listProduct = order.listProduct.map(product => {
+        return {
+          proCode: '',
+          id: product.id,
+          name: product.name,
+          group: product.group,
+          brand: product.brand,
+          size: product.size,
+          flavour: product.flavour,
+          qty: product.qty,
+          unit: product.unit,
+          unitName: product.unitName,
+          price: product.price,
+          subtotal: product.subtotal,
+          discount: product.discount,
+          netTotal: product.netTotal
+        }
+      })
 
-      return listProduct.map(product => {
+      const productIDS = [...listProduct].flat()
+
+      // console.log("productIDS",productIDS)
+      return productIDS.map(product => {
         counterOrder++
+
+        // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
+
         return {
           CUNO: order.store.storeId,
           FACI: 'F10',
           WHLO: order.sale.warehouse,
           ORNO: '',
-          OAORTP: 'A34', // << คืนของ
+          OAORTP: 'B31',
           RLDT: RLDT,
           ADID: '',
           CUOR: order.orderId,
           OAOREF: '',
           OBITNO: product.id,
-          OBBANO: product.lotNo ?? '', // อย่าใช้ ${} ในอ็อบเจ็กต์
+          OBBANO: '',
           OBALUN: product.unit,
-          OBORQA: `-${product.qty}`,
-          OBSAPR: `${product.price}`,
+          OBORQA: `${product.qty}`,
+          OBSAPR: `${product.price || 0}`,
           OBSPUN: product.unit,
-          OBWHSL: 'CS0001',
+          OBWHSL: '',
           ROUT: '',
           OBPONR: `${counterOrder}`,
           OBDIA2: `${product.discount || 0}`,
           OBRSCD: '',
           OBCMNO: '',
-          OBPIDE: '',
+          OBPIDE: product.proCode,
           OBSMCD: order.sale.saleCode,
           OAORDT: RLDT,
           OAODAM: '0',
@@ -850,51 +697,216 @@ exports.refundExcel = async (req, res) => {
         }
       })
     })
-  )
 
-  const tranFromRefund = tranFromRefundNested.flat()
+    // รวบรวม itemCode ทั้งหมดจาก refund
+    const refundItems = modelRefund.flatMap(o => o.listProduct.map(p => p.id))
+    // console.log(refundItems)
+    const uniqueCodes = [...new Set(refundItems)]
 
-  function yyyymmddToDdMmYyyy (dateString) {
-    // สมมติ dateString คือ '20250804'
-    const year = dateString.slice(0, 4)
-    const month = dateString.slice(4, 6)
-    const day = dateString.slice(6, 8)
-    return `${day}${month}${year}`
+    // ปีที่ยอมรับ
+    const currentYear = new Date().getFullYear()
+    const years = [currentYear, currentYear - 1, currentYear - 2, currentYear + 1]
+
+    // ดึงล็อตรวดเดียวจาก MSSQL (Sequelize)
+    const lotRows = await ItemLotM3.findAll({
+      where: {
+        itemCode: { [Op.in]: uniqueCodes },
+        expireDate: { [Op.or]: years.map(y => ({ [Op.like]: `${y}%` })) },
+        [Op.and]: [literal('LEN(LTRIM(RTRIM([LMBANO]))) = 16')]
+      },
+      attributes: ['itemCode', 'lot'], // แค่นี้พอ
+      raw: true
+    })
+
+    // ทำ map เพื่อ lookup เร็ว O(1)
+    const lotMap = new Map()
+    for (const r of lotRows) {
+      const code = (r.itemCode || '').trim() // <<<<<< สำคัญ
+      const lot = (r.lot || '').trim()
+      const curr = lotMap.get(code)
+
+      // ถ้ายังไม่มี หรือ lot นี้ใหม่กว่า ให้ทับ
+      if (!curr || lot > curr) {
+        // ตัวเลขความยาวเท่ากัน เปรียบเทียบ string ได้
+        lotMap.set(code, lot)
+      }
+    }
+
+    // console.log('uniqueCodes', uniqueCodes)
+    // console.log('lotRows', lotRows)
+    // console.log('lotMap', lotMap)
+
+    // --- สร้าง tranFromRefund ให้แบน ---
+    const tranFromRefundNested = await Promise.all(
+      modelRefund.map(async order => {
+        let counterOrder = 0
+
+        const formatDateToThaiYYYYMMDD = date => {
+          const d = new Date(date)
+          d.setHours(d.getHours() + 7)
+          const yyyy = d.getFullYear()
+          const mm = String(d.getMonth() + 1).padStart(2, '0')
+          const dd = String(d.getDate()).padStart(2, '0')
+          return `${yyyy}${mm}${dd}`
+        }
+
+        const RLDT = formatDateToThaiYYYYMMDD(order.createdAt)
+
+        const listProduct = await Promise.all(
+          order.listProduct
+            // .filter(p => p.condition === 'good')
+            .map(async p => {
+              // const lotData = await Item.findAll({
+              //   where: {
+              //     itemCode: p.id,
+              //     expireDate: { [Op.like]: `23%` },
+              //     [Op.and]: [{ lot: { [Op.regexp]: '^[0-9]{16}$' } }]
+              //   }
+              // })
+              // const lotData = await Item.findOne({
+              //   where: {
+              //     itemCode: p.id,
+              //     expireDate: {
+              //       [Op.or]: years.map(y => ({ [Op.like]: `${y}%` }))
+              //     },
+              //     // date: {
+              //     //   [Op.like]: `${p.expireDate.slice(0, 4)}%`
+              //     // },
+              //     // lot: { [Op.like]: `${p.expireDate.slice(2, 4)}%` },
+              //     [Op.and]: [
+              //       literal('LEN(LTRIM(RTRIM([Lot]))) = 16') // ความยาว 16 ตัวอักษร
+              //       // literal("LTRIM(RTRIM([Lot])) NOT LIKE '%[^0-9]%'") // ไม่มีตัวที่ไม่ใช่ตัวเลข
+              //     ]
+              //   }
+              // })
+              return {
+                proCode: '',
+                id: p.id,
+                name: p.name,
+                group: p.group,
+                brand: p.brand,
+                size: p.size,
+                flavour: p.flavour,
+                qty: p.qty,
+                unit: p.unit,
+                unitName: p.unitName,
+                price: p.price,
+                subtotal: p.subtotal,
+                discount: p.discount,
+                netTotal: p.netTotal,
+                lotNo: lotMap.get(p.id) || ''
+                // lotNo: lotData?.lot || null
+              }
+            })
+        )
+
+        return listProduct.map(product => {
+          counterOrder++
+          return {
+            CUNO: order.store.storeId,
+            FACI: 'F10',
+            WHLO: order.sale.warehouse,
+            ORNO: '',
+            OAORTP: 'A34', // << คืนของ
+            RLDT: RLDT,
+            ADID: '',
+            CUOR: order.orderId,
+            OAOREF: '',
+            OBITNO: product.id,
+            OBBANO: product.lotNo ?? '', // อย่าใช้ ${} ในอ็อบเจ็กต์
+            OBALUN: product.unit,
+            OBORQA: `-${product.qty}`,
+            OBSAPR: `${product.price}`,
+            OBSPUN: product.unit,
+            OBWHSL: 'CS0001',
+            ROUT: '',
+            OBPONR: `${counterOrder}`,
+            OBDIA2: `${product.discount || 0}`,
+            OBRSCD: '',
+            OBCMNO: '',
+            OBPIDE: '',
+            OBSMCD: order.sale.saleCode,
+            OAORDT: RLDT,
+            OAODAM: '0',
+            OECRID: '',
+            OECRAM: '',
+            OECRID2: '',
+            OECRAM2: '',
+            OECRID3: '',
+            OECRAM3: '',
+            OECRID4: '',
+            OECRAM4: '',
+            OECRID5: '',
+            OECRAM5: '',
+            OARESP: '',
+            OAYREF: '',
+            OATEL2: '',
+            OAWCON: '',
+            OAFRE1: '',
+            OATXAP: '',
+            OATXAP2: '',
+            OBDIA1: '',
+            OBDIA3: '',
+            OBDIA4: ''
+          }
+        })
+      })
+    )
+
+    const tranFromRefund = tranFromRefundNested.flat()
+
+    function yyyymmddToDdMmYyyy(dateString) {
+      // สมมติ dateString คือ '20250804'
+      const year = dateString.slice(0, 4)
+      const month = dateString.slice(4, 6)
+      const day = dateString.slice(6, 8)
+      return `${day}${month}${year}`
+    }
+
+    // รวม Order + Refund ให้เป็นชุดข้อมูลเดียว
+    const allTransactions = [...tranFromChange, ...tranFromRefund]
+
+    const wb = xlsx.utils.book_new()
+    const ws = xlsx.utils.json_to_sheet(allTransactions)
+    xlsx.utils.book_append_sheet(
+      wb,
+      ws,
+      `ESP${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}`
+    )
+
+    const tempPath = path.join(
+      os.tmpdir(),
+      `CA_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}.xlsx`
+    )
+    xlsx.writeFile(wb, tempPath)
+
+    res.download(
+      tempPath,
+      `CA_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}.xlsx`,
+      err => {
+        if (err) {
+          console.error('❌ Download error:', err)
+          // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+          if (!res.headersSent) {
+            res.status(500).send('Download failed')
+          }
+        }
+
+        // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+        fs.unlink(tempPath, () => { })
+      }
+    )
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
 
-  // รวม Order + Refund ให้เป็นชุดข้อมูลเดียว
-  const allTransactions = [...tranFromChange, ...tranFromRefund]
-
-  const wb = xlsx.utils.book_new()
-  const ws = xlsx.utils.json_to_sheet(allTransactions)
-  xlsx.utils.book_append_sheet(
-    wb,
-    ws,
-    `ESP${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}`
-  )
-
-  const tempPath = path.join(
-    os.tmpdir(),
-    `CA_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}.xlsx`
-  )
-  xlsx.writeFile(wb, tempPath)
-
-  res.download(
-    tempPath,
-    `CA_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}.xlsx`,
-    err => {
-      if (err) {
-        console.error('❌ Download error:', err)
-        // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
-        if (!res.headersSent) {
-          res.status(500).send('Download failed')
-        }
-      }
-
-      // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
-    }
-  )
 }
 
 exports.getRefundPending = async (req, res) => {
@@ -1147,18 +1159,18 @@ exports.getDetail = async (req, res) => {
 
     const listProductChange = order
       ? order.listProduct.map(product => ({
-          id: product.id,
-          name: product.name,
-          group: product.group,
-          brand: product.brand,
-          size: product.size,
-          flavour: product.flavour,
-          qty: product.qty,
-          unit: product.unit,
-          unitName: product.unitName,
-          price: product.price,
-          netTotal: product.netTotal
-        }))
+        id: product.id,
+        name: product.name,
+        group: product.group,
+        brand: product.brand,
+        size: product.size,
+        flavour: product.flavour,
+        qty: product.qty,
+        unit: product.unit,
+        unitName: product.unitName,
+        price: product.price,
+        netTotal: product.netTotal
+      }))
       : []
 
     const totalChange = order ? order.total : 0
@@ -1617,27 +1629,27 @@ exports.cancelApproveRefund = async (req, res) => {
       }
 
       for (const item of refundOrder.listProduct) {
-            if (item.condition === 'good') {
-              const hasError = await updateStockMongo(
-                { id: item.id, unit: item.unit, qty: item.qty },
-                refundOrder.store.area,
-                refundOrder.period,
-                'reduceWithdraw',
-                channel,
-                res
-              )
+        if (item.condition === 'good') {
+          const hasError = await updateStockMongo(
+            { id: item.id, unit: item.unit, qty: item.qty },
+            refundOrder.store.area,
+            refundOrder.period,
+            'reduceWithdraw',
+            channel,
+            res
+          )
 
-              if (hasError) {
-                return res
-                  .status(500)
-                  .json({ status: 500, message: 'Stock update error' })
-              }
-            }
+          if (hasError) {
+            return res
+              .status(500)
+              .json({ status: 500, message: 'Stock update error' })
           }
+        }
+      }
 
-       }
+    }
 
-    
+
 
     await Refund.findOneAndUpdate(
       { orderId },
@@ -1682,47 +1694,59 @@ exports.cancelApproveRefund = async (req, res) => {
 }
 
 exports.updateAddressChange = async (req, res) => {
-  const channel = req.headers['x-channel']
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-  const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
+  try {
+    const channel = req.headers['x-channel']
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
 
-  const changeData = await Order.find({ type: 'change' })
-  const storeId = [...new Set(changeData.flatMap(item => item.store.storeId))]
+    const changeData = await Order.find({ type: 'change' })
+    const storeId = [...new Set(changeData.flatMap(item => item.store.storeId))]
 
-  const storeData = await Store.find({ storeId: { $in: storeId } })
+    const storeData = await Store.find({ storeId: { $in: storeId } })
 
-  for (i of changeData) {
-    const store = storeData.find(item => item.storeId === i.store.storeId)
+    for (i of changeData) {
+      const store = storeData.find(item => item.storeId === i.store.storeId)
 
-    // console.log(store.storeId)
+      // console.log(store.storeId)
 
-    const shipping = store.shippingAddress[0]
+      const shipping = store.shippingAddress[0]
 
-    await Order.findOneAndUpdate(
-      { orderId: i.orderId }, // filter
-      {
-        $set: {
-          shipping: {
-            default: shipping?.default ?? '',
-            shippingId: shipping?.shippingId ?? '',
-            address: shipping?.address ?? '',
-            district: shipping?.district ?? '',
-            subDistrict: shipping?.subDistrict ?? '',
-            province: shipping?.province ?? '',
-            postCode: shipping?.postCode ?? '',
-            latitude: shipping?.latitude ?? '0',
-            longtitude: shipping?.longtitude ?? '0'
+      await Order.findOneAndUpdate(
+        { orderId: i.orderId }, // filter
+        {
+          $set: {
+            shipping: {
+              default: shipping?.default ?? '',
+              shippingId: shipping?.shippingId ?? '',
+              address: shipping?.address ?? '',
+              district: shipping?.district ?? '',
+              subDistrict: shipping?.subDistrict ?? '',
+              province: shipping?.province ?? '',
+              postCode: shipping?.postCode ?? '',
+              latitude: shipping?.latitude ?? '0',
+              longtitude: shipping?.longtitude ?? '0'
+            }
           }
-        }
-      },
-      { new: true } // options: คืนค่าที่อัปเดตแล้ว
-    )
+        },
+        { new: true } // options: คืนค่าที่อัปเดตแล้ว
+      )
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'Updated status successfully!',
+      // storeId,
+      data: changeData
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
 
-  res.status(200).json({
-    status: 200,
-    message: 'Updated status successfully!',
-    // storeId,
-    data: changeData
-  })
 }
