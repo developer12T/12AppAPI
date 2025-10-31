@@ -381,8 +381,8 @@ exports.checkout = async (req, res) => {
       refOrderId: createdMovement._id
     })
 
-    // await newOrder.save()
-    // await Cart.deleteOne({ type, area })
+    await newOrder.save()
+    await Cart.deleteOne({ type, area })
     await transaction.commit()
 
     const io = getSocket()
