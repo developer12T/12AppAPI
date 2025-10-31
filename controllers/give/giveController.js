@@ -274,7 +274,7 @@ exports.checkout = async (req, res) => {
 
     let storeData = {}
 
-    if (channel === 'pc') {
+    if (channel !== 'pc') {
       storeData =
         (await Store.findOne({
           storeId: cart.storeId,
