@@ -31,7 +31,8 @@ const { Item } = require('../../models/cash/master')
 const sendmoney = require('../../models/cash/sendmoney')
 
 exports.addSendMoney = async (req, res) => {
-  const channel = req.headers['x-channel']
+  try {
+    const channel = req.headers['x-channel']
   const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
   const { Order } = getModelsByChannel(channel, res, orderModel)
   const { Refund } = getModelsByChannel(channel, res, refundModel)
@@ -147,6 +148,17 @@ exports.addSendMoney = async (req, res) => {
     status: 200,
     message: 'success'
   })
+  } catch (error) {
+      console.error('❌ Error:', error)
+ 
+  res.status(500).json({
+    status: 500,
+    message: 'error from server',
+    error: error.message || error.toString(), // ✅ ป้องกัน circular object
+    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+  })
+  }
+  
 }
 
 exports.addSendMoneyImage = async (req, res) => {
@@ -374,7 +386,8 @@ exports.getSendMoney = async (req, res) => {
 }
 
 exports.getAllSendMoney = async (req, res) => {
-  const channel = req.headers['x-channel']
+  try {
+    const channel = req.headers['x-channel']
   const { area, zone } = req.query
   const { Order } = getModelsByChannel(channel, res, orderModel)
   const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
@@ -408,6 +421,17 @@ exports.getAllSendMoney = async (req, res) => {
     message: 'success',
     data: sendMoneyData
   })
+  } catch (error) {
+      console.error('❌ Error:', error)
+ 
+  res.status(500).json({
+    status: 500,
+    message: 'error from server',
+    error: error.message || error.toString(), // ✅ ป้องกัน circular object
+    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+  })
+  }
+  
 }
 
 exports.getSendMoneyForAcc = async (req, res) => {
@@ -830,7 +854,8 @@ exports.updateSendmoneyOld = async (req, res) => {
 }
 
 exports.sendmoneyToExcel = async (req, res) => {
-  const { excel, period, start, end } = req.query
+  try {
+    const { excel, period, start, end } = req.query
   const channel = 'cash'
 
   const { User } = getModelsByChannel(channel, res, userModel)
@@ -998,4 +1023,15 @@ exports.sendmoneyToExcel = async (req, res) => {
       data: dataFinal
     })
   }
+  } catch (error) {
+      console.error('❌ Error:', error)
+ 
+  res.status(500).json({
+    status: 500,
+    message: 'error from server',
+    error: error.message || error.toString(), // ✅ ป้องกัน circular object
+    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+  })
+  }
+  
 }
