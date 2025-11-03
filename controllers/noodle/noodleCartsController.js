@@ -5,6 +5,15 @@ const userModel = require("../../models/cash/user");
 const typetruck = require("../../models/cash/typetruck");
 const noodleCartModel = require("../../models/foodtruck/noodleCart");
 const cartModel = require("../../models/cash/cart");
+const {
+  to2,
+  getQty,
+  updateStockMongo,
+  getPeriodFromDate
+} = require('../../middleware/order')
+
+
+
 exports.addNoodleCart = async (req, res) => {
   try {
     const { type, area, storeId, sku, id, qty, price, unit } = req.body;
@@ -84,14 +93,13 @@ exports.addNoodleCart = async (req, res) => {
 
 const productTimestamps = {}
 
-exports.deleteProduct = async (req, res) => {
+exports.deleteProductNoodle = async (req, res) => {
   // const session = await require('mongoose').startSession();
   // session.startTransaction();
   try {
-    const { type, area, storeId, id, unit } = req.body
-    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
     const channel = req.headers['x-channel']
-
+    const { type, area, storeId, id, sku, unit } = req.body
+    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
     const storeIdAndId = `${type}_${storeId}_${id}_${unit}`
     const now = Date.now()
     const lastUpdate = productTimestamps[storeIdAndId] || 0
@@ -105,11 +113,8 @@ exports.deleteProduct = async (req, res) => {
     }
     productTimestamps[storeIdAndId] = now
 
-    // console.log(productTimestamps)
-
     if (!type || !area || !id || !unit) {
-      // await session.abortTransaction();
-      // session.endSession();
+
       return res.status(400).json({
         status: 400,
         message: 'type, area, id, and unit are required!'
@@ -117,31 +122,56 @@ exports.deleteProduct = async (req, res) => {
     }
 
     if ((type === 'sale' || type === 'refund' || type === 'give') && !storeId) {
-      // await session.abortTransaction();
-      // session.endSession();
       return res.status(400).json({
         status: 400,
         message: 'storeId is required for sale or refund or give!'
       })
     }
 
-
-    let cart = await NoodleCart.findOne(type, area, storeId)
-
-    // console.log()
+    let cart = await NoodleCart.findOne({
+      type: type,
+      area: area,
+      storeId: storeId
+    })
 
     if (!cart) {
-      // await session.abortTransaction();
-      // session.endSession();
+
       return res.status(404).json({ status: 404, message: 'Cart not found!' })
     }
 
+    const productIndex = cart.listProduct.findIndex(
+      p => p.id === id && p.unit === unit && p.sku === sku
+    )
+
+    if (productIndex === -1) {
+
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Product not found in cart!' })
+    }
+
+    product = cart.listProduct[productIndex]
+    cart.listProduct.splice(productIndex, 1)
+    cart.total -= product.qty * product.price
+    updated = true
+
+    const period = getPeriodFromDate(cart.createdAt)
+
+    // const updateResult = await updateStockMongo(
+    //   product,
+    //   area,
+    //   period,
+    //   'deleteCart',
+    //   channel,
+    //   res
+    // )
+    // if (updateResult) return
 
 
-    if (cart.listProduct.length === 0 && cart.listRefund.length === 0) {
-      await Cart.deleteOne(cartQuery)
-      // await session.commitTransaction();
-      // session.endSession();
+
+    if (cart.listProduct.length === 0) {
+      await NoodleCart.deleteOne({ type: type, area: area, storeId: storeId })
+
       return res.status(200).json({
         status: 200,
         message: 'Cart deleted successfully!'
@@ -151,12 +181,8 @@ exports.deleteProduct = async (req, res) => {
     if (updated) {
       await cart.save()
     }
-
-    // await session.commitTransaction();
-    // session.endSession();
-
-    const io = getSocket()
-    io.emit('cart/delete', {})
+    // const io = getSocket()
+    // io.emit('cart/delete', {})
 
     res.status(200).json({
       status: 200,
