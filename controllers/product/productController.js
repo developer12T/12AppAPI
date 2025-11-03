@@ -8,7 +8,7 @@ const orderModel = require('../../models/cash/sale')
 const stockModel = require('../../models/cash/stock')
 const { getSocket } = require('../../socket')
 const { getModelsByChannel } = require('../../middleware/channel')
-const { productQuery } = require('../../controllers/queryFromM3/querySctipt')
+const { productQuery,productFoodtruckQuery } = require('../../controllers/queryFromM3/querySctipt')
 const { group } = require('console')
 const { flatMap } = require('lodash')
 const distributionModel = require('../../models/cash/distribution')
@@ -817,6 +817,74 @@ exports.addFromERPnew = async (req, res) => {
   }
 
 }
+
+exports.addFromERPFoodtruck = async (req,res) =>{
+  try {
+    const channel = req.headers['x-channel']
+    const result = await productFoodtruckQuery(channel)
+
+    const { Product } = getModelsByChannel(channel, res, productModel)
+
+    for (const row of result){
+
+      const exists = await Product.findOne({id:row.ITNO})
+      console.log(exists)
+
+      if (exists) {
+        continue
+      } else {
+        const dataTran = {
+          id:row.ITNO,
+          name:row.NAME_BILL,
+          groupCode:row.GRP,
+          group:'',
+          groupCodeM3:row.GREPORT,
+          groupM3:"",
+          brandCode:row.BRAND,
+          brand:'',
+          size:row.WEIGHT,
+          flavourCode:row.FLAVIUR,
+          flavour:'',
+          type:'',
+          weightGross:'',
+          weightNet:'',
+          statusSale:row.IS_OPEN2,
+          statusWithdraw:row.IS_OPEN3,
+          statusRefund:row.IS_OPEN4,
+          statusRefundDmg:row.IS_OPEN5,
+          image:"",
+          
+        }
+
+        console.log(dataTran)
+
+      }
+      
+      
+
+    }
+    
+    res.status(201).json({
+      status:201,
+      message:'sucess'
+    })
+
+
+  
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+}
+
+
+
 
 exports.groupProductId = async (req, res) => {
   try {
