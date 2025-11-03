@@ -27,8 +27,12 @@ const RouteSchema = new mongoose.Schema(
     id: { type: String, required: true, index: true },
     period: { type: String, required: true, index: true },
     area: { type: String, required: true },
+    zone : { type: String, required: true },
+    team : { type: String, required: true },
     day: { type: String, required: true },
     listStore: [ListStoreSchema],
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
   },
   {
     timestamps: true // ✅ Mongoose จะสร้าง createdAt / updatedAt ให้อัตโนมัติ

@@ -1434,3 +1434,27 @@ exports.wereHouseQuery = async function (channel) {
   await sql.close()
   return result.recordset
 }
+
+
+
+exports.productFoodtruckQuery = async function () {
+  const config = {
+    user: process.env.MS_SQL_USER,
+    password: process.env.MS_SQL_PASSWORD,
+    server: process.env.MS_SQL_SERVER,
+    database: process.env.MS_SQL_DATABASE_Food_Truck,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  }
+  await sql.connect(config)
+
+  result = await sql.query`
+   select * FROM [dbo].[M_PRODUCT]
+    where ITNO like 'ZNS%'
+   `
+
+  await sql.close()
+  return result.recordset
+}

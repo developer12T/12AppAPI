@@ -394,9 +394,13 @@ exports.addFromERPnew = async (req, res) => {
             }
           }
 
+          const team = storeList.area.slice(0, 2) + storeList.area.charAt(3)
+          const zone = storeList.area.slice(0, 2)
           const data = {
             id: storeList.id,
             area: storeList.area,
+            zone: zone,
+            team: team,
             period: period,
             day: storeList.day,
             listStore
@@ -1601,7 +1605,7 @@ exports.getRouteProvince = async (req, res) => {
 
 exports.getRouteEffective = async (req, res) => {
   try {
-    const { area, team, period, excel } = req.body
+    const { area, zone, team, all, period, excel } = req.body
     const channel = req.headers['x-channel']
 
     const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
@@ -1616,15 +1620,19 @@ exports.getRouteEffective = async (req, res) => {
     // ❌ ถ้าไม่มี area — ดึงทุก area ยกเว้น IT211
     if (area) {
       query.area = area
-    } else {
+    } else if (zone) {
+      query.zone = zone
+    } else if (team) {
+      query.team = team
+    } else if (all) {
       query.area = { $ne: 'IT211' }
     }
 
     let routes = await Route.find({
       ...query,
-      period,
-      area: { $ne: 'IT211' } // ✅ exclude area 'IT211'
     }).populate('listStore.storeInfo', 'storeId name address typeName taxId tel')
+
+    // console.log(routes)
 
     if (!routes.length) {
       return res.status(404).json({ status: 404, message: 'Not found route' })
@@ -1711,6 +1719,75 @@ exports.getRouteEffective = async (req, res) => {
       }
     })
 
+    let zoneRoute = []
+    if (zone) {
+      // ✅ filter เฉพาะ route ที่อยู่ใน zone นี้
+      const filteredRoutes = routesTranFrom.filter(r => r.area.startsWith(zone))
+      const routeId = [...new Set(filteredRoutes.map(r => r.route))]
+
+  for (const route of routeId) {
+    const dataRoute = filteredRoutes.filter(item => item.route === route)
+
+    // ✅ รวมค่าใน route เดียวกัน
+    const total = dataRoute.reduce(
+      (acc, cur) => {
+        acc.storeAll += cur.storeAll || 0
+        acc.storePending += cur.storePending || 0
+        acc.storeSell += cur.storeSell || 0
+        acc.storeNotSell += cur.storeNotSell || 0
+        acc.storeCheckInNotSell += cur.storeCheckInNotSell || 0
+        acc.storeTotal += cur.storeTotal || 0
+        acc.summary += cur.summary || 0
+        acc.totalqty += cur.totalqty || 0
+        acc.percentVisit += parseFloat(cur.percentVisit || 0)
+        acc.percentEffective += parseFloat(cur.percentEffective || 0)
+        return acc
+      },
+      {
+        // routeId: dataRoute[0].routeId || route,
+        route: route,
+        storeAll: 0,
+        storePending: 0,
+        storeSell: 0,
+        storeNotSell: 0,
+        storeCheckInNotSell: 0,
+        storeTotal: 0,
+        percentVisit: 0,
+        percentEffective: 0,
+        summary: 0,
+        totalqty: 0,
+      }
+    )
+
+    // ✅ คำนวณค่าเฉลี่ย %
+    const len = dataRoute.length || 1
+    total.percentVisit = (total.percentVisit / len).toFixed(2)
+    total.percentEffective = (total.percentEffective / len).toFixed(2)
+
+    zoneRoute.push(total)
+  }
+
+
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     // ❌ ตัด R25 / R26
     const excludedRoutes = ['R25', 'R26']
     const filteredRoutes = routesTranFrom.filter(r => !excludedRoutes.includes(r.route))
@@ -1762,22 +1839,30 @@ exports.getRouteEffective = async (req, res) => {
       return totalRoute
     })
 
+    totalByArea.sort((a, b) => a.percentVisit - b.percentVisit)
 
     // 📊 ถ้า export Excel
     if (excel === 'true') {
-      const xlsxData = [...filteredRoutes, ...totalByArea].map(r => ({
+
+      if (area) {
+        mergeData = [...filteredRoutes, ...totalByArea]
+      } else {
+        mergeData = [...totalByArea]
+      }
+      const xlsxData = mergeData.map(r => ({
         Area: r.area || area,
         Route: r.route,
         ร้านทั้งหมด: r.storeAll,
-        รอเยี่ยม: r.storePending,
+        เยี่ยมแล้ว: r.storeTotal,
         ซื้อ: r.storeSell,
-        เยี่ยม: r.storeCheckInNotSell + r.storeNotSell,
+        ไม่ซื้อ: r.storeCheckInNotSell + r.storeNotSell,
+        รอเยี่ยม: r.storeAll - r.storeTotal,
         ขาย: r.summary,
         ยอดหีบ: r.totalqty,
         เปอร์เซ็นต์การเข้าเยี่ยม: r.percentVisit,
         เปอร์เซ็นต์การขายได้: r.percentEffective,
       }))
-
+      console.log(xlsxData)
       const wb = xlsx.utils.book_new()
       const ws = xlsx.utils.json_to_sheet(xlsxData)
       xlsx.utils.book_append_sheet(wb, ws, `getRouteEffective_${period}`)
@@ -1792,6 +1877,7 @@ exports.getRouteEffective = async (req, res) => {
         status: 200,
         data: filteredRoutes,
         totalByArea,
+        zoneRoute
 
       })
     }

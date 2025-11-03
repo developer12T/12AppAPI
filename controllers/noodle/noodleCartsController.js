@@ -13,22 +13,47 @@ exports.addNoodleCart = async (req, res) => {
 
     const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
 
-    const data = {
-      type: type,
-      area: area,
-      storeId: storeId,
-      sku: sku,
-      id: id,
-      qty: qty,
-      price: price,
-      unit: unit,
-    };
+    const existNoodleCart = await NoodleCart.findOne({
+  type,
+  area,
+  storeId
+})
 
-    await NoodleCart.create(data);
+
+if (existNoodleCart) {
+  existNoodleCart.listProduct = existNoodleCart.listProduct || [];
+  existNoodleCart.listProduct.push({
+    sku,
+    id,
+    qty,
+    price,
+    unit
+  });
+  await existNoodleCart.save();
+} else {
+  const data = {
+    type,
+    area,
+    storeId,
+    listProduct: [
+      {
+        sku,
+        id,
+        qty,
+        price,
+        unit
+      }
+    ]
+  };
+
+  await NoodleCart.create(data);
+}
+
+
     res.status(200).json({
       status: 201,
       message: "Insert cart Sucess",
-      data: data,
+      // data: data,
     });
   } catch (error) {
     console.error('❌ Error:', error)
