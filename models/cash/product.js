@@ -19,6 +19,7 @@ const listUnit = mongoose.Schema({
 const productSchema = mongoose.Schema({
     id: { type: String, require: true },
     name: { type: String, require: true },
+    nameBill:{ type: String },
     groupCode: { type: String, require: true },
     group: { type: String, require: true },
     groupCodeM3: { type: String, require: true },

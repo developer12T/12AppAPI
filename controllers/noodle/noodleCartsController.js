@@ -4,6 +4,7 @@ const { getModelsByChannel } = require("../../middleware/channel");
 const userModel = require("../../models/cash/user");
 const typetruck = require("../../models/cash/typetruck");
 const noodleCartModel = require("../../models/foodtruck/noodleCart");
+const productModel = require('../../models/cash/product')
 const cartModel = require("../../models/cash/cart");
 const {
   to2,
@@ -247,3 +248,50 @@ exports.getCartDetailNew = async (req, res) => {
   }
 
 };
+
+exports.getSoup = async (req,res) => {
+try {
+  
+
+    const channel = req.headers["x-channel"];
+    const { Product } = getModelsByChannel(channel, res, productModel);
+    const { Cart } = getModelsByChannel(channel, res, cartModel);
+
+
+    const dataProduct = await Product.find({
+  id: { $regex: 'ZNS' }
+}).sort({ id: 1 });
+
+    const data = dataProduct.map(item => {
+
+      const unit =  item.listUnit.find(u => u.unit === 'PCS')
+
+      return {
+        id:item.id,
+        name:item.name,
+        nameBill:item.nameBill,
+        price:unit.price.sale,
+      }
+    })
+
+
+
+
+    res.status(200).json({
+      status:200,
+      message:'Fetch data success',
+      data:data
+    })
+
+} catch (error) {
+      console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+}
+
+}
