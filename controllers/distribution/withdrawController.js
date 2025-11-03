@@ -57,11 +57,13 @@ exports.checkout = async (req, res) => {
       sendDate,
       note,
       period,
-      newtrip,
+      
       // wereHouse,
       // routeWithdraw,
       Des_No
     } = req.body
+
+    let {newtrip} = req.body
 
     const today = new Date()
     const day = today.getDate()
