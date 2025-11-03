@@ -259,8 +259,8 @@ try {
 
 
     const dataProduct = await Product.find({
-  id: { $regex: 'ZNS' }
-}).sort({ id: 1 });
+        id: { $regex: 'ZNS' }
+      }).sort({ id: 1 });
 
     const data = dataProduct.map(item => {
 
