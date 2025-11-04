@@ -3637,3 +3637,45 @@ exports.updateAreaStore = async (req, res) => {
   }
 
 }
+
+exports.areaStoreM3toMongo = async (req, res) => {
+  try {
+    const { area } = req.body
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const dataM3Store = await Customer.findAll({
+      where: {
+        OKCFC1: area
+      }
+    });
+
+    const storeIdM3 = dataM3Store.map(item => item.customerNo?.trim()).filter(Boolean);
+
+    const dataMongoStore = await Store.find({
+      storeId: { $in: storeIdM3 }
+    });
+
+    await Store.updateMany(
+      { storeId: { $in: storeIdM3 } },
+      { $set: { area: area } }
+    );
+
+
+    res.status(201).json({
+      status: 201,
+      message: 'Sucess',
+      data: storeIdM3
+    })
+
+
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+}
