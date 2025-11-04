@@ -2823,9 +2823,9 @@ exports.addLatLong = async (req, res) => {
 
     const storeData = await Store.findOne({ storeId: storeId })
     // console.log(storeData)
-    // const sale = await User.findOne({ area: storeData.area }).select(
-    //   'firstName surName warehouse tel saleCode salePayer'
-    // )
+    const sale = await User.findOne({ area: storeData.area }).select(
+      'firstName surName warehouse tel saleCode salePayer'
+    )
 
     const orderId = await generateOrderIdStoreLatLong(
       storeData.area,
