@@ -25,6 +25,7 @@ const fs = require('fs')
 // const { Refund } = require('../../models/cash/refund')
 const {
   stockQuery,
+  stockPcQuery,
   withdrawQuery
 } = require('../../controllers/queryFromM3/querySctipt')
 const userModel = require('../../models/cash/user')
@@ -5628,4 +5629,114 @@ exports.checkStock = async (req, res) => {
       error: error.message
     })
   }
+}
+
+exports.addStockPc = async (req, res) => {
+
+  try {
+    const {period } = req.body
+    const channel = req.headers['x-channel']
+    const cleanPeriod = period.replace('-', '') // "202506"
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+
+    const data = await stockPcQuery(channel, period)
+
+    const users = await User.find({ role: 'sale' ,platformType:'PC'})
+      .select('area saleCode warehouse')
+      .lean()
+
+    const productId = data.flatMap(item => item.ITEM_CODE)
+
+    const factorCtn = await Product.aggregate([
+      {
+        $match: {
+          id: { $in: productId }
+        }
+      },
+      {
+        $project: {
+          id: 1,
+          listUnit: {
+            $arrayElemAt: [
+              {
+                $filter: {
+                  input: '$listUnit',
+                  as: 'unit',
+                  cond: { $eq: ['$$unit.unit', 'CTN'] }
+                }
+              },
+              0
+            ]
+          }
+        }
+      }
+    ])
+
+    const result = []
+
+    for (const item of users) {
+      const datastock = data.filter(i => i.WH == item.warehouse)
+      // console.log("datastock",datastock)
+      // console
+      const existingStock = await Stock.findOne({
+        area: item.area,
+        period: cleanPeriod,
+        warehouse: item.warehouse
+      })
+
+      if (existingStock) {
+        continue
+      }
+
+      const record = {
+        area: item.area,
+        saleCode: item.saleCode,
+        period: cleanPeriod,
+        warehouse: item.warehouse,
+        listProduct: datastock.map(stock => {
+          
+          const ctn = factorCtn.find(i => i.id === stock.ITEM_CODE) || {}
+          const factor = Number(ctn?.listUnit?.factor)
+          const qtyCtn = factor > 0 ? Math.floor(stock.ITEM_QTY / factor) : 0
+          return {
+            productId: stock.ITEM_CODE,
+            stockPcs: stock.ITEM_QTY,
+            stockInPcs: 0,
+            stockOutPcs: 0,
+            balancePcs: stock.ITEM_QTY,
+            stockCtn: qtyCtn,
+            stockInCtn: 0,
+            stockOutCtn: 0,
+            balanceCtn: qtyCtn
+          }
+        })
+      }
+
+      result.push(record)
+      // console.log(record.listProduct)
+      const stockDoc = new Stock(record)
+      await stockDoc.save()
+    }
+
+
+
+
+    res.status(201).json({
+      status:201,
+      message:'Insert stock sucess',
+      data:result
+    })
+
+
+  } catch (error) {
+    console.error('checkStock error:', error)
+    return res.status(500).json({
+      status: 500,
+      message: 'Internal Server Error',
+      error: error.message
+    })
+  }
+
 }

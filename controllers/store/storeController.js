@@ -2829,7 +2829,7 @@ exports.addLatLong = async (req, res) => {
 
     const orderId = await generateOrderIdStoreLatLong(
       storeData.area,
-      // sale.warehouse,
+      sale.warehouse,
       channel,
       res
     )
