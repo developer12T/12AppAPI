@@ -95,7 +95,7 @@ exports.checkout = async (req, res) => {
 
 
 
-    
+
     await NoodleSales.create(noodleOrder);
     await NoodleCart.deleteOne({ type, area, storeId });
 
@@ -123,13 +123,13 @@ exports.orderIdDetailFoodtruck = async (req, res) => {
     const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
     const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel);
 
-    // if (!orderId) {
-    //   return res
-    //     .status(400)
-    //     .json({ status: 400, message: "Missing required fields!" });
-    // }
+    if (!orderId) {
+      return res
+        .status(400)
+        .json({ status: 400, message: "Missing required fields!" });
+    }
 
-    const foodTruckData = await NoodleSales.find()
+    const foodTruckData = await NoodleSales.find({ orderId: orderId })
 
     const data = foodTruckData.map(item => {
 
@@ -158,30 +158,39 @@ exports.orderIdDetailFoodtruck = async (req, res) => {
           area: item.area || '',
           zone: item.zone || ''
         },
-
+        shipping: {
+          shippingId: item.shippingId || '',
+          address: item.address || '',
+          district: item.district || '',
+          subDistrict: item.subDistrict || '',
+          province: item.province || '',
+          postCode: item.postCode || '',
+          latitude: item.latitude || '',
+          longtitude: item.longtitude || '',
+        },
         item: item.note || '',
         latitude: item.latitude || '',
         longitude: item.longitude || '',
         listProduct: item.listProduct.map(product => {
 
           return {
-              id: product.id || '',
-              name: product.name || '',
-              groupCode: product.groupCode || '',
-              group: product.group || '',
-              brandCode: product.brandCode || '',
-              brand: product.brand || '',
-              size: product.size || '',
-              flavourCode: product.flavourCode || '',
-              flavour: product.flavour || '',
-              qty: product.qty || 0,
-              unit: product.unit || '',
-              unitName: product.unitName || '',
-              price: product.price || 0,
-              subtotal: product.subtotal || 0,
-              discount: product.discount || 0,
-              netTotal: product.netTotal || 0
-            }
+            id: product.id || '',
+            name: product.name || '',
+            groupCode: product.groupCode || '',
+            group: product.group || '',
+            brandCode: product.brandCode || '',
+            brand: product.brand || '',
+            size: product.size || '',
+            flavourCode: product.flavourCode || '',
+            flavour: product.flavour || '',
+            qty: product.qty || 0,
+            unit: product.unit || '',
+            unitName: product.unitName || '',
+            price: product.price || 0,
+            subtotal: product.subtotal || 0,
+            discount: product.discount || 0,
+            netTotal: product.netTotal || 0
+          }
         }),
         listPromotions: item.listPromotions || [],
 
@@ -192,7 +201,8 @@ exports.orderIdDetailFoodtruck = async (req, res) => {
         vat: item.vat || 0,
         totalExVat: item.totalExVat || 0,
         total: item.total || 0,
-        shipping: item.shipping || 0,
+        qr : item.qr || 0 ,
+
         paymentMethod: item.paymentMethod || '',
         paymentStatus: item.paymentStatus || '',
         createdBy: item.createdBy || '',
