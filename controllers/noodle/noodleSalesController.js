@@ -85,23 +85,23 @@ exports.checkout = async (req, res) => {
       subtotal += totalPrice;
 
       return {
-        id: product.id,
-        // lot: item.lot,
-        name: product.name,
-        group: product.group,
-        groupCode: product.groupCode,
-        brandCode: product.brandCode,
-        brand: product.brand,
-        size: product.size,
-        flavourCode: product.flavourCode,
-        flavour: product.flavour,
-        qty: item.qty,
-        unit: item.unit,
-        unitName: unitData.name,
-        price: unitData.price.sale,
-        subtotal: parseFloat(totalPrice.toFixed(2)),
+        id: product.id || '',
+        sku: item.sku || '',
+        name: product.name || '',
+        group: product.group || '',
+        groupCode: product.groupCode || '',
+        brandCode: product.brandCode || '',
+        brand: product.brand || '',
+        size: product.size || '',
+        flavourCode: product.flavourCode || '',
+        flavour: product.flavour || '',
+        qty: item.qty || '',
+        unit: item.unit || '',
+        unitName: unitData.name || '',
+        price: unitData.price.sale || 0,
+        subtotal: parseFloat(totalPrice.toFixed(2)) || 0,
         discount: 0,
-        netTotal: parseFloat(totalPrice.toFixed(2))
+        netTotal: parseFloat(totalPrice.toFixed(2)) || 0
       };
     });
 
@@ -125,7 +125,6 @@ exports.checkout = async (req, res) => {
       store: {
         storeId: "",
         name: "",
-        type: "",
         address: "",
         taxId: "",
         tel: "",
@@ -133,6 +132,7 @@ exports.checkout = async (req, res) => {
         zone: sale.zone || ""
       },
       shipping: {
+        default: '',
         shippingId: "",
         address: "",
         district: "",
@@ -148,8 +148,9 @@ exports.checkout = async (req, res) => {
       listProduct,
       listPromotions: [],
       // listQuota: summary.listQuota,
-      subtotal,
+      subtotal ,
       discount: 0,
+      listQuota:[],
       discountProductId: [],
       discountProduct: 0,
       vat: parseFloat((total - total / 1.07).toFixed(2)),
@@ -217,7 +218,6 @@ exports.orderIdDetailFoodtruck = async (req, res) => {
         store: {
           storeId: item.storeId || '',
           name: item.name || '',
-          type: item.type || '',
           address: item.address || '',
           taxId: item.taxId || '',
           tel: item.tel || '',
@@ -241,6 +241,7 @@ exports.orderIdDetailFoodtruck = async (req, res) => {
 
           return {
             id: product.id || '',
+            sku: product.sku || '', 
             name: product.name || '',
             groupCode: product.groupCode || '',
             group: product.group || '',
@@ -262,8 +263,8 @@ exports.orderIdDetailFoodtruck = async (req, res) => {
 
         subtotal: item.subtotal || 0,
         discount: item.discount || 0,
-        discountProductId: item.discountProductId || '',
-        discountProduct: item.discountProduct || '',
+        discountProductId: [],
+        discountProduct: 0,
         vat: item.vat || 0,
         totalExVat: item.totalExVat || 0,
         total: item.total || 0,
@@ -272,7 +273,10 @@ exports.orderIdDetailFoodtruck = async (req, res) => {
         paymentMethod: item.paymentMethod || '',
         paymentStatus: item.paymentStatus || '',
         createdBy: item.createdBy || '',
-        period: item.period || ''
+        period: item.period || '',
+        listImage:[],
+        createdAt:item.createdAt,
+        updatedAt:item.updatedAt
       }
 
     })

@@ -18,7 +18,7 @@ const cartSchema = mongoose.Schema(
     storeId: { type: String },
     
     listProduct: [listCartProduct],
-
+    total :{ type:Number ,require:true }
 
   },
   {

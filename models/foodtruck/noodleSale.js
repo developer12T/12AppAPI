@@ -5,7 +5,9 @@ const listOrderProductSchema = new mongoose.Schema({
   id: { type: String, require: true },
   sku: { type: String },
   groupCode : { type: String },
+  qty : { type: Number },
   price: { type: Number },
+  
   // ingredients: [
   //   {
   //     type: { type: String },
