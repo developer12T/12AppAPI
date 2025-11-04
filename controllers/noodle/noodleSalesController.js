@@ -146,7 +146,7 @@ exports.checkout = async (req, res) => {
       latitude: "",
       longitude: "",
       listProduct,
-      listPromotions: "",
+      listPromotions: [],
       // listQuota: summary.listQuota,
       subtotal,
       discount: 0,
