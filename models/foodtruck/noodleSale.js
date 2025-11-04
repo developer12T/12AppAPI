@@ -35,7 +35,7 @@ const noodleOrderSchema = new mongoose.Schema(
       enum: ["รอนำเข้า", "สำเร็จ", "ยกเลิก", "ถูกปฏิเสธ"],
       default: "รอนำเข้า",
     },
-    listProduct: listOrderProductSchema,
+    listProduct: [listOrderProductSchema],
     subtotal: { type: Number, require: true },
     discount: { type: Number, default: 0 },
     discountProduct: { type: Number, default: 0 },
