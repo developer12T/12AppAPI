@@ -17,7 +17,7 @@ exports.login = async (req, res) => {
 
     let channelStr = ''
 
-    if (channel === 'cash') {
+    if (channel === 'cash' ||channel === 'uat') {
       channelStr = 'CASH'
     } else if (channel === 'pc') {
       channelStr = 'PC'
