@@ -17,33 +17,44 @@ const {
 
 exports.addNoodleCart = async (req, res) => {
   try {
-    const { type, area, storeId, sku, id, qty, price, unit } = req.body;
-
+    const { type, area, storeId, sku, id, qty, unit } = req.body;
     const channel = req.headers["x-channel"];
-
+    const { Product } = getModelsByChannel(channel, res, productModel);
     const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
 
-    const existNoodleCart = await NoodleCart.findOne({
-      type,
-      area,
-      storeId
-    })
+    let data = null; // ✅ ประกาศก่อน
 
+    const existNoodleCart = await NoodleCart.findOne({ type, area, storeId });
+
+    const product = await Product.findOne({ id }).lean();
+    if (!product) {
+      return res.status(404).json({
+        status: 404,
+        message: "Product not found!",
+      });
+    }
+
+    const unitData = product.listUnit.find((u) => u.unit === unit);
+    if (!unitData) {
+      return res.status(400).json({
+        status: 400,
+        message: `Unit '${unit}' not found for this product!`,
+      });
+    }
+
+    const price = parseFloat(unitData.price["sale"]);
 
     if (existNoodleCart) {
       existNoodleCart.listProduct = existNoodleCart.listProduct || [];
 
-      // หาว่ามีสินค้านี้อยู่ใน list แล้วหรือยัง (เทียบจาก sku, id, unit)
       const existingIndex = existNoodleCart.listProduct.findIndex(
         (item) => item.sku === sku && item.id === id && item.unit === unit
       );
 
       if (existingIndex !== -1) {
-        // ✅ ถ้ามีอยู่แล้ว → บวก qty และ price ต่อ
         existNoodleCart.listProduct[existingIndex].qty += qty;
         existNoodleCart.listProduct[existingIndex].price += price;
       } else {
-        // ✅ ถ้ายังไม่มี → เพิ่มใหม่
         existNoodleCart.listProduct.push({
           sku,
           id,
@@ -53,9 +64,10 @@ exports.addNoodleCart = async (req, res) => {
         });
       }
 
-      await existNoodleCart.save();
+      const savedCart = await existNoodleCart.save(); // ✅ save แล้วเก็บค่าที่คืนมา
+      data = savedCart; // ✅ เก็บใน data
     } else {
-      const data = {
+      data = {
         type,
         area,
         storeId,
@@ -65,32 +77,33 @@ exports.addNoodleCart = async (req, res) => {
             id,
             qty,
             price,
-            unit
-          }
-        ]
+            unit,
+          },
+        ],
       };
 
-      await NoodleCart.create(data);
+      const newCart = await NoodleCart.create(data);
+      data = newCart; // ✅ เก็บใน data
     }
 
-
+    // ✅ ส่ง data กลับใน response เสมอ
     res.status(200).json({
       status: 201,
-      message: "Insert cart Sucess",
-      // data: data,
+      message: "Insert cart success",
+      data: data,
     });
   } catch (error) {
-    console.error('❌ Error:', error)
-
+    console.error("❌ Error:", error);
     res.status(500).json({
       status: 500,
-      message: 'error from server',
-      error: error.message || error.toString(), // ✅ ป้องกัน circular object
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
-    })
+      message: "error from server",
+      error: error.message || error.toString(),
+      stack:
+        process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
   }
-
 };
+
 
 const productTimestamps = {}
 
