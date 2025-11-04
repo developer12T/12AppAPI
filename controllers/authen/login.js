@@ -23,12 +23,27 @@ exports.login = async (req, res) => {
       channelStr = 'PC'
     }
 
+  if (!channel) {
+    // ไม่มี channel → หาผู้ใช้ทั่วไป
+    data = await User.findOne({ username: req.body.username });
+  } else {
+    // มี channel → เช็ก ADMIN ก่อน
+    const dataAdmin = await User.findOne({
+      username: req.body.username,
+      platformType: 'ADMIN'
+    });
 
-    if (!channel) {
-      data = await User.findOne({ username: req.body.username });
-    } else {
-      data = await User.findOne({ username: req.body.username,platformType:channelStr });
+    data = dataAdmin
+
+    // ถ้ามี admin → ออกจาก if (ไม่ทำอะไรต่อในบล็อกนี้)
+    if (!dataAdmin) {
+      // ถ้าไม่ใช่ admin → หา user ตาม channel
+      data = await User.findOne({
+        username: req.body.username,
+        platformType: channelStr
+      });
     }
+  }
 
     
 

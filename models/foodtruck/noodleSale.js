@@ -18,11 +18,48 @@ const listOrderProductSchema = new mongoose.Schema({
   // ],
 });
 
+const orderStoreSchema = new mongoose.Schema({
+  storeId: { type: String, require: true },
+  name: { type: String, require: true },
+  type: { type: String },
+  address: { type: String, require: true },
+  taxId: { type: String, require: true },
+  tel: { type: String, require: true },
+  area: { type: String, require: true },
+  zone: { type: String, require: true },
+  isBeauty: { type: String, require: false }
+})
+
+
+const orderSaleSchema = new mongoose.Schema({
+  saleCode: { type: String, require: true },
+  salePayer: { type: String, require: true },
+  name: { type: String, require: true },
+  tel: { type: String, require: true },
+  warehouse: { type: String, require: true }
+})
+
+
+const orderShipingSchema = new mongoose.Schema({
+  default: { type: String },
+  shippingId: { type: String },
+  address: { type: String },
+  district: { type: String },
+  subDistrict: { type: String },
+  province: { type: String },
+  postCode: { type: String },
+  latitude: { type: String },
+  longtitude: { type: String }
+})
+
+
 const noodleOrderSchema = new mongoose.Schema(
   {
     type: { type: String, require: true },
     orderId: { type: String, require: true, unique: true },
-    area : { type: String, require: true },
+    sale: orderSaleSchema,
+    store: orderStoreSchema,
+    shipping: orderShipingSchema,
     status: {
       type: String,
       require: true,
@@ -35,7 +72,7 @@ const noodleOrderSchema = new mongoose.Schema(
       enum: ["รอนำเข้า", "สำเร็จ", "ยกเลิก", "ถูกปฏิเสธ"],
       default: "รอนำเข้า",
     },
-    listProduct: listOrderProductSchema,
+    listProduct: [listOrderProductSchema],
     subtotal: { type: Number, require: true },
     discount: { type: Number, default: 0 },
     discountProduct: { type: Number, default: 0 },

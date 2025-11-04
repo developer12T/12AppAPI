@@ -5,7 +5,7 @@ const { dbCA } = require('../../config/db')
 const listCartProduct = mongoose.Schema({
     sku: { type: String, require: true, },
     id: { type: String, require: true, },
-    qty: { type: String  ,require: true,},
+    qty: { type: Number  ,require: true,},
     price: { type: Number, require: true, default: 0 },
     unit: { type: String  ,require: true,},
 })

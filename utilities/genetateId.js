@@ -373,7 +373,7 @@ const generateOrderIdFoodTruck = async (area,channel,res) => {
   const { NoodleSales } = getModelsByChannel(channel, res, noodleSaleModel)
 
   const latestOrder = await NoodleSales.findOne({
-    area: area,
+    'store.area': area,
     createdAt: {
       $gte: new Date(`${new Date().getFullYear()}-${currentMonth}-01`),
       $lt: new Date(
@@ -388,7 +388,10 @@ const generateOrderIdFoodTruck = async (area,channel,res) => {
     ? parseInt(latestOrder.orderId.slice(-4)) + 1
     : 1
 
-  // console.log(latestOrder)
+
+  const orderId = `F${currentYear.toString().slice(2, 4)}${currentMonth}${runningNumber.toString().padStart(4, '0')}`
+
+  // console.log('orderId',orderId)
 
   return `F${currentYear
     .toString()
