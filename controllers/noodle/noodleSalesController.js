@@ -14,6 +14,7 @@ const {
   updateStockMongo,
   getPeriodFromDate
 } = require('../../middleware/order')
+const productModel = require('../../models/cash/product')
 const orderTimestamps = {};
 
 exports.checkout = async (req, res) => {
@@ -25,6 +26,8 @@ exports.checkout = async (req, res) => {
     const { NoodleSales } = getModelsByChannel(channel, res, noodleSaleModel);
     const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
     const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel);
+    const { User } = getModelsByChannel(channel, res, userModel);
+    const { Product } = getModelsByChannel(channel, res, productModel);
 
     if (!type || !area || !storeId || !payment) {
       return res
@@ -43,6 +46,7 @@ exports.checkout = async (req, res) => {
     //       "This order was updated less than 1 minute ago. Please try again later!",
     //   });
     // }
+
     orderTimestamps[storeId] = now;
 
     const cart = await NoodleCart.findOne({ type, area, storeId });
@@ -53,48 +57,109 @@ exports.checkout = async (req, res) => {
     }
 
     const noodleItem = await NoodleItems.findOne({ id: cart.id });
-
+    const sale = (await User.findOne({ area: area })) ?? {};
     const orderId = await generateOrderIdFoodTruck(area, channel, res);
 
     const total = to2(cart.price); // ราคารวมภาษี เช่น 45
     const totalExVat = to2(total / 1.07); // แยกภาษีออก
-    const vat = to2(total - totalExVat); // ส่วนที่เป็น VAT
+
+    const productIds = cart.listProduct.map(p => p.id);
+    const products = await Product.find({ id: { $in: productIds } }).select(
+      "id name groupCode group brandCode brand size flavourCode flavour listUnit"
+    );
+
+    let subtotal = 0;
+    let listProduct = cart.listProduct.map(item => {
+      const product = products.find(p => p.id === item.id);
+      if (!product) return null;
+
+      const unitData = product.listUnit.find(u => u.unit === item.unit);
+      if (!unitData) {
+        return res.status(400).json({
+          status: 400,
+          message: `Invalid unit for product ${item.id}`
+        });
+      }
+
+      const totalPrice = item.qty * unitData.price.sale;
+      subtotal += totalPrice;
+
+      return {
+        id: product.id,
+        // lot: item.lot,
+        name: product.name,
+        group: product.group,
+        groupCode: product.groupCode,
+        brandCode: product.brandCode,
+        brand: product.brand,
+        size: product.size,
+        flavourCode: product.flavourCode,
+        flavour: product.flavour,
+        qty: item.qty,
+        unit: item.unit,
+        unitName: unitData.name,
+        price: unitData.price.sale,
+        subtotal: parseFloat(totalPrice.toFixed(2)),
+        discount: 0,
+        netTotal: parseFloat(totalPrice.toFixed(2))
+      };
+    });
+
+    if (listProduct.includes(null)) return;
+
+    // console.log(listProduct);
 
     const noodleOrder = {
-      type: type,
-      orderId: orderId,
-      area: area,
+      orderId,
+      routeId: "",
+      type: "saleNoodle",
       status: "pending",
       statusTH: "รอนำเข้า",
-      listProduct: {
-        id: cart.id,
-        sku: cart.sku,
-        groupCode: noodleItem.groupCode,
-        price: cart.price,
+      sale: {
+        saleCode: sale.saleCode || "",
+        salePayer: sale.salePayer || "",
+        name: `${sale.firstName} ${sale.surName}` || "",
+        tel: sale.tel || "",
+        warehouse: sale.warehouse || ""
       },
-      subtotal: cart.subtotal,
+      store: {
+        storeId: "",
+        name: "",
+        type: "",
+        address: "",
+        taxId: "",
+        tel: "",
+        area: sale.area || "",
+        zone: sale.zone || ""
+      },
+      shipping: {
+        shippingId: "",
+        address: "",
+        district: "",
+        subDistrict: "",
+        province: "",
+        postCode: "",
+        latitude: "",
+        longtitude: ""
+      },
+      note: "",
+      latitude: "",
+      longitude: "",
+      listProduct,
+      listPromotions: "",
+      // listQuota: summary.listQuota,
+      subtotal,
       discount: 0,
+      discountProductId: [],
       discountProduct: 0,
-      vat: vat,
-      totalExVat: totalExVat,
-      qr: 0,
+      vat: parseFloat((total - total / 1.07).toFixed(2)),
+      totalExVat: parseFloat((total / 1.07).toFixed(2)),
       total: total,
       paymentMethod: payment,
       paymentStatus: "unpaid",
-      period: period,
+      createdBy: sale.username,
+      period: period
     };
-
-
-
-
-
-
-
-
-
-
-
-
 
     await NoodleSales.create(noodleOrder);
     await NoodleCart.deleteOne({ type, area, storeId });
@@ -102,7 +167,7 @@ exports.checkout = async (req, res) => {
     res.status(201).json({
       status: 201,
       message: "Insert Order success",
-      data: noodleOrder,
+      data: noodleOrder
     });
   } catch (error) {
     // await transaction.rollback()
@@ -110,6 +175,7 @@ exports.checkout = async (req, res) => {
     res.status(500).json({ status: "500", message: error.message });
   }
 };
+
 
 
 
