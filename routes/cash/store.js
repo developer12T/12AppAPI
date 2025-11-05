@@ -44,7 +44,8 @@ const {
   updateStoreAddressIt,
   checkRangeLatLong,
   checkNewStoreLatLong,
-  updateAreaStore
+  updateAreaStore,
+  areaStoreM3toMongo
   // test
 } = require('../../controllers/store/storeController')
 
@@ -117,6 +118,8 @@ router.post('/updateStoreAddressIt', updateStoreAddressIt)
 router.get('/checkRangeLatLong', checkRangeLatLong)
 router.get('/checkNewStoreLatLong', checkNewStoreLatLong)
 router.post('/updateAreaStore', updateAreaStore)
+
+router.post('/areaStoreM3toMongo', areaStoreM3toMongo)
 
 
 router.get('/:storeId', getDetailStore)

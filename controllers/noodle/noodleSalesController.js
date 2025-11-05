@@ -14,7 +14,8 @@ const {
   updateStockMongo,
   getPeriodFromDate
 } = require('../../middleware/order')
-const productModel = require('../../models/cash/product')
+const productModel = require('../../models/cash/product');
+const { before } = require("lodash");
 const orderTimestamps = {};
 
 exports.checkout = async (req, res) => {
@@ -35,7 +36,7 @@ exports.checkout = async (req, res) => {
         .json({ status: 400, message: "Missing required fields!" });
     }
 
-    const now = Date.now();
+    const now = new Date();
     const lastUpdate = orderTimestamps[storeId] || 0;
     const ONE_MINUTE = 60 * 1000;
 
@@ -85,34 +86,63 @@ exports.checkout = async (req, res) => {
       subtotal += totalPrice;
 
       return {
-        id: product.id,
-        // lot: item.lot,
-        name: product.name,
-        group: product.group,
-        groupCode: product.groupCode,
-        brandCode: product.brandCode,
-        brand: product.brand,
-        size: product.size,
-        flavourCode: product.flavourCode,
-        flavour: product.flavour,
-        qty: item.qty,
-        unit: item.unit,
-        unitName: unitData.name,
-        price: unitData.price.sale,
-        subtotal: parseFloat(totalPrice.toFixed(2)),
+        id: product.id || '',
+        sku: item.sku || '',
+        name: product.name || '',
+        group: product.group || '',
+        groupCode: product.groupCode || '',
+        brandCode: product.brandCode || '',
+        brand: product.brand || '',
+        size: product.size || '',
+        flavourCode: product.flavourCode || '',
+        flavour: product.flavour || '',
+        qty: item.qty || '',
+        unit: item.unit || '',
+        unitName: unitData.name || '',
+        price: unitData.price.sale || 0,
+        subtotal: parseFloat(totalPrice.toFixed(2)) || 0,
         discount: 0,
-        netTotal: parseFloat(totalPrice.toFixed(2))
+        netTotal: parseFloat(totalPrice.toFixed(2)) || 0
       };
     });
 
     if (listProduct.includes(null)) return;
 
-    // console.log(listProduct);
+    // เวลาไทย = UTC + 7 ชั่วโมง
+    const thailand = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+
+    const start = new Date(Date.UTC(
+      thailand.getFullYear(),
+      thailand.getMonth(),
+      thailand.getDate(),
+      -7, 0, 0 // ⬅️ = UTC ของเวลา 00:00 ไทย
+    ));
+
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1)
+
+    const exitOrder = await NoodleSales.findOne({
+      'store.area': area,
+      status: { $in: ['pending', 'paid'] },
+      createdAt: { $gte: start, $lte: end }
+    }).sort({ createdAt: -1 }).select('number waiting')
+
+    let number = 0
+    let waiting = 0
+
+    if (exitOrder) {
+      number = exitOrder.number + 1
+      waiting = exitOrder.waiting + 1
+    } else {
+      number = 1
+      waiting = 0
+    }
 
     const noodleOrder = {
       orderId,
       routeId: "",
       type: "saleNoodle",
+      number: number,
+      waiting: waiting,
       status: "pending",
       statusTH: "รอนำเข้า",
       sale: {
@@ -125,7 +155,6 @@ exports.checkout = async (req, res) => {
       store: {
         storeId: "",
         name: "",
-        type: "",
         address: "",
         taxId: "",
         tel: "",
@@ -133,6 +162,7 @@ exports.checkout = async (req, res) => {
         zone: sale.zone || ""
       },
       shipping: {
+        default: '',
         shippingId: "",
         address: "",
         district: "",
@@ -150,6 +180,7 @@ exports.checkout = async (req, res) => {
       // listQuota: summary.listQuota,
       subtotal,
       discount: 0,
+      listQuota: [],
       discountProductId: [],
       discountProduct: 0,
       vat: parseFloat((total - total / 1.07).toFixed(2)),
@@ -175,6 +206,104 @@ exports.checkout = async (req, res) => {
     res.status(500).json({ status: "500", message: error.message });
   }
 };
+
+exports.updateStatus = async (req, res) => {
+  try {
+
+    const channel = req.headers["x-channel"];
+    const { NoodleSales } = getModelsByChannel(channel, res, noodleSaleModel);
+    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
+    const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel);
+
+    const { orderId, status } = req.body
+
+    let statusStrTH = ''
+    let orderUpdated = {}
+  
+    const orderDetail = await NoodleSales.findOne({ orderId: orderId ,status:{$in: ['paid', 'pending']}})
+
+    if (!orderDetail) {
+      return res.status(404).json({
+        status: 400,
+        message: 'Not found Order'
+      })
+    }
+    const area = orderDetail.store.area
+
+    switch (status) {
+      case 'paid':
+        statusStrTH = 'จ่ายเงินแล้ว'
+        orderUpdated = await NoodleSales.findOneAndUpdate(
+          { orderId },
+          {
+            $set: {
+              status,
+              statusTH: statusStrTH
+            }
+          },
+          { new: true }
+        );
+        break
+      case 'sucess':
+
+        const now = new Date();
+        const thailand = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+
+        const start = new Date(Date.UTC(
+          thailand.getFullYear(),
+          thailand.getMonth(),
+          thailand.getDate(),
+          -7, 0, 0 // ⬅️ = UTC ของเวลา 00:00 ไทย
+        ));
+
+        const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1)
+
+
+        statusStrTH = 'สำเร็จแล้ว'
+        orderUpdated = await NoodleSales.findOneAndUpdate(
+          { orderId },
+          {
+            $set: {
+              status,
+              statusTH: statusStrTH
+            }
+          },
+          { new: true }
+        );
+
+        await NoodleSales.updateMany(
+          {
+            'store.area': area,
+            status: { $in: ['paid', 'pending'] },
+            createdAt: { $gte: start, $lte: end }
+          },
+          {
+            $inc: { waiting: -1 } // ✅ ไม่ต้องอยู่ใน $set
+          }
+        );
+
+        break
+      default:
+        return res.status(404).json({
+          status: 400,
+          message: 'Not found status'
+        })
+    }
+
+    res.status(201).json({
+      status: 201,
+      message: 'Update Sucess',
+      data: orderUpdated
+    }
+    )
+
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ status: "500", message: error.message });
+  }
+}
+
 
 
 
@@ -217,7 +346,6 @@ exports.orderIdDetailFoodtruck = async (req, res) => {
         store: {
           storeId: item.storeId || '',
           name: item.name || '',
-          type: item.type || '',
           address: item.address || '',
           taxId: item.taxId || '',
           tel: item.tel || '',
@@ -241,6 +369,7 @@ exports.orderIdDetailFoodtruck = async (req, res) => {
 
           return {
             id: product.id || '',
+            sku: product.sku || '',
             name: product.name || '',
             groupCode: product.groupCode || '',
             group: product.group || '',
@@ -262,17 +391,20 @@ exports.orderIdDetailFoodtruck = async (req, res) => {
 
         subtotal: item.subtotal || 0,
         discount: item.discount || 0,
-        discountProductId: item.discountProductId || '',
-        discountProduct: item.discountProduct || '',
+        discountProductId: [],
+        discountProduct: 0,
         vat: item.vat || 0,
         totalExVat: item.totalExVat || 0,
         total: item.total || 0,
-        qr : item.qr || 0 ,
+        qr: item.qr || 0,
 
         paymentMethod: item.paymentMethod || '',
         paymentStatus: item.paymentStatus || '',
         createdBy: item.createdBy || '',
-        period: item.period || ''
+        period: item.period || '',
+        listImage: [],
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt
       }
 
     })

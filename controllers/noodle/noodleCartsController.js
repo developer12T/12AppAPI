@@ -53,7 +53,7 @@ exports.addNoodleCart = async (req, res) => {
 
       if (existingIndex !== -1) {
         existNoodleCart.listProduct[existingIndex].qty += qty;
-        existNoodleCart.listProduct[existingIndex].price += price;
+        // existNoodleCart.listProduct[existingIndex].price += price;
       } else {
         existNoodleCart.listProduct.push({
           sku,
@@ -64,13 +64,22 @@ exports.addNoodleCart = async (req, res) => {
         });
       }
 
-      const savedCart = await existNoodleCart.save(); // ✅ save แล้วเก็บค่าที่คืนมา
-      data = savedCart; // ✅ เก็บใน data
+      // ✅ คำนวณ total ใหม่ทุกครั้งหลังจากอัปเดต listProduct
+      existNoodleCart.total = existNoodleCart.listProduct.reduce(
+        (sum, p) => sum + p.qty * p.price,
+        0
+      );
+      existNoodleCart.total = to2(existNoodleCart.total);
+      // console.log(existNoodleCart.total);
+
+      const savedCart = await existNoodleCart.save();
+      data = savedCart;
     } else {
       data = {
         type,
         area,
         storeId,
+        total: price * qty,
         listProduct: [
           {
             sku,
@@ -83,8 +92,9 @@ exports.addNoodleCart = async (req, res) => {
       };
 
       const newCart = await NoodleCart.create(data);
-      data = newCart; // ✅ เก็บใน data
+      data = newCart;
     }
+
 
     // ✅ ส่ง data กลับใน response เสมอ
     res.status(200).json({
@@ -262,9 +272,9 @@ exports.getCartDetailNew = async (req, res) => {
 
 };
 
-exports.getSoup = async (req,res) => {
-try {
-  
+exports.getSoup = async (req, res) => {
+  try {
+
 
     const channel = req.headers["x-channel"];
     const { Product } = getModelsByChannel(channel, res, productModel);
@@ -272,18 +282,18 @@ try {
 
 
     const dataProduct = await Product.find({
-        id: { $regex: 'ZNS' }
-      }).sort({ id: 1 });
+      id: { $regex: 'ZNS' }
+    }).sort({ id: 1 });
 
     const data = dataProduct.map(item => {
 
-      const unit =  item.listUnit.find(u => u.unit === 'PCS')
+      const unit = item.listUnit.find(u => u.unit === 'PCS')
 
       return {
-        id:item.id,
-        name:item.name,
-        nameBill:item.nameBill,
-        price:unit.price.sale,
+        id: item.id,
+        name: item.name,
+        nameBill: item.nameBill,
+        price: unit.price.sale,
       }
     })
 
@@ -291,13 +301,13 @@ try {
 
 
     res.status(200).json({
-      status:200,
-      message:'Fetch data success',
-      data:data
+      status: 200,
+      message: 'Fetch data success',
+      data: data
     })
 
-} catch (error) {
-      console.error('❌ Error:', error)
+  } catch (error) {
+    console.error('❌ Error:', error)
 
     res.status(500).json({
       status: 500,
@@ -305,6 +315,6 @@ try {
       error: error.message || error.toString(), // ✅ ป้องกัน circular object
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
-}
+  }
 
 }

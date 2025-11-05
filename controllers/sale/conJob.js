@@ -763,8 +763,8 @@ async function updateOrderDistribution (channel = 'cash') {
     const day = String(thailand.getDate() - 1).padStart(2, '0')
     const nextDay = String(thailand.getDate()).padStart(2, '0')
 
-    const currentDate = `${year}${month}${day}`
-    const startDate = `${year}${month}${day}`
+    // const currentDate = `${year}${month}${day}`
+    const startDate = `${year}${month}${nextDay}`
     // const startDate = `20250901`
     const endDate = `${year}${month}${nextDay}`
     // const endDate = `20250930`

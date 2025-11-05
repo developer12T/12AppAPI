@@ -4,8 +4,10 @@ const { dbCA } = require("../../config/db");
 const listOrderProductSchema = new mongoose.Schema({
   id: { type: String, require: true },
   sku: { type: String },
-  groupCode : { type: String },
+  groupCode: { type: String },
+  qty: { type: Number },
   price: { type: Number },
+
   // ingredients: [
   //   {
   //     type: { type: String },
@@ -57,6 +59,8 @@ const noodleOrderSchema = new mongoose.Schema(
   {
     type: { type: String, require: true },
     orderId: { type: String, require: true, unique: true },
+    number: { type: Number },
+    waiting: { type: Number },
     sale: orderSaleSchema,
     store: orderStoreSchema,
     shipping: orderShipingSchema,

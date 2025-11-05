@@ -22,6 +22,7 @@ const routeModel = require('../../models/cash/route')
 const radiusModel = require('../../models/cash/radius')
 const storeModel = require('../../models/cash/store')
 const productModel = require('../../models/cash/product')
+const storeLatLongModel = require('../../models/cash/storeLatLong')
 const { getSocket } = require('../../socket')
 const { getModelsByChannel } = require('../../middleware/channel')
 const path = require('path')
@@ -56,6 +57,10 @@ exports.getRoute = async (req, res) => {
     )
 
     // console.log(routes)
+
+
+    let data = []
+
 
     const filteredRoutes = routes
       .map(route => {
@@ -1638,16 +1643,6 @@ exports.getRouteEffective = async (req, res) => {
       return res.status(404).json({ status: 404, message: 'Not found route' })
     }
 
-    // 🧩 สร้าง team code ถ้ามี
-    if (team) {
-      routes = routes
-        .map(item => ({
-          ...item.toObject(),
-          team: item.area.substring(0, 2) + item.area.charAt(3),
-        }))
-        .filter(item => item.team === team)
-    }
-
     // 🧩 ดึง order ทั้งหมดจากทุก route
     const orderIdList = routes.flatMap(r =>
       r.listStore.flatMap(s => s.listOrder?.map(o => o.orderId) || [])
@@ -1704,6 +1699,8 @@ exports.getRouteEffective = async (req, res) => {
 
       return {
         area: r.area,
+        zone: r.zone,
+        team: r.team,
         routeId: r.id,
         route: r.id.slice(-3),
         storeAll: r.storeAll,
@@ -1719,79 +1716,69 @@ exports.getRouteEffective = async (req, res) => {
       }
     })
 
-    let zoneRoute = []
-    if (zone) {
+    let data = []
+    if (zone || team) {
       // ✅ filter เฉพาะ route ที่อยู่ใน zone นี้
-      const filteredRoutes = routesTranFrom.filter(r => r.area.startsWith(zone))
-      const routeId = [...new Set(filteredRoutes.map(r => r.route))]
 
-  for (const route of routeId) {
-    const dataRoute = filteredRoutes.filter(item => item.route === route)
-
-    // ✅ รวมค่าใน route เดียวกัน
-    const total = dataRoute.reduce(
-      (acc, cur) => {
-        acc.storeAll += cur.storeAll || 0
-        acc.storePending += cur.storePending || 0
-        acc.storeSell += cur.storeSell || 0
-        acc.storeNotSell += cur.storeNotSell || 0
-        acc.storeCheckInNotSell += cur.storeCheckInNotSell || 0
-        acc.storeTotal += cur.storeTotal || 0
-        acc.summary += cur.summary || 0
-        acc.totalqty += cur.totalqty || 0
-        acc.percentVisit += parseFloat(cur.percentVisit || 0)
-        acc.percentEffective += parseFloat(cur.percentEffective || 0)
-        return acc
-      },
-      {
-        // routeId: dataRoute[0].routeId || route,
-        route: route,
-        storeAll: 0,
-        storePending: 0,
-        storeSell: 0,
-        storeNotSell: 0,
-        storeCheckInNotSell: 0,
-        storeTotal: 0,
-        percentVisit: 0,
-        percentEffective: 0,
-        summary: 0,
-        totalqty: 0,
+      if (zone) {
+        filteredRoutes = routesTranFrom.filter(r => r.zone === zone)
+      } else if (team) {
+        filteredRoutes = routesTranFrom.filter(r => r.team === team)
       }
-    )
 
-    // ✅ คำนวณค่าเฉลี่ย %
-    const len = dataRoute.length || 1
-    total.percentVisit = (total.percentVisit / len).toFixed(2)
-    total.percentEffective = (total.percentEffective / len).toFixed(2)
+      const routeId = [...new Set(filteredRoutes.map(r => r.route))]
+      for (const route of routeId) {
+        const dataRoute = filteredRoutes.filter(item => item.route === route)
 
-    zoneRoute.push(total)
-  }
+        // ✅ รวมค่าใน route เดียวกัน
+        const total = dataRoute.reduce(
+          (acc, cur) => {
+            acc.storeAll += cur.storeAll || 0
+            acc.storePending += cur.storePending || 0
+            acc.storeSell += cur.storeSell || 0
+            acc.storeNotSell += cur.storeNotSell || 0
+            acc.storeCheckInNotSell += cur.storeCheckInNotSell || 0
+            acc.storeTotal += cur.storeTotal || 0
+            acc.summary += cur.summary || 0
+            acc.totalqty += cur.totalqty || 0
+            acc.percentVisit += parseFloat(cur.percentVisit || 0)
+            acc.percentEffective += parseFloat(cur.percentEffective || 0)
+            return acc
+          },
+          {
+            // routeId: dataRoute[0].routeId || route,
+            route: route,
+            storeAll: 0,
+            storePending: 0,
+            storeSell: 0,
+            storeNotSell: 0,
+            storeCheckInNotSell: 0,
+            storeTotal: 0,
+            percentVisit: 0,
+            percentEffective: 0,
+            summary: 0,
+            totalqty: 0,
+          }
+        )
+
+        // ✅ คำนวณค่าเฉลี่ย %
+        const len = dataRoute.length || 1
+        total.percentVisit = (total.percentVisit / len).toFixed(2)
+        total.percentEffective = (total.percentEffective / len).toFixed(2)
+
+        data.push(total)
+      }
 
 
+    } else {
+
+      filteredRoutes = routesTranFrom
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     // ❌ ตัด R25 / R26
-    const excludedRoutes = ['R25', 'R26']
-    const filteredRoutes = routesTranFrom.filter(r => !excludedRoutes.includes(r.route))
 
+
+    const excludedRoutes = ['R25', 'R26']
     // ✅ Group routes by area
     const groupedByArea = filteredRoutes.reduce((acc, cur) => {
       if (!acc[cur.area]) acc[cur.area] = []
@@ -1876,8 +1863,8 @@ exports.getRouteEffective = async (req, res) => {
       res.json({
         status: 200,
         data: filteredRoutes,
-        totalByArea,
-        zoneRoute
+        // totalByArea,
+        // zoneRoute
 
       })
     }
@@ -2655,12 +2642,21 @@ exports.updateRouteAllStore = async (req, res) => {
     const channel = req.headers['x-channel']
     const { Route } = getModelsByChannel(channel, res, routeModel)
     const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+
+    const latLongStoreIdDocs = await StoreLatLong.find({
+      zone: 'SH',
+      status: 'approved'
+    }).select('storeId');
+
+    const storeIdLatLong = [
+      ...new Set(latLongStoreIdDocs.map(doc => doc.storeId?.trim()).filter(Boolean))
+    ];
 
     const storeData = await Store.find({
-      area: { $nin: ['IT211', null, ''] }
+      zone: 'SH',
+      storeId: { $nin: storeIdLatLong } // ✅ ต้องอยู่ใน object แบบนี้
     })
-      .select('_id storeId')
-      .lean()
 
     let dataFinal = []
     const BATCH = 20;                 // ปรับตามแรงเครื่อง/DB
