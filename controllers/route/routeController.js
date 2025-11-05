@@ -22,6 +22,7 @@ const routeModel = require('../../models/cash/route')
 const radiusModel = require('../../models/cash/radius')
 const storeModel = require('../../models/cash/store')
 const productModel = require('../../models/cash/product')
+const storeLatLongModel = require('../../models/cash/storeLatLong')
 const { getSocket } = require('../../socket')
 const { getModelsByChannel } = require('../../middleware/channel')
 const path = require('path')
@@ -1718,13 +1719,13 @@ exports.getRouteEffective = async (req, res) => {
     let data = []
     if (zone || team) {
       // ✅ filter เฉพาะ route ที่อยู่ใน zone นี้
-      
+
       if (zone) {
         filteredRoutes = routesTranFrom.filter(r => r.zone === zone)
       } else if (team) {
         filteredRoutes = routesTranFrom.filter(r => r.team === team)
       }
-      
+
       const routeId = [...new Set(filteredRoutes.map(r => r.route))]
       for (const route of routeId) {
         const dataRoute = filteredRoutes.filter(item => item.route === route)
@@ -1770,13 +1771,13 @@ exports.getRouteEffective = async (req, res) => {
 
 
     } else {
-      
+
       filteredRoutes = routesTranFrom
     }
 
     // ❌ ตัด R25 / R26
-    
-    
+
+
     const excludedRoutes = ['R25', 'R26']
     // ✅ Group routes by area
     const groupedByArea = filteredRoutes.reduce((acc, cur) => {
@@ -2641,12 +2642,21 @@ exports.updateRouteAllStore = async (req, res) => {
     const channel = req.headers['x-channel']
     const { Route } = getModelsByChannel(channel, res, routeModel)
     const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+
+    const latLongStoreIdDocs = await StoreLatLong.find({
+      zone: 'SH',
+      status: 'approved'
+    }).select('storeId');
+
+    const storeIdLatLong = [
+      ...new Set(latLongStoreIdDocs.map(doc => doc.storeId?.trim()).filter(Boolean))
+    ];
 
     const storeData = await Store.find({
-      area: { $nin: ['IT211', null, ''] }
+      zone: 'SH',
+      storeId: { $nin: storeIdLatLong } // ✅ ต้องอยู่ใน object แบบนี้
     })
-      .select('_id storeId')
-      .lean()
 
     let dataFinal = []
     const BATCH = 20;                 // ปรับตามแรงเครื่อง/DB
