@@ -53,7 +53,7 @@ exports.addNoodleCart = async (req, res) => {
 
       if (existingIndex !== -1) {
         existNoodleCart.listProduct[existingIndex].qty += qty;
-        existNoodleCart.listProduct[existingIndex].price += price;
+        // existNoodleCart.listProduct[existingIndex].price += price;
       } else {
         existNoodleCart.listProduct.push({
           sku,
@@ -79,7 +79,7 @@ exports.addNoodleCart = async (req, res) => {
         type,
         area,
         storeId,
-        total: price,
+        total: price * qty,
         listProduct: [
           {
             sku,
