@@ -6,6 +6,7 @@ const typetruck = require("../../models/cash/typetruck");
 const noodleCartModel = require("../../models/foodtruck/noodleCart");
 const cartModel = require("../../models/cash/cart");
 const noodleSaleModel = require("../../models/foodtruck/noodleSale");
+const orderModel = require('../../models/cash/sale')
 const noodleItemModel = require("../../models/foodtruck/noodleItem");
 const { generateOrderIdFoodTruck } = require("../../utilities/genetateId");
 const {
@@ -24,6 +25,7 @@ exports.checkout = async (req, res) => {
     const { type, area, storeId, period, payment } = req.body;
 
     const channel = req.headers["x-channel"];
+    const { Order } = getModelsByChannel(channel, res, orderModel)
     const { NoodleSales } = getModelsByChannel(channel, res, noodleSaleModel);
     const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
     const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel);
@@ -58,7 +60,7 @@ exports.checkout = async (req, res) => {
     }
 
     const sale = (await User.findOne({ area: area })) ?? {};
-    // console.log(sale)
+    // console.log(area,sale.warehouse)
     const orderId = await generateOrderIdFoodTruck(area,sale.warehouse, channel, res);
 
     const total = to2(cart.total); // ราคารวมภาษี เช่น 45
@@ -100,11 +102,10 @@ exports.checkout = async (req, res) => {
         qty: item.qty || '',
         unit: item.unit || '',
         unitName: unitData.name || '',
-        price: item.price || 0,
-        unitPrice: item.unitPrice || 0,
-        subtotal: parseFloat(totalPrice.toFixed(2)) || 0,
+        price: item.unitPrice || 0,
+        subtotal: parseFloat(item.price.toFixed(2)) || 0,
         discount: 0,
-        netTotal: parseFloat(totalPrice.toFixed(2)) || 0,
+        netTotal: parseFloat(item.price.toFixed(2)) || 0,
         time:item.time,
         remark:item.remark,
       };
@@ -124,7 +125,7 @@ exports.checkout = async (req, res) => {
 
     const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1)
 
-    const exitOrder = await NoodleSales.findOne({
+    const exitOrder = await Order.findOne({
       'store.area': area,
       status: { $in: ['pending', 'paid'] },
       createdAt: { $gte: start, $lte: end }
@@ -196,7 +197,7 @@ exports.checkout = async (req, res) => {
       period: period
     };
 
-    await NoodleSales.create(noodleOrder);
+    await Order.create(noodleOrder);
     await NoodleCart.deleteOne({ type, area, storeId });
 
     res.status(201).json({
@@ -426,5 +427,20 @@ exports.orderIdDetailFoodtruck = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ status: "500", message: error.message });
+  }
+}
+
+exports.orderList = async (req, res) => {
+  try {
+
+
+    const channel = req.headers["x-channel"];
+    const { NoodleSales } = getModelsByChannel(channel, res, noodleSaleModel);
+    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
+    const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel);
+
+
+  } catch (error) {
+    
   }
 }
