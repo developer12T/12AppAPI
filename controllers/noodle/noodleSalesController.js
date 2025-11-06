@@ -249,7 +249,7 @@ exports.updateStatus = async (req, res) => {
           { new: true }
         );
         break
-      case 'sucess':
+      case 'success':
 
         const now = new Date();
         const thailand = new Date(now.getTime() + 7 * 60 * 60 * 1000);
@@ -473,3 +473,6 @@ exports.updatePickUp = async (req, res) => {
     res.status(500).json({ status: "500", message: error.message });
   }
 }
+
+
+exports.updat
