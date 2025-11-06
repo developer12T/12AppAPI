@@ -59,9 +59,10 @@ exports.checkout = async (req, res) => {
 
     const noodleItem = await NoodleItems.findOne({ id: cart.id });
     const sale = (await User.findOne({ area: area })) ?? {};
+    // console.log(sale)
     const orderId = await generateOrderIdFoodTruck(area,sale.warehouse, channel, res);
 
-    const total = to2(cart.price); // ราคารวมภาษี เช่น 45
+    const total = to2(cart.total); // ราคารวมภาษี เช่น 45
     const totalExVat = to2(total / 1.07); // แยกภาษีออก
 
     const productIds = cart.listProduct.map(p => p.id);
@@ -88,6 +89,8 @@ exports.checkout = async (req, res) => {
       return {
         id: product.id || '',
         sku: item.sku || '',
+        noodle: item.noodle || '',
+        soup: item.soup || '' ,
         name: product.name || '',
         group: product.group || '',
         groupCode: product.groupCode || '',
@@ -99,10 +102,13 @@ exports.checkout = async (req, res) => {
         qty: item.qty || '',
         unit: item.unit || '',
         unitName: unitData.name || '',
-        price: unitData.price.sale || 0,
+        price: item.price || 0,
+        unitPrice: item.unitPrice || 0,
         subtotal: parseFloat(totalPrice.toFixed(2)) || 0,
         discount: 0,
-        netTotal: parseFloat(totalPrice.toFixed(2)) || 0
+        netTotal: parseFloat(totalPrice.toFixed(2)) || 0,
+        time:item.time,
+        remark:item.remark,
       };
     });
 
