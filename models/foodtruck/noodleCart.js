@@ -12,7 +12,7 @@ const listCartProduct = mongoose.Schema({
   unitPrice: { type: Number },
   price: { type: Number, require: true, default: 0 },
   unit: { type: String, require: true, },
-  time:{ type: String },
+  time: { type: String },
   remark:{ type: String },
 })
 

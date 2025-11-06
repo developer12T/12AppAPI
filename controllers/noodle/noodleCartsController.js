@@ -17,7 +17,7 @@ const {
 
 exports.addNoodleCart = async (req, res) => {
   try {
-    const { type, area, storeId, sku,noodle, id, qty,price,unitPrice, unit,soup } = req.body;
+    const { type, area, storeId, sku,noodle, id, qty,price,unitPrice, unit,soup,time,remark } = req.body;
     const channel = req.headers["x-channel"];
     const { Product } = getModelsByChannel(channel, res, productModel);
     const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
@@ -55,18 +55,28 @@ exports.addNoodleCart = async (req, res) => {
 
       if (existingIndex !== -1) {
         existNoodleCart.listProduct[existingIndex].qty += qty;
-        // existNoodleCart.listProduct[existingIndex].price += price;
+        existNoodleCart.listProduct[existingIndex].price += price;  
+
+        existNoodleCart.listProduct[existingIndex].time = price;  
+        existNoodleCart.listProduct[existingIndex].remark = remark;  
+
+
       } else {
         existNoodleCart.listProduct.push({     
-          id,
-          noodle,
-          sku,
-          soup,
-          qty,
-          price,
-          unitPrice,
-          unit,
+          id:id,
+          noodle:noodle,
+          sku:sku,
+          soup:soup,
+          qty:qty,
+          price:unitPrice * qty,
+          unitPrice:unitPrice,
+          unit:unit,
+          time:time,
+          remark:remark
         });
+
+
+        // console.log(remark)
       }
 
       // ✅ คำนวณ total ใหม่ทุกครั้งหลังจากอัปเดต listProduct
@@ -95,6 +105,8 @@ exports.addNoodleCart = async (req, res) => {
             price:price,
             unitPrice:unitPrice,
             unit:unit,
+            time:time,
+            remark:remark
           },
         ],
       };
