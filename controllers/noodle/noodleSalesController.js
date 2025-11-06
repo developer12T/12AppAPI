@@ -430,17 +430,46 @@ exports.orderIdDetailFoodtruck = async (req, res) => {
   }
 }
 
-exports.orderList = async (req, res) => {
+exports.updatePickUp = async (req, res) => {
   try {
 
+    const {pickUp ,orderId} = req.body
 
+    if (!pickUp) {
+      return res.status(404).json({
+        message:'Not found pickUp status'
+      })
+    }
     const channel = req.headers["x-channel"];
+    const { Order } = getModelsByChannel(channel, res, orderModel)
     const { NoodleSales } = getModelsByChannel(channel, res, noodleSaleModel);
     const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
     const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel);
 
+    const existOrder = await Order.find({orderId:orderId})
+
+    if (!existOrder) {
+      return res.status(404).json({
+        message:'Not found orderId'
+      })
+    }
+
+    const data = await Order.findOneAndUpdate(
+      { orderId:orderId},
+      {$set:{
+        pickUp:pickUp
+      }},
+      {new:true}
+    )
+
+    res.status(201).json({
+      status:201,
+      message:'Update pickup sucess',
+      data:data
+    })
 
   } catch (error) {
-    
+    console.error(error);
+    res.status(500).json({ status: "500", message: error.message });
   }
 }

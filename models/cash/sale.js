@@ -167,7 +167,8 @@ const orderSchema = new mongoose.Schema(
     createdBy: { type: String, require: true },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
-    period: { type: String, require: true }
+    period: { type: String, require: true },
+    pickUp:{ type: String},
   },
   {
     timestamps: true
