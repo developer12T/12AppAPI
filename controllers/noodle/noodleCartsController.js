@@ -17,12 +17,14 @@ const {
 
 exports.addNoodleCart = async (req, res) => {
   try {
-    const { type, area, storeId, sku, id, qty, unit } = req.body;
+    const { type, area, storeId, sku,noodle, id, qty,price,unitPrice, unit,soup } = req.body;
     const channel = req.headers["x-channel"];
     const { Product } = getModelsByChannel(channel, res, productModel);
     const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
 
-    let data = null; // ✅ ประกาศก่อน
+    // console.log(price,unitPrice)
+
+    let data = {}; // ✅ ประกาศก่อน
 
     const existNoodleCart = await NoodleCart.findOne({ type, area, storeId });
 
@@ -42,7 +44,7 @@ exports.addNoodleCart = async (req, res) => {
       });
     }
 
-    const price = parseFloat(unitData.price["sale"]);
+    // const price = parseFloat(unitData.price["sale"]);
 
     if (existNoodleCart) {
       existNoodleCart.listProduct = existNoodleCart.listProduct || [];
@@ -55,18 +57,21 @@ exports.addNoodleCart = async (req, res) => {
         existNoodleCart.listProduct[existingIndex].qty += qty;
         // existNoodleCart.listProduct[existingIndex].price += price;
       } else {
-        existNoodleCart.listProduct.push({
-          sku,
+        existNoodleCart.listProduct.push({     
           id,
+          noodle,
+          sku,
+          soup,
           qty,
           price,
+          unitPrice,
           unit,
         });
       }
 
       // ✅ คำนวณ total ใหม่ทุกครั้งหลังจากอัปเดต listProduct
       existNoodleCart.total = existNoodleCart.listProduct.reduce(
-        (sum, p) => sum + p.qty * p.price,
+        (sum, p) => sum + p.qty * p.unitPrice,
         0
       );
       existNoodleCart.total = to2(existNoodleCart.total);
@@ -79,18 +84,22 @@ exports.addNoodleCart = async (req, res) => {
         type,
         area,
         storeId,
-        total: price * qty,
+        total: unitPrice * qty,
         listProduct: [
           {
-            sku,
-            id,
-            qty,
-            price,
-            unit,
+            id:id,
+            noodle:noodle,
+            sku:sku,
+            soup:soup,
+            qty:qty,
+            price:price,
+            unitPrice:unitPrice,
+            unit:unit,
           },
         ],
       };
 
+      // console.log(data)
       const newCart = await NoodleCart.create(data);
       data = newCart;
     }

@@ -59,7 +59,7 @@ exports.checkout = async (req, res) => {
 
     const noodleItem = await NoodleItems.findOne({ id: cart.id });
     const sale = (await User.findOne({ area: area })) ?? {};
-    const orderId = await generateOrderIdFoodTruck(area, channel, res);
+    const orderId = await generateOrderIdFoodTruck(area,sale.warehouse, channel, res);
 
     const total = to2(cart.price); // ราคารวมภาษี เช่น 45
     const totalExVat = to2(total / 1.07); // แยกภาษีออก
