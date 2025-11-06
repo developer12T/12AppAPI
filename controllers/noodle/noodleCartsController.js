@@ -18,7 +18,7 @@ const {
 
 exports.addNoodleCart = async (req, res) => {
   try {
-    const { type,area,storeId,typeProduct,id,sku,unitPrice,qty,unit,time,remark } = req.body;
+    const { type, area, storeId, typeProduct, id, sku, unitPrice, qty, unit, time, remark } = req.body;
     const channel = req.headers["x-channel"];
     const { Product } = getModelsByChannel(channel, res, productModel);
     const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
@@ -27,15 +27,21 @@ exports.addNoodleCart = async (req, res) => {
 
     let data = {}; // ✅ ประกาศก่อน
 
-    const [soupId, noodleId] = sku.split('_');
-    const soupDetail = await Product.findOne({id:soupId})
-    const noodleDetail = await NoodleItems.findOne({id:noodleId})
+    let nameProduct = ''
+    if (typeProduct === 'noodle') {
+      const [soupId, noodleId] = sku.split('_');
+      const soupDetail = await Product.findOne({ id: soupId })
+      const noodleDetail = await NoodleItems.findOne({ id: noodleId })
+      
+      nameProduct = `${soupDetail.name}_${noodleDetail.name}`
+    } else if (typeProduct === 'pc') {
+      const productDetail = await Product.findOne({ id: sku })
 
+      nameProduct = `${productDetail.name}`
+    }
 
-    const existNoodleCart = await NoodleCart.findOne({ type, area, storeId });
-    const nameProduct = `${soupDetail.name}_${noodleDetail.name}`
     // console.log(nameProduct)
-
+    const existNoodleCart = await NoodleCart.findOne({ type, area, storeId });
 
     const product = await Product.findOne({ id }).lean();
     if (!product) {
@@ -64,24 +70,24 @@ exports.addNoodleCart = async (req, res) => {
 
       if (existingIndex !== -1) {
         existNoodleCart.listProduct[existingIndex].qty += qty;
-        existNoodleCart.listProduct[existingIndex].price += qty * unitPrice;  
+        existNoodleCart.listProduct[existingIndex].price += qty * unitPrice;
 
-        existNoodleCart.listProduct[existingIndex].time = time;  
-        existNoodleCart.listProduct[existingIndex].remark = remark;  
+        existNoodleCart.listProduct[existingIndex].time = time;
+        existNoodleCart.listProduct[existingIndex].remark = remark;
 
 
       } else {
-        existNoodleCart.listProduct.push({ 
-          type:typeProduct,    
-          id:id,
-          sku:sku,
-          name:nameProduct,
-          qty:qty,
-          price:unitPrice * qty,
-          unitPrice:unitPrice,
-          unit:unit,
-          time:time,
-          remark:remark
+        existNoodleCart.listProduct.push({
+          type: typeProduct,
+          id: id,
+          sku: sku,
+          name: nameProduct,
+          qty: qty,
+          price: unitPrice * qty,
+          unitPrice: unitPrice,
+          unit: unit,
+          time: time,
+          remark: remark
         });
 
 
@@ -106,16 +112,16 @@ exports.addNoodleCart = async (req, res) => {
         total: unitPrice * qty,
         listProduct: [
           {
-            type:typeProduct,
-            id:id,
-            sku:sku,
-            name:nameProduct,
-            qty:qty,
-            unitPrice:unitPrice,
-            price:unitPrice * qty,
-            unit:unit,
-            time:time,
-            remark:remark
+            type: typeProduct,
+            id: id,
+            sku: sku,
+            name: nameProduct,
+            qty: qty,
+            unitPrice: unitPrice,
+            price: unitPrice * qty,
+            unit: unit,
+            time: time,
+            remark: remark
           },
         ],
       };
