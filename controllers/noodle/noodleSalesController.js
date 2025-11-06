@@ -219,13 +219,13 @@ exports.updateStatus = async (req, res) => {
     const { NoodleSales } = getModelsByChannel(channel, res, noodleSaleModel);
     const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
     const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel);
-
+    const { Order } = getModelsByChannel(channel, res, orderModel)
     const { orderId, status } = req.body
 
     let statusStrTH = ''
     let orderUpdated = {}
   
-    const orderDetail = await NoodleSales.findOne({ orderId: orderId ,status:{$in: ['paid', 'pending']}})
+    const orderDetail = await Order.findOne({ orderId: orderId ,status:{$in: ['paid', 'pending']}})
 
     if (!orderDetail) {
       return res.status(404).json({
@@ -238,7 +238,7 @@ exports.updateStatus = async (req, res) => {
     switch (status) {
       case 'paid':
         statusStrTH = 'จ่ายเงินแล้ว'
-        orderUpdated = await NoodleSales.findOneAndUpdate(
+        orderUpdated = await Order.findOneAndUpdate(
           { orderId },
           {
             $set: {
@@ -265,7 +265,7 @@ exports.updateStatus = async (req, res) => {
 
 
         statusStrTH = 'สำเร็จแล้ว'
-        orderUpdated = await NoodleSales.findOneAndUpdate(
+        orderUpdated = await Order.findOneAndUpdate(
           { orderId },
           {
             $set: {
@@ -276,7 +276,7 @@ exports.updateStatus = async (req, res) => {
           { new: true }
         );
 
-        await NoodleSales.updateMany(
+        await Order.updateMany(
           {
             'store.area': area,
             status: { $in: ['paid', 'pending'] },
@@ -322,14 +322,14 @@ exports.orderIdDetailFoodtruck = async (req, res) => {
     const { NoodleSales } = getModelsByChannel(channel, res, noodleSaleModel);
     const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
     const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel);
-
+    const { Order } = getModelsByChannel(channel, res, orderModel)
     if (!orderId) {
       return res
         .status(400)
         .json({ status: 400, message: "Missing required fields!" });
     }
 
-    const foodTruckData = await NoodleSales.find({ orderId: orderId })
+    const foodTruckData = await Order.find({ orderId: orderId })
 
     const data = foodTruckData.map(item => {
 

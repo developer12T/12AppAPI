@@ -704,6 +704,8 @@ exports.getOrder = async (req, res) => {
         $project: {
           orderId: 1,
           orderNo: 1,
+          number:1,
+          waiting:1,
           lowStatus: 1,
           heightStatus: 1,
           lineM3: 1,
@@ -745,6 +747,8 @@ exports.getOrder = async (req, res) => {
     response = order.map(o => ({
       orderId: o.orderId,
       orderNo: o.orderNo ?? '',
+      number: o.number ?? 0,
+      waiting: o.waiting ?? 0 ,
       lowStatus: o.lowStatus ?? '',
       heightStatus: o.heightStatus ?? '',
       lineM3: o.lineM3 ?? 0,
