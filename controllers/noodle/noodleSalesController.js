@@ -149,7 +149,7 @@ exports.checkout = async (req, res) => {
       number: number,
       waiting: waiting,
       status: "pending",
-      statusTH: "รอนำเข้า",
+      statusTH: "รอชำระ",
       sale: {
         saleCode: sale.saleCode || "",
         salePayer: sale.salePayer || "",

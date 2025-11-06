@@ -1771,42 +1771,40 @@ exports.getRouteEffective = async (req, res) => {
 
 
     } else {
-
-      filteredRoutes = routesTranFrom
+      data = routesTranFrom
     }
 
-    // ❌ ตัด R25 / R26
-
-
     const excludedRoutes = ['R25', 'R26']
-    // ✅ Group routes by area
-    const groupedByArea = filteredRoutes.reduce((acc, cur) => {
+
+    const filteredRoutesR = routesTranFrom.filter(r => !excludedRoutes.includes(r.route))
+
+    const groupedByArea = filteredRoutesR.reduce((acc, cur) => {
       if (!acc[cur.area]) acc[cur.area] = []
       acc[cur.area].push(cur)
       return acc
     }, {})
 
-    // ✅ สร้าง totalRoute สำหรับแต่ละ area
     const totalByArea = Object.keys(groupedByArea).map(areaKey => {
       const routesInArea = groupedByArea[areaKey]
+
       const totalRoute = routesInArea.reduce(
         (acc, cur) => {
-          acc.storeAll += cur.storeAll
-          acc.storePending += cur.storePending
-          acc.storeSell += cur.storeSell
-          acc.storeNotSell += cur.storeNotSell
-          acc.storeCheckInNotSell += cur.storeCheckInNotSell
-          acc.storeTotal += cur.storeTotal
-          acc.summary += cur.summary
-          acc.totalqty += cur.totalqty
-          acc.percentVisit += cur.percentVisit
-          acc.percentEffective += cur.percentEffective
+          acc.storeAll += cur.storeAll || 0
+          acc.storePending += cur.storePending || 0
+          acc.storeSell += cur.storeSell || 0
+          acc.storeNotSell += cur.storeNotSell || 0
+          acc.storeCheckInNotSell += cur.storeCheckInNotSell || 0
+          acc.storeTotal += cur.storeTotal || 0
+          acc.summary += cur.summary || 0
+          acc.totalqty += cur.totalqty || 0
+          acc.percentVisit += cur.percentVisit || 0
+          acc.percentEffective += cur.percentEffective || 0
           return acc
         },
         {
-          area: areaKey,
+          // area: areaKey,
           routeId: 'Total',
-          route: `Total (${areaKey})`,
+          // route: `Total (${areaKey})`,
           storeAll: 0,
           storePending: 0,
           storeSell: 0,
@@ -1821,10 +1819,12 @@ exports.getRouteEffective = async (req, res) => {
       )
 
       const len = routesInArea.length || 1
-      totalRoute.percentVisit = (totalRoute.percentVisit / len).toFixed(2)
-      totalRoute.percentEffective = (totalRoute.percentEffective / len).toFixed(2)
+      totalRoute.percentVisit = +(totalRoute.percentVisit / len).toFixed(2)
+      totalRoute.percentEffective = +(totalRoute.percentEffective / len).toFixed(2)
+
       return totalRoute
     })
+
 
     totalByArea.sort((a, b) => a.percentVisit - b.percentVisit)
 
@@ -1862,8 +1862,8 @@ exports.getRouteEffective = async (req, res) => {
     } else {
       res.json({
         status: 200,
-        data: filteredRoutes,
-        // totalByArea,
+        data: data,
+        total:totalByArea,
         // zoneRoute
 
       })
