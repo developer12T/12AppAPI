@@ -6,6 +6,7 @@ const typetruck = require("../../models/cash/typetruck");
 const noodleCartModel = require("../../models/foodtruck/noodleCart");
 const productModel = require('../../models/cash/product')
 const cartModel = require("../../models/cash/cart");
+const noodleItemModel = require("../../models/foodtruck/noodleItem");
 const {
   to2,
   getQty,
@@ -17,16 +18,24 @@ const {
 
 exports.addNoodleCart = async (req, res) => {
   try {
-    const { type, area, storeId, sku,noodle, id, qty,unitPrice, unit,soup,time,remark,typeProduct } = req.body;
+    const { type,area,storeId,typeProduct,id,sku,unitPrice,qty,unit,time,remark } = req.body;
     const channel = req.headers["x-channel"];
     const { Product } = getModelsByChannel(channel, res, productModel);
     const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
-
+    const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel);
     // console.log(price,unitPrice)
 
     let data = {}; // ✅ ประกาศก่อน
 
+    const [soupId, noodleId] = sku.split('_');
+    const soupDetail = await Product.findOne({id:soupId})
+    const noodleDetail = await NoodleItems.findOne({id:noodleId})
+
+
     const existNoodleCart = await NoodleCart.findOne({ type, area, storeId });
+    const nameProduct = `${soupDetail.name}_${noodleDetail.name}`
+    // console.log(nameProduct)
+
 
     const product = await Product.findOne({ id }).lean();
     if (!product) {
@@ -55,7 +64,7 @@ exports.addNoodleCart = async (req, res) => {
 
       if (existingIndex !== -1) {
         existNoodleCart.listProduct[existingIndex].qty += qty;
-        existNoodleCart.listProduct[existingIndex].price += price;  
+        existNoodleCart.listProduct[existingIndex].price += qty * unitPrice;  
 
         existNoodleCart.listProduct[existingIndex].time = time;  
         existNoodleCart.listProduct[existingIndex].remark = remark;  
@@ -65,9 +74,8 @@ exports.addNoodleCart = async (req, res) => {
         existNoodleCart.listProduct.push({ 
           type:typeProduct,    
           id:id,
-          noodle:noodle,
           sku:sku,
-          soup:soup,
+          name:nameProduct,
           qty:qty,
           price:unitPrice * qty,
           unitPrice:unitPrice,
@@ -100,9 +108,8 @@ exports.addNoodleCart = async (req, res) => {
           {
             type:typeProduct,
             id:id,
-            noodle:noodle,
             sku:sku,
-            soup:soup,
+            name:nameProduct,
             qty:qty,
             unitPrice:unitPrice,
             price:unitPrice * qty,

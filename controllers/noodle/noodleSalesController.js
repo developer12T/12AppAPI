@@ -57,7 +57,6 @@ exports.checkout = async (req, res) => {
         .json({ status: 404, message: "NoodleCart is empty!" });
     }
 
-    const noodleItem = await NoodleItems.findOne({ id: cart.id });
     const sale = (await User.findOne({ area: area })) ?? {};
     // console.log(sale)
     const orderId = await generateOrderIdFoodTruck(area,sale.warehouse, channel, res);
@@ -90,9 +89,7 @@ exports.checkout = async (req, res) => {
         type:item.type || '',
         id: product.id || '',
         sku: item.sku || '',
-        noodle: item.noodle || '',
-        soup: item.soup || '' ,
-        name: product.name || '',
+        name: item.name || '',
         group: product.group || '',
         groupCode: product.groupCode || '',
         brandCode: product.brandCode || '',
