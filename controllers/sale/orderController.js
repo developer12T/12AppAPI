@@ -5771,9 +5771,9 @@ exports.updateOrderDistribution = async (req, res) => {
 
     const currentDate = `${year}${month}${day}`
     // const startDate = `${year}${month}${day}`
-    const startDate = `20251104`
+    const startDate = `20251105`
     // const endDate = `${year}${month}${nextDay}`
-    const endDate = `20251104`
+    const endDate = `20251105`
     const status = ''
     const channel = 'cash'
 

@@ -602,17 +602,17 @@ async function updateOrderPowerBI (channel = 'cash') {
   }
 }
 
-const startCronJobUpdateOrderPowerBI = () => {
+const startCronJobInsertDistribution = () => {
   cron.schedule(
     '0 21 * * *', // 👉 00:00 AM (เวลาไทย)
     // "*/3 * * * *",
 
     async () => {
       console.log(
-        'Running cron job startCronJobUpdateOrderPowerBI at 21:00 AM Thai time. Now:',
+        'Running cron job startCronJobInsertDistribution at 21:00 AM Thai time. Now:',
         new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
       )
-      await updateOrderPowerBI()
+      await updateOrderDistribution()
     },
     {
       timezone: 'Asia/Bangkok' // 👈 สำคัญมาก
@@ -620,14 +620,14 @@ const startCronJobUpdateOrderPowerBI = () => {
   )
 }
 
-const startCronJobUpdatBIOrderDistribution = () => {
+const startCronJobUpdateStatusDistribution = () => {
   cron.schedule(
     '0 21 * * *', // 👉 00:00 AM (เวลาไทย)
     // "*/3 * * * *",
 
     async () => {
       console.log(
-        'Running cron job startCronJobUpdatBIOrderDistribution at 21:00 AM Thai time. Now:',
+        'Running cron job startCronJobUpdateStatusDistribution at 21:00 AM Thai time. Now:',
         new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
       )
       await updateStatusOrderDistribution()
@@ -638,20 +638,77 @@ const startCronJobUpdatBIOrderDistribution = () => {
   )
 }
 
-const startCronJobUpdateOrderDistribution = () => {
+const startCronJobInsertPowerBI = () => {
   cron.schedule(
     '0 21 * * *', // 👉 00:00 AM (เวลาไทย)
     // "*/3 * * * *",
 
     async () => {
       console.log(
-        'Running cron job startCronJobUpdateOrderDistribution at 21:00 AM Thai time. Now:',
+        'Running cron job startCronJobInsertPowerBI at 21:00 AM Thai time. Now:',
         new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
       )
-      await updateOrderDistribution()
+      await updateOrderPowerBI()
     },
     {
       timezone: 'Asia/Bangkok' // 👈 สำคัญมาก
+    }
+  )
+}
+
+const startCronJobErpApiCheck = () => {
+  cron.schedule(
+    '0 8 * * *', // 👉 6:00 AM (เวลาไทย)
+    // "* * * * *",
+    async () => {
+      console.log(
+        'Running cron job startCronJobErpApiCheck at 8:00 AM Thai time. Now:',
+        new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+      )
+      await erpApiCheckOrderJob()
+    },
+    {
+      timezone: 'Asia/Bangkok' // 👈 สำคัญมาก
+    }
+  )
+}
+
+const startCronJobErpApiCheckDisribution = () => {
+  cron.schedule('*/10 * * * *', async () => {
+    console.log(
+      'Running cron job startCronJobErpApiCheckDisribution every 10 minutes'
+    )
+    await erpApiCheckDisributionM3Job()
+  })
+}
+
+const startCronJobDeleteCartDaily = () => {
+  cron.schedule(
+    '0 0 * * *',
+    async () => {
+      // cron.schedule('*/1 * * * *', async () => {
+      console.log('Running cron job DeleteCartDaily at 00:00 (Asia/Bangkok)')
+      await DeleteCartDaily()
+    },
+    {
+      timezone: 'Asia/Bangkok'
+    }
+  )
+}
+
+const startCronJobreStoreStockDaily = () => {
+  cron.schedule(
+    '30 21 * * *', // 21:30 ทุกวัน
+    // "* * * * *", // 👉 ทุก 5 นาที
+    async () => {
+      console.log(
+        'Running cron job reStoreStock at 21:30 Bangkok time. Now:',
+        new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+      )
+      await reStoreStock()
+    },
+    {
+      timezone: 'Asia/Bangkok' // 👈 สำคัญ
     }
   )
 }
@@ -665,6 +722,7 @@ async function updateStatusOrderDistribution (channel = 'cash') {
   const nowLog = new Date().toLocaleString('th-TH', {
     timeZone: 'Asia/Bangkok'
   })
+
   try {
     const now = new Date()
     const currentMonth = now.getMonth() + 1 // (0-based, so add 1)
@@ -739,7 +797,6 @@ async function updateStatusOrderDistribution (channel = 'cash') {
   } catch (error) {
     console.error(err)
     fs.appendFileSync(logFile, `[${nowLog}] ❌ Job failed: ${err.message}\n`)
-    // return res.status(500).json({ status: 500, message: err.message })
   }
 }
 
@@ -789,116 +846,15 @@ async function updateOrderDistribution (channel = 'cash') {
   }
 }
 
-const startCronJobDistribution = () => {
-  cron.schedule(
-    '0 21 * * *', // 👉 00:00 AM (เวลาไทย)
-    // "*/3 * * * *",
-
-    async () => {
-      console.log(
-        'Running cron job startCronJobDistribution at 21:00 AM Thai time. Now:',
-        new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
-      )
-      await updateOrderDistribution()
-    },
-    {
-      timezone: 'Asia/Bangkok' // 👈 สำคัญมาก
-    }
-  )
-}
-
-const startCronJobErpApiCheck = () => {
-  cron.schedule(
-    '0 8 * * *', // 👉 6:00 AM (เวลาไทย)
-    // "* * * * *",
-    async () => {
-      console.log(
-        'Running cron job startCronJobErpApiCheck at 8:00 AM Thai time. Now:',
-        new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
-      )
-      await erpApiCheckOrderJob()
-    },
-    {
-      timezone: 'Asia/Bangkok' // 👈 สำคัญมาก
-    }
-  )
-}
-
-const startCronJobErpApiCheckDisribution = () => {
-  cron.schedule('*/10 * * * *', async () => {
-    console.log(
-      'Running cron job startCronJobErpApiCheckDisribution every 10 minutes'
-    )
-    await erpApiCheckDisributionM3Job()
-  })
-}
-
-const startCronJobDeleteCartDaily = () => {
-  cron.schedule(
-    '0 0 * * *',
-    async () => {
-      // cron.schedule('*/1 * * * *', async () => {
-      console.log('Running cron job DeleteCartDaily at 00:00 (Asia/Bangkok)')
-      await DeleteCartDaily()
-    },
-    {
-      timezone: 'Asia/Bangkok'
-    }
-  )
-}
-// const startCronJobreStoreStockDaily = () => {
-// cron.schedule(
-//   '* * * * *',  async () => {
-//     console.log('Running cron job reStoreStock at 01:00 (Asia/Bangkok)')
-//     await reStoreStock()
-//   },
-//   {
-//     timezone: 'Asia/Bangkok' // บังคับให้ตีความตามเวลาไทย
-//   }
-// )
-// }
-
-const startCronJobreStoreStockDaily = () => {
-  cron.schedule(
-    '30 21 * * *', // 21:30 ทุกวัน
-    // "* * * * *", // 👉 ทุก 5 นาที
-    async () => {
-      console.log(
-        'Running cron job reStoreStock at 21:30 Bangkok time. Now:',
-        new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
-      )
-      await reStoreStock()
-    },
-    {
-      timezone: 'Asia/Bangkok' // 👈 สำคัญ
-    }
-  )
-}
-
-// const startCronJobreStoreStockDaily = () => {
-//   cron.schedule(
-//     '* * * * *', // ทุก 1 นาที
-//     async () => {
-//       console.log(
-//         'Running cron job reStoreStock every 1 minute. Now:',
-//         new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
-//       );
-//       await reStoreStock();
-//     },
-//     {
-//       timezone: 'Asia/Bangkok' // 👈 สำคัญ
-//     }
-//   );
-// };
-
 module.exports = {
   startCronJobErpApiCheck,
-  // startCronJobOrderToExcel
-  startCronJobUpdateOrderDistribution,
-  startCronJobUpdateOrderPowerBI,
   startCronJobErpApiCheckDisribution,
+
+  startCronJobInsertPowerBI,
+
+  startCronJobInsertDistribution,
+  startCronJobUpdateStatusDistribution,
+
   startCronJobDeleteCartDaily,
-  startCronJobDistribution,
-  startCronJobreStoreStockDaily,
-  startCronJobUpdatBIOrderDistribution
+  startCronJobreStoreStockDaily
 }

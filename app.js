@@ -8,21 +8,21 @@ const app = express()
 const {
   startCronJobErpApiCheck,
   startCronJobErpApiCheckDisribution,
-  startCronJobDeleteCartDaily,
+
   startCronJobreStoreStockDaily,
-  startCronJobUpdateOrderPowerBI,
-  startCronJobDistribution,
-  startCronJobUpdateOrderDistribution,
-  startCronJobUpdatBIOrderDistribution
+
+  startCronJobInsertDistribution,
+  startCronJobUpdateStatusDistribution,
+
+  startCronJobInsertPowerBI
 } = require('../12AppAPI/controllers/sale/conJob')
 
 if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
   startCronJobErpApiCheck()
-  startCronJobUpdateOrderPowerBI()
-  startCronJobUpdateOrderDistribution()
+  startCronJobInsertPowerBI()
   startCronJobreStoreStockDaily()
-  startCronJobDistribution()
-  startCronJobUpdatBIOrderDistribution()
+  startCronJobInsertDistribution()
+  startCronJobUpdateStatusDistribution()
 }
 
 app.use(bodyParser.json({ limit: '50mb' }))
