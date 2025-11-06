@@ -17,7 +17,7 @@ const {
 
 exports.addNoodleCart = async (req, res) => {
   try {
-    const { type, area, storeId, sku,noodle, id, qty,price,unitPrice, unit,soup,time,remark } = req.body;
+    const { type, area, storeId, sku,noodle, id, qty,unitPrice, unit,soup,time,remark,typeProduct } = req.body;
     const channel = req.headers["x-channel"];
     const { Product } = getModelsByChannel(channel, res, productModel);
     const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
@@ -57,12 +57,13 @@ exports.addNoodleCart = async (req, res) => {
         existNoodleCart.listProduct[existingIndex].qty += qty;
         existNoodleCart.listProduct[existingIndex].price += price;  
 
-        existNoodleCart.listProduct[existingIndex].time = price;  
+        existNoodleCart.listProduct[existingIndex].time = time;  
         existNoodleCart.listProduct[existingIndex].remark = remark;  
 
 
       } else {
-        existNoodleCart.listProduct.push({     
+        existNoodleCart.listProduct.push({ 
+          type:typeProduct,    
           id:id,
           noodle:noodle,
           sku:sku,
@@ -97,13 +98,14 @@ exports.addNoodleCart = async (req, res) => {
         total: unitPrice * qty,
         listProduct: [
           {
+            type:typeProduct,
             id:id,
             noodle:noodle,
             sku:sku,
             soup:soup,
             qty:qty,
-            price:price,
             unitPrice:unitPrice,
+            price:unitPrice * qty,
             unit:unit,
             time:time,
             remark:remark

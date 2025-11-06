@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const { dbCA } = require("../../config/db");
 
 const listOrderProductSchema = new mongoose.Schema({
+  type :{ type: String, require: true, },
   id: { type: String, require: true, },
   noodle: { type: String },
   sku: { type: String, require: true, },

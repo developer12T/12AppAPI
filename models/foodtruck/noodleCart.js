@@ -3,7 +3,7 @@ const { dbCA } = require('../../config/db')
 
 
 const listCartProduct = mongoose.Schema({
-
+  type :{ type: String, require: true, },
   id: { type: String, require: true, },
   noodle: { type: String },
   sku: { type: String, require: true, },

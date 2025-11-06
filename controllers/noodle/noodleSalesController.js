@@ -87,6 +87,7 @@ exports.checkout = async (req, res) => {
       subtotal += totalPrice;
 
       return {
+        type:item.type || '',
         id: product.id || '',
         sku: item.sku || '',
         noodle: item.noodle || '',
