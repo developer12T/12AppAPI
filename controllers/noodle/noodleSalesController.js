@@ -61,7 +61,7 @@ exports.checkout = async (req, res) => {
 
     const sale = (await User.findOne({ area: area })) ?? {};
     // console.log(area,sale.warehouse)
-    const orderId = await generateOrderIdFoodTruck(area,sale.warehouse, channel, res);
+    const orderId = await generateOrderIdFoodTruck(area, sale.warehouse, channel, res);
 
     const total = to2(cart.total); // ราคารวมภาษี เช่น 45
     const totalExVat = to2(total / 1.07); // แยกภาษีออก
@@ -88,7 +88,7 @@ exports.checkout = async (req, res) => {
       subtotal += totalPrice;
 
       return {
-        type:item.type || '',
+        type: item.type || '',
         id: product.id || '',
         sku: item.sku || '',
         name: item.name || '',
@@ -106,8 +106,8 @@ exports.checkout = async (req, res) => {
         subtotal: parseFloat(item.price.toFixed(2)) || 0,
         discount: 0,
         netTotal: parseFloat(item.price.toFixed(2)) || 0,
-        time:item.time,
-        remark:item.remark,
+        time: item.time,
+        remark: item.remark,
       };
     });
 
@@ -224,8 +224,8 @@ exports.updateStatus = async (req, res) => {
 
     let statusStrTH = ''
     let orderUpdated = {}
-  
-    const orderDetail = await Order.findOne({ orderId: orderId ,status:{$in: ['paid', 'pending']}})
+
+    const orderDetail = await Order.findOne({ orderId: orderId, status: { $in: ['paid', 'pending'] } })
 
     if (!orderDetail) {
       return res.status(404).json({
@@ -433,11 +433,11 @@ exports.orderIdDetailFoodtruck = async (req, res) => {
 exports.updatePickUp = async (req, res) => {
   try {
 
-    const {pickUp ,orderId} = req.body
+    const { pickUp, orderId } = req.body
 
     if (!pickUp) {
       return res.status(404).json({
-        message:'Not found pickUp status'
+        message: 'Not found pickUp status'
       })
     }
     const channel = req.headers["x-channel"];
@@ -446,26 +446,28 @@ exports.updatePickUp = async (req, res) => {
     const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
     const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel);
 
-    const existOrder = await Order.find({orderId:orderId})
+    const existOrder = await Order.find({ orderId: orderId })
 
     if (!existOrder) {
       return res.status(404).json({
-        message:'Not found orderId'
+        message: 'Not found orderId'
       })
     }
 
     const data = await Order.findOneAndUpdate(
-      { orderId:orderId},
-      {$set:{
-        pickUp:pickUp
-      }},
-      {new:true}
+      { orderId: orderId },
+      {
+        $set: {
+          pickUp: pickUp
+        }
+      },
+      { new: true }
     )
 
     res.status(201).json({
-      status:201,
-      message:'Update pickup sucess',
-      data:data
+      status: 201,
+      message: 'Update pickup sucess',
+      data: data
     })
 
   } catch (error) {
@@ -475,4 +477,58 @@ exports.updatePickUp = async (req, res) => {
 }
 
 
-exports.updat
+exports.updateQrPayment = async (req, res) => {
+  try {
+    const { value, orderId } = req.body
+    const channel = req.headers["x-channel"];
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+
+    const existOrder = await Order.find({ orderId: orderId })
+
+    if (!existOrder) {
+      res.status(404).json({
+        status: 404,
+        message: 'Not found Order'
+      })
+    }
+
+    const order = await Order.findOne({
+      orderId: orderId,
+      $expr: {
+        $and: [
+          { $gte: [{ $add: ["$qr", +value] }, 0] },
+          { $gte: [{ $add: ["$total", -value] }, 0] }
+        ]
+      }
+    })
+
+    if (!order) {
+      return res.status(400).json({
+        status: 400,
+        message: 'Cannot update: negative value or order not found.'
+      })
+    }
+
+    const dataUpdate = await Order.findOneAndUpdate(
+      { orderId: orderId },
+      {
+        $inc: {
+          qr: +value,
+          total: -value
+        }
+      },
+      { new: true }
+    )
+
+    res.status(201).json({
+      status: 201,
+      message: 'update payment qr success',
+      data: dataUpdate
+    })
+
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ status: "500", message: error.message });
+  }
+}

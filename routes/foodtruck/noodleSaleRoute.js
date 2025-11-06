@@ -5,7 +5,8 @@ const {
     checkout,
     orderIdDetailFoodtruck,
     // updateStatus,
-    updatePickUp
+    updatePickUp,
+    updateQrPayment
 } = require('../../controllers/noodle/noodleSalesController')
 
 
@@ -16,4 +17,5 @@ router.post('/checkout', checkout)
 router.get('/orderIdDetailFoodtruck', orderIdDetailFoodtruck)
 // router.post('/updateStatus', updateStatus)
 router.post('/updatePickUp', updatePickUp)
+router.post('/updateQrPayment', updateQrPayment)
 module.exports = router
