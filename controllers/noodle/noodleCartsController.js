@@ -141,7 +141,23 @@ exports.addNoodleCart = async (req, res) => {
         ],
       };
 
-      // console.log(data)
+      // const period = getPeriodFromDate(existNoodleCart.createdAt)
+      // const qtyProduct = { id: id, qty: qty, unit: unit }
+
+      // if (type === 'saleNoodle') {
+      //   const updateResult = await updateStockMongo(
+      //   qtyProduct,
+      //   area,
+      //   period,
+      //   'addproduct',
+      //   channel,
+      //   stockType, // ส่ง stockType เข้าไปด้วย!
+      //   res
+      // )
+      // if (updateResult) return
+      // }
+
+
       const newCart = await NoodleCart.create(data);
       data = newCart;
     }

@@ -168,7 +168,7 @@ const orderSchema = new mongoose.Schema(
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
     period: { type: String, require: true },
-    pickUp:{ type: String},
+    pickUp:{ type: String , default : 'dineIn'},
   },
   {
     timestamps: true

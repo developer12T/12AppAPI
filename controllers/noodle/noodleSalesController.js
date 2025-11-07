@@ -16,7 +16,7 @@ const {
   getPeriodFromDate
 } = require('../../middleware/order')
 const productModel = require('../../models/cash/product');
-const { before } = require("lodash");
+const { before, range } = require("lodash");
 const orderTimestamps = {};
 
 exports.checkout = async (req, res) => {
@@ -137,7 +137,7 @@ exports.checkout = async (req, res) => {
 
     const maxNumber = maxOrder ? maxOrder.number : 0; // ถ้าไม่เจอให้เป็น 0
 
-    
+
 
     let number = 0
     let waiting = 0
@@ -272,8 +272,6 @@ exports.updateStatus = async (req, res) => {
         ));
 
         const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1)
-
-
         statusStrTH = 'สำเร็จแล้ว'
         orderUpdated = await Order.findOneAndUpdate(
           { orderId },
@@ -285,17 +283,27 @@ exports.updateStatus = async (req, res) => {
           },
           { new: true }
         );
+        const dataOrder = await Order.find({
+          'store.area': area,
+          status: { $in: ['paid', 'pending'] },
+          createdAt: { $gte: start, $lte: end }
+        }).sort({ number: 1 }).select('number orderId');
+
+        // console.log(dataOrder)
+        let count = 0;
+
+        for (const order of dataOrder) {
 
         await Order.updateMany(
           {
-            'store.area': area,
-            status: { $in: ['paid', 'pending'] },
-            createdAt: { $gte: start, $lte: end }
+            orderId:order.orderId
           },
           {
-            $inc: { waiting: -1 } // ✅ ไม่ต้องอยู่ใน $set
+            $set: { waiting: count } // ✅ ไม่ต้องอยู่ใน $set
           }
         );
+          count++;
+        }
 
         break
       default:
