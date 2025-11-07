@@ -606,6 +606,8 @@ exports.getOrder = async (req, res) => {
           8
         )}T23:59:59.999+07:00`
       )
+
+      // console.log(startDate,endDate)
     } else if (period) {
       const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
       startDate = range.startDate
@@ -639,7 +641,7 @@ exports.getOrder = async (req, res) => {
 
     const matchQuery = {
       type,
-      ...areaQuery, // zone หรือ store.area ตามที่คุณเซ็ตไว้
+      ...areaQuery , // zone หรือ store.area ตามที่คุณเซ็ตไว้
       ...(store ? { 'store.storeId': store } : {}),
       ...(period ? { period } : {}),
       createdAt: { $gte: startDate, $lt: endDate }
