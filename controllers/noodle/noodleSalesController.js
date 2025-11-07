@@ -230,7 +230,7 @@ exports.updateStatus = async (req, res) => {
     if (!orderDetail) {
       return res.status(404).json({
         status: 400,
-        message: 'Not found Order'
+        message: 'Not found Order or status is success'
       })
     }
     const area = orderDetail.store.area
