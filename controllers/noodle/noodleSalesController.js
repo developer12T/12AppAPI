@@ -131,16 +131,26 @@ exports.checkout = async (req, res) => {
       createdAt: { $gte: start, $lte: end }
     }).sort({ createdAt: -1 }).select('number waiting')
 
+    const maxOrder = await Order.findOne({ 'store.area': area })
+      .sort({ number: -1 }) // เรียงจากมากไปน้อย
+      .select('number');    // ดึงเฉพาะ field number (จะเร็วขึ้น)
+
+    const maxNumber = maxOrder ? maxOrder.number : 0; // ถ้าไม่เจอให้เป็น 0
+
+    
+
     let number = 0
     let waiting = 0
 
     if (exitOrder) {
-      number = exitOrder.number + 1
+      number = maxNumber + 1
       waiting = exitOrder.waiting + 1
     } else {
-      number = 1
+      number = maxNumber + 1
       waiting = 0
     }
+
+    // console.log('maxNumber.number',maxNumber)
 
     const noodleOrder = {
       orderId,
