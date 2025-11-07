@@ -33,9 +33,24 @@ exports.addNoodleCart = async (req, res) => {
       const soupDetail = await Product.findOne({ id: soupId })
       const noodleDetail = await NoodleItems.findOne({ id: noodleId })
       
+      if (!soupDetail || !noodleDetail) {
+        return res.status(404).json({
+          status:404,
+          message:'Not found this product'
+        })
+      }
+
       nameProduct = `${soupDetail.name}_${noodleDetail.name}`
     } else if (typeProduct === 'pc') {
       const productDetail = await Product.findOne({ id: sku })
+
+      if (!productDetail) {
+        return res.status(404).json({
+          status:404,
+          message:'Not found this product'
+        })
+      }
+
 
       nameProduct = `${productDetail.name}`
     }
@@ -70,7 +85,7 @@ exports.addNoodleCart = async (req, res) => {
 
       if (existingIndex !== -1) {
         existNoodleCart.listProduct[existingIndex].qty += qty;
-        existNoodleCart.listProduct[existingIndex].price += qty * unitPrice;
+        existNoodleCart.listProduct[existingIndex].totalPrice += qty * unitPrice;
 
         existNoodleCart.listProduct[existingIndex].time = time;
         existNoodleCart.listProduct[existingIndex].remark = remark;
@@ -83,8 +98,8 @@ exports.addNoodleCart = async (req, res) => {
           sku: sku,
           name: nameProduct,
           qty: qty,
-          price: unitPrice * qty,
-          unitPrice: unitPrice,
+          price: unitPrice,
+          totalPrice: unitPrice * qty,
           unit: unit,
           time: time,
           remark: remark
@@ -96,7 +111,7 @@ exports.addNoodleCart = async (req, res) => {
 
       // ✅ คำนวณ total ใหม่ทุกครั้งหลังจากอัปเดต listProduct
       existNoodleCart.total = existNoodleCart.listProduct.reduce(
-        (sum, p) => sum + p.qty * p.unitPrice,
+        (sum, p) => sum + p.qty * p.price,
         0
       );
       existNoodleCart.total = to2(existNoodleCart.total);
@@ -117,8 +132,8 @@ exports.addNoodleCart = async (req, res) => {
             sku: sku,
             name: nameProduct,
             qty: qty,
-            unitPrice: unitPrice,
-            price: unitPrice * qty,
+            price: unitPrice,
+            totalPrice: unitPrice * qty,
             unit: unit,
             time: time,
             remark: remark

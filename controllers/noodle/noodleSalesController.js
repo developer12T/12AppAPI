@@ -102,10 +102,10 @@ exports.checkout = async (req, res) => {
         qty: item.qty || '',
         unit: item.unit || '',
         unitName: unitData.name || '',
-        price: item.unitPrice || 0,
-        subtotal: parseFloat(item.price.toFixed(2)) || 0,
+        price: item.price || 0,
+        subtotal: parseFloat(item.totalPrice.toFixed(2)) || 0,
         discount: 0,
-        netTotal: parseFloat(item.price.toFixed(2)) || 0,
+        netTotal: parseFloat(item.totalPrice.toFixed(2)) || 0,
         time: item.time,
         remark: item.remark,
       };

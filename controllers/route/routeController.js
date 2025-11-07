@@ -1786,7 +1786,7 @@ exports.getRouteEffective = async (req, res) => {
 
     const totalByArea = Object.keys(groupedByArea).map(areaKey => {
       const routesInArea = groupedByArea[areaKey]
-
+      // console.log(areaKey)
       const totalRoute = routesInArea.reduce(
         (acc, cur) => {
           acc.storeAll += cur.storeAll || 0
@@ -1804,7 +1804,7 @@ exports.getRouteEffective = async (req, res) => {
         {
           // area: areaKey,
           routeId: 'Total',
-          // route: `Total (${areaKey})`,
+          route: '',
           storeAll: 0,
           storePending: 0,
           storeSell: 0,
