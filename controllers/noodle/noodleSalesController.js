@@ -207,8 +207,35 @@ exports.checkout = async (req, res) => {
       period: period
     };
 
+
+    const qtyproduct = noodleOrder.listProduct
+      .filter(u => u?.id && u?.unit && u?.qty > 0)
+      .map(u => ({
+        id: u.id,
+        unit: u.unit,
+        qty: u.qty,
+        statusMovement: 'OUT'
+      }))
+
+
+    for (const item of qtyproduct) {
+      const updateResult = await updateStockMongo(
+        item,
+        area,
+        period,
+        'sale',
+        channel,
+        res
+      )
+      if (updateResult) return
+    }
+
+
+
+
     await Order.create(noodleOrder);
     await NoodleCart.deleteOne({ type, area, storeId });
+
 
     res.status(201).json({
       status: 201,
