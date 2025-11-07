@@ -23,8 +23,9 @@ const cartSchema = mongoose.Schema(
     storeId: { type: String },
 
     listProduct: [listCartProduct],
-    total: { type: Number, require: true }
-
+    total: { type: Number, require: true },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
   },
   {
     timestamps: true
