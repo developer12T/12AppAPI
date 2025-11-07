@@ -641,7 +641,7 @@ exports.getOrder = async (req, res) => {
 
     const matchQuery = {
       type,
-      ...areaQuery , // zone หรือ store.area ตามที่คุณเซ็ตไว้
+      ...areaQuery, // zone หรือ store.area ตามที่คุณเซ็ตไว้
       ...(store ? { 'store.storeId': store } : {}),
       ...(period ? { period } : {}),
       createdAt: { $gte: startDate, $lt: endDate }
@@ -781,7 +781,14 @@ exports.getOrder = async (req, res) => {
     // const io = getSocket()
     // io.emit('order/all', {});
     if (channel === 'pc') {
-      response.sort((a, b) => a.number - b.number)
+      response.sort((a, b) => {
+        // 1️⃣ ถ้า a เป็น success แต่ b ไม่ใช่ → เอา a ไปท้าย
+        if (a.status === 'success' && b.status !== 'success') return 1;
+        // 2️⃣ ถ้า b เป็น success แต่ a ไม่ใช่ → เอา b ไปท้าย
+        if (b.status === 'success' && a.status !== 'success') return -1;
+        // 3️⃣ ถ้า status เหมือนกัน → เรียงตาม number ปกติ
+        return a.number - b.number;
+      });
     }
 
 
