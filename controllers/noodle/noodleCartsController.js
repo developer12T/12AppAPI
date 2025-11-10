@@ -1,12 +1,11 @@
-const express = require("express");
+const express = require('express')
 
-const { getModelsByChannel } = require("../../middleware/channel");
-const userModel = require("../../models/cash/user");
-const typetruck = require("../../models/cash/typetruck");
-const noodleCartModel = require("../../models/foodtruck/noodleCart");
+const { getModelsByChannel } = require('../../middleware/channel')
+const userModel = require('../../models/cash/user')
+const typetruck = require('../../models/cash/typetruck')
+const noodleCartModel = require('../../models/foodtruck/noodleCart')
 const productModel = require('../../models/cash/product')
-const cartModel = require("../../models/cash/cart");
-const noodleItemModel = require("../../models/foodtruck/noodleItem");
+const cartModel = require('../../models/cash/cart')
 const {
   to2,
   getQty,
@@ -14,150 +13,79 @@ const {
   getPeriodFromDate
 } = require('../../middleware/order')
 
-
-
 exports.addNoodleCart = async (req, res) => {
   try {
-    const { type, area, storeId, typeProduct, id, sku, unitPrice, qty, unit, time, remark } = req.body;
-    const channel = req.headers["x-channel"];
+    const { type, area, storeId, sku, id, qty, price, unit } = req.body
 
-    const { Product } = getModelsByChannel(channel, res, productModel);
-    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
-    const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel);
+    const channel = req.headers['x-channel']
 
-    let nameProduct = '';
-    let data = {};
+    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel)
 
-    if (typeProduct === 'noodle') {
-      const [soupId, noodleId] = sku.split('_');
-      const soupDetail = await Product.findOne({ id: soupId });
-      const noodleDetail = await NoodleItems.findOne({ id: noodleId });
-
-      if (!soupDetail || !noodleDetail) {
-        return res.status(404).json({ status: 404, message: 'Not found this product' });
-      }
-
-      nameProduct = `${soupDetail.name}_${noodleDetail.name}`;
-    } else if (typeProduct === 'pc') {
-      const productDetail = await Product.findOne({ id: sku });
-      if (!productDetail) {
-        return res.status(404).json({ status: 404, message: 'Not found this product' });
-      }
-
-      nameProduct = `${productDetail.name}`;
-    }
-
-    const product = await Product.findOne({ id }).lean();
-    if (!product) {
-      return res.status(404).json({ status: 404, message: "Product not found!" });
-    }
-
-    const unitData = product.listUnit.find((u) => u.unit === unit);
-    if (!unitData) {
-      return res.status(400).json({
-        status: 400,
-        message: `Unit '${unit}' not found for this product!`,
-      });
-    }
-
-    const existNoodleCart = await NoodleCart.findOne({ type, area, storeId });
+    const existNoodleCart = await NoodleCart.findOne({
+      type,
+      area,
+      storeId
+    })
 
     if (existNoodleCart) {
-      existNoodleCart.listProduct = existNoodleCart.listProduct || [];
+      existNoodleCart.listProduct = existNoodleCart.listProduct || []
 
+      // หาว่ามีสินค้านี้อยู่ใน list แล้วหรือยัง (เทียบจาก sku, id, unit)
       const existingIndex = existNoodleCart.listProduct.findIndex(
-        (item) => item.sku === sku && item.id === id && item.unit === unit
-      );
+        item => item.sku === sku && item.id === id && item.unit === unit
+      )
 
       if (existingIndex !== -1) {
-        const item = existNoodleCart.listProduct[existingIndex];
-        item.qty += qty;
-        item.totalPrice += qty * unitPrice;
-        item.time = time;
-        item.remark = remark;
+        // ✅ ถ้ามีอยู่แล้ว → บวก qty และ price ต่อ
+        existNoodleCart.listProduct[existingIndex].qty += qty
+        existNoodleCart.listProduct[existingIndex].price += price
       } else {
-
+        // ✅ ถ้ายังไม่มี → เพิ่มใหม่
         existNoodleCart.listProduct.push({
-          type: typeProduct,
-          id,
           sku,
-          name: nameProduct,
+          id,
           qty,
-          price: unitPrice,
-          totalPrice: unitPrice * qty,
-          unit,
-          time,
-          remark,
-        });
+          price,
+          unit
+        })
       }
 
-
-      existNoodleCart.total = to2(
-        existNoodleCart.listProduct.reduce((sum, p) => sum + p.qty * p.price, 0)
-      );
-
-      data = existNoodleCart; 
+      await existNoodleCart.save()
     } else {
-
-      data = new NoodleCart({
+      const data = {
         type,
         area,
         storeId,
-        total: unitPrice * qty,
         listProduct: [
           {
-            type: typeProduct,
-            id,
             sku,
-            name: nameProduct,
+            id,
             qty,
-            price: unitPrice,
-            totalPrice: unitPrice * qty,
-            unit,
-            time,
-            remark,
-          },
-        ],
-      });
+            price,
+            unit
+          }
+        ]
+      }
+
+      await NoodleCart.create(data)
     }
 
-    const period = getPeriodFromDate(data.createdAt || new Date());
-    const qtyProduct = { id, qty, unit };
-
-    if (type === 'saleNoodle') {
-      const updateResult = await updateStockMongo(
-        qtyProduct,
-        area,
-        period,
-        'addproduct',
-        channel,
-        'OUT',
-        res
-      );
-      if (updateResult) return;
-    }
-
-    const savedCart = await data.save();
-
-
-    res.status(201).json({
+    res.status(200).json({
       status: 201,
-      message: "Insert / Update cart success",
-      data: savedCart,
-    });
-
+      message: 'Insert cart Sucess'
+      // data: data,
+    })
   } catch (error) {
-    console.error("❌ Error:", error);
+    console.error('❌ Error:', error)
+
     res.status(500).json({
       status: 500,
-      message: "Error from server",
-      error: error.message || error.toString(),
-      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
-    });
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
-};
-
-
+}
 
 const productTimestamps = {}
 
@@ -167,7 +95,7 @@ exports.deleteProductNoodle = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
     const { type, area, storeId, id, sku, unit } = req.body
-    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
+    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel)
     const storeIdAndId = `${type}_${storeId}_${id}_${unit}`
     const now = Date.now()
     const lastUpdate = productTimestamps[storeIdAndId] || 0
@@ -176,13 +104,13 @@ exports.deleteProductNoodle = async (req, res) => {
     if (now - lastUpdate < ONE_MINUTE) {
       return res.status(429).json({
         status: 429,
-        message: 'This order was updated less than 15 seconds ago. Please try again later!'
+        message:
+          'This order was updated less than 15 seconds ago. Please try again later!'
       })
     }
     productTimestamps[storeIdAndId] = now
 
     if (!type || !area || !id || !unit) {
-
       return res.status(400).json({
         status: 400,
         message: 'type, area, id, and unit are required!'
@@ -203,7 +131,6 @@ exports.deleteProductNoodle = async (req, res) => {
     })
 
     if (!cart) {
-
       return res.status(404).json({ status: 404, message: 'Cart not found!' })
     }
 
@@ -212,7 +139,6 @@ exports.deleteProductNoodle = async (req, res) => {
     )
 
     if (productIndex === -1) {
-
       return res
         .status(404)
         .json({ status: 404, message: 'Product not found in cart!' })
@@ -234,8 +160,6 @@ exports.deleteProductNoodle = async (req, res) => {
     //   res
     // )
     // if (updateResult) return
-
-
 
     if (cart.listProduct.length === 0) {
       await NoodleCart.deleteOne({ type: type, area: area, storeId: storeId })
@@ -265,44 +189,39 @@ exports.deleteProductNoodle = async (req, res) => {
   }
 }
 
-
-
-
-
 exports.getCartDetailNew = async (req, res) => {
   try {
-    const { type, area, storeId } = req.query;
+    const { type, area, storeId } = req.query
 
-    const channel = req.headers["x-channel"];
-    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
-    const { Cart } = getModelsByChannel(channel, res, cartModel);
+    const channel = req.headers['x-channel']
+    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel)
+    const { Cart } = getModelsByChannel(channel, res, cartModel)
 
     const query = {
       area: area,
-      ...(storeId ? { storeId } : {}),
-    };
+      ...(storeId ? { storeId } : {})
+    }
 
-    let dataCart = {};
-    if (["sale", "refund", "withdraw", "give"].includes(type)) {
-      dataCart = await Cart.findOne(query);
-    } else if (["saleNoodle"].includes(type)) {
-      dataCart = await NoodleCart.findOne(query);
+    let dataCart = []
+    if (['sale', 'refund', 'withdraw', 'give'].includes(type)) {
+      dataCart = await Cart.find(query)
+    } else if (['saleNoodle'].includes(type)) {
+      dataCart = await NoodleCart.find(query)
     }
 
     if (dataCart.length === 0) {
       return res.status(404).json({
         status: 404,
-        message: "Not found cart",
-      });
+        message: 'Not found cart'
+      })
     }
 
     res.status(200).json({
       status: 200,
-      message: "Fecth data sucess",
-      data: dataCart,
-    });
+      message: 'Fecth data sucess',
+      data: dataCart
+    })
   } catch (error) {
-
     console.error('❌ Error:', error)
 
     res.status(500).json({
@@ -311,45 +230,35 @@ exports.getCartDetailNew = async (req, res) => {
       error: error.message || error.toString(), // ✅ ป้องกัน circular object
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
-
   }
-
-};
+}
 
 exports.getSoup = async (req, res) => {
   try {
-
-
-    const channel = req.headers["x-channel"];
-    const { Product } = getModelsByChannel(channel, res, productModel);
-    const { Cart } = getModelsByChannel(channel, res, cartModel);
-
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Cart } = getModelsByChannel(channel, res, cartModel)
 
     const dataProduct = await Product.find({
       id: { $regex: 'ZNS' }
-    }).sort({ id: 1 });
+    }).sort({ id: 1 })
 
     const data = dataProduct.map(item => {
-
       const unit = item.listUnit.find(u => u.unit === 'PCS')
 
       return {
         id: item.id,
         name: item.name,
         nameBill: item.nameBill,
-        price: unit.price.sale,
+        price: unit.price.sale
       }
     })
-
-
-
 
     res.status(200).json({
       status: 200,
       message: 'Fetch data success',
       data: data
     })
-
   } catch (error) {
     console.error('❌ Error:', error)
 
@@ -360,5 +269,4 @@ exports.getSoup = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
