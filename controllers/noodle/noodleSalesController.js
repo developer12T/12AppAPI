@@ -113,17 +113,14 @@ exports.checkout = async (req, res) => {
 
     if (listProduct.includes(null)) return;
 
-    // เวลาไทย = UTC + 7 ชั่วโมง
-    const thailand = new Date(now.getTime() + 7 * 60 * 60 * 1000);
-
     const start = new Date(Date.UTC(
-      thailand.getFullYear(),
-      thailand.getMonth(),
-      thailand.getDate(),
-      -7, 0, 0 // ⬅️ = UTC ของเวลา 00:00 ไทย
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate() - 1, // ✅ ลบ 1 วัน เพราะไทยเร็วกว่า UTC 7 ชั่วโมง
+      17, 0, 0               // 17 UTC = 00:00 ไทย
     ));
 
-    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1)
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
 
     const exitOrder = await Order.findOne({
       'store.area': area,
@@ -137,10 +134,9 @@ exports.checkout = async (req, res) => {
 
     const maxNumber = maxOrder ? maxOrder.number : 0; // ถ้าไม่เจอให้เป็น 0
 
-
-
     let number = 0
     let waiting = 0
+
 
     if (exitOrder) {
       number = maxNumber + 1 || 1
@@ -207,8 +203,35 @@ exports.checkout = async (req, res) => {
       period: period
     };
 
+
+    const qtyproduct = noodleOrder.listProduct
+      .filter(u => u?.id && u?.unit && u?.qty > 0)
+      .map(u => ({
+        id: u.id,
+        unit: u.unit,
+        qty: u.qty,
+        statusMovement: 'OUT'
+      }))
+
+
+    for (const item of qtyproduct) {
+      const updateResult = await updateStockMongo(
+        item,
+        area,
+        period,
+        'sale',
+        channel,
+        res
+      )
+      if (updateResult) return
+    }
+
+
+
+
     await Order.create(noodleOrder);
     await NoodleCart.deleteOne({ type, area, storeId });
+
 
     res.status(201).json({
       status: 201,
@@ -294,14 +317,14 @@ exports.updateStatus = async (req, res) => {
 
         for (const order of dataOrder) {
 
-        await Order.updateMany(
-          {
-            orderId:order.orderId
-          },
-          {
-            $set: { waiting: count } // ✅ ไม่ต้องอยู่ใน $set
-          }
-        );
+          await Order.updateMany(
+            {
+              orderId: order.orderId
+            },
+            {
+              $set: { waiting: count } // ✅ ไม่ต้องอยู่ใน $set
+            }
+          );
           count++;
         }
 
