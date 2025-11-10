@@ -8,7 +8,10 @@ const orderModel = require('../../models/cash/sale')
 const stockModel = require('../../models/cash/stock')
 const { getSocket } = require('../../socket')
 const { getModelsByChannel } = require('../../middleware/channel')
-const { productQuery,productFoodtruckQuery } = require('../../controllers/queryFromM3/querySctipt')
+const {
+  productQuery,
+  productFoodtruckQuery
+} = require('../../controllers/queryFromM3/querySctipt')
 const { group } = require('console')
 const { flatMap } = require('lodash')
 const distributionModel = require('../../models/cash/distribution')
@@ -375,7 +378,7 @@ exports.getFilters = async (req, res) => {
       sensitivity: 'base'
     })
 
-    function cleanList(list) {
+    function cleanList (list) {
       const arr = Array.isArray(list) ? list : []
       const filtered = arr
         .map(v => (typeof v === 'string' ? v.trim() : v))
@@ -387,7 +390,7 @@ exports.getFilters = async (req, res) => {
 
     const firstAttr = attributes[0] ?? {} // ปลอดภัยกว่า attributes.length เช็คทีเดียว
 
-    function sortSizesAscGFirst(list) {
+    function sortSizesAscGFirst (list) {
       const UNIT_PRIORITY = { G: 0, KG: 1, L: 2 } // อยากให้ L ไปท้ายสุดกว่าก็ปรับเลขได้
       const coll = new Intl.Collator('th-TH', {
         numeric: true,
@@ -815,62 +818,52 @@ exports.addFromERPnew = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
-exports.addFromERPFoodtruck = async (req,res) =>{
+exports.addFromERPFoodtruck = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
     const result = await productFoodtruckQuery(channel)
 
     const { Product } = getModelsByChannel(channel, res, productModel)
 
-    for (const row of result){
-
-      const exists = await Product.findOne({id:row.ITNO})
+    for (const row of result) {
+      const exists = await Product.findOne({ id: row.ITNO })
       console.log(exists)
 
       if (exists) {
         continue
       } else {
         const dataTran = {
-          id:row.ITNO,
-          name:row.NAME_BILL,
-          groupCode:row.GRP,
-          group:'',
-          groupCodeM3:row.GREPORT,
-          groupM3:"",
-          brandCode:row.BRAND,
-          brand:'',
-          size:row.WEIGHT,
-          flavourCode:row.FLAVIUR,
-          flavour:'',
-          type:'',
-          weightGross:'',
-          weightNet:'',
-          statusSale:row.IS_OPEN2,
-          statusWithdraw:row.IS_OPEN3,
-          statusRefund:row.IS_OPEN4,
-          statusRefundDmg:row.IS_OPEN5,
-          image:"",
-          
+          id: row.ITNO,
+          name: row.NAME_BILL,
+          groupCode: row.GRP,
+          group: '',
+          groupCodeM3: row.GREPORT,
+          groupM3: '',
+          brandCode: row.BRAND,
+          brand: '',
+          size: row.WEIGHT,
+          flavourCode: row.FLAVIUR,
+          flavour: '',
+          type: '',
+          weightGross: '',
+          weightNet: '',
+          statusSale: row.IS_OPEN2,
+          statusWithdraw: row.IS_OPEN3,
+          statusRefund: row.IS_OPEN4,
+          statusRefundDmg: row.IS_OPEN5,
+          image: ''
         }
 
         console.log(dataTran)
-
       }
-      
-      
-
     }
-    
+
     res.status(201).json({
-      status:201,
-      message:'sucess'
+      status: 201,
+      message: 'sucess'
     })
-
-
-  
   } catch (error) {
     console.error('❌ Error:', error)
 
@@ -882,9 +875,6 @@ exports.addFromERPFoodtruck = async (req,res) =>{
     })
   }
 }
-
-
-
 
 exports.groupProductId = async (req, res) => {
   try {
@@ -923,7 +913,6 @@ exports.groupProductId = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.groupBrandId = async (req, res) => {
@@ -963,7 +952,6 @@ exports.groupBrandId = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.groupSize = async (req, res) => {
@@ -1111,7 +1099,6 @@ exports.groupFlavourId = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.groupByFilter = async (req, res) => {
@@ -1175,7 +1162,6 @@ exports.groupByFilter = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.flavourByFilter = async (req, res) => {
@@ -1237,7 +1223,6 @@ exports.flavourByFilter = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.sizeByFilter = async (req, res) => {
@@ -1299,7 +1284,6 @@ exports.sizeByFilter = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.brandByFilter = async (req, res) => {
@@ -1361,7 +1345,6 @@ exports.brandByFilter = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.unitByFilter = async (req, res) => {
@@ -1423,7 +1406,6 @@ exports.unitByFilter = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.addProductimage = async (req, res) => {
@@ -1464,7 +1446,6 @@ exports.addProductimage = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.productUpdatePrice = async (req, res) => {
@@ -1516,7 +1497,6 @@ exports.productUpdatePrice = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.productCheckPrice = async (req, res) => {
@@ -1535,7 +1515,9 @@ exports.productCheckPrice = async (req, res) => {
       const uatDetail = productUatData.find(o => o.id === item.id)
 
       for (const unit of item.listUnit) {
-        const uatDetailUnit = uatDetail?.listUnit.find(o => o.unit === unit.unit)
+        const uatDetailUnit = uatDetail?.listUnit.find(
+          o => o.unit === unit.unit
+        )
         const salePrd = unit.price.sale
         const saleUat = uatDetailUnit?.price?.sale
 
@@ -1577,7 +1559,7 @@ exports.productCheckPrice = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       })
     } else {
       res.status(200).json({
@@ -1595,9 +1577,7 @@ exports.productCheckPrice = async (req, res) => {
       error: error.message || error.toString(), // ✅ ป้องกัน circular object
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
-
   }
-
 }
 
 exports.checkPriceProductOrder = async (req, res) => {
@@ -1641,15 +1621,13 @@ exports.checkPriceProductOrder = async (req, res) => {
       error: error.message || error.toString(), // ✅ ป้องกัน circular object
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
-
   }
-
 }
 
-
-exports.getProductPage = async (req ,res) => {
+exports.getProductPage = async (req, res) => {
   try {
-    const { type, group, area, period, brand, size, flavour, limit, page,  } = req.body
+    const { type, group, area, period, brand, size, flavour, limit, query,page } =
+      req.body
     const channel = req.headers['x-channel']
 
     const { Product } = getModelsByChannel(channel, res, productModel)
@@ -1676,65 +1654,78 @@ exports.getProductPage = async (req ,res) => {
     let products = []
     let stock = []
 
- 
-      if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
-        return res.status(400).json({
-          status: '400',
-          message: 'Invalid type! Required: sale, refund, or withdraw.'
-        })
+    if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
+      return res.status(400).json({
+        status: '400',
+        message: 'Invalid type! Required: sale, refund, or withdraw.'
+      })
+    }
+
+    const groupArray = parseArrayParam(group)
+    const brandArray = parseArrayParam(brand)
+    const sizeArray = parseArrayParam(size)
+    const flavourArray = parseArrayParam(flavour)
+
+    const filter = {
+      ...(type === 'sale' && { statusSale: 'Y' }),
+      ...(type === 'refund' && { statusRefund: 'Y' }),
+      ...(type === 'withdraw' && { statusWithdraw: 'Y' })
+    }
+
+    const andConditions = []
+    if (groupArray.length) andConditions.push({ group: { $in: groupArray } })
+    if (brandArray.length) andConditions.push({ brand: { $in: brandArray } })
+    if (sizeArray.length) andConditions.push({ size: { $in: sizeArray } })
+    if (flavourArray.length)
+      andConditions.push({ flavour: { $in: flavourArray } })
+
+    // ✅ text query (ค้นหาหลายฟิลด์แบบ case-insensitive)
+    if (query && String(query).trim()) {
+      const q = String(query).trim()
+      const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') // escape + i
+      andConditions.push({
+        $or: [
+          { name: rx },
+          { brand: rx },
+          { group: rx },
+          { flavour: rx },
+          { id: rx },
+          { size: rx },
+          { keywords: rx } // ถ้ามีฟิลด์ keywords
+        ]
+      })
+    }
+
+    if (andConditions.length) filter.$and = andConditions
+
+    // products = await Product.find(filter).lean()
+
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1)
+    const perPage = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100)
+
+    products = await Product.find(filter)
+      .skip((pageNum - 1) * perPage)
+      .limit(perPage)
+      .lean()
+
+    // console.log(products)
+
+    stock = await Stock.aggregate([
+      {
+        $match: {
+          period: period,
+          area: area
+        }
+      },
+      { $unwind: '$listProduct' },
+      {
+        $group: {
+          _id: '$listProduct.productId',
+          balanceCtn: { $sum: '$listProduct.balanceCtn' },
+          balancePcs: { $sum: '$listProduct.balancePcs' }
+        }
       }
-
-      const groupArray = parseArrayParam(group)
-      const brandArray = parseArrayParam(brand)
-      const sizeArray = parseArrayParam(size)
-      const flavourArray = parseArrayParam(flavour)
-
-      const filter = {
-        ...(type === 'sale' && { statusSale: 'Y' }),
-        ...(type === 'refund' && { statusRefund: 'Y' }),
-        ...(type === 'withdraw' && { statusWithdraw: 'Y' })
-      }
-
-      const andConditions = []
-      if (groupArray.length) andConditions.push({ group: { $in: groupArray } })
-      if (brandArray.length) andConditions.push({ brand: { $in: brandArray } })
-      if (sizeArray.length) andConditions.push({ size: { $in: sizeArray } })
-      if (flavourArray.length)
-        andConditions.push({ flavour: { $in: flavourArray } })
-      if (andConditions.length) filter.$and = andConditions
-
-        // products = await Product.find(filter).lean()
-        
-        const pageNum = Math.max(parseInt(page, 10) || 1, 1)
-        const perPage = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100)
-
-
-        products = await Product.find(filter)
-        .skip((pageNum - 1) * perPage)
-        .limit(perPage)
-        .lean()
-      
-
-      // console.log(products)
-
-        stock = await Stock.aggregate([
-          {
-            $match: {
-              period: period,
-              area: area
-            }
-          },
-          { $unwind: '$listProduct' },
-          {
-            $group: {
-              _id: '$listProduct.productId',
-              balanceCtn: { $sum: '$listProduct.balanceCtn' },
-              balancePcs: { $sum: '$listProduct.balancePcs' }
-            }
-          }
-        ])
-      
-  
+    ])
 
     if (!products.length) {
       return res
@@ -1772,7 +1763,6 @@ exports.getProductPage = async (req ,res) => {
         if (a.groupCode > b.groupCode) return 1
         return parseGram(a.size) - parseGram(b.size)
       })
-
 
     res.status(200).json({
       status: '200',
