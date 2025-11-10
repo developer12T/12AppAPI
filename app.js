@@ -14,7 +14,8 @@ const {
   startCronJobInsertDistribution,
   startCronJobUpdateStatusDistribution,
 
-  startCronJobInsertPowerBI
+  startCronJobInsertPowerBI,
+  startCronJobUpdateSendmoney
 } = require('../12AppAPI/controllers/sale/conJob')
 
 if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
@@ -23,6 +24,7 @@ if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
   startCronJobreStoreStockDaily()
   startCronJobInsertDistribution()
   startCronJobUpdateStatusDistribution()
+  startCronJobUpdateSendmoney()
 }
 
 app.use(bodyParser.json({ limit: '50mb' }))
