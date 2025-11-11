@@ -1803,7 +1803,7 @@ exports.getRouteEffective = async (req, res) => {
         },
         {
           // area: areaKey,
-          routeId: 'Total',
+          routeId: `Total ${areaKey}`,
           route: '',
           storeAll: 0,
           storePending: 0,
