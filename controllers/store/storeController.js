@@ -1995,22 +1995,33 @@ exports.addBueatyStore = async (req, res) => {
   const channel = req.headers['x-channel']
 
   try {
-    const bueatydata = await bueatyStoreQuery()
-    const { TypeStore } = getModelsByChannel(channel, res, storeModel)
+    const bueatydata = await bueatyStoreQuery();
+    const { TypeStore } = getModelsByChannel(channel, res, storeModel);
 
-    await TypeStore.deleteMany({})
+    for (const row of bueatydata) {
+      // trim storeId ก่อน
+      const storeIdTrimmed = typeof row.storeId === 'string'
+        ? row.storeId.trim()
+        : row.storeId;
 
-    await TypeStore.insertMany(
-      bueatydata.map(x => {
-        const trimmed = Object.fromEntries(
-          Object.entries(x).map(([key, value]) => [
-            key,
-            typeof value === 'string' ? value.trim() : value
-          ])
-        )
-        return { ...trimmed, type: ['beauty'] }
-      })
-    )
+      // check ซ้ำด้วยค่า trimmed
+      const existTypeStore = await TypeStore.findOne({ storeId: storeIdTrimmed });
+      if (existTypeStore) continue;
+
+      // trim ทุก field ก่อน insert
+      const trimmed = Object.fromEntries(
+        Object.entries(row).map(([key, value]) => [
+          key,
+          typeof value === 'string' ? value.trim() : value
+        ])
+      );
+
+      await TypeStore.create({
+        ...trimmed,
+        storeId: storeIdTrimmed, // ensure cleaned version
+        type: ['beauty']
+      });
+    }
 
     const io = getSocket()
     io.emit('store/addBueatyStore', {})
