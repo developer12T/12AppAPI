@@ -11,7 +11,14 @@ const multer = require('multer')
 const xlsx = require('xlsx')
 const os = require('os')
 const fs = require('fs')
-const { replace } = require('lodash')
+const { replace, filter } = require('lodash')
+const {
+  getSeries,
+  updateRunningNumber,
+  getOrders,
+  getChange,
+  getRefund
+} = require('../../middleware/order')
 const upload = multer({ storage: multer.memoryStorage() }).array(
   'sendmoneyImage',
   1
@@ -446,7 +453,7 @@ exports.getSendMoneyForAcc = async (req, res) => {
     }
 
     const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
-    const { User } = getModelsByChannel(channel, res, userModel)
+    const { User } = getModelsByChannel('user', res, userModel)
 
     const year = Number(date.slice(0, 4))
     const month = Number(date.slice(5, 7))
@@ -551,13 +558,13 @@ exports.getSendMoneyForAcc = async (req, res) => {
           SALE: '$_id.SALE',
           STATUS: { $cond: [{ $eq: ['$VALUES', 0] }, 'NOT OK', 'OK'] },
           TRANSFER_DATE: '$_id.TRANSFER_DATE',
-          VALUES: {
-            $cond: [
-              { $eq: ['$VALUES', null] },
-              '0.00',
-              { $toString: { $round: ['$VALUES', 2] } }
-            ]
-          },
+          // VALUES: {
+          //   $cond: [
+          //     { $eq: ['$VALUES', null] },
+          //     '0.00',
+          //     { $toString: { $round: ['$VALUES', 2] } }
+          //   ]
+          // },
           ZONE: '$_id.ZONE',
           IMAGE: '$_id.IMAGE',
           WAREHOUSE: '$_id.WAREHOUSE'
@@ -570,15 +577,41 @@ exports.getSendMoneyForAcc = async (req, res) => {
       COUNT: `${totalUserCount}`,
       VALUES: Number(item.VALUES).toFixed(2)
     }))
+
+
+    const areaList = [...new Set(formatted.flatMap(item => item.AREA))];
+    const dataOrder = await getOrders(areaList, res, channel, 'area', start, end)
+    const dataChange = await getChange(areaList, res, channel, 'area', start, end)
+    const dataRefund = await getRefund(areaList, res, channel, 'area', start, end)
+
+    let dataFinal = []
+
     // console.log(formatted)
 
-    // res.setHeader(
-    //   'Content-Disposition',
-    //   `attachment; filename="sendmoney_${date}.json"`
-    // )
-    // res.setHeader('Content-Type', 'application/json; charset=utf-8')
-    // res.send(JSON.stringify({ formatted }, null, 2)) // pretty format
-    res.status(200).json(formatted)
+    for (const row of formatted) {
+      const dataOrderArea = dataOrder.filter(item => item.store.area === row.AREA);
+      const dataChangeArea = dataChange.filter(item => item.store.area === row.AREA);
+      const dataRefundArea = dataRefund.filter(item => item.store.area === row.AREA);
+
+      const totalOrder = dataOrderArea.reduce((sum, i) => sum + (i.total || 0), 0);
+      const totalChange = dataChangeArea.reduce((sum, i) => sum + (i.total || 0), 0);
+      const totalRefund = dataRefundArea.reduce((sum, i) => sum + (i.total || 0), 0);
+
+
+      
+      const VALUES = to2(totalOrder + (totalChange - totalRefund));
+
+      dataFinal.push({
+        ...row,
+        VALUES:VALUES
+      })
+
+    }
+
+
+
+
+    res.status(200).json(dataFinal)
   } catch (err) {
     console.error('[getSendMoneyForAcc] ❌', err)
     res.status(500).json({
@@ -1412,7 +1445,7 @@ exports.sendmoneyToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => {})
+        fs.unlink(tempPath, () => { })
       })
     } else {
       return res.status(200).json({
