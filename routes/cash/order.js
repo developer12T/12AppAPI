@@ -41,7 +41,7 @@ const {
   updateOrderDistribution,
   erpApiCheckOrderDistrabution,
   updateStatusOrderDistribution,
-  getOrderPcToExcel
+  
 } = require('../../controllers/sale/orderController')
 
 const router = express.Router()
@@ -93,5 +93,4 @@ router.post('/updatePaymentOrder', updatePaymentOrder)
 router.post('/updateAddressInOrder', updateAddressInOrder)
 router.post('/updateOrderPowerBI', updateOrderPowerBI)
 router.post('/updateUserSaleInOrder', updateUserSaleInOrder)
-router.get('/getOrderPcToExcel', getOrderPcToExcel)
 module.exports = router
