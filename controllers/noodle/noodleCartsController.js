@@ -6,6 +6,7 @@ const typetruck = require('../../models/cash/typetruck')
 const noodleCartModel = require('../../models/foodtruck/noodleCart')
 const productModel = require('../../models/cash/product')
 const cartModel = require('../../models/cash/cart')
+const NoodleItemsModel = require('../../models/foodtruck/noodleItem')
 const {
   to2,
   getQty,
@@ -15,16 +16,30 @@ const {
 
 exports.addNoodleCart = async (req, res) => {
   try {
-    const { type, area, sku, id, qty, price, unit } = req.body
+    const { type, area, sku,typeProduct, id, qty, price, unit } = req.body
 
     const channel = req.headers['x-channel']
 
     const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel)
-
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { NoodleItems } = getModelsByChannel(channel, res, NoodleItemsModel)
     const existNoodleCart = await NoodleCart.findOne({
       type,
       area
     })
+    let name =''
+    if (typeProduct === 'noodle') {
+      const soupId = sku.split('_')[0]
+      const soup = await Product.findOne({id:soupId})
+      const noodleId = sku.split('_')[1]
+      const noodle = await NoodleItems.findOne({id:noodleId})
+      name = `${soup.name}_${noodle.name}`
+    } else {
+      const product = await Product.findOne({id:id})
+      name = product.name
+
+    }
+
 
     if (existNoodleCart) {
       existNoodleCart.listProduct = existNoodleCart.listProduct || []
@@ -43,8 +58,10 @@ exports.addNoodleCart = async (req, res) => {
         // ✅ ถ้ายังไม่มี → เพิ่มใหม่
         existNoodleCart.total += price * qty
         existNoodleCart.listProduct.push({
+          typeProduct,
           sku,
           id,
+          name,
           qty,
           price,
           unit,
@@ -59,8 +76,10 @@ exports.addNoodleCart = async (req, res) => {
         area,
         listProduct: [
           {
+            typeProduct,
             sku,
             id,
+            name,
             qty,
             price,
             unit,
@@ -294,3 +313,4 @@ exports.getSoup = async (req, res) => {
     })
   }
 }
+
