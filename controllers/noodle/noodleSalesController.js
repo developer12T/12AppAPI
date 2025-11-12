@@ -17,12 +17,18 @@ const {
 } = require('../../middleware/order')
 const productModel = require('../../models/cash/product');
 const { before, range } = require("lodash");
+const xlsx = require('xlsx')
+const path = require('path')
+const os = require('os')
+const fs = require('fs')
+
+
 const orderTimestamps = {};
 
 exports.checkout = async (req, res) => {
   // const transaction = await sequelize.transaction();
   try {
-    const { type, area, storeId, period, payment } = req.body;
+    const { type, area, period, payment } = req.body;
 
     const channel = req.headers["x-channel"];
     const { Order } = getModelsByChannel(channel, res, orderModel)
@@ -32,14 +38,14 @@ exports.checkout = async (req, res) => {
     const { User } = getModelsByChannel(channel, res, userModel);
     const { Product } = getModelsByChannel(channel, res, productModel);
 
-    if (!type || !area || !storeId || !payment) {
+    if (!type || !area || !payment) {
       return res
         .status(400)
         .json({ status: 400, message: "Missing required fields!" });
     }
 
     const now = new Date();
-    const lastUpdate = orderTimestamps[storeId] || 0;
+    const lastUpdate = orderTimestamps[area] || 0;
     const ONE_MINUTE = 60 * 1000;
 
     // if (now - lastUpdate < ONE_MINUTE) {
@@ -50,9 +56,9 @@ exports.checkout = async (req, res) => {
     //   });
     // }
 
-    orderTimestamps[storeId] = now;
+    orderTimestamps[area] = now;
 
-    const cart = await NoodleCart.findOne({ type, area, storeId });
+    const cart = await NoodleCart.findOne({ type, area });
     if (!cart || cart.length === 0) {
       return res
         .status(404)
@@ -230,7 +236,7 @@ exports.checkout = async (req, res) => {
 
 
     await Order.create(noodleOrder);
-    await NoodleCart.deleteOne({ type, area, storeId });
+    await NoodleCart.deleteOne({ type, area });
 
 
     res.status(201).json({
@@ -578,7 +584,7 @@ exports.getOrderPcToExcel = async (req, res) => {
   try {
     const { channel } = req.query
     let { startDate, endDate } = req.query
-    const { area, team, zone } = req.query
+    const { area, team, zone, excel } = req.query
 
     // console.log(channel, date)
     let statusArray = (req.query.status || '')
@@ -784,12 +790,55 @@ exports.getOrderPcToExcel = async (req, res) => {
       })
     })
 
+    if (excel === 'true') {
 
-    res.status(200).json({
-      status: 200,
-      message: 'fetch data Success',
-      data: tranFromOrder
-    })
+    function yyyymmddToDdMmYyyy(dateString) {
+      // สมมติ dateString คือ '20250804'
+      const year = dateString.slice(0, 4)
+      const month = dateString.slice(4, 6)
+      const day = dateString.slice(6, 8)
+      return `${day}${month}${year}`
+    }
+
+      const wb = xlsx.utils.book_new()
+      const ws = xlsx.utils.json_to_sheet(tranFromOrder)
+      xlsx.utils.book_append_sheet(
+        wb,
+        ws,
+        `ESP${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}`
+      )
+
+      const tempPath = path.join(
+        os.tmpdir(),
+        `CA_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}.xlsx`
+      )
+      xlsx.writeFile(wb, tempPath)
+
+      res.download(
+        tempPath,
+        `PC_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}.xlsx`,
+        err => {
+          if (err) {
+            console.error('❌ Download error:', err)
+            // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+            if (!res.headersSent) {
+              res.status(500).send('Download failed')
+            }
+          }
+
+          // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+          fs.unlink(tempPath, () => { })
+        }
+      )
+    } else {
+      res.status(200).json({
+        status: 200,
+        message: 'fetch data Success',
+        data: tranFromOrder
+      })
+
+    }
+
 
 
 

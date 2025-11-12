@@ -15,7 +15,7 @@ const {
 
 exports.addNoodleCart = async (req, res) => {
   try {
-    const { type, area, storeId, sku, id, qty, price, unit } = req.body
+    const { type, area, sku, id, qty, price, unit } = req.body
 
     const channel = req.headers['x-channel']
 
@@ -23,8 +23,7 @@ exports.addNoodleCart = async (req, res) => {
 
     const existNoodleCart = await NoodleCart.findOne({
       type,
-      area,
-      storeId
+      area
     })
 
     if (existNoodleCart) {
@@ -55,7 +54,6 @@ exports.addNoodleCart = async (req, res) => {
       const data = {
         type,
         area,
-        storeId,
         listProduct: [
           {
             sku,
