@@ -793,6 +793,7 @@ exports.updateSendmoneyOld2 = async (req, res) => {
 
       // อัปเดตข้อมูล (ตาม warehouse ของแต่ละ user)
       if (totalSaleUpdateData.length > 0) {
+        
         await dataUpdateTotalSale('cash', totalSaleUpdateData, [
           'TRANSFER_DATE',
           'WH'
@@ -894,7 +895,6 @@ exports.updateSendmoneyOld = async (req, res) => {
         acc[dateStr] = { summary: 0, status: item.status || '' }
       }
       acc[dateStr].summary += item.sendmoney || 0
-      // acc[dateStr].status = item.status; // ถ้าอยากใช้ status อันสุดท้ายในวันนั้น
       return acc
     }, {})
 
