@@ -777,6 +777,7 @@ exports.addFromERPnew = async (req, res) => {
       const newProduct = new Product({
         id: listProduct.id,
         name: listProduct.name,
+        nameBill: listProduct.name,
         groupCode: listProduct.groupCode,
         group: listProduct.group,
         groupCodeM3: listProduct.groupCodeM3,
