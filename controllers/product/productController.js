@@ -734,7 +734,7 @@ exports.addFromERPnew = async (req, res) => {
     //     message: 'Invalid response data from external API'
     //   })
     // }
-    // console.log(result)
+    // console.log(JSON.stringify(result, null, 2))
     data = []
 
     for (const listProduct of result) {

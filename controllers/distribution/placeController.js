@@ -108,7 +108,10 @@ exports.getType = async (req, res) => {
     const channel = req.headers['x-channel']
     const { Place } = getModelsByChannel(channel, res, distributionModel)
 
-    const places = await Place.find({}, { listAddress: 1 }).lean()
+    const places = await Place.find(
+      { area: { $not: /PC|EV/i } }, // i = case-insensitive
+      { listAddress: 1 }
+    ).lean();
     // console.log(places)
     if (!places.length) {
       return res.status(404).json({
@@ -125,7 +128,7 @@ exports.getType = async (req, res) => {
       const typeKey = `${address.type}-${address.typeNameTH}-${address.typeNameEN}`
       if (!typeSet.has(typeKey)) {
         typeSet.add(typeKey)
-        console.log(address)
+        // console.log(address)
         if (address.type && address.typeNameTH && address.typeNameEN) {
           uniqueTypes.push({
             type: address.type,
