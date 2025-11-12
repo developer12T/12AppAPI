@@ -109,7 +109,7 @@ exports.getType = async (req, res) => {
     const { Place } = getModelsByChannel(channel, res, distributionModel)
 
     const places = await Place.find({}, { listAddress: 1 }).lean()
-
+    // console.log(places)
     if (!places.length) {
       return res.status(404).json({
         status: '404',

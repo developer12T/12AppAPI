@@ -229,8 +229,15 @@ exports.checkout = async (req, res) => {
 
     // console.log(area)
     // console.log(sale)
+    let orderId = {}
+    if (channel === 'pc') {
+      orderId = await generateOrderIdFoodTruck(area, sale.warehouse, channel, res);
+    } else {
+      orderId = await generateOrderId(area, sale.warehouse, channel, res)
+    }
 
-    const orderId = await generateOrderId(area, sale.warehouse, channel, res)
+
+
 
     let storeData = {}
 
