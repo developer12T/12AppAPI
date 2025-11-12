@@ -37,15 +37,18 @@ exports.addNoodleCart = async (req, res) => {
       if (existingIndex !== -1) {
         // ✅ ถ้ามีอยู่แล้ว → บวก qty และ price ต่อ
         existNoodleCart.listProduct[existingIndex].qty += qty
-        existNoodleCart.listProduct[existingIndex].price += price
+        existNoodleCart.listProduct[existingIndex].totalPrice += price * qty
+        existNoodleCart.total += price * qty
       } else {
         // ✅ ถ้ายังไม่มี → เพิ่มใหม่
+        existNoodleCart.total += price * qty
         existNoodleCart.listProduct.push({
           sku,
           id,
           qty,
           price,
-          unit
+          unit,
+          totalPrice :price * qty
         })
       }
 
@@ -60,18 +63,41 @@ exports.addNoodleCart = async (req, res) => {
             id,
             qty,
             price,
-            unit
+            unit,
+            totalPrice : qty * price
           }
-        ]
+        ],
+        total : qty * price
       }
 
       await NoodleCart.create(data)
     }
 
+    const cart = await NoodleCart.findOne({
+      type,
+      area
+    })
+
+    const period = getPeriodFromDate(cart.createdAt)
+    const qtyProduct = { id: id, qty: qty, unit: unit }
+
+    const updateResult = await updateStockMongo(
+        qtyProduct,
+        area,
+        period,
+        'addproduct',
+        channel,
+        'OUT', // ส่ง stockType เข้าไปด้วย!
+        res
+      )
+      if (updateResult) return
+
+
+
+
     res.status(200).json({
       status: 201,
-      message: 'Insert cart Sucess'
-      // data: data,
+      message: 'Insert cart Sucess',
     })
   } catch (error) {
     console.error('❌ Error:', error)
@@ -149,15 +175,15 @@ exports.deleteProductNoodle = async (req, res) => {
 
     const period = getPeriodFromDate(cart.createdAt)
 
-    // const updateResult = await updateStockMongo(
-    //   product,
-    //   area,
-    //   period,
-    //   'deleteCart',
-    //   channel,
-    //   res
-    // )
-    // if (updateResult) return
+    const updateResult = await updateStockMongo(
+      product,
+      area,
+      period,
+      'deleteCart',
+      channel,
+      res
+    )
+    if (updateResult) return
 
     if (cart.listProduct.length === 0) {
       await NoodleCart.deleteOne({ type: type, area: area, storeId: storeId })
