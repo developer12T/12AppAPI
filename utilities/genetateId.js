@@ -392,15 +392,11 @@ const generateOrderIdFoodTruck = async (area,warehouse,channel,res) => {
     : 1
 
 
-  const orderId = `F${currentYear.toString().slice(2, 4)}${currentMonth}${runningNumber.toString().padStart(4, '0')}`
+  const orderId = `${currentYear.toString().slice(2, 4)}${currentMonth}15${warehouse}${runningNumber.toString().padStart(4, '0')}`
 
   // console.log('orderId',orderId)
 
-  return `F${currentYear
-    .toString()
-    .slice(2, 4)}${currentMonth}${warehouse}${runningNumber
-      .toString()
-      .padStart(4, '0')}`
+  return orderId
 }
 
 
