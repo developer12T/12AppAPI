@@ -1186,7 +1186,7 @@ exports.OrderToExcel = async (req, res) => {
       },
       status: { $nin: ['canceled'] },
       status: { $in: statusArray },
-      type: { $in: ['sale'] },
+      type: { $in: ['sale','saleNoodle'] },
       'store.area': { $ne: 'IT211' }
     }
 
@@ -1421,16 +1421,27 @@ exports.OrderToExcel = async (req, res) => {
       // console.log("productIDS",productIDS)
       return productIDS.map(product => {
         counterOrder++
+        switch (channel) {
+          case 'cash':
+            CUNO = order.store.storeId
+            OAORTP = 'A31'
+            break;
+          case 'pc':
+            CUNO = order.sale.salePayer
+            OAORTP = 'A51'
+            break;
 
-        // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
+          default:
+            break;
+        }
 
         return {
           // AREA: order.store.area,
-          CUNO: order.store.storeId,
+          CUNO: CUNO,
           FACI: 'F10',
           WHLO: order.sale.warehouse,
           ORNO: '',
-          OAORTP: 'A31',
+          OAORTP: OAORTP,
           RLDT: RLDT,
           ADID: '',
           CUOR: order.orderId,
