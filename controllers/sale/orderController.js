@@ -38,7 +38,7 @@ const {
 } = require('../../models/cash/master')
 const { WithdrawCash } = require('../../models/cash/powerBi')
 const { Op, fn, col, where, literal } = require('sequelize')
-const { generateOrderId } = require('../../utilities/genetateId')
+const { generateOrderId,generateOrderIdFoodTruck } = require('../../utilities/genetateId')
 const { sortProduct } = require('../../utilities/product')
 const {
   summaryOrder,

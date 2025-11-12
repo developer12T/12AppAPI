@@ -120,7 +120,7 @@ exports.deleteProductNoodle = async (req, res) => {
     const channel = req.headers['x-channel']
     const { type, area, storeId, id, sku, unit } = req.body
     const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel)
-    const storeIdAndId = `${type}_${storeId}_${id}_${unit}`
+    const storeIdAndId = `${type}_${id}_${unit}`
     const now = Date.now()
     const lastUpdate = productTimestamps[storeIdAndId] || 0
     const ONE_MINUTE = 15 * 1000
