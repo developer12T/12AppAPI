@@ -22,7 +22,9 @@ const orderStoreSchema = new mongoose.Schema({
 })
 
 const listOrderProductSchema = new mongoose.Schema({
+  type :{ type: String,  },
   id: { type: String, require: true },
+  sku: { type: String,  },
   name: { type: String, require: true },
   lot: { type: String, require: true },
   groupCode: { type: String, require: true },
@@ -39,7 +41,9 @@ const listOrderProductSchema = new mongoose.Schema({
   price: { type: Number, require: true },
   subtotal: { type: Number, require: true },
   discount: { type: Number, require: true, default: 0 },
-  netTotal: { type: Number, require: true }
+  netTotal: { type: Number, require: true },
+  time: { type: String },
+  remark:{ type: String },
 })
 
 const listOrderPromotionSchema = new mongoose.Schema({
@@ -113,8 +117,10 @@ const orderImageSchema = mongoose.Schema({
 
 const orderSchema = new mongoose.Schema(
   {
-    type: { type: String, require: true, enum: ['sale', 'change', 'withdraw'] },
+    type: { type: String, require: true, enum: ['sale', 'change', 'withdraw','saleNoodle'] },
     orderId: { type: String, require: true, unique: true },
+    number: { type: Number },
+    waiting: { type: Number },
     orderNo: { type: String },
     lowStatus: { type: String },
     heightStatus: { type: String },
@@ -135,7 +141,7 @@ const orderSchema = new mongoose.Schema(
     statusTH: {
       type: String,
       require: true,
-      enum: ['รอนำเข้า', 'สำเร็จ', 'ยกเลิก', 'ถูกปฏิเสธ'],
+      enum: ['รอนำเข้า', 'สำเร็จ', 'ยกเลิก', 'ถูกปฏิเสธ','รอชำระ'],
       default: 'รอนำเข้า'
     },
     listProduct: [listOrderProductSchema],
@@ -161,7 +167,8 @@ const orderSchema = new mongoose.Schema(
     createdBy: { type: String, require: true },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
-    period: { type: String, require: true }
+    period: { type: String, require: true },
+    pickUp:{ type: String , default : 'dineIn'},
   },
   {
     timestamps: true

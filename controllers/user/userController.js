@@ -995,3 +995,63 @@ exports.addUserPcSample = async (req, res) => {
   }
 
 }
+
+exports.getArea = async (req, res) => {
+  try {
+    const { role, platformType, zone, team } = req.body
+    const channel = 'user'
+    const { User } = getModelsByChannel(channel, res, userModel);
+    let match = { role, platformType };
+
+    if (zone) match.zone = zone;
+
+    if (team) {
+      // team = area[0] + area[1] + area[3]
+      match.$expr = {
+        $eq: [
+          {
+            $concat: [
+              { $substr: ["$area", 0, 2] },   // 2 ตัวแรก
+              { $substr: ["$area", 3, 1] }    // ตัวที่ 4
+            ]
+          },
+          team
+        ]
+      };
+    }
+
+    const userData = await User.aggregate([
+      { $match: match },
+
+      {
+        $project: {
+          _id: 0,
+          area: 1,
+          team: {
+            $concat: [
+              { $substr: ["$area", 0, 2] },  // ตัว 1–2
+              { $substr: ["$area", 3, 1] }   // ตัวที่ 4
+            ]
+          }
+        }
+      }
+    ]);
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: userData
+    })
+
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+}

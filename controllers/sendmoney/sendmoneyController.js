@@ -33,132 +33,133 @@ const sendmoney = require('../../models/cash/sendmoney')
 exports.addSendMoney = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
-  const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-  const { Refund } = getModelsByChannel(channel, res, refundModel)
-  const { area, date, sendmoney, salePayer, saleCode } = req.body
+    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+    const { area, date, sendmoney, salePayer, saleCode } = req.body
 
-  const year = parseInt(date.slice(0, 4), 10)
-  const month = parseInt(date.slice(4, 6), 10)
-  const day = parseInt(date.slice(6, 8), 10)
-  const startOfMonthUTC = new Date(Date.UTC(year, month - 1, day - 1, 17, 0, 0))
-  const endOfMonthUTC = new Date(
-    Date.UTC(year, month - 1, day, 16, 59, 59, 999)
-  )
+    const year = parseInt(date.slice(0, 4), 10)
+    const month = parseInt(date.slice(4, 6), 10)
+    const day = parseInt(date.slice(6, 8), 10)
+    const startOfMonthUTC = new Date(
+      Date.UTC(year, month - 1, day - 1, 17, 0, 0)
+    )
+    const endOfMonthUTC = new Date(
+      Date.UTC(year, month - 1, day, 16, 59, 59, 999)
+    )
 
-  const existData = await SendMoney.aggregate([
-    { $match: { area: area } },
-    {
-      $addFields: {
-        thaiDate: {
-          $dateAdd: {
-            startDate: '$dateAt',
-            unit: 'hour',
-            amount: 7
+    const existData = await SendMoney.aggregate([
+      { $match: { area: area } },
+      {
+        $addFields: {
+          thaiDate: {
+            $dateAdd: {
+              startDate: '$dateAt',
+              unit: 'hour',
+              amount: 7
+            }
+          }
+        }
+      },
+      {
+        $match: {
+          $expr: {
+            $and: [
+              { $eq: [{ $year: '$thaiDate' }, year] },
+              { $eq: [{ $month: '$thaiDate' }, month] },
+              { $eq: [{ $dayOfMonth: '$thaiDate' }, day] }
+            ]
           }
         }
       }
-    },
-    {
-      $match: {
-        $expr: {
-          $and: [
-            { $eq: [{ $year: '$thaiDate' }, year] },
-            { $eq: [{ $month: '$thaiDate' }, month] },
-            { $eq: [{ $dayOfMonth: '$thaiDate' }, day] }
-          ]
-        }
-      }
-    }
-  ])
+    ])
 
-  const periodStr = period()
+    const periodStr = period()
 
-  const [dataRefund, dataOrderSale, dataOrderChange] = await Promise.all([
-    Refund.find({
-      'store.area': area,
-      period: periodStr,
-      createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
-      type: 'refund',
-      status: { $nin: ['pending', 'canceled', 'reject'] }
-    }),
-    Order.find({
-      'store.area': area,
-      period: periodStr,
-      createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
-      type: 'sale',
-      status: { $nin: ['canceled', 'reject'] }
-    }),
-    Order.find({
-      'store.area': area,
-      period: periodStr,
-      createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
-      type: 'change',
-      status: { $nin: ['pending', 'canceled', 'reject'] }
-    })
-  ])
+    const [dataRefund, dataOrderSale, dataOrderChange] = await Promise.all([
+      Refund.find({
+        'store.area': area,
+        period: periodStr,
+        createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+        type: 'refund',
+        status: { $nin: ['pending', 'canceled', 'reject'] }
+      }),
+      Order.find({
+        'store.area': area,
+        period: periodStr,
+        createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+        type: 'sale',
+        status: { $nin: ['canceled', 'reject'] }
+      }),
+      Order.find({
+        'store.area': area,
+        period: periodStr,
+        createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+        type: 'change',
+        status: { $nin: ['pending', 'canceled', 'reject'] }
+      })
+    ])
 
-  const refundSum = dataRefund.reduce((sum, item) => {
-    return sum + item.total
-  }, 0)
+    const refundSum = dataRefund.reduce((sum, item) => {
+      return sum + item.total
+    }, 0)
 
-  const saleSum = dataOrderSale.reduce((sum, item) => {
-    return sum + item.total
-  }, 0)
+    const saleSum = dataOrderSale.reduce((sum, item) => {
+      return sum + item.total
+    }, 0)
 
-  const changeSum = dataOrderChange.reduce((sum, item) => {
-    return sum + item.total
-  }, 0)
+    const changeSum = dataOrderChange.reduce((sum, item) => {
+      return sum + item.total
+    }, 0)
 
-  const sumTotalSale = saleSum + (changeSum - refundSum)
+    const sumTotalSale = saleSum + (changeSum - refundSum)
 
-  if (existData.length == 0) {
-    const different = sendmoney - sumTotalSale
-    sendmoneyData = await SendMoney.create({
-      area: area,
-      dateAt: startOfMonthUTC,
-      sendmoney: sendmoney,
-      salePayer: salePayer,
-      saleCode: saleCode,
-      period: periodStr,
-      different: to2(different)
-    })
-  } else {
-    const different = existData[0].sendmoney + sendmoney - sumTotalSale
-    sendmoneyData = await SendMoney.findOneAndUpdate(
-      { _id: existData[0]._id },
-      {
-        $inc: {
-          sendmoney: +sendmoney
-        },
+    if (existData.length == 0) {
+      const different = sendmoney - sumTotalSale
+      sendmoneyData = await SendMoney.create({
+        area: area,
+        dateAt: startOfMonthUTC,
+        sendmoney: sendmoney,
         salePayer: salePayer,
         saleCode: saleCode,
+        period: periodStr,
         different: to2(different)
-      }
-    )
-  }
+      })
+    } else {
+      const different = existData[0].sendmoney + sendmoney - sumTotalSale
+      sendmoneyData = await SendMoney.findOneAndUpdate(
+        { _id: existData[0]._id },
+        {
+          $inc: {
+            sendmoney: +sendmoney
+          },
+          salePayer: salePayer,
+          saleCode: saleCode,
+          different: to2(different)
+        }
+      )
+    }
 
-  const io = getSocket()
-  io.emit('sendmoney/addSendMoney', {
-    status: 200,
-    message: 'success'
-  })
+    const io = getSocket()
+    io.emit('sendmoney/addSendMoney', {
+      status: 200,
+      message: 'success'
+    })
 
-  res.status(200).json({
-    status: 200,
-    message: 'success'
-  })
+    res.status(200).json({
+      status: 200,
+      message: 'success'
+    })
   } catch (error) {
-      console.error('❌ Error:', error)
- 
-  res.status(500).json({
-    status: 500,
-    message: 'error from server',
-    error: error.message || error.toString(), // ✅ ป้องกัน circular object
-    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
-  })
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
-  
 }
 
 exports.addSendMoneyImage = async (req, res) => {
@@ -388,50 +389,49 @@ exports.getSendMoney = async (req, res) => {
 exports.getAllSendMoney = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
-  const { area, zone } = req.query
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-  const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
-  let pipeline = []
-  pipeline.push({
-    $addFields: {
-      zone: { $substrBytes: ['$area', 0, 2] }
+    const { area, zone } = req.query
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+    let pipeline = []
+    pipeline.push({
+      $addFields: {
+        zone: { $substrBytes: ['$area', 0, 2] }
+      }
+    })
+
+    let matchStage = {}
+
+    if (area) {
+      matchStage.area = area
     }
-  })
+    if (zone) {
+      matchStage.zone = zone
+    }
 
-  let matchStage = {}
+    if (Object.keys(matchStage).length > 0) {
+      pipeline.push({ $match: matchStage })
+    }
 
-  if (area) {
-    matchStage.area = area
-  }
-  if (zone) {
-    matchStage.zone = zone
-  }
+    const sendMoneyData = await SendMoney.aggregate(pipeline)
 
-  if (Object.keys(matchStage).length > 0) {
-    pipeline.push({ $match: matchStage })
-  }
+    // const io = getSocket()
+    // io.emit('sendmoney/getAllSendMoney', {});
 
-  const sendMoneyData = await SendMoney.aggregate(pipeline)
-
-  // const io = getSocket()
-  // io.emit('sendmoney/getAllSendMoney', {});
-
-  res.status(200).json({
-    status: 200,
-    message: 'success',
-    data: sendMoneyData
-  })
+    res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: sendMoneyData
+    })
   } catch (error) {
-      console.error('❌ Error:', error)
- 
-  res.status(500).json({
-    status: 500,
-    message: 'error from server',
-    error: error.message || error.toString(), // ✅ ป้องกัน circular object
-    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
-  })
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
-  
 }
 
 exports.getSendMoneyForAcc = async (req, res) => {
@@ -588,6 +588,234 @@ exports.getSendMoneyForAcc = async (req, res) => {
   }
 }
 
+exports.updateSendmoneyOld2 = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+
+    // รับ period และคำนวณปี เดือน
+    const periodStr = period()
+    const year = Number(periodStr.substring(0, 4))
+    const month = Number(periodStr.substring(4, 6))
+
+    // หาช่วงเวลา UTC ของเดือนที่ต้องการ (แปลงจากเวลาไทย)
+    const thOffset = 7 * 60 * 60 * 1000
+    const startOfMonthTH = new Date(year, month - 1, 1, 0, 0, 0, 0)
+    const endOfMonthTH = new Date(year, month, 0, 23, 59, 59, 999)
+    const startOfMonthUTC = new Date(startOfMonthTH.getTime() - thOffset)
+    const endOfMonthUTC = new Date(endOfMonthTH.getTime() - thOffset)
+
+    // ฟังก์ชันแปลงวันที่เป็น yyyy-mm-dd เวลาไทย
+    const getDateStrTH = dateUTC => {
+      const dateTH = new Date(new Date(dateUTC).getTime() + thOffset)
+      const day = dateTH.getDate().toString().padStart(2, '0')
+      const mon = (dateTH.getMonth() + 1).toString().padStart(2, '0')
+      const yr = dateTH.getFullYear()
+      return `${yr}-${mon}-${day}`
+    }
+
+    // 🔹 ดึงพนักงานขายทั้งหมด
+    const users = await User.find({ role: 'sale' }).lean()
+    if (!users.length) {
+      return res
+        .status(404)
+        .json({ status: 404, message: 'No sale users found!' })
+    }
+
+    for (const user of users) {
+      const area = user.area
+      console.log(`🔄 Processing area: ${area} (${user.warehouse})`)
+
+      const [dataSendmoney, dataRefund, dataOrderSale, dataOrderChange] =
+        await Promise.all([
+          SendMoney.aggregate([
+            {
+              $match: {
+                area: area,
+                dateAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC }
+              }
+            },
+            { $addFields: { createdAt: '$dateAt' } }
+          ]),
+          Refund.find({
+            'store.area': area,
+            period: periodStr,
+            createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+            type: 'refund',
+            status: { $nin: ['pending', 'canceled', 'reject'] }
+          }),
+          Order.find({
+            'store.area': area,
+            period: periodStr,
+            createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+            type: 'sale',
+            status: { $nin: ['canceled', 'reject'] }
+          }),
+          Order.find({
+            'store.area': area,
+            period: periodStr,
+            createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+            type: 'change',
+            status: { $nin: ['pending', 'canceled', 'reject'] }
+          })
+        ])
+
+      // รวม summary ต่อวันจาก sendmoney
+      const sumByDate = dataSendmoney.reduce((acc, item) => {
+        const dateStr = getDateStrTH(item.createdAt)
+        if (!acc[dateStr])
+          acc[dateStr] = { summary: 0, status: item.status || '' }
+        acc[dateStr].summary += item.sendmoney || 0
+        return acc
+      }, {})
+
+      const dataSendMoneyTran = Object.entries(sumByDate).map(
+        ([date, val]) => ({
+          date,
+          summary: val.summary,
+          status: val.status
+        })
+      )
+
+      const sendMoneyMap = Object.fromEntries(
+        dataSendMoneyTran.map(d => [d.date, d.summary])
+      )
+      const statusMap = Object.fromEntries(
+        dataSendMoneyTran.map(d => [d.date, d.status])
+      )
+
+      // สร้างรายการ refund แบบแบน
+      const refundListFlat = dataRefund.flatMap(item =>
+        item.listProduct.map(u => ({
+          price: u.total,
+          condition: u.condition,
+          date: getDateStrTH(item.createdAt)
+        }))
+      )
+
+      const refundByDate = refundListFlat.reduce((acc, r) => {
+        if (!acc[r.date]) acc[r.date] = []
+        acc[r.date].push(r)
+        return acc
+      }, {})
+
+      const orderSaleListFlat = dataOrderSale.flatMap(item =>
+        item.listProduct.map(u => ({
+          price: u.netTotal,
+          date: getDateStrTH(item.createdAt)
+        }))
+      )
+
+      const orderChangeListFlat = dataOrderChange.flatMap(item =>
+        item.listProduct.map(u => ({
+          price: u.netTotal,
+          date: getDateStrTH(item.createdAt)
+        }))
+      )
+
+      const saleByDate = orderSaleListFlat.reduce((acc, o) => {
+        acc[o.date] = (acc[o.date] || 0) + Number(o.price || 0)
+        return acc
+      }, {})
+
+      const changeByDate = orderChangeListFlat.reduce((acc, o) => {
+        acc[o.date] = (acc[o.date] || 0) + Number(o.price || 0)
+        return acc
+      }, {})
+
+      // เตรียมวันที่ครบทั้งเดือน
+      const lastDay = new Date(year, month, 0).getDate()
+      const allDateArr = Array.from(
+        { length: lastDay },
+        (_, i) =>
+          `${year}-${month.toString().padStart(2, '0')}-${(i + 1)
+            .toString()
+            .padStart(2, '0')}`
+      )
+
+      // สร้างผลลัพธ์รายวัน
+      const fullMonthArr = allDateArr.map(date => {
+        const sendmoneyRaw = sendMoneyMap[date] || 0
+        const sendmoney = to2(sendmoneyRaw)
+        const refundTodayRaw = refundByDate[date] || []
+        const good = to2(
+          refundTodayRaw
+            .filter(x => x.condition === 'good')
+            .reduce((sum, x) => sum + Number(x.price), 0)
+        )
+        const damaged = to2(
+          refundTodayRaw
+            .filter(x => x.condition === 'damaged')
+            .reduce((sum, x) => sum + Number(x.price), 0)
+        )
+        const summaryRaw = saleByDate[date] || 0
+        const changeRaw = changeByDate[date] || 0
+        const change = to2(changeRaw)
+        const diffChange = to2(change - damaged - good)
+        const summary = to2(summaryRaw + diffChange)
+        const diff = to2(sendmoney - summary)
+        const status = sendmoney > 0 ? 'ส่งเงินแล้ว' : 'ยังไม่ส่งเงิน'
+
+        return {
+          area,
+          date,
+          sendmoney,
+          summary,
+          diff,
+          change,
+          status,
+          good,
+          damaged,
+          diffChange
+        }
+      })
+
+      // เตรียมข้อมูลสำหรับ update
+      const fullMonthArr1 = fullMonthArr.map(item => ({
+        Amount_Send: Math.ceil(item.sendmoney),
+        DATE: item.date,
+        WH: user.warehouse
+      }))
+
+      const fullMonthArr2 = fullMonthArr.map(item => ({
+        TRANSFER_DATE: item.date,
+        Amount: Math.ceil(item.summary),
+        WH: user.warehouse
+      }))
+
+      const sendMoneyUpdateData = fullMonthArr1.filter(
+        item => item.Amount_Send > 0
+      )
+      const totalSaleUpdateData = fullMonthArr2.filter(item => item.Amount > 0)
+
+      // อัปเดตข้อมูล (ตาม warehouse ของแต่ละ user)
+      if (totalSaleUpdateData.length > 0) {
+        
+        await dataUpdateTotalSale('cash', totalSaleUpdateData, [
+          'TRANSFER_DATE',
+          'WH'
+        ])
+        console.log(`✅ Updated total sale for ${user.warehouse}`)
+      }
+    }
+
+    // ✅ ส่งผลลัพธ์สำเร็จเมื่อวนครบทุก user
+    res.status(200).json({
+      status: 200,
+      message: 'Success — updated sendmoney for all sale users'
+    })
+  } catch (error) {
+    console.error('updateSendmoneyOld ❌', error)
+    res.status(500).json({
+      status: 500,
+      message: error.message || 'Internal server error'
+    })
+  }
+}
+
 exports.updateSendmoneyOld = async (req, res) => {
   try {
     const { area } = req.body
@@ -667,7 +895,6 @@ exports.updateSendmoneyOld = async (req, res) => {
         acc[dateStr] = { summary: 0, status: item.status || '' }
       }
       acc[dateStr].summary += item.sendmoney || 0
-      // acc[dateStr].status = item.status; // ถ้าอยากใช้ status อันสุดท้ายในวันนั้น
       return acc
     }, {})
 
@@ -856,182 +1083,181 @@ exports.updateSendmoneyOld = async (req, res) => {
 exports.sendmoneyToExcel = async (req, res) => {
   try {
     const { excel, period, start, end } = req.query
-  const channel = 'cash'
+    const channel = 'cash'
 
-  const { User } = getModelsByChannel(channel, res, userModel)
-  const { Order } = getModelsByChannel(channel, res, orderModel)
-  const { Refund } = getModelsByChannel(channel, res, refundModel)
-  const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
 
-  const userData = await User.find({ role: 'sale' }).select('area')
-  let startDate, endDate
+    const userData = await User.find({ role: 'sale' }).select('area')
+    let startDate, endDate
 
-  if (start && end) {
-    // ตัด string แล้ว parse เป็น Date
-    startDate = new Date(
-      `${start.slice(0, 4)}-${start.slice(4, 6)}-${start.slice(
-        6,
-        8
-      )}T00:00:00+07:00`
-    )
-    endDate = new Date(
-      `${end.slice(0, 4)}-${end.slice(4, 6)}-${end.slice(
-        6,
-        8
-      )}T23:59:59.999+07:00`
-    )
-  } else if (period) {
-    const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
-    startDate = range.startDate
-    endDate = range.endDate
-  } else {
-    return res
-      .status(400)
-      .json({ status: 400, message: 'period or start/end are required!' })
-  }
-
-  const matchQuery = {
-    ...(period ? { period } : {}),
-    createdAt: { $gte: startDate, $lt: endDate }
-  }
-  const matchQuerySend = {
-    ...(period ? { period } : {}),
-    dateAt: { $gte: startDate, $lt: endDate }
-  }
-
-  // console.log(matchQuery)
-
-  const sumByType = async (Model, type, area) => {
-    const result = await Model.aggregate([
-      {
-        $match: {
-          type,
-          'store.area': area,
-          status: { $nin: ['canceled', 'delete'] }
-        }
-      },
-      {
-        $match: matchQuery
-      },
-      { $group: { _id: null, sendmoney: { $sum: '$total' } } }
-    ])
-    return result.length > 0 ? result[0].sendmoney : 0
-  }
-
-  const sumByTypeChangeRefund = async (Model, type, area) => {
-    const result = await Model.aggregate([
-      {
-        $match: {
-          type,
-          'store.area': area,
-          status: { $nin: ['pending', 'canceled', 'delete'] }
-        }
-      },
-      {
-        $match: matchQuery
-      },
-      { $group: { _id: null, sendmoney: { $sum: '$total' } } }
-    ])
-    return result.length > 0 ? result[0].sendmoney : 0
-  }
-
-  let dataFinal = []
-  let dataFinalExcel = []
-
-  for (item of userData) {
-    const saleSum = await sumByType(Order, 'sale', item.area)
-    const changeSum = await sumByTypeChangeRefund(Order, 'change', item.area)
-    const refundSum = await sumByTypeChangeRefund(Refund, 'refund', item.area)
-
-    const totalSale = saleSum + (changeSum - refundSum)
-    const alreadySentDocs = await SendMoney.aggregate([
-      {
-        $match: {
-          area: item.area
-        }
-      },
-      {
-        $match: matchQuerySend
-      },
-      { $unwind: '$imageList' },
-      {
-        $group: {
-          _id: null, // ไม่ group ตามค่าใด ๆ
-          totalSent: { $sum: '$sendmoney' },
-          images: { $push: '$imageList.path' }
-        }
-      },
-      {
-        $project: {
-          _id: 0, // ตัด _id ทิ้ง
-          totalSent: 1,
-          images: 1
-        }
-      }
-    ])
-
-    // console.log(alreadySentDocs);
-
-    const dataTran = {
-      area: item.area,
-      sale: to2(saleSum),
-      refund: to2(changeSum - refundSum),
-      totalSale: to2(totalSale),
-      sendmoney: to2(alreadySentDocs[0]?.totalSent ?? 0),
-      diff: to2(alreadySentDocs[0]?.totalSent - totalSale ?? 0),
-      image: alreadySentDocs[0]?.images
-    }
-
-    const dataTranExcel = {
-      เขตการขาย: item.area,
-      ยอดขาย: to2(saleSum),
-      ผลต่างใบเปลี่ยน: to2(changeSum - refundSum),
-      รวมยอดขาย: to2(totalSale),
-      ยอดชำระเงิน: to2(alreadySentDocs[0]?.totalSent ?? 0),
-      'ยอดส่งเงิน ขาด - เกิน': to2(
-        alreadySentDocs[0]?.totalSent - totalSale ?? 0
+    if (start && end) {
+      // ตัด string แล้ว parse เป็น Date
+      startDate = new Date(
+        `${start.slice(0, 4)}-${start.slice(4, 6)}-${start.slice(
+          6,
+          8
+        )}T00:00:00+07:00`
       )
+      endDate = new Date(
+        `${end.slice(0, 4)}-${end.slice(4, 6)}-${end.slice(
+          6,
+          8
+        )}T23:59:59.999+07:00`
+      )
+    } else if (period) {
+      const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
+      startDate = range.startDate
+      endDate = range.endDate
+    } else {
+      return res
+        .status(400)
+        .json({ status: 400, message: 'period or start/end are required!' })
     }
-    dataFinal.push(dataTran)
-    dataFinalExcel.push(dataTranExcel)
-  }
 
-  if (excel == 'true') {
-    const wb = xlsx.utils.book_new()
-    const ws = xlsx.utils.json_to_sheet(dataFinalExcel)
-    xlsx.utils.book_append_sheet(wb, ws, `sendMoney`)
+    const matchQuery = {
+      ...(period ? { period } : {}),
+      createdAt: { $gte: startDate, $lt: endDate }
+    }
+    const matchQuerySend = {
+      ...(period ? { period } : {}),
+      dateAt: { $gte: startDate, $lt: endDate }
+    }
 
-    const tempPath = path.join(os.tmpdir(), `sendMoney.xlsx`)
-    xlsx.writeFile(wb, tempPath)
+    // console.log(matchQuery)
 
-    res.download(tempPath, `sendMoney.xlsx`, err => {
-      if (err) {
-        console.error('❌ Download error:', err)
-        // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
-        if (!res.headersSent) {
-          res.status(500).send('Download failed')
+    const sumByType = async (Model, type, area) => {
+      const result = await Model.aggregate([
+        {
+          $match: {
+            type,
+            'store.area': area,
+            status: { $nin: ['canceled', 'delete'] }
+          }
+        },
+        {
+          $match: matchQuery
+        },
+        { $group: { _id: null, sendmoney: { $sum: '$total' } } }
+      ])
+      return result.length > 0 ? result[0].sendmoney : 0
+    }
+
+    const sumByTypeChangeRefund = async (Model, type, area) => {
+      const result = await Model.aggregate([
+        {
+          $match: {
+            type,
+            'store.area': area,
+            status: { $nin: ['pending', 'canceled', 'delete'] }
+          }
+        },
+        {
+          $match: matchQuery
+        },
+        { $group: { _id: null, sendmoney: { $sum: '$total' } } }
+      ])
+      return result.length > 0 ? result[0].sendmoney : 0
+    }
+
+    let dataFinal = []
+    let dataFinalExcel = []
+
+    for (item of userData) {
+      const saleSum = await sumByType(Order, 'sale', item.area)
+      const changeSum = await sumByTypeChangeRefund(Order, 'change', item.area)
+      const refundSum = await sumByTypeChangeRefund(Refund, 'refund', item.area)
+
+      const totalSale = saleSum + (changeSum - refundSum)
+      const alreadySentDocs = await SendMoney.aggregate([
+        {
+          $match: {
+            area: item.area
+          }
+        },
+        {
+          $match: matchQuerySend
+        },
+        { $unwind: '$imageList' },
+        {
+          $group: {
+            _id: null, // ไม่ group ตามค่าใด ๆ
+            totalSent: { $sum: '$sendmoney' },
+            images: { $push: '$imageList.path' }
+          }
+        },
+        {
+          $project: {
+            _id: 0, // ตัด _id ทิ้ง
+            totalSent: 1,
+            images: 1
+          }
         }
+      ])
+
+      // console.log(alreadySentDocs);
+
+      const dataTran = {
+        area: item.area,
+        sale: to2(saleSum),
+        refund: to2(changeSum - refundSum),
+        totalSale: to2(totalSale),
+        sendmoney: to2(alreadySentDocs[0]?.totalSent ?? 0),
+        diff: to2(alreadySentDocs[0]?.totalSent - totalSale ?? 0),
+        image: alreadySentDocs[0]?.images
       }
 
-      // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
-    })
-  } else {
-    return res.status(200).json({
-      status: 200,
-      message: 'Sucess',
-      data: dataFinal
-    })
-  }
+      const dataTranExcel = {
+        เขตการขาย: item.area,
+        ยอดขาย: to2(saleSum),
+        ผลต่างใบเปลี่ยน: to2(changeSum - refundSum),
+        รวมยอดขาย: to2(totalSale),
+        ยอดชำระเงิน: to2(alreadySentDocs[0]?.totalSent ?? 0),
+        'ยอดส่งเงิน ขาด - เกิน': to2(
+          alreadySentDocs[0]?.totalSent - totalSale ?? 0
+        )
+      }
+      dataFinal.push(dataTran)
+      dataFinalExcel.push(dataTranExcel)
+    }
+
+    if (excel == 'true') {
+      const wb = xlsx.utils.book_new()
+      const ws = xlsx.utils.json_to_sheet(dataFinalExcel)
+      xlsx.utils.book_append_sheet(wb, ws, `sendMoney`)
+
+      const tempPath = path.join(os.tmpdir(), `sendMoney.xlsx`)
+      xlsx.writeFile(wb, tempPath)
+
+      res.download(tempPath, `sendMoney.xlsx`, err => {
+        if (err) {
+          console.error('❌ Download error:', err)
+          // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+          if (!res.headersSent) {
+            res.status(500).send('Download failed')
+          }
+        }
+
+        // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+        fs.unlink(tempPath, () => {})
+      })
+    } else {
+      return res.status(200).json({
+        status: 200,
+        message: 'Sucess',
+        data: dataFinal
+      })
+    }
   } catch (error) {
-      console.error('❌ Error:', error)
- 
-  res.status(500).json({
-    status: 500,
-    message: 'error from server',
-    error: error.message || error.toString(), // ✅ ป้องกัน circular object
-    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
-  })
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
   }
-  
 }

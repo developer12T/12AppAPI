@@ -1995,22 +1995,33 @@ exports.addBueatyStore = async (req, res) => {
   const channel = req.headers['x-channel']
 
   try {
-    const bueatydata = await bueatyStoreQuery()
-    const { TypeStore } = getModelsByChannel(channel, res, storeModel)
+    const bueatydata = await bueatyStoreQuery();
+    const { TypeStore } = getModelsByChannel(channel, res, storeModel);
 
-    await TypeStore.deleteMany({})
+    for (const row of bueatydata) {
+      // trim storeId ก่อน
+      const storeIdTrimmed = typeof row.storeId === 'string'
+        ? row.storeId.trim()
+        : row.storeId;
 
-    await TypeStore.insertMany(
-      bueatydata.map(x => {
-        const trimmed = Object.fromEntries(
-          Object.entries(x).map(([key, value]) => [
-            key,
-            typeof value === 'string' ? value.trim() : value
-          ])
-        )
-        return { ...trimmed, type: ['beauty'] }
-      })
-    )
+      // check ซ้ำด้วยค่า trimmed
+      const existTypeStore = await TypeStore.findOne({ storeId: storeIdTrimmed });
+      if (existTypeStore) continue;
+
+      // trim ทุก field ก่อน insert
+      const trimmed = Object.fromEntries(
+        Object.entries(row).map(([key, value]) => [
+          key,
+          typeof value === 'string' ? value.trim() : value
+        ])
+      );
+
+      await TypeStore.create({
+        ...trimmed,
+        storeId: storeIdTrimmed, // ensure cleaned version
+        type: ['beauty']
+      });
+    }
 
     const io = getSocket()
     io.emit('store/addBueatyStore', {})
@@ -3678,4 +3689,77 @@ exports.areaStoreM3toMongo = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
+}
+
+function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000; // รัศมีโลก (เมตร)
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) *
+    Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) ** 2;
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c; // ระยะห่าง (เมตร)
+}
+
+
+exports.checkLatLongByStore = async (req, res) => {
+  try {
+    const { storeId, lat, long } = req.body;
+    const channel = req.headers['x-channel'];
+    const { Store } = getModelsByChannel(channel, res, storeModel);
+
+    // หาข้อมูลร้าน
+    const dataStore = await Store.findOne({ storeId });
+
+    if (!dataStore) {
+      return res.status(404).json({
+        status: 404,
+        message: "Store not found"
+      });
+    }
+
+    const storeLat = Number(dataStore.latitude);
+    const storeLon = Number(dataStore.longtitude);
+
+    // คำนวณระยะ
+    const distance = getDistanceFromLatLonInMeters(
+      Number(lat),
+      Number(long),
+      storeLat,
+      storeLon
+    );
+
+    res.status(200).json({
+      status: 200,
+      message: "success",
+      distance: distance.toFixed(2), // แสดงเป็นเมตร
+      data: {
+        sentLat: lat,
+        sentLong: long,
+        storeLat,
+        storeLon
+      }
+    });
+
+
+
+
+
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+
 }

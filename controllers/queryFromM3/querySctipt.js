@@ -110,7 +110,6 @@ WHERE
 }
 
 exports.userPcSample = async function (channel, area) {
-
   const config = {
     host: process.env.MY_SQL_SERVER,
     user: process.env.MY_SQL_USER,
@@ -149,14 +148,12 @@ exports.userPcSample = async function (channel, area) {
     --   DA.Sale_Code is not NULL AND
     --   DA.Sale_Code != 'ว่าง' 
         `
-    // console.log(query)
-    
-    const [result] = await connection.execute(query, [channel])
+  // console.log(query)
+
+  const [result] = await connection.execute(query, [channel])
 
   return result
 }
-
-
 
 exports.userQueryOne = async function (channel, area) {
   const config = {
@@ -822,11 +819,11 @@ exports.productQuery = async function (channel) {
   } else if (channel === 'credit') {
     priceType = 'PRICE'
     openType = 'IS_OPEN'
-  } else if (channel === 'pc'){
+  } else if (channel === 'pc') {
     priceType = 'PRICE2'
     openType = 'IS_OPEN2'
   }
-  const id = (name) => connection.escapeId(name)
+  const id = name => connection.escapeId(name)
   const query = `
       SELECT 
       ITNO AS id,
@@ -869,9 +866,8 @@ exports.productQuery = async function (channel) {
       LEFT JOIN m_prd_group gp ON a.GRP = gp.GRP_CODE
       `
   // console.log(query)
-  
-  const [result] = await connection.execute(query, [channel])
 
+  const [result] = await connection.execute(query, [channel])
 
   const returnArr = []
 
@@ -1180,6 +1176,39 @@ exports.dataUpdateTotalSale = async function (channel, data, primaryKeys = []) {
   await connection.end()
 }
 
+// exports.dataWithdrawInsert = async function (channel, data) {
+//   const config = {
+//     user: process.env.POWERBI_USER,
+//     password: process.env.POWERBI_PASSWORD,
+//     server: process.env.POWERBI_HOST,
+//     database: process.env.POWERBI_DATABASE,
+//     options: {
+//       encrypt: false,
+//       trustServerCertificate: true
+//     }
+//   }
+//   // console.log(RouteId)
+//   await sql.connect(config)
+
+//   for (const item of data) {
+//     const request = new sql.Request()
+//     for (let [key, value] of Object.entries(item)) {
+//       request.input(key, value)
+//     }
+
+//     const query = `
+//     INSERT INTO [dbo].[withdrawCash] (
+//       ${Object.keys(item).join(',')}
+//     ) VALUES (
+//       ${Object.keys(item)
+//         .map(k => '@' + k)
+//         .join(',')}
+//     )
+//   `
+//     await request.query(query)
+//   }
+// }
+
 exports.dataWithdrawInsert = async function (channel, data) {
   const config = {
     user: process.env.POWERBI_USER,
@@ -1191,25 +1220,45 @@ exports.dataWithdrawInsert = async function (channel, data) {
       trustServerCertificate: true
     }
   }
-  // console.log(RouteId)
-  await sql.connect(config)
+
+  const pool = await sql.connect(config)
 
   for (const item of data) {
-    const request = new sql.Request()
+    const request = pool.request()
     for (let [key, value] of Object.entries(item)) {
       request.input(key, value)
     }
 
+    // 👇 สมมติว่าคีย์หลักคือ withdrawNo + lineNo
+    // ปรับชื่อ field ให้ตรงกับ schema จริง
     const query = `
-    INSERT INTO [dbo].[withdrawCash] (
-      ${Object.keys(item).join(',')}
-    ) VALUES (
-      ${Object.keys(item)
-        .map(k => '@' + k)
-        .join(',')}
-    )
-  `
-    await request.query(query)
+      IF NOT EXISTS (
+        SELECT 1
+        FROM [dbo].[withdrawCash] WITH (UPDLOCK, HOLDLOCK)
+        WHERE WD_NO = @WD_NO AND ITEM_CODE = @ITEM_CODE
+      )
+      BEGIN
+        INSERT INTO [dbo].[withdrawCash] (
+          ${Object.keys(item).join(',')}
+        ) VALUES (
+          ${Object.keys(item)
+            .map(k => '@' + k)
+            .join(',')}
+        )
+      END
+    `
+
+    try {
+      await request.query(query)
+    } catch (err) {
+      if (err.message.includes('PRIMARY KEY constraint')) {
+        console.warn(
+          `⚠️ Skip duplicate withdrawNo=${item.withdrawNo}, lineNo=${item.lineNo}`
+        )
+      } else {
+        throw err
+      }
+    }
   }
 }
 
@@ -1435,8 +1484,6 @@ exports.wereHouseQuery = async function (channel) {
   return result.recordset
 }
 
-
-
 exports.productFoodtruckQuery = async function () {
   const config = {
     user: process.env.MS_SQL_USER,
@@ -1498,7 +1545,7 @@ exports.stockPcQuery = async function (channel, period, wereHouse) {
   GROUP BY WH, ITEM_CODE
 `
     }
-  } 
+  }
   await sql.close()
 
   return result.recordset

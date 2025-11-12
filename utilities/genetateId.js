@@ -367,12 +367,13 @@ const generateOrderIdStoreLatLong = async (area, warehouse, channel, res) => {
       .padStart(4, '0')}`
 }
 
-const generateOrderIdFoodTruck = async (area,channel,res) => {
+const generateOrderIdFoodTruck = async (area,warehouse,channel,res) => {
   const currentYear = new Date().getFullYear() + 543
   const currentMonth = (new Date().getMonth() + 1).toString().padStart(2, '0')
-  const { NoodleSales } = getModelsByChannel(channel, res, noodleSaleModel)
+  const { Order } = getModelsByChannel(channel, res, orderModel)
 
-  const latestOrder = await NoodleSales.findOne({
+
+  const latestOrder = await Order.findOne({
     'store.area': area,
     createdAt: {
       $gte: new Date(`${new Date().getFullYear()}-${currentMonth}-01`),
@@ -383,21 +384,19 @@ const generateOrderIdFoodTruck = async (area,channel,res) => {
   })
     .sort({ orderId: -1 })
     .select('orderId')
+
   // console.log("latestOrder",latestOrder)
+
   let runningNumber = latestOrder
     ? parseInt(latestOrder.orderId.slice(-4)) + 1
     : 1
 
 
-  const orderId = `F${currentYear.toString().slice(2, 4)}${currentMonth}${runningNumber.toString().padStart(4, '0')}`
+  const orderId = `${currentYear.toString().slice(2, 4)}${currentMonth}15${warehouse}${runningNumber.toString().padStart(4, '0')}`
 
   // console.log('orderId',orderId)
 
-  return `F${currentYear
-    .toString()
-    .slice(2, 4)}${currentMonth}${runningNumber
-      .toString()
-      .padStart(4, '0')}`
+  return orderId
 }
 
 

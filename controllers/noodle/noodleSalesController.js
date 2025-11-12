@@ -6,6 +6,7 @@ const typetruck = require("../../models/cash/typetruck");
 const noodleCartModel = require("../../models/foodtruck/noodleCart");
 const cartModel = require("../../models/cash/cart");
 const noodleSaleModel = require("../../models/foodtruck/noodleSale");
+const orderModel = require('../../models/cash/sale')
 const noodleItemModel = require("../../models/foodtruck/noodleItem");
 const { generateOrderIdFoodTruck } = require("../../utilities/genetateId");
 const {
@@ -15,7 +16,7 @@ const {
   getPeriodFromDate
 } = require('../../middleware/order')
 const productModel = require('../../models/cash/product');
-const { before } = require("lodash");
+const { before, range } = require("lodash");
 const orderTimestamps = {};
 
 exports.checkout = async (req, res) => {
@@ -24,6 +25,7 @@ exports.checkout = async (req, res) => {
     const { type, area, storeId, period, payment } = req.body;
 
     const channel = req.headers["x-channel"];
+    const { Order } = getModelsByChannel(channel, res, orderModel)
     const { NoodleSales } = getModelsByChannel(channel, res, noodleSaleModel);
     const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
     const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel);
@@ -57,11 +59,11 @@ exports.checkout = async (req, res) => {
         .json({ status: 404, message: "NoodleCart is empty!" });
     }
 
-    const noodleItem = await NoodleItems.findOne({ id: cart.id });
     const sale = (await User.findOne({ area: area })) ?? {};
-    const orderId = await generateOrderIdFoodTruck(area, channel, res);
+    // console.log(area,sale.warehouse)
+    const orderId = await generateOrderIdFoodTruck(area, sale.warehouse, channel, res);
 
-    const total = to2(cart.price); // ราคารวมภาษี เช่น 45
+    const total = to2(cart.total); // ราคารวมภาษี เช่น 45
     const totalExVat = to2(total / 1.07); // แยกภาษีออก
 
     const productIds = cart.listProduct.map(p => p.id);
@@ -86,9 +88,10 @@ exports.checkout = async (req, res) => {
       subtotal += totalPrice;
 
       return {
+        type: item.type || '',
         id: product.id || '',
         sku: item.sku || '',
-        name: product.name || '',
+        name: item.name || '',
         group: product.group || '',
         groupCode: product.groupCode || '',
         brandCode: product.brandCode || '',
@@ -99,43 +102,51 @@ exports.checkout = async (req, res) => {
         qty: item.qty || '',
         unit: item.unit || '',
         unitName: unitData.name || '',
-        price: unitData.price.sale || 0,
-        subtotal: parseFloat(totalPrice.toFixed(2)) || 0,
+        price: item.price || 0,
+        subtotal: parseFloat(item.totalPrice.toFixed(2)) || 0,
         discount: 0,
-        netTotal: parseFloat(totalPrice.toFixed(2)) || 0
+        netTotal: parseFloat(item.totalPrice.toFixed(2)) || 0,
+        time: item.time,
+        remark: item.remark,
       };
     });
 
     if (listProduct.includes(null)) return;
 
-    // เวลาไทย = UTC + 7 ชั่วโมง
-    const thailand = new Date(now.getTime() + 7 * 60 * 60 * 1000);
-
     const start = new Date(Date.UTC(
-      thailand.getFullYear(),
-      thailand.getMonth(),
-      thailand.getDate(),
-      -7, 0, 0 // ⬅️ = UTC ของเวลา 00:00 ไทย
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate() - 1, // ✅ ลบ 1 วัน เพราะไทยเร็วกว่า UTC 7 ชั่วโมง
+      17, 0, 0               // 17 UTC = 00:00 ไทย
     ));
 
-    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1)
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
 
-    const exitOrder = await NoodleSales.findOne({
+    const exitOrder = await Order.findOne({
       'store.area': area,
       status: { $in: ['pending', 'paid'] },
       createdAt: { $gte: start, $lte: end }
     }).sort({ createdAt: -1 }).select('number waiting')
 
+    const maxOrder = await Order.findOne({ 'store.area': area })
+      .sort({ number: -1 }) // เรียงจากมากไปน้อย
+      .select('number');    // ดึงเฉพาะ field number (จะเร็วขึ้น)
+
+    const maxNumber = maxOrder ? maxOrder.number : 0; // ถ้าไม่เจอให้เป็น 0
+
     let number = 0
     let waiting = 0
 
+
     if (exitOrder) {
-      number = exitOrder.number + 1
+      number = maxNumber + 1 || 1
       waiting = exitOrder.waiting + 1
     } else {
-      number = 1
+      number = maxNumber + 1 || 1
       waiting = 0
     }
+
+    // console.log('maxNumber.number',maxNumber)
 
     const noodleOrder = {
       orderId,
@@ -144,7 +155,7 @@ exports.checkout = async (req, res) => {
       number: number,
       waiting: waiting,
       status: "pending",
-      statusTH: "รอนำเข้า",
+      statusTH: "รอชำระ",
       sale: {
         saleCode: sale.saleCode || "",
         salePayer: sale.salePayer || "",
@@ -192,8 +203,35 @@ exports.checkout = async (req, res) => {
       period: period
     };
 
-    await NoodleSales.create(noodleOrder);
+
+    const qtyproduct = noodleOrder.listProduct
+      .filter(u => u?.id && u?.unit && u?.qty > 0)
+      .map(u => ({
+        id: u.id,
+        unit: u.unit,
+        qty: u.qty,
+        statusMovement: 'OUT'
+      }))
+
+
+    for (const item of qtyproduct) {
+      const updateResult = await updateStockMongo(
+        item,
+        area,
+        period,
+        'sale',
+        channel,
+        res
+      )
+      if (updateResult) return
+    }
+
+
+
+
+    await Order.create(noodleOrder);
     await NoodleCart.deleteOne({ type, area, storeId });
+
 
     res.status(201).json({
       status: 201,
@@ -214,18 +252,18 @@ exports.updateStatus = async (req, res) => {
     const { NoodleSales } = getModelsByChannel(channel, res, noodleSaleModel);
     const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
     const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel);
-
+    const { Order } = getModelsByChannel(channel, res, orderModel)
     const { orderId, status } = req.body
 
     let statusStrTH = ''
     let orderUpdated = {}
-  
-    const orderDetail = await NoodleSales.findOne({ orderId: orderId ,status:{$in: ['paid', 'pending']}})
+
+    const orderDetail = await Order.findOne({ orderId: orderId, status: { $in: ['paid', 'pending'] } })
 
     if (!orderDetail) {
       return res.status(404).json({
         status: 400,
-        message: 'Not found Order'
+        message: 'Not found Order or status is success'
       })
     }
     const area = orderDetail.store.area
@@ -233,7 +271,7 @@ exports.updateStatus = async (req, res) => {
     switch (status) {
       case 'paid':
         statusStrTH = 'จ่ายเงินแล้ว'
-        orderUpdated = await NoodleSales.findOneAndUpdate(
+        orderUpdated = await Order.findOneAndUpdate(
           { orderId },
           {
             $set: {
@@ -244,7 +282,7 @@ exports.updateStatus = async (req, res) => {
           { new: true }
         );
         break
-      case 'sucess':
+      case 'success':
 
         const now = new Date();
         const thailand = new Date(now.getTime() + 7 * 60 * 60 * 1000);
@@ -257,10 +295,8 @@ exports.updateStatus = async (req, res) => {
         ));
 
         const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1)
-
-
         statusStrTH = 'สำเร็จแล้ว'
-        orderUpdated = await NoodleSales.findOneAndUpdate(
+        orderUpdated = await Order.findOneAndUpdate(
           { orderId },
           {
             $set: {
@@ -270,17 +306,27 @@ exports.updateStatus = async (req, res) => {
           },
           { new: true }
         );
+        const dataOrder = await Order.find({
+          'store.area': area,
+          status: { $in: ['paid', 'pending'] },
+          createdAt: { $gte: start, $lte: end }
+        }).sort({ number: 1 }).select('number orderId');
 
-        await NoodleSales.updateMany(
-          {
-            'store.area': area,
-            status: { $in: ['paid', 'pending'] },
-            createdAt: { $gte: start, $lte: end }
-          },
-          {
-            $inc: { waiting: -1 } // ✅ ไม่ต้องอยู่ใน $set
-          }
-        );
+        // console.log(dataOrder)
+        let count = 0;
+
+        for (const order of dataOrder) {
+
+          await Order.updateMany(
+            {
+              orderId: order.orderId
+            },
+            {
+              $set: { waiting: count } // ✅ ไม่ต้องอยู่ใน $set
+            }
+          );
+          count++;
+        }
 
         break
       default:
@@ -317,14 +363,14 @@ exports.orderIdDetailFoodtruck = async (req, res) => {
     const { NoodleSales } = getModelsByChannel(channel, res, noodleSaleModel);
     const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
     const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel);
-
+    const { Order } = getModelsByChannel(channel, res, orderModel)
     if (!orderId) {
       return res
         .status(400)
         .json({ status: 400, message: "Missing required fields!" });
     }
 
-    const foodTruckData = await NoodleSales.find({ orderId: orderId })
+    const foodTruckData = await Order.find({ orderId: orderId })
 
     const data = foodTruckData.map(item => {
 
@@ -417,6 +463,109 @@ exports.orderIdDetailFoodtruck = async (req, res) => {
       data: data
     })
 
+
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ status: "500", message: error.message });
+  }
+}
+
+exports.updatePickUp = async (req, res) => {
+  try {
+
+    const { pickUp, orderId } = req.body
+
+    if (!pickUp) {
+      return res.status(404).json({
+        message: 'Not found pickUp status'
+      })
+    }
+    const channel = req.headers["x-channel"];
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { NoodleSales } = getModelsByChannel(channel, res, noodleSaleModel);
+    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
+    const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel);
+
+    const existOrder = await Order.find({ orderId: orderId })
+
+    if (!existOrder) {
+      return res.status(404).json({
+        message: 'Not found orderId'
+      })
+    }
+
+    const data = await Order.findOneAndUpdate(
+      { orderId: orderId },
+      {
+        $set: {
+          pickUp: pickUp
+        }
+      },
+      { new: true }
+    )
+
+    res.status(201).json({
+      status: 201,
+      message: 'Update pickup sucess',
+      data: data
+    })
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ status: "500", message: error.message });
+  }
+}
+
+
+exports.updateQrPayment = async (req, res) => {
+  try {
+    const { value, orderId } = req.body
+    const channel = req.headers["x-channel"];
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+
+    const existOrder = await Order.find({ orderId: orderId })
+
+    if (!existOrder) {
+      res.status(404).json({
+        status: 404,
+        message: 'Not found Order'
+      })
+    }
+
+    const order = await Order.findOne({
+      orderId: orderId,
+      $expr: {
+        $and: [
+          { $gte: [{ $add: ["$qr", +value] }, 0] },
+          { $gte: [{ $add: ["$total", -value] }, 0] }
+        ]
+      }
+    })
+
+    if (!order) {
+      return res.status(400).json({
+        status: 400,
+        message: 'Cannot update: negative value or order not found.'
+      })
+    }
+
+    const dataUpdate = await Order.findOneAndUpdate(
+      { orderId: orderId },
+      {
+        $inc: {
+          qr: +value,
+          total: -value
+        }
+      },
+      { new: true }
+    )
+
+    res.status(201).json({
+      status: 201,
+      message: 'update payment qr success',
+      data: dataUpdate
+    })
 
 
   } catch (error) {

@@ -2,22 +2,17 @@ const mongoose = require("mongoose");
 const { dbCA } = require("../../config/db");
 
 const listOrderProductSchema = new mongoose.Schema({
-  id: { type: String, require: true },
-  sku: { type: String },
-  groupCode: { type: String },
-  qty: { type: Number },
-  price: { type: Number },
+  type :{ type: String, require: true, },
+  id: { type: String, require: true, },
+  name: { type: String, require: true, },
+  sku: { type: String, require: true, },
+  qty: { type: Number, require: true, },
+  unitPrice: { type: Number },
+  price: { type: Number, require: true, default: 0 },
+  unit: { type: String, require: true, },
+  time: { type: String },
+  remark:{ type: String },
 
-  // ingredients: [
-  //   {
-  //     type: { type: String },
-  //     id: { type: String },
-  //     name: { type: String },
-  //     nameTH: { type: String },
-  //     groupCode: { type: String },
-  //     price: { type: Number },
-  //   },
-  // ],
 });
 
 const orderStoreSchema = new mongoose.Schema({

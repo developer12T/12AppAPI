@@ -606,6 +606,8 @@ exports.getOrder = async (req, res) => {
           8
         )}T23:59:59.999+07:00`
       )
+
+      // console.log(startDate,endDate)
     } else if (period) {
       const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
       startDate = range.startDate
@@ -704,6 +706,8 @@ exports.getOrder = async (req, res) => {
         $project: {
           orderId: 1,
           orderNo: 1,
+          number: 1,
+          waiting: 1,
           lowStatus: 1,
           heightStatus: 1,
           lineM3: 1,
@@ -745,6 +749,8 @@ exports.getOrder = async (req, res) => {
     response = order.map(o => ({
       orderId: o.orderId,
       orderNo: o.orderNo ?? '',
+      number: o.number ?? 0,
+      waiting: o.waiting ?? 0,
       lowStatus: o.lowStatus ?? '',
       heightStatus: o.heightStatus ?? '',
       lineM3: o.lineM3 ?? 0,
@@ -774,6 +780,17 @@ exports.getOrder = async (req, res) => {
 
     // const io = getSocket()
     // io.emit('order/all', {});
+    if (channel === 'pc') {
+      response.sort((a, b) => {
+        // 1️⃣ ถ้า a เป็น success แต่ b ไม่ใช่ → เอา a ไปท้าย
+        if (a.status === 'success' && b.status !== 'success') return 1;
+        // 2️⃣ ถ้า b เป็น success แต่ a ไม่ใช่ → เอา b ไปท้าย
+        if (b.status === 'success' && a.status !== 'success') return -1;
+        // 3️⃣ ถ้า status เหมือนกัน → เรียงตาม number ปกติ
+        return a.number - b.number;
+      });
+    }
+
 
     res.status(200).json({
       status: 200,
@@ -5771,9 +5788,9 @@ exports.updateOrderDistribution = async (req, res) => {
 
     const currentDate = `${year}${month}${day}`
     // const startDate = `${year}${month}${day}`
-    const startDate = `20251104`
+    const startDate = `20251105`
     // const endDate = `${year}${month}${nextDay}`
-    const endDate = `20251104`
+    const endDate = `20251105`
     const status = ''
     const channel = 'cash'
 
@@ -6719,6 +6736,125 @@ exports.updateUserSaleInOrder = async (req, res) => {
         totalUpdated
       }
     })
+  } catch (error) {
+    console.error('❌ updateUserSaleInOrder error:', error)
+    return res.status(500).json({
+      status: 500,
+      message: 'Server error',
+      error: error.message
+    })
+  }
+}
+
+
+exports.getOrderPcToExcel = async (req, res) => {
+  try {
+    const { channel } = req.query
+    let { startDate, endDate } = req.query
+    const { area, team, zone } = req.query
+
+    // console.log(channel, date)
+    let statusArray = (req.query.status || '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+
+    if (statusArray.length === 0) {
+      statusArray = ['pending'] // default
+    }
+
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+
+    if (!/^\d{8}$/.test(startDate)) {
+      const nowTH = new Date(
+        new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })
+      )
+      const y = nowTH.getFullYear()
+      const m = String(nowTH.getMonth() + 1).padStart(2, '0')
+      const d = String(nowTH.getDate()).padStart(2, '0') // ← ใช้ getDate() ไม่ใช่ getDay()
+      startDate = `${y}${m}${d}` // YYYYMMDD
+      endDate = `${y}${m}${d}` // YYYYMMDD
+    }
+    const startTH = new Date(
+      `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
+        6,
+        8
+      )}T00:00:00+07:00`
+    )
+    const endTH = new Date(
+      `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(
+        6,
+        8
+      )}T23:59:59.999+07:00`
+    )
+
+    let query = {
+      createdAt: {
+        $gte: startTH,
+        $lte: endTH
+      },
+      status: { $nin: ['canceled'] },
+      status: { $in: statusArray },
+      type: { $in: ['sale'] },
+      'store.area': { $ne: 'IT211' }
+    }
+
+    if (area) {
+      query['store.area'] = area
+      queryChange['store.area'] = area
+      queryRefund['store.area'] = area
+    } else if (zone) {
+      query['store.area'] = { $regex: `^${zone}`, $options: 'i' }
+      queryChange['store.area'] = { $regex: `^${zone}`, $options: 'i' }
+      queryRefund['store.area'] = { $regex: `^${zone}`, $options: 'i' }
+    }
+
+    const pipeline = [
+      {
+        $match: query
+      },
+      {
+        $addFields: {
+          createdAtThai: {
+            $dateAdd: {
+              startDate: '$createdAt',
+              unit: 'hour',
+              amount: 7
+            }
+          },
+          team3: {
+            $concat: [
+              { $substrCP: ['$store.area', 0, 2] },
+              { $substrCP: ['$store.area', 3, 1] }
+            ]
+          }
+        }
+      }
+    ]
+    if (team) {
+      pipeline.push({
+        $match: {
+          team3: { $regex: `^${team}`, $options: 'i' }
+        }
+      })
+    }
+
+    pipeline.push({
+      $sort: { statusASC: 1, createdAt: -1 }
+    })
+
+    const modelOrder = await Order.aggregate(pipeline)
+
+    res.status(200).json({
+      status:200,
+      message:'fetch data Success',
+      data:modelOrder
+    })
+
+
+
+
   } catch (error) {
     console.error('❌ updateUserSaleInOrder error:', error)
     return res.status(500).json({
