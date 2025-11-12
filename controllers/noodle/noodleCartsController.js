@@ -15,7 +15,7 @@ const {
 
 exports.addNoodleCart = async (req, res) => {
   try {
-    const { type, area, storeId, sku, id, qty, price, unit } = req.body
+    const { type, area, sku, id, qty, price, unit } = req.body
 
     const channel = req.headers['x-channel']
 
@@ -23,8 +23,7 @@ exports.addNoodleCart = async (req, res) => {
 
     const existNoodleCart = await NoodleCart.findOne({
       type,
-      area,
-      storeId
+      area
     })
 
     if (existNoodleCart) {
@@ -38,15 +37,18 @@ exports.addNoodleCart = async (req, res) => {
       if (existingIndex !== -1) {
         // ✅ ถ้ามีอยู่แล้ว → บวก qty และ price ต่อ
         existNoodleCart.listProduct[existingIndex].qty += qty
-        existNoodleCart.listProduct[existingIndex].price += price
+        existNoodleCart.listProduct[existingIndex].totalPrice += price * qty
+        existNoodleCart.total += price * qty
       } else {
         // ✅ ถ้ายังไม่มี → เพิ่มใหม่
+        existNoodleCart.total += price * qty
         existNoodleCart.listProduct.push({
           sku,
           id,
           qty,
           price,
-          unit
+          unit,
+          totalPrice :price * qty
         })
       }
 
@@ -55,25 +57,47 @@ exports.addNoodleCart = async (req, res) => {
       const data = {
         type,
         area,
-        storeId,
         listProduct: [
           {
             sku,
             id,
             qty,
             price,
-            unit
+            unit,
+            totalPrice : qty * price
           }
-        ]
+        ],
+        total : qty * price
       }
 
       await NoodleCart.create(data)
     }
 
+    const cart = await NoodleCart.findOne({
+      type,
+      area
+    })
+
+    const period = getPeriodFromDate(cart.createdAt)
+    const qtyProduct = { id: id, qty: qty, unit: unit }
+
+    const updateResult = await updateStockMongo(
+        qtyProduct,
+        area,
+        period,
+        'addproduct',
+        channel,
+        'OUT', // ส่ง stockType เข้าไปด้วย!
+        res
+      )
+      if (updateResult) return
+
+
+
+
     res.status(200).json({
       status: 201,
-      message: 'Insert cart Sucess'
-      // data: data,
+      message: 'Insert cart Sucess',
     })
   } catch (error) {
     console.error('❌ Error:', error)
@@ -96,7 +120,7 @@ exports.deleteProductNoodle = async (req, res) => {
     const channel = req.headers['x-channel']
     const { type, area, storeId, id, sku, unit } = req.body
     const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel)
-    const storeIdAndId = `${type}_${storeId}_${id}_${unit}`
+    const storeIdAndId = `${type}_${id}_${unit}`
     const now = Date.now()
     const lastUpdate = productTimestamps[storeIdAndId] || 0
     const ONE_MINUTE = 15 * 1000
@@ -151,15 +175,15 @@ exports.deleteProductNoodle = async (req, res) => {
 
     const period = getPeriodFromDate(cart.createdAt)
 
-    // const updateResult = await updateStockMongo(
-    //   product,
-    //   area,
-    //   period,
-    //   'deleteCart',
-    //   channel,
-    //   res
-    // )
-    // if (updateResult) return
+    const updateResult = await updateStockMongo(
+      product,
+      area,
+      period,
+      'deleteCart',
+      channel,
+      res
+    )
+    if (updateResult) return
 
     if (cart.listProduct.length === 0) {
       await NoodleCart.deleteOne({ type: type, area: area, storeId: storeId })

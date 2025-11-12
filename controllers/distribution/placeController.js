@@ -108,8 +108,11 @@ exports.getType = async (req, res) => {
     const channel = req.headers['x-channel']
     const { Place } = getModelsByChannel(channel, res, distributionModel)
 
-    const places = await Place.find({}, { listAddress: 1 }).lean()
-
+    const places = await Place.find(
+      { area: { $not: /PC|EV/i } }, // i = case-insensitive
+      { listAddress: 1 }
+    ).lean();
+    // console.log(places)
     if (!places.length) {
       return res.status(404).json({
         status: '404',

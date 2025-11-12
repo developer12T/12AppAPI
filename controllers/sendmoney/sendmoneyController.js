@@ -11,7 +11,14 @@ const multer = require('multer')
 const xlsx = require('xlsx')
 const os = require('os')
 const fs = require('fs')
-const { replace } = require('lodash')
+const { replace, filter } = require('lodash')
+const {
+  getSeries,
+  updateRunningNumber,
+  getOrders,
+  getChange,
+  getRefund
+} = require('../../middleware/order')
 const upload = multer({ storage: multer.memoryStorage() }).array(
   'sendmoneyImage',
   1
@@ -446,7 +453,7 @@ exports.getSendMoneyForAcc = async (req, res) => {
     }
 
     const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
-    const { User } = getModelsByChannel(channel, res, userModel)
+    const { User } = getModelsByChannel('user', res, userModel)
 
     const year = Number(date.slice(0, 4))
     const month = Number(date.slice(5, 7))
@@ -551,13 +558,13 @@ exports.getSendMoneyForAcc = async (req, res) => {
           SALE: '$_id.SALE',
           STATUS: { $cond: [{ $eq: ['$VALUES', 0] }, 'NOT OK', 'OK'] },
           TRANSFER_DATE: '$_id.TRANSFER_DATE',
-          VALUES: {
-            $cond: [
-              { $eq: ['$VALUES', null] },
-              '0.00',
-              { $toString: { $round: ['$VALUES', 2] } }
-            ]
-          },
+          // VALUES: {
+          //   $cond: [
+          //     { $eq: ['$VALUES', null] },
+          //     '0.00',
+          //     { $toString: { $round: ['$VALUES', 2] } }
+          //   ]
+          // },
           ZONE: '$_id.ZONE',
           IMAGE: '$_id.IMAGE',
           WAREHOUSE: '$_id.WAREHOUSE'
@@ -570,15 +577,41 @@ exports.getSendMoneyForAcc = async (req, res) => {
       COUNT: `${totalUserCount}`,
       VALUES: Number(item.VALUES).toFixed(2)
     }))
+
+
+    const areaList = [...new Set(formatted.flatMap(item => item.AREA))];
+    const dataOrder = await getOrders(areaList, res, channel, 'area', start, end)
+    const dataChange = await getChange(areaList, res, channel, 'area', start, end)
+    const dataRefund = await getRefund(areaList, res, channel, 'area', start, end)
+
+    let dataFinal = []
+
     // console.log(formatted)
 
-    // res.setHeader(
-    //   'Content-Disposition',
-    //   `attachment; filename="sendmoney_${date}.json"`
-    // )
-    // res.setHeader('Content-Type', 'application/json; charset=utf-8')
-    // res.send(JSON.stringify({ formatted }, null, 2)) // pretty format
-    res.status(200).json(formatted)
+    for (const row of formatted) {
+      const dataOrderArea = dataOrder.filter(item => item.store.area === row.AREA);
+      const dataChangeArea = dataChange.filter(item => item.store.area === row.AREA);
+      const dataRefundArea = dataRefund.filter(item => item.store.area === row.AREA);
+
+      const totalOrder = dataOrderArea.reduce((sum, i) => sum + (i.total || 0), 0);
+      const totalChange = dataChangeArea.reduce((sum, i) => sum + (i.total || 0), 0);
+      const totalRefund = dataRefundArea.reduce((sum, i) => sum + (i.total || 0), 0);
+
+
+      
+      const VALUES = to2(totalOrder + (totalChange - totalRefund));
+
+      dataFinal.push({
+        ...row,
+        VALUES:VALUES
+      })
+
+    }
+
+
+
+
+    res.status(200).json(dataFinal)
   } catch (err) {
     console.error('[getSendMoneyForAcc] ❌', err)
     res.status(500).json({
@@ -596,19 +629,27 @@ exports.updateSendmoneyOld2 = async (req, res) => {
     const { Refund } = getModelsByChannel(channel, res, refundModel)
     const { User } = getModelsByChannel(channel, res, userModel)
 
-    // รับ period และคำนวณปี เดือน
+    // ดึง user ทั้งหมดที่เป็น sale
+    const users = await User.find({ role: 'sale' }).lean()
+    if (!users.length) {
+      return res
+        .status(404)
+        .json({ status: 404, message: 'No sale users found!' })
+    }
+
+    // เตรียม period เดือนปัจจุบัน
     const periodStr = period()
     const year = Number(periodStr.substring(0, 4))
     const month = Number(periodStr.substring(4, 6))
 
-    // หาช่วงเวลา UTC ของเดือนที่ต้องการ (แปลงจากเวลาไทย)
+    // เวลาไทยและ UTC
     const thOffset = 7 * 60 * 60 * 1000
     const startOfMonthTH = new Date(year, month - 1, 1, 0, 0, 0, 0)
     const endOfMonthTH = new Date(year, month, 0, 23, 59, 59, 999)
     const startOfMonthUTC = new Date(startOfMonthTH.getTime() - thOffset)
     const endOfMonthUTC = new Date(endOfMonthTH.getTime() - thOffset)
 
-    // ฟังก์ชันแปลงวันที่เป็น yyyy-mm-dd เวลาไทย
+    // แปลงวันที่เป็น yyyy-mm-dd เวลาไทย
     const getDateStrTH = dateUTC => {
       const dateTH = new Date(new Date(dateUTC).getTime() + thOffset)
       const day = dateTH.getDate().toString().padStart(2, '0')
@@ -617,14 +658,7 @@ exports.updateSendmoneyOld2 = async (req, res) => {
       return `${yr}-${mon}-${day}`
     }
 
-    // 🔹 ดึงพนักงานขายทั้งหมด
-    const users = await User.find({ role: 'sale' }).lean()
-    if (!users.length) {
-      return res
-        .status(404)
-        .json({ status: 404, message: 'No sale users found!' })
-    }
-
+    // ✅ วนทุก user (area)
     for (const user of users) {
       const area = user.area
       console.log(`🔄 Processing area: ${area} (${user.warehouse})`)
@@ -663,7 +697,7 @@ exports.updateSendmoneyOld2 = async (req, res) => {
           })
         ])
 
-      // รวม summary ต่อวันจาก sendmoney
+      // รวม sendmoney ต่อวัน
       const sumByDate = dataSendmoney.reduce((acc, item) => {
         const dateStr = getDateStrTH(item.createdAt)
         if (!acc[dateStr])
@@ -672,22 +706,10 @@ exports.updateSendmoneyOld2 = async (req, res) => {
         return acc
       }, {})
 
-      const dataSendMoneyTran = Object.entries(sumByDate).map(
-        ([date, val]) => ({
-          date,
-          summary: val.summary,
-          status: val.status
-        })
-      )
-
       const sendMoneyMap = Object.fromEntries(
-        dataSendMoneyTran.map(d => [d.date, d.summary])
-      )
-      const statusMap = Object.fromEntries(
-        dataSendMoneyTran.map(d => [d.date, d.status])
+        Object.entries(sumByDate).map(([d, v]) => [d, v.summary])
       )
 
-      // สร้างรายการ refund แบบแบน
       const refundListFlat = dataRefund.flatMap(item =>
         item.listProduct.map(u => ({
           price: u.total,
@@ -695,7 +717,6 @@ exports.updateSendmoneyOld2 = async (req, res) => {
           date: getDateStrTH(item.createdAt)
         }))
       )
-
       const refundByDate = refundListFlat.reduce((acc, r) => {
         if (!acc[r.date]) acc[r.date] = []
         acc[r.date].push(r)
@@ -726,7 +747,6 @@ exports.updateSendmoneyOld2 = async (req, res) => {
         return acc
       }, {})
 
-      // เตรียมวันที่ครบทั้งเดือน
       const lastDay = new Date(year, month, 0).getDate()
       const allDateArr = Array.from(
         { length: lastDay },
@@ -736,25 +756,22 @@ exports.updateSendmoneyOld2 = async (req, res) => {
             .padStart(2, '0')}`
       )
 
-      // สร้างผลลัพธ์รายวัน
       const fullMonthArr = allDateArr.map(date => {
-        const sendmoneyRaw = sendMoneyMap[date] || 0
-        const sendmoney = to2(sendmoneyRaw)
-        const refundTodayRaw = refundByDate[date] || []
+        const sendmoney = to2(sendMoneyMap[date] || 0)
+        const refundToday = refundByDate[date] || []
         const good = to2(
-          refundTodayRaw
+          refundToday
             .filter(x => x.condition === 'good')
-            .reduce((sum, x) => sum + Number(x.price), 0)
+            .reduce((s, x) => s + Number(x.price), 0)
         )
         const damaged = to2(
-          refundTodayRaw
+          refundToday
             .filter(x => x.condition === 'damaged')
-            .reduce((sum, x) => sum + Number(x.price), 0)
+            .reduce((s, x) => s + Number(x.price), 0)
         )
         const summaryRaw = saleByDate[date] || 0
         const changeRaw = changeByDate[date] || 0
-        const change = to2(changeRaw)
-        const diffChange = to2(change - damaged - good)
+        const diffChange = to2(changeRaw - damaged - good)
         const summary = to2(summaryRaw + diffChange)
         const diff = to2(sendmoney - summary)
         const status = sendmoney > 0 ? 'ส่งเงินแล้ว' : 'ยังไม่ส่งเงิน'
@@ -765,7 +782,6 @@ exports.updateSendmoneyOld2 = async (req, res) => {
           sendmoney,
           summary,
           diff,
-          change,
           status,
           good,
           damaged,
@@ -773,27 +789,215 @@ exports.updateSendmoneyOld2 = async (req, res) => {
         }
       })
 
-      // เตรียมข้อมูลสำหรับ update
-      const fullMonthArr1 = fullMonthArr.map(item => ({
-        Amount_Send: Math.ceil(item.sendmoney),
-        DATE: item.date,
-        WH: user.warehouse
-      }))
+      // เตรียมข้อมูล update SendMoney
+      const sendMoneyUpdateData = fullMonthArr
+        .filter(item => item.sendmoney > 0)
+        .map(item => ({
+          Amount_Send: Math.ceil(item.sendmoney),
+          DATE: item.date,
+          WH: user.warehouse
+        }))
 
-      const fullMonthArr2 = fullMonthArr.map(item => ({
-        TRANSFER_DATE: item.date,
-        Amount: Math.ceil(item.summary),
-        WH: user.warehouse
-      }))
+      if (sendMoneyUpdateData.length > 0) {
+        await dataUpdateSendMoney('cash', sendMoneyUpdateData, ['DATE', 'WH'])
+        console.log(`✅ Updated sendmoney for ${user.warehouse}`)
+      }
+    }
 
-      const sendMoneyUpdateData = fullMonthArr1.filter(
-        item => item.Amount_Send > 0
+    res.status(200).json({
+      status: 200,
+      message: 'Success — updated sendmoney for all sale users'
+    })
+  } catch (error) {
+    console.error('updateSendmoneyOld2 ❌', error)
+    res.status(500).json({
+      status: 500,
+      message: error.message || 'Internal server error'
+    })
+  }
+}
+
+exports.updateSendmoneyOld2 = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+
+    // 🔹 ดึง user ทั้งหมดที่เป็น sale
+    const users = await User.find({ role: 'sale' }).lean()
+    if (!users.length) {
+      return res
+        .status(404)
+        .json({ status: 404, message: 'No sale users found!' })
+    }
+
+    // 🔹 รับ period เดือนปัจจุบัน
+    const periodStr = period()
+    const year = Number(periodStr.substring(0, 4))
+    const month = Number(periodStr.substring(4, 6))
+
+    // 🔹 คำนวณช่วงเวลาเดือนนั้นใน UTC
+    const thOffset = 7 * 60 * 60 * 1000
+    const startOfMonthTH = new Date(year, month - 1, 1, 0, 0, 0, 0)
+    const endOfMonthTH = new Date(year, month, 0, 23, 59, 59, 999)
+    const startOfMonthUTC = new Date(startOfMonthTH.getTime() - thOffset)
+    const endOfMonthUTC = new Date(endOfMonthTH.getTime() - thOffset)
+
+    // 🔹 แปลงวันที่เป็น yyyy-mm-dd เวลาไทย
+    const getDateStrTH = dateUTC => {
+      const dateTH = new Date(new Date(dateUTC).getTime() + thOffset)
+      const day = dateTH.getDate().toString().padStart(2, '0')
+      const mon = (dateTH.getMonth() + 1).toString().padStart(2, '0')
+      const yr = dateTH.getFullYear()
+      return `${yr}-${mon}-${day}`
+    }
+
+    // 🔹 วนตาม user ทีละคน
+    for (const user of users) {
+      const area = user.area
+      console.log(`🔄 Processing area: ${area} (${user.warehouse})`)
+
+      const [dataSendmoney, dataRefund, dataOrderSale, dataOrderChange] =
+        await Promise.all([
+          SendMoney.aggregate([
+            {
+              $match: {
+                area: area,
+                dateAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC }
+              }
+            },
+            { $addFields: { createdAt: '$dateAt' } }
+          ]),
+          Refund.find({
+            'store.area': area,
+            period: periodStr,
+            createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+            type: 'refund',
+            status: { $nin: ['pending', 'canceled', 'reject'] }
+          }),
+          Order.find({
+            'store.area': area,
+            period: periodStr,
+            createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+            type: 'sale',
+            status: { $nin: ['canceled', 'reject'] }
+          }),
+          Order.find({
+            'store.area': area,
+            period: periodStr,
+            createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
+            type: 'change',
+            status: { $nin: ['pending', 'canceled', 'reject'] }
+          })
+        ])
+
+      // รวมยอดส่งเงินรายวัน
+      const sumByDate = dataSendmoney.reduce((acc, item) => {
+        const dateStr = getDateStrTH(item.createdAt)
+        if (!acc[dateStr])
+          acc[dateStr] = { summary: 0, status: item.status || '' }
+        acc[dateStr].summary += item.sendmoney || 0
+        return acc
+      }, {})
+      const sendMoneyMap = Object.fromEntries(
+        Object.entries(sumByDate).map(([d, v]) => [d, v.summary])
       )
-      const totalSaleUpdateData = fullMonthArr2.filter(item => item.Amount > 0)
 
-      // อัปเดตข้อมูล (ตาม warehouse ของแต่ละ user)
+      // สร้าง refund แบบแบน
+      const refundListFlat = dataRefund.flatMap(item =>
+        item.listProduct.map(u => ({
+          price: u.total,
+          condition: u.condition,
+          date: getDateStrTH(item.createdAt)
+        }))
+      )
+      const refundByDate = refundListFlat.reduce((acc, r) => {
+        if (!acc[r.date]) acc[r.date] = []
+        acc[r.date].push(r)
+        return acc
+      }, {})
+
+      const orderSaleListFlat = dataOrderSale.flatMap(item =>
+        item.listProduct.map(u => ({
+          price: u.netTotal,
+          date: getDateStrTH(item.createdAt)
+        }))
+      )
+
+      const orderChangeListFlat = dataOrderChange.flatMap(item =>
+        item.listProduct.map(u => ({
+          price: u.netTotal,
+          date: getDateStrTH(item.createdAt)
+        }))
+      )
+
+      const saleByDate = orderSaleListFlat.reduce((acc, o) => {
+        acc[o.date] = (acc[o.date] || 0) + Number(o.price || 0)
+        return acc
+      }, {})
+
+      const changeByDate = orderChangeListFlat.reduce((acc, o) => {
+        acc[o.date] = (acc[o.date] || 0) + Number(o.price || 0)
+        return acc
+      }, {})
+
+      // 🔹 เตรียมวันที่ครบเดือน
+      const lastDay = new Date(year, month, 0).getDate()
+      const allDateArr = Array.from(
+        { length: lastDay },
+        (_, i) =>
+          `${year}-${month.toString().padStart(2, '0')}-${(i + 1)
+            .toString()
+            .padStart(2, '0')}`
+      )
+
+      // 🔹 คำนวณ summary, diff ฯลฯ
+      const fullMonthArr = allDateArr.map(date => {
+        const sendmoney = to2(sendMoneyMap[date] || 0)
+        const refundToday = refundByDate[date] || []
+        const good = to2(
+          refundToday
+            .filter(x => x.condition === 'good')
+            .reduce((s, x) => s + Number(x.price), 0)
+        )
+        const damaged = to2(
+          refundToday
+            .filter(x => x.condition === 'damaged')
+            .reduce((s, x) => s + Number(x.price), 0)
+        )
+        const summaryRaw = saleByDate[date] || 0
+        const changeRaw = changeByDate[date] || 0
+        const diffChange = to2(changeRaw - damaged - good)
+        const summary = to2(summaryRaw + diffChange)
+        const diff = to2(sendmoney - summary)
+        const status = sendmoney > 0 ? 'ส่งเงินแล้ว' : 'ยังไม่ส่งเงิน'
+
+        return {
+          area,
+          date,
+          sendmoney,
+          summary,
+          diff,
+          status,
+          good,
+          damaged,
+          diffChange
+        }
+      })
+
+      // 🔹 เตรียมข้อมูล update ยอดขาย
+      const totalSaleUpdateData = fullMonthArr
+        .filter(item => item.summary > 0)
+        .map(item => ({
+          TRANSFER_DATE: item.date,
+          Amount: Math.ceil(item.summary),
+          WH: user.warehouse
+        }))
+
+      // 🔹 อัปเดตยอดขาย (TotalSale)
       if (totalSaleUpdateData.length > 0) {
-        
         await dataUpdateTotalSale('cash', totalSaleUpdateData, [
           'TRANSFER_DATE',
           'WH'
@@ -802,13 +1006,13 @@ exports.updateSendmoneyOld2 = async (req, res) => {
       }
     }
 
-    // ✅ ส่งผลลัพธ์สำเร็จเมื่อวนครบทุก user
+    // ✅ ส่ง response สุดท้าย
     res.status(200).json({
       status: 200,
-      message: 'Success — updated sendmoney for all sale users'
+      message: 'Success — updated total sale for all sale users'
     })
   } catch (error) {
-    console.error('updateSendmoneyOld ❌', error)
+    console.error('updateSendmoneyOld2 ❌', error)
     res.status(500).json({
       status: 500,
       message: error.message || 'Internal server error'
@@ -1241,7 +1445,7 @@ exports.sendmoneyToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => {})
+        fs.unlink(tempPath, () => { })
       })
     } else {
       return res.status(200).json({

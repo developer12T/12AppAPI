@@ -38,7 +38,7 @@ const {
 } = require('../../models/cash/master')
 const { WithdrawCash } = require('../../models/cash/powerBi')
 const { Op, fn, col, where, literal } = require('sequelize')
-const { generateOrderId } = require('../../utilities/genetateId')
+const { generateOrderId,generateOrderIdFoodTruck } = require('../../utilities/genetateId')
 const { sortProduct } = require('../../utilities/product')
 const {
   summaryOrder,
@@ -229,8 +229,15 @@ exports.checkout = async (req, res) => {
 
     // console.log(area)
     // console.log(sale)
+    let orderId = {}
+    if (channel === 'pc') {
+      orderId = await generateOrderIdFoodTruck(area, sale.warehouse, channel, res);
+    } else {
+      orderId = await generateOrderId(area, sale.warehouse, channel, res)
+    }
 
-    const orderId = await generateOrderId(area, sale.warehouse, channel, res)
+
+
 
     let storeData = {}
 
@@ -1186,7 +1193,7 @@ exports.OrderToExcel = async (req, res) => {
       },
       status: { $nin: ['canceled'] },
       status: { $in: statusArray },
-      type: { $in: ['sale'] },
+      type: { $in: ['sale','saleNoodle'] },
       'store.area': { $ne: 'IT211' }
     }
 
@@ -1421,16 +1428,27 @@ exports.OrderToExcel = async (req, res) => {
       // console.log("productIDS",productIDS)
       return productIDS.map(product => {
         counterOrder++
+        switch (channel) {
+          case 'cash':
+            CUNO = order.store.storeId
+            OAORTP = 'A31'
+            break;
+          case 'pc':
+            CUNO = order.sale.salePayer
+            OAORTP = 'A51'
+            break;
 
-        // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
+          default:
+            break;
+        }
 
         return {
           // AREA: order.store.area,
-          CUNO: order.store.storeId,
+          CUNO: CUNO,
           FACI: 'F10',
           WHLO: order.sale.warehouse,
           ORNO: '',
-          OAORTP: 'A31',
+          OAORTP: OAORTP,
           RLDT: RLDT,
           ADID: '',
           CUOR: order.orderId,
@@ -6747,120 +6765,3 @@ exports.updateUserSaleInOrder = async (req, res) => {
 }
 
 
-exports.getOrderPcToExcel = async (req, res) => {
-  try {
-    const { channel } = req.query
-    let { startDate, endDate } = req.query
-    const { area, team, zone } = req.query
-
-    // console.log(channel, date)
-    let statusArray = (req.query.status || '')
-      .split(',')
-      .map(s => s.trim())
-      .filter(Boolean)
-
-    if (statusArray.length === 0) {
-      statusArray = ['pending'] // default
-    }
-
-    const { Order } = getModelsByChannel(channel, res, orderModel)
-    const { Refund } = getModelsByChannel(channel, res, refundModel)
-
-    if (!/^\d{8}$/.test(startDate)) {
-      const nowTH = new Date(
-        new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })
-      )
-      const y = nowTH.getFullYear()
-      const m = String(nowTH.getMonth() + 1).padStart(2, '0')
-      const d = String(nowTH.getDate()).padStart(2, '0') // ← ใช้ getDate() ไม่ใช่ getDay()
-      startDate = `${y}${m}${d}` // YYYYMMDD
-      endDate = `${y}${m}${d}` // YYYYMMDD
-    }
-    const startTH = new Date(
-      `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
-        6,
-        8
-      )}T00:00:00+07:00`
-    )
-    const endTH = new Date(
-      `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(
-        6,
-        8
-      )}T23:59:59.999+07:00`
-    )
-
-    let query = {
-      createdAt: {
-        $gte: startTH,
-        $lte: endTH
-      },
-      status: { $nin: ['canceled'] },
-      status: { $in: statusArray },
-      type: { $in: ['sale'] },
-      'store.area': { $ne: 'IT211' }
-    }
-
-    if (area) {
-      query['store.area'] = area
-      queryChange['store.area'] = area
-      queryRefund['store.area'] = area
-    } else if (zone) {
-      query['store.area'] = { $regex: `^${zone}`, $options: 'i' }
-      queryChange['store.area'] = { $regex: `^${zone}`, $options: 'i' }
-      queryRefund['store.area'] = { $regex: `^${zone}`, $options: 'i' }
-    }
-
-    const pipeline = [
-      {
-        $match: query
-      },
-      {
-        $addFields: {
-          createdAtThai: {
-            $dateAdd: {
-              startDate: '$createdAt',
-              unit: 'hour',
-              amount: 7
-            }
-          },
-          team3: {
-            $concat: [
-              { $substrCP: ['$store.area', 0, 2] },
-              { $substrCP: ['$store.area', 3, 1] }
-            ]
-          }
-        }
-      }
-    ]
-    if (team) {
-      pipeline.push({
-        $match: {
-          team3: { $regex: `^${team}`, $options: 'i' }
-        }
-      })
-    }
-
-    pipeline.push({
-      $sort: { statusASC: 1, createdAt: -1 }
-    })
-
-    const modelOrder = await Order.aggregate(pipeline)
-
-    res.status(200).json({
-      status:200,
-      message:'fetch data Success',
-      data:modelOrder
-    })
-
-
-
-
-  } catch (error) {
-    console.error('❌ updateUserSaleInOrder error:', error)
-    return res.status(500).json({
-      status: 500,
-      message: 'Server error',
-      error: error.message
-    })
-  }
-}

@@ -17,12 +17,18 @@ const {
 } = require('../../middleware/order')
 const productModel = require('../../models/cash/product');
 const { before, range } = require("lodash");
+const xlsx = require('xlsx')
+const path = require('path')
+const os = require('os')
+const fs = require('fs')
+
+
 const orderTimestamps = {};
 
 exports.checkout = async (req, res) => {
   // const transaction = await sequelize.transaction();
   try {
-    const { type, area, storeId, period, payment } = req.body;
+    const { type, area, period, payment } = req.body;
 
     const channel = req.headers["x-channel"];
     const { Order } = getModelsByChannel(channel, res, orderModel)
@@ -32,14 +38,14 @@ exports.checkout = async (req, res) => {
     const { User } = getModelsByChannel(channel, res, userModel);
     const { Product } = getModelsByChannel(channel, res, productModel);
 
-    if (!type || !area || !storeId || !payment) {
+    if (!type || !area || !payment) {
       return res
         .status(400)
         .json({ status: 400, message: "Missing required fields!" });
     }
 
     const now = new Date();
-    const lastUpdate = orderTimestamps[storeId] || 0;
+    const lastUpdate = orderTimestamps[area] || 0;
     const ONE_MINUTE = 60 * 1000;
 
     // if (now - lastUpdate < ONE_MINUTE) {
@@ -50,9 +56,9 @@ exports.checkout = async (req, res) => {
     //   });
     // }
 
-    orderTimestamps[storeId] = now;
+    orderTimestamps[area] = now;
 
-    const cart = await NoodleCart.findOne({ type, area, storeId });
+    const cart = await NoodleCart.findOne({ type, area });
     if (!cart || cart.length === 0) {
       return res
         .status(404)
@@ -124,6 +130,7 @@ exports.checkout = async (req, res) => {
 
     const exitOrder = await Order.findOne({
       'store.area': area,
+      type:'saleNoodle',
       status: { $in: ['pending', 'paid'] },
       createdAt: { $gte: start, $lte: end }
     }).sort({ createdAt: -1 }).select('number waiting')
@@ -137,16 +144,17 @@ exports.checkout = async (req, res) => {
     let number = 0
     let waiting = 0
 
-
+    // console.log('exitOrder',exitOrder)
     if (exitOrder) {
       number = maxNumber + 1 || 1
       waiting = exitOrder.waiting + 1
     } else {
+
       number = maxNumber + 1 || 1
       waiting = 0
     }
 
-    // console.log('maxNumber.number',maxNumber)
+    
 
     const noodleOrder = {
       orderId,
@@ -230,7 +238,7 @@ exports.checkout = async (req, res) => {
 
 
     await Order.create(noodleOrder);
-    await NoodleCart.deleteOne({ type, area, storeId });
+    await NoodleCart.deleteOne({ type, area });
 
 
     res.status(201).json({
@@ -571,5 +579,278 @@ exports.updateQrPayment = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ status: "500", message: error.message });
+  }
+}
+
+exports.getOrderPcToExcel = async (req, res) => {
+  try {
+    const { channel } = req.query
+    let { startDate, endDate } = req.query
+    const { area, team, zone, excel } = req.query
+
+    // console.log(channel, date)
+    let statusArray = (req.query.status || '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+
+    if (statusArray.length === 0) {
+      statusArray = ['pending'] // default
+    }
+
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+
+    if (!/^\d{8}$/.test(startDate)) {
+      const nowTH = new Date(
+        new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })
+      )
+      const y = nowTH.getFullYear()
+      const m = String(nowTH.getMonth() + 1).padStart(2, '0')
+      const d = String(nowTH.getDate()).padStart(2, '0') // ← ใช้ getDate() ไม่ใช่ getDay()
+      startDate = `${y}${m}${d}` // YYYYMMDD
+      endDate = `${y}${m}${d}` // YYYYMMDD
+    }
+    const startTH = new Date(
+      `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
+        6,
+        8
+      )}T00:00:00+07:00`
+    )
+    const endTH = new Date(
+      `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(
+        6,
+        8
+      )}T23:59:59.999+07:00`
+    )
+
+    let query = {
+      createdAt: {
+        $gte: startTH,
+        $lte: endTH
+      },
+      status: { $nin: ['canceled'] },
+      status: { $in: statusArray },
+      type: { $in: ['saleNoodle'] },
+      // 'store.area': { $ne: 'IT211' }
+    }
+
+    if (area) {
+      query['store.area'] = area
+      queryChange['store.area'] = area
+      queryRefund['store.area'] = area
+    } else if (zone) {
+      query['store.area'] = { $regex: `^${zone}`, $options: 'i' }
+      queryChange['store.area'] = { $regex: `^${zone}`, $options: 'i' }
+      queryRefund['store.area'] = { $regex: `^${zone}`, $options: 'i' }
+    }
+
+    const pipeline = [
+      {
+        $match: query
+      },
+      {
+        $addFields: {
+          createdAtThai: {
+            $dateAdd: {
+              startDate: '$createdAt',
+              unit: 'hour',
+              amount: 7
+            }
+          },
+          team3: {
+            $concat: [
+              { $substrCP: ['$store.area', 0, 2] },
+              { $substrCP: ['$store.area', 3, 1] }
+            ]
+          }
+        }
+      }
+    ]
+    if (team) {
+      pipeline.push({
+        $match: {
+          team3: { $regex: `^${team}`, $options: 'i' }
+        }
+      })
+    }
+
+    pipeline.push({
+      $sort: { statusASC: 1, createdAt: -1 }
+    })
+
+    const modelOrder = await Order.aggregate(pipeline)
+
+    const tranFromOrder = modelOrder.flatMap(order => {
+      let counterOrder = 0
+      function formatDateToThaiYYYYMMDD(date) {
+        const d = new Date(date)
+        d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
+
+        const yyyy = d.getFullYear()
+        const mm = String(d.getMonth() + 1).padStart(2, '0')
+        const dd = String(d.getDate()).padStart(2, '0')
+
+        return `${yyyy}${mm}${dd}`
+      }
+      // console.log(order.createdAtThai)
+      // ใช้งาน
+      const RLDT = formatDateToThaiYYYYMMDD(order.createdAt)
+
+      const listProduct = order.listProduct.map(product => {
+        return {
+          proCode: '',
+          id: product.id,
+          name: product.name,
+          group: product.group,
+          brand: product.brand,
+          size: product.size,
+          flavour: product.flavour,
+          qty: product.qty,
+          unit: product.unit,
+          unitName: product.unitName,
+          price: product.price,
+          subtotal: product.subtotal,
+          discount: product.discount,
+          netTotal: product.netTotal
+        }
+      })
+
+      const listPromotion = order.listPromotions.map(promo =>
+        promo.listProduct.map(product => {
+          return {
+            proCode: promo.proCode,
+            id: product.id,
+            name: product.name,
+            group: product.group,
+            brand: product.brand,
+            size: product.size,
+            flavour: product.flavour,
+            qty: product.qty,
+            unit: product.unit,
+            unitName: product.unitName,
+            qtyPcs: product.qtyPcs
+          }
+        })
+      )
+
+      const productIDS = [...listProduct, ...listPromotion].flat()
+
+      // console.log("productIDS",productIDS)
+      return productIDS.map(product => {
+        counterOrder++
+
+        // const promoCount = 0; // สามารถเปลี่ยนเป็นตัวเลขอื่นเพื่อทดสอบ
+
+        return {
+          // AREA: order.store.area,
+          CUNO: order.sale.salePayer,
+          FACI: 'F10',
+          WHLO: order.sale.warehouse,
+          ORNO: '',
+          OAORTP: 'A51',
+          RLDT: RLDT,
+          ADID: '',
+          CUOR: order.orderId,
+          OAOREF: '',
+          OBITNO: product.id,
+          OBBANO: '',
+          OBALUN: product.unit,
+          OBORQA: `${product.qty}`,
+          OBSAPR: `${product.price || 0}`,
+          OBSPUN: product.unit,
+          OBWHSL: '',
+          ROUT: '',
+          OBPONR: `${counterOrder}`,
+          OBDIA2: `${product.discount || 0}`,
+          OBRSCD: '',
+          OBCMNO: '',
+          OBPIDE: product.proCode,
+          OBSMCD: order.sale.saleCode,
+          OAORDT: RLDT,
+          OAODAM: '0',
+          OECRID: '',
+          OECRAM: '',
+          OECRID2: '',
+          OECRAM2: '',
+          OECRID3: '',
+          OECRAM3: '',
+          OECRID4: '',
+          OECRAM4: '',
+          OECRID5: '',
+          OECRAM5: '',
+          OARESP: '',
+          OAYREF: '',
+          OATEL2: '',
+          OAWCON: '',
+          OAFRE1: '',
+          OATXAP: '',
+          OATXAP2: '',
+          OBDIA1: '',
+          OBDIA3: '',
+          OBDIA4: ''
+        }
+      })
+    })
+
+    if (excel === 'true') {
+
+    function yyyymmddToDdMmYyyy(dateString) {
+      // สมมติ dateString คือ '20250804'
+      const year = dateString.slice(0, 4)
+      const month = dateString.slice(4, 6)
+      const day = dateString.slice(6, 8)
+      return `${day}${month}${year}`
+    }
+
+      const wb = xlsx.utils.book_new()
+      const ws = xlsx.utils.json_to_sheet(tranFromOrder)
+      xlsx.utils.book_append_sheet(
+        wb,
+        ws,
+        `ESP${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}`
+      )
+
+      const tempPath = path.join(
+        os.tmpdir(),
+        `CA_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}.xlsx`
+      )
+      xlsx.writeFile(wb, tempPath)
+
+      res.download(
+        tempPath,
+        `PC_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}.xlsx`,
+        err => {
+          if (err) {
+            console.error('❌ Download error:', err)
+            // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+            if (!res.headersSent) {
+              res.status(500).send('Download failed')
+            }
+          }
+
+          // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+          fs.unlink(tempPath, () => { })
+        }
+      )
+    } else {
+      res.status(200).json({
+        status: 200,
+        message: 'fetch data Success',
+        data: tranFromOrder
+      })
+
+    }
+
+
+
+
+
+  } catch (error) {
+    console.error('❌ updateUserSaleInOrder error:', error)
+    return res.status(500).json({
+      status: 500,
+      message: 'Server error',
+      error: error.message
+    })
   }
 }
