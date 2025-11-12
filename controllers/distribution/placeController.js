@@ -125,7 +125,7 @@ exports.getType = async (req, res) => {
       const typeKey = `${address.type}-${address.typeNameTH}-${address.typeNameEN}`
       if (!typeSet.has(typeKey)) {
         typeSet.add(typeKey)
-        // console.log(address)
+        console.log(address)
         if (address.type && address.typeNameTH && address.typeNameEN) {
           uniqueTypes.push({
             type: address.type,

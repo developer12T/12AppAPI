@@ -130,6 +130,7 @@ exports.checkout = async (req, res) => {
 
     const exitOrder = await Order.findOne({
       'store.area': area,
+      type:'saleNoodle',
       status: { $in: ['pending', 'paid'] },
       createdAt: { $gte: start, $lte: end }
     }).sort({ createdAt: -1 }).select('number waiting')
@@ -143,16 +144,17 @@ exports.checkout = async (req, res) => {
     let number = 0
     let waiting = 0
 
-
+    // console.log('exitOrder',exitOrder)
     if (exitOrder) {
       number = maxNumber + 1 || 1
       waiting = exitOrder.waiting + 1
     } else {
+
       number = maxNumber + 1 || 1
       waiting = 0
     }
 
-    // console.log('maxNumber.number',maxNumber)
+    
 
     const noodleOrder = {
       orderId,
