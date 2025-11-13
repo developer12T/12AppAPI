@@ -41,6 +41,7 @@ const {
   updateOrderDistribution,
   erpApiCheckOrderDistrabution,
   updateStatusOrderDistribution,
+  m3ToOrderMongo
   
 } = require('../../controllers/sale/orderController')
 
@@ -93,4 +94,5 @@ router.post('/updatePaymentOrder', updatePaymentOrder)
 router.post('/updateAddressInOrder', updateAddressInOrder)
 router.post('/updateOrderPowerBI', updateOrderPowerBI)
 router.post('/updateUserSaleInOrder', updateUserSaleInOrder)
+router.post('/m3ToOrderMongo', m3ToOrderMongo)
 module.exports = router

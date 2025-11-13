@@ -1095,6 +1095,11 @@ exports.addFromERPnew = async (req, res) => {
   }
 }
 
+
+
+
+
+
 exports.checkInStore = async (req, res) => {
   const { storeId } = req.params
   const { latitude, longtitude } = req.body
@@ -2080,22 +2085,24 @@ exports.addStoreArray = async (req, res) => {
     const insertedStores = []
     const existingStores = []
 
-    for (const item of result) {
-      const storeInDb = await Store.findOne({ storeId: item.storeId })
+    console.log(result)
 
-      if (!storeInDb) {
-        await Store.create(item)
-        insertedStores.push({
-          idStore: item.storeId,
-          name: item.name
-        })
-      } else {
-        existingStores.push({
-          idStore: item.storeId,
-          name: item.name
-        })
-      }
-    }
+    // for (const item of result) {
+    //   const storeInDb = await Store.findOne({ storeId: item.storeId })
+
+    //   if (!storeInDb) {
+    //     await Store.create(item)
+    //     insertedStores.push({
+    //       idStore: item.storeId,
+    //       name: item.name
+    //     })
+    //   } else {
+    //     existingStores.push({
+    //       idStore: item.storeId,
+    //       name: item.name
+    //     })
+    //   }
+    // }
 
     const io = getSocket()
     io.emit('store/addStoreArray', {})
@@ -3762,4 +3769,62 @@ exports.checkLatLongByStore = async (req, res) => {
     })
   }
 
+}
+
+exports.addStoreFromM3 = async (req, res) => {
+  try {
+    const { storeId } = req.body;
+    const channel = req.headers['x-channel'];
+    const { Store } = getModelsByChannel(channel, res, storeModel);
+
+
+    const storeM3 = await Customer.findOne({
+      where :{
+        OKCUNO : storeId
+      }
+    })
+
+    const data = {
+      storeId:'',
+      name:'',
+      taxId:'',
+      tel:"",
+      route:'',
+      type:'',
+      typeName:'',
+      address:'',
+      subDistrict:'',
+      district:'',
+      province:'',
+      provinceCode:'',
+      zone:'',
+      area:'',
+      latitude:'',
+      longtitude:'',
+      lineId:'',
+      status:'',
+      imageList: [],
+      shippingAddress: [],
+      // checkIn:
+    }
+
+
+
+    res.status(200).json({
+      status:200,
+      message:'Add store success',
+      data : storeM3
+    })
+
+
+  } catch (error) {
+        console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
 }

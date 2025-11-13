@@ -38,7 +38,7 @@ const {
 } = require('../../models/cash/master')
 const { WithdrawCash } = require('../../models/cash/powerBi')
 const { Op, fn, col, where, literal } = require('sequelize')
-const { generateOrderId,generateOrderIdFoodTruck } = require('../../utilities/genetateId')
+const { generateOrderId, generateOrderIdFoodTruck } = require('../../utilities/genetateId')
 const { sortProduct } = require('../../utilities/product')
 const {
   summaryOrder,
@@ -1193,7 +1193,7 @@ exports.OrderToExcel = async (req, res) => {
       },
       status: { $nin: ['canceled'] },
       status: { $in: statusArray },
-      type: { $in: ['sale','saleNoodle'] },
+      type: { $in: ['sale', 'saleNoodle'] },
       'store.area': { $ne: 'IT211' }
     }
 
@@ -6765,3 +6765,166 @@ exports.updateUserSaleInOrder = async (req, res) => {
 }
 
 
+exports.m3ToOrderMongo = async (req, res) => {
+  try {
+    const { orderId,period } = req.body
+    const channel = req.headers['x-channel']
+
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const dataM3Line = await OOLINE.findAll({
+      where: {
+        OBCUOR: {
+          [Op.in]: Array.isArray(orderId) ? orderId : [orderId]
+        }
+      },
+      raw: true
+    });
+
+    const trimmedDataM3Line = dataM3Line.map(record => {
+      const trimmedRecord = {};
+      for (const [key, value] of Object.entries(record)) {
+        if (typeof value === 'string') {
+          trimmedRecord[key] = value.trim(); // ตัดช่องว่างซ้ายขวา
+        } else {
+          trimmedRecord[key] = value; // เก็บค่าเดิมถ้าไม่ใช่ string
+        }
+      }
+      return trimmedRecord;
+    });
+
+    const productId = dataM3Line.map(item => item.OBITNO.trim());
+
+    const dataM3Head = await OOHEAD.findOne({
+      where: { OACUOR: orderId },
+      raw: true
+    });
+
+    const trimmedDataM3Head = {};
+    for (const [key, value] of Object.entries(dataM3Head || {})) {
+      trimmedDataM3Head[key] = typeof value === 'string' ? value.trim() : value;
+    }
+
+    const productData = await Product.find({
+      id: { $in: productId }
+    });
+
+
+    let listProduct = []
+
+    for (const item of trimmedDataM3Line) {
+      const productDetail = productData.find(u => u.id === item.OBITNO.trim())
+      // const unitName 
+      if (item.OBSAPR === 0 && item.OBLNA2 === 0) {
+
+      } else {
+        const data = {
+          id: productDetail.id,
+          name: productDetail.name,
+          groupCode: productDetail.groupCode,
+          group: productDetail.group,
+          brandCode: productDetail.brandCode,
+          brand: productDetail.brand,
+          size: productDetail.size,
+          flavourCode: productDetail.flavourCode,
+          flavour: productDetail.flavour,
+          qty: item.OBIVQA,
+          unit: item.OBALUN,
+          unitName: '',
+          price: item.OBSAPR,
+          subtotal: item.OBLNA2,
+          discount: 0,
+          netTotal: item.OBLNA2
+        }
+        listProduct.push(data)
+      }
+
+    }
+    const saleData = await User.findOne({warehouse:trimmedDataM3Head.OAWHLO})
+    const storeData = await Store.findOne({storeId:trimmedDataM3Head.OACUNO})
+    const total = trimmedDataM3Head.OABRLA
+    const count = trimmedDataM3Line.filter(item => item.OBITNO).length;
+
+    const data = {
+      type: 'sale',
+      orderId: orderId,
+      routeId: '',
+      sale: {
+        saleCode: trimmedDataM3Head.OASMCD,
+        salePayer: trimmedDataM3Head.OAPYNO,
+        name: `${saleData.firstName} ${saleData.surName}`,
+        tel: saleData.tel,
+        warehouse: trimmedDataM3Head.OAWHLO
+      },
+      store: {
+        storeId: trimmedDataM3Head.OACUNO,
+        // name: storeData.,
+        type: '',
+        address: '',
+        taxId: '',
+        tel: '',
+        area: '',
+        zone: '',
+      },
+      shipping: {
+        default: '1',
+        shippingId: '',
+        address: '',
+        district: '',
+        subDistrict: '',
+        province: '',
+        postCode: '',
+        latitude: '',
+        longtitude: '',
+      },
+      note: 'จาก M3 มา MONGO',
+      latitude: '0.00',
+      longitude: '0.00',
+      status: 'completed',
+      statusTH: 'สำเร็จ',
+      listProduct: listProduct,
+      listPromotions: [],
+      subtotal: total,
+      discount: 0,
+      discountProductId: [],
+      discountProduct: 0,
+      vat: parseFloat((total - total / 1.07).toFixed(2)),
+      totalExVat: parseFloat((total / 1.07).toFixed(2)),
+      qr: 0,
+      total: total,
+      paymentMethod: 'cash',
+      paymentStatus: 'unpaid',
+      reference: '',
+      period: period,
+      listQuota: [],
+      listImage: [],
+      createdAt: '',
+      updatedAt: '',
+      heightStatus: trimmedDataM3Head.OAORSL,
+      lineM3: `${count}`,
+      lowStatus: trimmedDataM3Head.OAORST,
+      orderNo: trimmedDataM3Head.OAORNO
+    }
+
+
+
+
+    res.status(201).json({
+      status: 201,
+      message: 'Insert success',
+      data: data
+    })
+
+
+  } catch (error) {
+    console.error('error:', error)
+    return res.status(500).json({
+      status: 500,
+      message: 'Server error',
+      error: error.message
+    })
+  }
+}
