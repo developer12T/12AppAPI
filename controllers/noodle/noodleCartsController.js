@@ -271,11 +271,11 @@ exports.getCartDetailNew = async (req, res) => {
       ...(storeId ? { storeId } : {})
     }
 
-    let dataCart = []
+    let dataCart = {}
     if (['sale', 'refund', 'withdraw', 'give'].includes(type)) {
-      dataCart = await Cart.find(query)
+      dataCart = await Cart.findOne(query)
     } else if (['saleNoodle'].includes(type)) {
-      dataCart = await NoodleCart.find(query)
+      dataCart = await NoodleCart.findOne(query)
     }
 
     if (dataCart.length === 0) {

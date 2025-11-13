@@ -841,11 +841,6 @@ exports.getOrderPcToExcel = async (req, res) => {
       })
 
     }
-
-
-
-
-
   } catch (error) {
     console.error('❌ updateUserSaleInOrder error:', error)
     return res.status(500).json({
@@ -855,3 +850,4 @@ exports.getOrderPcToExcel = async (req, res) => {
     })
   }
 }
+
