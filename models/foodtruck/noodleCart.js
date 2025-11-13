@@ -20,7 +20,7 @@ const cartSchema = mongoose.Schema(
   {
     type: { type: String, require: true },
     area: { type: String, require: true },
-
+    storeId: { type: String },
     listProduct: [listCartProduct],
     total: { type: Number, require: true },
     createdAt: { type: Date, default: Date.now },

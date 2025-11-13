@@ -28,7 +28,7 @@ const orderTimestamps = {};
 exports.checkout = async (req, res) => {
   // const transaction = await sequelize.transaction();
   try {
-    const { type, area, period, payment } = req.body;
+    const { type, area,storeId, period, payment } = req.body;
 
     const channel = req.headers["x-channel"];
     const { Order } = getModelsByChannel(channel, res, orderModel)
@@ -58,7 +58,7 @@ exports.checkout = async (req, res) => {
 
     orderTimestamps[area] = now;
 
-    const cart = await NoodleCart.findOne({ type, area });
+    const cart = await NoodleCart.findOne({ type, area,storeId });
     if (!cart || cart.length === 0) {
       return res
         .status(404)

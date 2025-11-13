@@ -16,7 +16,7 @@ const {
 
 exports.addNoodleCart = async (req, res) => {
   try {
-    const { type, area, sku,typeProduct, id, qty, price, unit } = req.body
+    const { type, area,storeId, sku,typeProduct, id, qty, price, unit } = req.body
 
     const channel = req.headers['x-channel']
 
@@ -74,6 +74,7 @@ exports.addNoodleCart = async (req, res) => {
       const data = {
         type,
         area,
+        storeId,
         listProduct: [
           {
             typeProduct,
@@ -94,7 +95,8 @@ exports.addNoodleCart = async (req, res) => {
 
     const cart = await NoodleCart.findOne({
       type,
-      area
+      area,
+      storeId
     })
 
     const period = getPeriodFromDate(cart.createdAt)
