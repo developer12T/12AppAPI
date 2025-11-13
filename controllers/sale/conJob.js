@@ -736,19 +736,18 @@ async function updateSendmoney (channel = 'cash') {
     timeZone: 'Asia/Bangkok'
   })
   try {
-    const channel = req.headers['x-channel']
-    const { Order } = getModelsByChannel(channel, res, orderModel)
-    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
-    const { Refund } = getModelsByChannel(channel, res, refundModel)
-    const { User } = getModelsByChannel(channel, res, userModel)
+    const { Order } = getModelsByChannel(channel, null, orderModel)
+    const { SendMoney } = getModelsByChannel(channel, null, sendmoneyModel)
+    const { Refund } = getModelsByChannel(channel, null, refundModel)
+    const { User } = getModelsByChannel(channel, null, userModel)
 
     // ดึง user ทั้งหมดที่เป็น sale
     const users = await User.find({ role: 'sale' }).lean()
-    if (!users.length) {
-      return res
-        .status(404)
-        .json({ status: 404, message: 'No sale users found!' })
-    }
+    // if (!users.length) {
+    //   return res
+    //     .status(404)
+    //     .json({ status: 404, message: 'No sale users found!' })
+    // }
 
     // เตรียม period เดือนปัจจุบัน
     const periodStr = period()
@@ -917,16 +916,23 @@ async function updateSendmoney (channel = 'cash') {
       }
     }
 
-    res.status(200).json({
-      status: 200,
-      message: 'Success — updated sendmoney for all sale users'
-    })
+    // res.status(200).json({
+    //   status: 200,
+    //   message: 'Success — updated sendmoney for all sale users'
+    // })
+
+    fs.appendFileSync(
+      logFile,
+      `[${nowLog}] ✅ Job completed updateSendmoney\n`
+    )
+
   } catch (error) {
-    console.error('updateSendmoneyOld2 ❌', error)
-    res.status(500).json({
-      status: 500,
-      message: error.message || 'Internal server error'
-    })
+    console.error('updateSendmoney ❌', error)
+    fs.appendFileSync(logFile, `[${nowLog}] ❌ Job failed: ${err.message}\n`)
+    // res.status(500).json({
+    //   status: 500,
+    //   message: error.message || 'Internal server error'
+    // })
   }
 }
 

@@ -46,15 +46,15 @@ exports.checkout = async (req, res) => {
 
     const now = new Date();
     const lastUpdate = orderTimestamps[area] || 0;
-    const ONE_MINUTE = 60 * 1000;
+    const ONE_MINUTE = 15 * 1000;
 
-    // if (now - lastUpdate < ONE_MINUTE) {
-    //   return res.status(429).json({
-    //     status: 429,
-    //     message:
-    //       "This order was updated less than 1 minute ago. Please try again later!",
-    //   });
-    // }
+    if (now - lastUpdate < ONE_MINUTE) {
+      return res.status(429).json({
+        status: 429,
+        message:
+          "This order was updated less than 15 second ago. Please try again later!",
+      });
+    }
 
     orderTimestamps[area] = now;
 
@@ -90,8 +90,9 @@ exports.checkout = async (req, res) => {
         });
       }
 
-      const totalPrice = item.qty * unitData.price.sale;
-      subtotal += totalPrice;
+      // const totalPrice = item.qty * unitData.price.sale;
+      // subtotal += totalPrice;
+      subtotal += total
 
       return {
         type: item.type || '',
