@@ -380,12 +380,13 @@ const generateOrderIdFoodTruck = async (area,warehouse,channel,res) => {
       $lt: new Date(
         `${new Date().getFullYear()}-${parseInt(currentMonth) + 1}-01`
       )
-    }
+    },
+    status: { $nin: ['canceled', 'reject'] }
   })
     .sort({ orderId: -1 })
     .select('orderId')
 
-  // console.log("latestOrder",latestOrder)
+  console.log("latestOrder",latestOrder)
 
   let runningNumber = latestOrder
     ? parseInt(latestOrder.orderId.slice(-4)) + 1
