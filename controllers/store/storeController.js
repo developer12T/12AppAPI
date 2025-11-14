@@ -1095,6 +1095,11 @@ exports.addFromERPnew = async (req, res) => {
   }
 }
 
+
+
+
+
+
 exports.checkInStore = async (req, res) => {
   const { storeId } = req.params
   const { latitude, longtitude } = req.body
@@ -2080,22 +2085,24 @@ exports.addStoreArray = async (req, res) => {
     const insertedStores = []
     const existingStores = []
 
-    for (const item of result) {
-      const storeInDb = await Store.findOne({ storeId: item.storeId })
+    console.log(result)
 
-      if (!storeInDb) {
-        await Store.create(item)
-        insertedStores.push({
-          idStore: item.storeId,
-          name: item.name
-        })
-      } else {
-        existingStores.push({
-          idStore: item.storeId,
-          name: item.name
-        })
-      }
-    }
+    // for (const item of result) {
+    //   const storeInDb = await Store.findOne({ storeId: item.storeId })
+
+    //   if (!storeInDb) {
+    //     await Store.create(item)
+    //     insertedStores.push({
+    //       idStore: item.storeId,
+    //       name: item.name
+    //     })
+    //   } else {
+    //     existingStores.push({
+    //       idStore: item.storeId,
+    //       name: item.name
+    //     })
+    //   }
+    // }
 
     const io = getSocket()
     io.emit('store/addStoreArray', {})
@@ -3762,4 +3769,68 @@ exports.checkLatLongByStore = async (req, res) => {
     })
   }
 
+}
+
+exports.addStoreFromM3 = async (req, res) => {
+  try {
+    const { storeId } = req.body;
+    const channel = req.headers['x-channel'];
+    const { Store } = getModelsByChannel(channel, res, storeModel);
+
+
+    const storeM3 = await Customer.findOne({
+      where: { OKCUNO: storeId },
+      raw: true
+    })
+
+    const trimmedDataStoreM3 = {};
+    for (const [key, value] of Object.entries(storeM3 || {})) {
+      trimmedDataStoreM3[key] = typeof value === 'string' ? value.trim() : value;
+    }
+
+
+
+    const data = {
+      storeId: trimmedDataStoreM3.customerNo,
+      name: trimmedDataStoreM3.customerName,
+      taxId: '',
+      tel: "",
+      route: trimmedDataStoreM3.OKCFC3,
+      type: trimmedDataStoreM3.customerCoType,
+      typeName: '',
+      address: `${trimmedDataStoreM3.customerAddress1} ${trimmedDataStoreM3.customerAddress2}`,
+      subDistrict: '',
+      district: '',
+      province: '',
+      provinceCode: '',
+      zone: trimmedDataStoreM3.saleZone,
+      area: trimmedDataStoreM3.OKCFC1,
+      latitude: '0.00',
+      longtitude: '0.00',
+      lineId: '',
+      status: trimmedDataStoreM3.OKECAR,
+      imageList: [],
+      shippingAddress: [],
+      // checkIn:
+    }
+
+    await Store.create(data)
+
+    res.status(200).json({
+      status: 200,
+      message: 'Add store success',
+      data: trimmedDataStoreM3
+    })
+
+
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
 }

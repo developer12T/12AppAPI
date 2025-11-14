@@ -346,11 +346,19 @@ exports.getPromotionProduct = async (req, res) => {
 
     const store = await Store.findOne({ storeId }).select('area').lean();
 
+    if (channel === 'pc') {
+      area = cart.area
+    } else {
+      area = store.area
+    }
+    
+    // const 
+
     const [productStock] = await Stock.aggregate([
       {
         $match: {
           period: period(),
-          area: store.area,
+          area: area,
           'listProduct.productId': { $in: productIds }
         }
       },

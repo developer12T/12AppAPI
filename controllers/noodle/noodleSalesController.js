@@ -28,7 +28,7 @@ const orderTimestamps = {};
 exports.checkout = async (req, res) => {
   // const transaction = await sequelize.transaction();
   try {
-    const { type, area, period, payment } = req.body;
+    const { type, area,storeId, period, payment } = req.body;
 
     const channel = req.headers["x-channel"];
     const { Order } = getModelsByChannel(channel, res, orderModel)
@@ -46,19 +46,19 @@ exports.checkout = async (req, res) => {
 
     const now = new Date();
     const lastUpdate = orderTimestamps[area] || 0;
-    const ONE_MINUTE = 60 * 1000;
+    const ONE_MINUTE = 3 * 1000;
 
-    // if (now - lastUpdate < ONE_MINUTE) {
-    //   return res.status(429).json({
-    //     status: 429,
-    //     message:
-    //       "This order was updated less than 1 minute ago. Please try again later!",
-    //   });
-    // }
+    if (now - lastUpdate < ONE_MINUTE) {
+      return res.status(429).json({
+        status: 429,
+        message:
+          "This order was updated less than 15 second ago. Please try again later!",
+      });
+    }
 
     orderTimestamps[area] = now;
 
-    const cart = await NoodleCart.findOne({ type, area });
+    const cart = await NoodleCart.findOne({ type, area,storeId });
     if (!cart || cart.length === 0) {
       return res
         .status(404)
@@ -90,8 +90,9 @@ exports.checkout = async (req, res) => {
         });
       }
 
-      const totalPrice = item.qty * unitData.price.sale;
-      subtotal += totalPrice;
+      // const totalPrice = item.qty * unitData.price.sale;
+      // subtotal += totalPrice;
+      subtotal += total
 
       return {
         type: item.type || '',
@@ -150,7 +151,7 @@ exports.checkout = async (req, res) => {
       waiting = exitOrder.waiting + 1
     } else {
 
-      number = maxNumber + 1 || 1
+      number =  1
       waiting = 0
     }
 
@@ -840,11 +841,6 @@ exports.getOrderPcToExcel = async (req, res) => {
       })
 
     }
-
-
-
-
-
   } catch (error) {
     console.error('❌ updateUserSaleInOrder error:', error)
     return res.status(500).json({
@@ -854,3 +850,4 @@ exports.getOrderPcToExcel = async (req, res) => {
     })
   }
 }
+

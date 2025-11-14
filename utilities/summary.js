@@ -22,6 +22,13 @@ async function summaryOrder (cart, channel, res) {
         area: cart.area
       }).lean()) || {}
 
+
+    if (channel === 'pc') {
+      area = cart.area
+    } else {
+      area = storeData.area
+    }
+
     const store = storeData
       ? {
           _id: storeData._id,
@@ -37,7 +44,7 @@ async function summaryOrder (cart, channel, res) {
           district: storeData.district || '',
           province: storeData.province || '',
           zone: storeData.zone || '',
-          area: storeData.area || ''
+          area: area || ''
         }
       : {}
     const productIds = [

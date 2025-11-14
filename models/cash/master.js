@@ -952,7 +952,29 @@ const OOHEAD = sequelize.define(
     },
     OACUOR: { type: DataTypes.STRING, field: 'OACUOR' },
     OAORST: { type: DataTypes.STRING, field: 'OAORST' },
-    OAORSL: { type: DataTypes.STRING, field: 'OAORSL' }
+    OAORSL: { type: DataTypes.STRING, field: 'OAORSL' },
+
+
+    OASMCD: { type: DataTypes.STRING, field: 'OASMCD' },
+    OAPYNO: { type: DataTypes.STRING, field: 'OAPYNO' },
+    OAWHLO: { type: DataTypes.STRING, field: 'OAWHLO' },
+    OACUNO: { type: DataTypes.STRING, field: 'OACUNO' },
+    OABRLA: { type: DataTypes.NUMBER, field: 'OABRLA' },
+    OAORSL: { type: DataTypes.STRING, field: 'OAORSL' },
+    OAORST: { type: DataTypes.STRING, field: 'OAORST' },
+
+
+
+
+
+
+
+
+
+
+
+
+
   },
   {
     tableName: 'OOHEAD',
@@ -967,12 +989,21 @@ const OOLINE = sequelize.define(
   {
     OBORNO: {
       type: DataTypes.STRING,
-      field: 'OAORNO',
-      allowNull: false
+      field: 'OBORNO',
+      allowNull: false,
+      primaryKey: true
     },
     OBCUOR: { type: DataTypes.STRING, field: 'OBCUOR' },
     OBORST: { type: DataTypes.STRING, field: 'OBORST' },
-    OBORSL: { type: DataTypes.STRING, field: 'OBORSL' }
+
+    OBITNO : { type: DataTypes.STRING, field: 'OBITNO' },
+    OBIVQA : { type: DataTypes.NUMBER, field: 'OBIVQA' },
+    OBALUN : { type: DataTypes.STRING, field: 'OBALUN' },
+    OBSAPR : { type: DataTypes.NUMBER, field: 'OBSAPR' },
+    OBLNA2 : { type: DataTypes.NUMBER, field: 'OBLNA2' },
+
+
+    // OBORSL: { type: DataTypes.STRING, field: 'OBORSL' }
   },
   {
     tableName: 'OOLINE',

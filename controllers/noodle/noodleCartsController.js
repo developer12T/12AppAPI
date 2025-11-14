@@ -6,6 +6,8 @@ const typetruck = require('../../models/cash/typetruck')
 const noodleCartModel = require('../../models/foodtruck/noodleCart')
 const productModel = require('../../models/cash/product')
 const cartModel = require('../../models/cash/cart')
+const NoodleItemsModel = require('../../models/foodtruck/noodleItem')
+const noodleItemModel = require("../../models/foodtruck/noodleItem");
 const {
   to2,
   getQty,
@@ -15,101 +17,144 @@ const {
 
 exports.addNoodleCart = async (req, res) => {
   try {
-    const { type, area, sku, id, qty, price, unit } = req.body
+    const { type, area, storeId, typeProduct, id, sku, price, qty, unit, time, remark } = req.body;
+    const channel = req.headers["x-channel"];
 
-    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel);
+    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
+    const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel);
 
-    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel)
+    let nameProduct = '';
+    let data = {};
 
-    const existNoodleCart = await NoodleCart.findOne({
-      type,
-      area
-    })
+    if (typeProduct === 'noodle') {
+      const [soupId, noodleId] = sku.split('_');
+      const soupDetail = await Product.findOne({ id: soupId });
+      const noodleDetail = await NoodleItems.findOne({ id: noodleId });
 
-    if (existNoodleCart) {
-      existNoodleCart.listProduct = existNoodleCart.listProduct || []
-
-      // หาว่ามีสินค้านี้อยู่ใน list แล้วหรือยัง (เทียบจาก sku, id, unit)
-      const existingIndex = existNoodleCart.listProduct.findIndex(
-        item => item.sku === sku && item.id === id && item.unit === unit
-      )
-
-      if (existingIndex !== -1) {
-        // ✅ ถ้ามีอยู่แล้ว → บวก qty และ price ต่อ
-        existNoodleCart.listProduct[existingIndex].qty += qty
-        existNoodleCart.listProduct[existingIndex].totalPrice += price * qty
-        existNoodleCart.total += price * qty
-      } else {
-        // ✅ ถ้ายังไม่มี → เพิ่มใหม่
-        existNoodleCart.total += price * qty
-        existNoodleCart.listProduct.push({
-          sku,
-          id,
-          qty,
-          price,
-          unit,
-          totalPrice :price * qty
-        })
+      if (!soupDetail || !noodleDetail) {
+        return res.status(404).json({ status: 404, message: 'Not found this product' });
       }
 
-      await existNoodleCart.save()
-    } else {
-      const data = {
-        type,
-        area,
-        listProduct: [
-          {
-            sku,
-            id,
-            qty,
-            price,
-            unit,
-            totalPrice : qty * price
-          }
-        ],
-        total : qty * price
+      nameProduct = `${soupDetail.name} ${noodleDetail.name}`;
+    } else if (typeProduct === 'pc') {
+      const productDetail = await Product.findOne({ id: sku });
+      if (!productDetail) {
+        return res.status(404).json({ status: 404, message: 'Not found this product' });
       }
 
-      await NoodleCart.create(data)
+      nameProduct = `${productDetail.name}`;
     }
 
-    const cart = await NoodleCart.findOne({
-      type,
-      area
-    })
+    const product = await Product.findOne({ id }).lean();
+    if (!product) {
+      return res.status(404).json({ status: 404, message: "Product not found!" });
+    }
 
-    const period = getPeriodFromDate(cart.createdAt)
-    const qtyProduct = { id: id, qty: qty, unit: unit }
+    const unitData = product.listUnit.find((u) => u.unit === unit);
+    if (!unitData) {
+      return res.status(400).json({
+        status: 400,
+        message: `Unit '${unit}' not found for this product!`,
+      });
+    }
 
-    const updateResult = await updateStockMongo(
+    const existNoodleCart = await NoodleCart.findOne({ type, area, storeId });
+
+    if (existNoodleCart) {
+      existNoodleCart.listProduct = existNoodleCart.listProduct || [];
+
+      const existingIndex = existNoodleCart.listProduct.findIndex(
+        (item) => item.sku === sku && item.id === id && item.unit === unit
+      );
+
+      if (existingIndex !== -1) {
+        const item = existNoodleCart.listProduct[existingIndex];
+        item.qty += qty;
+        item.totalPrice += qty * price;
+        item.time = time;
+        item.remark = remark;
+      } else {
+
+        existNoodleCart.listProduct.push({
+          type: typeProduct,
+          id,
+          sku,
+          name: nameProduct,
+          qty,
+          price: price,
+          totalPrice: price * qty,
+          unit,
+          time,
+          remark,
+        });
+      }
+
+
+      existNoodleCart.total = to2(
+        existNoodleCart.listProduct.reduce((sum, p) => sum + p.qty * p.price, 0)
+      );
+
+      data = existNoodleCart; 
+    } else {
+
+      data = new NoodleCart({
+        type,
+        area,
+        storeId,
+        total: price * qty,
+        listProduct: [
+          {
+            type: typeProduct,
+            id,
+            sku,
+            name: nameProduct,
+            qty,
+            price: price,
+            totalPrice: price * qty,
+            unit,
+            time,
+            remark,
+          },
+        ],
+      });
+    }
+
+    const period = getPeriodFromDate(data.createdAt || new Date());
+    const qtyProduct = { id, qty, unit };
+
+    if (type === 'saleNoodle') {
+      const updateResult = await updateStockMongo(
         qtyProduct,
         area,
         period,
         'addproduct',
         channel,
-        'OUT', // ส่ง stockType เข้าไปด้วย!
+        'OUT',
         res
-      )
-      if (updateResult) return
+      );
+      if (updateResult) return;
+    }
+
+    const savedCart = await data.save();
 
 
-
-
-    res.status(200).json({
+    res.status(201).json({
       status: 201,
-      message: 'Insert cart Sucess',
-    })
-  } catch (error) {
-    console.error('❌ Error:', error)
+      message: "Insert / Update cart success",
+      data: savedCart,
+    });
 
+  } catch (error) {
+    console.error("❌ Error:", error);
     res.status(500).json({
       status: 500,
-      message: 'error from server',
-      error: error.message || error.toString(), // ✅ ป้องกัน circular object
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
-    })
+      message: "Error from server",
+      error: error.message || error.toString(),
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
   }
-}
+};
 
 const productTimestamps = {}
 
@@ -226,14 +271,14 @@ exports.getCartDetailNew = async (req, res) => {
       ...(storeId ? { storeId } : {})
     }
 
-    let dataCart = []
+    let dataCart = {}
     if (['sale', 'refund', 'withdraw', 'give'].includes(type)) {
-      dataCart = await Cart.find(query)
+      dataCart = await Cart.findOne(query)
     } else if (['saleNoodle'].includes(type)) {
-      dataCart = await NoodleCart.find(query)
+      dataCart = await NoodleCart.findOne(query)
     }
 
-    if (dataCart.length === 0) {
+    if (!dataCart) {
       return res.status(404).json({
         status: 404,
         message: 'Not found cart'
@@ -294,3 +339,4 @@ exports.getSoup = async (req, res) => {
     })
   }
 }
+
