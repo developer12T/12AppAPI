@@ -278,7 +278,7 @@ exports.getCartDetailNew = async (req, res) => {
       dataCart = await NoodleCart.findOne(query)
     }
 
-    if (dataCart.length === 0) {
+    if (!dataCart) {
       return res.status(404).json({
         status: 404,
         message: 'Not found cart'

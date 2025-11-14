@@ -151,7 +151,7 @@ exports.checkout = async (req, res) => {
       waiting = exitOrder.waiting + 1
     } else {
 
-      number = maxNumber + 1 || 1
+      number =  1
       waiting = 0
     }
 
