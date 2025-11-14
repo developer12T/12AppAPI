@@ -6767,13 +6767,14 @@ exports.updateUserSaleInOrder = async (req, res) => {
 
 exports.m3ToOrderMongo = async (req, res) => {
   try {
-    const { orderId,period } = req.body
+    const { orderId, period, type } = req.body
     const channel = req.headers['x-channel']
 
     const { Order } = getModelsByChannel(channel, res, orderModel)
     const { User } = getModelsByChannel(channel, res, userModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
 
     const dataM3Line = await OOLINE.findAll({
       where: {
@@ -6831,83 +6832,144 @@ exports.m3ToOrderMongo = async (req, res) => {
           size: productDetail.size,
           flavourCode: productDetail.flavourCode,
           flavour: productDetail.flavour,
-          qty: item.OBIVQA,
+          qty: Math.abs(Number(item.OBIVQA)),
           unit: item.OBALUN,
           unitName: '',
           price: item.OBSAPR,
+          total: Math.abs(Number(item.OBLNA2)),
           subtotal: item.OBLNA2,
           discount: 0,
-          netTotal: item.OBLNA2
+          netTotal: item.OBLNA2,
+          condition : 'damaged'
         }
         listProduct.push(data)
       }
 
     }
-    const saleData = await User.findOne({warehouse:trimmedDataM3Head.OAWHLO})
-    const storeData = await Store.findOne({storeId:trimmedDataM3Head.OACUNO})
-    const total = trimmedDataM3Head.OABRLA
+    const saleData = await User.findOne({ warehouse: trimmedDataM3Head.OAWHLO })
+    const storeData = await Store.findOne({ storeId: trimmedDataM3Head.OACUNO })
+    const total = Math.abs(Number(trimmedDataM3Head.OABRLA));
     const count = trimmedDataM3Line.filter(item => item.OBITNO).length;
 
-    const data = {
-      type: 'sale',
-      orderId: orderId,
-      routeId: '',
-      sale: {
-        saleCode: trimmedDataM3Head.OASMCD,
-        salePayer: trimmedDataM3Head.OAPYNO,
-        name: `${saleData.firstName} ${saleData.surName}`,
-        tel: saleData.tel,
-        warehouse: trimmedDataM3Head.OAWHLO
-      },
-      store: {
-        storeId: trimmedDataM3Head.OACUNO,
-        // name: storeData.,
-        type: '',
-        address: '',
-        taxId: '',
-        tel: '',
-        area: '',
-        zone: '',
-      },
-      shipping: {
-        default: '1',
-        shippingId: '',
-        address: '',
-        district: '',
-        subDistrict: '',
-        province: '',
-        postCode: '',
-        latitude: '',
-        longtitude: '',
-      },
-      note: 'จาก M3 มา MONGO',
-      latitude: '0.00',
-      longitude: '0.00',
-      status: 'completed',
-      statusTH: 'สำเร็จ',
-      listProduct: listProduct,
-      listPromotions: [],
-      subtotal: total,
-      discount: 0,
-      discountProductId: [],
-      discountProduct: 0,
-      vat: parseFloat((total - total / 1.07).toFixed(2)),
-      totalExVat: parseFloat((total / 1.07).toFixed(2)),
-      qr: 0,
-      total: total,
-      paymentMethod: 'cash',
-      paymentStatus: 'unpaid',
-      reference: '',
-      period: period,
-      listQuota: [],
-      listImage: [],
-      createdAt: '',
-      updatedAt: '',
-      heightStatus: trimmedDataM3Head.OAORSL,
-      lineM3: `${count}`,
-      lowStatus: trimmedDataM3Head.OAORST,
-      orderNo: trimmedDataM3Head.OAORNO
+    if (['change', 'sale'].includes(type)) {
+
+      data = {
+        type: 'change',
+        orderId: orderId,
+        routeId: '',
+        sale: {
+          saleCode: trimmedDataM3Head.OASMCD,
+          salePayer: trimmedDataM3Head.OAPYNO,
+          name: `${saleData.firstName} ${saleData.surName}`,
+          tel: saleData.tel,
+          warehouse: trimmedDataM3Head.OAWHLO
+        },
+        store: {
+          storeId: trimmedDataM3Head.OACUNO,
+          // name: storeData.,
+          type: storeData.type,
+          address: storeData.name,
+          taxId: storeData.taxId,
+          tel: storeData.tel,
+          area: storeData.area,
+          zone: storeData.zone,
+        },
+        shipping: {
+          default: '1',
+          shippingId: '',
+          address: '',
+          district: '',
+          subDistrict: '',
+          province: '',
+          postCode: '',
+          latitude: '0',
+          longtitude: '0',
+        },
+        note: 'จาก M3 มา MONGO (เคส ทุจริต)',
+        latitude: '0.00',
+        longitude: '0.00',
+        status: 'completed',
+        statusTH: 'สำเร็จ',
+        listProduct: listProduct,
+        listPromotions: [],
+        subtotal: total,
+        discount: 0,
+        discountProductId: [],
+        discountProduct: 0,
+        vat: parseFloat((total - total / 1.07).toFixed(2)),
+        totalExVat: parseFloat((total / 1.07).toFixed(2)),
+        qr: 0,
+        total: total,
+        paymentMethod: 'cash',
+        paymentStatus: 'unpaid',
+        reference: '6811932220003',
+        period: period,
+        listQuota: [],
+        listImage: [],
+        createdAt: '',
+        updatedAt: '',
+        heightStatus: trimmedDataM3Head.OAORSL,
+        lineM3: `${count}`,
+        lowStatus: trimmedDataM3Head.OAORST,
+        orderNo: trimmedDataM3Head.OAORNO,
+        createdAt:trimmedDataM3Head.OARLDT
+      }
+
+      await Order.create(data)
+    } else if (type === 'refund') {
+      data = {
+        type: 'refund',
+        orderId: orderId,
+        sale: {
+          saleCode: trimmedDataM3Head.OASMCD,
+          salePayer: trimmedDataM3Head.OAPYNO,
+          name: `${saleData.firstName} ${saleData.surName}`,
+          tel: saleData.tel,
+          warehouse: trimmedDataM3Head.OAWHLO
+        },
+        store: {
+          storeId: trimmedDataM3Head.OACUNO,
+          // name: storeData.,
+          type: storeData.type,
+          address: storeData.name,
+          taxId: storeData.taxId,
+          tel: storeData.tel,
+          area: storeData.area,
+          zone: storeData.zone,
+        },
+        note: 'จาก M3 มา MONGO (เคส ทุจริต)',
+        latitude: '0.00',
+        longitude: '0.00',
+        status: 'completed',
+        statusTH: 'สำเร็จ',
+        listProduct: listProduct,
+        listPromotions: [],
+        subtotal: total,
+        discount: 0,
+        discountProductId: [],
+        discountProduct: 0,
+        vat: parseFloat((total - total / 1.07).toFixed(2)),
+        totalExVat: parseFloat((total / 1.07).toFixed(2)),
+        qr: 0,
+        total: total,
+        paymentMethod: 'cash',
+        paymentStatus: 'unpaid',
+        reference: '6811132220044',
+        period: period,
+        listQuota: [],
+        listImage: [],
+        createdAt: '',
+        updatedAt: '',
+        heightStatus: trimmedDataM3Head.OAORSL,
+        lineM3: `${count}`,
+        lowStatus: trimmedDataM3Head.OAORST,
+        orderNo: trimmedDataM3Head.OAORNO,
+        createdAt:trimmedDataM3Head.OARLDT
+      }
+
+    await Refund.create(data)
     }
+
 
 
 
