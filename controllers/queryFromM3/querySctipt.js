@@ -125,7 +125,7 @@ exports.userPcSample = async function (channel, area) {
   TRIM(REPLACE(REPLACE(REPLACE(SALE_PAYER, '\r', ''), '\n', ''), '\t', '')) AS salePayer,
   TRIM(REPLACE(REPLACE(REPLACE(SALE_USERNAME, '\r', ''), '\n', ''), '\t', '')) AS username,
   SUBSTRING_INDEX(TRIM(REPLACE(REPLACE(REPLACE(SALE_NAME, '\r', ''), '\n', ''), '\t', '')), ' ', 1) AS firstName,
-  TRIM(SUBSTRING_INDEX(TRIM(REPLACE(REPLACE(REPLACE(SALE_NAME, '\r', ''), '\n', ''), '\t', '')), ' ', -1)) AS surName,
+  TRIM(SUBSTRING_INDEX(TRIM(REPLACE(REPLACE(REPLACE(SALE_SNAME, '\r', ''), '\n', ''), '\t', '')), ' ', -1)) AS surName,
   '24e6b727065bbc15f1cf8d576c32fd53' AS password,
   '' AS tel,
   TRIM(REPLACE(REPLACE(REPLACE(SALE_ZONE, '\r', ''), '\n', ''), '\t', '')) AS zone,
