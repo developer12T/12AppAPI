@@ -36,7 +36,7 @@ exports.addNoodleCart = async (req, res) => {
         return res.status(404).json({ status: 404, message: 'Not found this product' });
       }
 
-      nameProduct = `${soupDetail.name}_${noodleDetail.name}`;
+      nameProduct = `${soupDetail.name} ${noodleDetail.name}`;
     } else if (typeProduct === 'pc') {
       const productDetail = await Product.findOne({ id: sku });
       if (!productDetail) {
