@@ -46,7 +46,7 @@ exports.checkout = async (req, res) => {
 
     const now = new Date();
     const lastUpdate = orderTimestamps[area] || 0;
-    const ONE_MINUTE = 15 * 1000;
+    const ONE_MINUTE = 3 * 1000;
 
     if (now - lastUpdate < ONE_MINUTE) {
       return res.status(429).json({
