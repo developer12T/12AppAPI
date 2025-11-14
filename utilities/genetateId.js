@@ -86,7 +86,7 @@ const generateOrderId = async (area, warehouse, channel, res) => {
   const { Order } = getModelsByChannel(channel, res, orderModel)
 
   const latestOrder = await Order.findOne({
-    'store.area': area,
+    'store.area': { $regex: area, $options: 'i' },
     createdAt: {
       $gte: new Date(`${new Date().getFullYear()}-${currentMonth}-01`),
       $lt: new Date(
@@ -117,7 +117,7 @@ const generateRefundId = async (area, warehouse, channel, res) => {
   const { Refund } = getModelsByChannel(channel, res, refundModel)
 
   const latestOrder = await Refund.findOne({
-    'store.area': area,
+    'store.area': { $regex: area, $options: 'i' },
     createdAt: {
       $gte: new Date(`${new Date().getFullYear()}-${currentMonth}-01`),
       $lt: new Date(
@@ -386,7 +386,7 @@ const generateOrderIdFoodTruck = async (area,warehouse,channel,res) => {
     .sort({ orderId: -1 })
     .select('orderId')
 
-  console.log("latestOrder",latestOrder)
+  // console.log("latestOrder",latestOrder)
 
   let runningNumber = latestOrder
     ? parseInt(latestOrder.orderId.slice(-4)) + 1

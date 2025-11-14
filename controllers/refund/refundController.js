@@ -85,7 +85,7 @@ exports.checkout = async (req, res) => {
     }
     orderTimestamps[storeId] = now
 
-    if (!type || !area || !storeId || !shipping || !payment) {
+    if (!type || !area || !storeId || !payment) {
       return res
         .status(400)
         .json({ status: 400, message: 'Missing required fields!' })
