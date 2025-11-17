@@ -1013,6 +1013,101 @@ const OOLINE = sequelize.define(
   }
 )
 
+const CIADDR = sequelize.define(
+  'CIADDR',
+  {
+    coNo: {
+      type: DataTypes.STRING,
+      primaryKey: true,
+      allowNull: true,
+      field: 'OACONO'
+    },
+    OAADK1: {
+      type: DataTypes.STRING,
+      primaryKey: true,
+      allowNull: true,
+      field: 'OAADK1'
+    },
+    OAADK2: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'OAADK2'
+    },
+    OACONM: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'OACONM'
+    },
+    OAADR1: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'OAADR1'
+    },
+    OAADR2: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'OAADR2'
+    },
+    OAADR3: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'OAADR3'
+    },
+    OAADR4: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'OAADR4'
+    },
+    OACSCD: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'OACSCD'
+    },
+    OAPONO: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'OAPONO'
+    },
+    OAECAR: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'OAECAR'
+    },
+    OATXID: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'OATXID'
+    },
+    OARGDT: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'OARGDT'
+    }
+    ,
+    OALMDT: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'OALMDT'
+    }
+    ,
+    OACHID: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'OACHID'
+    }
+  },
+  {
+    freezeTableName: true,
+    timestamps: false,
+    createdAt: false,
+    updatedAt: false
+  }
+)
+
+
+
+
+
 
 
 
@@ -1038,5 +1133,6 @@ module.exports = {
   PromotionStore,
   // MGTYPE,
   // OODFLT
-  OOHEAD
+  OOHEAD,
+  CIADDR
 }
