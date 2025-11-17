@@ -1201,7 +1201,7 @@ exports.getCartDetail = async (req, res) => {
     const cartData = await Cart.findOne({
       storeId: storeId,
       area: area,
-      // type: { $in: ['sale', 'refund', 'give'] }
+      type: { $in: ['sale', 'refund', 'give'] }
     })
 
 
