@@ -3834,3 +3834,79 @@ exports.addStoreFromM3 = async (req, res) => {
     })
   }
 }
+
+exports.moveStoreToCash = async (req, res) => {
+  try {
+    const { storeId, area } = req.body
+
+    const channel = req.headers['x-channel'];
+    const { Store, RunningNumber } = getModelsByChannel('pc', res, storeModel);
+
+    const storeData = await Store.findOne({ storeId: storeId })
+
+    if (!storeData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found store in pc'
+      })
+    } else {
+      const { Store } = getModelsByChannel(channel, res, storeModel);
+      const storeZone = area.substring(0, 2)
+      const maxRunningAll = await RunningNumber.findOne({ zone: storeZone }).select(
+        'last'
+      )
+
+    const oldId = maxRunningAll
+    // console.log(oldId, 'oldId')
+    const newId = oldId.last.replace(/\d+$/, n =>
+      String(+n + 1).padStart(n.length, '0')
+    )
+
+
+      await RunningNumber.findOneAndUpdate(
+        { zone: store.zone },
+        { $set: { last: newId } },
+        { new: true }
+      )
+      await Store.findOneAndUpdate(
+        { _id: store._id },
+        {
+          $set: {
+            storeId: newId,
+            isMove: 'true',
+            storeIdOld: storeData.storeId,
+            areaOld: storeData.area,
+            updatedDate: Date(),
+            'approve.dateAction': new Date(),
+            'approve.appPerson': user
+          }
+        },
+        { new: true }
+      )
+
+
+
+
+    }
+
+
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'moveStoreToCash Success',
+      data: storeData
+    })
+
+
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+}
