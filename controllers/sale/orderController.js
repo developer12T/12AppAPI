@@ -38,7 +38,10 @@ const {
 } = require('../../models/cash/master')
 const { WithdrawCash } = require('../../models/cash/powerBi')
 const { Op, fn, col, where, literal } = require('sequelize')
-const { generateOrderId, generateOrderIdFoodTruck } = require('../../utilities/genetateId')
+const {
+  generateOrderId,
+  generateOrderIdFoodTruck
+} = require('../../utilities/genetateId')
 const { sortProduct } = require('../../utilities/product')
 const {
   summaryOrder,
@@ -148,8 +151,11 @@ exports.checkout = async (req, res) => {
     }
     orderTimestamps[storeId] = now
 
-    const cart = await Cart.findOne({ type, area, storeId })
+    setTimeout(() => {
+      delete orderTimestamps[storeId]
+    }, ONE_MINUTE)
 
+    const cart = await Cart.findOne({ type, area, storeId })
 
     if (!cart || cart.listProduct.length === 0) {
       return res.status(404).json({ status: 404, message: 'Cart is empty!' })
@@ -231,13 +237,15 @@ exports.checkout = async (req, res) => {
     // console.log(sale)
     let orderId = {}
     if (channel === 'pc') {
-      orderId = await generateOrderIdFoodTruck(area, sale.warehouse, channel, res);
+      orderId = await generateOrderIdFoodTruck(
+        area,
+        sale.warehouse,
+        channel,
+        res
+      )
     } else {
       orderId = await generateOrderId(area, sale.warehouse, channel, res)
     }
-
-
-
 
     let storeData = {}
 
@@ -245,12 +253,9 @@ exports.checkout = async (req, res) => {
       storeData =
         (await Store.findOne({
           storeId: cart.storeId,
-          area: cart.area,
+          area: cart.area
         }).lean()) || {}
     }
-
-
-
 
     const promotionshelf =
       (await PromotionShelf.find({
@@ -260,12 +265,12 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-        .map(item => item.price)
-        .reduce((sum, price) => sum + price, 0)
+          .map(item => item.price)
+          .reduce((sum, price) => sum + price, 0)
       : 0
 
     // ✅ ช่วยฟังก์ชัน: เช็คว่า createAt ตั้งแต่ Aug-2025 ขึ้นไปไหม
-    function isAug2025OrLater(createAt) {
+    function isAug2025OrLater (createAt) {
       if (!createAt) return false
 
       // case: "YYYYMM" เช่น "202508"
@@ -286,14 +291,14 @@ exports.checkout = async (req, res) => {
     // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-        storeData.address,
-        storeData.subDistrict && `ต.${storeData.subDistrict}`,
-        storeData.district && `อ.${storeData.district}`,
-        storeData.province && `จ.${storeData.province}`,
-        storeData.postCode
-      ]
-        .filter(Boolean)
-        .join(' ')
+          storeData.address,
+          storeData.subDistrict && `ต.${storeData.subDistrict}`,
+          storeData.district && `อ.${storeData.district}`,
+          storeData.province && `จ.${storeData.province}`,
+          storeData.postCode
+        ]
+          .filter(Boolean)
+          .join(' ')
       : storeData.address
 
     // const addressFinal = `${storeData.address} ต.${storeData.subDistrict} อ.${storeData.district} จ.${province} ${postCode}`
@@ -790,14 +795,13 @@ exports.getOrder = async (req, res) => {
     if (channel === 'pc') {
       response.sort((a, b) => {
         // 1️⃣ ถ้า a เป็น success แต่ b ไม่ใช่ → เอา a ไปท้าย
-        if (a.status === 'success' && b.status !== 'success') return 1;
+        if (a.status === 'success' && b.status !== 'success') return 1
         // 2️⃣ ถ้า b เป็น success แต่ a ไม่ใช่ → เอา b ไปท้าย
-        if (b.status === 'success' && a.status !== 'success') return -1;
+        if (b.status === 'success' && a.status !== 'success') return -1
         // 3️⃣ ถ้า status เหมือนกัน → เรียงตาม number ปกติ
-        return a.number - b.number;
-      });
+        return a.number - b.number
+      })
     }
-
 
     res.status(200).json({
       status: 200,
@@ -913,6 +917,10 @@ exports.updateStatus = async (req, res) => {
       })
     }
     orderUpdateTimestamps[orderId] = now
+
+    setTimeout(() => {
+      delete orderUpdateTimestamps[orderId]
+    }, ONE_MINUTE)
     // ===== end debounce =====
 
     const order = await Order.findOne({ orderId })
@@ -978,7 +986,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -1372,7 +1380,7 @@ exports.OrderToExcel = async (req, res) => {
 
     const tranFromOrder = modelOrder.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD(date) {
+      function formatDateToThaiYYYYMMDD (date) {
         const d = new Date(date)
         d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1432,14 +1440,14 @@ exports.OrderToExcel = async (req, res) => {
           case 'cash':
             CUNO = order.store.storeId
             OAORTP = 'A31'
-            break;
+            break
           case 'pc':
             CUNO = order.sale.salePayer
             OAORTP = 'A51'
-            break;
+            break
 
           default:
-            break;
+            break
         }
 
         return {
@@ -1495,7 +1503,7 @@ exports.OrderToExcel = async (req, res) => {
 
     const tranFromChange = modelChange.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD(date) {
+      function formatDateToThaiYYYYMMDD (date) {
         const d = new Date(date)
         d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1603,7 +1611,12 @@ exports.OrderToExcel = async (req, res) => {
 
     // ปีที่ยอมรับ
     const currentYear = new Date().getFullYear()
-    const years = [currentYear, currentYear - 1, currentYear - 2, currentYear + 1]
+    const years = [
+      currentYear,
+      currentYear - 1,
+      currentYear - 2,
+      currentYear + 1
+    ]
 
     // ดึงล็อตรวดเดียวจาก MSSQL (Sequelize)
     const lotRows = await ItemLotM3.findAll({
@@ -1760,7 +1773,7 @@ exports.OrderToExcel = async (req, res) => {
         message: 'Not Found Order'
       })
     }
-    function yyyymmddToDdMmYyyy(dateString) {
+    function yyyymmddToDdMmYyyy (dateString) {
       // สมมติ dateString คือ '20250804'
       const year = dateString.slice(0, 4)
       const month = dateString.slice(4, 6)
@@ -1802,7 +1815,7 @@ exports.OrderToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       }
     )
 
@@ -1820,7 +1833,6 @@ exports.OrderToExcel = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.getAllOrder = async (req, res) => {
@@ -2566,7 +2578,7 @@ exports.getSummarybyArea = async (req, res) => {
 
       // console.log(dataRefund)
 
-      function groupByMonthAndSum(data) {
+      function groupByMonthAndSum (data) {
         return data.reduce((acc, item) => {
           // ดึงเดือนจาก createdAtThai (หรือใช้ createdAt ก็ได้ถ้าเป็น Date)
           const date = new Date(item.createdAt)
@@ -3213,8 +3225,9 @@ exports.erpApiCheckOrderDistrabution = async (req, res) => {
 
         const ReceiveQty = Object.values(
           Receive.reduce((acc, cur) => {
-            const key = `${cur.coNo}_${cur.withdrawUnit
-              }_${cur.productId.trim()}`
+            const key = `${cur.coNo}_${
+              cur.withdrawUnit
+            }_${cur.productId.trim()}`
             if (!acc[key]) {
               acc[key] = { ...cur }
             } else {
@@ -3514,7 +3527,6 @@ exports.getSaleSummaryByStore = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.getGroup = async (req, res) => {
@@ -3561,7 +3573,6 @@ exports.getGroup = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.getSummaryProduct = async (req, res) => {
@@ -3618,7 +3629,10 @@ exports.getSummaryProduct = async (req, res) => {
       },
       { $unwind: { path: '$order', preserveNullAndEmptyArrays: true } },
       {
-        $unwind: { path: '$order.listProduct', preserveNullAndEmptyArrays: true }
+        $unwind: {
+          path: '$order.listProduct',
+          preserveNullAndEmptyArrays: true
+        }
       },
       {
         $project: {
@@ -3664,8 +3678,9 @@ exports.getSummaryProduct = async (req, res) => {
         ) || {}
       const factorPcs = u.qty * qty.factor
       const factorCtn =
-        productFactor.find(i => i.productId === u.productId && i.unit == 'CTN') ||
-        {}
+        productFactor.find(
+          i => i.productId === u.productId && i.unit == 'CTN'
+        ) || {}
       const qtyCtn = Math.floor(factorPcs / factorCtn.factor)
 
       return {
@@ -3823,7 +3838,9 @@ exports.getSummaryProduct = async (req, res) => {
       const allStoreCount = constStoreOnArea.find(u => u.area == item.area)
 
       const percentStore = allStoreCount?.constStore
-        ? (((storeCount?.count || 0) / allStoreCount.constStore) * 100).toFixed(2)
+        ? (((storeCount?.count || 0) / allStoreCount.constStore) * 100).toFixed(
+            2
+          )
         : 0
 
       return {
@@ -3928,7 +3945,6 @@ exports.getSummaryProduct = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.getProductLimit = async (req, res) => {
@@ -3952,7 +3968,9 @@ exports.getProductLimit = async (req, res) => {
     })
     let productLimitList = []
     for (const i of productLimit) {
-      const productLimitDetail = await PromotionLimit.findOne({ proId: i.proId })
+      const productLimitDetail = await PromotionLimit.findOne({
+        proId: i.proId
+      })
       productLimitList.push(productLimitDetail)
     }
 
@@ -3970,7 +3988,6 @@ exports.getProductLimit = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.summaryAllProduct = async (req, res) => {
@@ -4044,7 +4061,6 @@ exports.summaryAllProduct = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.summaryDaily = async (req, res) => {
@@ -4443,7 +4459,11 @@ exports.saleReport = async (req, res) => {
               {
                 $gte: [
                   {
-                    $dateAdd: { startDate: '$createdAt', unit: 'hour', amount: 7 }
+                    $dateAdd: {
+                      startDate: '$createdAt',
+                      unit: 'hour',
+                      amount: 7
+                    }
                   },
                   startDateUTC
                 ]
@@ -4451,7 +4471,11 @@ exports.saleReport = async (req, res) => {
               {
                 $lt: [
                   {
-                    $dateAdd: { startDate: '$createdAt', unit: 'hour', amount: 7 }
+                    $dateAdd: {
+                      startDate: '$createdAt',
+                      unit: 'hour',
+                      amount: 7
+                    }
                   },
                   endDateUTC
                 ]
@@ -4600,7 +4624,6 @@ exports.saleReport = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.getSummary18SKU = async (req, res) => {
@@ -4722,7 +4745,6 @@ exports.getSummary18SKU = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.reportCheckin = async (req, res) => {
@@ -4868,7 +4890,6 @@ exports.reportCheckin = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.OrderZeroDiff = async (req, res) => {
@@ -4926,7 +4947,6 @@ exports.OrderZeroDiff = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.checkOrderCancelM3 = async (req, res) => {
@@ -5013,28 +5033,28 @@ exports.checkOrderCancelM3 = async (req, res) => {
       const type = saleSet.has(id)
         ? 'Sale'
         : refundSet.has(id)
-          ? 'Refund'
-          : changeSet.has(id)
-            ? 'Change'
-            : ''
+        ? 'Refund'
+        : changeSet.has(id)
+        ? 'Change'
+        : ''
 
       const typeId =
         type === 'Sale'
           ? 'A31'
           : type === 'Refund'
-            ? 'A34'
-            : type === 'Change'
-              ? 'B31'
-              : ''
+          ? 'A34'
+          : type === 'Change'
+          ? 'B31'
+          : ''
 
       const statusTablet =
         type === 'Sale'
           ? saleStatusMap.get(id) ?? ''
           : type === 'Refund'
-            ? refundStatusMap.get(id) ?? ''
-            : type === 'Change'
-              ? changeStatusMap.get(id) ?? ''
-              : ''
+          ? refundStatusMap.get(id) ?? ''
+          : type === 'Change'
+          ? changeStatusMap.get(id) ?? ''
+          : ''
 
       return { orderId: id, type, typeId, statusTablet }
     })
@@ -5056,7 +5076,7 @@ exports.checkOrderCancelM3 = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
 
     // res.status(200).json({
@@ -5074,7 +5094,6 @@ exports.checkOrderCancelM3 = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.getTarget = async (req, res) => {
@@ -5231,8 +5250,9 @@ exports.getTarget = async (req, res) => {
 
     for (const item of salePcs) {
       const factorCtn =
-        product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
-          ?.factor ?? 1
+        product
+          .find(u => u.id === item.id)
+          ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
 
       const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
       saleQty += saleCtn
@@ -5245,7 +5265,8 @@ exports.getTarget = async (req, res) => {
         .filter(i => i.condition === 'good') // เลือกเฉพาะ good
         .map(i => {
           const meta = (product || []).find(u => String(u.id) === String(i.id))
-          const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
+          const factor =
+            meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
           return {
             id: i.id,
             qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
@@ -5265,8 +5286,9 @@ exports.getTarget = async (req, res) => {
 
     for (const item of goodPcs) {
       const factorCtn =
-        product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
-          ?.factor ?? 1
+        product
+          .find(u => u.id === item.id)
+          ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
 
       const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
       goodQty += saleCtn
@@ -5279,7 +5301,8 @@ exports.getTarget = async (req, res) => {
         .filter(i => i.condition === 'damaged') // เลือกเฉพาะ good
         .map(i => {
           const meta = (product || []).find(u => String(u.id) === String(i.id))
-          const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
+          const factor =
+            meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
           return {
             id: i.id,
             qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
@@ -5299,8 +5322,9 @@ exports.getTarget = async (req, res) => {
 
     for (const item of damagedPcs) {
       const factorCtn =
-        product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
-          ?.factor ?? 1
+        product
+          .find(u => u.id === item.id)
+          ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
 
       const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
       damagedQty += saleCtn
@@ -5312,7 +5336,8 @@ exports.getTarget = async (req, res) => {
         .flatMap(o => o.listProduct || [])
         .map(i => {
           const meta = (product || []).find(u => String(u.id) === String(i.id))
-          const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
+          const factor =
+            meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
           return {
             id: i.id,
             qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
@@ -5332,8 +5357,9 @@ exports.getTarget = async (req, res) => {
 
     for (const item of refundPcs) {
       const factorCtn =
-        product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
-          ?.factor ?? 1
+        product
+          .find(u => u.id === item.id)
+          ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
 
       const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
       refundQty += saleCtn
@@ -5345,7 +5371,8 @@ exports.getTarget = async (req, res) => {
         .flatMap(o => o.listProduct || [])
         .map(i => {
           const meta = (product || []).find(u => String(u.id) === String(i.id))
-          const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
+          const factor =
+            meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
           return {
             id: i.id,
             qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
@@ -5365,8 +5392,9 @@ exports.getTarget = async (req, res) => {
 
     for (const item of changePcs) {
       const factorCtn =
-        product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
-          ?.factor ?? 1
+        product
+          .find(u => u.id === item.id)
+          ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
 
       const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
       changeQty += saleCtn
@@ -5378,7 +5406,8 @@ exports.getTarget = async (req, res) => {
         .flatMap(o => o.listProduct || [])
         .map(i => {
           const meta = (product || []).find(u => String(u.id) === String(i.id))
-          const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
+          const factor =
+            meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
           return {
             id: i.id,
             qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
@@ -5398,8 +5427,9 @@ exports.getTarget = async (req, res) => {
 
     for (const item of givePcs) {
       const factorCtn =
-        product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
-          ?.factor ?? 1
+        product
+          .find(u => u.id === item.id)
+          ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
 
       const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
       giveQty += saleCtn
@@ -5411,7 +5441,8 @@ exports.getTarget = async (req, res) => {
         .flatMap(o => o.listProduct || [])
         .map(i => {
           const meta = (product || []).find(u => String(u.id) === String(i.id))
-          const factor = meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
+          const factor =
+            meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
           return {
             id: i.id,
             qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
@@ -5431,8 +5462,9 @@ exports.getTarget = async (req, res) => {
 
     for (const item of withdrawPcs) {
       const factorCtn =
-        product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
-          ?.factor ?? 1
+        product
+          .find(u => u.id === item.id)
+          ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
 
       const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
       withdrawQty += saleCtn
@@ -5444,7 +5476,8 @@ exports.getTarget = async (req, res) => {
         .flatMap(o => o.listProduct || [])
         .map(i => {
           const meta = (product || []).find(u => String(u.id) === String(i.id))
-          const factor = meta?.listUnit?.find(u => u.unit === 'CTN')?.factor ?? 1
+          const factor =
+            meta?.listUnit?.find(u => u.unit === 'CTN')?.factor ?? 1
           // const salePrice = meta?.listUnit?.find(u => u.unit ===  'BOT'||'PCS').price.sale
           // console.log(i.receiveQty)
           return {
@@ -5466,12 +5499,14 @@ exports.getTarget = async (req, res) => {
 
     for (const item of recievePcs) {
       const factorCtn =
-        product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
-          ?.factor ?? 1
+        product
+          .find(u => u.id === item.id)
+          ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
 
       const sale =
-        product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
-          ?.price.sale ?? 0
+        product
+          .find(u => u.id === item.id)
+          ?.listUnit.find(u => u.unit === 'CTN')?.price.sale ?? 0
 
       const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
 
@@ -5508,8 +5543,9 @@ exports.getTarget = async (req, res) => {
 
     for (const item of adjustPcs) {
       const factorCtn =
-        product.find(u => u.id === item.id)?.listUnit.find(u => u.unit === 'CTN')
-          ?.factor ?? 1
+        product
+          .find(u => u.id === item.id)
+          ?.listUnit.find(u => u.unit === 'CTN')?.factor ?? 1
 
       const saleCtn = Math.floor((item.qtyPcs || 0) / (factorCtn || 1))
       adjustStockQty += saleCtn
@@ -5539,8 +5575,9 @@ exports.getTarget = async (req, res) => {
       adjustStockQty: adjustStockQty,
       target: parseFloat(dataTarget?.TG_AMOUNT ?? 0),
       targetPercent:
-        to2((sale * 100) / parseFloat(dataTarget?.TG_AMOUNT * 1.07 ?? 0) ?? 0) ??
-        0
+        to2(
+          (sale * 100) / parseFloat(dataTarget?.TG_AMOUNT * 1.07 ?? 0) ?? 0
+        ) ?? 0
     })
   } catch (error) {
     console.error('❌ Error:', error)
@@ -5552,7 +5589,6 @@ exports.getTarget = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.orderPowerBI = async (req, res) => {
@@ -5619,7 +5655,7 @@ exports.orderPowerBI = async (req, res) => {
           }
 
           // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-          fs.unlink(tempPath, () => { })
+          fs.unlink(tempPath, () => {})
         }
       )
     } else {
@@ -5639,7 +5675,6 @@ exports.orderPowerBI = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.updateOrderPowerBI = async (req, res) => {
@@ -5710,7 +5745,6 @@ exports.updateOrderPowerBI = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.updateStatusOrderDistribution = async (req, res) => {
@@ -5758,7 +5792,6 @@ exports.updateStatusOrderDistribution = async (req, res) => {
       const product = listProduct.find(p => p.id === row.ITEM_CODE)
 
       if (product) {
-
         await WithdrawCash.update(
           {
             WD_STATUS: dis.status == 'confirm' ? '99' : '22',
@@ -5847,7 +5880,11 @@ exports.getTargetProduct = async (req, res) => {
     const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
     const { Giveaway } = getModelsByChannel(channel, res, giveModel)
     const { Target } = getModelsByChannel(channel, res, targetModel)
-    const { targetProduct } = getModelsByChannel(channel, res, targetProductModel)
+    const { targetProduct } = getModelsByChannel(
+      channel,
+      res,
+      targetProductModel
+    )
 
     const query = { period }
     if (area) query.area = area
@@ -5941,7 +5978,9 @@ exports.getTargetProduct = async (req, res) => {
     const orderSaleTran = [...dataOrderChange, ...dataOrderSale].flatMap(item =>
       item.listProduct.map(i => {
         const productDetail = productData.find(o => o.id === i.id)
-        const factor = productDetail.listUnit.find(o => o.unit === i.unit).factor
+        const factor = productDetail.listUnit.find(
+          o => o.unit === i.unit
+        ).factor
         const factorCtn = productDetail.listUnit.find(
           o => o.unit === 'CTN'
         ).factor
@@ -5983,7 +6022,9 @@ exports.getTargetProduct = async (req, res) => {
     if (area) {
       areaList = [area]
     } else {
-      areaList = [...new Set(targetProductData.flatMap(item => item.area ?? []))]
+      areaList = [
+        ...new Set(targetProductData.flatMap(item => item.area ?? []))
+      ]
     }
     // console.log(areaList)
 
@@ -6073,7 +6114,6 @@ exports.getTargetProduct = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.getOrderExcelNew = async (req, res) => {
@@ -6462,7 +6502,7 @@ exports.getOrderExcelNew = async (req, res) => {
     dataGiveArray = sortProduct(dataGiveArray, 'productGroup')
 
     if (excel == 'true') {
-      function zeroToDash(value) {
+      function zeroToDash (value) {
         return value === 0 ? '-' : value
       }
       const dataSaleFinal = dataSaleArray.map(item => {
@@ -6554,7 +6594,7 @@ exports.getOrderExcelNew = async (req, res) => {
           }
         }
         // ลบไฟล์ทิ้งหลังจบ (สำเร็จหรือไม่ก็ตาม)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       })
     } else {
       return res.status(200).json({
@@ -6577,7 +6617,6 @@ exports.getOrderExcelNew = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.updatePaymentOrder = async (req, res) => {
@@ -6629,14 +6668,14 @@ exports.updateAddressInOrder = async (req, res) => {
 
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-        storeData.address,
-        storeData.subDistrict && `ต.${storeData.subDistrict}`,
-        storeData.district && `อ.${storeData.district}`,
-        storeData.province && `จ.${storeData.province}`,
-        storeData.postCode
-      ]
-        .filter(Boolean)
-        .join(' ')
+          storeData.address,
+          storeData.subDistrict && `ต.${storeData.subDistrict}`,
+          storeData.district && `อ.${storeData.district}`,
+          storeData.province && `จ.${storeData.province}`,
+          storeData.postCode
+        ]
+          .filter(Boolean)
+          .join(' ')
       : storeData.address
 
     for (i of dataOrder) {
@@ -6690,7 +6729,6 @@ exports.addTarget = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.updateUserSaleInOrder = async (req, res) => {
@@ -6764,7 +6802,6 @@ exports.updateUserSaleInOrder = async (req, res) => {
   }
 }
 
-
 exports.m3ToOrderMongo = async (req, res) => {
   try {
     const { orderId, period, type } = req.body
@@ -6783,44 +6820,42 @@ exports.m3ToOrderMongo = async (req, res) => {
         }
       },
       raw: true
-    });
+    })
 
     const trimmedDataM3Line = dataM3Line.map(record => {
-      const trimmedRecord = {};
+      const trimmedRecord = {}
       for (const [key, value] of Object.entries(record)) {
         if (typeof value === 'string') {
-          trimmedRecord[key] = value.trim(); // ตัดช่องว่างซ้ายขวา
+          trimmedRecord[key] = value.trim() // ตัดช่องว่างซ้ายขวา
         } else {
-          trimmedRecord[key] = value; // เก็บค่าเดิมถ้าไม่ใช่ string
+          trimmedRecord[key] = value // เก็บค่าเดิมถ้าไม่ใช่ string
         }
       }
-      return trimmedRecord;
-    });
+      return trimmedRecord
+    })
 
-    const productId = dataM3Line.map(item => item.OBITNO.trim());
+    const productId = dataM3Line.map(item => item.OBITNO.trim())
 
     const dataM3Head = await OOHEAD.findOne({
       where: { OACUOR: orderId },
       raw: true
-    });
+    })
 
-    const trimmedDataM3Head = {};
+    const trimmedDataM3Head = {}
     for (const [key, value] of Object.entries(dataM3Head || {})) {
-      trimmedDataM3Head[key] = typeof value === 'string' ? value.trim() : value;
+      trimmedDataM3Head[key] = typeof value === 'string' ? value.trim() : value
     }
 
     const productData = await Product.find({
       id: { $in: productId }
-    });
-
+    })
 
     let listProduct = []
 
     for (const item of trimmedDataM3Line) {
       const productDetail = productData.find(u => u.id === item.OBITNO.trim())
-      // const unitName 
+      // const unitName
       if (item.OBSAPR === 0 && item.OBLNA2 === 0) {
-
       } else {
         const data = {
           id: productDetail.id,
@@ -6840,19 +6875,17 @@ exports.m3ToOrderMongo = async (req, res) => {
           subtotal: item.OBLNA2,
           discount: 0,
           netTotal: item.OBLNA2,
-          condition : 'damaged'
+          condition: 'damaged'
         }
         listProduct.push(data)
       }
-
     }
     const saleData = await User.findOne({ warehouse: trimmedDataM3Head.OAWHLO })
     const storeData = await Store.findOne({ storeId: trimmedDataM3Head.OACUNO })
-    const total = Math.abs(Number(trimmedDataM3Head.OABRLA));
-    const count = trimmedDataM3Line.filter(item => item.OBITNO).length;
+    const total = Math.abs(Number(trimmedDataM3Head.OABRLA))
+    const count = trimmedDataM3Line.filter(item => item.OBITNO).length
 
     if (['change', 'sale'].includes(type)) {
-
       data = {
         type: 'change',
         orderId: orderId,
@@ -6872,7 +6905,7 @@ exports.m3ToOrderMongo = async (req, res) => {
           taxId: storeData.taxId,
           tel: storeData.tel,
           area: storeData.area,
-          zone: storeData.zone,
+          zone: storeData.zone
         },
         shipping: {
           default: '1',
@@ -6883,7 +6916,7 @@ exports.m3ToOrderMongo = async (req, res) => {
           province: '',
           postCode: '',
           latitude: '0',
-          longtitude: '0',
+          longtitude: '0'
         },
         note: 'จาก M3 มา MONGO (เคส ทุจริต)',
         latitude: '0.00',
@@ -6912,7 +6945,7 @@ exports.m3ToOrderMongo = async (req, res) => {
         lineM3: `${count}`,
         lowStatus: trimmedDataM3Head.OAORST,
         orderNo: trimmedDataM3Head.OAORNO,
-        createdAt:trimmedDataM3Head.OARLDT
+        createdAt: trimmedDataM3Head.OARLDT
       }
 
       await Order.create(data)
@@ -6935,7 +6968,7 @@ exports.m3ToOrderMongo = async (req, res) => {
           taxId: storeData.taxId,
           tel: storeData.tel,
           area: storeData.area,
-          zone: storeData.zone,
+          zone: storeData.zone
         },
         note: 'จาก M3 มา MONGO (เคส ทุจริต)',
         latitude: '0.00',
@@ -6964,23 +6997,17 @@ exports.m3ToOrderMongo = async (req, res) => {
         lineM3: `${count}`,
         lowStatus: trimmedDataM3Head.OAORST,
         orderNo: trimmedDataM3Head.OAORNO,
-        createdAt:trimmedDataM3Head.OARLDT
+        createdAt: trimmedDataM3Head.OARLDT
       }
 
-    await Refund.create(data)
+      await Refund.create(data)
     }
-
-
-
-
 
     res.status(201).json({
       status: 201,
       message: 'Insert success',
       data: data
     })
-
-
   } catch (error) {
     console.error('error:', error)
     return res.status(500).json({
