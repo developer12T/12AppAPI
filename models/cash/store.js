@@ -40,7 +40,7 @@ const checkinSchema = mongoose.Schema({
 
 const storeSchema = mongoose.Schema({
     storeId: { type: String, require: true, unique: true },
-    isMove : { type: String } ,
+    isMove : { type: Boolean } ,
     storeIdOld : { type: String } ,
     name: { type: String, require: true },
     taxId: { type: String },
