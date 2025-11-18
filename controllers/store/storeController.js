@@ -790,13 +790,13 @@ exports.checkSimilarStores = async (req, res) => {
     // )
 
     const existingStores = await Store.find(
-      {
-        ...(store.zone ? { zone: store.zone } : {}), // เพิ่มเฉพาะถ้ามีค่า
-        storeId: { $ne: storeId },
-        $expr: { $lte: [{ $strLenCP: '$storeId' }, 12] }
-      },
-      { _id: 0, __v: 0, idIndex: 0 }
-    )
+  {
+    ...(store?.zone ? { zone: store.zone } : {}), 
+    storeId: { $ne: storeId },
+    $expr: { $lte: [{ $strLenCP: '$storeId' }, 12] }
+  },
+  { _id: 0, __v: 0, idIndex: 0 }
+)
 
     // console.log(existingStores.length)
     // 1. กำหนด weight ของแต่ละ field (ค่า sum ต้องไม่จำเป็นต้องรวมกันเท่ากับ 100)
