@@ -1104,7 +1104,55 @@ const CIADDR = sequelize.define(
   }
 )
 
-
+const DROUTE = sequelize.define(
+  'DROUTE',
+  {
+    coNo: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'DRCONO'
+    },
+    DRRUTP: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'DRRUTP'
+    },
+    routeCode: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'DRROUT'
+    },
+    routeName: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'DRTX40'
+    },
+    DRTX15: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'DRTX15'
+    },
+    method: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'DRMODL'
+    },
+    transection: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'DRTRCA'
+    },
+  },
+  {
+    freezeTableName: true,
+    timestamps: false,
+    createdAt: false,
+    updatedAt: false,
+    primaryKey: false
+  }
+)
 
 
 
@@ -1134,5 +1182,6 @@ module.exports = {
   // MGTYPE,
   // OODFLT
   OOHEAD,
-  CIADDR
+  CIADDR,
+  DROUTE
 }

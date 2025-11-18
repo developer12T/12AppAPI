@@ -14,7 +14,7 @@ const {
   formatDate,
   formatDateToYYYYMMDD
 } = require('../../utilities/datetime')
-const { CIADDR } = require('../../models/cash/master')
+const { CIADDR,DROUTE } = require('../../models/cash/master')
 
 
 
@@ -408,7 +408,7 @@ exports.syncAddressCIADDR = async (req, res) => {
 
     await t.commit()   // 🟩 commit
 
-    res.status(200).json({
+    res.status(201).json({
       status: 201,
       message: 'syncAddressCIADDR Success',
       data: data,
@@ -422,3 +422,27 @@ exports.syncAddressCIADDR = async (req, res) => {
   }
 }
 
+exports.syncAddressDROUTE = async (req, res) => {
+  let t;
+  try {
+
+    const channel = req.headers['x-channel']
+    const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
+
+    t = await DROUTE.sequelize.transaction();   // 🟦 กำหนดค่าใน try
+
+    const DROUTEdata = await DROUTE.findAll()
+
+    res.status(200).json({
+      status:200,
+      message:'syncAddressDROUTE Success',
+      data : DROUTEdata
+    })
+
+
+  } catch (error) {
+    console.log("SQL ERROR =", error.original || error.parent || error);
+    if (t) await t.rollback();
+    res.status(500).json({ status: '500', message: error.message });
+  }
+}
