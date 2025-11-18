@@ -242,8 +242,8 @@ exports.checkout = async (req, res) => {
 
 
 
-    // await Order.create(noodleOrder);
-    // await NoodleCart.deleteOne({ type, area });
+    await Order.create(noodleOrder);
+    await NoodleCart.deleteOne({ type, area });
 
 
     res.status(201).json({
