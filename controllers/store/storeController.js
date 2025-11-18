@@ -3867,48 +3867,64 @@ exports.moveStoreToCash = async (req, res) => {
         message: 'Not found store in pc'
       })
     } else {
-      const { Store } = getModelsByChannel(channel, res, storeModel);
-      const storeZone = area.substring(0, 2)
-      const maxRunningAll = await RunningNumber.findOne({ zone: storeZone }).select(
+      const { Store,RunningNumber } = getModelsByChannel(channel, res, storeModel);
+      const zone = area.substring(0, 2)
+      const maxRunningAll = await RunningNumber.findOne({ zone: zone }).select(
         'last'
       )
 
       const oldId = maxRunningAll
-      // console.log(oldId, 'oldId')
+      console.log(maxRunningAll, 'maxRunningAll')
       const newId = oldId.last.replace(/\d+$/, n =>
         String(+n + 1).padStart(n.length, '0')
       )
 
-      console.log(maxRunningAll)
-      // await RunningNumber.findOneAndUpdate(
-      //   { zone: store.zone },
-      //   { $set: { last: newId } },
-      //   { new: true }
-      // )
+      // console.log(maxRunningAll)
+      await RunningNumber.findOneAndUpdate(
+        { zone: zone },
+        { $set: { last: newId } },
+        { new: true }
+      )
+
+      
 
       storeNew = {
-        ...storeData,
-        storeIdOld: storeData.storeId,
+
+        storeId: newId,
+        name: storeData.name,
+        isMove : "true",
+        storeIdOld : storeData.storeId,
         areaOld: storeData.area,
+        taxId : storeData.taxId,
+        tel : storeData.tel,
+        route : storeData.route,
+        type : storeData.type,
+        typeName : storeData.typeName,
+        address : storeData.address,
+        subDistrict : storeData.subDistrict,
+        district : storeData.district,
+        province : storeData.province,
+        provinceCode : storeData.provinceCode,
+        postCode : storeData.postCode,
+        zone : zone,
+        area : area,
+        latitude : storeData.latitude,
+        longtitude : storeData.longtitude,
+        lineId : storeData.lineId,
+        note : storeData.note,
+        status : storeData.status,
+        approve : storeData.approve,
+        policyConsent : storeData.policyConsent,
+        imageList : storeData.imageList,
+        shippingAddress : storeData.shippingAddress,
+        checkIn : storeData.checkIn,
+        createdAt : storeData.createdAt,
+        updatedAt : storeData.updatedAt,
+        date : storeData.date
+
       }
-      // await Store.findOneAndUpdate(
-      //   { _id: store._id },
-      //   {
-      //     $set: {
-      //       storeId: newId,
-      //       isMove: 'true',
-      //       storeIdOld: storeData.storeId,
-      //       areaOld: storeData.area,
-      //       updatedDate: Date(),
-      //       'approve.dateAction': new Date(),
-      //       'approve.appPerson': user
-      //     }
-      //   },
-      //   { new: true }
-      // )
 
-
-
+      Store.create(storeNew)
 
     }
 
