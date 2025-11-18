@@ -7,6 +7,16 @@ const userModel = require('../../models/cash/user')
 const distributionModel = require('../../models/cash/distribution')
 const { getModelsByChannel } = require('../../middleware/channel')
 const { wereHouseQuery } = require('../../controllers/queryFromM3/querySctipt')
+const {
+  period,
+  previousPeriod,
+  toThaiTime,
+  formatDate,
+  formatDateToYYYYMMDD
+} = require('../../utilities/datetime')
+const { CIADDR, DROUTE } = require('../../models/cash/master')
+
+
 
 exports.getPlace = async (req, res) => {
   try {
@@ -324,5 +334,147 @@ exports.getRouteWithdraw = async (req, res) => {
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.syncAddressCIADDR = async (req, res) => {
+  let t;   // 🟦 ประกาศไว้ด้านบนก่อน
+
+  try {
+    const channel = req.headers['x-channel']
+    const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
+
+    t = await CIADDR.sequelize.transaction();   // 🟦 กำหนดค่าใน try
+
+    const CIADDRdata = await CIADDR.findAll()
+    const idList = [...new Set(
+      CIADDRdata.map(item => item.OAADK1?.trim())
+    )];
+    const withdrawData = await Withdraw.find()
+
+    let data = []
+
+    for (const row of withdrawData) {
+
+      if (!idList.includes(row.Des_No)) {
+
+        if (row.Des_Name.length > 36) {
+          OACONM = row.Des_Name.slice(0, 36);
+          OAADR1 = row.Des_Name.slice(36);
+        } else {
+          OACONM = row.Des_Name;
+          OAADR1 = "";
+        }
+
+
+
+        const dataTran = {
+          coNo: 410,
+          OAADTH: 4,
+          OAADK1: row.Des_No,
+          OAADK2: '',
+          OAADK3: '',
+          OACONM: OACONM,
+          OAADR1: OAADR1,
+          OAADR2: '',
+          OAADR3: row.WH,
+          OAADR4: '',
+          OACSCD: 'TH',
+          OAPONO: row.ROUTE,
+          // OAADVI: '',
+          // OAGEOC: 0,
+          // OATAXC: '',
+          // OAECAR: '',
+          // OATOWN: '',
+          // OAPNOD: '',
+          // OATXID: '',
+          OARGDT: row.Des_Date,
+          // OARGTM: '',
+          OALMDT: formatDate(),
+          // OACHNO: '',
+          // OACHID: 'MI02',
+          OALMTS: `${Date.now()}`,
+          // OAGEOX: '',
+          // OAGEOY: '',
+          // OAGEOZ: '',
+          // OACUEX: ''
+        }
+
+        data.push(dataTran)
+
+        await CIADDR.create(dataTran, { transaction: t })  // 🟩 ผูกกับ transaction
+      }
+    }
+
+    await t.commit()   // 🟩 commit
+
+    res.status(201).json({
+      status: 201,
+      message: 'syncAddressCIADDR Success',
+      data: data,
+      // data : idList
+    })
+
+  } catch (error) {
+    console.log("SQL ERROR =", error.original || error.parent || error);
+    if (t) await t.rollback();
+    res.status(500).json({ status: '500', message: error.message });
+  }
+}
+
+exports.syncAddressDROUTE = async (req, res) => {
+  let t;
+  try {
+
+    const channel = req.headers['x-channel']
+    const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
+
+    t = await DROUTE.sequelize.transaction();   // 🟦 กำหนดค่าใน try
+
+    const DROUTEdata = await DROUTE.findAll()
+    const idList = [...new Set(
+      DROUTEdata.map(item => item.routeCode?.trim())
+    )];
+
+    const withdrawData = await Withdraw.find()
+
+    let data = []
+
+    for (const row of withdrawData) {
+
+      if (!idList.includes(row.ROUTE)) {
+
+        console.log("row.ROUTE",row.ROUTE)
+
+        const dataTran = {
+          coNo: 410,
+          DRRUTP: 5,
+          routeCode: row.ROUTE.slice(0, 6),
+          routeName: row.Des_Name.slice(0, 40),
+          DRTX15: row.Des_Name.slice(0, 15),
+          method: row.ZType,
+          transection: '',
+          DRLMDT: formatDate()
+        }
+
+        data.push(dataTran)
+        await DROUTE.create(dataTran, { transaction: t })
+      }
+
+    }
+
+    await t.commit()   // 🟩 commit
+
+    res.status(200).json({
+      status: 200,
+      message: 'syncAddressDROUTE Success',
+      data: data
+    })
+
+
+  } catch (error) {
+    console.log("SQL ERROR =", error.original || error.parent || error);
+    if (t) await t.rollback();
+    res.status(500).json({ status: '500', message: error.message });
   }
 }

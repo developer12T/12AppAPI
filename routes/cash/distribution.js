@@ -36,7 +36,9 @@ const {
   addAllPlace,
   addWereHouse,
   getWareHouse,
-  getRouteWithdraw
+  getRouteWithdraw,
+  syncAddressCIADDR,
+  syncAddressDROUTE
 } = require('../../controllers/distribution/placeController')
 
 const router = express.Router()
@@ -83,4 +85,6 @@ router.post('/UpdateWithdrawConjob', UpdateWithdrawConjob)
 router.post('/approveWithdrawCredit', approveWithdrawCredit)
 router.post('/addOneWithdraw', addOneWithdraw)
 router.get('/getRouteWithdraw', getRouteWithdraw)
+router.post('/syncAddressCIADDR', syncAddressCIADDR)
+router.post('/syncAddressDROUTE', syncAddressDROUTE)
 module.exports = router

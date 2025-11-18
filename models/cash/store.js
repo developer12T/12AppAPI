@@ -40,6 +40,7 @@ const checkinSchema = mongoose.Schema({
 
 const storeSchema = mongoose.Schema({
     storeId: { type: String, require: true, unique: true },
+    storeIdOld : { type: String } ,
     name: { type: String, require: true },
     taxId: { type: String },
     tel: { type: String, require: true },
@@ -54,6 +55,7 @@ const storeSchema = mongoose.Schema({
     postCode: { type: String, require: true },
     zone: { type: String, require: true },
     area: { type: String, require: true },
+    areaOld: { type: String  },
     latitude: { type: String, require: true },
     longtitude: { type: String, require: true },
     lineId: { type: String },

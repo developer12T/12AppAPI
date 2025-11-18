@@ -45,7 +45,7 @@ exports.addSendMoneyImageMuti = async (req, res) => {
         
         const uploadedFile = await uploadFiles(
           [files[i]],
-          path.join(__dirname, '../../public/images'),
+          path.join(__dirname, '../../public/images/sendmoney'),
           area,
           area
         )

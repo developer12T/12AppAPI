@@ -136,7 +136,11 @@ exports.checkout = async (req, res) => {
       createdAt: { $gte: start, $lte: end }
     }).sort({ createdAt: -1 }).select('number waiting')
 
-    const maxOrder = await Order.findOne({ 'store.area': area })
+    const maxOrder = await Order.findOne({ 
+      'store.area': area,type:'saleNoodle',
+      createdAt: { $gte: start, $lte: end }
+
+     })
       .sort({ number: -1 }) // เรียงจากมากไปน้อย
       .select('number');    // ดึงเฉพาะ field number (จะเร็วขึ้น)
 

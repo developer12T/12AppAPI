@@ -100,6 +100,7 @@ exports.login = async (req, res) => {
         area: data.area,
         zone: data.zone,
         warehouse: data.warehouse,
+        platformType: data.platformType,
         role: data.role,
         token: token,
         channel:channel

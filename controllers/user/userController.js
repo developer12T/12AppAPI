@@ -1055,3 +1055,46 @@ exports.getArea = async (req, res) => {
     })
   }
 }
+
+exports.getZone = async (req ,res) => {
+  try {
+    const { role } = req.body
+    const channel = 'user'
+    const { User } = getModelsByChannel(channel, res, userModel);
+    let match = { role };
+
+    const userData = await User.aggregate([
+  { $match: match },
+  {
+    $group: {
+      _id: "$zone"
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      zone: "$_id"
+    }
+  }
+]);
+
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: userData
+    })
+    
+
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+}
