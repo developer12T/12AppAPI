@@ -1705,9 +1705,14 @@ exports.getProductPage = async (req, res) => {
     const perPage = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100)
 
     products = await Product.find(filter)
-      .skip((pageNum - 1) * perPage)
-      .limit(perPage)
-      .lean()
+  .sort({ 
+    groupCode: 1,        // เรียงตามกลุ่มก่อน (A → Z)
+    sizeNumber: 1    // แล้วค่อยเรียงตามขนาด
+  })
+  .skip((pageNum - 1) * perPage)
+  .limit(perPage)
+  .lean()
+
 
     // console.log(products)
 
@@ -1759,17 +1764,54 @@ exports.getProductPage = async (req, res) => {
           qtyPcs: stockMatch.balancePcs || 0
         }
       })
-      .sort((a, b) => {
-        if (a.groupCode < b.groupCode) return -1
-        if (a.groupCode > b.groupCode) return 1
-        return parseGram(a.size) - parseGram(b.size)
-      })
+      // .sort((a, b) => {
+      //   if (a.groupCode < b.groupCode) return -1
+      //   if (a.groupCode > b.groupCode) return 1
+      //   return parseGram(a.size) - parseGram(b.size)
+      // })
 
     res.status(200).json({
       status: '200',
       message: 'Products fetched successfully!',
       data
     })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '501', message: error.message })
+  }
+}
+
+exports.addSizeNumber = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+
+    const { Product } = getModelsByChannel(channel, res, productModel)
+
+    const dataProduct = await Product.find()
+
+    const parseGram = sizeStr => {
+      const match = sizeStr.match(/^([\d.]+)(?:-[A-Z])?\s*(KG|G|g|kg)?/i)
+      if (!match) return 0
+      const value = parseFloat(match[1])
+      const unit = (match[2] || 'G').toUpperCase()
+      return unit === 'KG' ? value * 1000 : value
+    }
+
+    // --- อัพเดตทีละตัว ---
+    for (const p of dataProduct) {
+      const sizeNumber = parseGram(p.size || "")
+      await Product.updateOne(
+        { _id: p._id },
+        { $set: { sizeNumber: sizeNumber } }
+      )
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'addSizeNumber Success',
+      count: dataProduct
+    })
+
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '501', message: error.message })
