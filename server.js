@@ -24,7 +24,7 @@ setInterval(() => {
         if (usedMB > 1200) {
             console.log('🔥 High memory detected. Running GC...');
             if (global.gc) {
-                global.gc();
+                // global.gc();
                 console.log('✅ GC executed successfully');
             } else {
                 console.log('⚠️ GC not available. Start PM2 with --expose-gc');
