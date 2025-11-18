@@ -27,6 +27,7 @@ const productSchema = mongoose.Schema({
     brandCode: { type: String, require: true },
     brand: { type: String, require: true },
     size: { type: String, require: true },
+    sizeNumber : { type: Number ,default: 0},
     flavourCode: { type: String, require: true },
     flavour: { type: String, require: true },
     type: { type: String, require: true },
