@@ -7,7 +7,7 @@ const noodleCartModel = require('../../models/foodtruck/noodleCart')
 const productModel = require('../../models/cash/product')
 const cartModel = require('../../models/cash/cart')
 const NoodleItemsModel = require('../../models/foodtruck/noodleItem')
-const noodleItemModel = require("../../models/foodtruck/noodleItem");
+const noodleItemModel = require('../../models/foodtruck/noodleItem')
 const {
   to2,
   getQty,
@@ -17,65 +17,82 @@ const {
 
 exports.addNoodleCart = async (req, res) => {
   try {
-    const { type, area, storeId, typeProduct, id, sku, price, qty, unit, time, remark } = req.body;
-    const channel = req.headers["x-channel"];
+    const {
+      type,
+      area,
+      storeId,
+      typeProduct,
+      id,
+      sku,
+      price,
+      qty,
+      unit,
+      time,
+      remark
+    } = req.body
+    const channel = req.headers['x-channel']
 
-    const { Product } = getModelsByChannel(channel, res, productModel);
-    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
-    const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel);
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel)
+    const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel)
 
-    let nameProduct = '';
-    let data = {};
+    let nameProduct = ''
+    let data = {}
 
     if (typeProduct === 'noodle') {
-      const [soupId, noodleId] = sku.split('_');
-      const soupDetail = await Product.findOne({ id: soupId });
-      const noodleDetail = await NoodleItems.findOne({ id: noodleId });
+      const [soupId, noodleId] = sku.split('_')
+      const soupDetail = await Product.findOne({ id: soupId })
+      const noodleDetail = await NoodleItems.findOne({ id: noodleId })
 
       if (!soupDetail || !noodleDetail) {
-        return res.status(404).json({ status: 404, message: 'Not found this product' });
+        return res
+          .status(404)
+          .json({ status: 404, message: 'Not found this product' })
       }
 
-      nameProduct = `${soupDetail.name} ${noodleDetail.name}`;
+      nameProduct = `${soupDetail.name} ${noodleDetail.name}`
     } else if (typeProduct === 'pc') {
-      const productDetail = await Product.findOne({ id: sku });
+      const productDetail = await Product.findOne({ id: sku })
       if (!productDetail) {
-        return res.status(404).json({ status: 404, message: 'Not found this product' });
+        return res
+          .status(404)
+          .json({ status: 404, message: 'Not found this product' })
       }
 
-      nameProduct = `${productDetail.name}`;
+      nameProduct = `${productDetail.name}`
     }
 
-    const product = await Product.findOne({ id }).lean();
+    const product = await Product.findOne({ id }).lean()
     if (!product) {
-      return res.status(404).json({ status: 404, message: "Product not found!" });
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Product not found!' })
     }
 
-    const unitData = product.listUnit.find((u) => u.unit === unit);
+    const unitData = product.listUnit.find(u => u.unit === unit)
     if (!unitData) {
       return res.status(400).json({
         status: 400,
-        message: `Unit '${unit}' not found for this product!`,
-      });
+        message: `Unit '${unit}' not found for this product!`
+      })
     }
 
-    const existNoodleCart = await NoodleCart.findOne({ type, area, storeId });
+    const existNoodleCart = await NoodleCart.findOne({ type, area, storeId })
 
     if (existNoodleCart) {
-      existNoodleCart.listProduct = existNoodleCart.listProduct || [];
+      existNoodleCart.listProduct = existNoodleCart.listProduct || []
 
       const existingIndex = existNoodleCart.listProduct.findIndex(
-        (item) => item.sku === sku && item.id === id && item.unit === unit
-      );
+        item => item.sku === sku && item.id === id && item.unit === unit
+      )
 
       if (existingIndex !== -1) {
-        const item = existNoodleCart.listProduct[existingIndex];
-        item.qty += qty;
-        item.totalPrice += qty * price;
-        item.time = time;
-        item.remark = remark;
+        const item = existNoodleCart.listProduct[existingIndex]
+        item.qty += qty
+        item.totalPrice += qty * price
+        item.time = time
+        item.remark = remark
       } else {
-
         existNoodleCart.listProduct.push({
           type: typeProduct,
           id,
@@ -86,18 +103,16 @@ exports.addNoodleCart = async (req, res) => {
           totalPrice: price * qty,
           unit,
           time,
-          remark,
-        });
+          remark
+        })
       }
-
 
       existNoodleCart.total = to2(
         existNoodleCart.listProduct.reduce((sum, p) => sum + p.qty * p.price, 0)
-      );
+      )
 
-      data = existNoodleCart; 
+      data = existNoodleCart
     } else {
-
       data = new NoodleCart({
         type,
         area,
@@ -114,14 +129,14 @@ exports.addNoodleCart = async (req, res) => {
             totalPrice: price * qty,
             unit,
             time,
-            remark,
-          },
-        ],
-      });
+            remark
+          }
+        ]
+      })
     }
 
-    const period = getPeriodFromDate(data.createdAt || new Date());
-    const qtyProduct = { id, qty, unit };
+    const period = getPeriodFromDate(data.createdAt || new Date())
+    const qtyProduct = { id, qty, unit }
 
     if (type === 'saleNoodle') {
       const updateResult = await updateStockMongo(
@@ -132,29 +147,27 @@ exports.addNoodleCart = async (req, res) => {
         channel,
         'OUT',
         res
-      );
-      if (updateResult) return;
+      )
+      if (updateResult) return
     }
 
-    const savedCart = await data.save();
-
+    const savedCart = await data.save()
 
     res.status(201).json({
       status: 201,
-      message: "Insert / Update cart success",
-      data: savedCart,
-    });
-
+      message: 'Insert / Update cart success',
+      data: savedCart
+    })
   } catch (error) {
-    console.error("❌ Error:", error);
+    console.error('❌ Error:', error)
     res.status(500).json({
       status: 500,
-      message: "Error from server",
+      message: 'Error from server',
       error: error.message || error.toString(),
-      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
-    });
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    })
   }
-};
+}
 
 const productTimestamps = {}
 
@@ -178,6 +191,10 @@ exports.deleteProductNoodle = async (req, res) => {
       })
     }
     productTimestamps[storeIdAndId] = now
+
+    setTimeout(() => {
+      delete productTimestamps[storeIdAndId]
+    }, ONE_MINUTE)
 
     if (!type || !area || !id || !unit) {
       return res.status(400).json({
@@ -339,4 +356,3 @@ exports.getSoup = async (req, res) => {
     })
   }
 }
-

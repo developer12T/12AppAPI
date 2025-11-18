@@ -85,6 +85,10 @@ exports.checkout = async (req, res) => {
     }
     orderTimestamps[storeId] = now
 
+    setTimeout(() => {
+      delete orderTimestamps[storeId]
+    }, ONE_MINUTE)
+
     if (!type || !area || !storeId || !payment) {
       return res
         .status(400)
@@ -128,7 +132,7 @@ exports.checkout = async (req, res) => {
         area: cart.area
       }).lean()) || {}
 
-    function isAug2025OrLater(createAt) {
+    function isAug2025OrLater (createAt) {
       if (!createAt) return false
 
       // case: "YYYYMM" เช่น "202508"
@@ -149,14 +153,14 @@ exports.checkout = async (req, res) => {
     // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-        storeData.address,
-        storeData.subDistrict && `ต.${storeData.subDistrict}`,
-        storeData.district && `อ.${storeData.district}`,
-        storeData.province && `จ.${storeData.province}`,
-        storeData.postCode
-      ]
-        .filter(Boolean)
-        .join(' ')
+          storeData.address,
+          storeData.subDistrict && `ต.${storeData.subDistrict}`,
+          storeData.district && `อ.${storeData.district}`,
+          storeData.province && `จ.${storeData.province}`,
+          storeData.postCode
+        ]
+          .filter(Boolean)
+          .join(' ')
       : storeData.address
 
     const summary = await summaryRefund(cart, channel, res)
@@ -607,7 +611,7 @@ exports.refundExcel = async (req, res) => {
 
     const tranFromChange = modelChange.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD(date) {
+      function formatDateToThaiYYYYMMDD (date) {
         const d = new Date(date)
         d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -705,7 +709,12 @@ exports.refundExcel = async (req, res) => {
 
     // ปีที่ยอมรับ
     const currentYear = new Date().getFullYear()
-    const years = [currentYear, currentYear - 1, currentYear - 2, currentYear + 1]
+    const years = [
+      currentYear,
+      currentYear - 1,
+      currentYear - 2,
+      currentYear + 1
+    ]
 
     // ดึงล็อตรวดเดียวจาก MSSQL (Sequelize)
     const lotRows = await ItemLotM3.findAll({
@@ -855,7 +864,7 @@ exports.refundExcel = async (req, res) => {
 
     const tranFromRefund = tranFromRefundNested.flat()
 
-    function yyyymmddToDdMmYyyy(dateString) {
+    function yyyymmddToDdMmYyyy (dateString) {
       // สมมติ dateString คือ '20250804'
       const year = dateString.slice(0, 4)
       const month = dateString.slice(4, 6)
@@ -893,7 +902,7 @@ exports.refundExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       }
     )
   } catch (error) {
@@ -906,7 +915,6 @@ exports.refundExcel = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.getRefundPending = async (req, res) => {
@@ -1159,18 +1167,18 @@ exports.getDetail = async (req, res) => {
 
     const listProductChange = order
       ? order.listProduct.map(product => ({
-        id: product.id,
-        name: product.name,
-        group: product.group,
-        brand: product.brand,
-        size: product.size,
-        flavour: product.flavour,
-        qty: product.qty,
-        unit: product.unit,
-        unitName: product.unitName,
-        price: product.price,
-        netTotal: product.netTotal
-      }))
+          id: product.id,
+          name: product.name,
+          group: product.group,
+          brand: product.brand,
+          size: product.size,
+          flavour: product.flavour,
+          qty: product.qty,
+          unit: product.unit,
+          unitName: product.unitName,
+          price: product.price,
+          netTotal: product.netTotal
+        }))
       : []
 
     const totalChange = order ? order.total : 0
@@ -1646,10 +1654,7 @@ exports.cancelApproveRefund = async (req, res) => {
           }
         }
       }
-
     }
-
-
 
     await Refund.findOneAndUpdate(
       { orderId },
@@ -1748,5 +1753,4 @@ exports.updateAddressChange = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }

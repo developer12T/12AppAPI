@@ -243,6 +243,10 @@ exports.checkout = async (req, res) => {
     }
     orderTimestamps[storeId] = now
 
+    setTimeout(() => {
+      delete orderTimestamps[storeId]
+    }, ONE_MINUTE)
+
     if (!type || !area || !storeId || !giveId) {
       return res
         .status(400)
@@ -278,11 +282,11 @@ exports.checkout = async (req, res) => {
       storeData =
         (await Store.findOne({
           storeId: cart.storeId,
-          area: cart.area,
+          area: cart.area
         }).lean()) || {}
     }
 
-    function isAug2025OrLater(createAt) {
+    function isAug2025OrLater (createAt) {
       if (!createAt) return false
 
       // case: "YYYYMM" เช่น "202508"
@@ -303,14 +307,14 @@ exports.checkout = async (req, res) => {
     // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-        storeData.address,
-        storeData.subDistrict && `ต.${storeData.subDistrict}`,
-        storeData.district && `อ.${storeData.district}`,
-        storeData.province && `จ.${storeData.province}`,
-        storeData.postCode
-      ]
-        .filter(Boolean)
-        .join(' ')
+          storeData.address,
+          storeData.subDistrict && `ต.${storeData.subDistrict}`,
+          storeData.district && `อ.${storeData.district}`,
+          storeData.province && `จ.${storeData.province}`,
+          storeData.postCode
+        ]
+          .filter(Boolean)
+          .join(' ')
       : storeData.address
 
     const orderId = await generateGiveawaysId(
@@ -625,7 +629,6 @@ exports.getGiveaways = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.getGiveawaysDetail = async (req, res) => {
@@ -652,7 +655,6 @@ exports.getGiveawaysDetail = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.addimageGive = async (req, res) => {
@@ -835,6 +837,10 @@ exports.updateStatus = async (req, res) => {
       })
     }
     orderUpdateTimestamps[orderId] = now
+
+    setTimeout(() => {
+      delete orderUpdateTimestamps[orderId]
+    }, ONE_MINUTE)
     // ===== end debounce =====
 
     // ✅ Set Thai status name
@@ -893,7 +899,8 @@ exports.updateStatus = async (req, res) => {
 
 exports.giveToExcel = async (req, res) => {
   try {
-    const { channel, startDate, endDate, giveName, area, team, zone } = req.query
+    const { channel, startDate, endDate, giveName, area, team, zone } =
+      req.query
 
     // console.log(channel, date)
     let statusArray = (req.query.status || '')
@@ -1004,7 +1011,7 @@ exports.giveToExcel = async (req, res) => {
 
     const giveOrder = await Giveaway.aggregate(pipeline)
 
-    function formatDateToThaiYYYYMMDD(date) {
+    function formatDateToThaiYYYYMMDD (date) {
       const d = new Date(date)
       // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1015,7 +1022,7 @@ exports.giveToExcel = async (req, res) => {
       return `${yyyy}${mm}${dd}`
     }
 
-    function getCurrentTimeFormatted() {
+    function getCurrentTimeFormatted () {
       const now = new Date()
       const hours = String(now.getHours()).padStart(2, '0')
       const minutes = String(now.getMinutes()).padStart(2, '0')
@@ -1064,7 +1071,7 @@ exports.giveToExcel = async (req, res) => {
 
     const data = dataTran.flatMap(item => item)
 
-    function yyyymmddToDdMmYyyy(dateString) {
+    function yyyymmddToDdMmYyyy (dateString) {
       // สมมติ dateString คือ '20250804'
       const year = dateString.slice(0, 4)
       const month = dateString.slice(4, 6)
@@ -1107,7 +1114,7 @@ exports.giveToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       }
     )
 
@@ -1125,9 +1132,7 @@ exports.giveToExcel = async (req, res) => {
       error: error.message || error.toString(), // ✅ ป้องกัน circular object
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
-
   }
-
 }
 
 exports.fixOrderIdsGive = async (req, res) => {

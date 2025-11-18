@@ -81,10 +81,15 @@ exports.clearCartAll = async (req, res) => {
     if (now - lastUpdate < ONE_MINUTE) {
       return res.status(429).json({
         status: 429,
-        message: 'This order was updated less than 15 seconds ago. Please try again later!'
+        message:
+          'This order was updated less than 15 seconds ago. Please try again later!'
       })
     }
     orderTimestamps[area] = now
+
+    setTimeout(() => {
+      delete orderTimestamps[area]
+    }, ONE_MINUTE)
 
     const toDeleteIds = []
     const updateErrors = []
@@ -170,10 +175,10 @@ exports.getCart = async (req, res) => {
       type === 'withdraw'
         ? { type, area }
         : type === 'adjuststock'
-          ? { type, area, withdrawId }
-          : type === 'give'
-            ? { type, area, storeId, proId }
-            : { type, area, storeId }
+        ? { type, area, withdrawId }
+        : type === 'give'
+        ? { type, area, storeId, proId }
+        : { type, area, storeId }
 
     // ใช้ session ใน findOne เฉพาะกรณีที่ต้อง update ข้อมูล (กัน dirty read ใน replica set)
     let cart = await Cart.findOne(cartQuery)
@@ -245,7 +250,7 @@ exports.getCart = async (req, res) => {
         { _id: cart._id },
         { $set: { listPromotion: promotion.appliedPromotions } },
         { new: true, runValidators: true }
-      );
+      )
 
       // await session.commitTransaction();
     }
@@ -349,10 +354,10 @@ exports.addProduct = async (req, res) => {
       type === 'withdraw'
         ? { type, area }
         : type === 'adjuststock'
-          ? { type, area, withdrawId }
-          : type === 'give'
-            ? { type, area, storeId, proId }
-            : { type, area, storeId }
+        ? { type, area, withdrawId }
+        : type === 'give'
+        ? { type, area, storeId, proId }
+        : { type, area, storeId }
 
     const { Cart } = getModelsByChannel(channel, res, cartModel)
 
@@ -561,8 +566,8 @@ exports.adjustProduct = async (req, res) => {
       type === 'withdraw'
         ? { type, area }
         : type === 'adjuststock'
-          ? { type, area, withdrawId }
-          : { type, area, storeId }
+        ? { type, area, withdrawId }
+        : { type, area, storeId }
 
     let cart = await Cart.findOne(cartQuery)
     if (!cart) {
@@ -715,10 +720,15 @@ exports.deleteProduct = async (req, res) => {
     if (now - lastUpdate < ONE_MINUTE) {
       return res.status(429).json({
         status: 429,
-        message: 'This order was updated less than 15 seconds ago. Please try again later!'
+        message:
+          'This order was updated less than 15 seconds ago. Please try again later!'
       })
     }
     productTimestamps[storeIdAndId] = now
+
+    setTimeout(() => {
+      delete productTimestamps[storeIdAndId]
+    }, ONE_MINUTE)
 
     // console.log(productTimestamps)
 
@@ -1059,7 +1069,6 @@ exports.updateStock = async (req, res) => {
 }
 
 exports.autoDeleteCart = async (req, res) => {
-
   const channel = req.headers['x-channel']
   const { period } = req.body || {}
   const { Cart } = getModelsByChannel(channel, res, cartModel)
@@ -1133,7 +1142,7 @@ exports.getCountCart = async (req, res) => {
       { $match: { role: 'sale', zone: { $ne: 'IT' } } }, // เงื่อนไข role = sale
       { $group: { _id: '$zone' } }, // รวมกลุ่มตาม zone
       { $project: { _id: 0, zone: '$_id' } } // คืนค่า zone
-    ]);
+    ])
 
     const cartData = await Cart.aggregate([
       {
@@ -1142,28 +1151,26 @@ exports.getCountCart = async (req, res) => {
             $in: ['sale', 'refund', 'give']
           }
         }
-      }
-      ,
+      },
       {
         $addFields: {
-          zone: { $substr: ["$area", 0, 2] } // เอา 2 ตัวแรกจาก area
+          zone: { $substr: ['$area', 0, 2] } // เอา 2 ตัวแรกจาก area
         }
       }
-    ]);
+    ])
 
     let data = []
-
 
     if (zone) {
       const areaFilter = cartData.filter(o => o.zone === zone)
       data = areaFilter
     } else {
       for (item of userZones) {
-        const count = cartData.filter(o => o.zone === item.zone).length;
+        const count = cartData.filter(o => o.zone === item.zone).length
         const areaFilter = cartData.filter(o => o.zone === item.zone)
         const dataTram = {
           zone: item.zone,
-          count: count,
+          count: count
           // cart : areaFilter
         }
         data.push(dataTram)
@@ -1185,13 +1192,9 @@ exports.getCountCart = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
-
-
 }
 
 exports.getCartDetail = async (req, res) => {
-
   try {
     const { area, storeId } = req.query
     const channel = req.headers['x-channel']
@@ -1204,13 +1207,11 @@ exports.getCartDetail = async (req, res) => {
       type: { $in: ['sale', 'refund', 'give'] }
     })
 
-
     res.status(200).json({
       status: 200,
       message: 'Fetch data cart',
       data: cartData || []
     })
-
   } catch (error) {
     console.error('❌ Error:', error)
 
@@ -1221,5 +1222,4 @@ exports.getCartDetail = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
