@@ -1144,6 +1144,11 @@ const DROUTE = sequelize.define(
       allowNull: false,
       field: 'DRTRCA'
     },
+    DRLMDT : {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'DRLMDT'
+    }
   },
   {
     freezeTableName: true,

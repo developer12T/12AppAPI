@@ -14,7 +14,7 @@ const {
   formatDate,
   formatDateToYYYYMMDD
 } = require('../../utilities/datetime')
-const { CIADDR,DROUTE } = require('../../models/cash/master')
+const { CIADDR, DROUTE } = require('../../models/cash/master')
 
 
 
@@ -432,11 +432,43 @@ exports.syncAddressDROUTE = async (req, res) => {
     t = await DROUTE.sequelize.transaction();   // 🟦 กำหนดค่าใน try
 
     const DROUTEdata = await DROUTE.findAll()
+    const idList = [...new Set(
+      DROUTEdata.map(item => item.routeCode?.trim())
+    )];
+
+    const withdrawData = await Withdraw.find()
+
+    let data = []
+
+    for (const row of withdrawData) {
+
+      if (!idList.includes(row.ROUTE)) {
+
+        // console.log("row.ROUTE",row.ROUTE)
+
+        const dataTran = {
+          coNo: 410,
+          DRRUTP: 5,
+          routeCode: row.ROUTE.slice(0, 6),
+          routeName: row.Des_Name.slice(0, 40),
+          DRTX15: row.Des_Name.slice(0, 15),
+          method: row.ZType,
+          transection: '',
+          DRLMDT: formatDate()
+        }
+
+        data.push(dataTran)
+        await DROUTE.create(dataTran, { transaction: t })
+      }
+
+    }
+
+
 
     res.status(200).json({
-      status:200,
-      message:'syncAddressDROUTE Success',
-      data : DROUTEdata
+      status: 200,
+      message: 'syncAddressDROUTE Success',
+      data: data
     })
 
 
