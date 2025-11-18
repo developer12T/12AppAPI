@@ -779,6 +779,7 @@ const getOrders = async (areaList, res, channel, type, start, end) => {
     type: { $in: ['sale'] },
     'store.area': { $ne: 'IT211' }
   }
+  
   if (start && end) {
     match['createdAt'] = { $gte: start, $lte: end }
   }
