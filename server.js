@@ -23,12 +23,12 @@ setInterval(() => {
         // ถ้า memory เกิน 1.2GB → สั่ง GC ทันที
         if (usedMB > 1200) {
             console.log('🔥 High memory detected. Running GC...');
-            if (global.gc) {
-                // global.gc();
-                console.log('✅ GC executed successfully');
-            } else {
-                console.log('⚠️ GC not available. Start PM2 with --expose-gc');
-            }
+            // if (global.gc) {
+            //     // global.gc();
+            //     console.log('✅ GC executed successfully');
+            // } else {
+            //     console.log('⚠️ GC not available. Start PM2 with --expose-gc');
+            // }
         }
     } catch (err) {
         console.error("❌ Memory Auto Clean Error:", err);
