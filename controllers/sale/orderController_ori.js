@@ -250,13 +250,18 @@ exports.updateStatus = async (req, res) => {
     const lastUpdate = orderUpdateTimestamps[orderId] || 0
     const ONE_MINUTE = 60 * 1000
 
-        if (now - lastUpdate < ONE_MINUTE) {
+    if (now - lastUpdate < ONE_MINUTE) {
       return res.status(429).json({
         status: 429,
-        message: 'This order was updated less than 1 minute ago. Please try again later!'
+        message:
+          'This order was updated less than 1 minute ago. Please try again later!'
       })
     }
     orderUpdateTimestamps[orderId] = now
+
+    setTimeout(() => {
+      delete orderUpdateTimestamps[orderId]
+    }, ONE_MINUTE)
     // ===== end debounce =====
 
     const order = await Order.findOne({ orderId })

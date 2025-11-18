@@ -57,13 +57,13 @@ exports.checkout = async (req, res) => {
       sendDate,
       note,
       period,
-      
+
       // wereHouse,
       // routeWithdraw,
       Des_No
     } = req.body
 
-    let {newtrip} = req.body
+    let { newtrip } = req.body
 
     const today = new Date()
     const day = today.getDate()
@@ -77,7 +77,11 @@ exports.checkout = async (req, res) => {
     const { User } = getModelsByChannel(channel, res, userModel)
     const { Place } = getModelsByChannel(channel, res, distributionModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
-    const { Distribution, Withdraw } = getModelsByChannel(channel, res, distributionModel)
+    const { Distribution, Withdraw } = getModelsByChannel(
+      channel,
+      res,
+      distributionModel
+    )
     const { Npd, NpdArea } = getModelsByChannel(channel, res, npdModel)
     const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
       channel,
@@ -105,24 +109,17 @@ exports.checkout = async (req, res) => {
         .json({ status: 404, message: 'Sale user not found!' })
     }
 
-
     let shippingData = {}
     if (channel === 'pc') {
       shippingData = await Withdraw.findOne({
-        Des_No: Des_No,
-      }
-      )
-
+        Des_No: Des_No
+      })
     } else {
       shippingData = await Place.findOne(
         { area, 'listAddress.shippingId': shippingId },
         { 'listAddress.$': 1 }
       )
-
     }
-
-
-
 
     if (!shippingData) {
       return res
@@ -134,10 +131,8 @@ exports.checkout = async (req, res) => {
     let fromWarehouse
     let toWarehouse
 
-
     let shipping = {}
     if (channel === 'pc') {
-
       let typeNameTH = ''
       let shippingId = ''
       let route = ''
@@ -159,7 +154,7 @@ exports.checkout = async (req, res) => {
         shippingId: shippingId,
         route: route,
         name: name,
-        address: ""
+        address: ''
       }
 
       if (withdrawType === 'normal' || withdrawType === 'credit') {
@@ -559,9 +554,9 @@ exports.getOrderCredit = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -781,9 +776,9 @@ exports.getOrder = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -948,9 +943,9 @@ exports.getOrder2 = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -1122,9 +1117,9 @@ exports.getOrderSup = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           newTrip: o.newTrip,
@@ -1300,7 +1295,6 @@ exports.updateStatus = async (req, res) => {
 
 exports.updateStockWithdraw = async (req, res) => {
   try {
-
     const { orderId, status } = req.body
     const channel = req.headers['x-channel']
     const { Stock, StockMovementLog, StockMovement } = getModelsByChannel(
@@ -1408,12 +1402,17 @@ exports.updateStockWithdraw = async (req, res) => {
             'listProduct.$[product].sumQtyCtn': updated.sumQtyCtn,
             'listProduct.$[product].sumQtyPcsStockIn': updated.sumQtyPcsStockIn,
             'listProduct.$[product].sumQtyCtnStockIn': updated.sumQtyCtnStockIn,
-            'listProduct.$[product].sumQtyPcsStockOut': updated.sumQtyPcsStockOut,
-            'listProduct.$[product].sumQtyCtnStockOut': updated.sumQtyCtnStockOut,
+            'listProduct.$[product].sumQtyPcsStockOut':
+              updated.sumQtyPcsStockOut,
+            'listProduct.$[product].sumQtyCtnStockOut':
+              updated.sumQtyCtnStockOut,
             'listProduct.$[product].available': updated.available
           }
         },
-        { arrayFilters: [{ 'product.productId': updated.productId }], new: true }
+        {
+          arrayFilters: [{ 'product.productId': updated.productId }],
+          new: true
+        }
       )
     }
 
@@ -1435,14 +1434,10 @@ exports.updateStockWithdraw = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
-
 }
 
 exports.insertWithdrawToErp = async (req, res) => {
-
   try {
-
     const { area, period } = req.body
     const channel = req.headers['x-channel']
     const { Distribution } = getModelsByChannel(channel, res, distributionModel)
@@ -1451,7 +1446,10 @@ exports.insertWithdrawToErp = async (req, res) => {
     let data = []
     for (const item of distributionData) {
       const sendDate = new Date(item.sendDate) // สร้าง Date object
-      const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '') // "20250222"
+      const formattedDate = sendDate
+        .toISOString()
+        .slice(0, 10)
+        .replace(/-/g, '') // "20250222"
       const MGNUGL = item.listProduct.map(i => i.id)
       const uniqueCount = new Set(MGNUGL).size
 
@@ -1514,11 +1512,9 @@ exports.insertWithdrawToErp = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.insertOneWithdrawToErp = async (req, res) => {
-
   try {
     const { orderId } = req.body
     const channel = req.headers['x-channel']
@@ -1528,7 +1524,10 @@ exports.insertOneWithdrawToErp = async (req, res) => {
     let data = []
     for (const item of distributionData) {
       const sendDate = new Date(item.sendDate)
-      const formattedDate = sendDate.toISOString().slice(0, 10).replace(/-/g, '')
+      const formattedDate = sendDate
+        .toISOString()
+        .slice(0, 10)
+        .replace(/-/g, '')
       const MGNUGL = item.listProduct.map(i => i.id)
       const uniqueCount = new Set(MGNUGL).size
 
@@ -1591,11 +1590,9 @@ exports.insertOneWithdrawToErp = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.addFromERPWithdraw = async (req, res) => {
-
   try {
     const channel = req.headers['x-channel']
 
@@ -1680,7 +1677,6 @@ exports.addOneWithdraw = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.cancelWithdraw = async (req, res) => {
@@ -1909,12 +1905,15 @@ exports.approveWithdraw = async (req, res) => {
           <p>
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh} ${type}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName
-              }<br>
-            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
-              }<br>
-            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
-              }<br>
+            <strong>ประเภทการจัดส่ง:</strong> ${
+              distributionTran.orderTypeName
+            }<br>
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
+              '-' + wereHouseName?.wh_name || ''
+            }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
+              distributionTran.shippingName
+            }<br>
             <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
             <strong>เขต:</strong> ${distributionTran.area}<br>
             <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -2160,12 +2159,15 @@ exports.approveWithdrawCredit = async (req, res) => {
           <p>
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName
-              }<br>
-            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
-              }<br>
-            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
-              }<br>
+            <strong>ประเภทการจัดส่ง:</strong> ${
+              distributionTran.orderTypeName
+            }<br>
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
+              '-' + wereHouseName?.wh_name || ''
+            }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
+              distributionTran.shippingName
+            }<br>
             <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
             <strong>เขต:</strong> ${distributionTran.area}<br>
             <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -2257,6 +2259,10 @@ exports.saleConfirmWithdraw = async (req, res) => {
       })
     }
     withdrawUpdateTimestamps[orderId] = now
+
+    setTimeout(() => {
+      delete withdrawUpdateTimestamps[orderId]
+    }, ONE_MINUTE)
     // ===== end debounce =====
 
     // กรณี status === true
@@ -2345,8 +2351,9 @@ exports.saleConfirmWithdraw = async (req, res) => {
         const ReceiveQty = Object.values(
           Receive.reduce((acc, cur) => {
             // ใช้ key จาก coNo + withdrawUnit + productId (ถ้าอยากแยกตาม productId ด้วย)
-            const key = `${cur.coNo}_${cur.withdrawUnit
-              }_${cur.productId.trim()}`
+            const key = `${cur.coNo}_${
+              cur.withdrawUnit
+            }_${cur.productId.trim()}`
             if (!acc[key]) {
               acc[key] = { ...cur }
             } else {
@@ -2806,7 +2813,7 @@ exports.withdrawToExcel = async (req, res) => {
 
     const tranFromOrder = modelWithdraw.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD(date) {
+      function formatDateToThaiYYYYMMDD (date) {
         const d = new Date(date)
         // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -2896,7 +2903,7 @@ exports.withdrawToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       }
     )
   } catch (error) {
@@ -3037,7 +3044,6 @@ exports.updateReciveFix = async (req, res) => {
 }
 
 exports.withdrawBackOrderToExcel = async (req, res) => {
-
   try {
     const { excel, period } = req.query
 
@@ -3108,7 +3114,7 @@ exports.withdrawBackOrderToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       })
     }
   } catch (error) {
@@ -3121,8 +3127,6 @@ exports.withdrawBackOrderToExcel = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
-
 }
 
 exports.withdrawUpdateMGTRDT = async (req, res) => {
@@ -3171,7 +3175,6 @@ exports.withdrawUpdateMGTRDT = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.withdrawCheckM3 = async (req, res) => {
@@ -3219,7 +3222,6 @@ exports.withdrawCheckM3 = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.getWithdrawError = async (req, res) => {
@@ -3296,7 +3298,6 @@ exports.getWithdrawError = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.UpdateWithdrawConjob = async (req, res) => {
@@ -3345,7 +3346,6 @@ exports.UpdateWithdrawConjob = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.uploadNPDData = async (req, res) => {

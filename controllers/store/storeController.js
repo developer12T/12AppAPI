@@ -3114,6 +3114,14 @@ exports.getLatLongOrderDetail = async (req, res) => {
     const StoreLatLongData = await StoreLatLong.findOne({ orderId })
     // console.log(orderId)
 
+    if (!StoreLatLongData) {
+      return res.status(404).json({
+        status:404,
+        message:'Not found order LatLong'
+      })
+    }
+
+
     const data = {
       orderId: StoreLatLongData.orderId,
       storeId: StoreLatLongData.storeId,

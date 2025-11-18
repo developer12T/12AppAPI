@@ -1,93 +1,101 @@
-const express = require("express");
+const express = require('express')
 
-const { getModelsByChannel } = require("../../middleware/channel");
-const userModel = require("../../models/cash/user");
-const typetruck = require("../../models/cash/typetruck");
-const noodleCartModel = require("../../models/foodtruck/noodleCart");
-const cartModel = require("../../models/cash/cart");
-const noodleSaleModel = require("../../models/foodtruck/noodleSale");
+const { getModelsByChannel } = require('../../middleware/channel')
+const userModel = require('../../models/cash/user')
+const typetruck = require('../../models/cash/typetruck')
+const noodleCartModel = require('../../models/foodtruck/noodleCart')
+const cartModel = require('../../models/cash/cart')
+const noodleSaleModel = require('../../models/foodtruck/noodleSale')
 const orderModel = require('../../models/cash/sale')
-const noodleItemModel = require("../../models/foodtruck/noodleItem");
-const { generateOrderIdFoodTruck } = require("../../utilities/genetateId");
+const noodleItemModel = require('../../models/foodtruck/noodleItem')
+const { generateOrderIdFoodTruck } = require('../../utilities/genetateId')
 const {
   to2,
   getQty,
   updateStockMongo,
   getPeriodFromDate
 } = require('../../middleware/order')
-const productModel = require('../../models/cash/product');
-const { before, range } = require("lodash");
+const productModel = require('../../models/cash/product')
+const { before, range } = require('lodash')
 const xlsx = require('xlsx')
 const path = require('path')
 const os = require('os')
 const fs = require('fs')
 
-
-const orderTimestamps = {};
+const orderTimestamps = {}
 
 exports.checkout = async (req, res) => {
   // const transaction = await sequelize.transaction();
   try {
-    const { type, area,storeId, period, payment } = req.body;
+    const { type, area, storeId, period, payment } = req.body
 
-    const channel = req.headers["x-channel"];
+    const channel = req.headers['x-channel']
     const { Order } = getModelsByChannel(channel, res, orderModel)
-    const { NoodleSales } = getModelsByChannel(channel, res, noodleSaleModel);
-    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
-    const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel);
-    const { User } = getModelsByChannel(channel, res, userModel);
-    const { Product } = getModelsByChannel(channel, res, productModel);
+    const { NoodleSales } = getModelsByChannel(channel, res, noodleSaleModel)
+    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel)
+    const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
 
     if (!type || !area || !payment) {
       return res
         .status(400)
-        .json({ status: 400, message: "Missing required fields!" });
+        .json({ status: 400, message: 'Missing required fields!' })
     }
 
-    const now = new Date();
-    const lastUpdate = orderTimestamps[area] || 0;
-    const ONE_MINUTE = 3 * 1000;
+    const now = new Date()
+    const lastUpdate = orderTimestamps[area] || 0
+    const ONE_MINUTE = 3 * 1000
 
     if (now - lastUpdate < ONE_MINUTE) {
       return res.status(429).json({
         status: 429,
         message:
-          "This order was updated less than 15 second ago. Please try again later!",
-      });
+          'This order was updated less than 15 second ago. Please try again later!'
+      })
     }
 
-    orderTimestamps[area] = now;
+    orderTimestamps[area] = now
 
-    const cart = await NoodleCart.findOne({ type, area,storeId });
+    setTimeout(() => {
+      delete orderTimestamps[area]
+    }, ONE_MINUTE)
+
+    const cart = await NoodleCart.findOne({ type, area, storeId })
     if (!cart || cart.length === 0) {
       return res
         .status(404)
-        .json({ status: 404, message: "NoodleCart is empty!" });
+        .json({ status: 404, message: 'NoodleCart is empty!' })
     }
 
-    const sale = (await User.findOne({ area: area })) ?? {};
+    const sale = (await User.findOne({ area: area })) ?? {}
     // console.log(area,sale.warehouse)
-    const orderId = await generateOrderIdFoodTruck(area, sale.warehouse, channel, res);
+    const orderId = await generateOrderIdFoodTruck(
+      area,
+      sale.warehouse,
+      channel,
+      res
+    )
 
-    const total = to2(cart.total); // ราคารวมภาษี เช่น 45
-    const totalExVat = to2(total / 1.07); // แยกภาษีออก
+    const total = to2(cart.total) // ราคารวมภาษี เช่น 45
+    const totalExVat = to2(total / 1.07) // แยกภาษีออก
 
-    const productIds = cart.listProduct.map(p => p.id);
+    const productIds = cart.listProduct.map(p => p.id)
     const products = await Product.find({ id: { $in: productIds } }).select(
-      "id name groupCode group brandCode brand size flavourCode flavour listUnit"
-    );
+      'id name groupCode group brandCode brand size flavourCode flavour listUnit'
+    )
 
-    let subtotal = 0;
+    let subtotal = 0
     let listProduct = cart.listProduct.map(item => {
-      const product = products.find(p => p.id === item.id);
-      if (!product) return null;
+      const product = products.find(p => p.id === item.id)
+      if (!product) return null
 
-      const unitData = product.listUnit.find(u => u.unit === item.unit);
+      const unitData = product.listUnit.find(u => u.unit === item.unit)
       if (!unitData) {
         return res.status(400).json({
           status: 400,
           message: `Invalid unit for product ${item.id}`
-        });
+        })
       }
 
       // const totalPrice = item.qty * unitData.price.sale;
@@ -114,37 +122,43 @@ exports.checkout = async (req, res) => {
         discount: 0,
         netTotal: parseFloat(item.totalPrice.toFixed(2)) || 0,
         time: item.time,
-        remark: item.remark,
-      };
-    });
+        remark: item.remark
+      }
+    })
 
-    if (listProduct.includes(null)) return;
+    if (listProduct.includes(null)) return
 
-    const start = new Date(Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate() - 1, // ✅ ลบ 1 วัน เพราะไทยเร็วกว่า UTC 7 ชั่วโมง
-      17, 0, 0               // 17 UTC = 00:00 ไทย
-    ));
+    const start = new Date(
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate() - 1, // ✅ ลบ 1 วัน เพราะไทยเร็วกว่า UTC 7 ชั่วโมง
+        17,
+        0,
+        0 // 17 UTC = 00:00 ไทย
+      )
+    )
 
-    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1)
 
     const exitOrder = await Order.findOne({
       'store.area': area,
-      type:'saleNoodle',
+      type: 'saleNoodle',
       status: { $in: ['pending', 'paid'] },
       createdAt: { $gte: start, $lte: end }
-    }).sort({ createdAt: -1 }).select('number waiting')
+    })
+      .sort({ createdAt: -1 })
+      .select('number waiting')
 
-    const maxOrder = await Order.findOne({ 
-      'store.area': area,type:'saleNoodle',
+    const maxOrder = await Order.findOne({
+      'store.area': area,
+      type: 'saleNoodle',
       createdAt: { $gte: start, $lte: end }
-
-     })
+    })
       .sort({ number: -1 }) // เรียงจากมากไปน้อย
-      .select('number');    // ดึงเฉพาะ field number (จะเร็วขึ้น)
+      .select('number') // ดึงเฉพาะ field number (จะเร็วขึ้น)
 
-    const maxNumber = maxOrder ? maxOrder.number : 0; // ถ้าไม่เจอให้เป็น 0
+    const maxNumber = maxOrder ? maxOrder.number : 0 // ถ้าไม่เจอให้เป็น 0
 
     let number = 0
     let waiting = 0
@@ -154,51 +168,48 @@ exports.checkout = async (req, res) => {
       number = maxNumber + 1 || 1
       waiting = exitOrder.waiting + 1
     } else {
-
-      number =  1
+      number = 1
       waiting = 0
     }
 
-    
-
     const noodleOrder = {
       orderId,
-      routeId: "",
-      type: "saleNoodle",
+      routeId: '',
+      type: 'saleNoodle',
       number: number,
       waiting: waiting,
-      status: "pending",
-      statusTH: "รอชำระ",
+      status: 'pending',
+      statusTH: 'รอชำระ',
       sale: {
-        saleCode: sale.saleCode || "",
-        salePayer: sale.salePayer || "",
-        name: `${sale.firstName} ${sale.surName}` || "",
-        tel: sale.tel || "",
-        warehouse: sale.warehouse || ""
+        saleCode: sale.saleCode || '',
+        salePayer: sale.salePayer || '',
+        name: `${sale.firstName} ${sale.surName}` || '',
+        tel: sale.tel || '',
+        warehouse: sale.warehouse || ''
       },
       store: {
-        storeId: "",
-        name: "",
-        address: "",
-        taxId: "",
-        tel: "",
-        area: sale.area || "",
-        zone: sale.zone || ""
+        storeId: '',
+        name: '',
+        address: '',
+        taxId: '',
+        tel: '',
+        area: sale.area || '',
+        zone: sale.zone || ''
       },
       shipping: {
         default: '',
-        shippingId: "",
-        address: "",
-        district: "",
-        subDistrict: "",
-        province: "",
-        postCode: "",
-        latitude: "",
-        longtitude: ""
+        shippingId: '',
+        address: '',
+        district: '',
+        subDistrict: '',
+        province: '',
+        postCode: '',
+        latitude: '',
+        longtitude: ''
       },
-      note: "",
-      latitude: "",
-      longitude: "",
+      note: '',
+      latitude: '',
+      longitude: '',
       listProduct,
       listPromotions: [],
       // listQuota: summary.listQuota,
@@ -211,11 +222,10 @@ exports.checkout = async (req, res) => {
       totalExVat: parseFloat((total / 1.07).toFixed(2)),
       total: total,
       paymentMethod: payment,
-      paymentStatus: "unpaid",
+      paymentStatus: 'unpaid',
       createdBy: sale.username,
       period: period
-    };
-
+    }
 
     const qtyproduct = noodleOrder.listProduct
       .filter(u => u?.id && u?.unit && u?.qty > 0)
@@ -225,7 +235,6 @@ exports.checkout = async (req, res) => {
         qty: u.qty,
         statusMovement: 'OUT'
       }))
-
 
     for (const item of qtyproduct) {
       const updateResult = await updateStockMongo(
@@ -239,39 +248,37 @@ exports.checkout = async (req, res) => {
       if (updateResult) return
     }
 
-
-
-
-    await Order.create(noodleOrder);
-    await NoodleCart.deleteOne({ type, area });
-
+    await Order.create(noodleOrder)
+    await NoodleCart.deleteOne({ type, area })
 
     res.status(201).json({
       status: 201,
-      message: "Insert Order success",
+      message: 'Insert Order success',
       data: noodleOrder
-    });
+    })
   } catch (error) {
     // await transaction.rollback()
-    console.error(error);
-    res.status(500).json({ status: "500", message: error.message });
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
   }
-};
+}
 
 exports.updateStatus = async (req, res) => {
   try {
-
-    const channel = req.headers["x-channel"];
-    const { NoodleSales } = getModelsByChannel(channel, res, noodleSaleModel);
-    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
-    const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel);
+    const channel = req.headers['x-channel']
+    const { NoodleSales } = getModelsByChannel(channel, res, noodleSaleModel)
+    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel)
+    const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
     const { orderId, status } = req.body
 
     let statusStrTH = ''
     let orderUpdated = {}
 
-    const orderDetail = await Order.findOne({ orderId: orderId, status: { $in: ['paid', 'pending'] } })
+    const orderDetail = await Order.findOne({
+      orderId: orderId,
+      status: { $in: ['paid', 'pending'] }
+    })
 
     if (!orderDetail) {
       return res.status(404).json({
@@ -293,19 +300,22 @@ exports.updateStatus = async (req, res) => {
             }
           },
           { new: true }
-        );
+        )
         break
       case 'success':
+        const now = new Date()
+        const thailand = new Date(now.getTime() + 7 * 60 * 60 * 1000)
 
-        const now = new Date();
-        const thailand = new Date(now.getTime() + 7 * 60 * 60 * 1000);
-
-        const start = new Date(Date.UTC(
-          thailand.getFullYear(),
-          thailand.getMonth(),
-          thailand.getDate(),
-          -7, 0, 0 // ⬅️ = UTC ของเวลา 00:00 ไทย
-        ));
+        const start = new Date(
+          Date.UTC(
+            thailand.getFullYear(),
+            thailand.getMonth(),
+            thailand.getDate(),
+            -7,
+            0,
+            0 // ⬅️ = UTC ของเวลา 00:00 ไทย
+          )
+        )
 
         const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1)
         statusStrTH = 'สำเร็จแล้ว'
@@ -318,18 +328,19 @@ exports.updateStatus = async (req, res) => {
             }
           },
           { new: true }
-        );
+        )
         const dataOrder = await Order.find({
           'store.area': area,
           status: { $in: ['paid', 'pending'] },
           createdAt: { $gte: start, $lte: end }
-        }).sort({ number: 1 }).select('number orderId');
+        })
+          .sort({ number: 1 })
+          .select('number orderId')
 
         // console.log(dataOrder)
-        let count = 0;
+        let count = 0
 
         for (const order of dataOrder) {
-
           await Order.updateMany(
             {
               orderId: order.orderId
@@ -337,8 +348,8 @@ exports.updateStatus = async (req, res) => {
             {
               $set: { waiting: count } // ✅ ไม่ต้องอยู่ใน $set
             }
-          );
-          count++;
+          )
+          count++
         }
 
         break
@@ -353,40 +364,31 @@ exports.updateStatus = async (req, res) => {
       status: 201,
       message: 'Update Sucess',
       data: orderUpdated
-    }
-    )
-
-
+    })
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ status: "500", message: error.message });
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
   }
 }
 
-
-
-
-
 exports.orderIdDetailFoodtruck = async (req, res) => {
   try {
+    const { orderId } = req.query
 
-    const { orderId } = req.query;
-
-    const channel = req.headers["x-channel"];
-    const { NoodleSales } = getModelsByChannel(channel, res, noodleSaleModel);
-    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
-    const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel);
+    const channel = req.headers['x-channel']
+    const { NoodleSales } = getModelsByChannel(channel, res, noodleSaleModel)
+    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel)
+    const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
     if (!orderId) {
       return res
         .status(400)
-        .json({ status: 400, message: "Missing required fields!" });
+        .json({ status: 400, message: 'Missing required fields!' })
     }
 
     const foodTruckData = await Order.find({ orderId: orderId })
 
     const data = foodTruckData.map(item => {
-
       return {
         orderId: item.orderId || '',
         routeId: item.routeId || '',
@@ -419,13 +421,12 @@ exports.orderIdDetailFoodtruck = async (req, res) => {
           province: item.province || '',
           postCode: item.postCode || '',
           latitude: item.latitude || '',
-          longtitude: item.longtitude || '',
+          longtitude: item.longtitude || ''
         },
         item: item.note || '',
         latitude: item.latitude || '',
         longitude: item.longitude || '',
         listProduct: item.listProduct.map(product => {
-
           return {
             id: product.id || '',
             sku: product.sku || '',
@@ -465,28 +466,21 @@ exports.orderIdDetailFoodtruck = async (req, res) => {
         createdAt: item.createdAt,
         updatedAt: item.updatedAt
       }
-
     })
-
-
 
     res.status(200).json({
       status: 200,
       message: 'Fetch data sucess',
       data: data
     })
-
-
-
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ status: "500", message: error.message });
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
   }
 }
 
 exports.updatePickUp = async (req, res) => {
   try {
-
     const { pickUp, orderId } = req.body
 
     if (!pickUp) {
@@ -494,11 +488,11 @@ exports.updatePickUp = async (req, res) => {
         message: 'Not found pickUp status'
       })
     }
-    const channel = req.headers["x-channel"];
+    const channel = req.headers['x-channel']
     const { Order } = getModelsByChannel(channel, res, orderModel)
-    const { NoodleSales } = getModelsByChannel(channel, res, noodleSaleModel);
-    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel);
-    const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel);
+    const { NoodleSales } = getModelsByChannel(channel, res, noodleSaleModel)
+    const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel)
+    const { NoodleItems } = getModelsByChannel(channel, res, noodleItemModel)
 
     const existOrder = await Order.find({ orderId: orderId })
 
@@ -523,18 +517,16 @@ exports.updatePickUp = async (req, res) => {
       message: 'Update pickup sucess',
       data: data
     })
-
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ status: "500", message: error.message });
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
   }
 }
-
 
 exports.updateQrPayment = async (req, res) => {
   try {
     const { value, orderId } = req.body
-    const channel = req.headers["x-channel"];
+    const channel = req.headers['x-channel']
     const { Order } = getModelsByChannel(channel, res, orderModel)
 
     const existOrder = await Order.find({ orderId: orderId })
@@ -550,8 +542,8 @@ exports.updateQrPayment = async (req, res) => {
       orderId: orderId,
       $expr: {
         $and: [
-          { $gte: [{ $add: ["$qr", +value] }, 0] },
-          { $gte: [{ $add: ["$total", -value] }, 0] }
+          { $gte: [{ $add: ['$qr', +value] }, 0] },
+          { $gte: [{ $add: ['$total', -value] }, 0] }
         ]
       }
     })
@@ -579,11 +571,9 @@ exports.updateQrPayment = async (req, res) => {
       message: 'update payment qr success',
       data: dataUpdate
     })
-
-
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ status: "500", message: error.message });
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
   }
 }
 
@@ -635,7 +625,7 @@ exports.getOrderPcToExcel = async (req, res) => {
       },
       status: { $nin: ['canceled'] },
       status: { $in: statusArray },
-      type: { $in: ['saleNoodle'] },
+      type: { $in: ['saleNoodle'] }
       // 'store.area': { $ne: 'IT211' }
     }
 
@@ -687,7 +677,7 @@ exports.getOrderPcToExcel = async (req, res) => {
 
     const tranFromOrder = modelOrder.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD(date) {
+      function formatDateToThaiYYYYMMDD (date) {
         const d = new Date(date)
         d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -798,14 +788,13 @@ exports.getOrderPcToExcel = async (req, res) => {
     })
 
     if (excel === 'true') {
-
-    function yyyymmddToDdMmYyyy(dateString) {
-      // สมมติ dateString คือ '20250804'
-      const year = dateString.slice(0, 4)
-      const month = dateString.slice(4, 6)
-      const day = dateString.slice(6, 8)
-      return `${day}${month}${year}`
-    }
+      function yyyymmddToDdMmYyyy (dateString) {
+        // สมมติ dateString คือ '20250804'
+        const year = dateString.slice(0, 4)
+        const month = dateString.slice(4, 6)
+        const day = dateString.slice(6, 8)
+        return `${day}${month}${year}`
+      }
 
       const wb = xlsx.utils.book_new()
       const ws = xlsx.utils.json_to_sheet(tranFromOrder)
@@ -817,13 +806,17 @@ exports.getOrderPcToExcel = async (req, res) => {
 
       const tempPath = path.join(
         os.tmpdir(),
-        `CA_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}.xlsx`
+        `CA_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(
+          endDate
+        )}.xlsx`
       )
       xlsx.writeFile(wb, tempPath)
 
       res.download(
         tempPath,
-        `PC_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(endDate)}.xlsx`,
+        `PC_${yyyymmddToDdMmYyyy(startDate)}_${yyyymmddToDdMmYyyy(
+          endDate
+        )}.xlsx`,
         err => {
           if (err) {
             console.error('❌ Download error:', err)
@@ -834,7 +827,7 @@ exports.getOrderPcToExcel = async (req, res) => {
           }
 
           // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-          fs.unlink(tempPath, () => { })
+          fs.unlink(tempPath, () => {})
         }
       )
     } else {
@@ -843,7 +836,6 @@ exports.getOrderPcToExcel = async (req, res) => {
         message: 'fetch data Success',
         data: tranFromOrder
       })
-
     }
   } catch (error) {
     console.error('❌ updateUserSaleInOrder error:', error)
@@ -854,4 +846,3 @@ exports.getOrderPcToExcel = async (req, res) => {
     })
   }
 }
-
