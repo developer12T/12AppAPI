@@ -2681,7 +2681,7 @@ exports.getSummarybyArea = async (req, res) => {
       dataChange = null
       dataRefund = null
 
-      if (global.gc) global.gc()
+      // if (global.gc) global.gc()
 
       return res.status(200).json({
         status: 200,
