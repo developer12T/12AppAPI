@@ -2319,6 +2319,11 @@ exports.getSummarybyArea = async (req, res) => {
     const { period, year, type, zone, area } = req.query
     let query = {}
 
+    let zoneList = []
+    let dataOrder = []
+    let dataChange = []
+    let dataRefund = []
+
     if (area) {
       query = {
         $match: {
@@ -2449,7 +2454,7 @@ exports.getSummarybyArea = async (req, res) => {
     // console.log("modelRouteValue", modelRouteValue)
 
     const haveArea = [...new Set(modelRouteValue.map(i => i.area))]
-    otherModelRoute = await Route.aggregate([
+    let otherModelRoute = await Route.aggregate([
       {
         $match: {
           period: period,
@@ -2499,7 +2504,7 @@ exports.getSummarybyArea = async (req, res) => {
       })
     }
 
-    modelRoute = [...modelRouteValue, ...otherModelRoute]
+    let modelRoute = [...modelRouteValue, ...otherModelRoute]
 
     // const areaList = [...new Set(modelRoute.map(item => item.area))].filter(area => area !== undefined).sort();
 
@@ -2543,6 +2548,7 @@ exports.getSummarybyArea = async (req, res) => {
       })
     } else if (type === 'year') {
       // console.log('test')
+
       const users = await User.find({
         role: 'sale',
         area: { $ne: 'IT211' }
@@ -2598,11 +2604,18 @@ exports.getSummarybyArea = async (req, res) => {
       }
 
       data = []
+
       if (!zone && !area) {
         for (const zone of zoneList) {
-          dataOrderArea = dataOrder.filter(item => item.store.zone === zone)
-          dataChangeArea = dataChange.filter(item => item.store.zone === zone)
-          dataRefundArea = dataRefund.filter(item => item.store.zone === zone)
+          const dataOrderArea = dataOrder.filter(
+            item => item.store.zone === zone
+          )
+          const dataChangeArea = dataChange.filter(
+            item => item.store.zone === zone
+          )
+          const dataRefundArea = dataRefund.filter(
+            item => item.store.zone === zone
+          )
 
           const orderByMonth = groupByMonthAndSum(dataOrderArea)
           const changeByMonth = groupByMonthAndSum(dataChangeArea)
@@ -2629,9 +2642,15 @@ exports.getSummarybyArea = async (req, res) => {
         }
       } else {
         for (const area of areaList) {
-          dataOrderArea = dataOrder.filter(item => item.store.area === area)
-          dataChangeArea = dataChange.filter(item => item.store.area === area)
-          dataRefundArea = dataRefund.filter(item => item.store.area === area)
+          const dataOrderArea = dataOrder.filter(
+            item => item.store.area === area
+          )
+          const dataChangeArea = dataChange.filter(
+            item => item.store.area === area
+          )
+          const dataRefundArea = dataRefund.filter(
+            item => item.store.area === area
+          )
 
           const orderByMonth = groupByMonthAndSum(dataOrderArea)
           const changeByMonth = groupByMonthAndSum(dataChangeArea)
@@ -2658,6 +2677,12 @@ exports.getSummarybyArea = async (req, res) => {
         }
       }
 
+      dataOrder = null
+      dataChange = null
+      dataRefund = null
+
+      if (global.gc) global.gc()
+
       return res.status(200).json({
         status: 200,
         message: 'Sucess',
@@ -2673,6 +2698,9 @@ exports.getSummarybyArea = async (req, res) => {
       message: 'Success',
       data: data
     })
+
+    dataOrder = null
+    if (global.gc) global.gc()
     // }
   } catch (error) {
     console.error(error)
