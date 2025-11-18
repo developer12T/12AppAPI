@@ -783,6 +783,14 @@ exports.checkSimilarStores = async (req, res) => {
     const { Store } = getModelsByChannel(channel, res, storeModel)
     const store = await Store.findOne({ storeId })
     // console.log(store.zone)
+
+    if (!store) {
+      return res.status(200).json({
+        status:200,
+        message:'Not found store'
+      })
+    }
+
     // const existingStores = await Store.find(
     //   { storeId: { $ne: storeId } },
     //   { _id: 0, __v: 0, idIndex: 0 },
@@ -790,13 +798,13 @@ exports.checkSimilarStores = async (req, res) => {
     // )
 
     const existingStores = await Store.find(
-  {
-    ...(store?.zone ? { zone: store.zone } : {}), 
-    storeId: { $ne: storeId },
-    $expr: { $lte: [{ $strLenCP: '$storeId' }, 12] }
-  },
-  { _id: 0, __v: 0, idIndex: 0 }
-)
+      {
+        ...(store?.zone ? { zone: store.zone } : {}),
+        storeId: { $ne: storeId },
+        $expr: { $lte: [{ $strLenCP: '$storeId' }, 12] }
+      },
+      { _id: 0, __v: 0, idIndex: 0 }
+    )
 
     // console.log(existingStores.length)
     // 1. กำหนด weight ของแต่ละ field (ค่า sum ต้องไม่จำเป็นต้องรวมกันเท่ากับ 100)
@@ -3116,8 +3124,8 @@ exports.getLatLongOrderDetail = async (req, res) => {
 
     if (!StoreLatLongData) {
       return res.status(404).json({
-        status:404,
-        message:'Not found order LatLong'
+        status: 404,
+        message: 'Not found order LatLong'
       })
     }
 
@@ -3850,8 +3858,9 @@ exports.moveStoreToCash = async (req, res) => {
     const channel = req.headers['x-channel'];
     const { Store, RunningNumber } = getModelsByChannel('pc', res, storeModel);
 
-    const storeData = await Store.findOne({ storeId: storeId })
+    const storeData = await Store.findOne({ storeId: storeId }).lean()
 
+    let storeNew = {}
     if (!storeData) {
       return res.status(404).json({
         status: 404,
@@ -3864,33 +3873,39 @@ exports.moveStoreToCash = async (req, res) => {
         'last'
       )
 
-    const oldId = maxRunningAll
-    // console.log(oldId, 'oldId')
-    const newId = oldId.last.replace(/\d+$/, n =>
-      String(+n + 1).padStart(n.length, '0')
-    )
-
-
-      await RunningNumber.findOneAndUpdate(
-        { zone: store.zone },
-        { $set: { last: newId } },
-        { new: true }
+      const oldId = maxRunningAll
+      // console.log(oldId, 'oldId')
+      const newId = oldId.last.replace(/\d+$/, n =>
+        String(+n + 1).padStart(n.length, '0')
       )
-      await Store.findOneAndUpdate(
-        { _id: store._id },
-        {
-          $set: {
-            storeId: newId,
-            isMove: 'true',
-            storeIdOld: storeData.storeId,
-            areaOld: storeData.area,
-            updatedDate: Date(),
-            'approve.dateAction': new Date(),
-            'approve.appPerson': user
-          }
-        },
-        { new: true }
-      )
+
+      console.log(maxRunningAll)
+      // await RunningNumber.findOneAndUpdate(
+      //   { zone: store.zone },
+      //   { $set: { last: newId } },
+      //   { new: true }
+      // )
+
+      storeNew = {
+        ...storeData,
+        storeIdOld: storeData.storeId,
+        areaOld: storeData.area,
+      }
+      // await Store.findOneAndUpdate(
+      //   { _id: store._id },
+      //   {
+      //     $set: {
+      //       storeId: newId,
+      //       isMove: 'true',
+      //       storeIdOld: storeData.storeId,
+      //       areaOld: storeData.area,
+      //       updatedDate: Date(),
+      //       'approve.dateAction': new Date(),
+      //       'approve.appPerson': user
+      //     }
+      //   },
+      //   { new: true }
+      // )
 
 
 
@@ -3903,7 +3918,7 @@ exports.moveStoreToCash = async (req, res) => {
     res.status(200).json({
       status: 200,
       message: 'moveStoreToCash Success',
-      data: storeData
+      data: storeNew
     })
 
 
