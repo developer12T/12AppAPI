@@ -10,6 +10,7 @@ const {
   startCronJobErpApiCheckDisribution,
 
   startCronJobreStoreStockDaily,
+  startCronJobMemory,
 
   startCronJobInsertDistribution,
   startCronJobUpdateStatusDistribution,
@@ -22,6 +23,7 @@ if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
   startCronJobErpApiCheck()
   startCronJobInsertPowerBI()
   startCronJobreStoreStockDaily()
+  // startCronJobMemory()
   startCronJobInsertDistribution()
   startCronJobUpdateStatusDistribution()
   startCronJobUpdateSendmoney()

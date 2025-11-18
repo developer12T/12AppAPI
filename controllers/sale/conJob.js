@@ -53,6 +53,35 @@ const { create } = require('lodash')
 
 const pathLog = '/controllers/sale/conjobLog/'
 
+async function checkMemoryAndClear (channel = 'cash') {
+  const logFile = path.join(process.cwd(), `${pathLog}startCronJobMemory.txt`)
+  const now = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+  try {
+    const usedMB = process.memoryUsage().rss / 1024 / 1024
+
+    console.log(`🧠 Memory Usage: ${usedMB.toFixed(2)} MB`)
+
+    // ถ้า memory เกิน 1.2GB → สั่ง GC ทันที
+    if (usedMB > 1200) {
+      console.log('🔥 High memory detected. Running GC...')
+      if (global.gc) {
+        global.gc()
+        console.log('✅ GC executed successfully')
+        fs.appendFileSync(logFile, `[${now}] ✅ GC executed successfully\n`)
+      } else {
+        console.log('⚠️ GC not available. Start PM2 with --expose-gc')
+      }
+    }
+    fs.appendFileSync(
+      logFile,
+      `[${now}] ✅ 🧠 Memory Usage: ${usedMB.toFixed(2)} MB\n`
+    )
+  } catch (error) {
+    fs.appendFileSync(logFile, `[${now}] ❌ Job failed: ${error.message}\n`)
+    return { error: true, message: error.message }
+  }
+}
+
 async function erpApiCheckOrderJob (channel = 'cash') {
   const logFile = path.join(
     process.cwd(),
@@ -673,6 +702,22 @@ const startCronJobErpApiCheck = () => {
   )
 }
 
+const startCronJobMemory = () => {
+  cron.schedule(
+    '*/5 * * * *',
+    async () => {
+      console.log(
+        'Running cron job startCronJobErpApiCheck at 8:00 AM Thai time. Now:',
+        new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+      )
+      await checkMemoryAndClear()
+    },
+    {
+      timezone: 'Asia/Bangkok' // 👈 สำคัญมาก
+    }
+  )
+}
+
 const startCronJobErpApiCheckDisribution = () => {
   cron.schedule('*/10 * * * *', async () => {
     console.log(
@@ -921,11 +966,7 @@ async function updateSendmoney (channel = 'cash') {
     //   message: 'Success — updated sendmoney for all sale users'
     // })
 
-    fs.appendFileSync(
-      logFile,
-      `[${nowLog}] ✅ Job completed updateSendmoney\n`
-    )
-
+    fs.appendFileSync(logFile, `[${nowLog}] ✅ Job completed updateSendmoney\n`)
   } catch (error) {
     console.error('updateSendmoney ❌', error)
     fs.appendFileSync(logFile, `[${nowLog}] ❌ Job failed: ${err.message}\n`)
@@ -1283,5 +1324,6 @@ module.exports = {
 
   startCronJobDeleteCartDaily,
   startCronJobreStoreStockDaily,
+  startCronJobMemory,
   startCronJobUpdateSendmoney
 }
