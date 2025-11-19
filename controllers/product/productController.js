@@ -1721,9 +1721,23 @@ exports.getProductPage = async (req, res) => {
     // -------------------------------
     // STEP 1: ดึง product ทั้งหมด (ไม่ paginate)
     // -------------------------------
-    let rawProducts = await Product.find(filter)
-      .sort({ groupCode: 1, sizeNumber: 1 })
-      .lean()
+    let rawProducts = await Product.find(filter).sort({ sizeNumber: 1 }).lean()
+
+    rawProducts.sort((a, b) => {
+      const ga = String(a.groupCode).trim()
+      const gb = String(b.groupCode).trim()
+
+      // ถ้าเป็น 001 ให้ขึ้นก่อนทันที
+      if (ga === 'G001' && gb !== 'G001') return -1
+      if (ga !== 'G001' && gb === 'G001') return 1
+
+      // ถ้าไม่ใช่ 001 ทั้งคู่ → เรียงปกติ
+      if (ga < gb) return -1
+      if (ga > gb) return 1
+
+      // ต่อด้วย sizeNumber
+      return (a.sizeNumber || 0) - (b.sizeNumber || 0)
+    })
 
     // -------------------------------
     // STEP 2: trim fields
