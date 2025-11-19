@@ -87,6 +87,7 @@ exports.getProductSwitch = async (req, res) => {
     res.status(500).json({ status: '501', message: error.message })
   }
 }
+
 exports.getProduct = async (req, res) => {
   try {
     const { type, group, area, orderId, period, brand, size, flavour, limit } =
@@ -1627,14 +1628,27 @@ exports.checkPriceProductOrder = async (req, res) => {
 
 exports.getProductPage = async (req, res) => {
   try {
-    const { type, group, area, period, brand, size, flavour, limit, query,page } =
-      req.body
+    const {
+      type,
+      group,
+      area,
+      period,
+      brand,
+      size,
+      flavour,
+      limit,
+      query,
+      page
+    } = req.body
+
     const channel = req.headers['x-channel']
 
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Stock } = getModelsByChannel(channel, res, stockModel)
-    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
 
+    // -------------------------------
+    // Utility
+    // -------------------------------
     const parseArrayParam = param => {
       if (!param) return []
       try {
@@ -1644,17 +1658,9 @@ exports.getProductPage = async (req, res) => {
       }
     }
 
-    const parseGram = sizeStr => {
-      const match = sizeStr.match(/^([\d.]+)(?:-[A-Z])?\s*(KG|G|g|kg)?/i)
-      if (!match) return 0
-      const value = parseFloat(match[1])
-      const unit = (match[2] || 'G').toUpperCase()
-      return unit === 'KG' ? value * 1000 : value
-    }
-
-    let products = []
-    let stock = []
-
+    // -------------------------------
+    // Validate type
+    // -------------------------------
     if (!type || !['sale', 'refund', 'withdraw'].includes(type)) {
       return res.status(400).json({
         status: '400',
@@ -1662,11 +1668,17 @@ exports.getProductPage = async (req, res) => {
       })
     }
 
+    // -------------------------------
+    // Prepare arrays
+    // -------------------------------
     const groupArray = parseArrayParam(group)
     const brandArray = parseArrayParam(brand)
     const sizeArray = parseArrayParam(size)
     const flavourArray = parseArrayParam(flavour)
 
+    // -------------------------------
+    // Build filter (เหมือน getProduct)
+    // -------------------------------
     const filter = {
       ...(type === 'sale' && { statusSale: 'Y' }),
       ...(type === 'refund' && { statusRefund: 'Y' }),
@@ -1674,49 +1686,82 @@ exports.getProductPage = async (req, res) => {
     }
 
     const andConditions = []
-    if (groupArray.length) andConditions.push({ group: { $in: groupArray } })
-    if (brandArray.length) andConditions.push({ brand: { $in: brandArray } })
-    if (sizeArray.length) andConditions.push({ size: { $in: sizeArray } })
-    if (flavourArray.length)
-      andConditions.push({ flavour: { $in: flavourArray } })
 
-    // ✅ text query (ค้นหาหลายฟิลด์แบบ case-insensitive)
-    if (query && String(query).trim()) {
-      const q = String(query).trim()
-      const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') // escape + i
+    if (groupArray.length) {
       andConditions.push({
-        $or: [
-          { name: rx },
-          { brand: rx },
-          { group: rx },
-          { flavour: rx },
-          { id: rx },
-          { size: rx },
-          { keywords: rx } // ถ้ามีฟิลด์ keywords
-        ]
+        group: { $in: groupArray.map(x => String(x).trim()) }
+      })
+    }
+    if (brandArray.length) {
+      andConditions.push({
+        brand: { $in: brandArray.map(x => String(x).trim()) }
+      })
+    }
+    if (sizeArray.length) {
+      andConditions.push({
+        size: { $in: sizeArray.map(x => String(x).trim()) }
+      })
+    }
+    if (flavourArray.length) {
+      andConditions.push({
+        flavour: { $in: flavourArray.map(x => String(x).trim()) }
       })
     }
 
-    if (andConditions.length) filter.$and = andConditions
+    if (andConditions.length) {
+      filter.$and = andConditions
+    }
 
-    // products = await Product.find(filter).lean()
-
+    // -------------------------------
+    // Pagination
+    // -------------------------------
     const pageNum = Math.max(parseInt(page, 10) || 1, 1)
     const perPage = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100)
 
-    products = await Product.find(filter)
-  .sort({ 
-    groupCode: 1,        // เรียงตามกลุ่มก่อน (A → Z)
-    sizeNumber: 1    // แล้วค่อยเรียงตามขนาด
-  })
-  .skip((pageNum - 1) * perPage)
-  .limit(perPage)
-  .lean()
+    // -------------------------------
+    // STEP 1: ดึง product ทั้งหมด (ไม่ paginate)
+    // -------------------------------
+    let rawProducts = await Product.find(filter)
+      .sort({ groupCode: 1, sizeNumber: 1 })
+      .lean()
 
+    // -------------------------------
+    // STEP 2: trim fields
+    // -------------------------------
+    rawProducts = rawProducts.map(p => ({
+      ...p,
+      id: String(p.id).trim(),
+      group: String(p.group || '').trim(),
+      brand: String(p.brand || '').trim(),
+      size: String(p.size || '').trim(),
+      flavour: String(p.flavour || '').trim()
+    }))
 
-    // console.log(products)
+    // -------------------------------
+    // STEP 3: remove duplicate id
+    // -------------------------------
+    rawProducts = rawProducts.filter(
+      (p, idx, arr) => idx === arr.findIndex(x => x.id === p.id)
+    )
 
-    stock = await Stock.aggregate([
+    // -------------------------------
+    // STEP 4: pagination AFTER clean-up
+    // -------------------------------
+    const startIndex = (pageNum - 1) * perPage
+    const endIndex = startIndex + perPage
+    const products = rawProducts.slice(startIndex, endIndex)
+
+    if (!products.length) {
+      return res.status(404).json({
+        status: '404',
+        message: 'No products found!'
+      })
+    }
+
+    // -------------------------------
+    // STEP 5: get Stock once
+    // -------------------------------
+    const stock = await Stock.aggregate([
       {
         $match: {
           period: period,
@@ -1733,43 +1778,37 @@ exports.getProductPage = async (req, res) => {
       }
     ])
 
-    if (!products.length) {
-      return res
-        .status(404)
-        .json({ status: '404', message: 'No products found!' })
-    }
-    // console.log(products)
-    const data = products
-      .map(product => {
-        const stockMatch = stock.find(s => s._id === product.id) || {}
-        let listUnit = product.listUnit || []
-        // console.log(stockMatch)
-        if (type === 'sale') {
-          listUnit = listUnit.map(u => ({ ...u, price: u.price?.sale }))
-        } else if (type === 'refund') {
-          listUnit = listUnit.map(u => ({ ...u, price: u.price?.refund }))
-        } else if (type === 'withdraw') {
-          listUnit = listUnit
-            // .filter(u => u.unit === 'CTN') // ✅ เฉพาะ CTN
-            .map(u => ({
-              ...u,
-              price: u.price?.sale
-            }))
-        }
+    // -------------------------------
+    // STEP 6: merge stock + price modify
+    // -------------------------------
+    const data = products.map(product => {
+      const pid = String(product.id).trim()
+      const stockMatch = stock.find(s => String(s._id).trim() === pid) || {}
 
-        return {
-          ...product,
-          listUnit,
-          qtyCtn: stockMatch.balanceCtn || 0,
-          qtyPcs: stockMatch.balancePcs || 0
-        }
-      })
-      // .sort((a, b) => {
-      //   if (a.groupCode < b.groupCode) return -1
-      //   if (a.groupCode > b.groupCode) return 1
-      //   return parseGram(a.size) - parseGram(b.size)
-      // })
+      let listUnit = product.listUnit || []
 
+      if (type === 'sale') {
+        listUnit = listUnit.map(u => ({ ...u, price: u.price?.sale }))
+      } else if (type === 'refund') {
+        listUnit = listUnit.map(u => ({ ...u, price: u.price?.refund }))
+      } else if (type === 'withdraw') {
+        listUnit = listUnit.map(u => ({
+          ...u,
+          price: u.price?.sale
+        }))
+      }
+
+      return {
+        ...product,
+        listUnit,
+        qtyCtn: stockMatch.balanceCtn || 0,
+        qtyPcs: stockMatch.balancePcs || 0
+      }
+    })
+
+    // -------------------------------
+    // Response
+    // -------------------------------
     res.status(200).json({
       status: '200',
       message: 'Products fetched successfully!',
@@ -1777,7 +1816,10 @@ exports.getProductPage = async (req, res) => {
     })
   } catch (error) {
     console.error(error)
-    res.status(500).json({ status: '501', message: error.message })
+    res.status(500).json({
+      status: '501',
+      message: error.message
+    })
   }
 }
 
@@ -1799,7 +1841,7 @@ exports.addSizeNumber = async (req, res) => {
 
     // --- อัพเดตทีละตัว ---
     for (const p of dataProduct) {
-      const sizeNumber = parseGram(p.size || "")
+      const sizeNumber = parseGram(p.size || '')
       await Product.updateOne(
         { _id: p._id },
         { $set: { sizeNumber: sizeNumber } }
@@ -1811,7 +1853,6 @@ exports.addSizeNumber = async (req, res) => {
       message: 'addSizeNumber Success',
       count: dataProduct
     })
-
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '501', message: error.message })

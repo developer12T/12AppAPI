@@ -25,142 +25,142 @@ const { Item } = require('../../models/cash/master')
 
 exports.utilize = async (req, res) => {
   try {
-    
-const { area, period, typetruck } = req.body
-  const channel = req.headers['x-channel']
-  const { Product } = getModelsByChannel(channel, res, productModel)
-  const { Typetrucks } = getModelsByChannel(channel, res, typeTruckModel)
-  const { Stock } = getModelsByChannel(channel, res, stockModel)
-  const { Distribution } = getModelsByChannel(channel, res, DistributionModel)
-    
-  const dataStock = await Stock.findOne({ area: area, period: period })
-  if (!dataStock) {
-    return res.status(404).json({
-      status: 404,
-      message: 'Not found Stock'
+    const { area, period, typetruck } = req.body
+    const channel = req.headers['x-channel']
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Typetrucks } = getModelsByChannel(channel, res, typeTruckModel)
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
+    const { Distribution } = getModelsByChannel(channel, res, DistributionModel)
+
+    const dataStock = await Stock.findOne({ area: area, period: period })
+    if (!dataStock) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found Stock'
+      })
+    }
+    const productIds = dataStock.listProduct.flatMap(item => {
+      return item.productId
+    })
+
+    const dataTypetrucks = await Typetrucks.findOne({ type_name: typetruck })
+
+    if (!dataTypetrucks) {
+      return res.status(404).json({
+        status: 404,
+        message: `Not found typetruck: ${typetruck}`
+      })
+    }
+
+    const datawithdraw = await Distribution.find({
+      area: area,
+      period: period,
+      status: 'pending'
+    })
+
+    const withdrawProductIds = datawithdraw.flatMap(item =>
+      item.listProduct.map(u => u.id)
+    )
+    const withdrawProduct = datawithdraw.flatMap(item =>
+      item.listProduct.map(u => ({
+        id: u.id,
+        qtyPcs: u.qtyPcs
+      }))
+    )
+    // console.log(withdrawProductIds)
+    const allProductIds = [...new Set([...productIds, ...withdrawProductIds])]
+    const dataProduct = await Product.find({ id: { $in: allProductIds } })
+
+    // console.log(withdrawProduct)
+    let stock = 0
+    let withdraw = 0
+
+    // const dataqty = await Stock.aggregate([
+    //   { $match: { area: 'IT211', period: '202507' } },
+    //   { $unwind: "$listProduct" },
+    //   {
+    //     $group: {
+    //       _id: null, // รวมทั้งหมด ไม่แยกกลุ่ม
+    //       sum: { $sum: "$listProduct.balancePcs" }
+    //     }
+    //   }
+    // ]);
+    // console.log(dataqty)
+
+    let qty = 0
+    for (const item of allProductIds) {
+      const stockItem = dataStock.listProduct.find(u => u.productId === item)
+      const productItem = dataProduct.find(u => u.id === item)
+      // console.log(item)
+      // เช็คว่าหาเจอหรือไม่ (ป้องกัน error)
+      if (!stockItem || !productItem) continue
+
+      const maxFactor = Math.max(...productItem.listUnit.map(u => u.factor))
+
+      const dataStockPcs = stockItem.balancePcs
+      const productNet = productItem.weightNet / maxFactor
+
+      qty += dataStockPcs
+      stock += dataStockPcs * productNet
+
+      const withdrawTotalQty = withdrawProduct
+        .filter(u => u.id === item)
+        .reduce((sum, u) => sum + (u.qtyPcs || 0), 0)
+      // console.log(withdrawProductPcsObj)
+      // ถ้าไม่เจอ หรือไม่มี qtyPcs ให้ข้าม
+      // if (!withdrawProductPcsObj || withdrawProductPcsObj.qtyPcs === undefined) {
+      //   continue;
+      // }
+
+      withdraw += withdrawTotalQty * productNet
+    }
+
+    // console.log(stock)
+
+    const sum = stock + withdraw
+    const net = dataTypetrucks.weight
+    const payload = dataTypetrucks.payload
+    const free = dataTypetrucks.payload - sum
+
+    // console.log(free,payload)
+
+    const data = {
+      freePercentage: to2(free / payload),
+      stockPercentage: to2(stock / payload),
+      withdrawPercentage: to2(withdraw / payload),
+      sumPercentage: to2(sum / payload),
+      free: to2(free),
+      stock: to2(stock),
+      withdraw: to2(withdraw),
+      sum: to2(sum),
+      type_name: dataTypetrucks.type_name,
+      // weight: dataTypetrucks.weight,
+      total_weight: dataTypetrucks.total_weight,
+      law_weight: dataTypetrucks.law_weight,
+      height_floor: dataTypetrucks.height_floor,
+      width_floor: dataTypetrucks.width_floor,
+      length_floor: dataTypetrucks.length_floor,
+      front_pressure: dataTypetrucks.front_pressure,
+      back_pressure: dataTypetrucks.back_pressure,
+      set_speed: dataTypetrucks.set_speed,
+      set_speed_city: dataTypetrucks.set_speed_city,
+      net: to2(net),
+      payload: payload
+    }
+
+    res.status(200).json({
+      status: '200',
+      message: 'utilize fetched successfully!',
+      data: data
+    })
+  } catch (error) {
+    console.error('❌ Error in getRouteEffective:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-  const productIds = dataStock.listProduct.flatMap(item => {
-    return item.productId
-  })
-
-
-
-  const dataTypetrucks = await Typetrucks.findOne({ type_name: typetruck })
-  const datawithdraw = await Distribution.find({
-    area: area,
-    period: period,
-    status: 'pending'
-  })
-
-  const withdrawProductIds = datawithdraw.flatMap(item =>
-    item.listProduct.map(u => u.id)
-  )
-  const withdrawProduct = datawithdraw.flatMap(item =>
-    item.listProduct.map(u => ({
-      id: u.id,
-      qtyPcs: u.qtyPcs
-    }))
-  )
-  // console.log(withdrawProductIds)
-  const allProductIds = [...new Set([...productIds, ...withdrawProductIds])]
-  const dataProduct = await Product.find({ id: { $in: allProductIds } })
-
-  // console.log(withdrawProduct)
-  let stock = 0
-  let withdraw = 0
-
-  // const dataqty = await Stock.aggregate([
-  //   { $match: { area: 'IT211', period: '202507' } },
-  //   { $unwind: "$listProduct" },
-  //   {
-  //     $group: {
-  //       _id: null, // รวมทั้งหมด ไม่แยกกลุ่ม
-  //       sum: { $sum: "$listProduct.balancePcs" }
-  //     }
-  //   }
-  // ]);
-  // console.log(dataqty)
-
-  let qty = 0
-  for (const item of allProductIds) {
-    const stockItem = dataStock.listProduct.find(u => u.productId === item)
-    const productItem = dataProduct.find(u => u.id === item)
-    // console.log(item)
-    // เช็คว่าหาเจอหรือไม่ (ป้องกัน error)
-    if (!stockItem || !productItem) continue
-
-
-    const maxFactor = Math.max(...productItem.listUnit.map(u => u.factor))
-
-
-    const dataStockPcs = stockItem.balancePcs
-    const productNet = productItem.weightNet / maxFactor
-
-    qty += dataStockPcs
-    stock += dataStockPcs * productNet
-
-
-    const withdrawTotalQty = withdrawProduct
-      .filter(u => u.id === item)
-      .reduce((sum, u) => sum + (u.qtyPcs || 0), 0)
-    // console.log(withdrawProductPcsObj)
-    // ถ้าไม่เจอ หรือไม่มี qtyPcs ให้ข้าม
-    // if (!withdrawProductPcsObj || withdrawProductPcsObj.qtyPcs === undefined) {
-    //   continue;
-    // }
-
-    withdraw += withdrawTotalQty * productNet
-  }
-
-  // console.log(stock)
-
-  const sum = stock + withdraw
-  const net = dataTypetrucks.weight
-  const payload = dataTypetrucks.payload
-  const free = dataTypetrucks.payload - sum
-
-  // console.log(free,payload)
-
-  const data = {
-    freePercentage: to2(free / payload),
-    stockPercentage: to2(stock / payload),
-    withdrawPercentage: to2(withdraw / payload),
-    sumPercentage: to2(sum / payload),
-    free: to2(free),
-    stock: to2(stock),
-    withdraw: to2(withdraw),
-    sum: to2(sum),
-    type_name: dataTypetrucks.type_name,
-    // weight: dataTypetrucks.weight,
-    total_weight: dataTypetrucks.total_weight,
-    law_weight: dataTypetrucks.law_weight,
-    height_floor: dataTypetrucks.height_floor,
-    width_floor: dataTypetrucks.width_floor,
-    length_floor: dataTypetrucks.length_floor,
-    front_pressure: dataTypetrucks.front_pressure,
-    back_pressure: dataTypetrucks.back_pressure,
-    set_speed: dataTypetrucks.set_speed,
-    set_speed_city: dataTypetrucks.set_speed_city,
-    net: to2(net),
-    payload: payload
-  }
-
-  res.status(200).json({
-    status: '200',
-    message: 'utilize fetched successfully!',
-    data: data
-  })
-
-} catch (error) {
-  console.error('❌ Error in getRouteEffective:', error)
-
-  res.status(500).json({
-    status: 500,
-    message: 'error from server',
-    error: error.message || error.toString(), // ✅ ป้องกัน circular object
-    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
-  })
-}
-  
 }
