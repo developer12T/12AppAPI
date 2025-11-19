@@ -5785,7 +5785,7 @@ exports.updateStatusOrderDistribution = async (req, res) => {
     // ✅ 1. ดึงข้อมูลจาก WithdrawCash
     const withdrawList = await WithdrawCash.findAll({
       where: {
-        WD_STATUS: '99',
+        WD_STATUS: '22',
         [Op.and]: [
           where(fn('MONTH', col('WD_DATE')), currentMonth),
           where(fn('YEAR', col('WD_DATE')), currentYear)
@@ -5843,6 +5843,7 @@ exports.updateStatusOrderDistribution = async (req, res) => {
       message: 'Sucess'
       // data: data
     })
+
   } catch (error) {
     console.error('Error in updateStatusOrderDistribution:', error)
     res.status(500).json({

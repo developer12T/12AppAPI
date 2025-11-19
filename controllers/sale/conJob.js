@@ -25,6 +25,7 @@ const { getSocket } = require('../../socket')
 
 const userModel = require('../../models/cash/user')
 const distributionModel = require('../../models/cash/distribution')
+const sendmoneyModel = require('../../models/cash/sendmoney')
 const productModel = require('../../models/cash/product')
 const stockModel = require('../../models/cash/stock')
 const giveModel = require('../../models/cash/give')
@@ -1262,8 +1263,8 @@ async function updateStatusOrderDistribution (channel = 'cash') {
       `[${nowLog}] ✅ Job completed updatePowerBiSucess\n`
     )
   } catch (error) {
-    console.error(err)
-    fs.appendFileSync(logFile, `[${nowLog}] ❌ Job failed: ${err.message}\n`)
+    console.error(error)
+    fs.appendFileSync(logFile, `[${nowLog}] ❌ Job failed: ${error.message}\n`)
   }
 }
 

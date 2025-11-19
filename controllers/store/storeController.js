@@ -786,8 +786,8 @@ exports.checkSimilarStores = async (req, res) => {
 
     if (!store) {
       return res.status(200).json({
-        status:200,
-        message:'Not found store'
+        status: 200,
+        message: 'Not found store'
       })
     }
 
@@ -827,10 +827,13 @@ exports.checkSimilarStores = async (req, res) => {
       .map(existingStore => {
         let weightedSimilarity = 0
         fieldsToCheck.forEach(({ field, weight }) => {
-          const similarity = calculateSimilarity(
-            store[field]?.toString() || '',
-            existingStore[field]?.toString() || ''
-          )
+          const val1 = store[field] ? String(store[field]) : ''
+          const val2 = existingStore[field] ? String(existingStore[field]) : ''
+          // const similarity = calculateSimilarity(
+          //   store[field]?.toString() || '',
+          //   existingStore[field]?.toString() || ''
+          // )
+          const similarity = calculateSimilarity(val1, val2)
           weightedSimilarity += similarity * weight
         })
 
@@ -880,8 +883,8 @@ exports.checkSimilarStores = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
+
 exports.editStore = async (req, res) => {
   const { storeId } = req.params
   const data = req.body
@@ -1102,11 +1105,6 @@ exports.addFromERPnew = async (req, res) => {
     res.status(500).json({ status: 500, message: error.message })
   }
 }
-
-
-
-
-
 
 exports.checkInStore = async (req, res) => {
   const { storeId } = req.params
@@ -1448,7 +1446,11 @@ exports.updateStoreStatus = async (req, res) => {
   try {
     const { storeId, status, user } = req.body
     const channel = req.headers['x-channel']
-    const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
+    const { RunningNumber, Store } = getModelsByChannel(
+      channel,
+      res,
+      storeModel
+    )
     const { User } = getModelsByChannel(channel, res, userModel)
     const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
     const store = await Store.findOne({ storeId: storeId })
@@ -1460,9 +1462,9 @@ exports.updateStoreStatus = async (req, res) => {
       })
     }
     const storeZone = store.area.substring(0, 2)
-    const maxRunningAll = await RunningNumber.findOne({ zone: storeZone }).select(
-      'last'
-    )
+    const maxRunningAll = await RunningNumber.findOne({
+      zone: storeZone
+    }).select('last')
 
     // console.log(maxRunningAll)
 
@@ -1523,24 +1525,24 @@ exports.updateStoreStatus = async (req, res) => {
         customerCoType: item.type ?? '',
         customerAddress1: (
           item.address +
-          item.subDistrict +
-          item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+            item.subDistrict +
+            item.subDistrict +
+            item.province +
+            item.postCode ?? ''
         ).substring(0, 35),
         customerAddress2: (
           item.address +
-          item.subDistrict +
-          item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+            item.subDistrict +
+            item.subDistrict +
+            item.province +
+            item.postCode ?? ''
         ).substring(35, 70),
         customerAddress3: (
           item.address +
-          item.subDistrict +
-          item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+            item.subDistrict +
+            item.subDistrict +
+            item.province +
+            item.postCode ?? ''
         ).substring(70, 105),
         customerAddress4: '',
         customerPoscode: (item.postCode ?? '').substring(0, 35),
@@ -1655,9 +1657,7 @@ exports.updateStoreStatus = async (req, res) => {
       error: error.message || error.toString(), // ✅ ป้องกัน circular object
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
-
   }
-
 }
 
 exports.rejectStore = async (req, res) => {
@@ -1687,7 +1687,6 @@ exports.rejectStore = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.updateStoreStatusNoNewId = async (req, res) => {
@@ -1823,7 +1822,9 @@ exports.addAndUpdateStore = async (req, res) => {
       if (storeInMongo) {
         const includedKeys = ['route', 'zone', 'area']
 
-        const hasChanged = includedKeys.some(key => m3[key] !== storeInMongo[key])
+        const hasChanged = includedKeys.some(
+          key => m3[key] !== storeInMongo[key]
+        )
 
         if (hasChanged) {
           await Store.updateOne(
@@ -1859,13 +1860,16 @@ exports.addAndUpdateStore = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.createRunningNumber = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
-    const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
+    const { RunningNumber, Store } = getModelsByChannel(
+      channel,
+      res,
+      storeModel
+    )
 
     let type = ''
     let running = ''
@@ -1940,14 +1944,17 @@ exports.createRunningNumber = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.updateRunningNumber = async (req, res) => {
   try {
     const { storeId } = req.body
     const channel = req.headers['x-channel']
-    const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
+    const { RunningNumber, Store } = getModelsByChannel(
+      channel,
+      res,
+      storeModel
+    )
     const store = await Store.findOne({ storeId: storeId })
 
     if (!store) {
@@ -2001,25 +2008,25 @@ exports.updateRunningNumber = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.addBueatyStore = async (req, res) => {
   const channel = req.headers['x-channel']
 
   try {
-    const bueatydata = await bueatyStoreQuery();
-    const { TypeStore } = getModelsByChannel(channel, res, storeModel);
+    const bueatydata = await bueatyStoreQuery()
+    const { TypeStore } = getModelsByChannel(channel, res, storeModel)
 
     for (const row of bueatydata) {
       // trim storeId ก่อน
-      const storeIdTrimmed = typeof row.storeId === 'string'
-        ? row.storeId.trim()
-        : row.storeId;
+      const storeIdTrimmed =
+        typeof row.storeId === 'string' ? row.storeId.trim() : row.storeId
 
       // check ซ้ำด้วยค่า trimmed
-      const existTypeStore = await TypeStore.findOne({ storeId: storeIdTrimmed });
-      if (existTypeStore) continue;
+      const existTypeStore = await TypeStore.findOne({
+        storeId: storeIdTrimmed
+      })
+      if (existTypeStore) continue
 
       // trim ทุก field ก่อน insert
       const trimmed = Object.fromEntries(
@@ -2027,13 +2034,13 @@ exports.addBueatyStore = async (req, res) => {
           key,
           typeof value === 'string' ? value.trim() : value
         ])
-      );
+      )
 
       await TypeStore.create({
         ...trimmed,
         storeId: storeIdTrimmed, // ensure cleaned version
         type: ['beauty']
-      });
+      })
     }
 
     const io = getSocket()
@@ -2080,7 +2087,6 @@ exports.getBueatyStore = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.addStoreArray = async (req, res) => {
@@ -2131,7 +2137,6 @@ exports.addStoreArray = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.updateStoreArray = async (req, res) => {
@@ -2185,7 +2190,6 @@ exports.updateStoreArray = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.deleteStoreArray = async (req, res) => {
@@ -2221,7 +2225,6 @@ exports.deleteStoreArray = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.addTypeStore = async (req, res) => {
@@ -2251,7 +2254,6 @@ exports.addTypeStore = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.getTypeStore = async (req, res) => {
@@ -2275,7 +2277,6 @@ exports.getTypeStore = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.insertStoreToErpOne = async (req, res) => {
@@ -2381,7 +2382,6 @@ exports.insertStoreToErpOne = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.getShipping = async (req, res) => {
@@ -2420,7 +2420,6 @@ exports.getShipping = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.addShippingInStore = async (req, res) => {
@@ -2787,7 +2786,7 @@ exports.storeToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
   } catch (err) {
     console.error(err)
@@ -2835,7 +2834,6 @@ exports.updateStatusM3ToMongo = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.addLatLong = async (req, res) => {
@@ -3108,7 +3106,6 @@ exports.getLatLongOrder = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.getLatLongOrderDetail = async (req, res) => {
@@ -3128,7 +3125,6 @@ exports.getLatLongOrderDetail = async (req, res) => {
         message: 'Not found order LatLong'
       })
     }
-
 
     const data = {
       orderId: StoreLatLongData.orderId,
@@ -3163,7 +3159,6 @@ exports.getLatLongOrderDetail = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.approveLatLongStore = async (req, res) => {
@@ -3174,7 +3169,11 @@ exports.approveLatLongStore = async (req, res) => {
     const channel = req.headers['x-channel']
     const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
     const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
-    const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
+    const { RunningNumber, Store } = getModelsByChannel(
+      channel,
+      res,
+      storeModel
+    )
 
     // console.log(orderId)
 
@@ -3255,7 +3254,6 @@ exports.approveLatLongStore = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.canceledOrderLatLongStore = async (req, res) => {
@@ -3264,7 +3262,11 @@ exports.canceledOrderLatLongStore = async (req, res) => {
     const channel = req.headers['x-channel']
     const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
     const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
-    const { RunningNumber, Store } = getModelsByChannel(channel, res, storeModel)
+    const { RunningNumber, Store } = getModelsByChannel(
+      channel,
+      res,
+      storeModel
+    )
 
     const storeLatLongData = await StoreLatLong.findOne({
       orderId: orderId
@@ -3310,7 +3312,6 @@ exports.canceledOrderLatLongStore = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.getStorePage = async (req, res) => {
@@ -3431,7 +3432,6 @@ exports.updateStoreAddressIt = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.checkRangeLatLong = async (req, res) => {
@@ -3441,7 +3441,7 @@ exports.checkRangeLatLong = async (req, res) => {
 
     const dataStoreLatLong = await StoreLatLong.find({ status: 'approved' })
 
-    function calculateDistance(lat1, lon1, lat2, lon2) {
+    function calculateDistance (lat1, lon1, lat2, lon2) {
       const R = 6371 // รัศมีโลก (กิโลเมตร)
 
       const dLat = deg2rad(lat2 - lat1)
@@ -3450,16 +3450,16 @@ exports.checkRangeLatLong = async (req, res) => {
       const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos(deg2rad(lat1)) *
-        Math.cos(deg2rad(lat2)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2)
+          Math.cos(deg2rad(lat2)) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2)
 
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 
       return R * c // ระยะทาง (กิโลเมตร)
     }
 
-    function deg2rad(deg) {
+    function deg2rad (deg) {
       return deg * (Math.PI / 180)
     }
 
@@ -3506,7 +3506,7 @@ exports.checkRangeLatLong = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
 
     // res.status(200).json({
@@ -3524,7 +3524,6 @@ exports.checkRangeLatLong = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.checkNewStoreLatLong = async (req, res) => {
@@ -3605,7 +3604,6 @@ exports.checkNewStoreLatLong = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.updateAreaStore = async (req, res) => {
@@ -3669,7 +3667,6 @@ exports.updateAreaStore = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.areaStoreM3toMongo = async (req, res) => {
@@ -3681,27 +3678,26 @@ exports.areaStoreM3toMongo = async (req, res) => {
       where: {
         OKCFC1: area
       }
-    });
+    })
 
-    const storeIdM3 = dataM3Store.map(item => item.customerNo?.trim()).filter(Boolean);
+    const storeIdM3 = dataM3Store
+      .map(item => item.customerNo?.trim())
+      .filter(Boolean)
 
     const dataMongoStore = await Store.find({
       storeId: { $in: storeIdM3 }
-    });
+    })
 
     await Store.updateMany(
       { storeId: { $in: storeIdM3 } },
       { $set: { area: area } }
-    );
-
+    )
 
     res.status(201).json({
       status: 201,
       message: 'Sucess',
       data: storeIdM3
     })
-
-
   } catch (error) {
     console.error('❌ Error:', error)
 
@@ -3714,41 +3710,40 @@ exports.areaStoreM3toMongo = async (req, res) => {
   }
 }
 
-function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
-  const R = 6371000; // รัศมีโลก (เมตร)
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
+function getDistanceFromLatLonInMeters (lat1, lon1, lat2, lon2) {
+  const R = 6371000 // รัศมีโลก (เมตร)
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLon = ((lon2 - lon1) * Math.PI) / 180
 
   const a =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * Math.PI / 180) *
-    Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) ** 2;
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2
 
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 
-  return R * c; // ระยะห่าง (เมตร)
+  return R * c // ระยะห่าง (เมตร)
 }
-
 
 exports.checkLatLongByStore = async (req, res) => {
   try {
-    const { storeId, lat, long } = req.body;
-    const channel = req.headers['x-channel'];
-    const { Store } = getModelsByChannel(channel, res, storeModel);
+    const { storeId, lat, long } = req.body
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
     // หาข้อมูลร้าน
-    const dataStore = await Store.findOne({ storeId });
+    const dataStore = await Store.findOne({ storeId })
 
     if (!dataStore) {
       return res.status(404).json({
         status: 404,
-        message: "Store not found"
-      });
+        message: 'Store not found'
+      })
     }
 
-    const storeLat = Number(dataStore.latitude);
-    const storeLon = Number(dataStore.longtitude);
+    const storeLat = Number(dataStore.latitude)
+    const storeLon = Number(dataStore.longtitude)
 
     // คำนวณระยะ
     const distance = getDistanceFromLatLonInMeters(
@@ -3756,11 +3751,11 @@ exports.checkLatLongByStore = async (req, res) => {
       Number(long),
       storeLat,
       storeLon
-    );
+    )
 
     res.status(200).json({
       status: 200,
-      message: "success",
+      message: 'success',
       distance: distance.toFixed(2), // แสดงเป็นเมตร
       data: {
         sentLat: lat,
@@ -3768,12 +3763,7 @@ exports.checkLatLongByStore = async (req, res) => {
         storeLat,
         storeLon
       }
-    });
-
-
-
-
-
+    })
   } catch (error) {
     console.error('❌ Error:', error)
 
@@ -3784,33 +3774,29 @@ exports.checkLatLongByStore = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.addStoreFromM3 = async (req, res) => {
   try {
-    const { storeId } = req.body;
-    const channel = req.headers['x-channel'];
-    const { Store } = getModelsByChannel(channel, res, storeModel);
-
+    const { storeId } = req.body
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
     const storeM3 = await Customer.findOne({
       where: { OKCUNO: storeId },
       raw: true
     })
 
-    const trimmedDataStoreM3 = {};
+    const trimmedDataStoreM3 = {}
     for (const [key, value] of Object.entries(storeM3 || {})) {
-      trimmedDataStoreM3[key] = typeof value === 'string' ? value.trim() : value;
+      trimmedDataStoreM3[key] = typeof value === 'string' ? value.trim() : value
     }
-
-
 
     const data = {
       storeId: trimmedDataStoreM3.customerNo,
       name: trimmedDataStoreM3.customerName,
       taxId: '',
-      tel: "",
+      tel: '',
       route: trimmedDataStoreM3.OKCFC3,
       type: trimmedDataStoreM3.customerCoType,
       typeName: '',
@@ -3826,7 +3812,7 @@ exports.addStoreFromM3 = async (req, res) => {
       lineId: '',
       status: trimmedDataStoreM3.OKECAR,
       imageList: [],
-      shippingAddress: [],
+      shippingAddress: []
       // checkIn:
     }
 
@@ -3837,8 +3823,6 @@ exports.addStoreFromM3 = async (req, res) => {
       message: 'Add store success',
       data: trimmedDataStoreM3
     })
-
-
   } catch (error) {
     console.error('❌ Error:', error)
 
@@ -3855,8 +3839,8 @@ exports.moveStoreToCash = async (req, res) => {
   try {
     const { storeId, area } = req.body
 
-    const channel = req.headers['x-channel'];
-    const { Store, RunningNumber } = getModelsByChannel('pc', res, storeModel);
+    const channel = req.headers['x-channel']
+    const { Store, RunningNumber } = getModelsByChannel('pc', res, storeModel)
 
     const storeData = await Store.findOne({ storeId: storeId }).lean()
 
@@ -3867,7 +3851,11 @@ exports.moveStoreToCash = async (req, res) => {
         message: 'Not found store in pc'
       })
     } else {
-      const { Store,RunningNumber } = getModelsByChannel(channel, res, storeModel);
+      const { Store, RunningNumber } = getModelsByChannel(
+        channel,
+        res,
+        storeModel
+      )
       const zone = area.substring(0, 2)
       const maxRunningAll = await RunningNumber.findOne({ zone: zone }).select(
         'last'
@@ -3886,58 +3874,48 @@ exports.moveStoreToCash = async (req, res) => {
         { new: true }
       )
 
-      
-
       storeNew = {
-
         storeId: newId,
         name: storeData.name,
-        isMove : "true",
-        storeIdOld : storeData.storeId,
+        isMove: 'true',
+        storeIdOld: storeData.storeId,
         areaOld: storeData.area,
-        taxId : storeData.taxId,
-        tel : storeData.tel,
-        route : storeData.route,
-        type : storeData.type,
-        typeName : storeData.typeName,
-        address : storeData.address,
-        subDistrict : storeData.subDistrict,
-        district : storeData.district,
-        province : storeData.province,
-        provinceCode : storeData.provinceCode,
-        postCode : storeData.postCode,
-        zone : zone,
-        area : area,
-        latitude : storeData.latitude,
-        longtitude : storeData.longtitude,
-        lineId : storeData.lineId,
-        note : storeData.note,
-        status : storeData.status,
-        approve : storeData.approve,
-        policyConsent : storeData.policyConsent,
-        imageList : storeData.imageList,
-        shippingAddress : storeData.shippingAddress,
-        checkIn : storeData.checkIn,
-        createdAt : storeData.createdAt,
-        updatedAt : storeData.updatedAt,
-        date : storeData.date
-
+        taxId: storeData.taxId,
+        tel: storeData.tel,
+        route: storeData.route,
+        type: storeData.type,
+        typeName: storeData.typeName,
+        address: storeData.address,
+        subDistrict: storeData.subDistrict,
+        district: storeData.district,
+        province: storeData.province,
+        provinceCode: storeData.provinceCode,
+        postCode: storeData.postCode,
+        zone: zone,
+        area: area,
+        latitude: storeData.latitude,
+        longtitude: storeData.longtitude,
+        lineId: storeData.lineId,
+        note: storeData.note,
+        status: storeData.status,
+        approve: storeData.approve,
+        policyConsent: storeData.policyConsent,
+        imageList: storeData.imageList,
+        shippingAddress: storeData.shippingAddress,
+        checkIn: storeData.checkIn,
+        createdAt: storeData.createdAt,
+        updatedAt: storeData.updatedAt,
+        date: storeData.date
       }
 
       Store.create(storeNew)
-
     }
-
-
-
 
     res.status(200).json({
       status: 200,
       message: 'moveStoreToCash Success',
       data: storeNew
     })
-
-
   } catch (error) {
     console.error('❌ Error:', error)
 
