@@ -1003,7 +1003,6 @@ exports.getArea = async (req, res) => {
     const { User } = getModelsByChannel(channel, res, userModel);
     let match = { role, platformType };
 
-    if (zone) match.zone = zone;
 
     if (!zone) {
       let getZone = []
@@ -1029,7 +1028,7 @@ exports.getArea = async (req, res) => {
             }
           },
           { $project: { _id: 0, zone: 1 } },
-          { $sort: { zone: 1 } }
+          { $sort: { zone: 1 } } // <-- เพิ่มอันนี้
         ])
       }
 
@@ -1039,9 +1038,6 @@ exports.getArea = async (req, res) => {
         data: getZone
       })
     }
-
-
-
 
     if (team) {
       // team = area[0] + area[1] + area[3]
@@ -1057,6 +1053,13 @@ exports.getArea = async (req, res) => {
         ]
       };
     }
+
+    if (zone) match.zone = zone;
+    if (platformType === 'ADMIN') {
+      match.platformType = { $in: ['CASH', 'PC'] }
+    }
+
+    // console.log(match)
 
     const userData = await User.aggregate([
       { $match: match },

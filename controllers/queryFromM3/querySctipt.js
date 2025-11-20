@@ -1225,42 +1225,63 @@ exports.dataWithdrawInsert = async function (channel, data) {
 
   for (const item of data) {
     const request = pool.request()
+
+    // ใส่ parameter ทั้งหมด
     for (let [key, value] of Object.entries(item)) {
       request.input(key, value)
     }
 
-    // 👇 สมมติว่าคีย์หลักคือ withdrawNo + lineNo
-    // ปรับชื่อ field ให้ตรงกับ schema จริง
+    const columns = Object.keys(item).join(',')
+    const values = Object.keys(item)
+      .map(k => '@' + k)
+      .join(',')
+
+    // ปรับชื่อ PK ให้ตรง schema จริงของ withdrawCash
     const query = `
-      IF NOT EXISTS (
-        SELECT 1
-        FROM [dbo].[withdrawCash] WITH (UPDLOCK, HOLDLOCK)
-        WHERE WD_NO = @WD_NO AND ITEM_CODE = @ITEM_CODE
-      )
-      BEGIN
-        INSERT INTO [dbo].[withdrawCash] (
-          ${Object.keys(item).join(',')}
-        ) VALUES (
-          ${Object.keys(item)
-            .map(k => '@' + k)
-            .join(',')}
+      BEGIN TRY
+        IF NOT EXISTS (
+          SELECT 1
+          FROM [dbo].[withdrawCash] WITH (UPDLOCK, HOLDLOCK)
+          WHERE WD_NO = @WD_NO AND ITEM_CODE = @ITEM_CODE
         )
-      END
+        BEGIN
+          INSERT INTO [dbo].[withdrawCash] (${columns})
+          VALUES (${values})
+        END
+      END TRY
+      BEGIN CATCH
+        -- ตรวจว่าเป็น Duplicate Key Error
+        IF ERROR_NUMBER() IN (2627,2601)
+        BEGIN
+          -- duplicate → ไม่ throw ออกไป
+          PRINT 'Duplicate skip';
+        END
+        ELSE
+        BEGIN
+          -- error อื่นให้โยนขึ้นไปข้างนอก
+          THROW;
+        END
+      END CATCH
     `
 
     try {
       await request.query(query)
     } catch (err) {
-      if (err.message.includes('PRIMARY KEY constraint')) {
+      // ถ้าเป็น duplicate
+      if (err.message.includes('2627') || err.message.includes('PRIMARY KEY')) {
         console.warn(
-          `⚠️ Skip duplicate withdrawNo=${item.withdrawNo}, lineNo=${item.lineNo}`
+          `⚠️ Skip duplicate WD_NO=${item.WD_NO}, ITEM_CODE=${item.ITEM_CODE}`
         )
-      } else {
-        throw err
+        continue
       }
+
+      // error อื่นต้อง log แต่ไม่ throw (เพื่อให้ลูปทำต่อได้)
+      console.error(`❌ SQL Error for WD_NO=${item.WD_NO}`, err.message)
+      continue
     }
   }
 }
+
 
 exports.dataPowerBiQueryDelete = async function (channel, cono) {
   if (!cono || cono.length === 0) {
