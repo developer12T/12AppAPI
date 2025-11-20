@@ -1005,6 +1005,36 @@ exports.getArea = async (req, res) => {
 
     if (zone) match.zone = zone;
 
+    if (!zone) {
+      const getZone = await User.aggregate([
+        { $match: match },
+
+        {
+          $group: {
+            _id: "$zone",
+            zone: { $first: "$zone" }
+          }
+        },
+        { $project: { _id: 0, zone: 1 } }
+      ])
+
+
+
+
+
+      return res.status(200).json({
+        status: 200,
+        message: 'Get zone success',
+        data: getZone
+      })
+
+
+
+    }
+
+
+
+
     if (team) {
       // team = area[0] + area[1] + area[3]
       match.$expr = {
@@ -1056,7 +1086,7 @@ exports.getArea = async (req, res) => {
   }
 }
 
-exports.getZone = async (req ,res) => {
+exports.getZone = async (req, res) => {
   try {
     const { role } = req.body
     const channel = 'user'
@@ -1064,19 +1094,19 @@ exports.getZone = async (req ,res) => {
     let match = { role };
 
     const userData = await User.aggregate([
-  { $match: match },
-  {
-    $group: {
-      _id: "$zone"
-    }
-  },
-  {
-    $project: {
-      _id: 0,
-      zone: "$_id"
-    }
-  }
-]);
+      { $match: match },
+      {
+        $group: {
+          _id: "$zone"
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          zone: "$_id"
+        }
+      }
+    ]);
 
 
 
@@ -1085,7 +1115,7 @@ exports.getZone = async (req ,res) => {
       message: 'sucess',
       data: userData
     })
-    
+
 
   } catch (error) {
     console.error('❌ Error:', error)
