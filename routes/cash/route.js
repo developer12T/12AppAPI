@@ -9,6 +9,7 @@ const {
   getRouteCheckinAll,
   getTimelineCheckin,
   checkInVisit,
+  checkInVisitNew,
   routeTimeline,
   updateAndAddRoute,
   getRouteProvince,
@@ -37,6 +38,7 @@ router.get('/getRadius', getRadius)
 router.post('/checkIn', checkIn)
 router.post('/addRadius', addRadius)
 router.post('/checkInVisit', checkInVisit)
+router.post('/checkInVisitNew', checkInVisitNew)
 router.post('/addFromERP', addFromERP)
 router.post('/change', changeRoute)
 router.get('/history', routeHistory)
