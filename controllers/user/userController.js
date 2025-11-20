@@ -914,12 +914,12 @@ exports.checkUserLogin = async (req, res) => {
 
 exports.getTeam = async (req, res) => {
   try {
-    const { zone,platformType } = req.query
+    const { zone, platformType } = req.query
     const channel = req.headers['x-channel'];
     const { User } = getModelsByChannel('user', res, userModel);
 
     const dataUser = await User.aggregate([
-      { $match: { zone: zone,platformType:platformType } },
+      { $match: { zone: zone, platformType: platformType } },
       {
         $group: {
           _id: {
@@ -1006,30 +1006,38 @@ exports.getArea = async (req, res) => {
     if (zone) match.zone = zone;
 
     if (!zone) {
-      const getZone = await User.aggregate([
-        { $match: match },
-
-        {
-          $group: {
-            _id: "$zone",
-            zone: { $first: "$zone" }
-          }
-        },
-        { $project: { _id: 0, zone: 1 } }
-      ])
-
-
-
-
+      let getZone = []
+      if (platformType === 'ADMIN') {
+        getZone = await User.aggregate([
+          { $match: { role: role } },
+          {
+            $group: {
+              _id: "$zone",
+              zone: { $first: "$zone" }
+            }
+          },
+          { $project: { _id: 0, zone: 1 } },
+          { $sort: { zone: 1 } } // <-- เพิ่มอันนี้
+        ])
+      } else {
+        getZone = await User.aggregate([
+          { $match: match },
+          {
+            $group: {
+              _id: "$zone",
+              zone: { $first: "$zone" }
+            }
+          },
+          { $project: { _id: 0, zone: 1 } },
+          { $sort: { zone: 1 } }
+        ])
+      }
 
       return res.status(200).json({
         status: 200,
         message: 'Get zone success',
         data: getZone
       })
-
-
-
     }
 
 
