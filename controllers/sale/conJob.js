@@ -1305,7 +1305,7 @@ async function updateOrderDistribution (channel = 'cash') {
     await dataWithdrawInsert(channel, allTransactions)
     fs.appendFileSync(
       logFile,
-      `[${nowLog}] ✅ Job completed updatePowerBiSucess\n`
+      `[${nowLog}] ✅ Job completed dataWithdrawInsert\n`
     )
   } catch (error) {
     console.error(error)

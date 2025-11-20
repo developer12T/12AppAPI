@@ -914,12 +914,12 @@ exports.checkUserLogin = async (req, res) => {
 
 exports.getTeam = async (req, res) => {
   try {
-    const { zone } = req.query
+    const { zone,platformType } = req.query
     const channel = req.headers['x-channel'];
-    const { User } = getModelsByChannel(channel, res, userModel);
+    const { User } = getModelsByChannel('user', res, userModel);
 
     const dataUser = await User.aggregate([
-      { $match: { zone: zone } },
+      { $match: { zone: zone,platformType:platformType } },
       {
         $group: {
           _id: {
