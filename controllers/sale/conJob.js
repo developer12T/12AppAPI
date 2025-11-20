@@ -9,6 +9,11 @@ const {
 } = require('../../middleware/order')
 
 const {
+  dataUpdateSendMoney,
+  dataUpdateTotalSale
+} = require('../../controllers/queryFromM3/querySctipt')
+
+const {
   Warehouse,
   Locate,
   Balance,
