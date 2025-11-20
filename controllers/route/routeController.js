@@ -715,6 +715,136 @@ exports.checkIn = async (req, res) => {
   })
 }
 
+exports.checkInNew = async (req, res) => {
+  upload(req, res, async err => {
+    if (err) {
+      return res.status(400).json({ status: '400', message: err.message })
+    }
+    try {
+      const { routeId, storeId, note, latitude, longtitude } = req.body
+      const channel = req.headers['x-channel']
+
+      const { Store } = getModelsByChannel(channel, res, storeModel)
+
+      const { Route } = getModelsByChannel(channel, res, routeModel)
+      if (!routeId || !storeId) {
+        return res.status(400).json({
+          status: '400',
+          message: 'routeId and storeId are required'
+        })
+      }
+
+      const store = await Store.findOne({ storeId })
+      if (!store) {
+        return res
+          .status(404)
+          .json({ status: '404', message: 'Store not found' })
+      }
+
+      const period = routeId.substring(0, 6)
+      const startOfDay = new Date()
+      startOfDay.setHours(0, 0, 0, 0)
+
+      const endOfDay = new Date()
+      endOfDay.setHours(23, 59, 59, 999)
+
+      let allRoute = await Route.aggregate([
+        {
+          $match: {
+            period: period
+          }
+        },
+        { $unwind: '$listStore' },
+        {
+          $project: {
+            listStore: 1
+          }
+        },
+        {
+          $replaceRoot: { newRoot: '$listStore' }
+        },
+        {
+          $match: {
+            status: { $nin: ['0'] },
+            storeInfo: store._id.toString(),
+            date: { $gte: startOfDay, $lte: endOfDay }
+          }
+        }
+      ])
+      // console.log(allRoute.length)
+
+      if (allRoute.length > 0) {
+        return res.status(409).json({
+          status: 409,
+          message: 'Duplicate Store on this day'
+        })
+      }
+
+      let image = null
+      if (req.files) {
+        try {
+          const files = req.files
+          const uploadedFile = await uploadFilesCheckin(
+            files,
+            path.join(__dirname, '../../public/images/stores/checkin'),
+            store.area,
+            storeId
+          )
+
+          if (uploadedFile.length > 0) {
+            image = uploadedFile[0].path
+          }
+        } catch (fileError) {
+          return res.status(500).json({
+            status: '500',
+            message: `File upload error: ${fileError.message}`
+          })
+        }
+      }
+
+      const routeUpdate = await Route.findOneAndUpdate(
+        { id: routeId, 'listStore.storeInfo': store._id },
+        {
+          $set: {
+            'listStore.$.note': note,
+            'listStore.$.image': image,
+            'listStore.$.latitude': latitude,
+            'listStore.$.longtitude': longtitude,
+            'listStore.$.status': '2',
+            'listStore.$.statusText': 'ไม่ซื้อ',
+            'listStore.$.date': new Date()
+          }
+        },
+        { new: true }
+      )
+
+      if (!routeUpdate) {
+        return res.status(404).json({
+          status: '404',
+          message: 'Route not found or listStore not matched'
+        })
+      }
+
+      const io = getSocket()
+      io.emit('route/checkIn', {
+        status: '200',
+        message: 'check in successfully'
+      })
+
+      res.status(200).json({
+        status: '200',
+        message: 'check in successfully'
+      })
+    } catch (error) {
+      console.error('Error saving data to MongoDB:', error)
+      res.status(500).json({ status: '500', message: 'Server Error' })
+    }
+  })
+}
+
+
+
+
 exports.checkInVisit = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)

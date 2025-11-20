@@ -3,6 +3,7 @@ const {
   getRoute,
   addFromERP,
   checkIn,
+  checkInNew,
   changeRoute,
   routeHistory,
   createRoute,
@@ -36,6 +37,7 @@ const router = express.Router()
 router.get('/getRoute', getRoute)
 router.get('/getRadius', getRadius)
 router.post('/checkIn', checkIn)
+router.post('/checkInNew', checkInNew)
 router.post('/addRadius', addRadius)
 router.post('/checkInVisit', checkInVisit)
 router.post('/checkInVisitNew', checkInVisitNew)
