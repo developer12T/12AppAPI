@@ -578,38 +578,67 @@ exports.getSendMoneyForAcc = async (req, res) => {
       VALUES: Number(item.VALUES).toFixed(2)
     }))
 
-
-    const areaList = [...new Set(formatted.flatMap(item => item.AREA))];
-    const dataOrder = await getOrders(areaList, res, channel, 'area', start, end)
-    const dataChange = await getChange(areaList, res, channel, 'area', start, end)
-    const dataRefund = await getRefund(areaList, res, channel, 'area', start, end)
+    const areaList = [...new Set(formatted.flatMap(item => item.AREA))]
+    const dataOrder = await getOrders(
+      areaList,
+      res,
+      channel,
+      'area',
+      start,
+      end
+    )
+    const dataChange = await getChange(
+      areaList,
+      res,
+      channel,
+      'area',
+      start,
+      end
+    )
+    const dataRefund = await getRefund(
+      areaList,
+      res,
+      channel,
+      'area',
+      start,
+      end
+    )
 
     let dataFinal = []
 
     // console.log(formatted)
 
     for (const row of formatted) {
-      const dataOrderArea = dataOrder.filter(item => item.store.area === row.AREA);
-      const dataChangeArea = dataChange.filter(item => item.store.area === row.AREA);
-      const dataRefundArea = dataRefund.filter(item => item.store.area === row.AREA);
+      const dataOrderArea = dataOrder.filter(
+        item => item.store.area === row.AREA
+      )
+      const dataChangeArea = dataChange.filter(
+        item => item.store.area === row.AREA
+      )
+      const dataRefundArea = dataRefund.filter(
+        item => item.store.area === row.AREA
+      )
 
-      const totalOrder = dataOrderArea.reduce((sum, i) => sum + (i.total || 0), 0);
-      const totalChange = dataChangeArea.reduce((sum, i) => sum + (i.total || 0), 0);
-      const totalRefund = dataRefundArea.reduce((sum, i) => sum + (i.total || 0), 0);
+      const totalOrder = dataOrderArea.reduce(
+        (sum, i) => sum + (i.total || 0),
+        0
+      )
+      const totalChange = dataChangeArea.reduce(
+        (sum, i) => sum + (i.total || 0),
+        0
+      )
+      const totalRefund = dataRefundArea.reduce(
+        (sum, i) => sum + (i.total || 0),
+        0
+      )
 
-
-      
-      const VALUES = to2(totalOrder + (totalChange - totalRefund));
+      const VALUES = to2(totalOrder + (totalChange - totalRefund))
 
       dataFinal.push({
         ...row,
-        VALUES:VALUES
+        VALUES: VALUES
       })
-
     }
-
-
-
 
     res.status(200).json(dataFinal)
   } catch (err) {
@@ -1284,6 +1313,120 @@ exports.updateSendmoneyOld = async (req, res) => {
   }
 }
 
+// exports.sendmoneyToExcel = async (req, res) => {
+//   try {
+//     const { excel, period, start, end } = req.query
+//     const channel = 'cash'
+
+//     const { User } = getModelsByChannel(channel, res, userModel)
+//     const { Order } = getModelsByChannel(channel, res, orderModel)
+//     const { Refund } = getModelsByChannel(channel, res, refundModel)
+//     const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+
+//     const userData = await User.find({ role: 'sale' }).select('area')
+
+//     let startDate, endDate
+
+//     if (start && end) {
+//       startDate = new Date(`${start.slice(0, 4)}-${start.slice(4, 6)}-${start.slice(6, 8)}T00:00:00+07:00`)
+//       endDate = new Date(`${end.slice(0, 4)}-${end.slice(4, 6)}-${end.slice(6, 8)}T23:59:59.999+07:00`)
+//     } else if (period) {
+//       const range = rangeDate(period)
+//       startDate = range.startDate
+//       endDate = range.endDate
+//     } else {
+//       return res.status(400).json({ status: 400, message: 'period or start/end required!' })
+//     }
+
+//     const matchMain = { createdAt: { $gte: startDate, $lt: endDate } }
+//     const matchSend = { dateAt: { $gte: startDate, $lt: endDate } }
+
+//     let dataFinal = []
+//     let dataFinalExcel = []
+
+//     for (const item of userData) {
+
+//       const p1 = Order.aggregate([
+//         { $match: { type: 'sale', 'store.area': item.area, status: { $nin: ['canceled', 'delete'] } } },
+//         { $match: matchMain },
+//         { $group: { _id: null, total: { $sum: '$total' } } }
+//       ])
+
+//       const p2 = Order.aggregate([
+//         { $match: { type: 'change', 'store.area': item.area, status: { $nin: ['pending', 'canceled', 'delete'] } } },
+//         { $match: matchMain },
+//         { $group: { _id: null, total: { $sum: '$total' } } }
+//       ])
+
+//       const p3 = Refund.aggregate([
+//         { $match: { type: 'refund', 'store.area': item.area, status: { $nin: ['pending', 'canceled', 'delete'] } } },
+//         { $match: matchMain },
+//         { $group: { _id: null, total: { $sum: '$total' } } }
+//       ])
+
+//       const p4 = SendMoney.aggregate([
+//         { $match: { area: item.area } },
+//         { $match: matchSend },
+//         { $unwind: { path: '$imageList', preserveNullAndEmptyArrays: true } },
+//         {
+//           $group: {
+//             _id: null,
+//             totalSent: { $sum: '$sendmoney' },
+//             images: { $push: '$imageList.path' }
+//           }
+//         }
+//       ])
+
+//       const [saleRes, changeRes, refundRes, sendRes] = await Promise.all([p1, p2, p3, p4])
+
+//       const saleSum = saleRes[0]?.total ?? 0
+//       const changeSum = changeRes[0]?.total ?? 0
+//       const refundSum = refundRes[0]?.total ?? 0
+//       const totalSent = sendRes[0]?.totalSent ?? 0
+//       const images = sendRes[0]?.images ?? []
+
+//       const totalSale = saleSum + (changeSum - refundSum)
+
+//       dataFinal.push({
+//         area: item.area,
+//         sale: to2(saleSum),
+//         refund: to2(changeSum - refundSum),
+//         totalSale: to2(totalSale),
+//         sendmoney: to2(totalSent),
+//         diff: to2(totalSent - totalSale),
+//         image: images
+//       })
+
+//       dataFinalExcel.push({
+//         เขตการขาย: item.area,
+//         ยอดขาย: to2(saleSum),
+//         ผลต่างใบเปลี่ยน: to2(changeSum - refundSum),
+//         รวมยอดขาย: to2(totalSale),
+//         ยอดชำระเงิน: to2(totalSent),
+//         'ยอดส่งเงิน ขาด - เกิน': to2(totalSent - totalSale)
+//       })
+//     }
+
+//     if (excel === 'true') {
+//       const wb = xlsx.utils.book_new()
+//       const ws = xlsx.utils.json_to_sheet(dataFinalExcel)
+//       xlsx.utils.book_append_sheet(wb, ws, `sendMoney`)
+//       const tempPath = path.join(os.tmpdir(), `sendMoney.xlsx`)
+//       xlsx.writeFile(wb, tempPath)
+
+//       return res.download(tempPath, `sendMoney.xlsx`, err => {
+//         if (!err) fs.unlink(tempPath, () => { })
+//       })
+//     }
+
+//     return res.status(200).json({ status: 200, message: 'Success', data: dataFinal })
+
+//   } catch (error) {
+//     console.error(error)
+//     return res.status(500).json({ status: 500, message: 'error from server', error: error.message })
+//   }
+// }
+
 exports.sendmoneyToExcel = async (req, res) => {
   try {
     const { excel, period, start, end } = req.query
@@ -1294,107 +1437,160 @@ exports.sendmoneyToExcel = async (req, res) => {
     const { Refund } = getModelsByChannel(channel, res, refundModel)
     const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
 
-    const userData = await User.find({ role: 'sale' }).select('area')
-
+    // ==============================
+    // 1) Validate Date Range
+    // ==============================
     let startDate, endDate
 
     if (start && end) {
-      startDate = new Date(`${start.slice(0, 4)}-${start.slice(4, 6)}-${start.slice(6, 8)}T00:00:00+07:00`)
-      endDate = new Date(`${end.slice(0, 4)}-${end.slice(4, 6)}-${end.slice(6, 8)}T23:59:59.999+07:00`)
+      startDate = new Date(
+        `${start.slice(0, 4)}-${start.slice(4, 6)}-${start.slice(
+          6,
+          8
+        )}T00:00:00+07:00`
+      )
+      endDate = new Date(
+        `${end.slice(0, 4)}-${end.slice(4, 6)}-${end.slice(
+          6,
+          8
+        )}T23:59:59.999+07:00`
+      )
     } else if (period) {
       const range = rangeDate(period)
       startDate = range.startDate
       endDate = range.endDate
     } else {
-      return res.status(400).json({ status: 400, message: 'period or start/end required!' })
+      return res
+        .status(400)
+        .json({ status: 400, message: 'period or start/end required!' })
     }
 
     const matchMain = { createdAt: { $gte: startDate, $lt: endDate } }
     const matchSend = { dateAt: { $gte: startDate, $lt: endDate } }
 
-    let dataFinal = []
-    let dataFinalExcel = []
+    // ==============================
+    // 2) Query User Once
+    // ==============================
+    const areas = await User.find({ role: 'sale' }).distinct('area')
 
-    for (const item of userData) {
+    // ==============================
+    // 3) Aggregate All Areas at Once
+    // ==============================
 
-      const p1 = Order.aggregate([
-        { $match: { type: 'sale', 'store.area': item.area, status: { $nin: ['canceled', 'delete'] } } },
-        { $match: matchMain },
-        { $group: { _id: null, total: { $sum: '$total' } } }
-      ])
-
-      const p2 = Order.aggregate([
-        { $match: { type: 'change', 'store.area': item.area, status: { $nin: ['pending', 'canceled', 'delete'] } } },
-        { $match: matchMain },
-        { $group: { _id: null, total: { $sum: '$total' } } }
-      ])
-
-      const p3 = Refund.aggregate([
-        { $match: { type: 'refund', 'store.area': item.area, status: { $nin: ['pending', 'canceled', 'delete'] } } },
-        { $match: matchMain },
-        { $group: { _id: null, total: { $sum: '$total' } } }
-      ])
-
-      const p4 = SendMoney.aggregate([
-        { $match: { area: item.area } },
-        { $match: matchSend },
-        { $unwind: { path: '$imageList', preserveNullAndEmptyArrays: true } },
-        {
-          $group: {
-            _id: null,
-            totalSent: { $sum: '$sendmoney' },
-            images: { $push: '$imageList.path' }
-          }
+    // SALE
+    const saleAgg = await Order.aggregate([
+      {
+        $match: {
+          type: 'sale',
+          'store.area': { $in: areas },
+          status: { $nin: ['canceled', 'delete'] }
         }
-      ])
+      },
+      { $match: matchMain },
+      { $group: { _id: '$store.area', total: { $sum: '$total' } } }
+    ])
+    const saleMap = Object.fromEntries(saleAgg.map(e => [e._id, e.total]))
 
-      const [saleRes, changeRes, refundRes, sendRes] = await Promise.all([p1, p2, p3, p4])
+    // CHANGE
+    const changeAgg = await Order.aggregate([
+      {
+        $match: {
+          type: 'change',
+          'store.area': { $in: areas },
+          status: { $nin: ['pending', 'canceled', 'delete'] }
+        }
+      },
+      { $match: matchMain },
+      { $group: { _id: '$store.area', total: { $sum: '$total' } } }
+    ])
+    const changeMap = Object.fromEntries(changeAgg.map(e => [e._id, e.total]))
 
-      const saleSum = saleRes[0]?.total ?? 0
-      const changeSum = changeRes[0]?.total ?? 0
-      const refundSum = refundRes[0]?.total ?? 0
-      const totalSent = sendRes[0]?.totalSent ?? 0
-      const images = sendRes[0]?.images ?? []
+    // REFUND
+    const refundAgg = await Refund.aggregate([
+      {
+        $match: {
+          type: 'refund',
+          'store.area': { $in: areas },
+          status: { $nin: ['pending', 'canceled', 'delete'] }
+        }
+      },
+      { $match: matchMain },
+      { $group: { _id: '$store.area', total: { $sum: '$total' } } }
+    ])
+    const refundMap = Object.fromEntries(refundAgg.map(e => [e._id, e.total]))
 
-      const totalSale = saleSum + (changeSum - refundSum)
+    // SENDMONEY
+    const sendAgg = await SendMoney.aggregate([
+      { $match: { area: { $in: areas } } },
+      { $match: matchSend },
+      { $unwind: { path: '$imageList', preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: '$area',
+          totalSent: { $sum: '$sendmoney' },
+          images: { $push: '$imageList.path' }
+        }
+      }
+    ])
+    const sendMap = Object.fromEntries(sendAgg.map(e => [e._id, e]))
+
+    // ==============================
+    // 4) Combine Results
+    // ==============================
+    const dataFinal = []
+    const dataFinalExcel = []
+
+    for (const area of areas) {
+      const sale = saleMap[area] ?? 0
+      const change = changeMap[area] ?? 0
+      const refund = refundMap[area] ?? 0
+
+      const totalSale = sale + (change - refund)
+
+      const sent = sendMap[area]?.totalSent ?? 0
+      const images = sendMap[area]?.images ?? []
 
       dataFinal.push({
-        area: item.area,
-        sale: to2(saleSum),
-        refund: to2(changeSum - refundSum),
+        area,
+        sale: to2(sale),
+        refund: to2(change - refund),
         totalSale: to2(totalSale),
-        sendmoney: to2(totalSent),
-        diff: to2(totalSent - totalSale),
+        sendmoney: to2(sent),
+        diff: to2(sent - totalSale),
         image: images
       })
 
       dataFinalExcel.push({
-        เขตการขาย: item.area,
-        ยอดขาย: to2(saleSum),
-        ผลต่างใบเปลี่ยน: to2(changeSum - refundSum),
+        เขตการขาย: area,
+        ยอดขาย: to2(sale),
+        ผลต่างใบเปลี่ยน: to2(change - refund),
         รวมยอดขาย: to2(totalSale),
-        ยอดชำระเงิน: to2(totalSent),
-        'ยอดส่งเงิน ขาด - เกิน': to2(totalSent - totalSale)
+        ยอดชำระเงิน: to2(sent),
+        'ยอดส่งเงิน ขาด - เกิน': to2(sent - totalSale)
       })
     }
 
+    // ==============================
+    // 5) Generate Excel
+    // ==============================
     if (excel === 'true') {
       const wb = xlsx.utils.book_new()
       const ws = xlsx.utils.json_to_sheet(dataFinalExcel)
       xlsx.utils.book_append_sheet(wb, ws, `sendMoney`)
+
       const tempPath = path.join(os.tmpdir(), `sendMoney.xlsx`)
       xlsx.writeFile(wb, tempPath)
 
       return res.download(tempPath, `sendMoney.xlsx`, err => {
-        if (!err) fs.unlink(tempPath, () => { })
+        if (!err) fs.unlink(tempPath, () => {})
       })
     }
 
-    return res.status(200).json({ status: 200, message: 'Success', data: dataFinal })
-
+    return res
+      .status(200)
+      .json({ status: 200, message: 'Success', data: dataFinal })
   } catch (error) {
     console.error(error)
-    return res.status(500).json({ status: 500, message: 'error from server', error: error.message })
+    return res.status(500).json({ status: 500, message: error.message })
   }
 }
-

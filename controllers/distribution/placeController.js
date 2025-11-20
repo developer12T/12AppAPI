@@ -178,7 +178,7 @@ exports.addAllPlace = async (req, res) => {
     const users = await User.find({ role: 'sale' })
     // .session(session)
 
-    areaList = users.map(user => user.area)
+    const areaList = users.map(user => user.area)
 
     let data = []
 
