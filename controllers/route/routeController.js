@@ -715,7 +715,7 @@ exports.checkIn = async (req, res) => {
   })
 }
 
-exports.checkInNew = async (req, res) => {
+exports.checkInNotSale = async (req, res) => {
   upload(req, res, async err => {
     if (err) {
       return res.status(400).json({ status: '400', message: err.message })
