@@ -1784,6 +1784,10 @@ exports.getRouteEffective = async (req, res) => {
       return acc
     }, {})
 
+    console.log(groupedByArea)
+
+
+
     const totalSum = Object.keys(groupedByArea).reduce((acc, areaKey) => {
       const routesInArea = groupedByArea[areaKey]
 
@@ -1859,9 +1863,9 @@ exports.getRouteEffective = async (req, res) => {
     if (excel === 'true') {
 
       if (area) {
-        mergeData = [...filteredRoutes, ...totalByArea]
+        mergeData = [...data, totalSum]
       } else {
-        mergeData = [...totalByArea]
+        mergeData = [totalSum]
       }
       const xlsxData = mergeData.map(r => ({
         Area: r.area || area,
@@ -1876,7 +1880,7 @@ exports.getRouteEffective = async (req, res) => {
         เปอร์เซ็นต์การเข้าเยี่ยม: r.percentVisit,
         เปอร์เซ็นต์การขายได้: r.percentEffective,
       }))
-      console.log(xlsxData)
+      // console.log(xlsxData)
       const wb = xlsx.utils.book_new()
       const ws = xlsx.utils.json_to_sheet(xlsxData)
       xlsx.utils.book_append_sheet(wb, ws, `getRouteEffective_${period}`)
@@ -1890,7 +1894,19 @@ exports.getRouteEffective = async (req, res) => {
       res.json({
         status: 200,
         data: data,
-        total: totalSum,
+        total: {
+         route  : totalSum.route,
+         storeAll : totalSum.storeAll,
+         storePending : totalSum.storePending,
+         storeSell : totalSum.storeSell,
+         storeNotSell : totalSum.storeNotSell,
+         storeCheckInNotSell : totalSum.storeCheckInNotSell,
+         storeTotal : totalSum.storeTotal,
+         summary : totalSum.summary,
+         totalqty : totalSum.totalqty,
+         percentVisit : to2(totalSum.percentVisit),
+         percentEffective : to2(totalSum.percentEffective),
+        },
         // zoneRoute
 
       })
