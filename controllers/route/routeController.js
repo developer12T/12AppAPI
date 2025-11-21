@@ -2163,7 +2163,7 @@ exports.getRouteEffective = async (req, res) => {
          storeNotSell : totalSum.storeNotSell,
          storeCheckInNotSell : totalSum.storeCheckInNotSell,
          storeTotal : totalSum.storeTotal,
-         summary : totalSum.summary,
+         summary : to2(totalSum.summary),
          totalqty : totalSum.totalqty,
          percentVisit : to2(totalSum.percentVisit),
          percentEffective : to2(totalSum.percentEffective),
