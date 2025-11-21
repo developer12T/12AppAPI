@@ -2044,9 +2044,7 @@ exports.getRouteEffective = async (req, res) => {
       return acc
     }, {})
 
-    console.log(groupedByArea)
-
-
+  // console.log(groupedByArea)
 
     const totalSum = Object.keys(groupedByArea).reduce((acc, areaKey) => {
       const routesInArea = groupedByArea[areaKey]
@@ -2079,7 +2077,6 @@ exports.getRouteEffective = async (req, res) => {
         }
       )
 
-      // console.log(areaTotal.percentVisit)
       // บวกเข้า acc (sum รวมทุก area)
       acc.storeAll += areaTotal.storeAll
       acc.storePending += areaTotal.storePending
@@ -2089,8 +2086,8 @@ exports.getRouteEffective = async (req, res) => {
       acc.storeTotal += areaTotal.storeTotal
       acc.summary += areaTotal.summary
       acc.totalqty += areaTotal.totalqty
-      // acc.percentVisit += areaTotal.percentVisit
-      // acc.percentEffective += areaTotal.percentEffective
+      acc.percentVisit += areaTotal.percentVisit
+      acc.percentEffective += areaTotal.percentEffective
 
       return acc
     }, {
@@ -2110,11 +2107,15 @@ exports.getRouteEffective = async (req, res) => {
     // เฉลี่ย % ถ้าต้องการ
     
 
-    // console.log(totalSum.percentVisit)
+    
 
-    const len = Object.keys(groupedByArea).length || 1
-    totalSum.percentVisit = totalSum.storeTotal / totalSum.storeAll * 100
-    totalSum.percentEffective = totalSum.storeSell / totalSum.storeAll * 100
+    // const len = Object.keys(groupedByArea).length 
+    // console.log("len",len)
+    // console.log('totalSum.percentVisit',(totalSum.percentVisit / 24))
+    
+
+    totalSum.percentVisit = totalSum.percentVisit / 24
+    totalSum.percentEffective = totalSum.percentEffective / 24
 
 
 
