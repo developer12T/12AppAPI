@@ -4,6 +4,7 @@ const {
   getDetail,
   updateStatus,
   checkout,
+  checkOutSale,
   addSlip,
   OrderToExcel,
   getAllOrder,
@@ -51,6 +52,7 @@ router.get('/all', getOrder)
 router.get('/detail/:orderId', getDetail)
 router.post('/updateStatus', updateStatus)
 router.post('/checkout', checkout)
+router.post('/checkOutSale', checkOutSale)
 router.post('/addSlip', addSlip)
 router.get('/reflashOrder', reflashOrder)
 router.get('/updateOrderDistribution', updateOrderDistribution)

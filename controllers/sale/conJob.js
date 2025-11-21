@@ -975,7 +975,7 @@ async function updateSendmoney (channel = 'cash') {
     fs.appendFileSync(logFile, `[${nowLog}] ✅ Job completed updateSendmoney\n`)
   } catch (error) {
     console.error('updateSendmoney ❌', error)
-    fs.appendFileSync(logFile, `[${nowLog}] ❌ Job failed: ${err.message}\n`)
+    fs.appendFileSync(logFile, `[${nowLog}] ❌ Job failed: ${error.message}\n`)
     // res.status(500).json({
     //   status: 500,
     //   message: error.message || 'Internal server error'

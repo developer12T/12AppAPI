@@ -715,6 +715,136 @@ exports.checkIn = async (req, res) => {
   })
 }
 
+exports.checkInNotSale = async (req, res) => {
+  upload(req, res, async err => {
+    if (err) {
+      return res.status(400).json({ status: '400', message: err.message })
+    }
+    try {
+      const { routeId, storeId, note, latitude, longtitude } = req.body
+      const channel = req.headers['x-channel']
+
+      const { Store } = getModelsByChannel(channel, res, storeModel)
+
+      const { Route } = getModelsByChannel(channel, res, routeModel)
+      if (!routeId || !storeId) {
+        return res.status(400).json({
+          status: '400',
+          message: 'routeId and storeId are required'
+        })
+      }
+
+      const store = await Store.findOne({ storeId })
+      if (!store) {
+        return res
+          .status(404)
+          .json({ status: '404', message: 'Store not found' })
+      }
+
+      const period = routeId.substring(0, 6)
+      const startOfDay = new Date()
+      startOfDay.setHours(0, 0, 0, 0)
+
+      const endOfDay = new Date()
+      endOfDay.setHours(23, 59, 59, 999)
+
+      let allRoute = await Route.aggregate([
+        {
+          $match: {
+            period: period
+          }
+        },
+        { $unwind: '$listStore' },
+        {
+          $project: {
+            listStore: 1
+          }
+        },
+        {
+          $replaceRoot: { newRoot: '$listStore' }
+        },
+        {
+          $match: {
+            status: { $nin: ['0'] },
+            storeInfo: store._id.toString(),
+            date: { $gte: startOfDay, $lte: endOfDay }
+          }
+        }
+      ])
+      // console.log(allRoute.length)
+
+      if (allRoute.length > 0) {
+        return res.status(409).json({
+          status: 409,
+          message: 'Duplicate Store on this day'
+        })
+      }
+
+      let image = null
+      if (req.files) {
+        try {
+          const files = req.files
+          const uploadedFile = await uploadFilesCheckin(
+            files,
+            path.join(__dirname, '../../public/images/stores/checkin'),
+            store.area,
+            storeId
+          )
+
+          if (uploadedFile.length > 0) {
+            image = uploadedFile[0].path
+          }
+        } catch (fileError) {
+          return res.status(500).json({
+            status: '500',
+            message: `File upload error: ${fileError.message}`
+          })
+        }
+      }
+
+      const routeUpdate = await Route.findOneAndUpdate(
+        { id: routeId, 'listStore.storeInfo': store._id },
+        {
+          $set: {
+            'listStore.$.note': note,
+            'listStore.$.image': image,
+            'listStore.$.latitude': latitude,
+            'listStore.$.longtitude': longtitude,
+            'listStore.$.status': '2',
+            'listStore.$.statusText': 'ไม่ซื้อ',
+            'listStore.$.date': new Date()
+          }
+        },
+        { new: true }
+      )
+
+      if (!routeUpdate) {
+        return res.status(404).json({
+          status: '404',
+          message: 'Route not found or listStore not matched'
+        })
+      }
+
+      const io = getSocket()
+      io.emit('route/checkIn', {
+        status: '200',
+        message: 'check in successfully'
+      })
+
+      res.status(200).json({
+        status: '200',
+        message: 'check in successfully'
+      })
+    } catch (error) {
+      console.error('Error saving data to MongoDB:', error)
+      res.status(500).json({ status: '500', message: 'Server Error' })
+    }
+  })
+}
+
+
+
+
 exports.checkInVisit = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
@@ -841,6 +971,136 @@ exports.checkInVisit = async (req, res) => {
     }
   })
 }
+
+exports.checkInVisitNew = async (req, res) => {
+  const channel = req.headers['x-channel']
+  const { Store } = getModelsByChannel(channel, res, storeModel)
+  const { Route } = getModelsByChannel(channel, res, routeModel)
+
+  upload(req, res, async err => {
+    if (err) {
+      return res.status(400).json({ status: '400', message: err.message })
+    }
+    try {
+      const { routeId, storeId, note, latitude, longtitude } = req.body
+
+      if (!routeId || !storeId) {
+        return res.status(400).json({
+          status: '400',
+          message: 'routeId and storeId are required'
+        })
+      }
+
+      const store = await Store.findOne({ storeId })
+      if (!store) {
+        return res
+          .status(404)
+          .json({ status: '404', message: 'Store not found' })
+      }
+
+      const period = routeId.substring(0, 6)
+      const startOfDay = new Date()
+      startOfDay.setHours(0, 0, 0, 0)
+
+      const endOfDay = new Date()
+      endOfDay.setHours(23, 59, 59, 999)
+
+      let allRoute = await Route.aggregate([
+        {
+          $match: {
+            period: period
+          }
+        },
+        { $unwind: '$listStore' },
+        {
+          $project: {
+            listStore: 1
+          }
+        },
+        {
+          $replaceRoot: { newRoot: '$listStore' }
+        },
+        {
+          $match: {
+            status: { $nin: ['0'] },
+            storeInfo: store._id.toString(),
+            date: { $gte: startOfDay, $lte: endOfDay }
+          }
+        }
+      ])
+      // console.log(allRoute.length)
+
+      if (allRoute.length > 0) {
+        return res.status(409).json({
+          status: 409,
+          message: 'Duplicate Store on this day'
+        })
+      }
+
+      let image = null
+      if (req.files) {
+        try {
+          const files = req.files
+          const uploadedFile = await uploadFilesCheckin(
+            files,
+            path.join(__dirname, '../../public/images/stores/checkin'),
+            store.area,
+            storeId
+          )
+
+          if (uploadedFile.length > 0) {
+            image = uploadedFile[0].path
+          }
+        } catch (fileError) {
+          return res.status(500).json({
+            status: '500',
+            message: `File upload error: ${fileError.message}`
+          })
+        }
+      }
+
+      const route = await Route.findOneAndUpdate(
+        { id: routeId, 'listStore.storeInfo': store._id },
+        {
+          $set: {
+            'listStore.$.note': note,
+            'listStore.$.image': image,
+            'listStore.$.latitude': latitude,
+            'listStore.$.longtitude': longtitude,
+            'listStore.$.status': '1',
+            'listStore.$.statusText': 'เยี่ยมแล้ว',
+            'listStore.$.date': new Date()
+          }
+        },
+        { new: true }
+      )
+
+      if (!route) {
+        return res.status(404).json({
+          status: '404',
+          message: 'Route not found or listStore not matched'
+        })
+      }
+
+      const io = getSocket()
+      io.emit('route/checkInVisit', {
+        status: '200',
+        message: 'check in successfully'
+      })
+
+      res.status(200).json({
+        status: '200',
+        message: 'check in successfully'
+      })
+    } catch (error) {
+      console.error('Error saving data to MongoDB:', error)
+      res.status(500).json({ status: '500', message: 'Server Error' })
+    }
+  })
+}
+
+
+
 
 exports.changeRoute = async (req, res) => {
   try {
@@ -1784,6 +2044,8 @@ exports.getRouteEffective = async (req, res) => {
       return acc
     }, {})
 
+  // console.log(groupedByArea)
+
     const totalSum = Object.keys(groupedByArea).reduce((acc, areaKey) => {
       const routesInArea = groupedByArea[areaKey]
 
@@ -1815,7 +2077,6 @@ exports.getRouteEffective = async (req, res) => {
         }
       )
 
-      // console.log(areaTotal.percentVisit)
       // บวกเข้า acc (sum รวมทุก area)
       acc.storeAll += areaTotal.storeAll
       acc.storePending += areaTotal.storePending
@@ -1825,8 +2086,8 @@ exports.getRouteEffective = async (req, res) => {
       acc.storeTotal += areaTotal.storeTotal
       acc.summary += areaTotal.summary
       acc.totalqty += areaTotal.totalqty
-      // acc.percentVisit += areaTotal.percentVisit
-      // acc.percentEffective += areaTotal.percentEffective
+      acc.percentVisit += areaTotal.percentVisit
+      acc.percentEffective += areaTotal.percentEffective
 
       return acc
     }, {
@@ -1846,11 +2107,15 @@ exports.getRouteEffective = async (req, res) => {
     // เฉลี่ย % ถ้าต้องการ
     
 
-    // console.log(totalSum.percentVisit)
+    
 
-    const len = Object.keys(groupedByArea).length || 1
-    totalSum.percentVisit = totalSum.storeTotal / totalSum.storeAll * 100
-    totalSum.percentEffective = totalSum.storeSell / totalSum.storeAll * 100
+    // const len = Object.keys(groupedByArea).length 
+    // console.log("len",len)
+    // console.log('totalSum.percentVisit',(totalSum.percentVisit / 24))
+    
+
+    totalSum.percentVisit = totalSum.percentVisit / 24
+    totalSum.percentEffective = totalSum.percentEffective / 24
 
 
 
@@ -1859,9 +2124,9 @@ exports.getRouteEffective = async (req, res) => {
     if (excel === 'true') {
 
       if (area) {
-        mergeData = [...filteredRoutes, ...totalByArea]
+        mergeData = [...data, totalSum]
       } else {
-        mergeData = [...totalByArea]
+        mergeData = [totalSum]
       }
       const xlsxData = mergeData.map(r => ({
         Area: r.area || area,
@@ -1876,7 +2141,7 @@ exports.getRouteEffective = async (req, res) => {
         เปอร์เซ็นต์การเข้าเยี่ยม: r.percentVisit,
         เปอร์เซ็นต์การขายได้: r.percentEffective,
       }))
-      console.log(xlsxData)
+      // console.log(xlsxData)
       const wb = xlsx.utils.book_new()
       const ws = xlsx.utils.json_to_sheet(xlsxData)
       xlsx.utils.book_append_sheet(wb, ws, `getRouteEffective_${period}`)
@@ -1890,7 +2155,19 @@ exports.getRouteEffective = async (req, res) => {
       res.json({
         status: 200,
         data: data,
-        total: totalSum,
+        total: {
+         route  : totalSum.route,
+         storeAll : totalSum.storeAll,
+         storePending : totalSum.storePending,
+         storeSell : totalSum.storeSell,
+         storeNotSell : totalSum.storeNotSell,
+         storeCheckInNotSell : totalSum.storeCheckInNotSell,
+         storeTotal : totalSum.storeTotal,
+         summary : to2(totalSum.summary),
+         totalqty : totalSum.totalqty,
+         percentVisit : to2(totalSum.percentVisit),
+         percentEffective : to2(totalSum.percentEffective),
+        },
         // zoneRoute
 
       })
