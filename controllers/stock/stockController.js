@@ -2769,6 +2769,115 @@ exports.checkout = async (req, res) => {
   }
 }
 
+
+exports.checkOutAdjustStock = async (req, res) => {
+  try {
+    const { type, area, period, note, withdrawId } = req.body
+    const channel = req.headers['x-channel']
+    const { Cart } = getModelsByChannel(channel, res, cartModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+
+    const { Stock, StockMovementLog, StockMovement, AdjustStock } =
+      getModelsByChannel(channel, res, stockModel)
+
+    const { startDate, endDate } = rangeDate(period)
+
+    if (type != 'adjuststock') {
+      return res.status(400).json({ status: 400, message: 'Type is not vaild' })
+    }
+
+    if (!type || !area) {
+      return res
+        .status(400)
+        .json({ status: 400, message: 'Missing required fields!' })
+    }
+
+    const cart = await Cart.findOne({
+      type,
+      area,
+      createdAt: { $gte: startDate, $lt: endDate }
+    })
+    if (!cart || cart.listProduct.length === 0) {
+      return res.status(404).json({ status: 404, message: 'Cart is empty!' })
+    }
+
+    const sale = await User.findOne({ area }).select(
+      'firstName surName warehouse tel saleCode salePayer'
+    )
+    if (!sale) {
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Sale user not found!' })
+    }
+
+    const orderId = await generateStockId(area, sale.warehouse, channel, res)
+    // console.log(cart)
+    const productId = cart.listProduct.flatMap(item => item.id)
+    const productDetail = await Product.find({ id: { $in: productId } })
+
+    const newOrder = {
+      type,
+      orderId,
+      withdrawId: withdrawId,
+      area: area,
+      saleCode: sale.saleCode,
+      period: period,
+      note,
+      status: 'pending',
+      statusTH: 'รอนำเข้า',
+      listProduct: cart.listProduct.map(item => {
+        const product = productDetail.find(i => i.id === item.id)
+        const factorPcs = product.listUnit.find(
+          i => i.unit === item.unit
+        ).factor
+        const qtyPcs = item.qty * factorPcs
+        return {
+          id: item.id,
+          name: item.name,
+          qty: item.qty,
+          qtyPcs: qtyPcs,
+          unit: item.unit,
+          price: item.price,
+          action: item.action
+        }
+      }),
+      listImage: []
+      // listProduct: summary.listProduct
+    }
+    await AdjustStock.create(newOrder)
+    await Cart.deleteOne({
+      type,
+      area,
+      withdrawId,
+      createdAt: { $gte: startDate, $lt: endDate }
+    })
+
+    const io = getSocket()
+    io.emit('stock/checkout', {
+      status: 200,
+      message: 'Sucessful',
+      newOrder
+    })
+
+    res.status(200).json({
+      status: 200,
+      message: 'Sucessful',
+      newOrder
+      // cart
+    })
+  } catch (error) {
+        console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+
+
+
+
+
+
 exports.approveAdjustStock = async (req, res) => {
   try {
     const { orderId, status, user } = req.body

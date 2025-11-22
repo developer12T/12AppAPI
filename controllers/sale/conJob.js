@@ -9,6 +9,11 @@ const {
 } = require('../../middleware/order')
 
 const {
+  dataUpdateSendMoney,
+  dataUpdateTotalSale
+} = require('../../controllers/queryFromM3/querySctipt')
+
+const {
   Warehouse,
   Locate,
   Balance,
@@ -20,7 +25,7 @@ const { WithdrawCash } = require('../../models/cash/powerBi')
 const fs = require('fs')
 const path = require('path')
 const { sequelize, DataTypes } = require('../../config/m3db')
-const { Op, fn, literal } = require('sequelize')
+const { Op, fn, literal, where, col } = require('sequelize')
 const { getSocket } = require('../../socket')
 
 const userModel = require('../../models/cash/user')
@@ -634,18 +639,16 @@ async function updateOrderPowerBI (channel = 'cash') {
 
 const startCronJobInsertDistribution = () => {
   cron.schedule(
-    '0 21 * * *', // 👉 00:00 AM (เวลาไทย)
-    // "*/3 * * * *",
-
+    '0 21 * * *', // 👉 ทุก 1 นาที
     async () => {
       console.log(
-        'Running cron job startCronJobInsertDistribution at 21:00 AM Thai time. Now:',
+        'Running cron job startCronJobInsertDistribution Now:',
         new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
       )
       await updateOrderDistribution()
     },
     {
-      timezone: 'Asia/Bangkok' // 👈 สำคัญมาก
+      timezone: 'Asia/Bangkok'
     }
   )
 }
@@ -759,22 +762,23 @@ const startCronJobreStoreStockDaily = () => {
   )
 }
 
-const startCronJobUpdateSendmoney = () => {
-  cron.schedule(
-    '30 21 * * *', // 21:30 ทุกวัน
-    // "* * * * *", // 👉 ทุก 5 นาที
-    async () => {
-      console.log(
-        'Running cron job startCronJobUpdateSendmoney at 21:30 Bangkok time. Now:',
-        new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
-      )
-      await updateSendmoney()
-    },
-    {
-      timezone: 'Asia/Bangkok' // 👈 สำคัญ
-    }
-  )
-}
+// const startCronJobUpdateSendmoney = () => {
+//   cron.schedule(
+//     '30 21 * * *', // 21:30 ทุกวัน
+//     // '*/1 * * * *',
+//     // '* * * * *', // 👉 ทุก 5 นาที
+//     async () => {
+//       console.log(
+//         'Running cron job startCronJobUpdateSendmoney at 21:30 Bangkok time. Now:',
+//         new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+//       )
+//       await updateSendmoney()
+//     },
+//     {
+//       timezone: 'Asia/Bangkok' // 👈 สำคัญ
+//     }
+//   )
+// }
 
 async function updateSendmoney (channel = 'cash') {
   const logFile = path.join(process.cwd(), `${pathLog}updateSendmoney.txt`)
@@ -970,214 +974,11 @@ async function updateSendmoney (channel = 'cash') {
     fs.appendFileSync(logFile, `[${nowLog}] ✅ Job completed updateSendmoney\n`)
   } catch (error) {
     console.error('updateSendmoney ❌', error)
-    fs.appendFileSync(logFile, `[${nowLog}] ❌ Job failed: ${err.message}\n`)
+    fs.appendFileSync(logFile, `[${nowLog}] ❌ Job failed: ${error.message}\n`)
     // res.status(500).json({
     //   status: 500,
     //   message: error.message || 'Internal server error'
     // })
-  }
-}
-
-exports.updateSendmoneyOld2 = async (req, res) => {
-  try {
-    const channel = req.headers['x-channel']
-    const { Order } = getModelsByChannel(channel, res, orderModel)
-    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
-    const { Refund } = getModelsByChannel(channel, res, refundModel)
-    const { User } = getModelsByChannel(channel, res, userModel)
-
-    // 🔹 ดึง user ทั้งหมดที่เป็น sale
-    const users = await User.find({ role: 'sale' }).lean()
-    if (!users.length) {
-      return res
-        .status(404)
-        .json({ status: 404, message: 'No sale users found!' })
-    }
-
-    // 🔹 รับ period เดือนปัจจุบัน
-    const periodStr = period()
-    const year = Number(periodStr.substring(0, 4))
-    const month = Number(periodStr.substring(4, 6))
-
-    // 🔹 คำนวณช่วงเวลาเดือนนั้นใน UTC
-    const thOffset = 7 * 60 * 60 * 1000
-    const startOfMonthTH = new Date(year, month - 1, 1, 0, 0, 0, 0)
-    const endOfMonthTH = new Date(year, month, 0, 23, 59, 59, 999)
-    const startOfMonthUTC = new Date(startOfMonthTH.getTime() - thOffset)
-    const endOfMonthUTC = new Date(endOfMonthTH.getTime() - thOffset)
-
-    // 🔹 แปลงวันที่เป็น yyyy-mm-dd เวลาไทย
-    const getDateStrTH = dateUTC => {
-      const dateTH = new Date(new Date(dateUTC).getTime() + thOffset)
-      const day = dateTH.getDate().toString().padStart(2, '0')
-      const mon = (dateTH.getMonth() + 1).toString().padStart(2, '0')
-      const yr = dateTH.getFullYear()
-      return `${yr}-${mon}-${day}`
-    }
-
-    // 🔹 วนตาม user ทีละคน
-    for (const user of users) {
-      const area = user.area
-      console.log(`🔄 Processing area: ${area} (${user.warehouse})`)
-
-      const [dataSendmoney, dataRefund, dataOrderSale, dataOrderChange] =
-        await Promise.all([
-          SendMoney.aggregate([
-            {
-              $match: {
-                area: area,
-                dateAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC }
-              }
-            },
-            { $addFields: { createdAt: '$dateAt' } }
-          ]),
-          Refund.find({
-            'store.area': area,
-            period: periodStr,
-            createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
-            type: 'refund',
-            status: { $nin: ['pending', 'canceled', 'reject'] }
-          }),
-          Order.find({
-            'store.area': area,
-            period: periodStr,
-            createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
-            type: 'sale',
-            status: { $nin: ['canceled', 'reject'] }
-          }),
-          Order.find({
-            'store.area': area,
-            period: periodStr,
-            createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
-            type: 'change',
-            status: { $nin: ['pending', 'canceled', 'reject'] }
-          })
-        ])
-
-      // รวมยอดส่งเงินรายวัน
-      const sumByDate = dataSendmoney.reduce((acc, item) => {
-        const dateStr = getDateStrTH(item.createdAt)
-        if (!acc[dateStr])
-          acc[dateStr] = { summary: 0, status: item.status || '' }
-        acc[dateStr].summary += item.sendmoney || 0
-        return acc
-      }, {})
-      const sendMoneyMap = Object.fromEntries(
-        Object.entries(sumByDate).map(([d, v]) => [d, v.summary])
-      )
-
-      // สร้าง refund แบบแบน
-      const refundListFlat = dataRefund.flatMap(item =>
-        item.listProduct.map(u => ({
-          price: u.total,
-          condition: u.condition,
-          date: getDateStrTH(item.createdAt)
-        }))
-      )
-      const refundByDate = refundListFlat.reduce((acc, r) => {
-        if (!acc[r.date]) acc[r.date] = []
-        acc[r.date].push(r)
-        return acc
-      }, {})
-
-      const orderSaleListFlat = dataOrderSale.flatMap(item =>
-        item.listProduct.map(u => ({
-          price: u.netTotal,
-          date: getDateStrTH(item.createdAt)
-        }))
-      )
-
-      const orderChangeListFlat = dataOrderChange.flatMap(item =>
-        item.listProduct.map(u => ({
-          price: u.netTotal,
-          date: getDateStrTH(item.createdAt)
-        }))
-      )
-
-      const saleByDate = orderSaleListFlat.reduce((acc, o) => {
-        acc[o.date] = (acc[o.date] || 0) + Number(o.price || 0)
-        return acc
-      }, {})
-
-      const changeByDate = orderChangeListFlat.reduce((acc, o) => {
-        acc[o.date] = (acc[o.date] || 0) + Number(o.price || 0)
-        return acc
-      }, {})
-
-      // 🔹 เตรียมวันที่ครบเดือน
-      const lastDay = new Date(year, month, 0).getDate()
-      const allDateArr = Array.from(
-        { length: lastDay },
-        (_, i) =>
-          `${year}-${month.toString().padStart(2, '0')}-${(i + 1)
-            .toString()
-            .padStart(2, '0')}`
-      )
-
-      // 🔹 คำนวณ summary, diff ฯลฯ
-      const fullMonthArr = allDateArr.map(date => {
-        const sendmoney = to2(sendMoneyMap[date] || 0)
-        const refundToday = refundByDate[date] || []
-        const good = to2(
-          refundToday
-            .filter(x => x.condition === 'good')
-            .reduce((s, x) => s + Number(x.price), 0)
-        )
-        const damaged = to2(
-          refundToday
-            .filter(x => x.condition === 'damaged')
-            .reduce((s, x) => s + Number(x.price), 0)
-        )
-        const summaryRaw = saleByDate[date] || 0
-        const changeRaw = changeByDate[date] || 0
-        const diffChange = to2(changeRaw - damaged - good)
-        const summary = to2(summaryRaw + diffChange)
-        const diff = to2(sendmoney - summary)
-        const status = sendmoney > 0 ? 'ส่งเงินแล้ว' : 'ยังไม่ส่งเงิน'
-
-        return {
-          area,
-          date,
-          sendmoney,
-          summary,
-          diff,
-          status,
-          good,
-          damaged,
-          diffChange
-        }
-      })
-
-      // 🔹 เตรียมข้อมูล update ยอดขาย
-      const totalSaleUpdateData = fullMonthArr
-        .filter(item => item.summary > 0)
-        .map(item => ({
-          TRANSFER_DATE: item.date,
-          Amount: Math.ceil(item.summary),
-          WH: user.warehouse
-        }))
-
-      // 🔹 อัปเดตยอดขาย (TotalSale)
-      if (totalSaleUpdateData.length > 0) {
-        await dataUpdateTotalSale('cash', totalSaleUpdateData, [
-          'TRANSFER_DATE',
-          'WH'
-        ])
-        console.log(`✅ Updated total sale for ${user.warehouse}`)
-      }
-    }
-    // console.log(`Total updated Order: ${summaryCount}`)
-    fs.appendFileSync(logFile, `[${nowLog}] ✅ Job completed successfully\n`)
-
-    // ✅ ส่งผลลัพธ์สำเร็จเมื่อวนครบทุก user
-    // res.status(200).json({
-    //   status: 200,
-    //   message: 'Success — updated sendmoney for all sale users'
-    // })
-  } catch (error) {
-    console.error('❌ Error in erpApiCheckOrderJob:', error)
-    fs.appendFileSync(logFile, `[${nowLog}] ❌ Job failed: ${error.message}\n`)
-    return { error: true, message: error.message }
   }
 }
 
@@ -1203,7 +1004,8 @@ async function updateStatusOrderDistribution (channel = 'cash') {
     // ✅ 1. ดึงข้อมูลจาก WithdrawCash
     const withdrawList = await WithdrawCash.findAll({
       where: {
-        WD_STATUS: '22',
+        // WD_STATUS: '22',
+        [Op.or]: [{ WD_STATUS: '22' }, { STATUS: 'canceled' }],
         [Op.and]: [
           where(fn('MONTH', col('WD_DATE')), currentMonth),
           where(fn('YEAR', col('WD_DATE')), currentYear)
@@ -1281,20 +1083,20 @@ async function updateOrderDistribution (channel = 'cash') {
     const now = new Date()
     const thailandOffset = 7 * 60 // นาที
     const utc = now.getTime() + now.getTimezoneOffset() * 60000
-    const thailand = new Date(utc + thailandOffset * 60000)
+    // const thailand = new Date(utc + thailandOffset * 60000)
+    const thailand = new Date() // cron already uses Bangkok timezone
 
     const year = thailand.getFullYear()
+
     const month = String(thailand.getMonth() + 1).padStart(2, '0')
-    const day = String(thailand.getDate() - 1).padStart(2, '0')
+    const day = String(thailand.getDate()).padStart(2, '0')
+
+    // ใช้วันวันนี้เป็น start/end
     const nextDay = String(thailand.getDate()).padStart(2, '0')
 
-    // const currentDate = `${year}${month}${day}`
-    const startDate = `${year}${month}${nextDay}`
-    // const startDate = `20250901`
-    const endDate = `${year}${month}${nextDay}`
-    // const endDate = `20250930`
+    const startDate = `${year}${month}${day}`
+    const endDate = `${year}${month}${day}`
     const status = ''
-    const channel = 'cash'
 
     const allTransactions = await dataWithdraw(
       channel,
@@ -1305,7 +1107,7 @@ async function updateOrderDistribution (channel = 'cash') {
     await dataWithdrawInsert(channel, allTransactions)
     fs.appendFileSync(
       logFile,
-      `[${nowLog}] ✅ Job completed updatePowerBiSucess\n`
+      `[${nowLog}] ✅ Job completed dataWithdrawInsert\n`
     )
   } catch (error) {
     console.error(error)
@@ -1325,6 +1127,6 @@ module.exports = {
 
   startCronJobDeleteCartDaily,
   startCronJobreStoreStockDaily,
-  startCronJobMemory,
-  startCronJobUpdateSendmoney
+  startCronJobMemory
+  // startCronJobUpdateSendmoney
 }

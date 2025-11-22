@@ -3,12 +3,14 @@ const {
   getRoute,
   addFromERP,
   checkIn,
+  checkInNotSale,
   changeRoute,
   routeHistory,
   createRoute,
   getRouteCheckinAll,
   getTimelineCheckin,
   checkInVisit,
+  checkInVisitNew,
   routeTimeline,
   updateAndAddRoute,
   getRouteProvince,
@@ -35,8 +37,10 @@ const router = express.Router()
 router.get('/getRoute', getRoute)
 router.get('/getRadius', getRadius)
 router.post('/checkIn', checkIn)
+router.post('/checkInNotSale', checkInNotSale)
 router.post('/addRadius', addRadius)
 router.post('/checkInVisit', checkInVisit)
+router.post('/checkInVisitNew', checkInVisitNew)
 router.post('/addFromERP', addFromERP)
 router.post('/change', changeRoute)
 router.get('/history', routeHistory)

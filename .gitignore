@@ -5,5 +5,9 @@
 .env
 .area_status
 .Order
-/controlllers/sale/conjobLog/startCronJobErpApiCheck.txt
+/controlllers/sale/conjobLog/
 startCronJobErpApiCheck.txt
+startCronJobUpdateOrderDistribution.txt
+updateStatusOrderDistribution.txt
+startCronJobUpdateOrderDistribution.txt
+startCronJobUpdateOrderDistribution.txt

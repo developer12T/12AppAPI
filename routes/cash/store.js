@@ -48,7 +48,8 @@ const {
   areaStoreM3toMongo,
   checkLatLongByStore,
   addStoreFromM3,
-  moveStoreToCash
+  moveStoreToCash,
+  getStoreOnRoute
   // test
 } = require('../../controllers/store/storeController')
 
@@ -125,7 +126,7 @@ router.post('/updateAreaStore', updateAreaStore)
 router.post('/areaStoreM3toMongo', areaStoreM3toMongo)
 router.post('/checkLatLongByStore', checkLatLongByStore)
 router.post('/moveStoreToCash', moveStoreToCash)
-
+router.post('/getStoreOnRoute', getStoreOnRoute)
 
 router.get('/:storeId', getDetailStore)
 module.exports = router

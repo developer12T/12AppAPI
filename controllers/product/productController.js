@@ -1646,6 +1646,7 @@ exports.getProductPage = async (req, res) => {
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Stock } = getModelsByChannel(channel, res, stockModel)
 
+
     // -------------------------------
     // Utility
     // -------------------------------
@@ -1712,6 +1713,28 @@ exports.getProductPage = async (req, res) => {
       filter.$and = andConditions
     }
 
+
+    if (query && String(query).trim()) {
+      const q = String(query).trim()
+      const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') // escape + i
+
+      andConditions.push({
+        $or: [
+          { name: rx },
+          { brand: rx },
+          { group: rx },
+          { flavour: rx },
+          { id: rx },
+          { size: rx },
+          { keywords: rx } // ถ้ามีฟิลด์ keywords
+        ]
+      })
+    }
+
+    if (andConditions.length) filter.$and = andConditions
+
+    // console.log("filter",filter)
+
     // -------------------------------
     // Pagination
     // -------------------------------
@@ -1721,9 +1744,24 @@ exports.getProductPage = async (req, res) => {
     // -------------------------------
     // STEP 1: ดึง product ทั้งหมด (ไม่ paginate)
     // -------------------------------
-    let rawProducts = await Product.find(filter)
-      .sort({ groupCode: 1, sizeNumber: 1 })
-      .lean()
+    
+    let rawProducts = await Product.find(filter).sort({ sizeNumber: 1 }).lean()
+
+    rawProducts.sort((a, b) => {
+      const ga = String(a.groupCode).trim()
+      const gb = String(b.groupCode).trim()
+
+      // ถ้าเป็น 001 ให้ขึ้นก่อนทันที
+      if (ga === 'G001' && gb !== 'G001') return -1
+      if (ga !== 'G001' && gb === 'G001') return 1
+
+      // ถ้าไม่ใช่ 001 ทั้งคู่ → เรียงปกติ
+      if (ga < gb) return -1
+      if (ga > gb) return 1
+
+      // ต่อด้วย sizeNumber
+      return (a.sizeNumber || 0) - (b.sizeNumber || 0)
+    })
 
     // -------------------------------
     // STEP 2: trim fields
@@ -1747,9 +1785,17 @@ exports.getProductPage = async (req, res) => {
     // -------------------------------
     // STEP 4: pagination AFTER clean-up
     // -------------------------------
+    let products = []
+    if (query) {
+      products = rawProducts
+    } else {
     const startIndex = (pageNum - 1) * perPage
     const endIndex = startIndex + perPage
-    const products = rawProducts.slice(startIndex, endIndex)
+     products = rawProducts.slice(startIndex, endIndex)
+    }
+
+
+    // console.log("products",products)
 
     if (!products.length) {
       return res.status(404).json({

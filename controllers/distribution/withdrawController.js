@@ -1851,21 +1851,21 @@ exports.approveWithdraw = async (req, res) => {
             return res.status(500).json({
               status: 500,
               message: 'External API failed',
-              error: err.response.data // <-- error ที่มาจากปลายทางจริง
+              error: err // <-- error ที่มาจากปลายทางจริง
             })
           } else if (err.request) {
-            console.log('No response from API:', err.message)
+            console.log('No response from API', err.message)
             return res.status(500).json({
               status: 500,
               message: 'External API unreachable',
-              error: err.message
+              error: err
             })
           } else {
             console.log('Other error:', err.message)
             return res.status(500).json({
               status: 500,
               message: 'External API error',
-              error: err.message
+              error: err
             })
           }
         }
