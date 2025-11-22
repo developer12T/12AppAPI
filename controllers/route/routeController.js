@@ -2026,6 +2026,7 @@ exports.getRouteEffective = async (req, res) => {
         total.percentVisit = (total.percentVisit / len).toFixed(2)
         total.percentEffective = (total.percentEffective / len).toFixed(2)
 
+
         data.push(total)
       }
 
@@ -2044,7 +2045,8 @@ exports.getRouteEffective = async (req, res) => {
       return acc
     }, {})
 
-  // console.log(groupedByArea)
+    const len = filteredRoutesR.length
+
 
     const totalSum = Object.keys(groupedByArea).reduce((acc, areaKey) => {
       const routesInArea = groupedByArea[areaKey]
@@ -2111,11 +2113,11 @@ exports.getRouteEffective = async (req, res) => {
 
     // const len = Object.keys(groupedByArea).length 
     // console.log("len",len)
-    // console.log('totalSum.percentVisit',(totalSum.percentVisit / 24))
+    // console.log('totalSum.percentVisit',(totalSum.percentVisit))
     
 
-    totalSum.percentVisit = totalSum.percentVisit / 24
-    totalSum.percentEffective = totalSum.percentEffective / 24
+    totalSum.percentVisit = totalSum.percentVisit / len
+    totalSum.percentEffective = totalSum.percentEffective / len
 
 
 
@@ -2123,11 +2125,12 @@ exports.getRouteEffective = async (req, res) => {
     // 📊 ถ้า export Excel
     if (excel === 'true') {
 
-      if (area) {
-        mergeData = [...data, totalSum]
-      } else {
-        mergeData = [totalSum]
-      }
+      mergeData = [...data, totalSum]
+      // if (area) {
+      //   mergeData = [...data, totalSum]
+      // } else {
+      //   mergeData = [...data,totalSum]
+      // }
       const xlsxData = mergeData.map(r => ({
         Area: r.area || area,
         Route: r.route,
@@ -2138,8 +2141,8 @@ exports.getRouteEffective = async (req, res) => {
         รอเยี่ยม: r.storeAll - r.storeTotal,
         ขาย: r.summary,
         ยอดหีบ: r.totalqty,
-        เปอร์เซ็นต์การเข้าเยี่ยม: r.percentVisit,
-        เปอร์เซ็นต์การขายได้: r.percentEffective,
+        เปอร์เซ็นต์การเข้าเยี่ยม: to2(r.percentVisit),
+        เปอร์เซ็นต์การขายได้: to2(r.percentEffective),
       }))
       // console.log(xlsxData)
       const wb = xlsx.utils.book_new()

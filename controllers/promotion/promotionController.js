@@ -990,6 +990,13 @@ exports.getReward = async (req, res) => {
     const { Product } = getModelsByChannel(channel, res, productModel)
     const promotion = await Promotion.findOne({ proId })
 
+    if (!promotion) {
+      return res.status(404).json({
+        status:404,
+        message:'Not found promotion'
+      })
+    }
+
 
     const rewards = promotion.rewards
 
