@@ -1859,7 +1859,7 @@ exports.sendmoneyToExcel = async (req, res) => {
 
         finalRows.push({
           area,
-          date:formatDDMMYYYY(date),
+          date: formatDDMMYYYY(date),
           sale: to2(row.sale),
           change: to2(row.change),
           refund: to2(row.refund),
@@ -1910,4 +1910,190 @@ exports.sendmoneyToExcel = async (req, res) => {
     console.error(err)
     return res.status(500).json({ status: 500, message: err.message })
   }
+}
+
+// exports.fixSendmoney = async (req, res) => {
+//   try {
+//     if (!req.file) {
+//       return res.status(400).json({ message: 'No file uploaded' })
+//     }
+
+//     // 2. อ่านไฟล์ Excel
+//     const workbook = xlsx.readFile(req.file.path)
+
+//     // 3. เลือกชีตแรก
+//     const sheetName = workbook.SheetNames[0]
+//     const worksheet = workbook.Sheets[sheetName]
+
+//     // 4. แปลงเป็น JSON
+//     const excelData = xlsx.utils.sheet_to_json(worksheet, { defval: '' })
+
+//     // 5. ส่งกลับ หรือจะประมวลผลต่อก็ได้
+//     return res.json({
+//       message: 'File processed successfully',
+//       data: excelData
+//     })
+//   } catch (error) {
+//     res.status(500).json({
+//       status: 500,
+//       message: 'Internal server error',
+//       error: error.message
+//     })
+//   }
+// }
+
+exports.fixSendmoney = async (req, res) => {
+  try {
+    const channel = 'cash'
+    const { User } = getModelsByChannel(channel, null, userModel)
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' })
+    }
+
+    const users = await User.find({ role: 'sale' })
+      .select('area warehouse')
+      .lean()
+
+    // 2) ทำ map zone → warehouse
+    const zoneToWH = {}
+    users.forEach(u => {
+      if (u.area) {
+        zoneToWH[u.area.trim()] = u.warehouse
+      }
+    })
+
+    // อ่านไฟล์จาก buffer
+    const workbook = xlsx.read(req.file.buffer, { type: 'buffer' })
+
+    // ตรวจสอบว่า workbook มี Sheets จริงมั้ย
+    if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
+      return res.status(400).json({
+        message: 'Invalid Excel file: No sheets found'
+      })
+    }
+
+    // เลือก sheet แรก
+    const sheetName = workbook.SheetNames[0]
+    const worksheet = workbook.Sheets[sheetName]
+
+    // แปลงเป็น JSON
+    const excelData = xlsx.utils.sheet_to_json(worksheet, { defval: '' })
+
+    const year = 2025
+    const month = 11
+
+    const excelJson = transformExcelData(excelData)
+
+    const fullMonthArr = convertToFullMonthArr(excelJson, year, month)
+
+    const sendMoneyUpdateData = fullMonthArr
+      .filter(item => item.sendmoney > 0)
+      .map(item => ({
+        Amount_Send: Math.ceil(item.sendmoney),
+        DATE: item.date,
+        WH: zoneToWH[item.zone] || null // หา WH ตาม zone
+      }))
+    // const sendMoneyUpdateData = fullMonthArr
+    //   .filter(item => item.sendmoney > 0)
+    //   .map(item => ({
+    //     Amount_Send: Math.ceil(item.sendmoney),
+    //     DATE: item.date,
+    //     WH: user.warehouse
+    //   }))
+
+    if (sendMoneyUpdateData.length > 0) {
+      await dataUpdateSendMoney('cash', sendMoneyUpdateData, ['DATE', 'WH'])
+      console.log(`✅ Updated sendmoney `)
+      
+      return res.json({
+        message: 'File processed successfully',
+        data: sendMoneyUpdateData
+      })
+    }
+
+    // return res.json({
+    //   message: 'File processed successfully',
+    //   data: sendMoneyUpdateData
+    // })
+  } catch (error) {
+    return res.status(500).json({
+      status: 500,
+      message: 'Internal server error',
+      error: error.message
+    })
+  }
+}
+
+function transformExcelData (excelData) {
+  // ต้องมีอย่างน้อย 2 แถว (หัวตาราง + วันที่)
+  if (!excelData || excelData.length < 2) {
+    throw new Error('Invalid Excel format – missing header rows')
+  }
+
+  const result = []
+
+  const headerRow = excelData[1] // แถววันที่ เช่น 1,2,3,...
+  if (!headerRow) {
+    throw new Error('Cannot read header row')
+  }
+
+  // map key → day number เช่น "__EMPTY_3" → 4
+  const dayMap = Object.keys(headerRow)
+    .filter(key => key.startsWith('__EMPTY'))
+    .reduce((map, key, index) => {
+      map[key] = headerRow[key]
+      return map
+    }, {})
+
+  // เริ่ม loop ข้อมูลจริงแถวที่ 2 เป็นต้นไป
+  for (let i = 2; i < excelData.length; i++) {
+    const row = excelData[i]
+    if (!row) continue
+
+    const zoneName = row['สรุปยอดส่งเงิน ประจำเดือน พฤศจิกายน 2025']
+    if (!zoneName || zoneName.trim() === '') continue
+
+    const obj = { Zone: zoneName.slice(0, 5) }
+
+    for (const key in row) {
+      if (key.startsWith('__EMPTY')) {
+        const day = dayMap[key]
+        if (day && row[key] !== '') {
+          obj[day] = Number(row[key])
+        }
+      }
+    }
+
+    result.push(obj)
+  }
+
+  return result
+}
+
+function convertToFullMonthArr (data, year, month) {
+  const fullMonthArray = []
+
+  const filtered = data.filter(row => row.Zone !== 'รวม' && row.Zone !== '')
+
+  filtered.forEach(row => {
+    const zone = row.Zone
+
+    // loop ทุก key ที่เป็นตัวเลขวัน
+    Object.keys(row).forEach(day => {
+      if (!/^\d+$/.test(day)) return // ข้าม key ไม่ใช่ตัวเลขวัน
+
+      const sendmoney = Number(row[day] || 0)
+      const date = `${year}-${String(month).padStart(2, '0')}-${String(
+        day
+      ).padStart(2, '0')}`
+
+      fullMonthArray.push({
+        zone,
+        date,
+        sendmoney
+      })
+    })
+  })
+
+  return fullMonthArray
 }
