@@ -952,17 +952,28 @@ async function updateSendmoney (channel = 'cash') {
       })
 
       // เตรียมข้อมูล update SendMoney
-      const sendMoneyUpdateData = fullMonthArr
-        .filter(item => item.sendmoney > 0)
+      // const sendMoneyUpdateData = fullMonthArr
+      //   .filter(item => item.sendmoney > 0)
+      //   .map(item => ({
+      //     Amount_Send: Math.ceil(item.sendmoney),
+      //     DATE: item.date,
+      //     WH: user.warehouse
+      //   }))
+
+      const totalSaleUpdateData = fullMonthArr
+        .filter(item => item.summary > 0)
         .map(item => ({
-          Amount_Send: Math.ceil(item.sendmoney),
-          DATE: item.date,
+          TRANSFER_DATE: item.date,
+          Amount: Math.ceil(item.summary),
           WH: user.warehouse
         }))
 
-      if (sendMoneyUpdateData.length > 0) {
-        await dataUpdateSendMoney('cash', sendMoneyUpdateData, ['DATE', 'WH'])
-        console.log(`✅ Updated sendmoney for ${user.warehouse}`)
+      if (totalSaleUpdateData.length > 0) {
+        await dataUpdateTotalSale('cash', totalSaleUpdateData, [
+          'TRANSFER_DATE',
+          'WH'
+        ])
+        console.log(`✅ Updated total sale for ${user.warehouse}`)
       }
     }
 
