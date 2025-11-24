@@ -681,8 +681,8 @@ exports.checkIn = async (req, res) => {
           $set: {
             'listStore.$.note': note,
             'listStore.$.image': image,
-            // 'listStore.$.latitude': latitude,
-            // 'listStore.$.longtitude': longtitude,
+            'listStore.$.latitude': latitude,
+            'listStore.$.longtitude': longtitude,
             'listStore.$.status': '2',
             'listStore.$.statusText': 'ไม่ซื้อ',
             'listStore.$.date': new Date()
@@ -808,8 +808,8 @@ exports.checkInNotSale = async (req, res) => {
           $set: {
             'listStore.$.note': note,
             'listStore.$.image': image,
-            'listStore.$.latitude': latitude,
-            'listStore.$.longtitude': longtitude,
+            // 'listStore.$.latitude': latitude,
+            // 'listStore.$.longtitude': longtitude,
             'listStore.$.status': '2',
             'listStore.$.statusText': 'ไม่ซื้อ',
             'listStore.$.date': new Date()
