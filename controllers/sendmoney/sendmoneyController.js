@@ -131,6 +131,7 @@ exports.addSendMoney = async (req, res) => {
         area: area,
         dateAt: startOfMonthUTC,
         sendmoney: sendmoney,
+        sendmoneyAcc : sendmoney,
         salePayer: salePayer,
         saleCode: saleCode,
         period: periodStr,
@@ -146,6 +147,7 @@ exports.addSendMoney = async (req, res) => {
           },
           salePayer: salePayer,
           saleCode: saleCode,
+          sendmoneyAcc : sendmoney,
           different: to2(different)
         }
       )
