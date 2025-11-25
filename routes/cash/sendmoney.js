@@ -9,7 +9,8 @@ const {
   sendmoneyToExcel,
   updateSendmoneyOld,
   updateSendmoneyOld2,
-  fixSendmoney
+  fixSendmoney,
+  addSendMoneyToColumnAcc
 } = require('../../controllers/sendmoney/sendmoneyController')
 
 const multer = require('multer')
@@ -46,4 +47,6 @@ router.get('/getSendMoneyForAcc', getSendMoneyForAcc)
 router.get('/sendmoneyToExcel', sendmoneyToExcel)
 router.get('/sendmoneyToExcel', sendmoneyToExcel)
 router.post('/fixSendmoney', upload.single('file'), fixSendmoney)
+
+router.post('/addSendMoneyToColumnAcc', addSendMoneyToColumnAcc)
 module.exports = router

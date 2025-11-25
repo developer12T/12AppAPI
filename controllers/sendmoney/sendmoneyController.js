@@ -1801,3 +1801,60 @@ function convertToFullMonthArr (data, year, month) {
 
   return fullMonthArray
 }
+
+
+exports.addSendMoneyToColumnAcc = async (req, res) => {
+  try {
+    
+    const { period , date } = req.query
+    const channel = 'cash'
+
+    const { User } = getModelsByChannel('user', res, userModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+
+    const dataUser = await User.find({
+      platformType: 'CASH',
+      role : 'sale'
+    })
+
+for (const row of dataUser) {
+
+  const sendmoneyData = await SendMoney.findOne({
+    area: row.area,
+    period: period,
+    dateAt: date,
+  });
+
+  if (!sendmoneyData) continue;
+
+  await SendMoney.updateOne(
+    {
+      area: row.area,
+      period: period,
+      dateAt: date,
+    },
+    {
+      $set: {
+        sendmoneyAcc: sendmoneyData.sendmoney,
+      },
+    }
+  );
+}
+
+    res.status(200).json({
+      status:200 ,
+      message:'Add data success',
+      data : dataUser
+    })
+
+  } catch (error) {
+      return res.status(500).json({
+      status: 500,
+      message: 'Internal server error',
+      error: error.message
+    })
+    
+  }
+}
