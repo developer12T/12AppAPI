@@ -2863,7 +2863,7 @@ exports.checkOutAdjustStock = async (req, res) => {
     res.status(200).json({
       status: 200,
       message: 'Sucessful',
-      newOrder
+      data :newOrder
       // cart
     })
   } catch (error) {

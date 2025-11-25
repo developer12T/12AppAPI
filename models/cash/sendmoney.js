@@ -11,6 +11,7 @@ const sendMoneySchema = mongoose.Schema({
   period: { type: String, require: true },
   sendmoney: { type: Number, require: true },
   different: { type: Number, require: true },
+  sendmoneyAcc : { type: Number, require: true },
   imageList: [imageSchema],
   status: { type: String },
   createdAt: { type: Date, default: Date.now },

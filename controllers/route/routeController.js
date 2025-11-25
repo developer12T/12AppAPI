@@ -741,44 +741,44 @@ exports.checkInNotSale = async (req, res) => {
           .json({ status: '404', message: 'Store not found' })
       }
 
-      const period = routeId.substring(0, 6)
-      const startOfDay = new Date()
-      startOfDay.setHours(0, 0, 0, 0)
+      // const period = routeId.substring(0, 6)
+      // const startOfDay = new Date()
+      // startOfDay.setHours(0, 0, 0, 0)
 
-      const endOfDay = new Date()
-      endOfDay.setHours(23, 59, 59, 999)
+      // const endOfDay = new Date()
+      // endOfDay.setHours(23, 59, 59, 999)
 
-      let allRoute = await Route.aggregate([
-        {
-          $match: {
-            period: period
-          }
-        },
-        { $unwind: '$listStore' },
-        {
-          $project: {
-            listStore: 1
-          }
-        },
-        {
-          $replaceRoot: { newRoot: '$listStore' }
-        },
-        {
-          $match: {
-            status: { $nin: ['0'] },
-            storeInfo: store._id.toString(),
-            date: { $gte: startOfDay, $lte: endOfDay }
-          }
-        }
-      ])
+      // let allRoute = await Route.aggregate([
+      //   {
+      //     $match: {
+      //       period: period
+      //     }
+      //   },
+      //   { $unwind: '$listStore' },
+      //   {
+      //     $project: {
+      //       listStore: 1
+      //     }
+      //   },
+      //   {
+      //     $replaceRoot: { newRoot: '$listStore' }
+      //   },
+      //   {
+      //     $match: {
+      //       status: { $in: ['2'] },
+      //       storeInfo: store._id.toString(),
+      //       date: { $gte: startOfDay, $lte: endOfDay }
+      //     }
+      //   }
+      // ])
       // console.log(allRoute.length)
 
-      if (allRoute.length > 0) {
-        return res.status(409).json({
-          status: 409,
-          message: 'Duplicate Store on this day'
-        })
-      }
+      // if (allRoute.length > 0) {
+      //   return res.status(409).json({
+      //     status: 409,
+      //     message: 'Duplicate Store on this day'
+      //   })
+      // }
 
       let image = null
       if (req.files) {
@@ -808,8 +808,8 @@ exports.checkInNotSale = async (req, res) => {
           $set: {
             'listStore.$.note': note,
             'listStore.$.image': image,
-            'listStore.$.latitude': latitude,
-            'listStore.$.longtitude': longtitude,
+            // 'listStore.$.latitude': latitude,
+            // 'listStore.$.longtitude': longtitude,
             'listStore.$.status': '2',
             'listStore.$.statusText': 'ไม่ซื้อ',
             'listStore.$.date': new Date()
@@ -2107,14 +2107,14 @@ exports.getRouteEffective = async (req, res) => {
     })
 
     // เฉลี่ย % ถ้าต้องการ
-    
 
-    
+
+
 
     // const len = Object.keys(groupedByArea).length 
     // console.log("len",len)
     // console.log('totalSum.percentVisit',(totalSum.percentVisit))
-    
+
 
     totalSum.percentVisit = totalSum.percentVisit / len
     totalSum.percentEffective = totalSum.percentEffective / len
@@ -2159,17 +2159,17 @@ exports.getRouteEffective = async (req, res) => {
         status: 200,
         data: data,
         total: {
-         route  : totalSum.route,
-         storeAll : totalSum.storeAll,
-         storePending : totalSum.storePending,
-         storeSell : totalSum.storeSell,
-         storeNotSell : totalSum.storeNotSell,
-         storeCheckInNotSell : totalSum.storeCheckInNotSell,
-         storeTotal : totalSum.storeTotal,
-         summary : to2(totalSum.summary),
-         totalqty : totalSum.totalqty,
-         percentVisit : to2(totalSum.percentVisit),
-         percentEffective : to2(totalSum.percentEffective),
+          route: totalSum.route,
+          storeAll: totalSum.storeAll,
+          storePending: totalSum.storePending,
+          storeSell: totalSum.storeSell,
+          storeNotSell: totalSum.storeNotSell,
+          storeCheckInNotSell: totalSum.storeCheckInNotSell,
+          storeTotal: totalSum.storeTotal,
+          summary: to2(totalSum.summary),
+          totalqty: totalSum.totalqty,
+          percentVisit: to2(totalSum.percentVisit),
+          percentEffective: to2(totalSum.percentEffective),
         },
         // zoneRoute
 
@@ -3187,3 +3187,48 @@ exports.addRouteByArea = async (req, res) => {
   }
 }
 
+exports.reRouteIt = async (req, res) => {
+  try {
+
+    const { routeId } = req.body
+    const channel = req.headers['x-channel']
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+
+    const dataRoute = await Route.findOne({ id: routeId })
+
+
+    let data = []
+
+    for (const row of dataRoute.listStore) {
+
+      const dataTran = {
+        storeInfo: row.storeInfo,
+        note: '',
+        image: '',
+        latitude: '',
+        longtitude: "",
+        status: '0',
+        statusText: 'รอเยี่ยม',
+        date: null,
+        listOrder: [{}]
+      }
+      data.push(dataTran)
+
+    }
+
+    await Route.updateOne(
+      { id: routeId },     // filter object อย่างเดียว
+      { $set: { listStore:data } }   // update object อย่างเดียว
+    )
+
+    res.status(200).json({
+      status: 200,
+      message: 'RerouteIt success',
+      // dataRoute: dataRoute,
+      data: data
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
