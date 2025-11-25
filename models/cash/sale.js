@@ -175,11 +175,23 @@ const orderSchema = new mongoose.Schema(
   }
 )
 
-// const Order = dbCA.model('Order', orderSchema)
-// module.exports = { Order }
+const editOrderSchema = mongoose.Schema({
+  orderId : { type: String} ,
+  editPerson  : { type: String} ,
+  name : { type: String} ,
+  nameOld : { type: String} ,
+  address : { type: String} ,
+  addressOld : { type: String} ,
+  taxId : { type: String} ,
+  taxIdOld : { type: String} ,
+  tel : { type: String} ,
+  telOld : { type: String} ,
+  editAt: { type: Date, default: Date.now },
+})
 
 module.exports = conn => {
   return {
-    Order: conn.model('Order', orderSchema)
+    Order: conn.model('Order', orderSchema) ,
+    OrderHisLog : conn.model('editOrderLog', editOrderSchema,'editOrderLog') ,
   }
 }

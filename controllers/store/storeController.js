@@ -897,6 +897,15 @@ exports.editStore = async (req, res) => {
       }
     });
 
+
+    if (!data.user) {
+      return res.status(401).json({
+        status:401,
+        message : "user is required"
+      })
+    }
+
+
     const channel = req.headers['x-channel']
     const { Store, StoreHisLog } = getModelsByChannel(channel, res, storeModel);
 
@@ -972,9 +981,6 @@ exports.editStore = async (req, res) => {
       editPerson,
       ...history
     }
-
-    // console.log(historyFinal)
-
 
     // บันทึกประวัติการแก้ไข
     await StoreHisLog.create(historyFinal);
