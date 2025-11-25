@@ -38,6 +38,9 @@ const checkinSchema = mongoose.Schema({
     updateDate: { type: Date, default: Date.now },
 })
 
+
+
+
 const storeSchema = mongoose.Schema({
     storeId: { type: String, require: true, unique: true },
     isMove : { type: Boolean } ,
@@ -69,6 +72,7 @@ const storeSchema = mongoose.Schema({
     checkIn: checkinSchema,
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
+    // editHis: [editHisSchema],
     date: {
         type: Date,
         default: () => {
@@ -118,6 +122,30 @@ const storeBeautySchema = new mongoose.Schema({
   timestamps: true
 });
 
+const editHisSchema = mongoose.Schema({
+  storeId : { type: String} ,
+  editPerson  : { type: String} ,
+  name : { type: String} ,
+  nameOld : { type: String} ,
+  taxId : { type: String} ,
+  taxIdOld : { type: String} ,
+  tel : { type: String} ,
+  telOld : { type: String} ,
+  address : { type: String} ,
+  addressOld : { type: String} ,
+  subDistrict : { type: String} ,
+  subDistrictOld : { type: String} ,
+  district : { type: String} ,
+  districtOld : { type: String} ,
+  province : { type: String} ,
+  provinceOld : { type: String} ,
+  provinceCode : { type: String} ,
+  provinceCodeOld : { type: String} ,
+  postCode : { type: String} ,
+  postCodeOld : { type: String} ,
+  editAt: { type: Date, default: Date.now },
+})
+
 
 
 module.exports = (conn) => {
@@ -125,7 +153,7 @@ module.exports = (conn) => {
       Store: conn.model('Store', storeSchema),
       StoreType: conn.model('storetypes', typeStoreSchema,'storetypes'),
       RunningNumber: conn.model('runningnumber',runningNumberSchema,'runningnumber'),
-      TypeStore: conn.model('typestores',storeBeautySchema,'typestores')
-
+      TypeStore: conn.model('typestores',storeBeautySchema,'typestores'),
+      StoreHisLog : conn.model('editHisLog',editHisSchema,'editHisLog'),
     };
   };

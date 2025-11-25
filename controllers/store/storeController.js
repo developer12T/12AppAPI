@@ -886,58 +886,112 @@ exports.checkSimilarStores = async (req, res) => {
 }
 
 exports.editStore = async (req, res) => {
-  const { storeId } = req.params
-  const data = req.body
+  // const { storeId, name, taxId, tel, address, subDistrict, district, province, provinceCode, postCode, user } = req.body
 
   try {
-    const immutableFields = [
-      'latitude',
-      'longitude',
-      'taxId',
-      'approve',
-      'policyAgree'
-    ]
-
-    immutableFields.forEach(field => delete data[field])
-
+    const { storeId } = req.params
+    const data = req.body
     Object.keys(data).forEach(key => {
-      if (data[key] === '' || data[key] === null) {
-        delete data[key]
+      if (data[key] === '' || data[key] === null || data[key] === undefined) {
+        delete data[key];
       }
-    })
+    });
 
-    if (Object.keys(data).length === 0) {
-      return res
-        .status(400)
-        .json({ status: '400', message: 'No valid fields to update' })
+    const channel = req.headers['x-channel']
+    const { Store, StoreHisLog } = getModelsByChannel(channel, res, storeModel);
+
+    // 1) ดึงข้อมูลเดิม
+    const oldStore = await Store.findOne({ storeId: storeId });
+    if (!oldStore) {
+      return res.status(404).json({ status: '404', message: 'Store not found' });
     }
 
-    const channel = req.headers['x-channel'] // 'credit' or 'cash'
+    const editableFields = [
+      'storeId',
+      'name',
+      'taxId',
+      'tel',
+      'address',
+      'subDistrict',
+      'district',
+      'province',
+      'provinceCode',
+      'postCode'
+    ];
 
-    const { Store } = getModelsByChannel(channel, res, storeModel)
-    const store = await Store.findOneAndUpdate({ storeId }, data, { new: true })
+    // History ที่จะบันทึก
+    const history = {
+      editPerson: req.user,
+      editAt: new Date(),
+    };
 
-    if (!store) {
-      return res.status(404).json({ status: '404', message: 'Store not found' })
+    // ตรวจว่า field ไหนมีการแก้จริง
+    editableFields.forEach(field => {
+      const oldVal = oldStore[field];
+      const newVal = data[field];
+
+      // เงื่อนไข: มีค่าใหม่ + ไม่เท่าค่าเก่า = ถือว่าแก้ไข
+      if (
+        newVal !== undefined &&
+        newVal !== null &&
+        newVal !== '' &&
+        newVal !== oldVal
+      ) {
+        history[field] = newVal;
+        history[field + 'Old'] = oldVal;
+      }
+    });
+
+
+
+
+    const editPerson = data.user
+    // console.log(editPerson)
+    // ถ้าไม่มีฟิลด์ไหนถูกแก้ → แจ้งว่าไม่มีการเปลี่ยนแปลง
+    if (Object.keys(history).length === 2) {   // มีแค่ editPerson + editAt
+      return res.status(400).json({
+        status: '400',
+        message: 'Nothing changed'
+      });
     }
 
-    const io = getSocket()
-    io.emit('store/editStore', {
-      status: '200',
-      message: 'Store updated successfully',
-      data: store
-    })
+
+    // console.log('editPerson', editPerson)
+
+    // อัปเดตร้าน
+    const updatedStore = await Store.findOneAndUpdate(
+      { storeId: storeId },
+      { $set: data },
+      { new: true }
+    );
+
+    delete history.editPerson;
+
+    const historyFinal = {
+      storeId,
+      editPerson,
+      ...history
+    }
+
+    // console.log(historyFinal)
+
+
+    // บันทึกประวัติการแก้ไข
+    await StoreHisLog.create(historyFinal);
+
+
 
     res.status(200).json({
       status: '200',
       message: 'Store updated successfully',
-      data: store
-    })
+      data: updatedStore
+    });
+
   } catch (error) {
-    console.error('Error updating store:', error)
-    res.status(500).json({ status: '500', message: 'Server error' })
+    console.error(error);
+    res.status(500).json({ status: '500', message: 'Server error' });
   }
-}
+};
 
 exports.addFromERP = async (req, res) => {
   try {
