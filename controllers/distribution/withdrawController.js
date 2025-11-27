@@ -3397,3 +3397,43 @@ exports.uploadNPDData = async (req, res) => {
     return res.status(500).json({ message: error.message })
   }
 }
+
+exports.addNPDProduct = async (req, res) => {
+  try {
+    const now = new Date()
+    const period =
+      now.getFullYear().toString() + String(now.getMonth() + 1).padStart(2, '0')
+    const channel = req.headers['x-channel']
+    const { Npd } = getModelsByChannel(channel, res, npdModel)
+    const { User } = getModelsByChannel('user', res, userModel)
+
+    const userData = await User.find({ platformType: "CASH",role:'sale',zone:{$ne:'SH'} })
+
+    for (const item of userData) {
+      
+      const dataTran = {
+        area:item.area,
+        period:period,
+        npd : [{
+          productId: '10010201058',
+          qty : 3 ,
+          unit : 'CTN'
+        }]
+      }
+
+      Npd.create(dataTran)
+
+    }
+
+    res.status(200).json({
+      status:200,
+      message:'addNPDProduct',
+
+    })
+
+
+  } catch (error) {
+    console.error('Error uploading NPD data:', error)
+    return res.status(500).json({ message: error.message })
+  }
+}
