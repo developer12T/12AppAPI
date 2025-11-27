@@ -100,7 +100,6 @@ exports.checkout = async (req, res) => {
 
       // const totalPrice = item.qty * unitData.price.sale;
       // subtotal += totalPrice;
-      subtotal += total
 
       return {
         type: item.type || '',
@@ -213,7 +212,7 @@ exports.checkout = async (req, res) => {
       listProduct,
       listPromotions: [],
       // listQuota: summary.listQuota,
-      subtotal,
+      subtotal : total,
       discount: 0,
       listQuota: [],
       discountProductId: [],
