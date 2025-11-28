@@ -900,8 +900,8 @@ exports.editStore = async (req, res) => {
 
     if (!data.user) {
       return res.status(401).json({
-        status:401,
-        message : "user is required"
+        status: 401,
+        message: "user is required"
       })
     }
 
@@ -911,7 +911,15 @@ exports.editStore = async (req, res) => {
 
     // 1) ดึงข้อมูลเดิม
     const oldStore = await Store.findOne({ storeId: storeId });
-    if (!oldStore) {
+
+    const m3Store = await Customer.findOne({
+      where: {
+        coNo: 410,
+        customerNo: storeId
+      }
+    });
+
+    if (!oldStore || !m3Store) {
       return res.status(404).json({ status: '404', message: 'Store not found' });
     }
 
@@ -951,9 +959,6 @@ exports.editStore = async (req, res) => {
       }
     });
 
-
-
-
     const editPerson = data.user
     // console.log(editPerson)
     // ถ้าไม่มีฟิลด์ไหนถูกแก้ → แจ้งว่าไม่มีการเปลี่ยนแปลง
@@ -965,7 +970,7 @@ exports.editStore = async (req, res) => {
     }
 
 
-    // console.log('editPerson', editPerson)
+    // console.log('data', data)
 
     // อัปเดตร้าน
     const updatedStore = await Store.findOneAndUpdate(
@@ -973,6 +978,10 @@ exports.editStore = async (req, res) => {
       { $set: data },
       { new: true }
     );
+
+    // const updatedStore = await Store.findOne({ storeId: storeId })
+
+
 
     delete history.editPerson;
 
@@ -985,7 +994,46 @@ exports.editStore = async (req, res) => {
     // บันทึกประวัติการแก้ไข
     await StoreHisLog.create(historyFinal);
 
+    const updateData = {};
 
+    // ---- NAME ----
+    if (data.name) {
+      const nameStr = updatedStore.name ?? '';
+      updateData.OKALCU =  nameStr.slice(0, 10);
+      updateData.customerName = nameStr.slice(0, 36);
+      updateData.customerAddress4 = nameStr.slice(36, 72);
+    }
+
+    if (data.taxId) {
+      updateData.taxno = data.taxId
+    }
+
+    if (data.tel) {
+      updateData.customerPhone = data.tel
+    }
+
+
+    // ---- ADDRESS ----
+    if (data.address || data.subDistrict || data.province || data.postCode) {
+
+      const fullAddress =
+        (updatedStore.address ?? '') +
+        (updatedStore.subDistrict ?? '') +
+        (updatedStore.province ?? '') +
+        (updatedStore.postCode ?? '');
+
+      updateData.customerAddress1 = fullAddress.slice(0, 35);
+      updateData.customerAddress2 = fullAddress.slice(35, 70);
+      updateData.customerAddress3 = fullAddress.slice(70, 105);
+    }
+
+    // ---- UPDATE ครั้งเดียว ----
+    await Customer.update(updateData, {
+      where: {
+        coNo: 410,
+        customerNo: storeId
+      }
+    });
 
     res.status(200).json({
       status: '200',
@@ -1586,21 +1634,21 @@ exports.updateStoreStatus = async (req, res) => {
         customerAddress1: (
           item.address +
           item.subDistrict +
-          item.subDistrict +
+          // item.subDistrict +
           item.province +
           item.postCode ?? ''
         ).substring(0, 35),
         customerAddress2: (
           item.address +
           item.subDistrict +
-          item.subDistrict +
+          // item.subDistrict +
           item.province +
           item.postCode ?? ''
         ).substring(35, 70),
         customerAddress3: (
           item.address +
           item.subDistrict +
-          item.subDistrict +
+          // item.subDistrict +
           item.province +
           item.postCode ?? ''
         ).substring(70, 105),

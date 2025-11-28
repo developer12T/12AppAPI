@@ -290,58 +290,60 @@ exports.checkout = async (req, res) => {
         area: area
       })
       newOrder.newTrip = 'true'
-      if (getNpd.isReceived == 'false') {
-        const areaNpd = await Npd.findOne({ period: period, area: area })
-        // console.log(areaNpdProduct.npd)
-        const productList = areaNpd.npd.flatMap(item => item.productId)
-        const productNew = await Product.find({ id: { $in: productList } })
+      if (getNpd) {
+        if (getNpd.isReceived == 'false') {
+          const areaNpd = await Npd.findOne({ period: period, area: area })
+          // console.log(areaNpdProduct.npd)
+          const productList = areaNpd.npd.flatMap(item => item.productId)
+          const productNew = await Product.find({ id: { $in: productList } })
 
-        let npdProduct = []
-        let totalQtyNpd = 0
-        // console.log(areaNpdProduct)
-        for (const row of areaNpd.npd) {
-          const productDetail = productNew.find(
-            item => item.id === row.productId
-          )
-          // console.log(productDetail)
+          let npdProduct = []
+          let totalQtyNpd = 0
+          // console.log(areaNpdProduct)
+          for (const row of areaNpd.npd) {
+            const productDetail = productNew.find(
+              item => item.id === row.productId
+            )
+            // console.log(productDetail)
 
-          const factor = productDetail.listUnit.find(
-            item => item.unit === row.unit
-          )
-          const qtyPcs = row.qty * factor.factor
+            const factor = productDetail.listUnit.find(
+              item => item.unit === row.unit
+            )
+            const qtyPcs = row.qty * factor.factor
 
-          const data = {
-            id: productDetail.id,
-            lot: '',
-            name: productDetail.name,
-            group: productDetail.group,
-            brand: productDetail.brand,
-            size: productDetail.size,
-            flavour: productDetail.flavour,
-            qty: row.qty,
-            unit: row.unit,
-            qtyPcs: qtyPcs,
-            price: factor.price.sale,
-            total: factor.price.sale * row.qty,
-            weightGross: parseFloat(productDetail.weightGross.toFixed(2)),
-            weightNet: parseFloat(productDetail.weightNet.toFixed(2)),
-            isNPD: true,
-            isBlind: true
-          }
-          npdProduct.push(data)
-          totalQtyNpd += row.qty
-        }
-        // console.log('npdProduct',npdProduct)
-        newOrder.listProduct.push(...npdProduct)
-        newOrder.totalQty += totalQtyNpd
-        await Npd.findOneAndUpdate(
-          { period: period, area: area },
-          {
-            $set: {
-              isReceived: 'true'
+            const data = {
+              id: productDetail.id,
+              lot: '',
+              name: productDetail.name,
+              group: productDetail.group,
+              brand: productDetail.brand,
+              size: productDetail.size,
+              flavour: productDetail.flavour,
+              qty: row.qty,
+              unit: row.unit,
+              qtyPcs: qtyPcs,
+              price: factor.price.sale,
+              total: factor.price.sale * row.qty,
+              weightGross: parseFloat(productDetail.weightGross.toFixed(2)),
+              weightNet: parseFloat(productDetail.weightNet.toFixed(2)),
+              isNPD: true,
+              isBlind: true
             }
+            npdProduct.push(data)
+            totalQtyNpd += row.qty
           }
-        )
+          // console.log('npdProduct',npdProduct)
+          newOrder.listProduct.push(...npdProduct)
+          newOrder.totalQty += totalQtyNpd
+          await Npd.findOneAndUpdate(
+            { period: period, area: area },
+            {
+              $set: {
+                isReceived: 'true'
+              }
+            }
+          )
+        }
       }
     }
 
@@ -554,9 +556,9 @@ exports.getOrderCredit = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-                fullname: `${userData.firstName} ${userData.surName}`,
-                tel: `${userData.tel}`
-              }
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -776,9 +778,9 @@ exports.getOrder = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-                fullname: `${userData.firstName} ${userData.surName}`,
-                tel: `${userData.tel}`
-              }
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -943,9 +945,9 @@ exports.getOrder2 = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-                fullname: `${userData.firstName} ${userData.surName}`,
-                tel: `${userData.tel}`
-              }
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -1117,9 +1119,9 @@ exports.getOrderSup = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-                fullname: `${userData.firstName} ${userData.surName}`,
-                tel: `${userData.tel}`
-              }
+              fullname: `${userData.firstName} ${userData.surName}`,
+              tel: `${userData.tel}`
+            }
             : null,
           orderId: o.orderId,
           newTrip: o.newTrip,
@@ -1905,15 +1907,12 @@ exports.approveWithdraw = async (req, res) => {
           <p>
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh} ${type}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-            <strong>ประเภทการจัดส่ง:</strong> ${
-              distributionTran.orderTypeName
-            }<br>
-            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
-              '-' + wereHouseName?.wh_name || ''
-            }<br>
-            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
-              distributionTran.shippingName
-            }<br>
+            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName
+              }<br>
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
+              }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
+              }<br>
             <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
             <strong>เขต:</strong> ${distributionTran.area}<br>
             <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -2159,15 +2158,12 @@ exports.approveWithdrawCredit = async (req, res) => {
           <p>
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-            <strong>ประเภทการจัดส่ง:</strong> ${
-              distributionTran.orderTypeName
-            }<br>
-            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
-              '-' + wereHouseName?.wh_name || ''
-            }<br>
-            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
-              distributionTran.shippingName
-            }<br>
+            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName
+              }<br>
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
+              }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
+              }<br>
             <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
             <strong>เขต:</strong> ${distributionTran.area}<br>
             <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -2351,9 +2347,8 @@ exports.saleConfirmWithdraw = async (req, res) => {
         const ReceiveQty = Object.values(
           Receive.reduce((acc, cur) => {
             // ใช้ key จาก coNo + withdrawUnit + productId (ถ้าอยากแยกตาม productId ด้วย)
-            const key = `${cur.coNo}_${
-              cur.withdrawUnit
-            }_${cur.productId.trim()}`
+            const key = `${cur.coNo}_${cur.withdrawUnit
+              }_${cur.productId.trim()}`
             if (!acc[key]) {
               acc[key] = { ...cur }
             } else {
@@ -2813,7 +2808,7 @@ exports.withdrawToExcel = async (req, res) => {
 
     const tranFromOrder = modelWithdraw.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD (date) {
+      function formatDateToThaiYYYYMMDD(date) {
         const d = new Date(date)
         // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -2903,7 +2898,7 @@ exports.withdrawToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => {})
+        fs.unlink(tempPath, () => { })
       }
     )
   } catch (error) {
@@ -3114,7 +3109,7 @@ exports.withdrawBackOrderToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => {})
+        fs.unlink(tempPath, () => { })
       })
     }
   } catch (error) {
@@ -3392,6 +3387,46 @@ exports.uploadNPDData = async (req, res) => {
       count: formattedData.length,
       data: formattedData
     })
+  } catch (error) {
+    console.error('Error uploading NPD data:', error)
+    return res.status(500).json({ message: error.message })
+  }
+}
+
+exports.addNPDProduct = async (req, res) => {
+  try {
+    const now = new Date()
+    const period =
+      now.getFullYear().toString() + String(now.getMonth() + 1).padStart(2, '0')
+    const channel = req.headers['x-channel']
+    const { Npd } = getModelsByChannel(channel, res, npdModel)
+    const { User } = getModelsByChannel('user', res, userModel)
+
+    const userData = await User.find({ platformType: "CASH", role: 'sale', zone: { $ne: 'SH' } })
+
+    for (const item of userData) {
+
+      const dataTran = {
+        area: item.area,
+        period: period,
+        npd: [{
+          productId: '10010201058',
+          qty: 3,
+          unit: 'CTN'
+        }]
+      }
+
+      Npd.create(dataTran)
+
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'addNPDProduct',
+
+    })
+
+
   } catch (error) {
     console.error('Error uploading NPD data:', error)
     return res.status(500).json({ message: error.message })

@@ -27,7 +27,8 @@ const {
   getOrder2,
   addRemark,
   addOneWithdraw,
-  uploadNPDData
+  uploadNPDData,
+  addNPDProduct
 } = require('../../controllers/distribution/withdrawController')
 const {
   getPlace,
@@ -87,4 +88,5 @@ router.post('/addOneWithdraw', addOneWithdraw)
 router.get('/getRouteWithdraw', getRouteWithdraw)
 router.post('/syncAddressCIADDR', syncAddressCIADDR)
 router.post('/syncAddressDROUTE', syncAddressDROUTE)
+router.post('/addNPDProduct', addNPDProduct)
 module.exports = router
