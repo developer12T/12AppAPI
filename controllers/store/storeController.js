@@ -3446,6 +3446,8 @@ exports.getStorePage = async (req, res) => {
     if (route) filter.route = route
     if (type && type !== 'all') filter.type = type
 
+    filter.status = { $nin: ['10', '90'] }
+
     const qText = (q || '').trim()
     if (qText) {
       filter.$or = [
