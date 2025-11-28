@@ -1099,7 +1099,14 @@ exports.getOrderSup = async (req, res) => {
       $sort: { statusASC: 1, createdAt: -1 }
     })
 
-    const order = await Distribution.aggregate(pipeline)
+    let order = []
+    if (zone === 'PC') {
+      order = await Distribution.find({ period: period }).sort({ statusASC: 1, createdAt: -1 });
+    } else {
+      order = await Distribution.aggregate(pipeline)
+    }
+
+    
 
     if (order.length == 0) {
       return res
