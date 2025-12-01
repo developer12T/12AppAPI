@@ -1050,3 +1050,83 @@ exports.getReward = async (req, res) => {
     })
   }
 }
+
+exports.getPromotionPc = async (req, res) => {
+  try {
+    
+    const { total,period,area } = req.body
+    // console.log(total)
+    const channel = req.headers['x-channel']
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const promotion = await Promotion.find({ status: 'active' })
+    const { Stock } = getModelsByChannel(channel, res, stockModel)
+
+    const stockData = await Stock.findOne({period:period,area:area})
+    const productData = await Product.find()
+    const stockList = stockData.listProduct
+
+    // console.log(productData)
+
+
+
+    let data = []
+
+    for (const row of promotion) {
+
+      const promoAmount = row.conditions[0].productAmount
+      if (total >= promoAmount) {
+
+        const qtyPromo = Math.floor(total / promoAmount)
+      
+        const dataTran = {
+          proId:row.proId,
+          name:row.name,
+          description:row.name,
+          pricePro: promoAmount,
+          rewards : row.rewards.map(item => {
+            const productDetail = productData.find(u => u.id === item.productId)
+            const stockDetail = stockList.find(u => u.productId === item.productId)
+            const unit = productDetail.listUnit.find(u => u.factor === 1)
+            // console.log(unit)
+            return {
+              id : item.productId,
+              name : productDetail.name,
+              groupCode : productDetail.groupCode,
+              group : productDetail.group,
+              brandCode: productDetail.brandCode,
+              brand : productDetail.brand ,
+              size : productDetail.size,
+              flavourCode :productDetail.flavourCode  ,
+              flavour : productDetail.flavour ,
+              qty : stockDetail?.balancePcs ?? 0,
+              unit : unit.unit,
+              unitName : unit.name,
+
+            }
+          }),
+          qtyPromo : qtyPromo
+        }
+        data.push(dataTran)
+
+      }
+
+    }
+
+
+
+    res.status(200).json({
+      status:200,
+      message:'get promotion pc success',
+      data : data,
+      // totol
+    })
+
+  } catch (error) {
+        console.error('deletePromotion error:', error)
+    return res.status(500).json({
+      status: 500,
+      message: 'Internal server error'
+    })
+  }
+}
