@@ -320,9 +320,12 @@ exports.getRouteWithdraw = async (req, res) => {
 
     const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
 
+
+
     let query = {}
     if (WH) query.WH = WH
-    query.Des_Area = { $regex: `^P`, $options: 'i' }
+    if (Des_Area) query.Des_Area = Des_Area
+    // query.Des_Area = { $regex: `^P`, $options: 'i' }
 
     const data = await Withdraw.find(query)
 
