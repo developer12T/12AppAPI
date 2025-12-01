@@ -12,7 +12,8 @@ const {
   getPromotionDetail,
   deletePromotion,
   addPromotionM3,
-  getReward
+  getReward,
+  getPromotionPc
 } = require('../../controllers/promotion/promotionController')
 
 const router = express.Router()
@@ -33,4 +34,5 @@ router.post('/addPromotionShelf', addPromotionShelf)
 
 router.post('/deletePromotion', deletePromotion)
 router.post('/getReward', getReward)
+router.post('/getPromotionPc', getPromotionPc)
 module.exports = router

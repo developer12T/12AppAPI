@@ -367,38 +367,40 @@ const generateOrderIdStoreLatLong = async (area, warehouse, channel, res) => {
       .padStart(4, '0')}`
 }
 
-const generateOrderIdFoodTruck = async (area,warehouse,channel,res) => {
-  const currentYear = new Date().getFullYear() + 543
-  const currentMonth = (new Date().getMonth() + 1).toString().padStart(2, '0')
+const generateOrderIdFoodTruck = async (area, warehouse, channel, res) => {
+  const now = new Date()
+
+  const currentYear = now.getFullYear() + 543
+  const year = now.getFullYear()
+  const month = now.getMonth() // 0–11
+  const currentMonth = (month + 1).toString().padStart(2, '0')
+
   const { Order } = getModelsByChannel(channel, res, orderModel)
 
+  // สร้างช่วงวันที่ด้วย date object (ไม่ต้องใช้ string)
+  const start = new Date(year, month, 1)      // เช่น 2025-11-01
+  const end   = new Date(year, month + 1, 1)  // เดือนถัดไป (Auto overflow → Jan next year)
 
   const latestOrder = await Order.findOne({
     'store.area': area,
     createdAt: {
-      $gte: new Date(`${new Date().getFullYear()}-${currentMonth}-01`),
-      $lt: new Date(
-        `${new Date().getFullYear()}-${parseInt(currentMonth) + 1}-01`
-      )
+      $gte: start,
+      $lt: end
     },
     status: { $nin: ['canceled', 'reject'] }
   })
     .sort({ orderId: -1 })
     .select('orderId')
 
-  // console.log("latestOrder",latestOrder)
-
   let runningNumber = latestOrder
     ? parseInt(latestOrder.orderId.slice(-4)) + 1
     : 1
 
-
   const orderId = `${currentYear.toString().slice(2, 4)}${currentMonth}15${warehouse}${runningNumber.toString().padStart(4, '0')}`
-
-  // console.log('orderId',orderId)
 
   return orderId
 }
+
 
 
 

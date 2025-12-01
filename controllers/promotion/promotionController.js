@@ -1050,3 +1050,53 @@ exports.getReward = async (req, res) => {
     })
   }
 }
+
+exports.getPromotionPc = async (req, res) => {
+  try {
+    
+    const { total } = req.body
+    console.log(total)
+    const channel = req.headers['x-channel']
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const promotion = await Promotion.find({ status: 'active' })
+
+    let data = []
+
+    for (const row of promotion) {
+
+      const promoAmount = row.conditions[0].productAmount
+
+      // console.log(totol)
+      // console.log(promoAmount)
+      if (total >= promoAmount) {
+      
+        const dataTran = {
+          proId:row.proId,
+          name:row.name,
+          description:row.name,
+          rewards : row.rewards
+        }
+        data.push(dataTran)
+
+      }
+
+    }
+
+
+
+    res.status(200).json({
+      status:200,
+      message:'get promotion pc success',
+      data : promotion,
+      // totol
+    })
+
+  } catch (error) {
+        console.error('deletePromotion error:', error)
+    return res.status(500).json({
+      status: 500,
+      message: 'Internal server error'
+    })
+  }
+}
