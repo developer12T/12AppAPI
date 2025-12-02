@@ -33,6 +33,8 @@ const listCartPromotion = mongoose.Schema({
   proType: { type: String, require: true, default: '' },
   proQty: { type: Number, require: true, default: 0 },
   discount: { type: Number, require: true, default: 0 },
+  proConditions: { type: Number } ,
+  proAmount: { type: Number } ,
   listProduct: [listProductPromotion]
 })
 
@@ -83,6 +85,8 @@ const cartSchema = mongoose.Schema(
     total: { type: Number, require: true, default: 0 },
     listProduct: [listCartProduct],
     listPromotion: [listCartPromotion],
+    totalProCal : { type: Number },
+    listPromotionSelect: [listCartPromotion],
     listRefund: [listCartRefund],
     listQuota: [listQuotaSchema],
     cartHashProduct: { type: String, default: '' },

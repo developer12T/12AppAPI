@@ -9,7 +9,8 @@ const {
   clearCartAll,
   autoDeleteCart,
   getCountCart,
-  getCartDetail
+  getCartDetail,
+  selectProCart
 } = require('../../controllers/cart/cartController')
 
 const router = express.Router()
@@ -24,4 +25,5 @@ router.post('/updateStock', updateStock)
 router.post('/autoDeleteCart', autoDeleteCart)
 router.get('/getCountCart', getCountCart)
 router.get('/getCartDetail', getCartDetail)
+router.post('/selectProCart', selectProCart)
 module.exports = router

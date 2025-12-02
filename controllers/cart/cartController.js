@@ -175,10 +175,10 @@ exports.getCart = async (req, res) => {
       type === 'withdraw'
         ? { type, area }
         : type === 'adjuststock'
-        ? { type, area, withdrawId }
-        : type === 'give'
-        ? { type, area, storeId, proId }
-        : { type, area, storeId }
+          ? { type, area, withdrawId }
+          : type === 'give'
+            ? { type, area, storeId, proId }
+            : { type, area, storeId }
 
     // ใช้ session ใน findOne เฉพาะกรณีที่ต้อง update ข้อมูล (กัน dirty read ใน replica set)
     let cart = await Cart.findOne(cartQuery)
@@ -354,10 +354,10 @@ exports.addProduct = async (req, res) => {
       type === 'withdraw'
         ? { type, area }
         : type === 'adjuststock'
-        ? { type, area, withdrawId }
-        : type === 'give'
-        ? { type, area, storeId, proId }
-        : { type, area, storeId }
+          ? { type, area, withdrawId }
+          : type === 'give'
+            ? { type, area, storeId, proId }
+            : { type, area, storeId }
 
     const { Cart } = getModelsByChannel(channel, res, cartModel)
 
@@ -566,8 +566,8 @@ exports.adjustProduct = async (req, res) => {
       type === 'withdraw'
         ? { type, area }
         : type === 'adjuststock'
-        ? { type, area, withdrawId }
-        : { type, area, storeId }
+          ? { type, area, withdrawId }
+          : { type, area, storeId }
 
     let cart = await Cart.findOne(cartQuery)
     if (!cart) {
@@ -1220,6 +1220,96 @@ exports.getCartDetail = async (req, res) => {
       message: 'error from server',
       error: error.message || error.toString(), // ✅ ป้องกัน circular object
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+}
+
+
+exports.selectProCart = async (req, res) => {
+  try {
+    const { area, storeId, listPromotion } = req.body
+    const channel = req.headers['x-channel']
+
+    const { Cart } = getModelsByChannel(channel, res, cartModel)
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel)
+
+    const promotionData = await Promotion.findOne({
+      proId: listPromotion.proId,
+      status: 'active'
+    })
+
+    const cart = await Cart.findOne({ area, storeId, type: 'sale' })
+
+    // ❌ findOne จะไม่ return array → ไม่มี length
+    if (!promotionData) {
+      return res.status(404).json({
+        status: 404,
+        message: "not found promotion"
+      })
+    }
+
+    if (!cart) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found cart'
+      })
+    }
+
+    cart.listPromotionSelect = cart.listPromotionSelect || []
+
+    const existingIndex = cart.listPromotionSelect.findIndex(
+      p => p.proId === listPromotion.proId
+    )
+
+    const pricePromo = promotionData.conditions[0].productAmount
+
+    if (existingIndex !== -1) {
+      const item = cart.listPromotionSelect[existingIndex]
+
+      item.proQty += listPromotion.proQty
+      // item.proAmount += listPromotion.proQty * pricePromo
+
+      // ป้องกันไม่ให้ listProduct เป็น undefined
+      item.listProduct = item.listProduct || []
+
+      // ❗ listPromotion.listProduct = object เดี่ยว
+      const prod = listPromotion.listProduct
+
+      const existingProductIndex = item.listProduct.findIndex(
+        u => u.id === prod.id && u.unit === prod.unit
+      )
+
+      if (existingProductIndex !== -1) {
+        const dataProduct = item.listProduct[existingProductIndex]
+        dataProduct.qty += prod.qty
+        dataProduct.qtyPcs += prod.qtyPcs
+
+      } else {
+        // push เข้า item.listProduct เท่านั้น
+        item.listProduct.push(prod)
+      }
+
+    } else {
+      // push promotion ทั้ง block
+      cart.listPromotionSelect.push(listPromotion)
+    }
+
+    await cart.save()
+
+    res.status(200).json({
+      status: 200,
+      message: 'Add promotion success',
+      data: cart   // แก้จาก data → cart
+    })
+
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     })
   }
 }
