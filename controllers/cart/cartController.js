@@ -219,6 +219,7 @@ exports.getCart = async (req, res) => {
       // cart.cartHashPromotion = newCartHashPromotion
       summary.listPromotion = cart.listPromotion
       summary.listQuota = quota.appliedPromotions
+      summary.listPromotionSelect = cart.listPromotionSelect || [];
 
       // console.log(promotion.appliedPromotions)
 
