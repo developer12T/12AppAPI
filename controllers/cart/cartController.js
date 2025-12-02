@@ -1295,6 +1295,7 @@ exports.addSelectProCart = async (req, res) => {
     } else {
       // push promotion ทั้ง block
       listPromotion.proAmount = listPromotion.proQty * pricePromo
+      listPromotion.proConditions = pricePromo
       cart.listPromotionSelect.push(listPromotion)
     }
 
@@ -1319,6 +1320,100 @@ exports.addSelectProCart = async (req, res) => {
       status: 200,
       message: 'Add promotion success',
       data: cart   // แก้จาก data → cart
+    })
+
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    })
+  }
+}
+
+exports.deleteSelectProCart = async (req, res) => {
+  try {
+    const { area, storeId, proId, id, unit } = req.body
+    const channel = req.headers['x-channel']
+
+    const { Cart } = getModelsByChannel(channel, res, cartModel)
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel)
+
+    const cart = await Cart.findOne({ area, storeId, type: 'sale' })
+
+    // 🔥 ต้องเช็ค cart ก่อน ไม่งั้น cart.listPromotionSelect พังแน่นอน
+    if (!cart) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found cart'
+      })
+    }
+
+    cart.listPromotionSelect = cart.listPromotionSelect || []
+
+    const existingIndex = cart.listPromotionSelect.findIndex(
+      p => p.proId === proId
+    )
+
+    if (existingIndex === -1) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found promotion'
+      })
+    }
+
+    const listPromotionSelect = cart.listPromotionSelect[existingIndex]
+
+    if (!listPromotionSelect?.listProduct) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found promotion'
+      })
+    }
+
+    const existingProductIndex = listPromotionSelect.listProduct.findIndex(
+      p => p.id === id && p.unit === unit
+    )
+
+    if (existingProductIndex === -1) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found product'
+      })
+    }
+
+    // ลบ product
+    cart.listPromotionSelect[existingIndex].listProduct.splice(existingProductIndex, 1)
+
+    const proQty = to2(
+      cart.listPromotionSelect[existingIndex].listProduct.reduce((sum, p) => sum + p.qty, 0)
+    )
+
+    cart.listPromotionSelect[existingIndex].proAmount =
+      proQty * (cart.listPromotionSelect[existingIndex].proConditions)
+
+    cart.listPromotionSelect[existingIndex].proQty = proQty
+
+    const countListProduct = cart.listPromotionSelect[existingIndex].listProduct.length
+
+    if (countListProduct === 0) {
+      cart.listPromotionSelect.splice(existingIndex, 1)
+    }
+
+    cart.totalProCal = to2(
+      cart.listPromotionSelect.reduce((sum, p) => sum + p.proAmount, 0)
+    )
+
+    await cart.save()
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'deleteSelectProCart success',
+      data: cart
     })
 
   } catch (error) {
