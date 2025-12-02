@@ -1285,7 +1285,6 @@ exports.addSelectProCart = async (req, res) => {
         dataProduct.qty += prod.qty
         dataProduct.qtyPcs += prod.qtyPcs
 
-        item.proQty += prod.qty
 
       } else {
         // push เข้า item.listProduct เท่านั้น
