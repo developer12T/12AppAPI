@@ -3098,7 +3098,7 @@ exports.withdrawBackOrderToExcel = async (req, res) => {
         const sendthaiMonth = sendAtUtc.getMonth() + 1
         const sendthaiYear = sendAtUtc.getFullYear() + 543
 
-        const updatedthaiDay =  updateAtUtc.getDate()
+        const updatedthaiDay = updateAtUtc.getDate()
         const updatedthaiMonth = updateAtUtc.getMonth() + 1
         const updatedthaiYear = updateAtUtc.getFullYear() + 543
 

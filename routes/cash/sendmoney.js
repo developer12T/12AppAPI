@@ -9,6 +9,7 @@ const {
   sendmoneyToExcel,
   updateSendmoneyOld,
   updateSendmoneyOld2,
+  updateSendmoneyAcc,
   fixSendmoney,
   addSendMoneyToColumnAcc
 } = require('../../controllers/sendmoney/sendmoneyController')
@@ -45,7 +46,8 @@ router.post('/getSendMoney', getSendMoney)
 router.get('/getAllSendMoney', getAllSendMoney)
 router.get('/getSendMoneyForAcc', getSendMoneyForAcc)
 router.get('/sendmoneyToExcel', sendmoneyToExcel)
-router.get('/sendmoneyToExcel', sendmoneyToExcel)
+router.patch('/updateSndmoneyAcc', updateSendmoneyAcc)
+// router.get('/sendmoneyToExcel', sendmoneyToExcel)
 router.post('/fixSendmoney', upload.single('file'), fixSendmoney)
 
 router.post('/addSendMoneyToColumnAcc', addSendMoneyToColumnAcc)
