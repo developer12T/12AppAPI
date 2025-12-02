@@ -1651,6 +1651,47 @@ exports.sendmoneyToExcel = async (req, res) => {
   }
 }
 
+exports.updateSendmoneyAcc = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    let { sendmoneyAcc, date, area } = req.body
+    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+
+    // 🟦 Convert "DD-MM-YYYY" → "YYYY-MM-DD"
+    if (date.includes('-')) {
+      const [dd, mm, yyyy] = date.split('-')
+      date = `${yyyy}-${mm}-${dd}` // convert
+    }
+
+    // 🟦 Create date range (UTC+7)
+    const start = new Date(`${date}T00:00:00+07:00`)
+    const end = new Date(`${date}T23:59:59.999+07:00`)
+
+    const updatedStore = await SendMoney.findOneAndUpdate(
+      {
+        area: area,
+        dateAt: { $gte: start, $lt: end }
+      },
+      {
+        $set: { sendmoneyAcc }
+      },
+      { new: true }
+    )
+
+    return res.status(200).json({
+      status: 200,
+      message: 'successfully',
+      data: updatedStore
+    })
+  } catch (error) {
+    return res.status(500).json({
+      status: 500,
+      message: 'Internal server error',
+      error: error.message
+    })
+  }
+}
+
 exports.fixSendmoney = async (req, res) => {
   try {
     const channel = 'cash'
