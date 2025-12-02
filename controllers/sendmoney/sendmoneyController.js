@@ -131,7 +131,7 @@ exports.addSendMoney = async (req, res) => {
         area: area,
         dateAt: startOfMonthUTC,
         sendmoney: sendmoney,
-        sendmoneyAcc : sendmoney,
+        sendmoneyAcc: sendmoney,
         salePayer: salePayer,
         saleCode: saleCode,
         period: periodStr,
@@ -147,7 +147,7 @@ exports.addSendMoney = async (req, res) => {
           },
           salePayer: salePayer,
           saleCode: saleCode,
-          sendmoneyAcc : sendmoney,
+          sendmoneyAcc: sendmoney,
           different: to2(different)
         }
       )
@@ -1494,6 +1494,7 @@ exports.sendmoneyToExcel = async (req, res) => {
         $project: {
           area: 1,
           sendmoney: 1,
+          sendmoneyAcc: 1,
           imageList: 1,
           date: {
             $dateToString: {
@@ -1507,6 +1508,7 @@ exports.sendmoneyToExcel = async (req, res) => {
       {
         $group: {
           _id: { area: '$area', date: '$date' },
+          totalAcc: { $sum: '$sendmoneyAcc' }, // <== เพิ่ม
           totalSent: { $sum: '$sendmoney' },
           images: { $push: '$imageList.path' }
         }
@@ -1525,6 +1527,7 @@ exports.sendmoneyToExcel = async (req, res) => {
       refund: 0,
       totalSale: 0,
       sendmoney: 0,
+      sendmoneyAcc: 0,
       diff: 0,
       image: []
     })
@@ -1562,6 +1565,7 @@ exports.sendmoneyToExcel = async (req, res) => {
       const row = put(area, date)
       row.sendmoney = e.totalSent || 0
       row.image = e.images || []
+      row.sendmoneyAcc = e.totalAcc || 0 // <== เพิ่มตรงนี้
     })
 
     // -------------------------
@@ -1586,6 +1590,7 @@ exports.sendmoneyToExcel = async (req, res) => {
           totalSale: to2(row.totalSale),
           sendmoney: to2(row.sendmoney),
           diff: to2(row.diff),
+          sendmoneyAcc: to2(row.sendmoneyAcc),
           image: row.image[0]
         })
       }
@@ -1643,6 +1648,47 @@ exports.sendmoneyToExcel = async (req, res) => {
   } catch (err) {
     console.error(err)
     return res.status(500).json({ status: 500, message: err.message })
+  }
+}
+
+exports.updateSendmoneyAcc = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    let { sendmoneyAcc, date, area } = req.body
+    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+
+    // 🟦 Convert "DD-MM-YYYY" → "YYYY-MM-DD"
+    if (date.includes('-')) {
+      const [dd, mm, yyyy] = date.split('-')
+      date = `${yyyy}-${mm}-${dd}` // convert
+    }
+
+    // 🟦 Create date range (UTC+7)
+    const start = new Date(`${date}T00:00:00+07:00`)
+    const end = new Date(`${date}T23:59:59.999+07:00`)
+
+    const updatedStore = await SendMoney.findOneAndUpdate(
+      {
+        area: area,
+        dateAt: { $gte: start, $lt: end }
+      },
+      {
+        $set: { sendmoneyAcc }
+      },
+      { new: true }
+    )
+
+    return res.status(200).json({
+      status: 200,
+      message: 'successfully',
+      data: updatedStore
+    })
+  } catch (error) {
+    return res.status(500).json({
+      status: 500,
+      message: 'Internal server error',
+      error: error.message
+    })
   }
 }
 
@@ -1802,11 +1848,9 @@ function convertToFullMonthArr (data, year, month) {
   return fullMonthArray
 }
 
-
 exports.addSendMoneyToColumnAcc = async (req, res) => {
   try {
-    
-    const { period , date } = req.query
+    const { period, date } = req.query
     const channel = 'cash'
 
     const { User } = getModelsByChannel('user', res, userModel)
@@ -1816,45 +1860,42 @@ exports.addSendMoneyToColumnAcc = async (req, res) => {
 
     const dataUser = await User.find({
       platformType: 'CASH',
-      role : 'sale'
+      role: 'sale'
     })
 
-for (const row of dataUser) {
+    for (const row of dataUser) {
+      const sendmoneyData = await SendMoney.findOne({
+        area: row.area,
+        period: period,
+        dateAt: date
+      })
 
-  const sendmoneyData = await SendMoney.findOne({
-    area: row.area,
-    period: period,
-    dateAt: date,
-  });
+      if (!sendmoneyData) continue
 
-  if (!sendmoneyData) continue;
-
-  await SendMoney.updateOne(
-    {
-      area: row.area,
-      period: period,
-      dateAt: date,
-    },
-    {
-      $set: {
-        sendmoneyAcc: sendmoneyData.sendmoney,
-      },
+      await SendMoney.updateOne(
+        {
+          area: row.area,
+          period: period,
+          dateAt: date
+        },
+        {
+          $set: {
+            sendmoneyAcc: sendmoneyData.sendmoney
+          }
+        }
+      )
     }
-  );
-}
 
     res.status(200).json({
-      status:200 ,
-      message:'Add data success',
-      data : dataUser
+      status: 200,
+      message: 'Add data success',
+      data: dataUser
     })
-
   } catch (error) {
-      return res.status(500).json({
+    return res.status(500).json({
       status: 500,
       message: 'Internal server error',
       error: error.message
     })
-    
   }
 }
