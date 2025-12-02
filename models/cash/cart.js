@@ -34,7 +34,7 @@ const listCartPromotion = mongoose.Schema({
   proQty: { type: Number, require: true, default: 0 },
   discount: { type: Number, require: true, default: 0 },
   proConditions: { type: Number } ,
-  proAmount: { type: Number } ,
+  proAmount: { type: Number,  default: 0 } ,
   listProduct: [listProductPromotion]
 })
 

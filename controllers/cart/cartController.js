@@ -1267,7 +1267,8 @@ exports.selectProCart = async (req, res) => {
       const item = cart.listPromotionSelect[existingIndex]
 
       item.proQty += listPromotion.proQty
-      // item.proAmount += listPromotion.proQty * pricePromo
+
+      item.proAmount += listPromotion.proQty * pricePromo
 
       // ป้องกันไม่ให้ listProduct เป็น undefined
       item.listProduct = item.listProduct || []
@@ -1284,6 +1285,8 @@ exports.selectProCart = async (req, res) => {
         dataProduct.qty += prod.qty
         dataProduct.qtyPcs += prod.qtyPcs
 
+        item.proQty += prod.qty
+
       } else {
         // push เข้า item.listProduct เท่านั้น
         item.listProduct.push(prod)
@@ -1291,8 +1294,24 @@ exports.selectProCart = async (req, res) => {
 
     } else {
       // push promotion ทั้ง block
+      listPromotion.proAmount = listPromotion.proQty * pricePromo
       cart.listPromotionSelect.push(listPromotion)
     }
+
+    cart.totalProCal = to2(
+      cart.listPromotionSelect.reduce((sum, p) => sum + p.proAmount, 0)
+    )
+
+    const totalProCal = cart.totalProCal
+
+    if (totalProCal > cart.total) {
+      return res.status(405).json({
+        status: 405,
+        message: "Discount exceeds total amount. Promotion cannot be applied."
+
+      })
+    }
+
 
     await cart.save()
 
