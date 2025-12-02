@@ -1225,7 +1225,7 @@ exports.getCartDetail = async (req, res) => {
 }
 
 
-exports.selectProCart = async (req, res) => {
+exports.addselectProCart = async (req, res) => {
   try {
     const { area, storeId, listPromotion } = req.body
     const channel = req.headers['x-channel']
