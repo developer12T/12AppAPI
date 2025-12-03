@@ -251,7 +251,13 @@ exports.getCart = async (req, res) => {
       summary.listPromotionSelect = cart.listPromotionSelect || [];
       summary.totalProCal = cart.totalProCal || 0;
       summary.totalProCalDiff = cart.totalProCalDiff || 0
-      // console.log(promotion.appliedPromotions)
+
+
+      if (summary.listPromotion.length === 0) {
+        summary.canSelectPro = false
+      } else {
+        summary.canSelectPro = true
+      }
 
       const qtyproductPro = summary.listPromotion.flatMap(u => {
         const promoDetail = u.listProduct
@@ -279,7 +285,7 @@ exports.getCart = async (req, res) => {
       // console.log(cart.listPromotion)
       const updated = await Cart.findOneAndUpdate(
         { _id: cart._id },
-        { $set: { listPromotion: promotion.appliedPromotions } },
+        { $set: { listPromotion: promotion.appliedPromotions,canSelectPro:summary.canSelectPro } },
         { new: true, runValidators: true }
       )
 

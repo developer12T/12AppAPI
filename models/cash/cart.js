@@ -90,6 +90,7 @@ const cartSchema = mongoose.Schema(
     listPromotionSelect: [listCartPromotion],
     listRefund: [listCartRefund],
     listQuota: [listQuotaSchema],
+    canSelectPro : {type:Boolean},
     cartHashProduct: { type: String, default: '' },
     cartHashPromotion: { type: String, default: '' },
     createdAt: { type: Date, default: Date.now },

@@ -112,6 +112,8 @@ async function summaryOrder (cart, channel, res) {
         })
       })) || []
 
+      // console.log(cart)
+
     return {
       type: cart.type,
       store,
