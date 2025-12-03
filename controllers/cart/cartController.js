@@ -220,7 +220,7 @@ exports.getCart = async (req, res) => {
       summary.listPromotion = cart.listPromotion
       summary.listQuota = quota.appliedPromotions
       summary.listPromotionSelect = cart.listPromotionSelect || [];
-
+      summary.totalProCal = cart.totalProCal || 0;
       // console.log(promotion.appliedPromotions)
 
       const qtyproductPro = summary.listPromotion.flatMap(u => {
@@ -1427,3 +1427,5 @@ exports.deleteSelectProCart = async (req, res) => {
     })
   }
 }
+
+
