@@ -250,6 +250,7 @@ exports.getCart = async (req, res) => {
       summary.listQuota = quota.appliedPromotions
       summary.listPromotionSelect = cart.listPromotionSelect || [];
       summary.totalProCal = cart.totalProCal || 0;
+      summary.totalProCalDiff = cart.totalProCalDiff || 0
       // console.log(promotion.appliedPromotions)
 
       const qtyproductPro = summary.listPromotion.flatMap(u => {
@@ -1334,6 +1335,7 @@ exports.addSelectProCart = async (req, res) => {
     )
 
     const totalProCal = cart.totalProCal
+    cart.totalProCalDiff =  cart.total - cart.totalProCal
 
     if (totalProCal > cart.total) {
       return res.status(405).json({
@@ -1436,6 +1438,8 @@ exports.deleteSelectProCart = async (req, res) => {
     cart.totalProCal = to2(
       cart.listPromotionSelect.reduce((sum, p) => sum + p.proAmount, 0)
     )
+
+    cart.totalProCalDiff = cart.total - cart.totalProCal  
 
     await cart.save()
 

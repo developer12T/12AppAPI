@@ -550,7 +550,16 @@ async function applyPromotion(order, channel, res) {
 
 
         // let totalAmount = matchedProducts.reduce((sum, p) => sum + (p.qtyPcs * p.pricePcs), 0)
-        let totalAmount = matchedProducts.reduce((sum, p) => sum + (p.total), 0)
+        // let totalAmount = matchedProducts.reduce((sum, p) => sum + (p.total), 0)
+        let totalAmount = 0
+        if (channel === 'pc') {
+            totalAmount = order.totalProCalDiff
+        }else{
+            totalAmount = matchedProducts.reduce((sum, p) => sum + (p.total), 0)
+        }
+
+        console.log("totalAmount",totalAmount)
+
         let totalQty = matchedProducts.reduce((sum, p) => sum + p.qtyPromo, 0)
 
         // console.log(totalAmount)

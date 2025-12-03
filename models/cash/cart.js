@@ -86,6 +86,7 @@ const cartSchema = mongoose.Schema(
     listProduct: [listCartProduct],
     listPromotion: [listCartPromotion],
     totalProCal : { type: Number },
+    totalProCalDiff : { type: Number },
     listPromotionSelect: [listCartPromotion],
     listRefund: [listCartRefund],
     listQuota: [listQuotaSchema],
