@@ -195,7 +195,7 @@ exports.getCart = async (req, res) => {
       // session.startTransaction();
       let proCheck = false
       summary = await summaryOrder(cart, channel, res)
-
+      console.log("summary",summary)
       // const newCartHashProduct = crypto
       //   .createHash('md5')
       //   .update(JSON.stringify(cart.listProduct))
@@ -250,7 +250,7 @@ exports.getCart = async (req, res) => {
       summary.listQuota = quota.appliedPromotions
       summary.listPromotionSelect = cart.listPromotionSelect || [];
       summary.totalProCal = cart.totalProCal || 0;
-      summary.totalProCalDiff = summary.totalProCalDiff || 0
+      // summary.totalProCalDiff = cart.total - cart.totalProCal || 0
 
 
       if (summary.listPromotion.length === 0) {
