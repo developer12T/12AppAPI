@@ -208,9 +208,38 @@ exports.getCart = async (req, res) => {
       // let shouldRecalculatePromotion =
       //   cart.cartHashProduct !== newCartHashProduct
       // if (shouldRecalculatePromotion) {
-      const promotion = await applyPromotion(summary, channel, res)
+      const promotion = await applyPromotion(summary, channel, res);
 
-      // console.log('promotion', promotion)
+      // กัน null
+      const appliedPromotions = promotion?.appliedPromotions ?? [];
+
+      // เอาเฉพาะ proId ไม่ซ้ำ
+      const proIdList = [...new Set(
+        appliedPromotions.flatMap(item => item.proId)
+      )];
+
+      const promotionDetail = await Promotion.find({
+        proId: { $in: proIdList }
+      });
+
+      const appliedWithPromo = appliedPromotions.map(item => {
+        const promo = promotionDetail.find(u => u.proId === item.proId);
+        const pricePromo = promo?.conditions?.[0]?.productAmount ?? 0;
+
+        // console.log("pricePromo", pricePromo);
+
+        return {
+          ...item,
+          proCode: promo?.proCode ?? null,
+          proConditions: pricePromo
+        };
+      });
+
+      // อัปเดตกลับ
+      if (promotion) {
+        promotion.appliedPromotions = appliedWithPromo;
+      }
+
 
       const quota = await applyQuota(summary, channel, res)
       cart.listQuota = quota.appliedPromotions
@@ -1296,6 +1325,7 @@ exports.addSelectProCart = async (req, res) => {
       // push promotion ทั้ง block
       listPromotion.proAmount = listPromotion.proQty * pricePromo
       listPromotion.proConditions = pricePromo
+      listPromotion.proCode = promotionData.proCode
       cart.listPromotionSelect.push(listPromotion)
     }
 
