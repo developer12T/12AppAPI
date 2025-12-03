@@ -128,7 +128,7 @@ async function summaryOrder (cart, channel, res) {
       discountProduct: 0,
       vat: parseFloat((cart.total - cart.total / 1.07).toFixed(2)),
       totalExVat: parseFloat((cart.total / 1.07).toFixed(2)),
-      totalProCalDiff: cart.totalProCalDiff ?? 0
+      totalProCalDiff: parseFloat(cart.total.toFixed(2))
 
     }
     // }

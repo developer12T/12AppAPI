@@ -250,7 +250,7 @@ exports.getCart = async (req, res) => {
       summary.listQuota = quota.appliedPromotions
       summary.listPromotionSelect = cart.listPromotionSelect || [];
       summary.totalProCal = cart.totalProCal || 0;
-      summary.totalProCalDiff = cart.totalProCalDiff || 0
+      summary.totalProCalDiff = summary.totalProCalDiff || 0
 
 
       if (summary.listPromotion.length === 0) {
