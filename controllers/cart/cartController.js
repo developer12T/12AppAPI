@@ -175,10 +175,10 @@ exports.getCart = async (req, res) => {
       type === 'withdraw'
         ? { type, area }
         : type === 'adjuststock'
-        ? { type, area, withdrawId }
-        : type === 'give'
-        ? { type, area, storeId, proId }
-        : { type, area, storeId }
+          ? { type, area, withdrawId }
+          : type === 'give'
+            ? { type, area, storeId, proId }
+            : { type, area, storeId }
 
     // ใช้ session ใน findOne เฉพาะกรณีที่ต้อง update ข้อมูล (กัน dirty read ใน replica set)
     let cart = await Cart.findOne(cartQuery)
@@ -208,9 +208,38 @@ exports.getCart = async (req, res) => {
       // let shouldRecalculatePromotion =
       //   cart.cartHashProduct !== newCartHashProduct
       // if (shouldRecalculatePromotion) {
-      const promotion = await applyPromotion(summary, channel, res)
+      const promotion = await applyPromotion(summary, channel, res);
 
-      // console.log('promotion', promotion)
+      // กัน null
+      const appliedPromotions = promotion?.appliedPromotions ?? [];
+
+      // เอาเฉพาะ proId ไม่ซ้ำ
+      const proIdList = [...new Set(
+        appliedPromotions.flatMap(item => item.proId)
+      )];
+
+      const promotionDetail = await Promotion.find({
+        proId: { $in: proIdList }
+      });
+
+      const appliedWithPromo = appliedPromotions.map(item => {
+        const promo = promotionDetail.find(u => u.proId === item.proId);
+        const pricePromo = promo?.conditions?.[0]?.productAmount ?? 0;
+
+        // console.log("pricePromo", pricePromo);
+
+        return {
+          ...item,
+          proCode: promo?.proCode ?? null,
+          proConditions: pricePromo
+        };
+      });
+
+      // อัปเดตกลับ
+      if (promotion) {
+        promotion.appliedPromotions = appliedWithPromo;
+      }
+
 
       const quota = await applyQuota(summary, channel, res)
       cart.listQuota = quota.appliedPromotions
@@ -219,7 +248,8 @@ exports.getCart = async (req, res) => {
       // cart.cartHashPromotion = newCartHashPromotion
       summary.listPromotion = cart.listPromotion
       summary.listQuota = quota.appliedPromotions
-
+      summary.listPromotionSelect = cart.listPromotionSelect || [];
+      summary.totalProCal = cart.totalProCal || 0;
       // console.log(promotion.appliedPromotions)
 
       const qtyproductPro = summary.listPromotion.flatMap(u => {
@@ -354,10 +384,10 @@ exports.addProduct = async (req, res) => {
       type === 'withdraw'
         ? { type, area }
         : type === 'adjuststock'
-        ? { type, area, withdrawId }
-        : type === 'give'
-        ? { type, area, storeId, proId }
-        : { type, area, storeId }
+          ? { type, area, withdrawId }
+          : type === 'give'
+            ? { type, area, storeId, proId }
+            : { type, area, storeId }
 
     const { Cart } = getModelsByChannel(channel, res, cartModel)
 
@@ -566,8 +596,8 @@ exports.adjustProduct = async (req, res) => {
       type === 'withdraw'
         ? { type, area }
         : type === 'adjuststock'
-        ? { type, area, withdrawId }
-        : { type, area, storeId }
+          ? { type, area, withdrawId }
+          : { type, area, storeId }
 
     let cart = await Cart.findOne(cartQuery)
     if (!cart) {
@@ -1223,3 +1253,209 @@ exports.getCartDetail = async (req, res) => {
     })
   }
 }
+
+
+exports.addSelectProCart = async (req, res) => {
+  try {
+    const { area, storeId, listPromotion } = req.body
+    const channel = req.headers['x-channel']
+
+    const { Cart } = getModelsByChannel(channel, res, cartModel)
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel)
+
+    const promotionData = await Promotion.findOne({
+      proId: listPromotion.proId,
+      status: 'active'
+    })
+
+    const cart = await Cart.findOne({ area, storeId, type: 'sale' })
+
+    // ❌ findOne จะไม่ return array → ไม่มี length
+    if (!promotionData) {
+      return res.status(404).json({
+        status: 404,
+        message: "not found promotion"
+      })
+    }
+
+    if (!cart) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found cart'
+      })
+    }
+
+    cart.listPromotionSelect = cart.listPromotionSelect || []
+
+    const existingIndex = cart.listPromotionSelect.findIndex(
+      p => p.proId === listPromotion.proId
+    )
+
+    const pricePromo = promotionData.conditions[0].productAmount
+
+    if (existingIndex !== -1) {
+      const item = cart.listPromotionSelect[existingIndex]
+
+      item.proQty += listPromotion.proQty
+
+      item.proAmount += listPromotion.proQty * pricePromo
+
+      // ป้องกันไม่ให้ listProduct เป็น undefined
+      item.listProduct = item.listProduct || []
+
+      // ❗ listPromotion.listProduct = object เดี่ยว
+      const prod = listPromotion.listProduct
+
+      const existingProductIndex = item.listProduct.findIndex(
+        u => u.id === prod.id && u.unit === prod.unit
+      )
+
+      if (existingProductIndex !== -1) {
+        const dataProduct = item.listProduct[existingProductIndex]
+        dataProduct.qty += prod.qty
+        dataProduct.qtyPcs += prod.qtyPcs
+
+
+      } else {
+        // push เข้า item.listProduct เท่านั้น
+        item.listProduct.push(prod)
+      }
+
+    } else {
+      // push promotion ทั้ง block
+      listPromotion.proAmount = listPromotion.proQty * pricePromo
+      listPromotion.proConditions = pricePromo
+      listPromotion.proCode = promotionData.proCode
+      cart.listPromotionSelect.push(listPromotion)
+    }
+
+    cart.totalProCal = to2(
+      cart.listPromotionSelect.reduce((sum, p) => sum + p.proAmount, 0)
+    )
+
+    const totalProCal = cart.totalProCal
+
+    if (totalProCal > cart.total) {
+      return res.status(405).json({
+        status: 405,
+        message: "Discount exceeds total amount. Promotion cannot be applied."
+
+      })
+    }
+
+
+    await cart.save()
+
+    res.status(200).json({
+      status: 200,
+      message: 'Add promotion success',
+      data: cart   // แก้จาก data → cart
+    })
+
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    })
+  }
+}
+
+exports.deleteSelectProCart = async (req, res) => {
+  try {
+    const { area, storeId, proId, id, unit } = req.body
+    const channel = req.headers['x-channel']
+
+    const { Cart } = getModelsByChannel(channel, res, cartModel)
+    const { Promotion } = getModelsByChannel(channel, res, promotionModel)
+
+    const cart = await Cart.findOne({ area, storeId, type: 'sale' })
+
+    // 🔥 ต้องเช็ค cart ก่อน ไม่งั้น cart.listPromotionSelect พังแน่นอน
+    if (!cart) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found cart'
+      })
+    }
+
+    cart.listPromotionSelect = cart.listPromotionSelect || []
+
+    const existingIndex = cart.listPromotionSelect.findIndex(
+      p => p.proId === proId
+    )
+
+    if (existingIndex === -1) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found promotion'
+      })
+    }
+
+    const listPromotionSelect = cart.listPromotionSelect[existingIndex]
+
+    if (!listPromotionSelect?.listProduct) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found promotion'
+      })
+    }
+
+    const existingProductIndex = listPromotionSelect.listProduct.findIndex(
+      p => p.id === id && p.unit === unit
+    )
+
+    if (existingProductIndex === -1) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found product'
+      })
+    }
+
+    // ลบ product
+    cart.listPromotionSelect[existingIndex].listProduct.splice(existingProductIndex, 1)
+
+    const proQty = to2(
+      cart.listPromotionSelect[existingIndex].listProduct.reduce((sum, p) => sum + p.qty, 0)
+    )
+
+    cart.listPromotionSelect[existingIndex].proAmount =
+      proQty * (cart.listPromotionSelect[existingIndex].proConditions)
+
+    cart.listPromotionSelect[existingIndex].proQty = proQty
+
+    const countListProduct = cart.listPromotionSelect[existingIndex].listProduct.length
+
+    if (countListProduct === 0) {
+      cart.listPromotionSelect.splice(existingIndex, 1)
+    }
+
+    cart.totalProCal = to2(
+      cart.listPromotionSelect.reduce((sum, p) => sum + p.proAmount, 0)
+    )
+
+    await cart.save()
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'deleteSelectProCart success',
+      data: cart
+    })
+
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    })
+  }
+}
+
+

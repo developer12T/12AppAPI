@@ -187,6 +187,8 @@ exports.checkout = async (req, res) => {
     let promotion = []
     if (changePromotionStatus === 1) {
       promotion = listPromotion
+    } else if (channel === 'pc') {
+      promotion = cart.listPromotionSelect
     } else {
       promotion = cart.listPromotion
     }
@@ -336,6 +338,7 @@ exports.checkout = async (req, res) => {
       listProduct,
 
       listPromotions: promotion,
+
       // listQuota: summary.listQuota,
       subtotal,
       discount: 0,
@@ -7502,8 +7505,8 @@ exports.editOrderSale = async (req, res) => {
 
     if (!user) {
       return res.status(401).json({
-        status:401,
-        message : "user is required"
+        status: 401,
+        message: "user is required"
       })
     }
 
