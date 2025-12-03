@@ -195,7 +195,7 @@ exports.getCart = async (req, res) => {
       // session.startTransaction();
       let proCheck = false
       summary = await summaryOrder(cart, channel, res)
-      console.log("summary",summary)
+      // console.log("summary",summary)
       // const newCartHashProduct = crypto
       //   .createHash('md5')
       //   .update(JSON.stringify(cart.listProduct))
