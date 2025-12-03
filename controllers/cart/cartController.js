@@ -195,7 +195,7 @@ exports.getCart = async (req, res) => {
       // session.startTransaction();
       let proCheck = false
       summary = await summaryOrder(cart, channel, res)
-
+      // console.log("summary",summary)
       // const newCartHashProduct = crypto
       //   .createHash('md5')
       //   .update(JSON.stringify(cart.listProduct))
@@ -250,7 +250,14 @@ exports.getCart = async (req, res) => {
       summary.listQuota = quota.appliedPromotions
       summary.listPromotionSelect = cart.listPromotionSelect || [];
       summary.totalProCal = cart.totalProCal || 0;
-      // console.log(promotion.appliedPromotions)
+      // summary.totalProCalDiff = cart.total - cart.totalProCal || 0
+
+
+      if (summary.listPromotion.length === 0) {
+        summary.canSelectPro = false
+      } else {
+        summary.canSelectPro = true
+      }
 
       const qtyproductPro = summary.listPromotion.flatMap(u => {
         const promoDetail = u.listProduct
@@ -278,7 +285,7 @@ exports.getCart = async (req, res) => {
       // console.log(cart.listPromotion)
       const updated = await Cart.findOneAndUpdate(
         { _id: cart._id },
-        { $set: { listPromotion: promotion.appliedPromotions } },
+        { $set: { listPromotion: promotion.appliedPromotions,canSelectPro:summary.canSelectPro } },
         { new: true, runValidators: true }
       )
 
@@ -1334,6 +1341,7 @@ exports.addSelectProCart = async (req, res) => {
     )
 
     const totalProCal = cart.totalProCal
+    cart.totalProCalDiff =  cart.total - cart.totalProCal
 
     if (totalProCal > cart.total) {
       return res.status(405).json({
@@ -1436,6 +1444,8 @@ exports.deleteSelectProCart = async (req, res) => {
     cart.totalProCal = to2(
       cart.listPromotionSelect.reduce((sum, p) => sum + p.proAmount, 0)
     )
+
+    cart.totalProCalDiff = cart.total - cart.totalProCal  
 
     await cart.save()
 

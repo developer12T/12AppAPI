@@ -95,16 +95,21 @@ SELECT
     '1' AS status,
     TRUCK_SIZE AS typeTruck,
     TRUCK_NO as noTruck,
-    'https://apps.onetwotrading.co.th/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage
+    'https://apps.onetwotrading.co.th/images/qrcode/' + DA.AREA + '.jpg' AS qrCodeImage,
+        case 
+     when CHANNEL_NAME = 'PC' THEN 'PC'
+     else CHANNEL_NAME 
+     end as platformType
 FROM 
   [DATA_OMS].[dbo].[DATA_Area] AS DA
 WHERE 
-  DA.CHANNEL_NAME = 'PC' AND 
-  DA.Sale_Code is not NULL AND
-  DA.Sale_Code != 'ว่าง' 
+  DA.CHANNEL_NAME = 'PC' 
   `
   }
 
+  // AND 
+  // DA.Sale_Code is not NULL AND
+  // DA.Sale_Code != 'ว่าง' 
   await sql.close()
   return result.recordset
 }

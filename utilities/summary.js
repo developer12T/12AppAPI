@@ -8,7 +8,7 @@ const userModel = require('../models/cash/user')
 const { getModelsByChannel } = require('../middleware/channel')
 const { applyPromotion } = require('../controllers/promotion/calculate')
 
-async function summaryOrder (cart, channel, res) {
+async function summaryOrder(cart, channel, res) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
@@ -31,21 +31,21 @@ async function summaryOrder (cart, channel, res) {
 
     const store = storeData
       ? {
-          _id: storeData._id,
-          storeId: storeData.storeId,
-          name: storeData.name || '',
-          taxId: storeData.taxId || '',
-          tel: storeData.tel || '',
-          route: storeData.route || '',
-          storeType: storeData.type || '',
-          typeName: storeData.typeName || '',
-          address: storeData.address || '',
-          subDistrict: storeData.subDistrict || '',
-          district: storeData.district || '',
-          province: storeData.province || '',
-          zone: storeData.zone || '',
-          area: area || ''
-        }
+        _id: storeData._id,
+        storeId: storeData.storeId,
+        name: storeData.name || '',
+        taxId: storeData.taxId || '',
+        tel: storeData.tel || '',
+        route: storeData.route || '',
+        storeType: storeData.type || '',
+        typeName: storeData.typeName || '',
+        address: storeData.address || '',
+        subDistrict: storeData.subDistrict || '',
+        district: storeData.district || '',
+        province: storeData.province || '',
+        zone: storeData.zone || '',
+        area: area || ''
+      }
       : {}
     const productIds = [
       ...cart.listProduct.map(p => p.id),
@@ -112,6 +112,14 @@ async function summaryOrder (cart, channel, res) {
         })
       })) || []
 
+    // console.log(cart)
+
+    console.log("cart.total", cart.total)
+    console.log("cart.totalProCal", cart.totalProCal)
+    const totalProCal = cart.totalProCal ?? 0;
+    const total = cart.total ?? 0;
+
+    const totalProCalDiff = total - totalProCal;
     return {
       type: cart.type,
       store,
@@ -125,7 +133,9 @@ async function summaryOrder (cart, channel, res) {
       discount: 0,
       discountProduct: 0,
       vat: parseFloat((cart.total - cart.total / 1.07).toFixed(2)),
-      totalExVat: parseFloat((cart.total / 1.07).toFixed(2))
+      totalExVat: parseFloat((cart.total / 1.07).toFixed(2)),
+      totalProCalDiff: totalProCalDiff ?? 0,
+      totalProCal: cart?.total || 0
     }
     // }
 
@@ -138,7 +148,7 @@ async function summaryOrder (cart, channel, res) {
   }
 }
 
-async function summaryAjustStock (cart, channel, res) {
+async function summaryAjustStock(cart, channel, res) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
@@ -189,7 +199,7 @@ async function summaryAjustStock (cart, channel, res) {
   }
 }
 
-async function summaryWithdraw (cart, channel, res) {
+async function summaryWithdraw(cart, channel, res) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
@@ -355,7 +365,7 @@ async function summaryWithdraw (cart, channel, res) {
 //   // }
 // }
 
-async function summaryGive (cart, channel, res) {
+async function summaryGive(cart, channel, res) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
@@ -370,20 +380,20 @@ async function summaryGive (cart, channel, res) {
     // console.log(storeData)
     const store = storeData
       ? {
-          storeId: storeData.storeId,
-          name: storeData.name || '',
-          taxId: storeData.taxId || '',
-          tel: storeData.tel || '',
-          route: storeData.route || '',
-          storeType: storeData.type || '',
-          typeName: storeData.typeName || '',
-          address: storeData.address || '',
-          subDistrict: storeData.subDistrict || '',
-          district: storeData.district || '',
-          province: storeData.province || '',
-          zone: storeData.zone || '',
-          area: storeData.area || ''
-        }
+        storeId: storeData.storeId,
+        name: storeData.name || '',
+        taxId: storeData.taxId || '',
+        tel: storeData.tel || '',
+        route: storeData.route || '',
+        storeType: storeData.type || '',
+        typeName: storeData.typeName || '',
+        address: storeData.address || '',
+        subDistrict: storeData.subDistrict || '',
+        district: storeData.district || '',
+        province: storeData.province || '',
+        zone: storeData.zone || '',
+        area: storeData.area || ''
+      }
       : {}
 
     const productIds = cart.listProduct.map(p => p.id)
@@ -433,7 +443,7 @@ async function summaryGive (cart, channel, res) {
     return null
   }
 }
-async function summaryOrderProStatusOne (cart, listPromotion, channel, res) {
+async function summaryOrderProStatusOne(cart, listPromotion, channel, res) {
   if (!cart) {
     throw new Error('Cart data is required')
   }
@@ -443,21 +453,21 @@ async function summaryOrderProStatusOne (cart, listPromotion, channel, res) {
   const storeData = await Store.findOne({ storeId: cart.storeId }).lean()
   const store = storeData
     ? {
-        _id: storeData._id,
-        storeId: storeData.storeId,
-        name: storeData.name || '',
-        taxId: storeData.taxId || '',
-        tel: storeData.tel || '',
-        route: storeData.route || '',
-        storeType: storeData.type || '',
-        typeName: storeData.typeName || '',
-        address: storeData.address || '',
-        subDistrict: storeData.subDistrict || '',
-        district: storeData.district || '',
-        province: storeData.province || '',
-        zone: storeData.zone || '',
-        area: storeData.area || ''
-      }
+      _id: storeData._id,
+      storeId: storeData.storeId,
+      name: storeData.name || '',
+      taxId: storeData.taxId || '',
+      tel: storeData.tel || '',
+      route: storeData.route || '',
+      storeType: storeData.type || '',
+      typeName: storeData.typeName || '',
+      address: storeData.address || '',
+      subDistrict: storeData.subDistrict || '',
+      district: storeData.district || '',
+      province: storeData.province || '',
+      zone: storeData.zone || '',
+      area: storeData.area || ''
+    }
     : {}
 
   // 2. Get all product ids (main + promotions)
@@ -465,8 +475,8 @@ async function summaryOrderProStatusOne (cart, listPromotion, channel, res) {
     ...(cart.listProduct || []).map(p => p.id),
     ...(cart.listPromotion
       ? cart.listPromotion.flatMap(promo =>
-          (promo.listProduct || []).map(p => p.id)
-        )
+        (promo.listProduct || []).map(p => p.id)
+      )
       : [])
   ]
   const { Product } = getModelsByChannel(channel, res, productModel)
@@ -540,7 +550,7 @@ async function summaryOrderProStatusOne (cart, listPromotion, channel, res) {
   }
 }
 
-async function summaryWithdraw (cart, channel, res) {
+async function summaryWithdraw(cart, channel, res) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
@@ -590,7 +600,7 @@ async function summaryWithdraw (cart, channel, res) {
   }
 }
 
-async function summaryRefund (cart, channel, res) {
+async function summaryRefund(cart, channel, res) {
   try {
     if (!cart) {
       throw new Error('Cart data is required')
@@ -600,20 +610,20 @@ async function summaryRefund (cart, channel, res) {
     // console.log(storeData)
     const store = storeData
       ? {
-          storeId: storeData.storeId,
-          name: storeData.name || '',
-          taxId: storeData.taxId || '',
-          tel: storeData.tel || '',
-          route: storeData.route || '',
-          storeType: storeData.type || '',
-          typeName: storeData.typeName || '',
-          address: storeData.address || '',
-          subDistrict: storeData.subDistrict || '',
-          district: storeData.district || '',
-          province: storeData.province || '',
-          zone: storeData.zone || '',
-          area: storeData.area || ''
-        }
+        storeId: storeData.storeId,
+        name: storeData.name || '',
+        taxId: storeData.taxId || '',
+        tel: storeData.tel || '',
+        route: storeData.route || '',
+        storeType: storeData.type || '',
+        typeName: storeData.typeName || '',
+        address: storeData.address || '',
+        subDistrict: storeData.subDistrict || '',
+        district: storeData.district || '',
+        province: storeData.province || '',
+        zone: storeData.zone || '',
+        area: storeData.area || ''
+      }
       : {}
 
     const productIds = [
