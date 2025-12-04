@@ -448,7 +448,7 @@ exports.syncAddressDROUTE = async (req, res) => {
 
       if (!idList.includes(row.ROUTE)) {
 
-        console.log("row.ROUTE", row.ROUTE)
+        // console.log("row.ROUTE", row.ROUTE)
 
         const dataTran = {
           coNo: 410,

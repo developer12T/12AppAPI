@@ -127,7 +127,7 @@ exports.addPromotionM3 = async (req, res) => {
       const t = await sequelize.transaction()
       try {
         const { startDate, endDate } = rangeDate(period)
-        console.log(user)
+        // console.log(user)
         // 1) fetch once per user
         const stores = await Store.find(
           {

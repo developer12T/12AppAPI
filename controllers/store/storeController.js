@@ -2207,7 +2207,7 @@ exports.addStoreArray = async (req, res) => {
     const insertedStores = []
     const existingStores = []
 
-    console.log(result)
+    // console.log(result)
 
     // for (const item of result) {
     //   const storeInDb = await Store.findOne({ storeId: item.storeId })

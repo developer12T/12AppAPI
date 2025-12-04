@@ -831,7 +831,7 @@ exports.addFromERPFoodtruck = async (req, res) => {
 
     for (const row of result) {
       const exists = await Product.findOne({ id: row.ITNO })
-      console.log(exists)
+      // console.log(exists)
 
       if (exists) {
         continue
@@ -858,7 +858,7 @@ exports.addFromERPFoodtruck = async (req, res) => {
           image: ''
         }
 
-        console.log(dataTran)
+        // console.log(dataTran)
       }
     }
 
