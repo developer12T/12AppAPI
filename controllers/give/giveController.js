@@ -972,7 +972,7 @@ exports.giveToExcel = async (req, res) => {
       query['giveInfo.name'] = giveName
     }
 
-    console.log(query)
+    // console.log(query)
 
     const pipeline = [
       {

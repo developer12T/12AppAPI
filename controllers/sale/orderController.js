@@ -3520,7 +3520,7 @@ exports.erpApiCheckOrder = async (req, res) => {
       raw: true
     })
 
-    console.log(lineAgg)
+    // console.log(lineAgg)
 
     const lineCountByOBORNO = new Map(
       lineAgg.map(r => [String(r.OBCUOR), Number(r.lineCount) || 0])
@@ -3530,7 +3530,7 @@ exports.erpApiCheckOrder = async (req, res) => {
       refundLineAgg.map(r => [String(r.OBCUOR), Number(r.lineCount) || 0])
     )
 
-    console.log(lineCountByOBORNO)
+    // console.log(lineCountByOBORNO)
 
     // 4) แปลงเป็น OACUOR -> lineCount (อาศัย OAORNO ของ sales)
     const lineCountByOACUOR = new Map(
@@ -3547,7 +3547,7 @@ exports.erpApiCheckOrder = async (req, res) => {
       ])
     )
 
-    console.log(lineCountByOACUOR)
+    // console.log(lineCountByOACUOR)
 
     // 4. อัปเดตทุกตัวที่ match (วนทีละตัว)
     let updatedCount = 0
