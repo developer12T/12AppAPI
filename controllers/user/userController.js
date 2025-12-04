@@ -68,7 +68,7 @@ exports.getUser = async (req, res) => {
 
 exports.downloadUserExcel = async (req, res) => {
   try {
-    const { User } = getModelsByChannel('cash', res, userModel);
+    const { User } = getModelsByChannel('user', res, userModel);
     const users = await User.find({ role: 'sale' }).lean();
 
     if (!users || users.length === 0) {
