@@ -15,6 +15,7 @@ const {
   formatDateToYYYYMMDD
 } = require('../../utilities/datetime')
 const { CIADDR, DROUTE } = require('../../models/cash/master')
+const { stat } = require('fs')
 
 
 
@@ -447,7 +448,7 @@ exports.syncAddressDROUTE = async (req, res) => {
 
       if (!idList.includes(row.ROUTE)) {
 
-        console.log("row.ROUTE",row.ROUTE)
+        console.log("row.ROUTE", row.ROUTE)
 
         const dataTran = {
           coNo: 410,
@@ -474,6 +475,33 @@ exports.syncAddressDROUTE = async (req, res) => {
       data: data
     })
 
+
+  } catch (error) {
+    console.log("SQL ERROR =", error.original || error.parent || error);
+    if (t) await t.rollback();
+    res.status(500).json({ status: '500', message: error.message });
+  }
+}
+
+exports.CiaddrAddToWithdraw = async (req, res) => {
+  try {
+    const { platformType } = req.body
+    const channel = req.headers['x-channel']
+    const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
+    const { User } = getModelsByChannel('user', res, userModel)
+
+    const userData = await User.find({platformType:platformType,sale:'sale'})
+
+    t = await CIADDR.sequelize.transaction();   // 🟦 กำหนดค่าใน try
+
+    const CIADDRdata = await CIADDR.findAll()
+
+
+    res.status(200).json({
+      status: 200,
+      message:'add successful',
+      data : CIADDRdata
+    })
 
   } catch (error) {
     console.log("SQL ERROR =", error.original || error.parent || error);

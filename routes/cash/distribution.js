@@ -39,7 +39,8 @@ const {
   getWareHouse,
   getRouteWithdraw,
   syncAddressCIADDR,
-  syncAddressDROUTE
+  syncAddressDROUTE,
+  CiaddrAddToWithdraw
 } = require('../../controllers/distribution/placeController')
 
 const router = express.Router()
@@ -60,6 +61,7 @@ router.get('/getType', getType)
 
 router.get('/place/get', getPlace)
 router.post('/place/add', addPlace)
+router.post('/place/CiaddrAddToWithdraw', CiaddrAddToWithdraw)
 router.post('/uploadNPDData', upload.single('file'), uploadNPDData)
 
 router.post('/addRemark', addRemark)
