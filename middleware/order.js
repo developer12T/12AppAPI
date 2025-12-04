@@ -375,7 +375,7 @@ module.exports.updateStockMongo = async function (
   } else if (type === 'promotion') {
     // In: Increase stock (return cart to stock)
 
-    console.log(id, factorPcsQty)
+    // console.log(id, factorPcsQty)
 
     try {
       await Stock.findOneAndUpdate(

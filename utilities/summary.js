@@ -114,8 +114,8 @@ async function summaryOrder(cart, channel, res) {
 
     // console.log(cart)
 
-    console.log("cart.total", cart.total)
-    console.log("cart.totalProCal", cart.totalProCal)
+    // console.log("cart.total", cart.total)
+    // console.log("cart.totalProCal", cart.totalProCal)
     const totalProCal = cart.totalProCal ?? 0;
     const total = cart.total ?? 0;
 
