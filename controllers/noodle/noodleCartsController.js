@@ -138,18 +138,18 @@ exports.addNoodleCart = async (req, res) => {
     const period = getPeriodFromDate(data.createdAt || new Date())
     const qtyProduct = { id, qty, unit }
 
-    if (type === 'saleNoodle') {
-      const updateResult = await updateStockMongo(
-        qtyProduct,
-        area,
-        period,
-        'addproduct',
-        channel,
-        'OUT',
-        res
-      )
-      if (updateResult) return
-    }
+    // if (type === 'saleNoodle') {
+    //   const updateResult = await updateStockMongo(
+    //     qtyProduct,
+    //     area,
+    //     period,
+    //     'addproduct',
+    //     channel,
+    //     'OUT',
+    //     res
+    //   )
+    //   if (updateResult) return
+    // }
 
     const savedCart = await data.save()
 
