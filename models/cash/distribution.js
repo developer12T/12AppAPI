@@ -175,9 +175,9 @@ const withdrawSchema = mongoose.Schema({
   Des_Date: { type: String, required: true },
   Des_Area: { type: String, required: true },
   ZType: { type: String, required: true },
-  WH: { type: String, required: true },
+  WH: { type: String, },
   ROUTE: { type: String, required: true },
-  WH1: { type: String, required: true },
+  WH1: { type: String },
   Dc_Email: { type: String }
 })
 

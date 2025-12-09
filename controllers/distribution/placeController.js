@@ -16,7 +16,7 @@ const {
 } = require('../../utilities/datetime')
 const { CIADDR, DROUTE } = require('../../models/cash/master')
 const { stat } = require('fs')
-
+const { Op } = require('sequelize')
 
 
 exports.getPlace = async (req, res) => {
@@ -440,31 +440,39 @@ exports.syncAddressDROUTE = async (req, res) => {
       DROUTEdata.map(item => item.routeCode?.trim())
     )];
 
-    const withdrawData = await Withdraw.find()
+    const withdrawData = await Withdraw.find({})
 
     let data = []
+
+    const usedRouteCodes = new Set();   // เอาไว้เก็บ routeCode ที่สร้างไปแล้ว
 
     for (const row of withdrawData) {
 
       if (!idList.includes(row.ROUTE)) {
 
-        // console.log("row.ROUTE", row.ROUTE)
+        const routeCode = row.ROUTE.slice(0, 6);
+
+        // กันซ้ำด้วย routeCode
+        if (usedRouteCodes.has(routeCode)) {
+          continue;
+        }
 
         const dataTran = {
           coNo: 410,
           DRRUTP: 5,
-          routeCode: row.ROUTE.slice(0, 6),
-          routeName: row.Des_Name.slice(0, 40),
-          DRTX15: row.Des_Name.slice(0, 15),
+          routeCode,
+          routeName: row.Des_Name?.slice(0, 40) || '',
+          DRTX15: row.Des_Name?.slice(0, 15) || '',
           method: row.ZType,
           transection: '',
           DRLMDT: formatDate()
-        }
+        };
 
-        data.push(dataTran)
-        await DROUTE.create(dataTran, { transaction: t })
+        usedRouteCodes.add(routeCode); // จดไว้ว่า routeCode นี้ถูกใช้แล้ว
+
+        data.push(dataTran);
+        await DROUTE.create(dataTran, { transaction: t });
       }
-
     }
 
     await t.commit()   // 🟩 commit
@@ -490,17 +498,86 @@ exports.CiaddrAddToWithdraw = async (req, res) => {
     const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
     const { User } = getModelsByChannel('user', res, userModel)
 
-    const userData = await User.find({platformType:platformType,sale:'sale'})
-
+    const userData = await User.find()
+    // console.log(platformType)
+    const area = userData.map(item => {
+      return {
+        area: item.area,
+        warehouse: item.warehouse
+      }
+    })
     t = await CIADDR.sequelize.transaction();   // 🟦 กำหนดค่าใน try
 
-    const CIADDRdata = await CIADDR.findAll()
+    const CIADDRdata = await CIADDR.findAll({
+      // where: {
+      //   [Op.or]: [
+      //     { OAADK1: { [Op.like]: `%PC%` } },
+      //     { OAADK1: { [Op.like]: `%EV%` } }
+      //   ]
+      // }
+    });
 
+
+    const CIADDRroute = CIADDRdata.map(item => {
+      const OAADK1Clean = item.OAADK1?.replace(/\s+/g, '') || ""
+      const OAPONOClean = item.OAPONO?.replace(/\s+/g, '') || ""
+      const werehouse = item.OAADK1.slice(2, 5)
+
+      return {
+        OAADK1: OAADK1Clean,
+        OAPONO: OAPONOClean,
+        werehouse: werehouse,
+        name: item.OACONM,
+        OAADR3: item.OAADR3
+      }
+    });
+
+    const withdrawData = await Withdraw.find()
+    const desList = withdrawData.flatMap(item => item.Des_No)
+    const desSet = new Set(desList)
+
+    let data = []
+
+    for (const row of area) {
+
+      const CIADDRdataArea = CIADDRroute.filter(item => item.werehouse === row.warehouse)
+
+      for (const item of CIADDRdataArea) {
+
+        if (desSet.has(item.OAADK1)) {
+          continue
+        }
+        if (item.OAADR3 === '') {
+          continue
+        }
+        let ZType = ''
+        if (item.name?.includes('รับของเอง')) {
+          ZType = 'T04'
+        } else {
+          ZType = 'T05'
+        }
+        const dataTran = {
+          Des_No: item.OAADK1,
+          Des_Name: item.name,
+          Des_Date: '20250101',
+          ZType: ZType,
+          Des_Area: row.area,
+          WH: item.OAADR3,
+          ROUTE: item.OAPONO,
+          WH1: '',
+          Dc_Email: ''
+        }
+        Withdraw.create(dataTran)
+        data.push(dataTran)
+      }
+    }
 
     res.status(200).json({
       status: 200,
-      message:'add successful',
-      data : CIADDRdata
+      message: 'add successful',
+      data: data,
+      // CIADDRroute: CIADDRroute
+      // user: area
     })
 
   } catch (error) {
