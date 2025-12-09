@@ -564,37 +564,45 @@ exports.CiaddrAddToWithdraw = async (req, res) => {
     const desSet = new Set(desList)
     let data = []
 
+    const emailMap = {
+      '109': 'dc_nr@onetwotrading.co.th',
+      '101': 'dc_np2@onetwotrading.co.th',
+      '102': 'dc_mk@onetwotrading.co.th',
+      '104': 'dc_sr@onetwotrading.co.th',
+      '105': 'dc_samutprakan@onetwotrading.co.th',
+      '106': 'dc_nakhonsawan@onetwotrading.co.th',
+      '103': 'dc_lp@onetwotrading.co.th',
+      '111': 'dc_np2@onetwotrading.co.th',
+      '121': '',
+      '110': '',
+    };
+
     for (const row of area) {
+      const list = CIADDRroute.filter(item => item.werehouse === row.warehouse)
 
-      const CIADDRdataArea = CIADDRroute.filter(item => item.werehouse === row.warehouse)
+      for (const item of list) {
 
-      for (const item of CIADDRdataArea) {
+        if (desSet.has(item.OAADK1)) continue
+        if (!item.OAADR3) continue
 
-        if (desSet.has(item.OAADK1)) {
-          continue
-        }
-        if (item.OAADR3 === '') {
-          continue
-        }
-        let ZType = ''
-        if (item.name?.includes('รับของเอง')) {
-          ZType = 'T04'
-        } else {
-          ZType = 'T05'
-        }
+        const ZType = item.name?.includes('รับของเอง') ? 'T04' : 'T05'
+        const Dc_Email = emailMap[item.OAADR3] ?? ''
+
         const dataTran = {
           Des_No: item.OAADK1,
           Des_Name: item.name,
           Des_Date: '20250101',
-          ZType: ZType,
+          ZType,
           Des_Area: row.area,
           WH: item.OAADR3,
           ROUTE: item.OAPONO,
           WH1: '',
-          Dc_Email: ''
+          Dc_Email
         }
-        Withdraw.create(dataTran)
+
+        await Withdraw.create(dataTran) // 👈 กันพลาด
         data.push(dataTran)
+        desSet.add(item.OAADK1) // ป้องกันซ้ำในรอบถัดไป
       }
     }
 
