@@ -165,117 +165,94 @@ exports.getType = async (req, res) => {
 }
 
 exports.addAllPlace = async (req, res) => {
-  // const session = await require('mongoose').startSession();
-  // session.startTransaction();
   try {
-    const channel = req.headers['x-channel']
-    const { User } = getModelsByChannel('user', res, userModel)
-    const { Place, Withdraw } = getModelsByChannel(
-      channel,
-      res,
-      distributionModel
-    )
+    const channel = req.headers['x-channel'];
+    const { User } = getModelsByChannel('user', res, userModel);
+    const { Place, Withdraw } = getModelsByChannel(channel, res, distributionModel);
 
-    if (channel === 'pc') {
-      type = 'PC'
-    } else {
-      type = 'cash'
-    }
+    let type = channel === 'pc' ? 'PC' : 'cash';
 
+    const users = await User.find({ role: 'sale', platformType: type });
 
-    const users = await User.find({ role: 'sale', platformType: type })
-    // .session(session)
+    const areaList = [...new Set(users.map(u => u.area).filter(Boolean))]; // กรอง null และซ้ำ
 
-    const areaList = users.map(user => user.area)
+    let data = [];
+    let areaAdded = [];
+    let areaUpdated = [];
 
-    let data = []
+    for (const area of areaList) {
+      const withdrawList = await Withdraw.find({ Des_Area: area });
 
-    areaAdded = []
-    // console.log("areaList", areaList)
-    for (const user of areaList) {
-      const withdrawT04 =
-        (await Withdraw.find({ Des_Area: user, ZType: 'T04' })) || []
-      const withdrawT05 =
-        (await Withdraw.find({ Des_Area: user, ZType: 'T05' })) || []
-      const checkPlace = await Place.findOne({ area: user })
+      const listAddressNew = [];
 
-      if (!checkPlace) {
-        const listAddress = []
+      for (const i of withdrawList) {
+        const isPickup = i.ZType === 'T04';
 
-        // วน T04
-        for (const i of withdrawT04) {
-          listAddress.push({
-            type: 'T04',
-            typeNameTH: i.Des_Name,
-            typeNameEN: 'pickup',
-            shippingId: i.Des_Area,
-            route: i.ROUTE,
-            name: '',
-            address: '',
-            district: '',
-            subDistrict: '',
-            province: '',
-            postcode: '',
-            tel: '',
-            warehouse: {
-              normal: i.WH,
-              clearance: i.WH1
-            }
-          })
+        listAddressNew.push({
+          type: i.ZType,
+          typeNameTH: isPickup ? i.Des_Name : 'ส่งสินค้า',
+          typeNameEN: isPickup ? 'pickup' : 'delivery',
+          shippingId: isPickup ? i.Des_Area : i.Des_No,
+          route: isPickup ? i.ROUTE : i.Des_Area,
+          name: isPickup ? '' : i.Des_Name,
+          address: '',
+          district: '',
+          subDistrict: '',
+          province: '',
+          postcode: '',
+          tel: '',
+          warehouse: {
+            normal: i.WH,
+            clearance: i.WH1
+          }
+        });
+      }
+
+      const place = await Place.findOne({ area });
+
+      if (!place) {
+        // CREATE NEW
+        const newData = { area, listAddress: listAddressNew };
+        await Place.create(newData);
+
+        data.push(newData);
+        areaAdded.push(area);
+      } else {
+        // MERGE ONLY NEW ITEMS
+        const existingIds = new Set(
+          place.listAddress.map(
+            x => `${x.type}-${x.shippingId}-${x.route}`
+          )
+        );
+
+        const merged = listAddressNew.filter(
+          x => !existingIds.has(`${x.type}-${x.shippingId}-${x.route}`)
+        );
+
+        if (merged.length > 0) {
+          place.listAddress.push(...merged);
+          await place.save();
+          areaUpdated.push(area);
         }
-
-        // วน T05
-        for (const i of withdrawT05) {
-          listAddress.push({
-            type: 'T05',
-            typeNameTH: 'ส่งสินค้า',
-            typeNameEN: 'delivery',
-            shippingId: i.Des_No,
-            route: i.Des_Area,
-            name: i.Des_Name,
-            address: '',
-            district: '',
-            subDistrict: '',
-            province: '',
-            postcode: '',
-            tel: '',
-            warehouse: {
-              normal: i.WH,
-              clearance: i.WH1
-            }
-          })
-        }
-
-        // รวมข้อมูล
-        const combineData = {
-          area: user,
-          listAddress
-        }
-        data.push(combineData)
-        areaAdded.push(combineData.area)
-        const placeDoc = new Place(combineData)
-        await placeDoc.save()
       }
     }
 
-    // await session.commitTransaction();
-    // session.endSession();
-
-    const io = getSocket()
-    io.emit('distribution/place/addAllPlace', {})
+    const io = getSocket();
+    io.emit('distribution/place/addAllPlace', {});
 
     res.status(200).json({
       status: 200,
-      message: `add place ${areaAdded} fetched successfully!`,
-      data: data
-    })
+      message: `Added: ${areaAdded.length}, Updated: ${areaUpdated.length}`,
+      addedArea: areaAdded,
+      updatedArea: areaUpdated
+    });
+
   } catch (error) {
-    // await session.abortTransaction().catch(() => { });
-    // session.endSession();
-    console.error(error)
-    res.status(500).json({ status: '500', message: error.message })
+    console.error(error);
+    res.status(500).json({ status: '500', message: error.message });
   }
-}
+};
+
 
 exports.addWereHouse = async (req, res) => {
   try {
