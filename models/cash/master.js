@@ -996,11 +996,11 @@ const OOLINE = sequelize.define(
     OBCUOR: { type: DataTypes.STRING, field: 'OBCUOR' },
     OBORST: { type: DataTypes.STRING, field: 'OBORST' },
 
-    OBITNO : { type: DataTypes.STRING, field: 'OBITNO' },
-    OBIVQA : { type: DataTypes.NUMBER, field: 'OBIVQA' },
-    OBALUN : { type: DataTypes.STRING, field: 'OBALUN' },
-    OBSAPR : { type: DataTypes.NUMBER, field: 'OBSAPR' },
-    OBLNA2 : { type: DataTypes.NUMBER, field: 'OBLNA2' },
+    OBITNO: { type: DataTypes.STRING, field: 'OBITNO' },
+    OBIVQA: { type: DataTypes.NUMBER, field: 'OBIVQA' },
+    OBALUN: { type: DataTypes.STRING, field: 'OBALUN' },
+    OBSAPR: { type: DataTypes.NUMBER, field: 'OBSAPR' },
+    OBLNA2: { type: DataTypes.NUMBER, field: 'OBLNA2' },
 
 
     // OBORSL: { type: DataTypes.STRING, field: 'OBORSL' }
@@ -1144,11 +1144,17 @@ const DROUTE = sequelize.define(
       allowNull: false,
       field: 'DRTRCA'
     },
-    DRLMDT : {
+    DRLMDT: {
       type: DataTypes.STRING,
       allowNull: false,
       field: 'DRLMDT'
-    }
+    },
+    DRMODL: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'DRMODL'
+    },
+    
   },
   {
     freezeTableName: true,

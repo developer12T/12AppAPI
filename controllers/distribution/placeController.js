@@ -169,14 +169,21 @@ exports.addAllPlace = async (req, res) => {
   // session.startTransaction();
   try {
     const channel = req.headers['x-channel']
-    const { User } = getModelsByChannel(channel, res, userModel)
+    const { User } = getModelsByChannel('user', res, userModel)
     const { Place, Withdraw } = getModelsByChannel(
       channel,
       res,
       distributionModel
     )
 
-    const users = await User.find({ role: 'sale' })
+    if (channel === 'pc') {
+      type = 'PC'
+    } else {
+      type = 'cash'
+    }
+
+
+    const users = await User.find({ role: 'sale', platformType: type })
     // .session(session)
 
     const areaList = users.map(user => user.area)
@@ -440,40 +447,60 @@ exports.syncAddressDROUTE = async (req, res) => {
       DROUTEdata.map(item => item.routeCode?.trim())
     )];
 
+    let data = []
     const withdrawData = await Withdraw.find({})
 
-    let data = []
-
-    const usedRouteCodes = new Set();   // เอาไว้เก็บ routeCode ที่สร้างไปแล้ว
+    const usedRouteCodes = new Set();
+    const usedRouteCodesFromDB = new Set(
+      idList.map(r => {
+        const rr = r || '';
+        const f6 = rr.slice(0, 6);
+        const f5 = rr.slice(0, 5);
+        return f6.includes('R') ? f5 + 'R' : f5;
+      })
+    );
 
     for (const row of withdrawData) {
+      let routeCodeRaw = row.ROUTE || '';
+      let routeCode = routeCodeRaw.slice(0, 6);
 
-      if (!idList.includes(row.ROUTE)) {
+      const first6 = routeCode.slice(0, 6);
+      const first5 = routeCode.slice(0, 5);
 
-        const routeCode = row.ROUTE.slice(0, 6);
-
-        // กันซ้ำด้วย routeCode
-        if (usedRouteCodes.has(routeCode)) {
-          continue;
-        }
-
-        const dataTran = {
-          coNo: 410,
-          DRRUTP: 5,
-          routeCode,
-          routeName: row.Des_Name?.slice(0, 40) || '',
-          DRTX15: row.Des_Name?.slice(0, 15) || '',
-          method: row.ZType,
-          transection: '',
-          DRLMDT: formatDate()
-        };
-
-        usedRouteCodes.add(routeCode); // จดไว้ว่า routeCode นี้ถูกใช้แล้ว
-
-        data.push(dataTran);
-        await DROUTE.create(dataTran, { transaction: t });
+      // ปรับ format ให้เสร็จก่อน
+      if (first6.includes('R')) {
+        routeCode = first5 + 'R';
+      } else {
+        routeCode = first5;
       }
+
+      // เช็กซ้ำกับที่มีใน DB
+      if (usedRouteCodesFromDB.has(routeCode)) {
+        continue;
+      }
+
+      // เช็กซ้ำในรอบนี้
+      if (usedRouteCodes.has(routeCode)) {
+        continue;
+      }
+
+      const dataTran = {
+        coNo: 410,
+        DRRUTP: 5,
+        routeCode,
+        routeName: row.Des_Name?.slice(0, 40) || '',
+        DRTX15: row.Des_Name?.slice(0, 15) || '',
+        method: row.ZType,
+        transection: '',
+        DRLMDT: formatDate(),
+        DRMODL: 'VOF'
+      };
+
+      usedRouteCodes.add(routeCode);
+      data.push(dataTran);
+      await DROUTE.create(dataTran, { transaction: t });
     }
+
 
     await t.commit()   // 🟩 commit
 
@@ -498,7 +525,7 @@ exports.CiaddrAddToWithdraw = async (req, res) => {
     const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
     const { User } = getModelsByChannel('user', res, userModel)
 
-    const userData = await User.find()
+    const userData = await User.find({ role: "sale", platformType: platformType })
     // console.log(platformType)
     const area = userData.map(item => {
       return {
@@ -535,7 +562,6 @@ exports.CiaddrAddToWithdraw = async (req, res) => {
     const withdrawData = await Withdraw.find()
     const desList = withdrawData.flatMap(item => item.Des_No)
     const desSet = new Set(desList)
-
     let data = []
 
     for (const row of area) {
