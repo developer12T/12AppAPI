@@ -497,12 +497,10 @@ exports.syncAddressDROUTE = async (req, res) => {
 
 exports.CiaddrAddToWithdraw = async (req, res) => {
   try {
-    const { platformType } = req.body
-    const channel = req.headers['x-channel']
-    const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
+    const { Withdraw } = getModelsByChannel('pc', res, distributionModel)
     const { User } = getModelsByChannel('user', res, userModel)
 
-    const userData = await User.find({ role: "sale", platformType: platformType })
+    const userData = await User.find({ role: "sale", platformType: 'PC' })
     // console.log(platformType)
     const area = userData.map(item => {
       return {
