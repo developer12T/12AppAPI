@@ -1904,48 +1904,47 @@ exports.approveWithdraw = async (req, res) => {
       const userData = await User.findOne({
         role: 'sale',
         area: distributionTran.area
-      })
+      }) || {}; // ป้องกันไม่เจอ user
+
       const email = await Withdraw.findOne({
         ROUTE: distributionTran.shippingRoute,
         Des_No: distributionTran.shippingId
-      }).select('Dc_Email Des_Name')
+      }).select('Dc_Email Des_Name') || {}; // ป้องกันไม่เจอ email
+
       const wereHouseName = await WereHouse.findOne({
         wh_code: distributionTran.fromWarehouse
-      }).select('wh_name')
-      let type = ''
-      if (distributionTran.newTrip == 'true') {
-        type = 'เบิกต้นทริป'
-      } else {
-        type = 'เบิกระหว่างทริป'
-      }
-      if (distributionTran.area != 'IT211') {
+      }).select('wh_name') || {}; // ป้องกันไม่เจอ warehouse
+
+      let type = distributionTran.newTrip == 'true'
+        ? 'เบิกต้นทริป'
+        : 'เบิกระหว่างทริป';
+
+      if (distributionTran.area !== 'IT211') {
         if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
+
           sendEmail({
-            to: email.Dc_Email,
-            // cc: [process.env.BELL_MAIL, process.env.BANK_MAIL],
+            to: email?.Dc_Email ?? '',
             cc: process.env.IT_MAIL,
-            subject: `${distributionTran.orderId} 12App cash`,
+            subject: `${distributionTran.orderId ?? ''} 12App cash`,
             html: `
-          <h1>แจ้งการส่งใบขอเบิกผ่านทางอีเมล</h1>
-          <p>
-            <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh} ${type}<br> 
-            <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName
-              }<br>
-            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
-              }<br>
-            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
-              }<br>
-            <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
-            <strong>เขต:</strong> ${distributionTran.area}<br>
-            <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
-            <strong>เบอร์โทรศัพท์เซลล์:</strong> ${userData.tel}<br>
-            <strong>หมายเหตุ:</strong> ${distributionTran.remark}
-          </p>
-        `
-          })
+        <h1>แจ้งการส่งใบขอเบิกผ่านทางอีเมล</h1>
+        <p>
+          <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh ?? ''} ${type}<br>
+          <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId ?? ''}<br>
+          <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName ?? ''}<br>
+          <strong>จัดส่ง:</strong> ${(distributionTran.fromWarehouse ?? '') + '-' + (wereHouseName?.wh_name ?? '')}<br>
+          <strong>สถานที่จัดส่ง:</strong> ${(distributionTran.toWarehouse ?? '')}-${distributionTran.shippingName ?? ''}<br>
+          <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate ?? ''}<br>
+          <strong>เขต:</strong> ${distributionTran.area ?? ''}<br>
+          <strong>ชื่อ:</strong> ${(userData?.firstName ?? '')} ${(userData?.surName ?? '')}<br>
+          <strong>เบอร์โทรศัพท์เซลล์:</strong> ${userData?.tel ?? ''}<br>
+          <strong>หมายเหตุ:</strong> ${distributionTran.remark ?? ''}
+        </p>
+      `
+          });
         }
       }
+
 
       const io = getSocket()
       io.emit('distribution/approveWithdraw', {
