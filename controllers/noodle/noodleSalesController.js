@@ -235,17 +235,17 @@ exports.checkout = async (req, res) => {
         statusMovement: 'OUT'
       }))
 
-    for (const item of qtyproduct) {
-      const updateResult = await updateStockMongo(
-        item,
-        area,
-        period,
-        'sale',
-        channel,
-        res
-      )
-      if (updateResult) return
-    }
+    // for (const item of qtyproduct) {
+    //   const updateResult = await updateStockMongo(
+    //     item,
+    //     area,
+    //     period,
+    //     'sale',
+    //     channel,
+    //     res
+    //   )
+    //   if (updateResult) return
+    // }
 
     await Order.create(noodleOrder)
     await NoodleCart.deleteOne({ type, area })

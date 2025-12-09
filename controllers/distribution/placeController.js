@@ -16,7 +16,7 @@ const {
 } = require('../../utilities/datetime')
 const { CIADDR, DROUTE } = require('../../models/cash/master')
 const { stat } = require('fs')
-
+const { Op } = require('sequelize')
 
 
 exports.getPlace = async (req, res) => {
@@ -165,110 +165,94 @@ exports.getType = async (req, res) => {
 }
 
 exports.addAllPlace = async (req, res) => {
-  // const session = await require('mongoose').startSession();
-  // session.startTransaction();
   try {
-    const channel = req.headers['x-channel']
-    const { User } = getModelsByChannel(channel, res, userModel)
-    const { Place, Withdraw } = getModelsByChannel(
-      channel,
-      res,
-      distributionModel
-    )
+    const channel = req.headers['x-channel'];
+    const { User } = getModelsByChannel('user', res, userModel);
+    const { Place, Withdraw } = getModelsByChannel(channel, res, distributionModel);
 
-    const users = await User.find({ role: 'sale' })
-    // .session(session)
+    let type = channel === 'pc' ? 'PC' : 'cash';
 
-    const areaList = users.map(user => user.area)
+    const users = await User.find({ role: 'sale', platformType: type });
 
-    let data = []
+    const areaList = [...new Set(users.map(u => u.area).filter(Boolean))]; // กรอง null และซ้ำ
 
-    areaAdded = []
-    // console.log("areaList", areaList)
-    for (const user of areaList) {
-      const withdrawT04 =
-        (await Withdraw.find({ Des_Area: user, ZType: 'T04' })) || []
-      const withdrawT05 =
-        (await Withdraw.find({ Des_Area: user, ZType: 'T05' })) || []
-      const checkPlace = await Place.findOne({ area: user })
+    let data = [];
+    let areaAdded = [];
+    let areaUpdated = [];
 
-      if (!checkPlace) {
-        const listAddress = []
+    for (const area of areaList) {
+      const withdrawList = await Withdraw.find({ Des_Area: area });
 
-        // วน T04
-        for (const i of withdrawT04) {
-          listAddress.push({
-            type: 'T04',
-            typeNameTH: i.Des_Name,
-            typeNameEN: 'pickup',
-            shippingId: i.Des_Area,
-            route: i.ROUTE,
-            name: '',
-            address: '',
-            district: '',
-            subDistrict: '',
-            province: '',
-            postcode: '',
-            tel: '',
-            warehouse: {
-              normal: i.WH,
-              clearance: i.WH1
-            }
-          })
+      const listAddressNew = [];
+
+      for (const i of withdrawList) {
+        const isPickup = i.ZType === 'T04';
+
+        listAddressNew.push({
+          type: i.ZType,
+          typeNameTH: isPickup ? i.Des_Name : 'ส่งสินค้า',
+          typeNameEN: isPickup ? 'pickup' : 'delivery',
+          shippingId: isPickup ? i.Des_Area : i.Des_No,
+          route: isPickup ? i.ROUTE : i.Des_Area,
+          name: isPickup ? '' : i.Des_Name,
+          address: '',
+          district: '',
+          subDistrict: '',
+          province: '',
+          postcode: '',
+          tel: '',
+          warehouse: {
+            normal: i.WH,
+            clearance: i.WH1
+          }
+        });
+      }
+
+      const place = await Place.findOne({ area });
+
+      if (!place) {
+        // CREATE NEW
+        const newData = { area, listAddress: listAddressNew };
+        await Place.create(newData);
+
+        data.push(newData);
+        areaAdded.push(area);
+      } else {
+        // MERGE ONLY NEW ITEMS
+        const existingIds = new Set(
+          place.listAddress.map(
+            x => `${x.type}-${x.shippingId}-${x.route}`
+          )
+        );
+
+        const merged = listAddressNew.filter(
+          x => !existingIds.has(`${x.type}-${x.shippingId}-${x.route}`)
+        );
+
+        if (merged.length > 0) {
+          place.listAddress.push(...merged);
+          await place.save();
+          areaUpdated.push(area);
         }
-
-        // วน T05
-        for (const i of withdrawT05) {
-          listAddress.push({
-            type: 'T05',
-            typeNameTH: 'ส่งสินค้า',
-            typeNameEN: 'delivery',
-            shippingId: i.Des_No,
-            route: i.Des_Area,
-            name: i.Des_Name,
-            address: '',
-            district: '',
-            subDistrict: '',
-            province: '',
-            postcode: '',
-            tel: '',
-            warehouse: {
-              normal: i.WH,
-              clearance: i.WH1
-            }
-          })
-        }
-
-        // รวมข้อมูล
-        const combineData = {
-          area: user,
-          listAddress
-        }
-        data.push(combineData)
-        areaAdded.push(combineData.area)
-        const placeDoc = new Place(combineData)
-        await placeDoc.save()
       }
     }
 
-    // await session.commitTransaction();
-    // session.endSession();
-
-    const io = getSocket()
-    io.emit('distribution/place/addAllPlace', {})
+    const io = getSocket();
+    io.emit('distribution/place/addAllPlace', {});
 
     res.status(200).json({
       status: 200,
-      message: `add place ${areaAdded} fetched successfully!`,
-      data: data
-    })
+      message: `Added: ${areaAdded.length}, Updated: ${areaUpdated.length}`,
+      addedArea: areaAdded,
+      updatedArea: areaUpdated
+    });
+
   } catch (error) {
-    // await session.abortTransaction().catch(() => { });
-    // session.endSession();
-    console.error(error)
-    res.status(500).json({ status: '500', message: error.message })
+    console.error(error);
+    res.status(500).json({ status: '500', message: error.message });
   }
-}
+};
+
 
 exports.addWereHouse = async (req, res) => {
   try {
@@ -440,32 +424,60 @@ exports.syncAddressDROUTE = async (req, res) => {
       DROUTEdata.map(item => item.routeCode?.trim())
     )];
 
-    const withdrawData = await Withdraw.find()
-
     let data = []
+    const withdrawData = await Withdraw.find({})
+
+    const usedRouteCodes = new Set();
+    const usedRouteCodesFromDB = new Set(
+      idList.map(r => {
+        const rr = r || '';
+        const f6 = rr.slice(0, 6);
+        const f5 = rr.slice(0, 5);
+        return f6.includes('R') ? f5 + 'R' : f5;
+      })
+    );
 
     for (const row of withdrawData) {
+      let routeCodeRaw = row.ROUTE || '';
+      let routeCode = routeCodeRaw.slice(0, 6);
 
-      if (!idList.includes(row.ROUTE)) {
+      const first6 = routeCode.slice(0, 6);
+      const first5 = routeCode.slice(0, 5);
 
-        // console.log("row.ROUTE", row.ROUTE)
-
-        const dataTran = {
-          coNo: 410,
-          DRRUTP: 5,
-          routeCode: row.ROUTE.slice(0, 6),
-          routeName: row.Des_Name.slice(0, 40),
-          DRTX15: row.Des_Name.slice(0, 15),
-          method: row.ZType,
-          transection: '',
-          DRLMDT: formatDate()
-        }
-
-        data.push(dataTran)
-        await DROUTE.create(dataTran, { transaction: t })
+      // ปรับ format ให้เสร็จก่อน
+      if (first6.includes('R')) {
+        routeCode = first5 + 'R';
+      } else {
+        routeCode = first5;
       }
 
+      // เช็กซ้ำกับที่มีใน DB
+      if (usedRouteCodesFromDB.has(routeCode)) {
+        continue;
+      }
+
+      // เช็กซ้ำในรอบนี้
+      if (usedRouteCodes.has(routeCode)) {
+        continue;
+      }
+
+      const dataTran = {
+        coNo: 410,
+        DRRUTP: 5,
+        routeCode,
+        routeName: row.Des_Name?.slice(0, 40) || '',
+        DRTX15: row.Des_Name?.slice(0, 15) || '',
+        method: row.ZType,
+        transection: '',
+        DRLMDT: formatDate(),
+        DRMODL: 'VOF'
+      };
+
+      usedRouteCodes.add(routeCode);
+      data.push(dataTran);
+      await DROUTE.create(dataTran, { transaction: t });
     }
+
 
     await t.commit()   // 🟩 commit
 
@@ -485,22 +497,96 @@ exports.syncAddressDROUTE = async (req, res) => {
 
 exports.CiaddrAddToWithdraw = async (req, res) => {
   try {
-    const { platformType } = req.body
-    const channel = req.headers['x-channel']
-    const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
+    const { Withdraw } = getModelsByChannel('pc', res, distributionModel)
     const { User } = getModelsByChannel('user', res, userModel)
 
-    const userData = await User.find({platformType:platformType,sale:'sale'})
-
+    const userData = await User.find({ role: "sale", platformType: 'PC' })
+    // console.log(platformType)
+    const area = userData.map(item => {
+      return {
+        area: item.area,
+        warehouse: item.warehouse
+      }
+    })
     t = await CIADDR.sequelize.transaction();   // 🟦 กำหนดค่าใน try
 
-    const CIADDRdata = await CIADDR.findAll()
+    const CIADDRdata = await CIADDR.findAll({
+      // where: {
+      //   [Op.or]: [
+      //     { OAADK1: { [Op.like]: `%PC%` } },
+      //     { OAADK1: { [Op.like]: `%EV%` } }
+      //   ]
+      // }
+    });
 
+
+    const CIADDRroute = CIADDRdata.map(item => {
+      const OAADK1Clean = item.OAADK1?.replace(/\s+/g, '') || ""
+      const OAPONOClean = item.OAPONO?.replace(/\s+/g, '') || ""
+      const werehouse = item.OAADK1.slice(2, 5)
+
+      return {
+        OAADK1: OAADK1Clean,
+        OAPONO: OAPONOClean,
+        werehouse: werehouse,
+        name: item.OACONM,
+        OAADR3: item.OAADR3
+      }
+    });
+
+    const withdrawData = await Withdraw.find()
+    const desList = withdrawData.flatMap(item => item.Des_No)
+    const desSet = new Set(desList)
+    let data = []
+
+    const emailMap = {
+      '109': 'dc_nr@onetwotrading.co.th',
+      '101': 'dc_np2@onetwotrading.co.th',
+      '102': 'dc_mk@onetwotrading.co.th',
+      '104': 'dc_sr@onetwotrading.co.th',
+      '105': 'dc_samutprakan@onetwotrading.co.th',
+      '106': 'dc_nakhonsawan@onetwotrading.co.th',
+      '103': 'dc_lp@onetwotrading.co.th',
+      '111': 'dc_np2@onetwotrading.co.th',
+      '121': '',
+      '110': '',
+    };
+
+    for (const row of area) {
+      const list = CIADDRroute.filter(item => item.werehouse === row.warehouse)
+
+      for (const item of list) {
+
+        if (desSet.has(item.OAADK1)) continue
+        if (!item.OAADR3) continue
+
+        const ZType = item.name?.includes('รับของเอง') ? 'T04' : 'T05'
+        const Dc_Email = emailMap[item.OAADR3] ?? ''
+
+        const dataTran = {
+          Des_No: item.OAADK1,
+          Des_Name: item.name,
+          Des_Date: '20250101',
+          ZType,
+          Des_Area: row.area,
+          WH: item.OAADR3,
+          ROUTE: item.OAPONO,
+          WH1: '',
+          Dc_Email
+        }
+
+        await Withdraw.create(dataTran) // 👈 กันพลาด
+        data.push(dataTran)
+        desSet.add(item.OAADK1) // ป้องกันซ้ำในรอบถัดไป
+      }
+    }
 
     res.status(200).json({
       status: 200,
-      message:'add successful',
-      data : CIADDRdata
+      message: 'add successful',
+      data: data,
+      // CIADDRroute: CIADDRroute
+      // user: area
     })
 
   } catch (error) {
