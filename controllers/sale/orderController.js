@@ -1,8 +1,3 @@
-// const { Order } = require('../../models/cash/sale')
-// const { Cart } = require('../../models/cash/cart')
-// const { User } = require('../../models/cash/user')
-// const { Product } = require('../../models/cash/product')
-// const { Route } = require('../../models/cash/route')
 const {
   dataPowerBiQuery,
   dataM3Query,
