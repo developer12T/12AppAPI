@@ -173,8 +173,7 @@ exports.addAllPlace = async (req, res) => {
     let type = channel === 'pc' ? 'PC' : 'cash';
 
     const users = await User.find({ role: 'sale', platformType: type });
-
-    const areaList = [...new Set(users.map(u => u.area).filter(Boolean))]; // กรอง null และซ้ำ
+    const areaList = [...new Set(users.map(u => u.area).filter(Boolean))];
 
     let data = [];
     let areaAdded = [];
@@ -210,29 +209,57 @@ exports.addAllPlace = async (req, res) => {
 
       const place = await Place.findOne({ area });
 
+      // ----------------------------------
+      // 🔹 CREATE NEW
+      // ----------------------------------
       if (!place) {
-        // CREATE NEW
         const newData = { area, listAddress: listAddressNew };
         await Place.create(newData);
-
         data.push(newData);
         areaAdded.push(area);
       } else {
-        // MERGE ONLY NEW ITEMS
-        const existingIds = new Set(
-          place.listAddress.map(
-            x => `${x.type}-${x.shippingId}-${x.route}`
-          )
+        // ----------------------------------
+        // 🔸 UPDATE หรือ INSERT รายการใหม่
+        // ----------------------------------
+        const existingMap = new Map(
+          place.listAddress.map(x => [
+            `${x.type}-${x.shippingId}-${x.route}`,
+            x
+          ])
         );
 
-        const merged = listAddressNew.filter(
-          x => !existingIds.has(`${x.type}-${x.shippingId}-${x.route}`)
-        );
+        let updated = false;
 
-        if (merged.length > 0) {
-          place.listAddress.push(...merged);
+        for (const item of listAddressNew) {
+          const key = `${item.type}-${item.shippingId}-${item.route}`;
+          const exist = existingMap.get(key);
+
+          if (!exist) {
+            // INSERT ใหม่
+            place.listAddress.push(item);
+            updated = true;
+            areaUpdated.push(area);
+            console.log(`🆕 INSERTED Place: ${area} -> ${key}`);
+          } else {
+            // UPDATE ถ้าค่ามีการเปลี่ยนแปลง
+            const changed =
+              exist.name !== item.name ||
+              exist.typeNameTH !== item.typeNameTH ||
+              exist.typeNameEN !== item.typeNameEN ||
+              exist.warehouse.normal !== item.warehouse.normal ||
+              exist.warehouse.clearance !== item.warehouse.clearance;
+
+            if (changed) {
+              Object.assign(exist, item);
+              updated = true;
+              areaUpdated.push(area);
+              console.log(`🔄 UPDATED Place: ${area} -> ${key}`);
+            }
+          }
+        }
+
+        if (updated) {
           await place.save();
-          areaUpdated.push(area);
         }
       }
     }
@@ -252,6 +279,7 @@ exports.addAllPlace = async (req, res) => {
     res.status(500).json({ status: '500', message: error.message });
   }
 };
+
 
 
 exports.addWereHouse = async (req, res) => {
