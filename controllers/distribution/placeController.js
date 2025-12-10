@@ -576,9 +576,31 @@ exports.CiaddrAddToWithdraw = async (req, res) => {
           Dc_Email
         }
 
-        await Withdraw.create(dataTran) // 👈 กันพลาด
-        data.push(dataTran)
-        desSet.add(item.OAADK1) // ป้องกันซ้ำในรอบถัดไป
+        // -----------------------
+        // 🔥 Check ก่อน Insert
+        // -----------------------
+        const existing = await Withdraw.findOne({ Des_No: item.OAADK1 })
+
+        if (existing) {
+          // มีแล้ว → Update ให้เท่ากับข้อมูลใหม่
+          await Withdraw.update(
+            {
+              Des_Name: item.name,
+              WH: item.OAADR3,
+              ROUTE: item.OAPONO,
+              Dc_Email
+            },
+            { where: { Des_No: item.OAADK1 } }
+          )
+          console.log(`🔄 UPDATED: ${item.OAADK1}`)
+        } else {
+          // ไม่มี → Insert ใหม่
+          await Withdraw.create(dataTran)
+          console.log(`🆕 INSERTED: ${item.OAADK1}`)
+          data.push(dataTran)
+        }
+
+        desSet.add(item.OAADK1)  // กันซ้ำในรอบถัดไป
       }
     }
 
