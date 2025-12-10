@@ -139,8 +139,8 @@ exports.checkout = async (req, res) => {
       let name = ''
       if (shippingData.ZType === 'T05') {
         typeNameTH = 'ส่งสินค้า'
-        shippingId = shippingData.Des_No
-        route = shippingData.Des_Area
+        shippingId = shippingData.Des_Area
+        route = shippingData.Des_No
         name = shippingData.Des_Name
       } else if (shippingData.ZType === 'T04') {
         typeNameTH = shippingData.Des_Name
