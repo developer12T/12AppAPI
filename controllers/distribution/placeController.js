@@ -117,7 +117,7 @@ exports.addPlace = async (req, res) => {
 exports.getType = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
-    const { Place } = getModelsByChannel(channel, res, distributionModel)
+    const { Place } = getModelsByChannel('cash', res, distributionModel)
 
     const places = await Place.find(
       { area: { $not: /PC|EV/i } }, // i = case-insensitive
@@ -173,8 +173,7 @@ exports.addAllPlace = async (req, res) => {
     let type = channel === 'pc' ? 'PC' : 'cash';
 
     const users = await User.find({ role: 'sale', platformType: type });
-
-    const areaList = [...new Set(users.map(u => u.area).filter(Boolean))]; // กรอง null และซ้ำ
+    const areaList = [...new Set(users.map(u => u.area).filter(Boolean))];
 
     let data = [];
     let areaAdded = [];
@@ -210,29 +209,57 @@ exports.addAllPlace = async (req, res) => {
 
       const place = await Place.findOne({ area });
 
+      // ----------------------------------
+      // 🔹 CREATE NEW
+      // ----------------------------------
       if (!place) {
-        // CREATE NEW
         const newData = { area, listAddress: listAddressNew };
         await Place.create(newData);
-
         data.push(newData);
         areaAdded.push(area);
       } else {
-        // MERGE ONLY NEW ITEMS
-        const existingIds = new Set(
-          place.listAddress.map(
-            x => `${x.type}-${x.shippingId}-${x.route}`
-          )
+        // ----------------------------------
+        // 🔸 UPDATE หรือ INSERT รายการใหม่
+        // ----------------------------------
+        const existingMap = new Map(
+          place.listAddress.map(x => [
+            `${x.type}-${x.shippingId}-${x.route}`,
+            x
+          ])
         );
 
-        const merged = listAddressNew.filter(
-          x => !existingIds.has(`${x.type}-${x.shippingId}-${x.route}`)
-        );
+        let updated = false;
 
-        if (merged.length > 0) {
-          place.listAddress.push(...merged);
+        for (const item of listAddressNew) {
+          const key = `${item.type}-${item.shippingId}-${item.route}`;
+          const exist = existingMap.get(key);
+
+          if (!exist) {
+            // INSERT ใหม่
+            place.listAddress.push(item);
+            updated = true;
+            areaUpdated.push(area);
+            console.log(`🆕 INSERTED Place: ${area} -> ${key}`);
+          } else {
+            // UPDATE ถ้าค่ามีการเปลี่ยนแปลง
+            const changed =
+              exist.name !== item.name ||
+              exist.typeNameTH !== item.typeNameTH ||
+              exist.typeNameEN !== item.typeNameEN ||
+              exist.warehouse.normal !== item.warehouse.normal ||
+              exist.warehouse.clearance !== item.warehouse.clearance;
+
+            if (changed) {
+              Object.assign(exist, item);
+              updated = true;
+              areaUpdated.push(area);
+              console.log(`🔄 UPDATED Place: ${area} -> ${key}`);
+            }
+          }
+        }
+
+        if (updated) {
           await place.save();
-          areaUpdated.push(area);
         }
       }
     }
@@ -252,6 +279,7 @@ exports.addAllPlace = async (req, res) => {
     res.status(500).json({ status: '500', message: error.message });
   }
 };
+
 
 
 exports.addWereHouse = async (req, res) => {
@@ -497,6 +525,7 @@ exports.syncAddressDROUTE = async (req, res) => {
 
 exports.CiaddrAddToWithdraw = async (req, res) => {
   try {
+
     const { Withdraw } = getModelsByChannel('pc', res, distributionModel)
     const { User } = getModelsByChannel('user', res, userModel)
 
@@ -575,9 +604,31 @@ exports.CiaddrAddToWithdraw = async (req, res) => {
           Dc_Email
         }
 
-        await Withdraw.create(dataTran) // 👈 กันพลาด
-        data.push(dataTran)
-        desSet.add(item.OAADK1) // ป้องกันซ้ำในรอบถัดไป
+        // -----------------------
+        // 🔥 Check ก่อน Insert
+        // -----------------------
+        const existing = await Withdraw.findOne({ Des_No: item.OAADK1 })
+
+        if (existing) {
+          // มีแล้ว → Update ให้เท่ากับข้อมูลใหม่
+          await Withdraw.update(
+            {
+              Des_Name: item.name,
+              WH: item.OAADR3,
+              ROUTE: item.OAPONO,
+              Dc_Email
+            },
+            { where: { Des_No: item.OAADK1 } }
+          )
+          console.log(`🔄 UPDATED: ${item.OAADK1}`)
+        } else {
+          // ไม่มี → Insert ใหม่
+          await Withdraw.create(dataTran)
+          console.log(`🆕 INSERTED: ${item.OAADK1}`)
+          data.push(dataTran)
+        }
+
+        desSet.add(item.OAADK1)  // กันซ้ำในรอบถัดไป
       }
     }
 

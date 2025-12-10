@@ -110,7 +110,7 @@ exports.checkout = async (req, res) => {
     }
 
     let shippingData = {}
-    if (channel === 'pc') {
+    if (channel === 'pc' || channel === 'pc_uat') {
       shippingData = await Withdraw.findOne({
         Des_No: Des_No
       })
@@ -132,20 +132,31 @@ exports.checkout = async (req, res) => {
     let toWarehouse
 
     let shipping = {}
-    if (channel === 'pc') {
+    if (channel === 'pc' || channel === 'pc_uat') {
       let typeNameTH = ''
       let shippingId = ''
       let route = ''
       let name = ''
+
+      const first6 = shippingData.Des_No.slice(0, 6)
+      const first5 = shippingData.Des_No.slice(0, 5)
+
+      if (first6.includes('R')) {
+        routeCode = first5 + 'R'
+      } else {
+        routeCode = first5
+      }
+
+
       if (shippingData.ZType === 'T05') {
         typeNameTH = 'ส่งสินค้า'
         shippingId = shippingData.Des_No
-        route = shippingData.Des_Area
+        route = routeCode
         name = shippingData.Des_Name
       } else if (shippingData.ZType === 'T04') {
         typeNameTH = shippingData.Des_Name
         shippingId = shippingData.Des_Area
-        route = shippingData.ROUTE
+        route = routeCode
       }
 
       shipping = {
@@ -1817,18 +1828,18 @@ exports.approveWithdraw = async (req, res) => {
       const uniqueCount = new Set(MGNUGL).size
       let routeCode = distributionTran.shippingRoute || ''
 
-      if (channel === 'pc') {
-        const first6 = routeCode.slice(0, 6)
-        const first5 = routeCode.slice(0, 5)
+      // if (channel === 'pc') {
+      //   const first6 = routeCode.slice(0, 6)
+      //   const first5 = routeCode.slice(0, 5)
 
-        if (first6.includes('R')) {
-          routeCode = first5 + 'R'
-        } else {
-          routeCode = first5
-        }
-      } else if (channel === 'cash') {
-        routeCode = distributionTran.shippingRoute
-      }
+      //   if (first6.includes('R')) {
+      //     routeCode = first5 + 'R'
+      //   } else {
+      //     routeCode = first5
+      //   }
+      // } else if (channel === 'cash') {
+      //   routeCode = distributionTran.shippingRoute
+      // }
 
       let data = []
       dataTran = {
@@ -1906,10 +1917,18 @@ exports.approveWithdraw = async (req, res) => {
         area: distributionTran.area
       }) || {}; // ป้องกันไม่เจอ user
 
-      const email = await Withdraw.findOne({
-        ROUTE: distributionTran.shippingRoute,
-        Des_No: distributionTran.shippingId
-      }).select('Dc_Email Des_Name') || {}; // ป้องกันไม่เจอ email
+      let email = {}
+      if (channel === 'pc' || channel === 'pc_uat') {
+        email = await Withdraw.findOne({
+          Des_No: distributionTran.shippingId,
+          Des_Area: distributionTran.area
+        }).select('Dc_Email Des_Name') || {}; // ป้องกันไม่เจอ email
+      } else {
+        email = await Withdraw.findOne({
+          ROUTE: distributionTran.shippingRoute,
+          Des_No: distributionTran.shippingId
+        }).select('Dc_Email Des_Name') || {}; // ป้องกันไม่เจอ email
+      }
 
       const wereHouseName = await WereHouse.findOne({
         wh_code: distributionTran.fromWarehouse
