@@ -117,7 +117,7 @@ exports.addPlace = async (req, res) => {
 exports.getType = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
-    const { Place } = getModelsByChannel(channel, res, distributionModel)
+    const { Place } = getModelsByChannel('cash', res, distributionModel)
 
     const places = await Place.find(
       { area: { $not: /PC|EV/i } }, // i = case-insensitive
@@ -497,6 +497,7 @@ exports.syncAddressDROUTE = async (req, res) => {
 
 exports.CiaddrAddToWithdraw = async (req, res) => {
   try {
+
     const { Withdraw } = getModelsByChannel('pc', res, distributionModel)
     const { User } = getModelsByChannel('user', res, userModel)
 
