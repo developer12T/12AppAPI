@@ -1906,10 +1906,19 @@ exports.approveWithdraw = async (req, res) => {
         area: distributionTran.area
       }) || {}; // ป้องกันไม่เจอ user
 
-      const email = await Withdraw.findOne({
-        ROUTE: distributionTran.shippingRoute,
-        Des_No: distributionTran.shippingId
-      }).select('Dc_Email Des_Name') || {}; // ป้องกันไม่เจอ email
+      let email = {}
+      if (channel === 'pc') {
+        email = await Withdraw.findOne({
+          Des_No: distributionTran.shippingRoute,
+          Des_Area: distributionTran.shippingId
+        }).select('Dc_Email Des_Name') || {}; // ป้องกันไม่เจอ email
+      } else {
+        email = await Withdraw.findOne({
+          ROUTE: distributionTran.shippingRoute,
+          Des_No: distributionTran.shippingId
+        }).select('Dc_Email Des_Name') || {}; // ป้องกันไม่เจอ email
+      }
+
 
       const wereHouseName = await WereHouse.findOne({
         wh_code: distributionTran.fromWarehouse
