@@ -1,7 +1,7 @@
 // const storeModel = require('../../models/cash/store');
-const { dbCA, dbCR, dbPC, dbUSER,dbCA_UAT } = require('../config/db')
+const { dbCA, dbCR, dbPC, dbUSER, dbCA_UAT,dbPC_UAT } = require('../config/db')
 
-function getModelsByChannel (channel, res, model) {
+function getModelsByChannel(channel, res, model) {
   let conn
 
   switch (channel) {
@@ -19,6 +19,9 @@ function getModelsByChannel (channel, res, model) {
       break
     case 'uat':
       conn = dbCA_UAT
+      break
+    case 'pc_uat':
+      conn = dbPC_UAT
       break
     default:
       res.status(400).json({

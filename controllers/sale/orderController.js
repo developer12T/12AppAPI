@@ -4591,7 +4591,7 @@ exports.summaryDaily = async (req, res) => {
           'store.area': area,
           period: periodStr,
           createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
-          type: 'sale',
+          type:{$in:['sale','saleNoodle']} ,
           status: { $nin: ['canceled', 'reject'] }
         }),
         Order.find({
