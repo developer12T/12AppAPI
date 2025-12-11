@@ -1164,7 +1164,7 @@ exports.addUserPcToPromotionStore = async (req, res) => {
       })
     }
 
-    const dataUser = await User.find({ role: "sale", platformType: "PC" ,area:{$ne:'PC999'}})
+    const dataUser = await User.find({ role: "sale", platformType: "PC", area: { $ne: 'PC999' } })
 
     const salePayerList = [
       ...new Set(dataUser.flatMap(item => item.salePayer))
@@ -1244,6 +1244,52 @@ exports.addUserPcToPromotionStore = async (req, res) => {
       message: 'add to OPROMC success',
       data: data
     })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+}
+
+exports.updateUserPcToPromotionStore = async (req, res) => {
+  try {
+
+    const { User } = getModelsByChannel('user', res, userModel);
+
+    const dataUser = await User.find({ role: "sale", platformType: "PC", area: { $ne: 'PC999' } })
+
+    const salePayerList = [
+      ...new Set(dataUser.flatMap(item => item.salePayer))
+    ];
+    const dataPromotionStore = await PromotionStore.findAll({
+      where: {
+        FBCUNO: { [Op.in]: salePayerList },
+      }
+    });
+
+    for (const row of dataUser) {
+      if (!row.salePayer) {
+        continue
+      }
+
+      const promotionStore = dataPromotionStore.filter(
+        item => item.FBCUNO?.trim() === row.salePayer?.trim()
+      );
+
+    }
+
+    res.status(201).json({
+      status:201,
+      message:'updateUserPcToPromotionStore success',
+      data:dataPromotionStore
+    })
+
+
   } catch (error) {
     console.error('❌ Error:', error)
 

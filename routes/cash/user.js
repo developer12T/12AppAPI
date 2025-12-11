@@ -20,7 +20,8 @@ const {
  addUserPcSample,
  getArea,
  getZone,
- addUserPcToPromotionStore
+ addUserPcToPromotionStore,
+ updateUserPcToPromotionStore
 } = require('../../controllers/user/userController')
 
 const router = express.Router()
@@ -46,4 +47,5 @@ router.post('/addUserPcSample', addUserPcSample)
 router.post('/getArea', getArea)
 router.post('/getZone', getZone)
 router.post('/addUserPcToPromotionStore', addUserPcToPromotionStore)
+router.post('/updateUserPcToPromotionStore', updateUserPcToPromotionStore)
 module.exports = router
