@@ -1,5 +1,5 @@
 // const { User } = require('../../models/cash/user')
-const { period, previousPeriod } = require('../../utilities/datetime')
+const { period, previousPeriod, formatDate } = require('../../utilities/datetime')
 const sql = require('mssql');
 const fs = require('fs');
 const dayjs = require('dayjs');
@@ -16,7 +16,12 @@ const { userQuery, userQueryFilter, userQueryManeger, userQueryOne, userPcSample
 const user = require('../../models/cash/user');
 const { getSocket } = require('../../socket')
 const { encrypt, decrypt } = require('../../middleware/authen');
+const {
+  PromotionStore,
 
+} = require('../../models/cash/master');
+const { where } = require('sequelize');
+const { Op } = require("sequelize");
 
 function exportUsersToXlsx(data, sheetName = 'Sheet1') {
   const worksheet = XLSX.utils.json_to_sheet(data);
@@ -1131,6 +1136,157 @@ exports.getZone = async (req, res) => {
       status: 200,
       message: 'sucess',
       data: userData
+    })
+
+
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+}
+
+
+exports.addUserPcToPromotionStore = async (req, res) => {
+  try {
+    const { proCode } = req.body
+    const { User } = getModelsByChannel('user', res, userModel);
+
+    if (!proCode) {
+      return res.status(404).json({
+        status: 404,
+        message: 'proCode is require'
+      })
+    }
+
+    const dataUser = await User.find({ role: "sale", platformType: "PC", area: { $ne: 'PC999' } })
+
+    const salePayerList = [
+      ...new Set(dataUser.flatMap(item => item.salePayer))
+    ];
+    const dataPromotionStore = await PromotionStore.findAll({
+      where: {
+        FBCUNO: { [Op.in]: salePayerList },
+        proId: proCode
+      }
+    });
+
+    // console.log("dataPromotionStore", dataPromotionStore)
+
+
+    let data = []
+
+    for (const row of dataUser) {
+      if (!row.salePayer) {
+        continue
+      }
+
+      const promotionStore = dataPromotionStore.find(
+        item => item.FBCUNO?.trim() === row.salePayer?.trim()
+      );
+
+      if (!promotionStore) {
+        const dataTran = {
+          coNo: 410,
+          FBDIVI: 'OTT',
+          FBCUNO: row.salePayer,
+          proId: proCode,
+          customerChannel: '105',
+          FBCUTP: 0,
+          saleCode: row.saleCode,
+          FBDISY: '',
+          FBDIGC: '',
+          orderType: '051',
+          warehouse: row.warehouse,
+          zone: 'PC',
+          FBCSCD: 'TH',
+          FBPYNO: row.salePayer,
+          FBCUST: '',
+          FBFRE1: '',
+          FBFRE2: '',
+          FBBGRP: '',
+          posccode: '',
+          FBCFC0: '',
+          area: row.area,
+          FBCFC2: 0,
+          FBCFC3: 'R24',
+          FBCFC4: '',
+          FBCFC5: '',
+          OKCUCL: '',
+          FBCFC6: '001',
+          FBCFC7: '0',
+          FBCFC8: '',
+          FBCFC9: '',
+          FBECAR: '73',
+          FBFVDT: formatDate(),
+          FBLVDT: formatDate(),
+          FBRGDT: formatDate(),
+          FBRGTM: 0,
+          FBLMDT: formatDate(),
+          FBCHNO: '11',
+          FBCHID: 'CRS610S1',
+          FBPRI2: 5
+
+        }
+        data.push(dataTran)
+        await PromotionStore.create(dataTran)
+      }
+
+    }
+
+    res.status(201).json({
+      status: 201,
+      message: 'add to OPROMC success',
+      data: data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+}
+
+exports.updateUserPcToPromotionStore = async (req, res) => {
+  try {
+
+    const { User } = getModelsByChannel('user', res, userModel);
+
+    const dataUser = await User.find({ role: "sale", platformType: "PC", area: { $ne: 'PC999' } })
+
+    const salePayerList = [
+      ...new Set(dataUser.flatMap(item => item.salePayer))
+    ];
+    const dataPromotionStore = await PromotionStore.findAll({
+      where: {
+        FBCUNO: { [Op.in]: salePayerList },
+      }
+    });
+
+    for (const row of dataUser) {
+      if (!row.salePayer) {
+        continue
+      }
+
+      const promotionStore = dataPromotionStore.filter(
+        item => item.FBCUNO?.trim() === row.salePayer?.trim()
+      );
+
+    }
+
+    res.status(201).json({
+      status:201,
+      message:'updateUserPcToPromotionStore success',
+      data:dataPromotionStore
     })
 
 

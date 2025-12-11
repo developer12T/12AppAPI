@@ -4591,7 +4591,7 @@ exports.summaryDaily = async (req, res) => {
           'store.area': area,
           period: periodStr,
           createdAt: { $gte: startOfMonthUTC, $lte: endOfMonthUTC },
-          type:{$in:['sale','saleNoodle']} ,
+          type: { $in: ['sale', 'saleNoodle'] },
           status: { $nin: ['canceled', 'reject'] }
         }),
         Order.find({
@@ -7581,3 +7581,52 @@ exports.editOrderSale = async (req, res) => {
     });
   }
 };
+
+
+exports.updateProCodeInOrder = async (req, res) => {
+  try {
+    const { period } = req.body
+    const channel = req.headers['x-channel']
+    const { Promotion, PromotionShelf, Quota } = getModelsByChannel(
+      channel,
+      res,
+      promotionModel
+    )
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const orderData = await Order.find({ period: period })
+    const promotionData = await Promotion.find({ status: 'active' })
+
+
+    let data = []
+
+
+    for (const item of orderData) {
+
+      for (const promo of item.listPromotions) {
+        console.log("old proCode:", promo.proCode);
+
+        // 👉 แก้ค่าที่ต้องการ
+        promo.proCode = 'FV1P';
+      }
+
+      // 👉 SAVE document กลับ MongoDB
+      await item.save();
+    }
+
+
+    res.status(201).json({
+      status: 200,
+      message: 'updateProCodeInOrder success',
+      data: orderData
+    })
+
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      status: 500,
+      message: "Server error",
+      error: error.message
+    });
+  }
+}

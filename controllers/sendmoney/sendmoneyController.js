@@ -132,7 +132,7 @@ exports.addSendMoney = async (req, res) => {
         area: area,
         dateAt: startOfMonthUTC,
         sendmoney: sendmoney,
-        sendmoneyAcc: sendmoney,
+        sendmoneyAcc: 0,
         salePayer: salePayer,
         saleCode: saleCode,
         period: periodStr,
@@ -148,7 +148,7 @@ exports.addSendMoney = async (req, res) => {
           },
           salePayer: salePayer,
           saleCode: saleCode,
-          sendmoneyAcc: sendmoney,
+          sendmoneyAcc: 0,
           different: to2(different)
         }
       )
@@ -1008,6 +1008,7 @@ exports.updateSendmoneyOld2 = async (req, res) => {
         const diffChange = to2(changeRaw - damaged - good)
         const summary = to2(summaryRaw + diffChange)
         const diff = to2(sendmoney - summary)
+      
         const status = sendmoney > 0 ? 'ส่งเงินแล้ว' : 'ยังไม่ส่งเงิน'
 
         return {
@@ -1594,6 +1595,7 @@ exports.sendmoneyToExcel = async (req, res) => {
 
         row.totalSale = row.sale + (row.change - row.refund)
         row.diff = row.sendmoney - row.totalSale
+        row.diffAcc = row.sendmoneyAcc - row.totalSale
 
         finalRows.push({
           area,
@@ -1605,6 +1607,7 @@ exports.sendmoneyToExcel = async (req, res) => {
           totalSale: to2(row.totalSale),
           sendmoney: to2(row.sendmoney),
           diff: to2(row.diff),
+          diffAcc: to2(row.diffAcc),
           sendmoneyAcc: to2(row.sendmoneyAcc),
           image: row.image[0]
         })
