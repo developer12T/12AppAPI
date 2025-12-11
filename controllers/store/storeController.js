@@ -912,15 +912,26 @@ exports.editStore = async (req, res) => {
     // 1) ดึงข้อมูลเดิม
     const oldStore = await Store.findOne({ storeId: storeId });
 
-    const m3Store = await Customer.findOne({
-      where: {
-        coNo: 410,
-        customerNo: storeId
-      }
-    });
+    if (oldStore.area !== 'IT211') {
+      const m3Store = await Customer.findOne({
+        where: {
+          coNo: 410,
+          customerNo: storeId
+        }
+      });
 
-    if (!oldStore || !m3Store) {
-      return res.status(404).json({ status: '404', message: 'Store not found' });
+      if (!m3Store) {
+        return res.status(404).json({
+          status: 404,
+          message: 'Store not found in M3'
+        })
+
+      }
+
+    }
+
+    if (!oldStore) {
+      return res.status(404).json({ status: '404', message: 'Store not found mongo' });
     }
 
     const editableFields = [
@@ -999,7 +1010,7 @@ exports.editStore = async (req, res) => {
     // ---- NAME ----
     if (data.name) {
       const nameStr = updatedStore.name ?? '';
-      updateData.OKALCU =  nameStr.slice(0, 10);
+      updateData.OKALCU = nameStr.slice(0, 10);
       updateData.customerName = nameStr.slice(0, 36);
       updateData.customerAddress4 = nameStr.slice(36, 72);
     }
@@ -1017,9 +1028,9 @@ exports.editStore = async (req, res) => {
     if (data.address || data.subDistrict || data.province || data.postCode) {
 
       const fullAddress =
-        (updatedStore.address ?? '') +
-        (updatedStore.subDistrict ?? '') +
-        (updatedStore.province ?? '') +
+        (updatedStore.address ?? '') + '' +
+        (updatedStore.subDistrict ?? '') + '' +
+        (updatedStore.province ?? '') + '' +
         (updatedStore.postCode ?? '');
 
       updateData.customerAddress1 = fullAddress.slice(0, 35);
