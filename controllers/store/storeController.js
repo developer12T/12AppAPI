@@ -251,10 +251,48 @@ exports.getPendingStore = async (req, res) => {
 
 exports.getStore = async (req, res) => {
   try {
-    const { area, type, route, zone, team, year, month, showMap } = req.query
+    const {
+      area,
+      type,
+      route,
+      zone,
+      team,
+      year,
+      month,
+      showMap,
+      q
+      // start,
+      // end,
+      // period
+    } = req.query
     const channel = req.headers['x-channel'] // 'credit' or 'cash'
 
     const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    // let startDate, endDate
+
+    // if (start && end) {
+    //   startDate = new Date(
+    //     `${start.slice(0, 4)}-${start.slice(4, 6)}-${start.slice(
+    //       6,
+    //       8
+    //     )}T00:00:00+07:00`
+    //   )
+    //   endDate = new Date(
+    //     `${end.slice(0, 4)}-${end.slice(4, 6)}-${end.slice(
+    //       6,
+    //       8
+    //     )}T23:59:59.999+07:00`
+    //   )
+    // } else if (period) {
+    //   const range = rangeDate(period) // ฟังก์ชันที่คุณมีอยู่แล้ว
+    //   startDate = range.startDate
+    //   endDate = range.endDate
+    // } else {
+    //   return res
+    //     .status(400)
+    //     .json({ status: 400, message: 'period or start/end are required!' })
+    // }
 
     const currentDate = new Date()
     // startMonth: 3 เดือนที่แล้ว (นับรวมเดือนนี้)
@@ -359,6 +397,22 @@ exports.getStore = async (req, res) => {
         }
       }
     ]
+
+    // ADD SEARCH QUERY
+    if (q) {
+      const regex = new RegExp(q, 'i')
+      pipeline.unshift({
+        $match: {
+          $or: [
+            { storeId: regex },
+            { name: regex },
+            { address: regex },
+            { route: regex },
+            { area: regex }
+          ]
+        }
+      })
+    }
 
     if (team) {
       pipeline.push({
@@ -893,24 +947,22 @@ exports.editStore = async (req, res) => {
     const data = req.body
     Object.keys(data).forEach(key => {
       if (data[key] === '' || data[key] === null || data[key] === undefined) {
-        delete data[key];
+        delete data[key]
       }
-    });
-
+    })
 
     if (!data.user) {
       return res.status(401).json({
         status: 401,
-        message: "user is required"
+        message: 'user is required'
       })
     }
 
-
     const channel = req.headers['x-channel']
-    const { Store, StoreHisLog } = getModelsByChannel(channel, res, storeModel);
+    const { Store, StoreHisLog } = getModelsByChannel(channel, res, storeModel)
 
     // 1) ดึงข้อมูลเดิม
-    const oldStore = await Store.findOne({ storeId: storeId });
+    const oldStore = await Store.findOne({ storeId: storeId })
 
     if (oldStore.area !== 'IT211') {
       const m3Store = await Customer.findOne({
@@ -945,18 +997,18 @@ exports.editStore = async (req, res) => {
       'province',
       'provinceCode',
       'postCode'
-    ];
+    ]
 
     // History ที่จะบันทึก
     const history = {
       editPerson: req.user,
-      editAt: new Date(),
-    };
+      editAt: new Date()
+    }
 
     // ตรวจว่า field ไหนมีการแก้จริง
     editableFields.forEach(field => {
-      const oldVal = oldStore[field];
-      const newVal = data[field];
+      const oldVal = oldStore[field]
+      const newVal = data[field]
 
       // เงื่อนไข: มีค่าใหม่ + ไม่เท่าค่าเก่า = ถือว่าแก้ไข
       if (
@@ -965,21 +1017,21 @@ exports.editStore = async (req, res) => {
         newVal !== '' &&
         newVal !== oldVal
       ) {
-        history[field] = newVal;
-        history[field + 'Old'] = oldVal;
+        history[field] = newVal
+        history[field + 'Old'] = oldVal
       }
-    });
+    })
 
     const editPerson = data.user
     // console.log(editPerson)
     // ถ้าไม่มีฟิลด์ไหนถูกแก้ → แจ้งว่าไม่มีการเปลี่ยนแปลง
-    if (Object.keys(history).length === 2) {   // มีแค่ editPerson + editAt
+    if (Object.keys(history).length === 2) {
+      // มีแค่ editPerson + editAt
       return res.status(400).json({
         status: '400',
         message: 'Nothing changed'
-      });
+      })
     }
-
 
     // console.log('data', data)
 
@@ -988,13 +1040,11 @@ exports.editStore = async (req, res) => {
       { storeId: storeId },
       { $set: data },
       { new: true }
-    );
+    )
 
     // const updatedStore = await Store.findOne({ storeId: storeId })
 
-
-
-    delete history.editPerson;
+    delete history.editPerson
 
     const historyFinal = {
       storeId,
@@ -1003,9 +1053,9 @@ exports.editStore = async (req, res) => {
     }
 
     // บันทึกประวัติการแก้ไข
-    await StoreHisLog.create(historyFinal);
+    await StoreHisLog.create(historyFinal)
 
-    const updateData = {};
+    const updateData = {}
 
     // ---- NAME ----
     if (data.name) {
@@ -1023,19 +1073,17 @@ exports.editStore = async (req, res) => {
       updateData.customerPhone = data.tel
     }
 
-
     // ---- ADDRESS ----
     if (data.address || data.subDistrict || data.province || data.postCode) {
-
       const fullAddress =
         (updatedStore.address ?? '') + '' +
         (updatedStore.subDistrict ?? '') + '' +
         (updatedStore.province ?? '') + '' +
         (updatedStore.postCode ?? '');
 
-      updateData.customerAddress1 = fullAddress.slice(0, 35);
-      updateData.customerAddress2 = fullAddress.slice(35, 70);
-      updateData.customerAddress3 = fullAddress.slice(70, 105);
+      updateData.customerAddress1 = fullAddress.slice(0, 35)
+      updateData.customerAddress2 = fullAddress.slice(35, 70)
+      updateData.customerAddress3 = fullAddress.slice(70, 105)
     }
 
     // ---- UPDATE ครั้งเดียว ----
@@ -1044,19 +1092,18 @@ exports.editStore = async (req, res) => {
         coNo: 410,
         customerNo: storeId
       }
-    });
+    })
 
     res.status(200).json({
       status: '200',
       message: 'Store updated successfully',
       data: updatedStore
-    });
-
+    })
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ status: '500', message: 'Server error' });
+    console.error(error)
+    res.status(500).json({ status: '500', message: 'Server error' })
   }
-};
+}
 
 exports.addFromERP = async (req, res) => {
   try {
@@ -1644,24 +1691,24 @@ exports.updateStoreStatus = async (req, res) => {
         customerCoType: item.type ?? '',
         customerAddress1: (
           item.address +
-          item.subDistrict +
-          // item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+            item.subDistrict +
+            // item.subDistrict +
+            item.province +
+            item.postCode ?? ''
         ).substring(0, 35),
         customerAddress2: (
           item.address +
-          item.subDistrict +
-          // item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+            item.subDistrict +
+            // item.subDistrict +
+            item.province +
+            item.postCode ?? ''
         ).substring(35, 70),
         customerAddress3: (
           item.address +
-          item.subDistrict +
-          // item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+            item.subDistrict +
+            // item.subDistrict +
+            item.province +
+            item.postCode ?? ''
         ).substring(70, 105),
         customerAddress4: '',
         customerPoscode: (item.postCode ?? '').substring(0, 35),
@@ -2905,7 +2952,7 @@ exports.storeToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
   } catch (err) {
     console.error(err)
@@ -3562,7 +3609,7 @@ exports.checkRangeLatLong = async (req, res) => {
 
     const dataStoreLatLong = await StoreLatLong.find({ status: 'approved' })
 
-    function calculateDistance(lat1, lon1, lat2, lon2) {
+    function calculateDistance (lat1, lon1, lat2, lon2) {
       const R = 6371 // รัศมีโลก (กิโลเมตร)
 
       const dLat = deg2rad(lat2 - lat1)
@@ -3571,16 +3618,16 @@ exports.checkRangeLatLong = async (req, res) => {
       const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos(deg2rad(lat1)) *
-        Math.cos(deg2rad(lat2)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2)
+          Math.cos(deg2rad(lat2)) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2)
 
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 
       return R * c // ระยะทาง (กิโลเมตร)
     }
 
-    function deg2rad(deg) {
+    function deg2rad (deg) {
       return deg * (Math.PI / 180)
     }
 
@@ -3627,7 +3674,7 @@ exports.checkRangeLatLong = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
 
     // res.status(200).json({
@@ -3831,7 +3878,7 @@ exports.areaStoreM3toMongo = async (req, res) => {
   }
 }
 
-function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
+function getDistanceFromLatLonInMeters (lat1, lon1, lat2, lon2) {
   const R = 6371000 // รัศมีโลก (เมตร)
   const dLat = ((lat2 - lat1) * Math.PI) / 180
   const dLon = ((lon2 - lon1) * Math.PI) / 180
@@ -3839,8 +3886,8 @@ function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
   const a =
     Math.sin(dLat / 2) ** 2 +
     Math.cos((lat1 * Math.PI) / 180) *
-    Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLon / 2) ** 2
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 
@@ -4057,7 +4104,10 @@ exports.getStoreOnRoute = async (req, res) => {
     const { Store } = getModelsByChannel(channel, res, storeModel)
     const { Route } = getModelsByChannel(channel, res, routeModel)
 
-    const routeData = await Route.findOne({ id: routeId, period: period }).lean()
+    const routeData = await Route.findOne({
+      id: routeId,
+      period: period
+    }).lean()
 
     const storeIds = routeData.listStore
       .flatMap(item => item.storeInfo)
@@ -4065,16 +4115,11 @@ exports.getStoreOnRoute = async (req, res) => {
 
     docs = await Store.find({ _id: { $in: storeIds } })
 
-
-
     res.status(200).json({
       status: 200,
       message: 'fetch success',
       data: docs
     })
-
-
-
   } catch (error) {
     console.error('❌ Error:', error)
 

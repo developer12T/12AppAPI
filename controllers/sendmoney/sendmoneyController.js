@@ -40,6 +40,7 @@ const {
 const { query } = require('mssql')
 const { Item } = require('../../models/cash/master')
 const sendmoney = require('../../models/cash/sendmoney')
+const { exportExcel, exportSendMoneyMonthly } = require('../utils/exportExcel')
 
 exports.addSendMoney = async (req, res) => {
   try {
@@ -131,7 +132,7 @@ exports.addSendMoney = async (req, res) => {
         area: area,
         dateAt: startOfMonthUTC,
         sendmoney: sendmoney,
-        sendmoneyAcc: sendmoney,
+        sendmoneyAcc: 0,
         salePayer: salePayer,
         saleCode: saleCode,
         period: periodStr,
@@ -147,7 +148,7 @@ exports.addSendMoney = async (req, res) => {
           },
           salePayer: salePayer,
           saleCode: saleCode,
-          sendmoneyAcc: sendmoney,
+          sendmoneyAcc: 0,
           different: to2(different)
         }
       )
@@ -1007,6 +1008,7 @@ exports.updateSendmoneyOld2 = async (req, res) => {
         const diffChange = to2(changeRaw - damaged - good)
         const summary = to2(summaryRaw + diffChange)
         const diff = to2(sendmoney - summary)
+      
         const status = sendmoney > 0 ? 'ส่งเงินแล้ว' : 'ยังไม่ส่งเงิน'
 
         return {
@@ -1321,8 +1323,8 @@ exports.updateSendmoneyOld = async (req, res) => {
 
 exports.sendmoneyToExcel = async (req, res) => {
   try {
-    const { area, period, start, end, excel } = req.query
-    const channel = 'cash'
+    const { channel, area, period, start, end, excel } = req.query
+    // const channel = 'cash'
 
     const { User } = getModelsByChannel(channel, res, userModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
@@ -1388,6 +1390,19 @@ exports.sendmoneyToExcel = async (req, res) => {
     } else {
       areas = await User.find({ role: 'sale' }).distinct('area')
     }
+
+    // ดึงรายชื่อผู้ขายตาม area
+    const users = await User.find(
+      { area: { $in: areas } },
+      { area: 1, firstName: 1, surName: 1 }
+    ).lean()
+
+    // ทำเป็น Map เพื่อเรียกชื่อเร็วขึ้น
+    const userMap = {}
+    users.forEach(u => {
+      const name = `${u.firstName || ''} ${u.surName || ''}`.trim()
+      userMap[u.area] = name
+    })
 
     // -------------------------
     // 3) AGGREGATE — DAILY (ไม่รวม)
@@ -1580,9 +1595,11 @@ exports.sendmoneyToExcel = async (req, res) => {
 
         row.totalSale = row.sale + (row.change - row.refund)
         row.diff = row.sendmoney - row.totalSale
+        row.diffAcc = row.sendmoneyAcc - row.totalSale
 
         finalRows.push({
           area,
+          areaAndName: `${area}-${userMap[area] || 'ไม่พบชื่อ'}`.trim(),
           date: formatDDMMYYYY(date),
           sale: to2(row.sale),
           change: to2(row.change),
@@ -1590,6 +1607,7 @@ exports.sendmoneyToExcel = async (req, res) => {
           totalSale: to2(row.totalSale),
           sendmoney: to2(row.sendmoney),
           diff: to2(row.diff),
+          diffAcc: to2(row.diffAcc),
           sendmoneyAcc: to2(row.sendmoneyAcc),
           image: row.image[0]
         })
@@ -1625,6 +1643,19 @@ exports.sendmoneyToExcel = async (req, res) => {
         ขาดเกิน: r.diff
       }))
 
+      // ⚠️ Validate
+      if (!period) {
+        return res.status(400).json({
+          status: 400,
+          message: 'ต้องใช้ period เมื่อ export แบบรายเดือน'
+        })
+      }
+
+      const yearAD = parseInt(period.slice(0, 4))
+      const month = parseInt(period.slice(4, 6))
+      const yearTH = yearAD + 543
+      const monthNum = month
+
       const wb = xlsx.utils.book_new()
       const ws = xlsx.utils.json_to_sheet(excelRows)
       xlsx.utils.book_append_sheet(wb, ws, 'sendMoneyDaily')
@@ -1632,9 +1663,17 @@ exports.sendmoneyToExcel = async (req, res) => {
       const tempPath = path.join(os.tmpdir(), 'sendMoneyDaily.xlsx')
       xlsx.writeFile(wb, tempPath)
 
-      return res.download(tempPath, 'sendMoneyDaily.xlsx', err => {
-        if (!err) fs.unlink(tempPath, () => {})
-      })
+      // return res.download(tempPath, 'sendMoneyDaily.xlsx', err => {
+      //   if (!err) fs.unlink(tempPath, () => {})
+      // })
+
+      // return exportExcel(
+      //   res,
+      //   excelRows,
+      //   'sendMoneyDaily', // Sheet name
+      //   'sendMoneyDaily.xlsx' // Download file name
+      // )
+      return exportSendMoneyMonthly(res, finalRows, yearTH, monthNum)
     }
 
     // -------------------------
