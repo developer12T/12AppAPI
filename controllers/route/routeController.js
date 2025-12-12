@@ -3306,16 +3306,66 @@ exports.addStoreToRouteChange = async (req, res) => {
     const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
     const routeChangeData = await RouteChange.findOne({ id: id })
 
+    if (!routeChangeData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found routeId'
+      })
+    }
+
 
     const storeData = await Store.findOne({ storeId: storeId, area: routeChangeData.area })
-    console.log("storeId", storeId)
-    console.log("routeChangeData.area", routeChangeData.area)
+
+    if (!storeData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found storeId'
+      })
+    }
+
+    const exists = await RouteChange.findOne({
+      id,
+      'listStore.storeInfo': storeData._id
+    })
+
+    if (exists) {
+      return res.status(404).json({
+        status: 404,
+        message: 'duplicate store'
+      })
+    }
+
+
+    await RouteChange.updateOne(
+      {
+        id,
+        'listStore.storeInfo': { $ne: storeData._id }
+      },
+      {
+        $push: {
+          listStore: {
+            storeInfo: storeData._id,
+            note: '',
+            image: '',
+            latitude: '',
+            longtitude: '',
+            status: '0',
+            statusText: 'รอเยี่ยม',
+            date: '',
+            listOrder: []
+          }
+        }
+      }
+    )
+
+
+
 
 
     res.status(201).json({
       status: 201,
       message: 'insertRouteToRouteChange success',
-      data: storeData
+      // data: storeData
     })
 
   } catch (error) {
