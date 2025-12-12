@@ -2153,7 +2153,7 @@ exports.getRouteEffectiveAll = async (req, res) => {
     const { Route } = getModelsByChannel(channel, res, routeModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
 
-    console.log(query)
+    // console.log(query)
 
     let routes = await Route.find(query).populate(
       'listStore.storeInfo',
@@ -3206,8 +3206,12 @@ exports.insertRouteToRouteChange = async (req, res) => {
         continue
       }
 
+      const routeId = `${period}${item.area}R${item.day}`
+
+
+
       const route = {
-        id: item.id,
+        id: routeId,
         period: period,
         area: item.area,
         zone: item.zone,
@@ -3372,13 +3376,40 @@ exports.deleteStoreToRouteChange = async (req, res) => {
   }
 }
 
-exports.routeChangeToRoute = async (req, res) => {
+exports.addRouteChangeToRoute = async (req, res) => {
   try {
     const { period } = req.body
     const channel = req.headers['x-channel']
     const { Route, RouteChange } = getModelsByChannel(channel, res, routeModel)
 
-    // const route = await 
+    const routeChangeData = await RouteChange.find({ period }).lean()
+    const routeIdList = await routeChangeData.flatMap(item => item.id)
+
+    // 1. ดึง id ที่มีอยู่แล้ว
+    const existRoutes = await Route.find(
+      { id: { $in: routeChangeData.map(r => r.id) } },
+      { id: 1 }
+    ).lean()
+
+    const existIdSet = new Set(existRoutes.map(r => r.id))
+
+    // 2. คัดเฉพาะอันที่ยังไม่มี
+    const toCreate = routeChangeData
+      .filter(r => !existIdSet.has(r.id))
+      .map(({ _id, __v, ...rest }) => rest)
+
+    // 3. สร้างจริง ๆ
+    if (toCreate.length > 0) {
+      await Route.insertMany(toCreate)
+    }
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'addRouteChangeToRoute success',
+      data: toCreate
+    })
+
 
   } catch (error) {
     console.error(error)
