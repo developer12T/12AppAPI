@@ -104,10 +104,10 @@ const RouteChangeLogSchema = new mongoose.Schema({
 // const RouteChangeLog = dbCR.model('RouteChangeLog', RouteChangeLogSchema)
 // module.exports = { Route, RouteChangeLog }
 
-
 module.exports = (conn) => {
   return {
     Route: conn.model('Route', RouteSchema),
+    RouteChange: conn.model('RouteChange',RouteSchema),
     RouteChangeLog: conn.model('RouteChangeLog', RouteChangeLogSchema),
   };
 };
