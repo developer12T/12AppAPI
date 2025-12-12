@@ -1977,63 +1977,8 @@ exports.getRouteEffective = async (req, res) => {
     })
 
     let data = []
-    if (zone || team) {
-      // ✅ filter เฉพาะ route ที่อยู่ใน zone นี้
-
-      if (zone) {
-        filteredRoutes = routesTranFrom.filter(r => r.zone === zone)
-      } else if (team) {
-        filteredRoutes = routesTranFrom.filter(r => r.team === team)
-      }
-
-      const routeId = [...new Set(filteredRoutes.map(r => r.route))]
-      for (const route of routeId) {
-        const dataRoute = filteredRoutes.filter(item => item.route === route)
-
-        // ✅ รวมค่าใน route เดียวกัน
-        const total = dataRoute.reduce(
-          (acc, cur) => {
-            acc.storeAll += cur.storeAll || 0
-            acc.storePending += cur.storePending || 0
-            acc.storeSell += cur.storeSell || 0
-            acc.storeNotSell += cur.storeNotSell || 0
-            acc.storeCheckInNotSell += cur.storeCheckInNotSell || 0
-            acc.storeTotal += cur.storeTotal || 0
-            acc.summary += cur.summary || 0
-            acc.totalqty += cur.totalqty || 0
-            acc.percentVisit += parseFloat(cur.percentVisit || 0)
-            acc.percentEffective += parseFloat(cur.percentEffective || 0)
-            return acc
-          },
-          {
-            // routeId: dataRoute[0].routeId || route,
-            route: route,
-            storeAll: 0,
-            storePending: 0,
-            storeSell: 0,
-            storeNotSell: 0,
-            storeCheckInNotSell: 0,
-            storeTotal: 0,
-            percentVisit: 0,
-            percentEffective: 0,
-            summary: 0,
-            totalqty: 0,
-          }
-        )
-
-        // ✅ คำนวณค่าเฉลี่ย %
-        const len = dataRoute.length || 1
-        total.percentVisit = (total.percentVisit / len).toFixed(2)
-        total.percentEffective = (total.percentEffective / len).toFixed(2)
-
-
-        data.push(total)
-      }
-
-
-    } else {
-      data = routesTranFrom
-    }
+    
+    data = routesTranFrom
 
     const excludedRoutes = ['R25', 'R26']
 
