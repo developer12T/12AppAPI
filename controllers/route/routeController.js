@@ -3237,7 +3237,7 @@ exports.insertRouteToRouteChange = async (req, res) => {
   try {
     const { period } = req.body
     const channel = req.headers['x-channel']
-    const { Route,RouteChange } = getModelsByChannel(channel, res, routeModel)
+    const { Route, RouteChange } = getModelsByChannel(channel, res, routeModel)
 
     const year = parseInt(period.slice(0, 4), 10)
     const month = parseInt(period.slice(4, 6), 10)
@@ -3246,11 +3246,11 @@ exports.insertRouteToRouteChange = async (req, res) => {
       prevDate.getFullYear().toString() +
       String(prevDate.getMonth() + 1).padStart(2, '0')
     const routePrev = await Route.find({ period: prevPeriod })
-    const RouteChangeData = await RouteChange.find({ period:period })
+    const routeChangeData = await RouteChange.find({ period: period })
     const dataRouteChange = []
 
     for (const item of routePrev) {
-      const exitRoute = RouteChangeData.find(u => u.id === item.id) 
+      const exitRoute = routeChangeData.find(u => u.id === item.id)
       if (exitRoute) {
         continue
       }
@@ -3290,6 +3290,33 @@ exports.insertRouteToRouteChange = async (req, res) => {
       data: dataRouteChange
     })
 
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+
+exports.addStoreToRouteChange = async (req, res) => {
+  try {
+    const { id, storeId } = req.body
+    const channel = req.headers['x-channel']
+    const { Route, RouteChange } = getModelsByChannel(channel, res, routeModel)
+    const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
+    const routeChangeData = await RouteChange.findOne({ id: id })
+
+
+    const storeData = await Store.findOne({ storeId: storeId, area: routeChangeData.area })
+    console.log("storeId", storeId)
+    console.log("routeChangeData.area", routeChangeData.area)
+
+
+    res.status(201).json({
+      status: 201,
+      message: 'insertRouteToRouteChange success',
+      data: storeData
+    })
 
   } catch (error) {
     console.error(error)
