@@ -155,7 +155,7 @@ exports.checkout = async (req, res) => {
         name = shippingData.Des_Name
       } else if (shippingData.ZType === 'T04') {
         typeNameTH = shippingData.Des_Name
-        shippingId = shippingData.Des_Area
+        shippingId = shippingData.Des_No
         route = routeCode
       }
 
