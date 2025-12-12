@@ -2139,15 +2139,21 @@ exports.getRouteEffectiveAll = async (req, res) => {
   try {
     const { zone, area, team, period, day } = req.query
 
-    const query = {}
-    if (area) query.area = area
+    const query = {
+      area: { $ne: 'IT211' }
+    }
+
+    if (area) query.area = { $eq: area }
     if (period) query.period = period
     if (day) query.day = day
+
 
     const channel = req.headers['x-channel']
     const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
     const { Route } = getModelsByChannel(channel, res, routeModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
+
+    console.log(query)
 
     let routes = await Route.find(query).populate(
       'listStore.storeInfo',
@@ -3360,6 +3366,20 @@ exports.deleteStoreToRouteChange = async (req, res) => {
       message: 'deleteStoreToRouteChange success',
       // data: storeData
     })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.routeChangeToRoute = async (req, res) => {
+  try {
+    const { period } = req.body
+    const channel = req.headers['x-channel']
+    const { Route, RouteChange } = getModelsByChannel(channel, res, routeModel)
+
+    // const route = await 
+
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
