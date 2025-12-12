@@ -32,7 +32,8 @@ const {
   addRouteByArea,
   reRouteIt,
   insertRouteToRouteChange,
-  addStoreToRouteChange
+  addStoreToRouteChange,
+  deleteStoreToRouteChange
 } = require('../../controllers/route/routeController')
 
 const router = express.Router()
@@ -70,4 +71,5 @@ router.post('/addRouteByArea', addRouteByArea)
 router.post('/reRouteIt', reRouteIt)
 router.post('/insertRouteToRouteChange', insertRouteToRouteChange)
 router.post('/addStoreToRouteChange', addStoreToRouteChange)
+router.post('/deleteStoreToRouteChange', deleteStoreToRouteChange)
 module.exports = router

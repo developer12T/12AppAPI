@@ -1977,7 +1977,7 @@ exports.getRouteEffective = async (req, res) => {
     })
 
     let data = []
-    
+
     data = routesTranFrom
 
     const excludedRoutes = ['R25', 'R26']
@@ -3313,6 +3313,53 @@ exports.addStoreToRouteChange = async (req, res) => {
       // data: storeData
     })
 
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.deleteStoreToRouteChange = async (req, res) => {
+  try {
+    const { id, storeId } = req.body
+    const channel = req.headers['x-channel']
+    const { Route, RouteChange } = getModelsByChannel(channel, res, routeModel)
+    const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
+    const routeChangeData = await RouteChange.findOne({ id: id })
+    if (!routeChangeData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found routeId'
+      })
+    }
+    const storeIdList = routeChangeData.listStore.flatMap(item => item.storeInfo)
+    const storeData = await Store.findOne({ storeId: storeId, area: routeChangeData.area })
+    if (!storeData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found storeId'
+      })
+    }
+    const storeIdStrList = storeIdList.map(id => String(id))
+    if (!storeIdStrList.includes(String(storeData._id))) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found store in route'
+      })
+    }
+    await RouteChange.updateOne(
+      { id },
+      {
+        $pull: {
+          listStore: { storeInfo: storeData._id }
+        }
+      }
+    )
+    res.status(200).json({
+      status: 200,
+      message: 'deleteStoreToRouteChange success',
+      // data: storeData
+    })
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
