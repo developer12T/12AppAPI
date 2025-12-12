@@ -30,7 +30,8 @@ const {
   addRadius,
   getRadius,
   addRouteByArea,
-  reRouteIt
+  reRouteIt,
+  insertRouteToRouteChange
 } = require('../../controllers/route/routeController')
 
 const router = express.Router()
@@ -66,4 +67,5 @@ router.post('/getLatLongStore', getLatLongStore)
 router.post('/updateRouteAllStore', updateRouteAllStore)
 router.post('/addRouteByArea', addRouteByArea)
 router.post('/reRouteIt', reRouteIt)
+router.post('/insertRouteToRouteChange', insertRouteToRouteChange)
 module.exports = router

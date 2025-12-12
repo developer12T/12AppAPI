@@ -3218,7 +3218,7 @@ exports.reRouteIt = async (req, res) => {
 
     await Route.updateOne(
       { id: routeId },     // filter object อย่างเดียว
-      { $set: { listStore:data } }   // update object อย่างเดียว
+      { $set: { listStore: data } }   // update object อย่างเดียว
     )
 
     res.status(200).json({
@@ -3227,6 +3227,70 @@ exports.reRouteIt = async (req, res) => {
       // dataRoute: dataRoute,
       data: data
     })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.insertRouteToRouteChange = async (req, res) => {
+  try {
+    const { period } = req.body
+    const channel = req.headers['x-channel']
+    const { Route,RouteChange } = getModelsByChannel(channel, res, routeModel)
+
+    const year = parseInt(period.slice(0, 4), 10)
+    const month = parseInt(period.slice(4, 6), 10)
+    const prevDate = new Date(year, month - 2)
+    const prevPeriod =
+      prevDate.getFullYear().toString() +
+      String(prevDate.getMonth() + 1).padStart(2, '0')
+    const routePrev = await Route.find({ period: prevPeriod })
+    const RouteChangeData = await RouteChange.find({ period:period })
+    const dataRouteChange = []
+
+    for (const item of routePrev) {
+      const exitRoute = RouteChangeData.find(u => u.id === item.id) 
+      if (exitRoute) {
+        continue
+      }
+
+      const route = {
+        id: item.id,
+        period: period,
+        area: item.area,
+        zone: item.zone,
+        team: item.team,
+        day: item.day,
+        listStore: []
+      }
+
+      for (const store of item.listStore) {
+        route.listStore.push({
+          storeInfo: store.storeInfo,
+          note: '',
+          image: '',
+          latitude: '',
+          longtitude: '',
+          status: '0',
+          statusText: 'รอเยี่ยม',
+          date: '',
+          listOrder: []
+        })
+      }
+
+      dataRouteChange.push(route)
+      RouteChange.create(route)
+    }
+
+
+    res.status(201).json({
+      status: 201,
+      message: 'insertRouteToRouteChange success',
+      data: dataRouteChange
+    })
+
+
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
