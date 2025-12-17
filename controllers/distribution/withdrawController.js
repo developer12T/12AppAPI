@@ -1860,9 +1860,11 @@ exports.approveWithdraw = async (req, res) => {
         statusLow: '22',
         statusHigh: '22',
         orderType: distributionTran.orderType,
-        tranferDate: distributionTran.newTrip == 'ture'
-          ? formattedDateNewTrip
-          : formattedDate,
+        tranferDate: formattedDate,
+        receiveDate:
+          distributionTran.newTrip == 'true'
+            ? formattedDateNewTrip
+            : formattedDate,
         warehouse: distributionTran.fromWarehouse,
         towarehouse: distributionTran.toWarehouse,
         routeCode: routeCode,

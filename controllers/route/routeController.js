@@ -2214,6 +2214,7 @@ exports.getRouteEffectiveAll = async (req, res) => {
         message: 'Not found route'
       })
     }
+    
     if (team) {
       routes = routes.map(item => {
         const teamStr = item.area.substring(0, 2) + item.area.charAt(3)
@@ -2368,6 +2369,7 @@ exports.getRouteEffectiveAll = async (req, res) => {
     })
   }
 }
+
 exports.getRouteEffectiveByDayArea = async (req, res) => {
   try {
     const { area, zone, team, period } = req.body
@@ -2537,7 +2539,6 @@ exports.getRouteEffectiveByDayArea = async (req, res) => {
     })
   }
 }
-
 
 exports.getAreaInRoute = async (req, res) => {
   try {
