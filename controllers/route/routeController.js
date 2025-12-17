@@ -3823,7 +3823,7 @@ exports.getNewStoreToRoute = async (req, res) => {
 
     res.status(200).json({
       status: 200,
-      message: 'approveNewStoreToRoute success',
+      message: 'getNewStoreToRoute success',
       data: routeChangeLog
     })
 
@@ -3855,7 +3855,7 @@ exports.getNewStoreToRouteDetail = async (req, res) => {
 
     res.status(200).json({
       status: 200,
-      message: 'approveNewStoreToRoute success',
+      message: 'getNewStoreToRouteDetail success',
       data: routeChangeLog
     })
 
@@ -3869,10 +3869,15 @@ exports.approveNewStoreToRoute = async (req, res) => {
   try {
     const { id, user, status } = req.body
     const channel = req.headers['x-channel']
-    const { Route, RouteChange, RouteChangeLog } = getModelsByChannel(channel, res, routeModel)
+
+    const { RouteChangeLog, Route } = getModelsByChannel(
+      channel,
+      res,
+      routeModel
+    )
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
-    const routeChangeLog = await RouteChangeLog.findOne({ id: id, status: 'pending' })
+    const routeChangeLog = await RouteChangeLog.findOne({ id })
 
     if (!routeChangeLog) {
       return res.status(404).json({
@@ -3881,33 +3886,66 @@ exports.approveNewStoreToRoute = async (req, res) => {
       })
     }
 
-    let statusNew = ''
-    let statusTh = ''
-
-    if (status === true) {
-      statusNew = 'approved'
-      statusTh = 'อนุมัติ'
-    } else {
-      statusNew = 'rejected'
-      statusTh = 'ไม่อนุมัติ'
+    if (routeChangeLog.status !== 'pending') {
+      return res.status(400).json({
+        status: 400,
+        message: 'This request already processed'
+      })
     }
 
+    const isApprove = status === true
+
+    const statusNew = isApprove ? 'approved' : 'rejected'
+    const statusTh = isApprove ? 'อนุมัติ' : 'ไม่อนุมัติ'
 
 
     const result = await RouteChangeLog.findOneAndUpdate(
       { id, status: 'pending' },
       {
         status: statusNew,
-        statusTh: statusTh,
-        updatedDate: Date(),
+        statusTh,
+        updatedDate: new Date(),
         'approve.dateAction': new Date(),
-        'approve.appPerson': user,
+        'approve.appPerson': user
       },
       { new: true }
     )
 
 
+    if (isApprove) {
+      const [storeData, routeData] = await Promise.all([
+        Store.findOne({ storeId: routeChangeLog.storeId }),
+        Route.findOne({ id: routeChangeLog.routeId })
+      ])
 
+      if (!storeData || !routeData) {
+        return res.status(404).json({
+          status: 404,
+          message: 'Store or Route not found'
+        })
+      }
+
+      // ป้องกันเพิ่มซ้ำ
+      const isExist = routeData.listStore.some(
+        s => s.storeInfo.toString() === storeData._id.toString()
+      )
+
+      if (!isExist) {
+        routeData.listStore.push({
+          storeInfo: storeData._id,
+          note: '',
+          image: '',
+          latitude: '',
+          longtitude: '',
+          status: 0,
+          statusText: 'รอเยี่ยม',
+          listOrder: [],
+          date: ''
+        })
+
+        await routeData.save()
+      }
+    }
 
 
     res.status(200).json({
@@ -3915,9 +3953,11 @@ exports.approveNewStoreToRoute = async (req, res) => {
       message: 'approveNewStoreToRoute success',
       data: result
     })
-
   } catch (error) {
     console.error(error)
-    res.status(500).json({ status: '500', message: error.message })
+    res.status(500).json({
+      status: 500,
+      message: error.message
+    })
   }
 }
