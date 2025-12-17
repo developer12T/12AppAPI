@@ -3729,3 +3729,133 @@ exports.getRouteChange = async (req, res) => {
     res.status(500).json({ status: '500', message: error.message })
   }
 }
+
+exports.addNewStoreToRoute = async (req, res) => {
+  try {
+    const { id, storeId } = req.body
+    const channel = req.headers['x-channel']
+    const { Route, RouteChange, RouteChangeLog } = getModelsByChannel(channel, res, routeModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const currentDate = new Date()
+    // startMonth: 3 เดือนที่แล้ว (นับรวมเดือนนี้)
+    const startMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() - 2,
+      1
+    )
+
+    const nextMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() + 1,
+      1
+    )
+
+    const routeData = await Route.findOne({ id: id })
+
+    if (!routeData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found route'
+      })
+    }
+    const storeData = await Store.findOne({
+      storeId: storeId,
+      createdAt: {
+        $gte: startMonth,
+        $lt: nextMonth
+      },
+      status: '20'
+    })
+    if (!storeData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found storeNew'
+      })
+    }
+
+    const count = await RouteChangeLog.countDocuments()
+    const transactionId = `RN${String(count + 1).padStart(4, '0')}`
+
+
+    const transaction = {
+      id: transactionId,
+      area: routeData.area,
+      zone: routeData.zone,
+      period: period(),
+      storeId: storeId,
+      name: storeData.name,
+      routeId: id,
+      status: 'pending',
+      statusTh: 'กำลังดำเนินการ'
+    }
+
+    RouteChangeLog.create(transaction)
+
+    res.status(200).json({
+      status: 200,
+      message: 'addNewStoreToRoute success',
+      data: transaction
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.approveNewStoreToRoute = async (req, res) => {
+  try {
+    const { id, user, status } = req.body
+    const channel = req.headers['x-channel']
+    const { Route, RouteChange, RouteChangeLog } = getModelsByChannel(channel, res, routeModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const routeChangeLog = await RouteChangeLog.findOne({ id: id, status: 'pending' })
+
+    if (!routeChangeLog) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found routeChangeLog'
+      })
+    }
+
+    let statusNew = ''
+    let statusTh = ''
+
+    if (status === true) {
+      statusNew = 'approved'
+      statusTh = 'อนุมัติ'
+    } else {
+      statusNew = 'rejected'
+      statusTh = 'ไม่อนุมัติ'
+    }
+
+
+
+    const result = await RouteChangeLog.findOneAndUpdate(
+      { id, status: 'pending' },
+      {
+        status: statusNew,
+        statusTh: statusTh,
+        updatedDate: Date(),
+        'approve.dateAction': new Date(),
+        'approve.appPerson': user,
+      },
+      { new: true }
+    )
+
+
+
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'approveNewStoreToRoute success',
+      data: result
+    })
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}

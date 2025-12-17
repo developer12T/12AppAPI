@@ -37,7 +37,9 @@ const {
   addRouteChangeToRoute,
   addTargetRoute,
   getRouteEffectiveByDayArea,
-  getRouteChange
+  getRouteChange,
+  addNewStoreToRoute,
+  approveNewStoreToRoute
 } = require('../../controllers/route/routeController')
 
 const router = express.Router()
@@ -81,4 +83,6 @@ router.post('/addTargetRoute', addTargetRoute)
 router.post('/getRouteEffectiveByDay', getRouteEffectiveByDayArea)
 
 router.get('/getRouteChange', getRouteChange)
+router.post('/addNewStoreToRoute', addNewStoreToRoute)
+router.post('/approveNewStoreToRoute', approveNewStoreToRoute)
 module.exports = router

@@ -27,8 +27,8 @@ const RouteSchema = new mongoose.Schema(
     id: { type: String, required: true, index: true },
     period: { type: String, required: true, index: true },
     area: { type: String, required: true },
-    zone : { type: String, required: true },
-    team : { type: String, required: true },
+    zone: { type: String, required: true },
+    team: { type: String, required: true },
     day: { type: String, required: true },
     listStore: [ListStoreSchema],
     createdAt: { type: Date, default: Date.now },
@@ -83,19 +83,44 @@ const listStoreChange = mongoose.Schema({
   storeInfo: { type: String, ref: 'Store', required: true }
 })
 
-const RouteChangeLogSchema = new mongoose.Schema({
-  area: { type: String, required: true },
-  period: { type: String, required: true },
-  type: { type: String, required: true, default: '' },
-  fromRoute: { type: String, required: true },
-  toRoute: { type: String, required: true },
-  changedBy: { type: String, required: true },
-  changedDate: { type: Date },
-  listStore: [listStoreChange],
-  status: { type: String, default: '0' },
-  approvedBy: { type: String, default: '' },
-  approvedDate: { type: String, default: '' }
+// const RouteChangeLogSchema = new mongoose.Schema({
+//   area: { type: String, required: true },
+//   period: { type: String, required: true },
+//   type: { type: String, required: true, default: '' },
+//   fromRoute: { type: String, required: true },
+//   toRoute: { type: String, required: true },
+//   changedBy: { type: String, required: true },
+//   changedDate: { type: Date },
+//   listStore: [listStoreChange],
+//   status: { type: String, default: '0' },
+//   approvedBy: { type: String, default: '' },
+//   approvedDate: { type: String, default: '' }
+// })
+
+const approveSchema = mongoose.Schema({
+    dateSend: { type: Date, default: Date.now },
+    dateAction: { type: Date, default: Date.now },
+    appPerson: { type: String, require: true },
 })
+
+
+const RouteChangeLogSchema = new mongoose.Schema({
+  id: { type: String, required: true },
+  period: { type: String, required: true },
+  area : { type: String, required: true },
+  zone : { type: String, required: true },
+  storeId : { type: String, required: true },
+  name : { type: String, required: true },
+  routeId : { type: String, required: true },
+  status : { type: String, required: true },
+  statusTh : { type: String, required: true },
+  approve: approveSchema,
+})
+
+
+
+
+
 
 // const Route = dbCA.model('Route', RouteSchema)
 // const RouteChangeLog = dbCA.model('RouteChangeLog', RouteChangeLogSchema)
@@ -107,7 +132,7 @@ const RouteChangeLogSchema = new mongoose.Schema({
 module.exports = (conn) => {
   return {
     Route: conn.model('Route', RouteSchema),
-    RouteChange: conn.model('RouteChange',RouteSchema),
+    RouteChange: conn.model('RouteChange', RouteSchema),
     RouteChangeLog: conn.model('RouteChangeLog', RouteChangeLogSchema),
   };
 };
