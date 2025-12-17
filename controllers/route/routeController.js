@@ -3783,6 +3783,7 @@ exports.addNewStoreToRoute = async (req, res) => {
       id: transactionId,
       area: routeData.area,
       zone: routeData.zone,
+      team: routeData.team,
       period: period(),
       storeId: storeId,
       name: storeData.name,
@@ -3804,6 +3805,36 @@ exports.addNewStoreToRoute = async (req, res) => {
   }
 }
 
+exports.getNewStoreToRoute = async (req, res) => {
+  try {
+    const { zone, area, team } = req.query
+    const channel = req.headers['x-channel']
+    const { Route, RouteChange, RouteChangeLog } = getModelsByChannel(channel, res, routeModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    let query = {}
+    if (area) query.area = area
+    if (zone) query.zone = zone
+    if (team) query.team = team
+
+    // console.log(query)
+
+    const routeChangeLog = await RouteChangeLog.find(query)
+
+    res.status(200).json({
+      status: 200,
+      message: 'approveNewStoreToRoute success',
+      data: routeChangeLog
+    })
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+
+
 exports.getNewStoreToRouteDetail = async (req, res) => {
   try {
     const { id } = req.query
@@ -3815,8 +3846,8 @@ exports.getNewStoreToRouteDetail = async (req, res) => {
 
     if (!routeChangeLog) {
       return res.status(404).json({
-        status:404,
-        message:'Not found routeChangeLog'
+        status: 404,
+        message: 'Not found routeChangeLog'
       })
     }
 
@@ -3825,7 +3856,7 @@ exports.getNewStoreToRouteDetail = async (req, res) => {
     res.status(200).json({
       status: 200,
       message: 'approveNewStoreToRoute success',
-      data : routeChangeLog
+      data: routeChangeLog
     })
 
   } catch (error) {
