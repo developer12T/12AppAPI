@@ -2143,7 +2143,7 @@ exports.getRouteEffective = async (req, res) => {
       )
       xlsx.writeFile(wb, filePath)
       res.download(filePath, err => {
-        fs.unlink(filePath, () => {})
+        fs.unlink(filePath, () => { })
         if (err) console.error(err)
       })
     } else {
@@ -2346,11 +2346,11 @@ exports.getRouteEffectiveAll = async (req, res) => {
       // 🎯 target
       target: target
         ? {
-            visit: target.visitStore,
-            sale: target.saleStore,
-            visitPerDay: targetVisitPerDay,
-            salePerDay: targetSalePerDay
-          }
+          visit: target.visitStore,
+          sale: target.saleStore,
+          visitPerDay: targetVisitPerDay,
+          salePerDay: targetSalePerDay
+        }
         : null,
       // 📊 compare (optional)
       compare: {
@@ -2417,12 +2417,12 @@ exports.getRouteEffectiveByDayArea = async (req, res) => {
       // filter team (ต้องอยู่ตรงนี้ ❗)
       ...(team
         ? [
-            {
-              $match: {
-                team3: { $regex: `^${team}`, $options: 'i' }
-              }
+          {
+            $match: {
+              team3: { $regex: `^${team}`, $options: 'i' }
             }
-          ]
+          }
+        ]
         : []),
 
       // แตก store
@@ -2808,7 +2808,7 @@ exports.checkRouteStore = async (req, res) => {
       areaMap[area].del = storeCountMap[area]?.del || 0
     }
 
-    function sortKeys (obj) {
+    function sortKeys(obj) {
       const { area, R, del, ...days } = obj
       const sortedDays = Object.keys(days)
         .filter(k => /^R\d+$/.test(k))
@@ -3225,8 +3225,7 @@ exports.updateRouteAllStore = async (req, res) => {
       )
 
       console.log(
-        `processed ${Math.min(i + BATCH, storeData.length)} / ${
-          storeData.length
+        `processed ${Math.min(i + BATCH, storeData.length)} / ${storeData.length
         }`
       )
     }
@@ -3657,6 +3656,75 @@ exports.addRouteChangeToRoute = async (req, res) => {
       message: 'addRouteChangeToRoute success',
       data: toCreate
     })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.getRouteChange = async (req, res) => {
+  try {
+    const { id } = req.query
+    const channel = req.headers['x-channel']
+    const { Route, RouteChange } = getModelsByChannel(channel, res, routeModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const routeData = await Route.findOne({ id: id })
+
+    if (!routeData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found route'
+      })
+    }
+
+    const objIds = routeData.listStore
+      .map(item => item.storeInfo)
+      .filter(Boolean)
+      .map(id => new mongoose.Types.ObjectId(id))
+
+    const dataStore = await Store.find({ _id: { $in: objIds } })
+
+    const data = {
+      _id: routeData._id,
+      id: routeData.id,
+      period: routeData.period,
+      area: routeData.area,
+      zone: routeData.zone,
+      team: routeData.team,
+      day: routeData.day,
+      listStore: routeData.listStore.map(row => {
+        const storeDetail = dataStore.find(
+          store => store._id.equals(row.storeInfo)
+        )
+
+        return {
+          _id: row._id,
+          storeInfo: row.storeInfo,
+          storeId: storeDetail.storeId,
+          name: storeDetail.name,
+          type: storeDetail.type,
+          typeName: storeDetail.typeName,
+          statusStore: storeDetail.status,
+          note: row.note,
+          image: row.image,
+          latitude: row.latitude,
+          longtitude: row.longtitude,
+          status: row.status,
+          statusText: row.statusText,
+          date: row.date,
+          listOrder: []
+        }
+      })
+    }
+
+
+    res.status(200).json({
+      status: 201,
+      message: 'getRouteChange success',
+      data: data
+    })
+
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
