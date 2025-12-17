@@ -147,7 +147,6 @@ exports.checkout = async (req, res) => {
         routeCode = first5
       }
 
-
       if (shippingData.ZType === 'T05') {
         typeNameTH = 'ส่งสินค้า'
         shippingId = shippingData.Des_No
@@ -567,9 +566,9 @@ exports.getOrderCredit = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -789,9 +788,9 @@ exports.getOrder = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -956,9 +955,9 @@ exports.getOrder2 = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           // orderNo: o.orderNo,
@@ -1138,9 +1137,9 @@ exports.getOrderSup = async (req, res) => {
           area: o.area,
           sale: userData
             ? {
-              fullname: `${userData.firstName} ${userData.surName}`,
-              tel: `${userData.tel}`
-            }
+                fullname: `${userData.firstName} ${userData.surName}`,
+                tel: `${userData.tel}`
+              }
             : null,
           orderId: o.orderId,
           newTrip: o.newTrip,
@@ -1818,12 +1817,25 @@ exports.approveWithdraw = async (req, res) => {
           .status(404)
           .json({ status: 404, message: 'Not found period in doc' })
       }
-
       const sendDate = new Date(distributionTran.sendDate)
+      const dateNewTrip = new Date(distributionTran.sendDate)
+
+      // ไปเดือนถัดไป
+      dateNewTrip.setMonth(dateNewTrip.getMonth() + 1)
+      // ตั้งเป็นวันที่ 1 ของเดือนนั้น
+      dateNewTrip.setDate(1)
+
+      // format เป็น YYYYMMDD
+      const formattedDateNewTrip = dateNewTrip
+        .toISOString()
+        .slice(0, 10)
+        .replace(/-/g, '')
+
       const formattedDate = sendDate
         .toISOString()
         .slice(0, 10)
         .replace(/-/g, '')
+
       const MGNUGL = distributionTran.listProduct.map(i => i.id)
       const uniqueCount = new Set(MGNUGL).size
       let routeCode = distributionTran.shippingRoute || ''
@@ -1848,7 +1860,9 @@ exports.approveWithdraw = async (req, res) => {
         statusLow: '22',
         statusHigh: '22',
         orderType: distributionTran.orderType,
-        tranferDate: formattedDate,
+        tranferDate: distributionTran.newTrip == 'ture'
+          ? formattedDateNewTrip
+          : formattedDate,
         warehouse: distributionTran.fromWarehouse,
         towarehouse: distributionTran.toWarehouse,
         routeCode: routeCode,
@@ -1912,35 +1926,37 @@ exports.approveWithdraw = async (req, res) => {
         item => item.value === distributionTran.withdrawType
       ).name
       // console.log(withdrawTypeTh)
-      const userData = await User.findOne({
-        role: 'sale',
-        area: distributionTran.area
-      }) || {}; // ป้องกันไม่เจอ user
+      const userData =
+        (await User.findOne({
+          role: 'sale',
+          area: distributionTran.area
+        })) || {} // ป้องกันไม่เจอ user
 
       let email = {}
       if (channel === 'pc' || channel === 'pc_uat') {
-        email = await Withdraw.findOne({
-          Des_No: distributionTran.shippingId,
-          Des_Area: distributionTran.area
-        }).select('Dc_Email Des_Name') || {}; // ป้องกันไม่เจอ email
+        email =
+          (await Withdraw.findOne({
+            Des_No: distributionTran.shippingId,
+            Des_Area: distributionTran.area
+          }).select('Dc_Email Des_Name')) || {} // ป้องกันไม่เจอ email
       } else {
-        email = await Withdraw.findOne({
-          ROUTE: distributionTran.shippingRoute,
-          Des_No: distributionTran.shippingId
-        }).select('Dc_Email Des_Name') || {}; // ป้องกันไม่เจอ email
+        email =
+          (await Withdraw.findOne({
+            ROUTE: distributionTran.shippingRoute,
+            Des_No: distributionTran.shippingId
+          }).select('Dc_Email Des_Name')) || {} // ป้องกันไม่เจอ email
       }
 
-      const wereHouseName = await WereHouse.findOne({
-        wh_code: distributionTran.fromWarehouse
-      }).select('wh_name') || {}; // ป้องกันไม่เจอ warehouse
+      const wereHouseName =
+        (await WereHouse.findOne({
+          wh_code: distributionTran.fromWarehouse
+        }).select('wh_name')) || {} // ป้องกันไม่เจอ warehouse
 
-      let type = distributionTran.newTrip == 'true'
-        ? 'เบิกต้นทริป'
-        : 'เบิกระหว่างทริป';
+      let type =
+        distributionTran.newTrip == 'true' ? 'เบิกต้นทริป' : 'เบิกระหว่างทริป'
 
       if (distributionTran.area !== 'IT211') {
         if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
-
           sendEmail({
             to: email?.Dc_Email ?? '',
             cc: process.env.IT_MAIL,
@@ -1950,20 +1966,29 @@ exports.approveWithdraw = async (req, res) => {
         <p>
           <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh ?? ''} ${type}<br>
           <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId ?? ''}<br>
-          <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName ?? ''}<br>
-          <strong>จัดส่ง:</strong> ${(distributionTran.fromWarehouse ?? '') + '-' + (wereHouseName?.wh_name ?? '')}<br>
-          <strong>สถานที่จัดส่ง:</strong> ${(distributionTran.toWarehouse ?? '')}-${distributionTran.shippingName ?? ''}<br>
+          <strong>ประเภทการจัดส่ง:</strong> ${
+            distributionTran.orderTypeName ?? ''
+          }<br>
+          <strong>จัดส่ง:</strong> ${
+            (distributionTran.fromWarehouse ?? '') +
+            '-' +
+            (wereHouseName?.wh_name ?? '')
+          }<br>
+          <strong>สถานที่จัดส่ง:</strong> ${
+            distributionTran.toWarehouse ?? ''
+          }-${distributionTran.shippingName ?? ''}<br>
           <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate ?? ''}<br>
           <strong>เขต:</strong> ${distributionTran.area ?? ''}<br>
-          <strong>ชื่อ:</strong> ${(userData?.firstName ?? '')} ${(userData?.surName ?? '')}<br>
+          <strong>ชื่อ:</strong> ${userData?.firstName ?? ''} ${
+              userData?.surName ?? ''
+            }<br>
           <strong>เบอร์โทรศัพท์เซลล์:</strong> ${userData?.tel ?? ''}<br>
           <strong>หมายเหตุ:</strong> ${distributionTran.remark ?? ''}
         </p>
       `
-          });
+          })
         }
       }
-
 
       const io = getSocket()
       io.emit('distribution/approveWithdraw', {
@@ -2199,12 +2224,15 @@ exports.approveWithdrawCredit = async (req, res) => {
           <p>
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId}<br>
-            <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName
-              }<br>
-            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
-              }<br>
-            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${distributionTran.shippingName
-              }<br>
+            <strong>ประเภทการจัดส่ง:</strong> ${
+              distributionTran.orderTypeName
+            }<br>
+            <strong>จัดส่ง:</strong> ${distributionTran.fromWarehouse}${
+              '-' + wereHouseName?.wh_name || ''
+            }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse}-${
+              distributionTran.shippingName
+            }<br>
             <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate}<br>
             <strong>เขต:</strong> ${distributionTran.area}<br>
             <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -2388,8 +2416,9 @@ exports.saleConfirmWithdraw = async (req, res) => {
         const ReceiveQty = Object.values(
           Receive.reduce((acc, cur) => {
             // ใช้ key จาก coNo + withdrawUnit + productId (ถ้าอยากแยกตาม productId ด้วย)
-            const key = `${cur.coNo}_${cur.withdrawUnit
-              }_${cur.productId.trim()}`
+            const key = `${cur.coNo}_${
+              cur.withdrawUnit
+            }_${cur.productId.trim()}`
             if (!acc[key]) {
               acc[key] = { ...cur }
             } else {
@@ -2849,7 +2878,7 @@ exports.withdrawToExcel = async (req, res) => {
 
     const tranFromOrder = modelWithdraw.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD(date) {
+      function formatDateToThaiYYYYMMDD (date) {
         const d = new Date(date)
         // d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -2939,7 +2968,7 @@ exports.withdrawToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       }
     )
   } catch (error) {
@@ -3180,7 +3209,7 @@ exports.withdrawBackOrderToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       })
     }
   } catch (error) {
