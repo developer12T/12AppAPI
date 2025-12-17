@@ -3416,3 +3416,31 @@ exports.addRouteChangeToRoute = async (req, res) => {
     res.status(500).json({ status: '500', message: error.message })
   }
 }
+
+function getPrevPeriod(period) {
+  const y = Math.floor(period / 100)
+  const m = period % 100
+
+  if (m === 1) {
+    return (y - 1) * 100 + 12
+  }
+  return y * 100 + (m - 1)
+}
+
+
+
+exports.getRouteChange = async (req, res) => {
+  try {
+    const { period } = body.req
+    const channel = req.headers['x-channel']
+    const { Route, RouteChange } = getModelsByChannel(channel, res, routeModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const periodPev = number(period) - 1
+    
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
