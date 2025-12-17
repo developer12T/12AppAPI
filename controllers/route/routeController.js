@@ -2214,7 +2214,7 @@ exports.getRouteEffectiveAll = async (req, res) => {
         message: 'Not found route'
       })
     }
-    
+
     if (team) {
       routes = routes.map(item => {
         const teamStr = item.area.substring(0, 2) + item.area.charAt(3)
@@ -3798,6 +3798,36 @@ exports.addNewStoreToRoute = async (req, res) => {
       message: 'addNewStoreToRoute success',
       data: transaction
     })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.getNewStoreToRouteDetail = async (req, res) => {
+  try {
+    const { id } = req.query
+    const channel = req.headers['x-channel']
+    const { Route, RouteChange, RouteChangeLog } = getModelsByChannel(channel, res, routeModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const routeChangeLog = await RouteChangeLog.findOne({ id: id })
+
+    if (!routeChangeLog) {
+      return res.status(404).json({
+        status:404,
+        message:'Not found routeChangeLog'
+      })
+    }
+
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'approveNewStoreToRoute success',
+      data : routeChangeLog
+    })
+
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
