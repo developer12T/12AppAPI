@@ -3789,7 +3789,7 @@ exports.addNewStoreToRoute = async (req, res) => {
       name: storeData.name,
       routeId: id,
       status: 'pending',
-      statusTh: 'กำลังดำเนินการ'
+      statusTH: 'กำลังดำเนินการ'
     }
 
     RouteChangeLog.create(transaction)

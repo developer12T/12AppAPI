@@ -113,7 +113,7 @@ const RouteChangeLogSchema = new mongoose.Schema({
   name : { type: String, required: true },
   routeId : { type: String, required: true },
   status : { type: String, required: true },
-  statusTh : { type: String, required: true },
+  statusTH : { type: String, required: true },
   approve: approveSchema,
 })
 
