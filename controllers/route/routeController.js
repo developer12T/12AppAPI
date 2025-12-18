@@ -3807,12 +3807,12 @@ exports.addNewStoreToRoute = async (req, res) => {
 
 exports.getNewStoreToRoute = async (req, res) => {
   try {
-    const { zone, area, team } = req.query
+    const { zone, area, team, period } = req.query
     const channel = req.headers['x-channel']
     const { Route, RouteChange, RouteChangeLog } = getModelsByChannel(channel, res, routeModel)
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
-    let query = {}
+    let query = { period : period}
     if (area) query.area = area
     if (zone) query.zone = zone
     if (team) query.team = team
