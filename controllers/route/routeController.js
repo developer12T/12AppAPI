@@ -3812,7 +3812,7 @@ exports.getNewStoreToRoute = async (req, res) => {
     const { Route, RouteChange, RouteChangeLog } = getModelsByChannel(channel, res, routeModel)
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
-    let query = { period : period}
+    let query = { period: period }
     if (area) query.area = area
     if (zone) query.zone = zone
     if (team) query.team = team
@@ -3945,6 +3945,13 @@ exports.approveNewStoreToRoute = async (req, res) => {
 
         await routeData.save()
       }
+      else {
+        return res.status(409).json({
+          status: 409,
+          message: 'Duplicate store'
+        })
+      }
+
     }
 
 
