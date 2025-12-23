@@ -1,7 +1,7 @@
 // const { query } = require('express')
 const axios = require('axios')
 const { Route, RouteChangeLog } = require('../../models/cash/route')
-const { period, previousPeriod } = require('../../utilities/datetime')
+const { period, periodNew, previousPeriod } = require('../../utilities/datetime')
 const { Store } = require('../../models/cash/store')
 const { uploadFilesCheckin } = require('../../utilities/upload')
 const multer = require('multer')
@@ -4092,10 +4092,7 @@ exports.approveNewStoreToRoute = async (req, res) => {
 exports.getDashboardRoute = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
-    let period = req.query.period
-    // period = period
 
-    const periodStr = period()
     const { RouteChangeLog, Route, RouteChange } = getModelsByChannel(
       channel,
       res,
@@ -4104,74 +4101,115 @@ exports.getDashboardRoute = async (req, res) => {
     const { Store } = getModelsByChannel(channel, res, storeModel)
     const { User } = getModelsByChannel('user', res, userModel)
 
-    const userData = await User.find({ platformType: 'CASH', role: 'sale' })
-
-    const year = parseInt(periodStr.slice(0, 4));
-    const month = parseInt(periodStr.slice(4, 6));
-
-    const startMonth = new Date(year, month - 1, 1);
-    const nextMonth = new Date(year, month, 1);
-    let query = {}
-    query.createdAt = {
-      $gte: startMonth,
-      $lt: nextMonth
+    const period = req.query.period
+    if (!period) {
+      return res.status(400).json({ status: 400, message: 'period is required' })
     }
 
-    const dataStoreNew = await Store.aggregate([
-      { $match: query }])
+    // ✅ ดึงข้อมูลพร้อมกัน
+    const userQuery = { platformType: 'CASH', role: 'sale' }
 
-    // const StoreNewList = [... new Set(dataStoreNew.flatMap(item => item.storeId))]
-    const routeData = await Route.find({ period: period })
-    const routeChangeData = await RouteChange.find({ period: period })
-    let routePev = []
+    const periodStr = periodNew()
+    const year = Number(periodStr.slice(0, 4))
+    const month = Number(periodStr.slice(4, 6))
+    const startMonth = new Date(year, month - 1, 1)
+    const nextMonth = new Date(year, month, 1)
+
+    const storeMatch = {
+      createdAt: { $gte: startMonth, $lt: nextMonth }
+    }
+
+    const [
+      userData,
+      routeData,
+      routeChangeData,
+      routeChangeLogData,
+      // ✅ store ใหม่ให้ count ต่อ area จาก DB เลย (ไม่ต้องดึงทั้งก้อนมานับใน Node)
+      storeNewAgg
+    ] = await Promise.all([
+      User.find(userQuery, { area: 1 }).lean(),
+      Route.find({ period }).select({ area: 1, listStore: 1 }).lean(),
+      RouteChange.find({ period }).select({ area: 1 }).lean(),
+      RouteChangeLog.find({ period, status: 'approved' }).select({ area: 1 }).lean(),
+      Store.aggregate([
+        { $match: storeMatch },
+        { $group: { _id: '$area', count: { $sum: 1 } } }
+      ])
+    ])
+
+    // ---------- ✅ Precompute maps (O(n)) ----------
+    // 1) route summary ต่อ area: routeCount + storeCount
+    const routeSummaryByArea = new Map()
+    for (const r of routeData) {
+      const area = r.area
+      if (!area) continue
+
+      const prev = routeSummaryByArea.get(area) || { routeCount: 0, storeCount: 0 }
+      prev.routeCount += 1
+      prev.storeCount += (r.listStore?.length ?? 0)
+      routeSummaryByArea.set(area, prev)
+    }
+
+    // 2) routeChange exists ต่อ area (แค่เช็คว่ามีไหม)
+    const hasRouteChangeByArea = new Set()
+    for (const rc of routeChangeData) {
+      if (rc.area) hasRouteChangeByArea.add(rc.area)
+    }
+
+    // 3) approved log count ต่อ area
+    const approvedLogCountByArea = new Map()
+    for (const log of routeChangeLogData) {
+      const area = log.area
+      if (!area) continue
+      approvedLogCountByArea.set(area, (approvedLogCountByArea.get(area) || 0) + 1)
+    }
+
+    // 4) store new count ต่อ area
+    const storeNewCountByArea = new Map()
+    for (const s of storeNewAgg) {
+      storeNewCountByArea.set(s._id, s.count)
+    }
+
+    // ---------- ✅ Build result ----------
     let notFoundRoute = 0
-    let routeChange = []
-    for (const row of userData) {
-      const routeDataPev = routeData?.filter(item => item.area === row.area) ?? []
-      const routeChange = routeChangeData?.filter(item => item.area === row.area) ?? []
-      
-      const storeNewList = dataStoreNew.filter(item => item.area === row.area) ?? []
-      const storeNewCount = storeNewList.length
+    const routeChangeAreas = []
+    const routePev = []
 
-      const routeList = routeDataPev.flatMap(item => item.id)
-      const countRoute = routeDataPev.length
-      const countStore = routeDataPev.reduce(
-        (sum, item) => sum + (item.listStore?.length ?? 0),
-        0
-      )
-      const countRouteChange = routeChange.reduce(
-        (sum, item) => sum + (item.listStore?.length ?? 0),
-        0
-      )
-      const storeNew = routeChange
+    for (const u of userData) {
+      const area = u.area
+      if (!area) continue
 
-      const routePevTran = {
-        area: row.area,
-        storeCount: countStore,
-        routeCount: countRoute,
-        storeNew: storeNewCount
+      const routeSummary = routeSummaryByArea.get(area) || { routeCount: 0, storeCount: 0 }
+      const storeNewCount = storeNewCountByArea.get(area) || 0
+      const addStoreToRoute = approvedLogCountByArea.get(area) || 0
+
+      // เดิม: ถ้า routeChangeDetail.length === 0 => notFoundRoute++
+      if (!hasRouteChangeByArea.has(area)) {
+        notFoundRoute++
+        routeChangeAreas.push(area)
       }
-      routePev.push(routePevTran)
 
-      // console.log('routePevTran', routePevTran)
-
+      routePev.push({
+        area,
+        storeCount: routeSummary.storeCount,
+        routeCount: routeSummary.routeCount,
+        storeNew: storeNewCount,
+        addStoreToRoute
+      })
     }
 
-
-
-
-    res.status(200).json({
+    return res.status(200).json({
       status: 200,
       message: 'getDashboardRoute Success',
       data: routePev,
-
+      number: notFoundRoute,
+      area: routeChangeAreas
     })
-
   } catch (error) {
     console.error(error)
-    res.status(500).json({
+    return res.status(500).json({
       status: 500,
       message: error.message
     })
   }
-} 
+}
