@@ -130,55 +130,55 @@ exports.getRoute = async (req, res) => {
     // If area is not provided (or explicitly empty), group results by day+period
     if ((!area || area === '') && period) {
       const groups = new Map()
-      ;(enrichedRoutes || []).forEach(route => {
-        // Skip routes with area == 'IT211'
-        if (route.area === 'IT211') return
+        ; (enrichedRoutes || []).forEach(route => {
+          // Skip routes with area == 'IT211'
+          if (route.area === 'IT211') return
 
-        // derive zone/team from route (prefer explicit fields, otherwise from area)
-        let zoneKey = route.zone || ''
-        let teamKey = route.team || ''
-        if (route.area) {
-          const a = String(route.area || '')
-          zoneKey = a.substring(0, 2)
-          teamKey = `${a.substring(0, 2)}${a.charAt(3) || ''}`
-        }
+          // derive zone/team from route (prefer explicit fields, otherwise from area)
+          let zoneKey = route.zone || ''
+          let teamKey = route.team || ''
+          if (route.area) {
+            const a = String(route.area || '')
+            zoneKey = a.substring(0, 2)
+            teamKey = `${a.substring(0, 2)}${a.charAt(3) || ''}`
+          }
 
-        // if request includes zone/team filters, skip non-matching routes
-        if (zone && String(zone) !== zoneKey) return
-        if (team && String(team) !== teamKey) return
+          // if request includes zone/team filters, skip non-matching routes
+          if (zone && String(zone) !== zoneKey) return
+          if (team && String(team) !== teamKey) return
 
-        const dayKey = route.day || ''
-        if (!groups.has(dayKey)) {
-          groups.set(dayKey, {
-            day: dayKey,
-            period: period,
-            // routes: [],
-            storeAll: 0,
-            storePending: 0,
-            storeSell: 0,
-            storeNotSell: 0,
-            storeCheckInNotSell: 0,
-            storeTotal: 0
-          })
-        }
+          const dayKey = route.day || ''
+          if (!groups.has(dayKey)) {
+            groups.set(dayKey, {
+              day: dayKey,
+              period: period,
+              // routes: [],
+              storeAll: 0,
+              storePending: 0,
+              storeSell: 0,
+              storeNotSell: 0,
+              storeCheckInNotSell: 0,
+              storeTotal: 0
+            })
+          }
 
-        const grp = groups.get(dayKey)
+          const grp = groups.get(dayKey)
 
-        // accumulate counts from each route (use numeric defaults)
-        const ra = Number(route.storeAll) || 0
-        const rp = Number(route.storePending) || 0
-        const rs = Number(route.storeSell) || 0
-        const rn = Number(route.storeNotSell) || 0
-        const rcn = Number(route.storeCheckInNotSell) || 0
-        const rt = Number(route.storeTotal) || 0
+          // accumulate counts from each route (use numeric defaults)
+          const ra = Number(route.storeAll) || 0
+          const rp = Number(route.storePending) || 0
+          const rs = Number(route.storeSell) || 0
+          const rn = Number(route.storeNotSell) || 0
+          const rcn = Number(route.storeCheckInNotSell) || 0
+          const rt = Number(route.storeTotal) || 0
 
-        grp.storeAll += ra
-        grp.storePending += rp
-        grp.storeSell += rs
-        grp.storeNotSell += rn
-        grp.storeCheckInNotSell += rcn
-        grp.storeTotal += rt
-      })
+          grp.storeAll += ra
+          grp.storePending += rp
+          grp.storeSell += rs
+          grp.storeNotSell += rn
+          grp.storeCheckInNotSell += rcn
+          grp.storeTotal += rt
+        })
 
       // finalize percentage fields for each group
       enrichedRoutes = Array.from(groups.values()).map(g => {
@@ -2226,7 +2226,7 @@ exports.getRouteEffective = async (req, res) => {
       )
       xlsx.writeFile(wb, filePath)
       res.download(filePath, err => {
-        fs.unlink(filePath, () => {})
+        fs.unlink(filePath, () => { })
         if (err) console.error(err)
       })
     } else {
@@ -2429,11 +2429,11 @@ exports.getRouteEffectiveAll = async (req, res) => {
       // 🎯 target
       target: target
         ? {
-            visit: target.visitStore,
-            sale: target.saleStore,
-            visitPerDay: targetVisitPerDay,
-            salePerDay: targetSalePerDay
-          }
+          visit: target.visitStore,
+          sale: target.saleStore,
+          visitPerDay: targetVisitPerDay,
+          salePerDay: targetSalePerDay
+        }
         : null,
       // 📊 compare (optional)
       compare: {
@@ -2500,12 +2500,12 @@ exports.getRouteEffectiveByDayArea = async (req, res) => {
       // filter team (ต้องอยู่ตรงนี้ ❗)
       ...(team
         ? [
-            {
-              $match: {
-                team3: { $regex: `^${team}`, $options: 'i' }
-              }
+          {
+            $match: {
+              team3: { $regex: `^${team}`, $options: 'i' }
             }
-          ]
+          }
+        ]
         : []),
 
       // แตก store
@@ -2891,7 +2891,7 @@ exports.checkRouteStore = async (req, res) => {
       areaMap[area].del = storeCountMap[area]?.del || 0
     }
 
-    function sortKeys (obj) {
+    function sortKeys(obj) {
       const { area, R, del, ...days } = obj
       const sortedDays = Object.keys(days)
         .filter(k => /^R\d+$/.test(k))
@@ -3308,8 +3308,7 @@ exports.updateRouteAllStore = async (req, res) => {
       )
 
       console.log(
-        `processed ${Math.min(i + BATCH, storeData.length)} / ${
-          storeData.length
+        `processed ${Math.min(i + BATCH, storeData.length)} / ${storeData.length
         }`
       )
     }
@@ -3543,7 +3542,8 @@ exports.insertRouteToRouteChange = async (req, res) => {
         continue
       }
 
-      const routeId = `${period}${item.area}R${item.day}`
+      const day = String(item.day).padStart(2, '0')
+      const routeId = `${period}${item.area}R${day}`
 
       const route = {
         id: routeId,
@@ -4095,7 +4095,7 @@ exports.getDashboardRoute = async (req, res) => {
     let period = req.query.period
     // period = period
 
-    const prevPeriod = previousPeriod(period)
+    const periodStr = period()
     const { RouteChangeLog, Route, RouteChange } = getModelsByChannel(
       channel,
       res,
@@ -4106,29 +4106,54 @@ exports.getDashboardRoute = async (req, res) => {
 
     const userData = await User.find({ platformType: 'CASH', role: 'sale' })
 
+    const year = parseInt(periodStr.slice(0, 4));
+    const month = parseInt(periodStr.slice(4, 6));
 
+    const startMonth = new Date(year, month - 1, 1);
+    const nextMonth = new Date(year, month, 1);
+    let query = {}
+    query.createdAt = {
+      $gte: startMonth,
+      $lt: nextMonth
+    }
 
-    const routeData = await Route.find({ period: prevPeriod })
+    const dataStoreNew = await Store.aggregate([
+      { $match: query }])
+
+    // const StoreNewList = [... new Set(dataStoreNew.flatMap(item => item.storeId))]
+    const routeData = await Route.find({ period: period })
     const routeChangeData = await RouteChange.find({ period: period })
     let routePev = []
     let notFoundRoute = 0
     let routeChange = []
     for (const row of userData) {
       const routeDataPev = routeData?.filter(item => item.area === row.area) ?? []
-      // console.log('routeDataPev',routeDataPev)
+      const routeChange = routeChangeData?.filter(item => item.area === row.area) ?? []
+      
+      const storeNewList = dataStoreNew.filter(item => item.area === row.area) ?? []
+      const storeNewCount = storeNewList.length
+
       const routeList = routeDataPev.flatMap(item => item.id)
+      const countRoute = routeDataPev.length
       const countStore = routeDataPev.reduce(
         (sum, item) => sum + (item.listStore?.length ?? 0),
         0
       )
+      const countRouteChange = routeChange.reduce(
+        (sum, item) => sum + (item.listStore?.length ?? 0),
+        0
+      )
+      const storeNew = routeChange
+
       const routePevTran = {
         area: row.area,
-        store: countStore,
-        route: routeList
+        storeCount: countStore,
+        routeCount: countRoute,
+        storeNew: storeNewCount
       }
       routePev.push(routePevTran)
 
-      console.log('routePevTran', routePevTran)
+      // console.log('routePevTran', routePevTran)
 
     }
 
