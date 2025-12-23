@@ -4036,7 +4036,42 @@ exports.approveNewStoreToRoute = async (req, res) => {
         })
 
         await routeData.save()
+
+        result = await RouteChangeLog.findOneAndUpdate(
+          { id, status: 'pending' },
+          {
+            status: statusNew,
+            statusTh,
+            updatedDate: new Date(),
+            'approve.dateAction': new Date(),
+            'approve.appPerson': user
+          },
+          { new: true }
+        )
+
+
       }
+      else {
+        return res.status(409).json({
+          status: 409,
+          message: 'Duplicate store'
+        })
+      }
+
+    } else {
+
+      result = await RouteChangeLog.findOneAndUpdate(
+        { id, status: 'pending' },
+        {
+          status: statusNew,
+          statusTh,
+          updatedDate: new Date(),
+          'approve.dateAction': new Date(),
+          'approve.appPerson': user
+        },
+        { new: true }
+      )
+
     }
 
     res.status(200).json({
