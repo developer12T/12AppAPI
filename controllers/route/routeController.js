@@ -3898,20 +3898,6 @@ exports.approveNewStoreToRoute = async (req, res) => {
     const statusNew = isApprove ? 'approved' : 'rejected'
     const statusTh = isApprove ? 'อนุมัติ' : 'ไม่อนุมัติ'
 
-
-    const result = await RouteChangeLog.findOneAndUpdate(
-      { id, status: 'pending' },
-      {
-        status: statusNew,
-        statusTh,
-        updatedDate: new Date(),
-        'approve.dateAction': new Date(),
-        'approve.appPerson': user
-      },
-      { new: true }
-    )
-
-
     if (isApprove) {
       const [storeData, routeData] = await Promise.all([
         Store.findOne({ storeId: routeChangeLog.storeId }),
@@ -3944,6 +3930,20 @@ exports.approveNewStoreToRoute = async (req, res) => {
         })
 
         await routeData.save()
+
+        result = await RouteChangeLog.findOneAndUpdate(
+          { id, status: 'pending' },
+          {
+            status: statusNew,
+            statusTh,
+            updatedDate: new Date(),
+            'approve.dateAction': new Date(),
+            'approve.appPerson': user
+          },
+          { new: true }
+        )
+
+
       }
       else {
         return res.status(409).json({
@@ -3951,6 +3951,20 @@ exports.approveNewStoreToRoute = async (req, res) => {
           message: 'Duplicate store'
         })
       }
+
+    } else {
+
+      result = await RouteChangeLog.findOneAndUpdate(
+        { id, status: 'pending' },
+        {
+          status: statusNew,
+          statusTh,
+          updatedDate: new Date(),
+          'approve.dateAction': new Date(),
+          'approve.appPerson': user
+        },
+        { new: true }
+      )
 
     }
 
