@@ -35,7 +35,7 @@ const os = require('os')
 
 exports.getRoute = async (req, res) => {
   try {
-    const { period, area, district, province, routeId, storeId } = req.query
+    const { period, area, district, province, routeId, storeId, zone, team } = req.query
     const channel = req.headers['x-channel']
 
     const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
@@ -125,6 +125,88 @@ exports.getRoute = async (req, res) => {
     })
 
     // console.log(enrichedRoutes)
+
+    // If area is not provided (or explicitly empty), group results by day+period
+    if ((!area || area === '') && period) {
+      const groups = new Map()
+      ;(enrichedRoutes || []).forEach(route => {
+        // Skip routes with area == 'IT211'
+        if (route.area === 'IT211') return
+
+        // derive zone/team from route (prefer explicit fields, otherwise from area)
+        let zoneKey = route.zone || ''
+        let teamKey = route.team || ''
+        if (route.area) {
+          const a = String(route.area || '')
+          zoneKey = a.substring(0, 2)
+          teamKey = `${a.substring(0, 2)}${a.charAt(3) || ''}`
+        }
+
+        // if request includes zone/team filters, skip non-matching routes
+        if (zone && String(zone) !== zoneKey) return
+        if (team && String(team) !== teamKey) return
+
+        const dayKey = route.day || ''
+        if (!groups.has(dayKey)) {
+          groups.set(dayKey, {
+            day: dayKey,
+            period: period,
+            // routes: [],
+            storeAll: 0,
+            storePending: 0,
+            storeSell: 0,
+            storeNotSell: 0,
+            storeCheckInNotSell: 0,
+            storeTotal: 0
+          })
+        }
+
+        const grp = groups.get(dayKey)
+
+        // accumulate counts from each route (use numeric defaults)
+        const ra = Number(route.storeAll) || 0
+        const rp = Number(route.storePending) || 0
+        const rs = Number(route.storeSell) || 0
+        const rn = Number(route.storeNotSell) || 0
+        const rcn = Number(route.storeCheckInNotSell) || 0
+        const rt = Number(route.storeTotal) || 0
+
+        grp.storeAll += ra
+        grp.storePending += rp
+        grp.storeSell += rs
+        grp.storeNotSell += rn
+        grp.storeCheckInNotSell += rcn
+        grp.storeTotal += rt
+      })
+
+      // finalize percentage fields for each group
+      enrichedRoutes = Array.from(groups.values()).map(g => {
+        const storeAll = g.storeAll || 0
+        const storeTotal = g.storeTotal || 0
+        const storeSell = g.storeSell || 0
+
+        const percentVisit = storeAll ? parseFloat(((storeTotal / storeAll) * 100).toFixed(2)) : 0
+        const percentEffective = storeAll ? parseFloat(((storeSell / storeAll) * 100).toFixed(2)) : 0
+        const complete = percentVisit
+        const percentComplete = storeAll ? parseFloat((((storeTotal / storeAll) * 100 * 360) / 100).toFixed(2)) : 0
+
+        return {
+          day: g.day,
+          period: g.period,
+          routes: g.routes,
+          storeAll: g.storeAll,
+          storePending: g.storePending,
+          storeSell: g.storeSell,
+          storeNotSell: g.storeNotSell,
+          storeCheckInNotSell: g.storeCheckInNotSell,
+          storeTotal: g.storeTotal,
+          percentComplete,
+          complete,
+          percentVisit,
+          percentEffective
+        }
+      })
+    }
 
     if (area && period && !routeId && !storeId && !province) {
       enrichedRoutes = (enrichedRoutes || []).map(item => ({
@@ -2143,7 +2225,7 @@ exports.getRouteEffective = async (req, res) => {
       )
       xlsx.writeFile(wb, filePath)
       res.download(filePath, err => {
-        fs.unlink(filePath, () => { })
+        fs.unlink(filePath, () => {})
         if (err) console.error(err)
       })
     } else {
@@ -2346,11 +2428,11 @@ exports.getRouteEffectiveAll = async (req, res) => {
       // 🎯 target
       target: target
         ? {
-          visit: target.visitStore,
-          sale: target.saleStore,
-          visitPerDay: targetVisitPerDay,
-          salePerDay: targetSalePerDay
-        }
+            visit: target.visitStore,
+            sale: target.saleStore,
+            visitPerDay: targetVisitPerDay,
+            salePerDay: targetSalePerDay
+          }
         : null,
       // 📊 compare (optional)
       compare: {
@@ -2417,12 +2499,12 @@ exports.getRouteEffectiveByDayArea = async (req, res) => {
       // filter team (ต้องอยู่ตรงนี้ ❗)
       ...(team
         ? [
-          {
-            $match: {
-              team3: { $regex: `^${team}`, $options: 'i' }
+            {
+              $match: {
+                team3: { $regex: `^${team}`, $options: 'i' }
+              }
             }
-          }
-        ]
+          ]
         : []),
 
       // แตก store
@@ -2808,7 +2890,7 @@ exports.checkRouteStore = async (req, res) => {
       areaMap[area].del = storeCountMap[area]?.del || 0
     }
 
-    function sortKeys(obj) {
+    function sortKeys (obj) {
       const { area, R, del, ...days } = obj
       const sortedDays = Object.keys(days)
         .filter(k => /^R\d+$/.test(k))
@@ -3225,7 +3307,8 @@ exports.updateRouteAllStore = async (req, res) => {
       )
 
       console.log(
-        `processed ${Math.min(i + BATCH, storeData.length)} / ${storeData.length
+        `processed ${Math.min(i + BATCH, storeData.length)} / ${
+          storeData.length
         }`
       )
     }
@@ -3694,8 +3777,8 @@ exports.getRouteChange = async (req, res) => {
       team: routeData.team,
       day: routeData.day,
       listStore: routeData.listStore.map(row => {
-        const storeDetail = dataStore.find(
-          store => store._id.equals(row.storeInfo)
+        const storeDetail = dataStore.find(store =>
+          store._id.equals(row.storeInfo)
         )
 
         return {
@@ -3718,13 +3801,11 @@ exports.getRouteChange = async (req, res) => {
       })
     }
 
-
     res.status(200).json({
       status: 201,
       message: 'getRouteChange success',
       data: data
     })
-
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
@@ -3735,7 +3816,11 @@ exports.addNewStoreToRoute = async (req, res) => {
   try {
     const { id, storeId } = req.body
     const channel = req.headers['x-channel']
-    const { Route, RouteChange, RouteChangeLog } = getModelsByChannel(channel, res, routeModel)
+    const { Route, RouteChange, RouteChangeLog } = getModelsByChannel(
+      channel,
+      res,
+      routeModel
+    )
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
     const currentDate = new Date()
@@ -3778,7 +3863,6 @@ exports.addNewStoreToRoute = async (req, res) => {
     const count = await RouteChangeLog.countDocuments()
     const transactionId = `RN${String(count + 1).padStart(4, '0')}`
 
-
     const transaction = {
       id: transactionId,
       area: routeData.area,
@@ -3809,37 +3893,50 @@ exports.getNewStoreToRoute = async (req, res) => {
   try {
     const { zone, area, team, period } = req.query
     const channel = req.headers['x-channel']
-    const { Route, RouteChange, RouteChangeLog } = getModelsByChannel(channel, res, routeModel)
+    const { Route, RouteChange, RouteChangeLog } = getModelsByChannel(
+      channel,
+      res,
+      routeModel
+    )
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
-    let query = { period : period}
+    let query = { period: period }
     if (area) query.area = area
     if (zone) query.zone = zone
     if (team) query.team = team
 
     // console.log(query)
 
-    const routeChangeLog = await RouteChangeLog.find(query)
+    const routeChangeLog = await RouteChangeLog.find(query).lean()
+
+    const data = routeChangeLog.map(item => {
+      return {
+        ...item,
+        route: item.routeId.slice(11, 15) //202512SH225R24
+        // route:item.routeId.slice(6,9) //202512SH225R24
+      }
+    })
 
     res.status(200).json({
       status: 200,
       message: 'getNewStoreToRoute success',
-      data: routeChangeLog
+      data: data
     })
-
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
   }
 }
 
-
-
 exports.getNewStoreToRouteDetail = async (req, res) => {
   try {
     const { id } = req.query
     const channel = req.headers['x-channel']
-    const { Route, RouteChange, RouteChangeLog } = getModelsByChannel(channel, res, routeModel)
+    const { Route, RouteChange, RouteChangeLog } = getModelsByChannel(
+      channel,
+      res,
+      routeModel
+    )
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
     const routeChangeLog = await RouteChangeLog.findOne({ id: id })
@@ -3851,14 +3948,11 @@ exports.getNewStoreToRouteDetail = async (req, res) => {
       })
     }
 
-
-
     res.status(200).json({
       status: 200,
       message: 'getNewStoreToRouteDetail success',
       data: routeChangeLog
     })
-
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
@@ -3896,21 +3990,19 @@ exports.approveNewStoreToRoute = async (req, res) => {
     const isApprove = status === true
 
     const statusNew = isApprove ? 'approved' : 'rejected'
-    const statusTh = isApprove ? 'อนุมัติ' : 'ไม่อนุมัติ'
-
+    const statusTH = isApprove ? 'อนุมัติ' : 'ไม่อนุมัติ'
 
     const result = await RouteChangeLog.findOneAndUpdate(
       { id, status: 'pending' },
       {
         status: statusNew,
-        statusTh,
+        statusTH,
         updatedDate: new Date(),
         'approve.dateAction': new Date(),
         'approve.appPerson': user
       },
       { new: true }
     )
-
 
     if (isApprove) {
       const [storeData, routeData] = await Promise.all([
@@ -3946,7 +4038,6 @@ exports.approveNewStoreToRoute = async (req, res) => {
         await routeData.save()
       }
     }
-
 
     res.status(200).json({
       status: 200,
