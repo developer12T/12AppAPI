@@ -32,6 +32,7 @@ const { group } = require('console')
 const { formatDateTimeToThai } = require('../../middleware/order')
 const fs = require('fs')
 const os = require('os')
+const moment = require('moment')
 
 exports.getRoute = async (req, res) => {
   try {
@@ -3982,3 +3983,65 @@ exports.approveNewStoreToRoute = async (req, res) => {
     })
   }
 }
+
+exports.getDashboardRoute = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    let period = req.query.period
+    // period = period
+
+    const prevPeriod = previousPeriod(period)
+    const { RouteChangeLog, Route, RouteChange } = getModelsByChannel(
+      channel,
+      res,
+      routeModel
+    )
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { User } = getModelsByChannel('user', res, userModel)
+
+    const userData = await User.find({ platformType: 'CASH', role: 'sale' })
+
+
+
+    const routeData = await Route.find({ period: prevPeriod })
+    const routeChangeData = await RouteChange.find({ period: period })
+    let routePev = []
+    let notFoundRoute = 0
+    let routeChange = []
+    for (const row of userData) {
+      const routeDataPev = routeData?.filter(item => item.area === row.area) ?? []
+      // console.log('routeDataPev',routeDataPev)
+      const routeList = routeDataPev.flatMap(item => item.id)
+      const countStore = routeDataPev.reduce(
+        (sum, item) => sum + (item.listStore?.length ?? 0),
+        0
+      )
+      const routePevTran = {
+        area: row.area,
+        store: countStore,
+        route: routeList
+      }
+      routePev.push(routePevTran)
+
+      console.log('routePevTran', routePevTran)
+
+    }
+
+
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'getDashboardRoute Success',
+      data: routePev,
+
+    })
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({
+      status: 500,
+      message: error.message
+    })
+  }
+} 
