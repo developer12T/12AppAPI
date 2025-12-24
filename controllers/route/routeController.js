@@ -4043,28 +4043,11 @@ exports.approveNewStoreToRoute = async (req, res) => {
     )
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
-    const routeChangeLog = await RouteChangeLog.findOne({ id })
-
-    if (!routeChangeLog) {
-      return res.status(404).json({
-        status: 404,
-        message: 'Not found routeChangeLog'
-      })
-    }
-
-    if (routeChangeLog.status !== 'pending') {
-      return res.status(400).json({
-        status: 400,
-        message: 'This request already processed'
-      })
-    }
-
     const isApprove = status === true
-
     const statusNew = isApprove ? 'approved' : 'rejected'
     const statusTH = isApprove ? 'อนุมัติ' : 'ไม่อนุมัติ'
 
-    const result = await RouteChangeLog.findOneAndUpdate(
+    const routeChangeLog = await RouteChangeLog.findOneAndUpdate(
       { id, status: 'pending' },
       {
         status: statusNew,
@@ -4076,89 +4059,76 @@ exports.approveNewStoreToRoute = async (req, res) => {
       { new: true }
     )
 
-    if (isApprove) {
-      const [storeData, routeData] = await Promise.all([
-        Store.findOne({ storeId: routeChangeLog.storeId }),
-        Route.findOne({ id: routeChangeLog.routeId })
-      ])
-
-      if (!storeData || !routeData) {
-        return res.status(404).json({
-          status: 404,
-          message: 'Store or Route not found'
-        })
-      }
-
-      // ป้องกันเพิ่มซ้ำ
-      const isExist = routeData.listStore.some(
-        s => s.storeInfo.toString() === storeData._id.toString()
-      )
-
-      if (!isExist) {
-        routeData.listStore.push({
-          storeInfo: storeData._id,
-          note: '',
-          image: '',
-          latitude: '',
-          longtitude: '',
-          status: 0,
-          statusText: 'รอเยี่ยม',
-          listOrder: [],
-          date: ''
-        })
-
-        await routeData.save()
-
-        result = await RouteChangeLog.findOneAndUpdate(
-          { id, status: 'pending' },
-          {
-            status: statusNew,
-            statusTH,
-            updatedDate: new Date(),
-            'approve.dateAction': new Date(),
-            'approve.appPerson': user
-          },
-          { new: true }
-        )
-
-
-      }
-      else {
-        return res.status(409).json({
-          status: 409,
-          message: 'Duplicate store'
-        })
-      }
-
-    } else {
-
-      result = await RouteChangeLog.findOneAndUpdate(
-        { id, status: 'pending' },
-        {
-          status: statusNew,
-          statusTh,
-          updatedDate: new Date(),
-          'approve.dateAction': new Date(),
-          'approve.appPerson': user
-        },
-        { new: true }
-      )
-
+    if (!routeChangeLog) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found routeChangeLog or status is pending'
+      })
     }
 
-    res.status(200).json({
+    if (!isApprove) {
+      return res.status(200).json({
+        status: 200,
+        message: 'rejectNewStoreToRoute success',
+        data: routeChangeLog
+      })
+    }
+
+    const storeData = await Store.findOne({
+      storeId: routeChangeLog.storeId
+    })
+
+    if (!storeData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Store not found'
+      })
+    }
+
+    const updateResult = await Route.updateOne(
+      {
+        id: routeChangeLog.routeId,
+        'listStore.storeInfo': { $ne: storeData._id }
+      },
+      {
+        $addToSet: {
+          listStore: {
+            storeInfo: storeData._id,
+            note: '',
+            image: '',
+            latitude: '',
+            longtitude: '',
+            status: 0,
+            statusText: 'รอเยี่ยม',
+            listOrder: [],
+            date: ''
+          }
+        }
+      }
+    )
+
+    if (updateResult.matchedCount === 0) {
+      return res.status(409).json({
+        status: 409,
+        message: 'Duplicate store'
+      })
+    }
+
+    return res.status(200).json({
       status: 200,
       message: 'approveNewStoreToRoute success',
-      data: result
+      data: routeChangeLog
     })
+
   } catch (error) {
     console.error(error)
-    res.status(500).json({
+    return res.status(500).json({
       status: 500,
       message: error.message
     })
   }
 }
+
 
 exports.getAreaApproval = async (req, res) => {
   try {
@@ -4235,8 +4205,8 @@ exports.getAreaApproval = async (req, res) => {
     ])
 
     // console.log('routeChangePendingAreasArr:', routeChangePendingAreasArr)
-    // console.log('routeChangeApproveAreasArr:', routeChangeApproveAreasArr)
-
+    console.log('routeChangeApproveAreasArr:', routeChangeApproveAreasArr)
+    
 
     // const changeAreaStorePending = await routeChangeAreasArr.filter(item => item.status === 'pending')
     // const changeAreaStoreApprove = await routeChangeAreasArr.filter(item => item.status === 'approved')
@@ -4282,6 +4252,8 @@ exports.getAreaApproval = async (req, res) => {
       let status = ''
       let statusTH = ''
       if (!hasRouteChangePendingByArea.has(area)) {
+
+        console.log('hasRouteChangePendingByArea', hasRouteChangePendingByArea)
         status = 'approved'
         statusTH = 'อนุมัติ'
       } else {
