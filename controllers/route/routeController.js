@@ -3882,6 +3882,20 @@ exports.addNewStoreToRoute = async (req, res) => {
       })
     }
 
+    
+    const exists = await Route.findOne({
+      id,
+      'listStore.storeInfo': storeData._id
+    })
+
+    if (exists) {
+      return res.status(409).json({
+        status: 409,
+        message: 'duplicate store'
+      })
+    }
+
+
     const count = await RouteChangeLog.countDocuments()
     const transactionId = `RN${String(count + 1).padStart(4, '0')}`
 
