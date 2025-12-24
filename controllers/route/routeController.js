@@ -4238,8 +4238,7 @@ exports.getAreaApproval = async (req, res) => {
     for (const u of userData) {
       const area = u.area
       if (!area) continue
-      let pending = 0
-      let approve = 0
+
       const routeSummary = routeSummaryByArea.get(area) || { routeCount: 0, storeCount: 0 }
       const storeNewCount = storeNewCountByArea.get(area) || 0
       const addStoreToRoute = approvedLogCountByArea.get(area) || 0
@@ -4251,9 +4250,7 @@ exports.getAreaApproval = async (req, res) => {
       }
       let status = ''
       let statusTH = ''
-      if (!hasRouteChangePendingByArea.has(area)) {
-
-        console.log('hasRouteChangePendingByArea', hasRouteChangePendingByArea)
+      if (hasRouteChangeApproveByArea.has(area)) {
         status = 'approved'
         statusTH = 'อนุมัติ'
       } else {
