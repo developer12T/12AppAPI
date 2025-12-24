@@ -4142,7 +4142,7 @@ exports.addLatLongToDataToHome = async (req, res) => {
     const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
 
     const storeData = await StoreLatLong.aggregate([
-      {$match: {status:'approved'}},
+      { $match: { status: 'approved' } },
       {
         $group: {
           _id: "$storeId",
@@ -4166,6 +4166,81 @@ exports.addLatLongToDataToHome = async (req, res) => {
       status: 200,
       message: 'sucess',
       data: storeData
+    })
+
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+}
+
+
+exports.changeAreaStore = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    // const storeData = await Store.find({ area: 'BT211' })
+    // 🔴 เช็กไฟล์
+    if (!req.file) {
+      return res.status(400).json({
+        status: 400,
+        message: 'file is required'
+      })
+    }
+
+    // buffer ของไฟล์ excel
+    const buffer = req.file.buffer
+
+    // อ่าน workbook
+    const workbook = xlsx.read(buffer, { type: 'buffer' })
+
+    // อ่าน sheet แรก
+    const sheetName = workbook.SheetNames[0]
+    const sheet = workbook.Sheets[sheetName]
+
+    // แปลงเป็น JSON
+    const rows = xlsx.utils.sheet_to_json(sheet)
+    const storeIdList = rows.map(row => row.Old_Area)
+    const storeData = await Store.find({ area: { $in: storeIdList } }).select('storeId area')
+
+    for (const row of rows) {
+      const existingStore = storeData.filter(store => store.area === row.Old_Area)
+
+      if (existingStore.length === 0) {
+        // console.log(`⚠️ ไม่พบร้านที่มี Area: ${row.Old_Area}`)
+        continue 
+      } else {
+        // console.log('row.New_Area.slice(0,2)',row.New_Area.slice(0,2))
+        await Store.updateMany(
+          { area: row.Old_Area },
+          { $set: { area: row.New_Area , zone : row.New_Area.slice(0,2)} }
+        )
+
+
+      }
+
+
+
+
+
+    }
+
+
+
+
+
+
+    return res.status(200).json({
+      status: 200,
+      message: 'upload excel success',
+      total: rows.length,
+      data: rows
     })
 
   } catch (error) {

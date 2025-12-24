@@ -4113,7 +4113,7 @@ exports.approveNewStoreToRoute = async (req, res) => {
           { id, status: 'pending' },
           {
             status: statusNew,
-            statusTh,
+            statusTH,
             updatedDate: new Date(),
             'approve.dateAction': new Date(),
             'approve.appPerson': user
@@ -4196,7 +4196,9 @@ exports.getAreaApproval = async (req, res) => {
       routeSummaryAgg,
       routeChangeAreasArr,
       routeChangeLogAgg,
-      storeNewAgg
+      storeNewAgg,
+      routeChangePendingAreasArr,
+      routeChangeApproveAreasArr
     ] = await Promise.all([
       User.find(userQuery, { area: 1 }).lean(),
 
@@ -4227,8 +4229,19 @@ exports.getAreaApproval = async (req, res) => {
       Store.aggregate([
         { $match: storeMatch },
         { $group: { _id: '$area', count: { $sum: 1 } } }
-      ])
+      ]),
+      RouteChange.distinct('area', { period, status: 'pending' }),
+      RouteChange.distinct('area', { period, status: 'approved' }),
     ])
+
+    // console.log('routeChangePendingAreasArr:', routeChangePendingAreasArr)
+    // console.log('routeChangeApproveAreasArr:', routeChangeApproveAreasArr)
+
+
+    // const changeAreaStorePending = await routeChangeAreasArr.filter(item => item.status === 'pending')
+    // const changeAreaStoreApprove = await routeChangeAreasArr.filter(item => item.status === 'approved')
+
+    // console.log('routeChangeAreasArr:', routeChangeAreasArr)
 
     // Build quick lookup maps from aggregation results
     const routeSummaryByArea = new Map(
@@ -4236,6 +4249,9 @@ exports.getAreaApproval = async (req, res) => {
     )
 
     const hasRouteChangeByArea = new Set((routeChangeAreasArr || []).filter(Boolean))
+    const hasRouteChangePendingByArea = new Set((routeChangePendingAreasArr || []).filter(Boolean))
+    const hasRouteChangeApproveByArea = new Set((routeChangeApproveAreasArr || []).filter(Boolean))
+
 
     const approvedLogCountByArea = new Map(
       (routeChangeLogAgg || []).map(l => [l._id, l.count])
@@ -4245,13 +4261,15 @@ exports.getAreaApproval = async (req, res) => {
 
     // ---------- ✅ Build result ----------
     let notFoundRoute = 0
+
     const routeChangeAreas = []
     const routePev = []
 
     for (const u of userData) {
       const area = u.area
       if (!area) continue
-
+      let pending = 0
+      let approve = 0
       const routeSummary = routeSummaryByArea.get(area) || { routeCount: 0, storeCount: 0 }
       const storeNewCount = storeNewCountByArea.get(area) || 0
       const addStoreToRoute = approvedLogCountByArea.get(area) || 0
@@ -4261,13 +4279,26 @@ exports.getAreaApproval = async (req, res) => {
         notFoundRoute++
         routeChangeAreas.push(area)
       }
+      let status = ''
+      let statusTH = ''
+      if (!hasRouteChangePendingByArea.has(area)) {
+        status = 'approved'
+        statusTH = 'อนุมัติ'
+      } else {
+        status = 'pending'
+        statusTH = 'รอดำเนินการ'
+      }
+
 
       routePev.push({
         area,
         storeCount: routeSummary.storeCount,
         routeCount: routeSummary.routeCount,
         storeNew: storeNewCount,
-        addStoreToRoute
+        addStoreToRoute,
+        status:status,
+        statusTH:statusTH
+        // สถานะปรับรูท: hasRouteChangeByArea.has(area) ? 'มีการขอปรับ' : 'ไม่มีการขอปรับ'
       })
     }
 
@@ -4287,7 +4318,7 @@ exports.getAreaApproval = async (req, res) => {
   }
 }
 
-exports.approveRouteChangeLog = async (req, res) => {
+exports.approveRouteChange = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
     const { period, area, status } = req.body

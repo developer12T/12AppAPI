@@ -1,4 +1,6 @@
 const express = require('express')
+const multer = require('multer')
+const upload = multer({ storage: multer.memoryStorage() })
 const {
   getStore,
   addStore,
@@ -50,7 +52,8 @@ const {
   addStoreFromM3,
   moveStoreToCash,
   getStoreOnRoute,
-  addLatLongToDataToHome
+  addLatLongToDataToHome,
+  changeAreaStore
   // test
 } = require('../../controllers/store/storeController')
 
@@ -129,7 +132,11 @@ router.post('/checkLatLongByStore', checkLatLongByStore)
 router.post('/moveStoreToCash', moveStoreToCash)
 router.post('/getStoreOnRoute', getStoreOnRoute)
 router.post('/addLatLongToDataToHome', addLatLongToDataToHome)
-
+router.post(
+  '/changeAreaStore',
+  upload.single('file'), // 👈 ต้องมี และต้องชื่อ file
+  changeAreaStore
+)
 
 
 router.get('/:storeId', getDetailStore)
