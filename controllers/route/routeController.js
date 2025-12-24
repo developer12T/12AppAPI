@@ -3715,7 +3715,6 @@ exports.addRouteChangeToRoute = async (req, res) => {
     const { Route, RouteChange } = getModelsByChannel(channel, res, routeModel)
 
     const routeChangeData = await RouteChange.find({ period }).lean()
-    const routeIdList = await routeChangeData.flatMap(item => item.id)
 
     // 1. ดึง id ที่มีอยู่แล้ว
     const existRoutes = await Route.find(
@@ -3725,8 +3724,30 @@ exports.addRouteChangeToRoute = async (req, res) => {
 
     const existIdSet = new Set(existRoutes.map(r => r.id))
 
+    const data = routeChangeData.map(r => {
+      return {
+        id: r.id,
+        period: r.period,
+        area: r.area,
+        zone: r.zone,
+        team: r.team,
+        day: r.day,
+        listStore: r.listStore.map(store => ({
+          storeInfo: store.storeInfo,
+          note: '',
+          image: '',
+          latitude: '',
+          longtitude: '',
+          status: '0',
+          statusText: 'รอเยี่ยม',
+          date: '',
+          listOrder: []
+        }))
+      }
+    })
+
     // 2. คัดเฉพาะอันที่ยังไม่มี
-    const toCreate = routeChangeData
+    const toCreate = data
       .filter(r => !existIdSet.has(r.id))
       .map(({ _id, __v, ...rest }) => rest)
 
