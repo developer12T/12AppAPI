@@ -3698,8 +3698,8 @@ exports.deleteStoreToRouteChange = async (req, res) => {
         }
       }
     )
-    res.status(204).json({
-      status: 204,
+    res.status(200).json({
+      status: 200,
       message: 'deleteStoreToRouteChange success'
       // data: storeData
     })
