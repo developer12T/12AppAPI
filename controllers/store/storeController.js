@@ -26,7 +26,8 @@ const {
   storeQueryFilter,
   groupStoreType,
   routeQuery,
-  routeQueryOne
+  routeQueryOne,
+  updateLatLong
 } = require('../../controllers/queryFromM3/querySctipt')
 
 // ===== helper: สร้างไดเรกทอรี + เซฟไฟล์ buffer เป็น .webp =====
@@ -4151,6 +4152,21 @@ exports.addLatLongToDataToHome = async (req, res) => {
         }
       }
     ])
+// updateLatLong
+    for (const item of storeData) {
+
+      const storeDetail ={ 
+        customerCode : item._id,
+        latitude : item.latitude,
+        longtitude : item.longtitude
+      }
+
+      await updateLatLong(channel, storeDetail)
+
+    }
+
+
+
 
     res.status(200).json({
       status: 200,
