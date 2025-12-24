@@ -39,6 +39,28 @@ const RouteSchema = new mongoose.Schema(
   }
 );
 
+const RouteChangeSchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true, index: true },
+    period: { type: String, required: true, index: true },
+    area: { type: String, required: true },
+    zone: { type: String, required: true },
+    team: { type: String, required: true },
+    day: { type: String, required: true },
+    listStore: [ListStoreSchema],
+    status : { type: String, default: 'pending' },
+    statusTH : { type: String, default: 'รอดำเนินการ' },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+  },
+  {
+    timestamps: true // ✅ Mongoose จะสร้าง createdAt / updatedAt ให้อัตโนมัติ
+  }
+);
+
+
+
+
 RouteSchema.virtual('storeAll').get(function () {
   return this.listStore.length
 })
@@ -132,7 +154,7 @@ const RouteChangeLogSchema = new mongoose.Schema({
 module.exports = (conn) => {
   return {
     Route: conn.model('Route', RouteSchema),
-    RouteChange: conn.model('RouteChange', RouteSchema),
+    RouteChange: conn.model('RouteChange', RouteChangeSchema),
     RouteChangeLog: conn.model('RouteChangeLog', RouteChangeLogSchema),
   };
 };

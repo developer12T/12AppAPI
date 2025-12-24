@@ -3537,13 +3537,14 @@ exports.insertRouteToRouteChange = async (req, res) => {
     const dataRouteChange = []
 
     for (const item of routePrev) {
-      const exitRoute = routeChangeData.find(u => u.id === item.id)
+      const day = String(item.day).padStart(2, '0')
+      const routeId = `${period}${item.area}R${day}`
+
+      const exitRoute = routeChangeData.find(u => u.id === routeId)
       if (exitRoute) {
         continue
       }
 
-      const day = String(item.day).padStart(2, '0')
-      const routeId = `${period}${item.area}R${day}`
 
       const route = {
         id: routeId,
@@ -3714,17 +3715,53 @@ exports.addRouteChangeToRoute = async (req, res) => {
     const channel = req.headers['x-channel']
     const { Route, RouteChange } = getModelsByChannel(channel, res, routeModel)
 
-    const routeChangeData = await RouteChange.find({ period }).lean()
+    const routeChangeData = await RouteChange.find({ period, status: 'approved' }).lean()
+    const routeChangeIdList = [...new Set(routeChangeData.map(r => r.id))]
 
-    // 1. ดึง id ที่มีอยู่แล้ว
+
+
+    const year = parseInt(period.slice(0, 4), 10)
+    const month = parseInt(period.slice(4, 6), 10)
+    const prevDate = new Date(year, month - 2)
+    const prevPeriod =
+      prevDate.getFullYear().toString() +
+      String(prevDate.getMonth() + 1).padStart(2, '0')
+
+
+    const routeChangePrevIdSet = routeChangeData.map(r => {
+      const idPrev = String(r.id)
+      return prevPeriod + idPrev.slice(6)
+    })
+
+
+    const routePrevRaw = await Route.find({
+      period: prevPeriod,
+      id: { $nin: routeChangePrevIdSet }
+    }).lean()
+
+    const routePrev = routePrevRaw.map(r => {
+      const idPrev = String(r.id)
+      return {
+        ...r,
+        id: period + idPrev.slice(6),
+        period
+      }
+    })
+    const routePrevIdList = [...new Set(routePrev.map(r => r.id))]
+
+    const mergeRouteIds = [...new Set([...routeChangeIdList, ...routePrevIdList])]
+
     const existRoutes = await Route.find(
-      { id: { $in: routeChangeData.map(r => r.id) } },
+      { id: { $in: mergeRouteIds } },
       { id: 1 }
     ).lean()
 
     const existIdSet = new Set(existRoutes.map(r => r.id))
+    // console.log('existIdSet', existIdSet)
 
-    const data = routeChangeData.map(r => {
+    const routeChangeMerge = [...routeChangeData, ...routePrev]
+
+    const data = routeChangeMerge.map(r => {
       return {
         id: r.id,
         period: r.period,
@@ -3746,7 +3783,6 @@ exports.addRouteChangeToRoute = async (req, res) => {
       }
     })
 
-    // 2. คัดเฉพาะอันที่ยังไม่มี
     const toCreate = data
       .filter(r => !existIdSet.has(r.id))
       .map(({ _id, __v, ...rest }) => rest)
@@ -3759,7 +3795,7 @@ exports.addRouteChangeToRoute = async (req, res) => {
     res.status(201).json({
       status: 201,
       message: 'addRouteChangeToRoute success',
-      data: toCreate
+      data: data
     })
   } catch (error) {
     console.error(error)
@@ -3882,7 +3918,7 @@ exports.addNewStoreToRoute = async (req, res) => {
       })
     }
 
-    
+
     const exists = await Route.findOne({
       id,
       'listStore.storeInfo': storeData._id
@@ -4237,11 +4273,54 @@ exports.getAreaApproval = async (req, res) => {
 
     return res.status(200).json({
       status: 200,
-      message: 'getDashboardRoute Success',
+      message: 'getAreaApproval Success',
       data: routePev,
       number: notFoundRoute,
       area: routeChangeAreas
     })
+  } catch (error) {
+    console.error(error)
+    return res.status(500).json({
+      status: 500,
+      message: error.message
+    })
+  }
+}
+
+exports.approveRouteChangeLog = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { period, area, status } = req.body
+    const { RouteChangeLog, Route, RouteChange } = getModelsByChannel(
+      channel,
+      res,
+      routeModel
+    )
+
+    let statusNew = ''
+    let statusTH = ''
+    if (status === true) {
+      statusNew = 'approved'
+      statusTH = 'อนุมัติ'
+    } else {
+      statusNew = 'rejected'
+      statusTH = 'ไม่อนุมัติ'
+    }
+
+    await RouteChange.updateMany(
+      { period: period, area: area, status: 'pending' },
+      {
+        status: statusNew,
+        statusTH: statusTH,
+        updatedDate: new Date()
+      }
+    )
+
+    res.status(200).json({
+      status: 200,
+      message: 'Update status success'
+    })
+
   } catch (error) {
     console.error(error)
     return res.status(500).json({
