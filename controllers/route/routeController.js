@@ -3617,8 +3617,8 @@ exports.addStoreToRouteChange = async (req, res) => {
     })
 
     if (exists) {
-      return res.status(404).json({
-        status: 404,
+      return res.status(409).json({
+        status: 409,
         message: 'duplicate store'
       })
     }
@@ -3637,7 +3637,7 @@ exports.addStoreToRouteChange = async (req, res) => {
             latitude: '',
             longtitude: '',
             status: '0',
-            statusText: 'รอเยี่ยม',
+            statusText: 'เพิ่มใหม่',
             date: '',
             listOrder: []
           }
