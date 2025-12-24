@@ -4110,7 +4110,7 @@ exports.approveNewStoreToRoute = async (req, res) => {
   }
 }
 
-exports.getDashboardRoute = async (req, res) => {
+exports.getAreaApproval = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
 
