@@ -3697,8 +3697,8 @@ exports.deleteStoreToRouteChange = async (req, res) => {
         }
       }
     )
-    res.status(200).json({
-      status: 200,
+    res.status(204).json({
+      status: 204,
       message: 'deleteStoreToRouteChange success'
       // data: storeData
     })
@@ -3756,8 +3756,8 @@ exports.addRouteChangeToRoute = async (req, res) => {
       await Route.insertMany(toCreate)
     }
 
-    res.status(200).json({
-      status: 200,
+    res.status(201).json({
+      status: 201,
       message: 'addRouteChangeToRoute success',
       data: toCreate
     })
