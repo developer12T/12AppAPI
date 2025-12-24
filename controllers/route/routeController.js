@@ -4106,7 +4106,7 @@ exports.getDashboardRoute = async (req, res) => {
       return res.status(400).json({ status: 400, message: 'period is required' })
     }
 
-    // ✅ ดึงข้อมูลพร้อมกัน
+    // Use DB aggregations to compute summaries server-side and reduce memory
     const userQuery = { platformType: 'CASH', role: 'sale' }
 
     const periodStr = periodNew()
@@ -4119,56 +4119,58 @@ exports.getDashboardRoute = async (req, res) => {
       createdAt: { $gte: startMonth, $lt: nextMonth }
     }
 
+    // Fetch only aggregated stats from DB to avoid loading entire collections in Node
     const [
       userData,
-      routeData,
-      routeChangeData,
-      routeChangeLogData,
-      // ✅ store ใหม่ให้ count ต่อ area จาก DB เลย (ไม่ต้องดึงทั้งก้อนมานับใน Node)
+      routeSummaryAgg,
+      routeChangeAreasArr,
+      routeChangeLogAgg,
       storeNewAgg
     ] = await Promise.all([
       User.find(userQuery, { area: 1 }).lean(),
-      Route.find({ period }).select({ area: 1, listStore: 1 }).lean(),
-      RouteChange.find({ period }).select({ area: 1 }).lean(),
-      RouteChangeLog.find({ period, status: 'approved' }).select({ area: 1 }).lean(),
+
+      // route: group by area, count routes and sum listStore sizes
+      Route.aggregate([
+        { $match: { period } },
+        {
+          $project: {
+            area: 1,
+            listStoreSize: {
+              $cond: [{ $isArray: '$listStore' }, { $size: '$listStore' }, 0]
+            }
+          }
+        },
+        { $group: { _id: '$area', routeCount: { $sum: 1 }, storeCount: { $sum: '$listStoreSize' } } }
+      ]),
+
+      // route change: get distinct areas that have changes
+      RouteChange.distinct('area', { period }),
+
+      // approved logs per area
+      RouteChangeLog.aggregate([
+        { $match: { period, status: 'approved' } },
+        { $group: { _id: '$area', count: { $sum: 1 } } }
+      ]),
+
+      // store new per area (existing aggregation)
       Store.aggregate([
         { $match: storeMatch },
         { $group: { _id: '$area', count: { $sum: 1 } } }
       ])
     ])
 
-    // ---------- ✅ Precompute maps (O(n)) ----------
-    // 1) route summary ต่อ area: routeCount + storeCount
-    const routeSummaryByArea = new Map()
-    for (const r of routeData) {
-      const area = r.area
-      if (!area) continue
+    // Build quick lookup maps from aggregation results
+    const routeSummaryByArea = new Map(
+      (routeSummaryAgg || []).map(r => [r._id, { routeCount: r.routeCount || 0, storeCount: r.storeCount || 0 }])
+    )
 
-      const prev = routeSummaryByArea.get(area) || { routeCount: 0, storeCount: 0 }
-      prev.routeCount += 1
-      prev.storeCount += (r.listStore?.length ?? 0)
-      routeSummaryByArea.set(area, prev)
-    }
+    const hasRouteChangeByArea = new Set((routeChangeAreasArr || []).filter(Boolean))
 
-    // 2) routeChange exists ต่อ area (แค่เช็คว่ามีไหม)
-    const hasRouteChangeByArea = new Set()
-    for (const rc of routeChangeData) {
-      if (rc.area) hasRouteChangeByArea.add(rc.area)
-    }
+    const approvedLogCountByArea = new Map(
+      (routeChangeLogAgg || []).map(l => [l._id, l.count])
+    )
 
-    // 3) approved log count ต่อ area
-    const approvedLogCountByArea = new Map()
-    for (const log of routeChangeLogData) {
-      const area = log.area
-      if (!area) continue
-      approvedLogCountByArea.set(area, (approvedLogCountByArea.get(area) || 0) + 1)
-    }
-
-    // 4) store new count ต่อ area
-    const storeNewCountByArea = new Map()
-    for (const s of storeNewAgg) {
-      storeNewCountByArea.set(s._id, s.count)
-    }
+    const storeNewCountByArea = new Map((storeNewAgg || []).map(s => [s._id, s.count]))
 
     // ---------- ✅ Build result ----------
     let notFoundRoute = 0

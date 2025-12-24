@@ -4135,6 +4135,29 @@ exports.getStoreOnRoute = async (req, res) => {
 exports.addLatLongToDataToHome = async (req, res) => {
   try {
 
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
+
+    const storeData = await StoreLatLong.aggregate([
+      {
+        $group: {
+          _id: "$storeId",
+          latestUpdatedAt: { $max: "$updatedAt" },
+          latitude: { $first: "$latitude" },
+          longtitude: { $first: "$longtitude" }
+
+        }
+      }
+    ])
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: storeData
+    })
+
   } catch (error) {
     console.error('❌ Error:', error)
 
@@ -4144,5 +4167,5 @@ exports.addLatLongToDataToHome = async (req, res) => {
       error: error.message || error.toString(), // ✅ ป้องกัน circular object
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
-}
+  }
 }
