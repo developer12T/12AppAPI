@@ -4142,6 +4142,7 @@ exports.addLatLongToDataToHome = async (req, res) => {
     const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
 
     const storeData = await StoreLatLong.aggregate([
+      {$match: {status:'approved'}},
       {
         $group: {
           _id: "$storeId",
@@ -4152,18 +4153,11 @@ exports.addLatLongToDataToHome = async (req, res) => {
         }
       }
     ])
-// updateLatLong
-    for (const item of storeData) {
-
-      const storeDetail ={ 
-        customerCode : item._id,
-        latitude : item.latitude,
-        longtitude : item.longtitude
-      }
-
-      await updateLatLong(channel, storeDetail)
-
-    }
+    await updateLatLong(channel, storeData.map(item => ({
+      customerCode: item._id,
+      latitude: item.latitude,
+      longtitude: item.longtitude
+    })))
 
 
 

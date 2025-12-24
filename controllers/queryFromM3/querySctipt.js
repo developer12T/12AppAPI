@@ -1577,7 +1577,9 @@ exports.stockPcQuery = async function (channel, period, wereHouse) {
 }
 
 
-exports.updateLatLong = async function (channel,store) {
+exports.updateLatLong = async function (channel, storeList) {
+  if (channel !== 'cash') return
+
   const config = {
     user: process.env.MS_SQL_USER,
     password: process.env.MS_SQL_PASSWORD,
@@ -1588,35 +1590,22 @@ exports.updateLatLong = async function (channel,store) {
       trustServerCertificate: true
     }
   }
-  await sql.connect(config)
 
-  if (channel === 'cash') {
-    const pool = await sql.connect(config)
-    const transaction = new sql.Transaction(pool)
+  const pool = await sql.connect(config)
 
-    await transaction.begin()
+  for (const store of storeList) {
+    const request = pool.request()
 
-    try {
-      const request = new sql.Request(transaction)
+    request.input('customerCode', sql.NVarChar(10), store.customerCode)
+    request.input('lat', sql.NVarChar(20), store.latitude)
+    request.input('long', sql.NVarChar(20), store.longtitude)
 
-      request.input('customerCode', sql.string, store.customerCode)
-      request.input('lat', sql.string, store.latitude)
-      request.input('long', sql.string, store.longtitude)
-
-      await request.query(`
-    UPDATE [dbo].[data_store]
-    SET lat = @lat,
-        long = @long
-    WHERE customerCode = @customerCode
-  `)
-
-      await transaction.commit()
-
-    } catch (err) {
-      await transaction.rollback()
-      throw err
-    }
-
+    await request.query(`
+      UPDATE dbo.data_store
+      SET lat = @lat,
+          long = @long
+      WHERE customerCode = @customerCode
+    `)
   }
 }
 
