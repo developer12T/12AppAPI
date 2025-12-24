@@ -3900,8 +3900,8 @@ exports.addNewStoreToRoute = async (req, res) => {
 
     RouteChangeLog.create(transaction)
 
-    res.status(200).json({
-      status: 200,
+    res.status(201).json({
+      status: 201,
       message: 'addNewStoreToRoute success',
       data: transaction
     })
