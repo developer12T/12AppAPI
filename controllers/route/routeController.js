@@ -3803,7 +3803,7 @@ exports.getRouteChange = async (req, res) => {
     }
 
     res.status(200).json({
-      status: 201,
+      status: 200,
       message: 'getRouteChange success',
       data: data
     })
