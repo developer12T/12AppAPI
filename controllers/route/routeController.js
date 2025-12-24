@@ -3753,7 +3753,7 @@ exports.getRouteChange = async (req, res) => {
     const { Route, RouteChange } = getModelsByChannel(channel, res, routeModel)
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
-    const routeData = await Route.findOne({ id: id })
+    const routeData = await RouteChange.findOne({ id: id })
 
     if (!routeData) {
       return res.status(404).json({
