@@ -3535,3 +3535,27 @@ exports.addNPDProduct = async (req, res) => {
     return res.status(500).json({ message: error.message })
   }
 }
+
+
+exports.distributionChangeWareHouse = async (req, res) => {
+  try {
+    const { area,period, fromWarehouse, toWarehouse } = req.body
+    const channel = req.headers['x-channel']
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+
+    const distData = await Distribution.find({area:area,period:period}) 
+
+    
+    
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'addNPDProduct'
+    })
+
+  } catch (error) {
+        console.error('Error uploading NPD data:', error)
+    return res.status(500).json({ message: error.message })
+  }
+}
