@@ -4242,7 +4242,7 @@ exports.getAreaApproval = async (req, res) => {
 
       const routeSummary = routeSummaryByArea.get(area) || { routeCount: 0, storeCount: 0 }
       const storeNewCount = storeNewCountByArea.get(area) || 0
-      const addStoreToRoute = approvedLogCountByArea.get(area) || 0
+      // const addStoreToRoute = approvedLogCountByArea.get(area) || 0
 
       // เดิม: ถ้า routeChangeDetail.length === 0 => notFoundRoute++
       if (!hasRouteChangeByArea.has(area)) {
@@ -4251,11 +4251,16 @@ exports.getAreaApproval = async (req, res) => {
       }
       let status = ''
       let statusTH = ''
+      let addStoreToRoute = 0
       if (hasRouteChangeApproveByArea.has(area)) {
+        addStoreToRoute += 1
         status = 'approved'
-        statusTH = 'มีการอนุมัติปรับรูท'
-      } else {
+        statusTH = 'อนุมัติแล้ว'
+      } else if (hasRouteChangePendingByArea.has(area)) {
         status = 'pending'
+        statusTH = 'รออนุมัติ'
+      } else {
+        status = 'notchange'
         statusTH = 'ไม่มีการปรับเปลี่ยนรูท'
       }
 
