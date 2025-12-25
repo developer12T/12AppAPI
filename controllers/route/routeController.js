@@ -3851,6 +3851,10 @@ exports.getRouteChange = async (req, res) => {
           image: row.image,
           latitude: row.latitude,
           longtitude: row.longtitude,
+          location: [
+            Number(storeDetail.longtitude) || 0,
+            Number(storeDetail.latitude) || 0
+          ],
           status: row.status,
           statusText: row.statusText,
           date: row.date,
@@ -3943,6 +3947,8 @@ exports.addNewStoreToRoute = async (req, res) => {
       period: period(),
       storeId: storeId,
       name: storeData.name,
+      latitude: storeData.latitude,
+      longtitude: storeData.longtitude,
       routeId: id,
       status: 'pending',
       statusTH: 'กำลังดำเนินการ'
@@ -3984,8 +3990,11 @@ exports.getNewStoreToRoute = async (req, res) => {
     const data = routeChangeLog.map(item => {
       return {
         ...item,
-        route: item.routeId.slice(11, 15) //202512SH225R24
-        // route:item.routeId.slice(6,9) //202512SH225R24
+        route: item.routeId.slice(11, 15),
+        location: [
+          Number(item?.longtitude) || 0,
+          Number(item?.latitude) || 0
+        ]
       }
     })
 
@@ -4257,8 +4266,8 @@ exports.getAreaApproval = async (req, res) => {
         routeCount: routeSummary.routeCount,
         storeNew: storeNewCount,
         addStoreToRoute,
-        status:status,
-        statusTH:statusTH
+        status: status,
+        statusTH: statusTH
         // สถานะปรับรูท: hasRouteChangeByArea.has(area) ? 'มีการขอปรับ' : 'ไม่มีการขอปรับ'
       })
     }

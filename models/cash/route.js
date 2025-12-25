@@ -48,8 +48,8 @@ const RouteChangeSchema = new mongoose.Schema(
     team: { type: String, required: true },
     day: { type: String, required: true },
     listStore: [ListStoreSchema],
-    status : { type: String, default: 'pending' },
-    statusTH : { type: String, default: 'รอดำเนินการ' },
+    status: { type: String, default: 'pending' },
+    statusTH: { type: String, default: 'รอดำเนินการ' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
   },
@@ -120,22 +120,24 @@ const listStoreChange = mongoose.Schema({
 // })
 
 const approveSchema = mongoose.Schema({
-    dateSend: { type: Date, default: Date.now },
-    dateAction: { type: Date, default: Date.now },
-    appPerson: { type: String, require: true },
+  dateSend: { type: Date, default: Date.now },
+  dateAction: { type: Date, default: Date.now },
+  appPerson: { type: String, require: true },
 })
 
 
 const RouteChangeLogSchema = new mongoose.Schema({
   id: { type: String, required: true },
   period: { type: String, required: true },
-  area : { type: String, required: true },
-  zone : { type: String, required: true },
-  storeId : { type: String, required: true },
-  name : { type: String, required: true },
-  routeId : { type: String, required: true },
-  status : { type: String, required: true },
-  statusTH : { type: String, required: true },
+  area: { type: String, required: true },
+  zone: { type: String, required: true },
+  storeId: { type: String, required: true },
+  name: { type: String, required: true },
+  latitude: { type: String },
+  longtitude: { type: String },
+  routeId: { type: String, required: true },
+  status: { type: String, required: true },
+  statusTH: { type: String, required: true },
   approve: approveSchema,
 })
 
