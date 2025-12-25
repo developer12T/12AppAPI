@@ -337,6 +337,10 @@ const Customer = sequelize.define(
       type: DataTypes.INTEGER,
 
       field: 'OKFRE1'
+    }, OKCFC4: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'OKCFC4'
     }
   },
   {
@@ -1154,7 +1158,7 @@ const DROUTE = sequelize.define(
       allowNull: false,
       field: 'DRMODL'
     },
-    
+
   },
   {
     freezeTableName: true,

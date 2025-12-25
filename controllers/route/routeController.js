@@ -4204,14 +4204,6 @@ exports.getAreaApproval = async (req, res) => {
       RouteChange.distinct('area', { period, status: 'approved' }),
     ])
 
-    // console.log('routeChangePendingAreasArr:', routeChangePendingAreasArr)
-    console.log('routeChangeApproveAreasArr:', routeChangeApproveAreasArr)
-    
-
-    // const changeAreaStorePending = await routeChangeAreasArr.filter(item => item.status === 'pending')
-    // const changeAreaStoreApprove = await routeChangeAreasArr.filter(item => item.status === 'approved')
-
-    // console.log('routeChangeAreasArr:', routeChangeAreasArr)
 
     // Build quick lookup maps from aggregation results
     const routeSummaryByArea = new Map(

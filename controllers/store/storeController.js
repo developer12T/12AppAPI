@@ -4221,6 +4221,12 @@ exports.changeAreaStore = async (req, res) => {
           { area: row.Old_Area },
           { $set: { area: row.New_Area , zone : row.New_Area.slice(0,2)} }
         )
+        const zone = row.New_Area.slice(0, 2)
+        const team = row.New_Area.slice(3, 4)
+        await Customer.update({ OKCFC1: row.Old_Area }, 
+          { OKCFC1: row.New_Area, OKCFC4: row.New_Area, saleZone : zone , saleTeam : team }
+        )
+
 
 
       }
