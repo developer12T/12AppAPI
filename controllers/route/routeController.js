@@ -4253,10 +4253,10 @@ exports.getAreaApproval = async (req, res) => {
       let statusTH = ''
       if (hasRouteChangeApproveByArea.has(area)) {
         status = 'approved'
-        statusTH = 'อนุมัติ'
+        statusTH = 'มีการอนุมัติปรับรูท'
       } else {
         status = 'pending'
-        statusTH = 'รอดำเนินการ'
+        statusTH = 'ไม่มีการปรับเปลี่ยนรูท'
       }
 
 
