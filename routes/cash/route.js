@@ -30,7 +30,20 @@ const {
   addRadius,
   getRadius,
   addRouteByArea,
-  reRouteIt
+  reRouteIt,
+  insertRouteToRouteChange,
+  addStoreToRouteChange,
+  deleteStoreToRouteChange,
+  addRouteChangeToRoute,
+  addTargetRoute,
+  getRouteEffectiveByDayArea,
+  getRouteChange,
+  addNewStoreToRoute,
+  approveNewStoreToRoute,
+  getNewStoreToRouteDetail,
+  getNewStoreToRoute,
+  getAreaApproval,
+  approveRouteChange,
 } = require('../../controllers/route/routeController')
 
 const router = express.Router()
@@ -66,4 +79,19 @@ router.post('/getLatLongStore', getLatLongStore)
 router.post('/updateRouteAllStore', updateRouteAllStore)
 router.post('/addRouteByArea', addRouteByArea)
 router.post('/reRouteIt', reRouteIt)
+router.post('/insertRouteToRouteChange', insertRouteToRouteChange)
+router.post('/addStoreToRouteChange', addStoreToRouteChange)
+router.post('/deleteStoreToRouteChange', deleteStoreToRouteChange)
+router.post('/addRouteChangeToRoute', addRouteChangeToRoute)
+router.post('/addTargetRoute', addTargetRoute)
+router.post('/getRouteEffectiveByDay', getRouteEffectiveByDayArea)
+
+router.get('/getRouteChange', getRouteChange)
+router.post('/addNewStoreToRoute', addNewStoreToRoute)
+router.post('/approveNewStoreToRoute', approveNewStoreToRoute)
+router.get('/getNewStoreToRouteDetail', getNewStoreToRouteDetail)
+router.get('/getNewStoreToRoute', getNewStoreToRoute)
+router.get('/getAreaApproval', getAreaApproval)
+router.post('/approveRouteChange', approveRouteChange)
+
 module.exports = router

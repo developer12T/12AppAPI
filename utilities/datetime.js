@@ -5,6 +5,11 @@ function period () {
   return date
 }
 
+function periodNew () {
+  const date = moment().format('YYYYMM', 'th')
+  return date
+}
+
 const previousPeriod = period => {
   const year = parseInt(period.slice(0, 4), 10)
   const month = parseInt(period.slice(4), 10)
@@ -74,5 +79,6 @@ module.exports = {
   formatDate,
   getCurrentTimeFormatted,
   toThaiTime,
-  formatDateToYYYYMMDD
+  formatDateToYYYYMMDD,
+  periodNew
 }

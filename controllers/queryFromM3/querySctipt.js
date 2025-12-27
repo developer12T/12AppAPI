@@ -545,36 +545,36 @@ exports.storeQuery = async function (channel) {
       status: 'Agree',
       date: new Date()
     }
-    ;(mainData = {
-      storeId: splitData.storeId,
-      name: splitData.name,
-      taxId: splitData.taxId,
-      tel: splitData.tel,
-      route: splitData.route,
-      type: splitData.type,
-      typeName: splitData.typeName,
-      address: splitData.address,
-      district: splitData.district,
-      subDistrict: splitData.subDistrict,
-      province: splitData.province,
-      provinceCode: splitData.provinceCode,
-      'postCode ': splitData.postCode,
-      zone: splitData.zone,
-      area: splitData.area,
-      latitude: splitData.latitude,
-      longtitude: splitData.longtitude,
-      lineId: '',
-      'note ': '',
-      approve: approveData,
-      status: splitData.status,
-      policyConsent: poliAgree,
-      imageList: [],
-      shippingAddress: splitData.shippingAddress,
-      checkIn: {},
-      createdAt: splitData.createdAt,
-      updatedDate: Date()
-    }),
-      data.push(mainData)
+      ; (mainData = {
+        storeId: splitData.storeId,
+        name: splitData.name,
+        taxId: splitData.taxId,
+        tel: splitData.tel,
+        route: splitData.route,
+        type: splitData.type,
+        typeName: splitData.typeName,
+        address: splitData.address,
+        district: splitData.district,
+        subDistrict: splitData.subDistrict,
+        province: splitData.province,
+        provinceCode: splitData.provinceCode,
+        'postCode ': splitData.postCode,
+        zone: splitData.zone,
+        area: splitData.area,
+        latitude: splitData.latitude,
+        longtitude: splitData.longtitude,
+        lineId: '',
+        'note ': '',
+        approve: approveData,
+        status: splitData.status,
+        policyConsent: poliAgree,
+        imageList: [],
+        shippingAddress: splitData.shippingAddress,
+        checkIn: {},
+        createdAt: splitData.createdAt,
+        updatedDate: Date()
+      }),
+        data.push(mainData)
   }
 
   return data
@@ -770,36 +770,36 @@ exports.storeQueryFilter = async function (channel, storeId) {
       status: 'Agree',
       date: new Date()
     }
-    ;(mainData = {
-      storeId: splitData.storeId,
-      name: splitData.name,
-      taxId: splitData.taxId,
-      tel: splitData.tel,
-      route: splitData.route,
-      type: splitData.type,
-      typeName: splitData.typeName,
-      address: splitData.address,
-      district: splitData.district,
-      subDistrict: splitData.subDistrict,
-      province: splitData.province,
-      provinceCode: splitData.provinceCode,
-      'postCode ': splitData.postCode,
-      zone: splitData.zone,
-      area: splitData.area,
-      latitude: splitData.latitude,
-      longtitude: splitData.longtitude,
-      lineId: '',
-      'note ': '',
-      approve: approveData,
-      status: '20',
-      policyConsent: poliAgree,
-      imageList: [],
-      shippingAddress: splitData.shippingAddress,
-      checkIn: {},
-      createdAt: splitData.createdAt,
-      updatedDate: Date()
-    }),
-      data.push(mainData)
+      ; (mainData = {
+        storeId: splitData.storeId,
+        name: splitData.name,
+        taxId: splitData.taxId,
+        tel: splitData.tel,
+        route: splitData.route,
+        type: splitData.type,
+        typeName: splitData.typeName,
+        address: splitData.address,
+        district: splitData.district,
+        subDistrict: splitData.subDistrict,
+        province: splitData.province,
+        provinceCode: splitData.provinceCode,
+        'postCode ': splitData.postCode,
+        zone: splitData.zone,
+        area: splitData.area,
+        latitude: splitData.latitude,
+        longtitude: splitData.longtitude,
+        lineId: '',
+        'note ': '',
+        approve: approveData,
+        status: '20',
+        policyConsent: poliAgree,
+        imageList: [],
+        shippingAddress: splitData.shippingAddress,
+        checkIn: {},
+        createdAt: splitData.createdAt,
+        updatedDate: Date()
+      }),
+        data.push(mainData)
   }
 
   return data
@@ -1365,7 +1365,7 @@ exports.stockQuery = async function (channel, period, wereHouse) {
   let result = ''
   if (channel == 'cash') {
     if (wereHouse) {
-      ;`
+      ; `
   SELECT WH, 
   ITEM_CODE, 
   SUM(ITEM_QTY) AS ITEM_QTY
@@ -1552,7 +1552,7 @@ exports.stockPcQuery = async function (channel, period, wereHouse) {
   let result = ''
   if (channel === 'cash' || channel === 'pc') {
     if (wereHouse) {
-      ;`
+      ; `
   SELECT WH, 
   ITEM_CODE, 
   SUM(ITEM_QTY) AS ITEM_QTY
@@ -1575,3 +1575,37 @@ exports.stockPcQuery = async function (channel, period, wereHouse) {
 
   return result.recordset
 }
+
+
+exports.updateLatLong = async function (channel, storeList) {
+  if (channel !== 'cash') return
+
+  const config = {
+    user: process.env.MS_SQL_USER,
+    password: process.env.MS_SQL_PASSWORD,
+    server: process.env.MS_SQL_SERVER,
+    database: process.env.MS_SQL_DATABASE,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  }
+
+  const pool = await sql.connect(config)
+
+  for (const store of storeList) {
+    const request = pool.request()
+
+    request.input('customerCode', sql.NVarChar(10), store.customerCode)
+    request.input('lat', sql.NVarChar(20), store.latitude)
+    request.input('long', sql.NVarChar(20), store.longtitude)
+
+    await request.query(`
+      UPDATE dbo.data_store
+      SET lat = @lat,
+          long = @long
+      WHERE customerCode = @customerCode
+    `)
+  }
+}
+

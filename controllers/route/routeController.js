@@ -1,7 +1,7 @@
 // const { query } = require('express')
 const axios = require('axios')
 const { Route, RouteChangeLog } = require('../../models/cash/route')
-const { period, previousPeriod } = require('../../utilities/datetime')
+const { period, periodNew, previousPeriod } = require('../../utilities/datetime')
 const { Store } = require('../../models/cash/store')
 const { uploadFilesCheckin } = require('../../utilities/upload')
 const multer = require('multer')
@@ -17,6 +17,8 @@ const {
   routeQuery,
   routeQueryOne
 } = require('../../controllers/queryFromM3/querySctipt')
+const userModel = require('../../models/cash/user')
+const targetVisitModel = require('../../models/cash/targetVisit')
 const orderModel = require('../../models/cash/sale')
 const routeModel = require('../../models/cash/route')
 const radiusModel = require('../../models/cash/radius')
@@ -30,12 +32,11 @@ const { group } = require('console')
 const { formatDateTimeToThai } = require('../../middleware/order')
 const fs = require('fs')
 const os = require('os')
-
-
+const moment = require('moment')
 
 exports.getRoute = async (req, res) => {
   try {
-    const { period, area, district, province, routeId, storeId } = req.query
+    const { period, area, district, province, routeId, storeId, zone, team } = req.query
     const channel = req.headers['x-channel']
 
     const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
@@ -58,9 +59,7 @@ exports.getRoute = async (req, res) => {
 
     // console.log(routes)
 
-
     let data = []
-
 
     const filteredRoutes = routes
       .map(route => {
@@ -128,6 +127,88 @@ exports.getRoute = async (req, res) => {
 
     // console.log(enrichedRoutes)
 
+    // If area is not provided (or explicitly empty), group results by day+period
+    if ((!area || area === '') && period) {
+      const groups = new Map()
+        ; (enrichedRoutes || []).forEach(route => {
+          // Skip routes with area == 'IT211'
+          if (route.area === 'IT211') return
+
+          // derive zone/team from route (prefer explicit fields, otherwise from area)
+          let zoneKey = route.zone || ''
+          let teamKey = route.team || ''
+          if (route.area) {
+            const a = String(route.area || '')
+            zoneKey = a.substring(0, 2)
+            teamKey = `${a.substring(0, 2)}${a.charAt(3) || ''}`
+          }
+
+          // if request includes zone/team filters, skip non-matching routes
+          if (zone && String(zone) !== zoneKey) return
+          if (team && String(team) !== teamKey) return
+
+          const dayKey = route.day || ''
+          if (!groups.has(dayKey)) {
+            groups.set(dayKey, {
+              day: dayKey,
+              period: period,
+              // routes: [],
+              storeAll: 0,
+              storePending: 0,
+              storeSell: 0,
+              storeNotSell: 0,
+              storeCheckInNotSell: 0,
+              storeTotal: 0
+            })
+          }
+
+          const grp = groups.get(dayKey)
+
+          // accumulate counts from each route (use numeric defaults)
+          const ra = Number(route.storeAll) || 0
+          const rp = Number(route.storePending) || 0
+          const rs = Number(route.storeSell) || 0
+          const rn = Number(route.storeNotSell) || 0
+          const rcn = Number(route.storeCheckInNotSell) || 0
+          const rt = Number(route.storeTotal) || 0
+
+          grp.storeAll += ra
+          grp.storePending += rp
+          grp.storeSell += rs
+          grp.storeNotSell += rn
+          grp.storeCheckInNotSell += rcn
+          grp.storeTotal += rt
+        })
+
+      // finalize percentage fields for each group
+      enrichedRoutes = Array.from(groups.values()).map(g => {
+        const storeAll = g.storeAll || 0
+        const storeTotal = g.storeTotal || 0
+        const storeSell = g.storeSell || 0
+
+        const percentVisit = storeAll ? parseFloat(((storeTotal / storeAll) * 100).toFixed(2)) : 0
+        const percentEffective = storeAll ? parseFloat(((storeSell / storeAll) * 100).toFixed(2)) : 0
+        const complete = percentVisit
+        const percentComplete = storeAll ? parseFloat((((storeTotal / storeAll) * 100 * 360) / 100).toFixed(2)) : 0
+
+        return {
+          day: g.day,
+          period: g.period,
+          routes: g.routes,
+          storeAll: g.storeAll,
+          storePending: g.storePending,
+          storeSell: g.storeSell,
+          storeNotSell: g.storeNotSell,
+          storeCheckInNotSell: g.storeCheckInNotSell,
+          storeTotal: g.storeTotal,
+          percentComplete,
+          complete,
+          percentVisit,
+          percentEffective
+        }
+      })
+    }
+
     if (area && period && !routeId && !storeId && !province) {
       enrichedRoutes = (enrichedRoutes || []).map(item => ({
         ...item,
@@ -152,6 +233,64 @@ exports.getRoute = async (req, res) => {
   } catch (err) {
     console.error(err)
     res.status(500).json({ status: 500, message: err.message })
+  }
+}
+
+exports.addTargetRoute = async (req, res) => {
+  try {
+    const { period, saleStore, visitStore, saleStoreperDay, visitStoreperDay } =
+      req.body
+    const channel = req.headers['x-channel']
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { TargetVisit } = getModelsByChannel(channel, res, targetVisitModel)
+
+    const users = await User.find({
+      role: 'sale',
+      platformType: 'CASH'
+    })
+      .select('area zone')
+      .lean()
+
+    // console.log(users)
+
+    if (!users.length) {
+      return res.status(404).json({
+        status: 404,
+        message: 'No sale user found'
+      })
+    }
+
+    // const insertData = []
+
+    const ops = users.map(user => ({
+      updateOne: {
+        filter: {
+          zone: user.zone,
+          area: user.area,
+          period
+        },
+        update: {
+          $set: {
+            saleStore,
+            visitStore,
+            saleStoreperDay,
+            visitStoreperDay
+          }
+        },
+        upsert: true
+      }
+    }))
+
+    await TargetVisit.bulkWrite(ops)
+
+    res.status(200).json({
+      status: 200,
+      message: 'Insert target visit success',
+      total: ops
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: 500, message: error.message })
   }
 }
 
@@ -288,7 +427,6 @@ exports.addFromERPnew = async (req, res) => {
     const { period } = req.body
     const result = await routeQuery(channel)
 
-
     const return_arr = []
 
     for (const row of result) {
@@ -337,7 +475,6 @@ exports.addFromERPnew = async (req, res) => {
     const latestRoute = route.sort((a, b) => b.id.localeCompare(a.id))[0]
     if (!latestRoute) {
       routeId = `${period}${return_arr.area}R01`
-
     } else {
       const prefix = latestRoute.id.slice(0, 6)
       const subfix = (parseInt(latestRoute.id.slice(7)) + 1)
@@ -842,9 +979,6 @@ exports.checkInNotSale = async (req, res) => {
   })
 }
 
-
-
-
 exports.checkInVisit = async (req, res) => {
   const channel = req.headers['x-channel']
   const { Store } = getModelsByChannel(channel, res, storeModel)
@@ -1098,9 +1232,6 @@ exports.checkInVisitNew = async (req, res) => {
     }
   })
 }
-
-
-
 
 exports.changeRoute = async (req, res) => {
   try {
@@ -1785,7 +1916,6 @@ exports.updateAndAddRoute = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.getRouteProvince = async (req, res) => {
@@ -1865,7 +1995,6 @@ exports.getRouteProvince = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.getRouteEffective = async (req, res) => {
@@ -1877,7 +2006,6 @@ exports.getRouteEffective = async (req, res) => {
     const { Route } = getModelsByChannel(channel, res, routeModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
-
 
     let query = { period }
 
@@ -1894,8 +2022,11 @@ exports.getRouteEffective = async (req, res) => {
     }
 
     let routes = await Route.find({
-      ...query,
-    }).populate('listStore.storeInfo', 'storeId name address typeName taxId tel')
+      ...query
+    }).populate(
+      'listStore.storeInfo',
+      'storeId name address typeName taxId tel'
+    )
 
     // console.log(routes)
 
@@ -1922,9 +2053,9 @@ exports.getRouteEffective = async (req, res) => {
           _id: 0,
           id: '$id',
           unit: '$listUnit.unit',
-          factor: '$listUnit.factor',
-        },
-      },
+          factor: '$listUnit.factor'
+        }
+      }
     ])
 
     // ✅ เก็บเป็น Map ของ Map เช่น factorMap.get(productId).get(unit)
@@ -1972,72 +2103,19 @@ exports.getRouteEffective = async (req, res) => {
         percentVisit: r.percentVisit,
         percentEffective: r.percentEffective,
         summary: totalSummary,
-        totalqty: totalQtyCtnSum,
+        totalqty: totalQtyCtnSum
       }
     })
 
     let data = []
-    if (zone || team) {
-      // ✅ filter เฉพาะ route ที่อยู่ใน zone นี้
 
-      if (zone) {
-        filteredRoutes = routesTranFrom.filter(r => r.zone === zone)
-      } else if (team) {
-        filteredRoutes = routesTranFrom.filter(r => r.team === team)
-      }
-
-      const routeId = [...new Set(filteredRoutes.map(r => r.route))]
-      for (const route of routeId) {
-        const dataRoute = filteredRoutes.filter(item => item.route === route)
-
-        // ✅ รวมค่าใน route เดียวกัน
-        const total = dataRoute.reduce(
-          (acc, cur) => {
-            acc.storeAll += cur.storeAll || 0
-            acc.storePending += cur.storePending || 0
-            acc.storeSell += cur.storeSell || 0
-            acc.storeNotSell += cur.storeNotSell || 0
-            acc.storeCheckInNotSell += cur.storeCheckInNotSell || 0
-            acc.storeTotal += cur.storeTotal || 0
-            acc.summary += cur.summary || 0
-            acc.totalqty += cur.totalqty || 0
-            acc.percentVisit += parseFloat(cur.percentVisit || 0)
-            acc.percentEffective += parseFloat(cur.percentEffective || 0)
-            return acc
-          },
-          {
-            // routeId: dataRoute[0].routeId || route,
-            route: route,
-            storeAll: 0,
-            storePending: 0,
-            storeSell: 0,
-            storeNotSell: 0,
-            storeCheckInNotSell: 0,
-            storeTotal: 0,
-            percentVisit: 0,
-            percentEffective: 0,
-            summary: 0,
-            totalqty: 0,
-          }
-        )
-
-        // ✅ คำนวณค่าเฉลี่ย %
-        const len = dataRoute.length || 1
-        total.percentVisit = (total.percentVisit / len).toFixed(2)
-        total.percentEffective = (total.percentEffective / len).toFixed(2)
-
-
-        data.push(total)
-      }
-
-
-    } else {
-      data = routesTranFrom
-    }
+    data = routesTranFrom
 
     const excludedRoutes = ['R25', 'R26']
 
-    const filteredRoutesR = routesTranFrom.filter(r => !excludedRoutes.includes(r.route))
+    const filteredRoutesR = routesTranFrom.filter(
+      r => !excludedRoutes.includes(r.route)
+    )
 
     const groupedByArea = filteredRoutesR.reduce((acc, cur) => {
       if (!acc[cur.area]) acc[cur.area] = []
@@ -2047,84 +2125,78 @@ exports.getRouteEffective = async (req, res) => {
 
     const len = filteredRoutesR.length
 
+    const totalSum = Object.keys(groupedByArea).reduce(
+      (acc, areaKey) => {
+        const routesInArea = groupedByArea[areaKey]
 
-    const totalSum = Object.keys(groupedByArea).reduce((acc, areaKey) => {
-      const routesInArea = groupedByArea[areaKey]
+        const areaTotal = routesInArea.reduce(
+          (a, cur) => {
+            a.storeAll += cur.storeAll || 0
+            a.storePending += cur.storePending || 0
+            a.storeSell += cur.storeSell || 0
+            a.storeNotSell += cur.storeNotSell || 0
+            a.storeCheckInNotSell += cur.storeCheckInNotSell || 0
+            a.storeTotal += cur.storeTotal || 0
+            a.summary += cur.summary || 0
+            a.totalqty += cur.totalqty || 0
+            a.percentVisit += cur.percentVisit || 0
+            a.percentEffective += cur.percentEffective || 0
+            return a
+          },
+          {
+            storeAll: 0,
+            storePending: 0,
+            storeSell: 0,
+            storeNotSell: 0,
+            storeCheckInNotSell: 0,
+            storeTotal: 0,
+            summary: 0,
+            totalqty: 0,
+            percentVisit: 0,
+            percentEffective: 0
+          }
+        )
 
-      const areaTotal = routesInArea.reduce(
-        (a, cur) => {
-          a.storeAll += cur.storeAll || 0
-          a.storePending += cur.storePending || 0
-          a.storeSell += cur.storeSell || 0
-          a.storeNotSell += cur.storeNotSell || 0
-          a.storeCheckInNotSell += cur.storeCheckInNotSell || 0
-          a.storeTotal += cur.storeTotal || 0
-          a.summary += cur.summary || 0
-          a.totalqty += cur.totalqty || 0
-          a.percentVisit += cur.percentVisit || 0
-          a.percentEffective += cur.percentEffective || 0
-          return a
-        },
-        {
-          storeAll: 0,
-          storePending: 0,
-          storeSell: 0,
-          storeNotSell: 0,
-          storeCheckInNotSell: 0,
-          storeTotal: 0,
-          summary: 0,
-          totalqty: 0,
-          percentVisit: 0,
-          percentEffective: 0,
-        }
-      )
+        // บวกเข้า acc (sum รวมทุก area)
+        acc.storeAll += areaTotal.storeAll
+        acc.storePending += areaTotal.storePending
+        acc.storeSell += areaTotal.storeSell
+        acc.storeNotSell += areaTotal.storeNotSell
+        acc.storeCheckInNotSell += areaTotal.storeCheckInNotSell
+        acc.storeTotal += areaTotal.storeTotal
+        acc.summary += areaTotal.summary
+        acc.totalqty += areaTotal.totalqty
+        acc.percentVisit += areaTotal.percentVisit
+        acc.percentEffective += areaTotal.percentEffective
 
-      // บวกเข้า acc (sum รวมทุก area)
-      acc.storeAll += areaTotal.storeAll
-      acc.storePending += areaTotal.storePending
-      acc.storeSell += areaTotal.storeSell
-      acc.storeNotSell += areaTotal.storeNotSell
-      acc.storeCheckInNotSell += areaTotal.storeCheckInNotSell
-      acc.storeTotal += areaTotal.storeTotal
-      acc.summary += areaTotal.summary
-      acc.totalqty += areaTotal.totalqty
-      acc.percentVisit += areaTotal.percentVisit
-      acc.percentEffective += areaTotal.percentEffective
-
-      return acc
-    }, {
-      route: 'Total ไม่นับ R25, R26',
-      storeAll: 0,
-      storePending: 0,
-      storeSell: 0,
-      storeNotSell: 0,
-      storeCheckInNotSell: 0,
-      storeTotal: 0,
-      summary: 0,
-      totalqty: 0,
-      percentVisit: 0,
-      percentEffective: 0,
-    })
+        return acc
+      },
+      {
+        route: 'Total ไม่นับ R25, R26',
+        storeAll: 0,
+        storePending: 0,
+        storeSell: 0,
+        storeNotSell: 0,
+        storeCheckInNotSell: 0,
+        storeTotal: 0,
+        summary: 0,
+        totalqty: 0,
+        percentVisit: 0,
+        percentEffective: 0
+      }
+    )
 
     // เฉลี่ย % ถ้าต้องการ
 
-
-
-
-    // const len = Object.keys(groupedByArea).length 
+    // const len = Object.keys(groupedByArea).length
     // console.log("len",len)
     // console.log('totalSum.percentVisit',(totalSum.percentVisit))
-
 
     totalSum.percentVisit = totalSum.percentVisit / len
     totalSum.percentEffective = totalSum.percentEffective / len
 
-
-
-
     // 📊 ถ้า export Excel
     if (excel === 'true') {
-
       mergeData = [...data, totalSum]
       // if (area) {
       //   mergeData = [...data, totalSum]
@@ -2142,13 +2214,16 @@ exports.getRouteEffective = async (req, res) => {
         ขาย: r.summary,
         ยอดหีบ: r.totalqty,
         เปอร์เซ็นต์การเข้าเยี่ยม: to2(r.percentVisit),
-        เปอร์เซ็นต์การขายได้: to2(r.percentEffective),
+        เปอร์เซ็นต์การขายได้: to2(r.percentEffective)
       }))
       // console.log(xlsxData)
       const wb = xlsx.utils.book_new()
       const ws = xlsx.utils.json_to_sheet(xlsxData)
       xlsx.utils.book_append_sheet(wb, ws, `getRouteEffective_${period}`)
-      const filePath = path.join(os.tmpdir(), `getRouteEffective_${period}.xlsx`)
+      const filePath = path.join(
+        os.tmpdir(),
+        `getRouteEffective_${period}.xlsx`
+      )
       xlsx.writeFile(wb, filePath)
       res.download(filePath, err => {
         fs.unlink(filePath, () => { })
@@ -2169,10 +2244,9 @@ exports.getRouteEffective = async (req, res) => {
           summary: to2(totalSum.summary),
           totalqty: totalSum.totalqty,
           percentVisit: to2(totalSum.percentVisit),
-          percentEffective: to2(totalSum.percentEffective),
-        },
+          percentEffective: to2(totalSum.percentEffective)
+        }
         // zoneRoute
-
       })
     }
   } catch (error) {
@@ -2185,24 +2259,27 @@ exports.getRouteEffective = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
-
-
 
 exports.getRouteEffectiveAll = async (req, res) => {
   try {
     const { zone, area, team, period, day } = req.query
 
-    const query = {}
-    if (area) query.area = area
+    const query = {
+      area: { $ne: 'IT211' }
+    }
+
+    if (area) query.area = { $eq: area }
     if (period) query.period = period
     if (day) query.day = day
 
     const channel = req.headers['x-channel']
-    const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
+
+    const { TargetVisit } = getModelsByChannel(channel, res, targetVisitModel)
     const { Route } = getModelsByChannel(channel, res, routeModel)
-    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    // console.log(query)
 
     let routes = await Route.find(query).populate(
       'listStore.storeInfo',
@@ -2220,6 +2297,7 @@ exports.getRouteEffectiveAll = async (req, res) => {
         message: 'Not found route'
       })
     }
+
     if (team) {
       routes = routes.map(item => {
         const teamStr = item.area.substring(0, 2) + item.area.charAt(3)
@@ -2256,31 +2334,30 @@ exports.getRouteEffectiveAll = async (req, res) => {
 
     // console.log(routes)
     // 🔹 กรองวันที่ไม่ใช่ 25 หรือ 26 ก่อน
-    const excludedDays = ['25', '26'];
+    const excludedDays = ['25', '26']
 
     const routesTranFrom = routes
       .filter(route => !excludedDays.includes(route.day))
       .map(u => {
-        const percentVisit = Number(u.percentVisit) || 0;
-        const percentEffective = Number(u.percentEffective) || 0;
-        const storeAll = Number(u.storeAll) || 0;
-        const storePending = Number(u.storePending) || 0;
-        const storeSell = Number(u.storeSell) || 0;
-        const storeNotSell = Number(u.storeNotSell + u.storeCheckInNotSell) || 0;
-        const storeCheckInNotSell = Number(u.storeCheckInNotSell) || 0; // ✅ ชื่อถูกแล้ว
-        const visit = Number(u.storeTotal) || 0;
-        // const 
+        const percentVisit = Number(u.percentVisit) || 0
+        const percentEffective = Number(u.percentEffective) || 0
+        const storeAll = Number(u.storeAll) || 0
+        const storePending = Number(u.storePending) || 0
+        const storeSell = Number(u.storeSell) || 0
+        const storeNotSell = Number(u.storeNotSell + u.storeCheckInNotSell) || 0
+        const storeCheckInNotSell = Number(u.storeCheckInNotSell) || 0 // ✅ ชื่อถูกแล้ว
+        const visit = Number(u.storeTotal) || 0
+        // const
 
-
-        totalVisit += percentVisit;
-        totalEffective += percentEffective;
-        totalStoreAll += storeAll;
-        totalStorePending += storePending;
-        totalStoreSell += storeSell;
-        totalStoreNotSell += storeNotSell;
-        totalStoreCheckInNotSell += storeCheckInNotSell;
+        totalVisit += percentVisit
+        totalEffective += percentEffective
+        totalStoreAll += storeAll
+        totalStorePending += storePending
+        totalStoreSell += storeSell
+        totalStoreNotSell += storeNotSell
+        totalStoreCheckInNotSell += storeCheckInNotSell
         sumVisit += visit
-        count++;
+        count++
 
         return {
           area: u.area,
@@ -2291,16 +2368,48 @@ exports.getRouteEffectiveAll = async (req, res) => {
           storePending,
           storeSell,
           storeNotSell,
-          storeCheckInNotSell,
-        };
-      });
+          storeCheckInNotSell
+        }
+      })
 
     // ✅ สรุปค่าเฉลี่ย
-    const percentVisitAvg = count > 0 ? totalVisit / count : 0;
-    const percentEffectiveAvg = count > 0 ? totalEffective / count : 0;
+    const percentVisitAvg = count > 0 ? totalVisit / count : 0
+    const percentEffectiveAvg = count > 0 ? totalEffective / count : 0
 
-    // const io = getSocket()
-    // io.emit('route/getRouteEffectiveAll', {});
+    const targetMatch = {}
+    if (period) targetMatch.period = period
+    if (zone) targetMatch.zone = zone
+    if (area) targetMatch.area = area
+
+    const targetAgg = await TargetVisit.aggregate([
+      { $match: targetMatch },
+      {
+        $group: {
+          _id: null,
+          visitStore: { $sum: '$visitStore' },
+          saleStore: { $sum: '$saleStore' },
+          visitStoreperDay: { $sum: '$visitStoreperDay' },
+          saleStoreperDay: { $sum: '$saleStoreperDay' }
+        }
+      }
+    ])
+
+    const target = targetAgg[0] || {
+      visitStore: 0,
+      saleStore: 0,
+      visitStoreperDay: 0,
+      saleStoreperDay: 0
+    }
+
+    const targetVisit = target.visitStore
+    const targetEffective = target.saleStore
+    const targetVisitPerDay = target.visitStoreperDay
+    const targetSalePerDay = target.saleStoreperDay
+
+    const visitVsTarget = targetVisit > 0 ? (sumVisit / targetVisit) * 100 : 0
+
+    const effectiveVsTarget =
+      targetEffective > 0 ? (totalStoreSell / targetEffective) * 100 : 0
 
     res.status(200).json({
       status: 200,
@@ -2316,7 +2425,21 @@ exports.getRouteEffectiveAll = async (req, res) => {
       totalStoreSell: to2(totalStoreSell),
       totalStoreNotSell: to2(totalStoreNotSell),
       // totalStoreCheckInNotSell: to2(totalStoreCheckInNotSell)
-      totalStoreCheckInNotSell: to2(sumVisit)
+      totalStoreCheckInNotSell: to2(sumVisit),
+      // 🎯 target
+      target: target
+        ? {
+          visit: target.visitStore,
+          sale: target.saleStore,
+          visitPerDay: targetVisitPerDay,
+          salePerDay: targetSalePerDay
+        }
+        : null,
+      // 📊 compare (optional)
+      compare: {
+        visitVsTarget: to2(visitVsTarget),
+        effectiveVsTarget: to2(effectiveVsTarget)
+      }
     })
   } catch (error) {
     console.error('❌ Error:', error)
@@ -2327,9 +2450,177 @@ exports.getRouteEffectiveAll = async (req, res) => {
       error: error.message || error.toString(), // ✅ ป้องกัน circular object
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
-
   }
+}
 
+exports.getRouteEffectiveByDayArea = async (req, res) => {
+  try {
+    const { area, zone, team, period } = req.body
+    const channel = req.headers['x-channel']
+
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+
+    // ===============================
+    // 1) MATCH ROUTE
+    // ===============================
+    const matchStage = {}
+    if (area) matchStage.area = area
+    if (zone) matchStage.zone = zone
+    if (period) matchStage.period = period
+
+    // ===============================
+    // 2) GROUP KEY (dynamic)
+    // ===============================
+    const groupId = {
+      day: '$day',
+      period: '$period'
+    }
+    if (area) groupId.area = '$area'
+    if (zone) groupId.zone = '$zone'
+
+    // ===============================
+    // 3) PIPELINE
+    // ===============================
+    const pipeline = [
+      // filter route
+      { $match: matchStage },
+
+      // คำนวณ team3 จาก area (เช่น CT212 → CT1)
+      {
+        $addFields: {
+          team3: {
+            $concat: [
+              { $substrCP: ['$area', 0, 2] },
+              { $substrCP: ['$area', 3, 1] }
+            ]
+          }
+        }
+      },
+
+      // filter team (ต้องอยู่ตรงนี้ ❗)
+      ...(team
+        ? [
+          {
+            $match: {
+              team3: { $regex: `^${team}`, $options: 'i' }
+            }
+          }
+        ]
+        : []),
+
+      // แตก store
+      { $unwind: '$listStore' },
+
+      // เอาเฉพาะร้านที่ check-in แล้ว
+      {
+        $match: {
+          'listStore.date': { $ne: null, $exists: true },
+          zone: { $ne: 'IT' }
+        }
+      },
+
+      // เตรียม field
+      {
+        $project: {
+          period: 1,
+          area: 1,
+          zone: 1,
+          team3: 1,
+          status: '$listStore.status',
+          day: {
+            $dateToString: {
+              format: '%d-%m-%Y',
+              date: '$listStore.date',
+              timezone: 'Asia/Bangkok'
+            }
+          }
+        }
+      },
+
+      // group
+      {
+        $group: {
+          _id: groupId,
+
+          storeCheckIn: {
+            $sum: {
+              $cond: [{ $in: ['$status', ['1', '2', '3']] }, 1, 0]
+            }
+          },
+          storeSell: {
+            $sum: { $cond: [{ $eq: ['$status', '3'] }, 1, 0] }
+          },
+          storeVisit: {
+            $sum: { $cond: [{ $eq: ['$status', '1'] }, 1, 0] }
+          },
+          storeNotSell: {
+            $sum: { $cond: [{ $eq: ['$status', '2'] }, 1, 0] }
+          },
+          storePending: {
+            $sum: { $cond: [{ $eq: ['$status', '0'] }, 1, 0] }
+          }
+        }
+      },
+
+      // shape output
+      {
+        $project: {
+          _id: 0,
+          day: '$_id.day',
+          period: '$_id.period',
+          area: '$_id.area',
+          zone: '$_id.zone',
+          storeCheckIn: 1,
+          storeSell: 1,
+          storeVisit: 1,
+          storeNotSell: 1,
+          storePending: 1
+        }
+      },
+
+      { $sort: { day: 1 } }
+    ]
+
+    const result = await Route.aggregate(pipeline)
+
+    // ===============================
+    // 🔥 SUM ALL
+    // ===============================
+    const total = result.reduce(
+      (acc, cur) => {
+        acc.storeCheckIn += cur.storeCheckIn || 0
+        acc.storeSell += cur.storeSell || 0
+        acc.storeVisit += cur.storeVisit || 0
+        acc.storeNotSell += cur.storeNotSell || 0
+        acc.storePending += cur.storePending || 0
+        return acc
+      },
+      {
+        day: 'Total',
+        period: period || '',
+        ...(area && { area }),
+        ...(zone && { zone }),
+        storeCheckIn: 0,
+        storeSell: 0,
+        storeVisit: 0,
+        storeNotSell: 0,
+        storePending: 0
+      }
+    )
+
+    res.json({
+      status: 200,
+      data: result,
+      total
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message
+    })
+  }
 }
 
 exports.getAreaInRoute = async (req, res) => {
@@ -2385,7 +2676,6 @@ exports.getAreaInRoute = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.getZoneInRoute = async (req, res) => {
@@ -2460,7 +2750,6 @@ exports.getZoneInRoute = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.getRouteByArea = async (req, res) => {
@@ -2509,7 +2798,6 @@ exports.getRouteByArea = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.checkRouteStore = async (req, res) => {
@@ -2745,7 +3033,9 @@ exports.addRouteIt = async (req, res) => {
 
     const now = new Date()
     const startOfDay = new Date(now.setHours(0, 0, 0, 0) - 7 * 60 * 60 * 1000)
-    const endOfDay = new Date(now.setHours(23, 59, 59, 999) - 7 * 60 * 60 * 1000)
+    const endOfDay = new Date(
+      now.setHours(23, 59, 59, 999) - 7 * 60 * 60 * 1000
+    )
 
     const dataStore = await Store.find({
       area: 'IT211',
@@ -2796,7 +3086,6 @@ exports.addRouteIt = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.addStoreOneToRoute = async (req, res) => {
@@ -2845,7 +3134,6 @@ exports.addStoreOneToRoute = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.getLatLongStore = async (req, res) => {
@@ -2855,7 +3143,9 @@ exports.getLatLongStore = async (req, res) => {
     const { Route } = getModelsByChannel(channel, res, routeModel)
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
-    const storeData = await Store.findOne({ storeId: storeId }).select('_id area')
+    const storeData = await Store.findOne({ storeId: storeId }).select(
+      '_id area'
+    )
 
     const routeData = await Route.aggregate([
       { $unwind: '$listStore' },
@@ -2903,7 +3193,6 @@ exports.getLatLongStore = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.addRadius = async (req, res) => {
@@ -2954,11 +3243,13 @@ exports.updateRouteAllStore = async (req, res) => {
     const latLongStoreIdDocs = await StoreLatLong.find({
       zone: 'SH',
       status: 'approved'
-    }).select('storeId');
+    }).select('storeId')
 
     const storeIdLatLong = [
-      ...new Set(latLongStoreIdDocs.map(doc => doc.storeId?.trim()).filter(Boolean))
-    ];
+      ...new Set(
+        latLongStoreIdDocs.map(doc => doc.storeId?.trim()).filter(Boolean)
+      )
+    ]
 
     const storeData = await Store.find({
       zone: 'SH',
@@ -2966,59 +3257,63 @@ exports.updateRouteAllStore = async (req, res) => {
     })
 
     let dataFinal = []
-    const BATCH = 20;                 // ปรับตามแรงเครื่อง/DB
-    let loopCount = 0;
+    const BATCH = 20 // ปรับตามแรงเครื่อง/DB
+    let loopCount = 0
 
     for (let i = 0; i < storeData.length; i += BATCH) {
-      const chunk = storeData.slice(i, i + BATCH);
+      const chunk = storeData.slice(i, i + BATCH)
 
-      await Promise.all(chunk.map(async (item) => {
-        loopCount++;
+      await Promise.all(
+        chunk.map(async item => {
+          loopCount++
 
-        const latest = await Route.aggregate([
-          // { $match: { period } }, // ถ้ามีก็เปิดได้
-          { $unwind: '$listStore' },
-          {
-            $match: {
-              'listStore.storeInfo': String(item._id),
-              'listStore.status': { $ne: '0' }
+          const latest = await Route.aggregate([
+            // { $match: { period } }, // ถ้ามีก็เปิดได้
+            { $unwind: '$listStore' },
+            {
+              $match: {
+                'listStore.storeInfo': String(item._id),
+                'listStore.status': { $ne: '0' }
+              }
+            },
+            { $sort: { 'listStore.date': -1 } },
+            { $limit: 1 },
+            {
+              $project: {
+                day: { $concat: ['R', { $toString: '$day' }] },
+                period: 1,
+                lat: '$listStore.latitude',
+                long: '$listStore.longtitude',
+                date: '$listStore.date'
+              }
             }
-          },
-          { $sort: { 'listStore.date': -1 } },
-          { $limit: 1 },
-          {
-            $project: {
-              day: { $concat: ['R', { $toString: '$day' }] },
-              period: 1,
-              lat: '$listStore.latitude',
-              long: '$listStore.longtitude',
-              date: '$listStore.date'
-            }
-          }
-        ]);
+          ])
 
-        if (latest.length === 0) return;
+          if (latest.length === 0) return
 
-        const dataUpdated = await Store.findOneAndUpdate(
-          { storeId: item.storeId },
-          {
-            $set: {
-              route: latest[0].day,
-              latitude: latest[0].lat,
-              longtitude: latest[0].long
-            }
-          },
-          { new: true, runValidators: true }
-        );
+          const dataUpdated = await Store.findOneAndUpdate(
+            { storeId: item.storeId },
+            {
+              $set: {
+                route: latest[0].day,
+                latitude: latest[0].lat,
+                longtitude: latest[0].long
+              }
+            },
+            { new: true, runValidators: true }
+          )
 
-        dataFinal.push(dataUpdated);
-      }));
+          dataFinal.push(dataUpdated)
+        })
+      )
 
-      console.log(`processed ${Math.min(i + BATCH, storeData.length)} / ${storeData.length}`);
+      console.log(
+        `processed ${Math.min(i + BATCH, storeData.length)} / ${storeData.length
+        }`
+      )
     }
 
-    console.log(`total loop: ${loopCount}`);
-
+    console.log(`total loop: ${loopCount}`)
 
     res.status(200).json({
       status: 200,
@@ -3035,10 +3330,7 @@ exports.updateRouteAllStore = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
-
 }
-
 
 exports.addRouteByArea = async (req, res) => {
   try {
@@ -3093,7 +3385,6 @@ exports.addRouteByArea = async (req, res) => {
     const latestRoute = route.sort((a, b) => b.id.localeCompare(a.id))[0]
     if (!latestRoute) {
       routeId = `${period}${return_arr.area}R01`
-
     } else {
       const prefix = latestRoute.id.slice(0, 6)
       const subfix = (parseInt(latestRoute.id.slice(7)) + 1)
@@ -3189,36 +3480,32 @@ exports.addRouteByArea = async (req, res) => {
 
 exports.reRouteIt = async (req, res) => {
   try {
-
     const { routeId } = req.body
     const channel = req.headers['x-channel']
     const { Route } = getModelsByChannel(channel, res, routeModel)
 
     const dataRoute = await Route.findOne({ id: routeId })
 
-
     let data = []
 
     for (const row of dataRoute.listStore) {
-
       const dataTran = {
         storeInfo: row.storeInfo,
         note: '',
         image: '',
         latitude: '',
-        longtitude: "",
+        longtitude: '',
         status: '0',
         statusText: 'รอเยี่ยม',
         date: null,
         listOrder: [{}]
       }
       data.push(dataTran)
-
     }
 
     await Route.updateOne(
-      { id: routeId },     // filter object อย่างเดียว
-      { $set: { listStore:data } }   // update object อย่างเดียว
+      { id: routeId }, // filter object อย่างเดียว
+      { $set: { listStore: data } } // update object อย่างเดียว
     )
 
     res.status(200).json({
@@ -3230,5 +3517,821 @@ exports.reRouteIt = async (req, res) => {
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.insertRouteToRouteChange = async (req, res) => {
+  try {
+    const { period } = req.body
+    const channel = req.headers['x-channel']
+    const { Route, RouteChange } = getModelsByChannel(channel, res, routeModel)
+
+    const year = parseInt(period.slice(0, 4), 10)
+    const month = parseInt(period.slice(4, 6), 10)
+    const prevDate = new Date(year, month - 2)
+    const prevPeriod =
+      prevDate.getFullYear().toString() +
+      String(prevDate.getMonth() + 1).padStart(2, '0')
+    const routePrev = await Route.find({ period: prevPeriod })
+    const routeChangeData = await RouteChange.find({ period: period })
+    const dataRouteChange = []
+
+    for (const item of routePrev) {
+      const day = String(item.day).padStart(2, '0')
+      const routeId = `${period}${item.area}R${day}`
+
+      const exitRoute = routeChangeData.find(u => u.id === routeId)
+      if (exitRoute) {
+        continue
+      }
+
+
+      const route = {
+        id: routeId,
+        period: period,
+        area: item.area,
+        zone: item.zone,
+        team: item.team,
+        day: item.day,
+        listStore: []
+      }
+
+      for (const store of item.listStore) {
+        route.listStore.push({
+          storeInfo: store.storeInfo,
+          note: '',
+          image: '',
+          latitude: '',
+          longtitude: '',
+          status: '0',
+          statusText: 'รอเยี่ยม',
+          date: '',
+          listOrder: []
+        })
+      }
+
+      dataRouteChange.push(route)
+      RouteChange.create(route)
+    }
+
+    res.status(201).json({
+      status: 201,
+      message: 'insertRouteToRouteChange success',
+      data: dataRouteChange
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.addStoreToRouteChange = async (req, res) => {
+  try {
+    const { id, storeId } = req.body
+    const channel = req.headers['x-channel']
+    const { Route, RouteChange } = getModelsByChannel(channel, res, routeModel)
+    const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
+    const routeChangeData = await RouteChange.findOne({ id: id })
+
+    if (!routeChangeData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found routeId'
+      })
+    }
+
+    const storeData = await Store.findOne({
+      storeId: storeId,
+      area: routeChangeData.area
+    })
+
+    if (!storeData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found storeId'
+      })
+    }
+
+    const exists = await RouteChange.findOne({
+      id,
+      'listStore.storeInfo': storeData._id
+    })
+
+    if (exists) {
+      return res.status(409).json({
+        status: 409,
+        message: 'duplicate store'
+      })
+    }
+
+    await RouteChange.updateOne(
+      {
+        id,
+        'listStore.storeInfo': { $ne: storeData._id }
+      },
+      {
+        $push: {
+          listStore: {
+            storeInfo: storeData._id,
+            note: '',
+            image: '',
+            latitude: '',
+            longtitude: '',
+            status: '0',
+            statusText: 'เพิ่มใหม่',
+            date: '',
+            listOrder: []
+          }
+        }
+      }
+    )
+
+    res.status(201).json({
+      status: 201,
+      message: 'insertRouteToRouteChange success'
+      // data: storeData
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.deleteStoreToRouteChange = async (req, res) => {
+  try {
+    const { id, storeId } = req.body
+    const channel = req.headers['x-channel']
+    const { Route, RouteChange } = getModelsByChannel(channel, res, routeModel)
+    const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
+    const routeChangeData = await RouteChange.findOne({ id: id })
+    if (!routeChangeData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found routeId'
+      })
+    }
+    const storeIdList = routeChangeData.listStore.flatMap(
+      item => item.storeInfo
+    )
+    const storeData = await Store.findOne({
+      storeId: storeId,
+      area: routeChangeData.area
+    })
+    if (!storeData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found storeId'
+      })
+    }
+    const storeIdStrList = storeIdList.map(id => String(id))
+    if (!storeIdStrList.includes(String(storeData._id))) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found store in route'
+      })
+    }
+    await RouteChange.updateOne(
+      { id },
+      {
+        $pull: {
+          listStore: { storeInfo: storeData._id }
+        }
+      }
+    )
+    res.status(200).json({
+      status: 200,
+      message: 'deleteStoreToRouteChange success'
+      // data: storeData
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.addRouteChangeToRoute = async (req, res) => {
+  try {
+    const { period } = req.body
+    const channel = req.headers['x-channel']
+    const { Route, RouteChange } = getModelsByChannel(channel, res, routeModel)
+
+    const routeChangeData = await RouteChange.find({ period, status: 'approved' }).lean()
+    const routeChangeIdList = [...new Set(routeChangeData.map(r => r.id))]
+
+
+
+    const year = parseInt(period.slice(0, 4), 10)
+    const month = parseInt(period.slice(4, 6), 10)
+    const prevDate = new Date(year, month - 2)
+    const prevPeriod =
+      prevDate.getFullYear().toString() +
+      String(prevDate.getMonth() + 1).padStart(2, '0')
+
+
+    const routeChangePrevIdSet = routeChangeData.map(r => {
+      const idPrev = String(r.id)
+      return prevPeriod + idPrev.slice(6)
+    })
+
+
+    const routePrevRaw = await Route.find({
+      period: prevPeriod,
+      id: { $nin: routeChangePrevIdSet }
+    }).lean()
+
+    const routePrev = routePrevRaw.map(r => {
+      const idPrev = String(r.id)
+      return {
+        ...r,
+        id: period + idPrev.slice(6),
+        period
+      }
+    })
+    const routePrevIdList = [...new Set(routePrev.map(r => r.id))]
+
+    const mergeRouteIds = [...new Set([...routeChangeIdList, ...routePrevIdList])]
+
+    const existRoutes = await Route.find(
+      { id: { $in: mergeRouteIds } },
+      { id: 1 }
+    ).lean()
+
+    const existIdSet = new Set(existRoutes.map(r => r.id))
+    // console.log('existIdSet', existIdSet)
+
+    const routeChangeMerge = [...routeChangeData, ...routePrev]
+
+    const data = routeChangeMerge.map(r => {
+      return {
+        id: r.id,
+        period: r.period,
+        area: r.area,
+        zone: r.zone,
+        team: r.team,
+        day: r.day,
+        listStore: r.listStore.map(store => ({
+          storeInfo: store.storeInfo,
+          note: '',
+          image: '',
+          latitude: '',
+          longtitude: '',
+          status: '0',
+          statusText: 'รอเยี่ยม',
+          date: '',
+          listOrder: []
+        }))
+      }
+    })
+
+    const toCreate = data
+      .filter(r => !existIdSet.has(r.id))
+      .map(({ _id, __v, ...rest }) => rest)
+
+    // 3. สร้างจริง ๆ
+    if (toCreate.length > 0) {
+      await Route.insertMany(toCreate)
+    }
+
+    res.status(201).json({
+      status: 201,
+      message: 'addRouteChangeToRoute success',
+      data: data
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.getRouteChange = async (req, res) => {
+  try {
+    const { id } = req.query
+    const channel = req.headers['x-channel']
+    const { Route, RouteChange } = getModelsByChannel(channel, res, routeModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const routeData = await RouteChange.findOne({ id: id })
+
+    if (!routeData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found route'
+      })
+    }
+
+    const objIds = routeData.listStore
+      .map(item => item.storeInfo)
+      .filter(Boolean)
+      .map(id => new mongoose.Types.ObjectId(id))
+
+    const dataStore = await Store.find({ _id: { $in: objIds } })
+
+    const data = {
+      _id: routeData._id,
+      id: routeData.id,
+      period: routeData.period,
+      area: routeData.area,
+      zone: routeData.zone,
+      team: routeData.team,
+      day: routeData.day,
+      listStore: routeData.listStore.map(row => {
+        const storeDetail = dataStore.find(store =>
+          store._id.equals(row.storeInfo)
+        )
+
+        return {
+          _id: row._id,
+          storeInfo: row.storeInfo,
+          storeId: storeDetail.storeId,
+          name: storeDetail.name,
+          type: storeDetail.type,
+          typeName: storeDetail.typeName,
+          statusStore: storeDetail.status,
+          note: row.note,
+          image: row.image,
+          latitude: row.latitude,
+          longtitude: row.longtitude,
+          location: [
+            Number(storeDetail.longtitude) || 0,
+            Number(storeDetail.latitude) || 0
+          ],
+          status: row.status,
+          statusText: row.statusText,
+          date: row.date,
+          listOrder: []
+        }
+      })
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'getRouteChange success',
+      data: data
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.addNewStoreToRoute = async (req, res) => {
+  try {
+    const { id, storeId } = req.body
+    const channel = req.headers['x-channel']
+    const { Route, RouteChange, RouteChangeLog } = getModelsByChannel(
+      channel,
+      res,
+      routeModel
+    )
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const currentDate = new Date()
+    // startMonth: 3 เดือนที่แล้ว (นับรวมเดือนนี้)
+    const startMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() - 2,
+      1
+    )
+
+    const nextMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() + 1,
+      1
+    )
+
+    const routeData = await Route.findOne({ id: id })
+
+    if (!routeData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found route'
+      })
+    }
+    const storeData = await Store.findOne({
+      storeId: storeId,
+      createdAt: {
+        $gte: startMonth,
+        $lt: nextMonth
+      },
+      status: '20'
+    })
+    if (!storeData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found storeNew'
+      })
+    }
+
+
+    const exists = await Route.findOne({
+      id,
+      'listStore.storeInfo': storeData._id
+    })
+
+    if (exists) {
+      return res.status(409).json({
+        status: 409,
+        message: 'duplicate store'
+      })
+    }
+
+
+    const count = await RouteChangeLog.countDocuments()
+    const transactionId = `RN${String(count + 1).padStart(4, '0')}`
+
+    const transaction = {
+      id: transactionId,
+      area: routeData.area,
+      zone: routeData.zone,
+      team: routeData.team,
+      period: period(),
+      storeId: storeId,
+      name: storeData.name,
+      latitude: storeData.latitude,
+      longtitude: storeData.longtitude,
+      routeId: id,
+      status: 'pending',
+      statusTH: 'กำลังดำเนินการ'
+    }
+
+    RouteChangeLog.create(transaction)
+
+    res.status(201).json({
+      status: 201,
+      message: 'addNewStoreToRoute success',
+      data: transaction
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.getNewStoreToRoute = async (req, res) => {
+  try {
+    const { zone, area, team, period } = req.query
+    const channel = req.headers['x-channel']
+    const { Route, RouteChange, RouteChangeLog } = getModelsByChannel(
+      channel,
+      res,
+      routeModel
+    )
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    let query = { period: period }
+    if (area) query.area = area
+    if (zone) query.zone = zone
+    if (team) query.team = team
+
+    // console.log(query)
+
+    const routeChangeLog = await RouteChangeLog.find(query).lean()
+
+    const data = routeChangeLog.map(item => {
+      return {
+        ...item,
+        route: item.routeId.slice(11, 15),
+        location: [
+          Number(item?.longtitude) || 0,
+          Number(item?.latitude) || 0
+        ]
+      }
+    })
+
+    res.status(200).json({
+      status: 200,
+      message: 'getNewStoreToRoute success',
+      data: data
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.getNewStoreToRouteDetail = async (req, res) => {
+  try {
+    const { id } = req.query
+    const channel = req.headers['x-channel']
+    const { Route, RouteChange, RouteChangeLog } = getModelsByChannel(
+      channel,
+      res,
+      routeModel
+    )
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const routeChangeLog = await RouteChangeLog.findOne({ id: id })
+
+    if (!routeChangeLog) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found routeChangeLog'
+      })
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'getNewStoreToRouteDetail success',
+      data: routeChangeLog
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.approveNewStoreToRoute = async (req, res) => {
+  try {
+    const { id, user, status } = req.body
+    const channel = req.headers['x-channel']
+
+    const { RouteChangeLog, Route } = getModelsByChannel(
+      channel,
+      res,
+      routeModel
+    )
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const isApprove = status === true
+    const statusNew = isApprove ? 'approved' : 'rejected'
+    const statusTH = isApprove ? 'อนุมัติ' : 'ไม่อนุมัติ'
+
+    const routeChangeLog = await RouteChangeLog.findOneAndUpdate(
+      { id, status: 'pending' },
+      {
+        status: statusNew,
+        statusTH,
+        updatedDate: new Date(),
+        'approve.dateAction': new Date(),
+        'approve.appPerson': user
+      },
+      { new: true }
+    )
+
+    if (!routeChangeLog) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found routeChangeLog or status is pending'
+      })
+    }
+
+    if (!isApprove) {
+      return res.status(200).json({
+        status: 200,
+        message: 'rejectNewStoreToRoute success',
+        data: routeChangeLog
+      })
+    }
+
+    const storeData = await Store.findOne({
+      storeId: routeChangeLog.storeId
+    })
+
+    if (!storeData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Store not found'
+      })
+    }
+
+    const updateResult = await Route.updateOne(
+      {
+        id: routeChangeLog.routeId,
+        'listStore.storeInfo': { $ne: storeData._id }
+      },
+      {
+        $addToSet: {
+          listStore: {
+            storeInfo: storeData._id,
+            note: '',
+            image: '',
+            latitude: '',
+            longtitude: '',
+            status: 0,
+            statusText: 'รอเยี่ยม',
+            listOrder: [],
+            date: ''
+          }
+        }
+      }
+    )
+
+    if (updateResult.matchedCount === 0) {
+      return res.status(409).json({
+        status: 409,
+        message: 'Duplicate store'
+      })
+    }
+
+    return res.status(200).json({
+      status: 200,
+      message: 'approveNewStoreToRoute success',
+      data: routeChangeLog
+    })
+
+  } catch (error) {
+    console.error(error)
+    return res.status(500).json({
+      status: 500,
+      message: error.message
+    })
+  }
+}
+
+
+exports.getAreaApproval = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+
+    const { RouteChangeLog, Route, RouteChange } = getModelsByChannel(
+      channel,
+      res,
+      routeModel
+    )
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { User } = getModelsByChannel('user', res, userModel)
+
+    const period = req.query.period
+    if (!period) {
+      return res.status(400).json({ status: 400, message: 'period is required' })
+    }
+
+    // Use DB aggregations to compute summaries server-side and reduce memory
+    const userQuery = { platformType: 'CASH', role: 'sale' }
+
+    const periodStr = periodNew()
+    const year = Number(periodStr.slice(0, 4))
+    const month = Number(periodStr.slice(4, 6))
+    const startMonth = new Date(year, month - 1, 1)
+    const nextMonth = new Date(year, month, 1)
+
+    const storeMatch = {
+      createdAt: { $gte: startMonth, $lt: nextMonth }
+    }
+
+    // Fetch only aggregated stats from DB to avoid loading entire collections in Node
+    const [
+      userData,
+      routeSummaryAgg,
+      routeChangeAreasArr,
+      routeChangeLogAgg,
+      storeNewAgg,
+      routeChangePendingAreasArr,
+      routeChangeApproveAreasArr
+    ] = await Promise.all([
+      User.find(userQuery, { area: 1 }).lean(),
+
+      // route: group by area, count routes and sum listStore sizes
+      Route.aggregate([
+        { $match: { period } },
+        {
+          $project: {
+            area: 1,
+            listStoreSize: {
+              $cond: [{ $isArray: '$listStore' }, { $size: '$listStore' }, 0]
+            }
+          }
+        },
+        { $group: { _id: '$area', routeCount: { $sum: 1 }, storeCount: { $sum: '$listStoreSize' } } }
+      ]),
+
+      // route change: get distinct areas that have changes
+      RouteChange.distinct('area', { period }),
+
+      // approved logs per area
+      RouteChangeLog.aggregate([
+        { $match: { period, status: 'approved' } },
+        { $group: { _id: '$area', count: { $sum: 1 } } }
+      ]),
+
+      // store new per area (existing aggregation)
+      Store.aggregate([
+        { $match: storeMatch },
+        { $group: { _id: '$area', count: { $sum: 1 } } }
+      ]),
+      RouteChange.distinct('area', { period, status: 'pending' }),
+      RouteChange.distinct('area', { period, status: 'approved' }),
+    ])
+
+
+    // Build quick lookup maps from aggregation results
+    const routeSummaryByArea = new Map(
+      (routeSummaryAgg || []).map(r => [r._id, { routeCount: r.routeCount || 0, storeCount: r.storeCount || 0 }])
+    )
+
+    const hasRouteChangeByArea = new Set((routeChangeAreasArr || []).filter(Boolean))
+    const hasRouteChangePendingByArea = new Set((routeChangePendingAreasArr || []).filter(Boolean))
+    const hasRouteChangeApproveByArea = new Set((routeChangeApproveAreasArr || []).filter(Boolean))
+
+
+    const approvedLogCountByArea = new Map(
+      (routeChangeLogAgg || []).map(l => [l._id, l.count])
+    )
+
+    const storeNewCountByArea = new Map((storeNewAgg || []).map(s => [s._id, s.count]))
+
+    // ---------- ✅ Build result ----------
+    let notFoundRoute = 0
+
+    const routeChangeAreas = []
+    const routePev = []
+
+    for (const u of userData) {
+      const area = u.area
+      if (!area) continue
+
+      const routeSummary = routeSummaryByArea.get(area) || { routeCount: 0, storeCount: 0 }
+      const storeNewCount = storeNewCountByArea.get(area) || 0
+      // const addStoreToRoute = approvedLogCountByArea.get(area) || 0
+
+      // เดิม: ถ้า routeChangeDetail.length === 0 => notFoundRoute++
+      if (!hasRouteChangeByArea.has(area)) {
+        notFoundRoute++
+        routeChangeAreas.push(area)
+      }
+      let status = ''
+      let statusTH = ''
+      let addStoreToRoute = 0
+      if (hasRouteChangeApproveByArea.has(area)) {
+        addStoreToRoute += 1
+        status = 'approved'
+        statusTH = 'อนุมัติแล้ว'
+      } else if (hasRouteChangePendingByArea.has(area)) {
+        status = 'pending'
+        statusTH = 'รออนุมัติ'
+      } else {
+        status = 'notchange'
+        statusTH = 'ไม่มีการปรับเปลี่ยนรูท'
+      }
+
+
+      routePev.push({
+        area,
+        storeCount: routeSummary.storeCount,
+        routeCount: routeSummary.routeCount,
+        storeNew: storeNewCount,
+        addStoreToRoute,
+        status: status,
+        statusTH: statusTH
+        // สถานะปรับรูท: hasRouteChangeByArea.has(area) ? 'มีการขอปรับ' : 'ไม่มีการขอปรับ'
+      })
+    }
+
+    return res.status(200).json({
+      status: 200,
+      message: 'getAreaApproval Success',
+      data: routePev,
+      number: notFoundRoute,
+      area: routeChangeAreas
+    })
+  } catch (error) {
+    console.error(error)
+    return res.status(500).json({
+      status: 500,
+      message: error.message
+    })
+  }
+}
+
+exports.approveRouteChange = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { period, area, status } = req.body
+    const { RouteChangeLog, Route, RouteChange } = getModelsByChannel(
+      channel,
+      res,
+      routeModel
+    )
+
+    let statusNew = ''
+    let statusTH = ''
+    if (status === true) {
+      statusNew = 'approved'
+      statusTH = 'อนุมัติ'
+    } else {
+      statusNew = 'rejected'
+      statusTH = 'ไม่อนุมัติ'
+    }
+
+    await RouteChange.updateMany(
+      { period: period, area: area, status: 'pending' },
+      {
+        status: statusNew,
+        statusTH: statusTH,
+        updatedDate: new Date()
+      }
+    )
+
+    res.status(200).json({
+      status: 200,
+      message: 'Update status success'
+    })
+
+  } catch (error) {
+    console.error(error)
+    return res.status(500).json({
+      status: 500,
+      message: error.message
+    })
   }
 }
