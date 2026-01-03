@@ -53,7 +53,9 @@ const {
   moveStoreToCash,
   getStoreOnRoute,
   addLatLongToDataToHome,
-  changeAreaStore
+  changeAreaStore,
+  addStoreBk228Excel,
+  addStoreBk228ExcelToErp
   // test
 } = require('../../controllers/store/storeController')
 
@@ -136,6 +138,16 @@ router.post(
   '/changeAreaStore',
   upload.single('file'), // 👈 ต้องมี และต้องชื่อ file
   changeAreaStore
+)
+router.post(
+  '/addStoreBk228Excel',
+  upload.single('file'), // 👈 ต้องมี และต้องชื่อ file
+  addStoreBk228Excel
+)
+router.post(
+  '/addStoreBk228ExcelToErp',
+  upload.single('file'), // 👈 ต้องมี และต้องชื่อ file
+  addStoreBk228ExcelToErp
 )
 
 
