@@ -55,7 +55,8 @@ const {
   addLatLongToDataToHome,
   changeAreaStore,
   addStoreBk228Excel,
-  addStoreBk228ExcelToErp
+  addStoreBk228ExcelToErp,
+  getNearbyStores
   // test
 } = require('../../controllers/store/storeController')
 
@@ -134,6 +135,9 @@ router.post('/checkLatLongByStore', checkLatLongByStore)
 router.post('/moveStoreToCash', moveStoreToCash)
 router.post('/getStoreOnRoute', getStoreOnRoute)
 router.post('/addLatLongToDataToHome', addLatLongToDataToHome)
+router.post('/getNearbyStores', getNearbyStores)
+
+
 router.post(
   '/changeAreaStore',
   upload.single('file'), // 👈 ต้องมี และต้องชื่อ file

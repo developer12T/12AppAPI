@@ -4472,3 +4472,86 @@ exports.addStoreBk228ExcelToErp = async (req, res) => {
     })
   }
 }
+
+function getDistanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371 // รัศมีโลก (km)
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) *
+    Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) ** 2
+
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)))
+}
+
+
+exports.getNearbyStores = async (req, res) => {
+  try {
+const { area, lat, long, distance } = req.body
+const channel = req.headers['x-channel']
+const { Store } = getModelsByChannel(channel, res, storeModel)
+
+const centerLat = Number(lat)
+const centerLong = Number(long)
+const maxKm = Number(distance)
+
+  const storesRaw = await Store.find({
+  ...(area ? { area } : {}),
+  status: { $nin: ['10', '90'] }
+})
+  .select('storeId name address area latitude longtitude')
+  .lean()
+
+const stores = storesRaw.map(s => ({
+  storeId: s.storeId,
+  storeName: s.name,
+  storeAddress: s.address,
+  area: s.area,
+  lat: Number(s.latitude),
+  lng: Number(s.longtitude)
+}))
+
+
+const storesInRadius = stores
+  .map(s => {
+    if (s.lat == null || s.lng == null) return null
+
+    const d = getDistanceKm(
+      centerLat,
+      centerLong,
+      Number(s.lat),
+      Number(s.lng)
+    )
+
+    if (d <= maxKm) {
+      return {
+        ...s,
+        distanceKm: Number(d.toFixed(2))
+      }
+    }
+    return null
+  })
+  .filter(Boolean)
+  .sort((a, b) => a.distanceKm - b.distanceKm)
+
+
+
+
+
+
+
+res.status(200).json({
+  status: 200,
+  message: 'sucess',
+  data: storesInRadius
+})
+
+      } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: 500, message: error.message })
+  }
+
+}
