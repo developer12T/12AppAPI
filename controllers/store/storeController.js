@@ -4366,7 +4366,7 @@ exports.addStoreBk228ExcelToErp = async (req, res) => {
 
     const storeIdList = rows.map(row => row.storeId)
     const storeData = await Store.find({ storeId: { $in: storeIdList } }).lean()
-    const dataUser = await User.findOne({ area: 'BK228', role: 'sale' })
+    const dataUser = await User.findOne({ area: 'CT215', role: 'sale' })
 
     let data = []
     for (const item of storeData) {

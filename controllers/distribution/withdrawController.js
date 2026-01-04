@@ -1781,10 +1781,10 @@ exports.approveWithdraw = async (req, res) => {
     const { orderId, status, user, role } = req.body
     let statusStr = status === true ? 'approved' : 'rejected'
     let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ'
-    return res.status(503).json({
-      status: 503,
-      message: 'Service temporarily unavailable',
-    })
+    // return res.status(503).json({
+    //   status: 503,
+    //   message: 'Service temporarily unavailable',
+    // })
     const channel = req.headers['x-channel']
     const { Distribution, WereHouse } = getModelsByChannel(
       channel,
@@ -2157,10 +2157,10 @@ exports.approveWithdrawCredit = async (req, res) => {
 
     const channel = req.headers['x-channel']
 
-    return res.status(503).json({
-      status: 503,
-      message: 'Service temporarily unavailable',
-    })
+    // return res.status(503).json({
+    //   status: 503,
+    //   message: 'Service temporarily unavailable',
+    // })
 
     const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
