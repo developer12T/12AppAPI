@@ -6,6 +6,12 @@ const refundModel = require('../../models/cash/refund')
 const routeModel = require('../../models/cash/route')
 const userModel = require('../../models/cash/user')
 const sendmoneyModel = require('../../models/cash/sendmoney')
+
+const {
+  dataUpsertSendMoney
+} = require('../../controllers/queryFromM3/querySctipt')
+const v_payinMap = require('../../mapping/v_payin.map')
+const mapToMySql = require('../../utilities/mapToMySql')
 const path = require('path')
 const multer = require('multer')
 const xlsx = require('xlsx')
@@ -1008,7 +1014,7 @@ exports.updateSendmoneyOld2 = async (req, res) => {
         const diffChange = to2(changeRaw - damaged - good)
         const summary = to2(summaryRaw + diffChange)
         const diff = to2(sendmoney - summary)
-      
+
         const status = sendmoney > 0 ? 'ส่งเงินแล้ว' : 'ยังไม่ส่งเงิน'
 
         return {
@@ -1318,6 +1324,202 @@ exports.updateSendmoneyOld = async (req, res) => {
       status: 500,
       message: error.message || 'Internal server error'
     })
+  }
+}
+
+exports.saveSendmoney = async (req, res) => {
+  try {
+    const { data } = req.body
+
+
+
+    const mysqlData = data.map(item => mapToMySql(item, v_payinMap))
+
+    
+    await dataUpsertSendMoney(
+      'cash',
+      mysqlData,
+      ['datemonth', 'wh'] // 🔑 primary key ตาม column จริง
+    )
+
+    res.status(200).json({
+      status: 200,
+      message: 'success'
+    })
+  } catch (error) {
+    console.error('saveSendmoney ❌', error)
+    res.status(500).json({
+      status: 500,
+      message: error.message || 'Internal server error'
+    })
+  }
+}
+
+exports.sendmoneySumByArea = async (req, res) => {
+  try {
+    const { channel, period } = req.query
+    if (!period) {
+      return res.status(400).json({ message: 'ต้องระบุ period' })
+    }
+
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+    const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
+
+    const { startDate, endDate } = rangeDate(period)
+
+    const users = await User.find(
+      { role: 'sale' },
+      { area: 1, firstName: 1, surName: 1, warehouse: 1 }
+    ).lean()
+
+    const areaMap = {}
+    const areas = []
+
+    users.forEach(u => {
+      if (!u.area) return
+
+      if (!areaMap[u.area]) {
+        areaMap[u.area] = {
+          name: `${u.firstName || ''} ${u.surName || ''}`.trim(),
+          warehouse: u.warehouse || ''
+        }
+        areas.push(u.area)
+      }
+    })
+    // const areas = await User.find({ role: 'sale' }).distinct(
+    //   'area firstName surName'
+    // )
+
+    const matchMain = {
+      createdAt: { $gte: startDate, $lt: endDate },
+      'store.area': { $in: areas }
+    }
+
+    const matchSend = {
+      dateAt: { $gte: startDate, $lt: endDate },
+      area: { $in: areas }
+    }
+
+    // ---------------- SALE ----------------
+    const saleAgg = await Order.aggregate([
+      {
+        $match: {
+          ...matchMain,
+          type: 'sale',
+          status: { $nin: ['canceled', 'delete'] }
+        }
+      },
+      {
+        $group: {
+          _id: '$store.area',
+          total: { $sum: '$total' }
+        }
+      }
+    ])
+
+    // ---------------- CHANGE ----------------
+    const changeAgg = await Order.aggregate([
+      {
+        $match: {
+          ...matchMain,
+          type: 'change',
+          status: { $nin: ['pending', 'canceled', 'delete'] }
+        }
+      },
+      {
+        $group: {
+          _id: '$store.area',
+          total: { $sum: '$total' }
+        }
+      }
+    ])
+
+    // ---------------- REFUND ----------------
+    const refundAgg = await Refund.aggregate([
+      {
+        $match: {
+          ...matchMain,
+          type: 'refund',
+          status: { $nin: ['pending', 'canceled', 'delete'] }
+        }
+      },
+      {
+        $group: {
+          _id: '$store.area',
+          total: { $sum: '$total' }
+        }
+      }
+    ])
+
+    // ---------------- SEND MONEY ----------------
+    const sendAgg = await SendMoney.aggregate([
+      { $match: matchSend },
+      {
+        $group: {
+          _id: '$area',
+          sendmoney: { $sum: '$sendmoney' },
+          sendmoneyAcc: { $sum: '$sendmoneyAcc' }
+        }
+      }
+    ])
+
+    // ---------------- MAP ----------------
+    const map = {}
+
+    const init = area => {
+      map[area] ??= {
+        sale: 0,
+        change: 0,
+        refund: 0,
+        sendmoney: 0,
+        sendmoneyAcc: 0
+      }
+      return map[area]
+    }
+
+    saleAgg.forEach(e => (init(e._id).sale = e.total))
+    changeAgg.forEach(e => (init(e._id).change = e.total))
+    refundAgg.forEach(e => (init(e._id).refund = e.total))
+    sendAgg.forEach(e => {
+      const r = init(e._id)
+      r.sendmoney = e.sendmoney
+      r.sendmoneyAcc = e.sendmoneyAcc
+    })
+
+    // ---------------- RESULT ----------------
+    const result = Object.keys(map).map(area => {
+      const r = map[area]
+      const totalSale = r.sale + (r.change - r.refund)
+
+      return {
+        area,
+        areaName: areaMap[area]?.name || '',
+        warehouse: areaMap[area]?.warehouse || '',
+        areaAndName: `${area} - ${areaMap[area]?.name || ''}`,
+        period,
+        sale: to2(r.sale),
+        change: to2(r.change),
+        refund: to2(r.refund),
+        totalSale: to2(totalSale),
+        sendmoney: to2(r.sendmoney),
+        sendmoneyAcc: to2(r.sendmoneyAcc),
+        diff: to2(r.sendmoney - totalSale),
+        diffAcc: to2(r.sendmoneyAcc - totalSale)
+      }
+    })
+
+    result.sort((a, b) => a.area.localeCompare(b.area))
+
+    return res.json({
+      status: 200,
+      message: 'Summary by area success',
+      data: result
+    })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: err.message })
   }
 }
 

@@ -107,9 +107,9 @@ WHERE
   `
   }
 
-  // AND 
+  // AND
   // DA.Sale_Code is not NULL AND
-  // DA.Sale_Code != 'ว่าง' 
+  // DA.Sale_Code != 'ว่าง'
   await sql.close()
   return result.recordset
 }
@@ -545,36 +545,36 @@ exports.storeQuery = async function (channel) {
       status: 'Agree',
       date: new Date()
     }
-      ; (mainData = {
-        storeId: splitData.storeId,
-        name: splitData.name,
-        taxId: splitData.taxId,
-        tel: splitData.tel,
-        route: splitData.route,
-        type: splitData.type,
-        typeName: splitData.typeName,
-        address: splitData.address,
-        district: splitData.district,
-        subDistrict: splitData.subDistrict,
-        province: splitData.province,
-        provinceCode: splitData.provinceCode,
-        'postCode ': splitData.postCode,
-        zone: splitData.zone,
-        area: splitData.area,
-        latitude: splitData.latitude,
-        longtitude: splitData.longtitude,
-        lineId: '',
-        'note ': '',
-        approve: approveData,
-        status: splitData.status,
-        policyConsent: poliAgree,
-        imageList: [],
-        shippingAddress: splitData.shippingAddress,
-        checkIn: {},
-        createdAt: splitData.createdAt,
-        updatedDate: Date()
-      }),
-        data.push(mainData)
+    ;(mainData = {
+      storeId: splitData.storeId,
+      name: splitData.name,
+      taxId: splitData.taxId,
+      tel: splitData.tel,
+      route: splitData.route,
+      type: splitData.type,
+      typeName: splitData.typeName,
+      address: splitData.address,
+      district: splitData.district,
+      subDistrict: splitData.subDistrict,
+      province: splitData.province,
+      provinceCode: splitData.provinceCode,
+      'postCode ': splitData.postCode,
+      zone: splitData.zone,
+      area: splitData.area,
+      latitude: splitData.latitude,
+      longtitude: splitData.longtitude,
+      lineId: '',
+      'note ': '',
+      approve: approveData,
+      status: splitData.status,
+      policyConsent: poliAgree,
+      imageList: [],
+      shippingAddress: splitData.shippingAddress,
+      checkIn: {},
+      createdAt: splitData.createdAt,
+      updatedDate: Date()
+    }),
+      data.push(mainData)
   }
 
   return data
@@ -770,36 +770,36 @@ exports.storeQueryFilter = async function (channel, storeId) {
       status: 'Agree',
       date: new Date()
     }
-      ; (mainData = {
-        storeId: splitData.storeId,
-        name: splitData.name,
-        taxId: splitData.taxId,
-        tel: splitData.tel,
-        route: splitData.route,
-        type: splitData.type,
-        typeName: splitData.typeName,
-        address: splitData.address,
-        district: splitData.district,
-        subDistrict: splitData.subDistrict,
-        province: splitData.province,
-        provinceCode: splitData.provinceCode,
-        'postCode ': splitData.postCode,
-        zone: splitData.zone,
-        area: splitData.area,
-        latitude: splitData.latitude,
-        longtitude: splitData.longtitude,
-        lineId: '',
-        'note ': '',
-        approve: approveData,
-        status: '20',
-        policyConsent: poliAgree,
-        imageList: [],
-        shippingAddress: splitData.shippingAddress,
-        checkIn: {},
-        createdAt: splitData.createdAt,
-        updatedDate: Date()
-      }),
-        data.push(mainData)
+    ;(mainData = {
+      storeId: splitData.storeId,
+      name: splitData.name,
+      taxId: splitData.taxId,
+      tel: splitData.tel,
+      route: splitData.route,
+      type: splitData.type,
+      typeName: splitData.typeName,
+      address: splitData.address,
+      district: splitData.district,
+      subDistrict: splitData.subDistrict,
+      province: splitData.province,
+      provinceCode: splitData.provinceCode,
+      'postCode ': splitData.postCode,
+      zone: splitData.zone,
+      area: splitData.area,
+      latitude: splitData.latitude,
+      longtitude: splitData.longtitude,
+      lineId: '',
+      'note ': '',
+      approve: approveData,
+      status: '20',
+      policyConsent: poliAgree,
+      imageList: [],
+      shippingAddress: splitData.shippingAddress,
+      checkIn: {},
+      createdAt: splitData.createdAt,
+      updatedDate: Date()
+    }),
+      data.push(mainData)
   }
 
   return data
@@ -1102,7 +1102,7 @@ exports.dataPowerBiQueryInsert = async function (channel, data) {
   }
 }
 
-exports.dataUpdateSendMoney = async function (channel, data, primaryKeys = []) {
+exports.dataUpsertSendMoney = async function (channel, data, primaryKeys = []) {
   const config = {
     host: process.env.MY_SQL_SERVER,
     user: process.env.MY_SQL_USER,
@@ -1113,32 +1113,82 @@ exports.dataUpdateSendMoney = async function (channel, data, primaryKeys = []) {
   const connection = await mysql.createConnection(config)
 
   for (const item of data) {
-    // ถ้า primaryKey เป็น string เดี่ยว ให้แปลงเป็น array
-    const keysToFilter = Array.isArray(primaryKeys)
-      ? primaryKeys
-      : [primaryKeys]
+    const keys = Array.isArray(primaryKeys) ? primaryKeys : [primaryKeys]
 
-    // เอาฟิลด์ทั้งหมด ยกเว้น primaryKeys
-    const updateFields = Object.keys(item).filter(
-      k => !keysToFilter.includes(k)
-    )
-    const updateValues = updateFields.map(k => item[k])
-    const setClause = updateFields.map(k => `\`${k}\` = ?`).join(', ')
+    const allFields = Object.keys(item)
 
-    // WHERE condition
-    const whereClause = keysToFilter.map(k => `\`${k}\` = ?`).join(' AND ')
-    const whereValues = keysToFilter.map(k => item[k])
+    // ---------- INSERT ----------
+    const insertFields = allFields.map(f => `\`${f}\``).join(', ')
+    const insertPlaceholders = allFields.map(() => '?').join(', ')
+    const insertValues = allFields.map(f => item[f])
 
-    const query = `
-      UPDATE \`van_sendmoney\`
-      SET ${setClause}
-      WHERE ${whereClause}
+    // ---------- UPDATE ----------
+    const updateFields = allFields.filter(f => !keys.includes(f))
+
+    const updateClause = [
+      ...updateFields.map(f => `\`${f}\` = VALUES(\`${f}\`)`),
+      '`period` = NOW()' // ⭐ สำคัญ: เวลาตอนอัปเดต
+    ].join(', ')
+
+    const sql = `
+      INSERT INTO \`v_payin_test\`
+      (${insertFields})
+      VALUES (${insertPlaceholders})
+      ON DUPLICATE KEY UPDATE
+      ${updateClause}
     `
 
-    await connection.execute(query, [...updateValues, ...whereValues])
+    await connection.execute(sql, insertValues)
   }
 
   await connection.end()
+}
+
+exports.upsertSendMoneySummary = async (mysqlConn, rows) => {
+  const sql = `
+    INSERT INTO sendmoney_summary (
+      period,
+      warehouse,
+      area,
+      sale,
+      change_amt,
+      refund,
+      total_sale,
+      sendmoney,
+      sendmoney_acc,
+      diff,
+      diff_acc
+    ) VALUES ?
+    ON DUPLICATE KEY UPDATE
+      area = VALUES(area),
+      sale = VALUES(sale),
+      change_amt = VALUES(change_amt),
+      refund = VALUES(refund),
+      total_sale = VALUES(total_sale),
+      sendmoney = VALUES(sendmoney),
+      sendmoney_acc = VALUES(sendmoney_acc),
+      diff = VALUES(diff),
+      diff_acc = VALUES(diff_acc),
+      updated_at = NOW()
+  `
+
+  const values = rows.map(r => [
+    r.period,
+    r.warehouse,
+    r.area,
+    r.sale,
+    r.change,
+    r.refund,
+    r.totalSale,
+    r.sendmoney,
+    r.sendmoneyAcc,
+    r.diff,
+    r.diffAcc
+  ])
+
+  if (values.length === 0) return
+
+  await mysqlConn.query(sql, [values])
 }
 
 exports.dataUpdateTotalSale = async function (channel, data, primaryKeys = []) {
@@ -1286,7 +1336,6 @@ exports.dataWithdrawInsert = async function (channel, data) {
   }
 }
 
-
 exports.dataPowerBiQueryDelete = async function (channel, cono) {
   if (!cono || cono.length === 0) {
     return
@@ -1365,7 +1414,7 @@ exports.stockQuery = async function (channel, period, wereHouse) {
   let result = ''
   if (channel == 'cash') {
     if (wereHouse) {
-      ; `
+      ;`
   SELECT WH, 
   ITEM_CODE, 
   SUM(ITEM_QTY) AS ITEM_QTY
@@ -1552,7 +1601,7 @@ exports.stockPcQuery = async function (channel, period, wereHouse) {
   let result = ''
   if (channel === 'cash' || channel === 'pc') {
     if (wereHouse) {
-      ; `
+      ;`
   SELECT WH, 
   ITEM_CODE, 
   SUM(ITEM_QTY) AS ITEM_QTY
@@ -1575,7 +1624,6 @@ exports.stockPcQuery = async function (channel, period, wereHouse) {
 
   return result.recordset
 }
-
 
 exports.updateLatLong = async function (channel, storeList) {
   if (channel !== 'cash') return
@@ -1608,4 +1656,3 @@ exports.updateLatLong = async function (channel, storeList) {
     `)
   }
 }
-
