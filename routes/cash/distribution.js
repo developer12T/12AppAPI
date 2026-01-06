@@ -29,7 +29,8 @@ const {
   addOneWithdraw,
   uploadNPDData,
   addNPDProduct,
-  distributionChangeWareHouse
+  distributionChangeWareHouse,
+  updateRunningOrderNewYear
 } = require('../../controllers/distribution/withdrawController')
 const {
   getPlace,
@@ -94,4 +95,6 @@ router.post('/syncAddressDROUTE', syncAddressDROUTE)
 router.post('/addNPDProduct', addNPDProduct)
 router.post('/distributionChangeWareHouse', distributionChangeWareHouse)
 
+
+router.post('/updateRunningOrderNewYear', upload.single('file'), updateRunningOrderNewYear)
 module.exports = router

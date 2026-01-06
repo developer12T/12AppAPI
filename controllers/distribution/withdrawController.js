@@ -1781,10 +1781,10 @@ exports.approveWithdraw = async (req, res) => {
     const { orderId, status, user, role } = req.body
     let statusStr = status === true ? 'approved' : 'rejected'
     let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ'
-    return res.status(503).json({
-      status: 503,
-      message: 'Service temporarily unavailable',
-    })
+    // return res.status(503).json({
+    //   status: 503,
+    //   message: 'Service temporarily unavailable',
+    // })
     const channel = req.headers['x-channel']
     const { Distribution, WereHouse } = getModelsByChannel(
       channel,
@@ -2157,10 +2157,10 @@ exports.approveWithdrawCredit = async (req, res) => {
 
     const channel = req.headers['x-channel']
 
-    return res.status(503).json({
-      status: 503,
-      message: 'Service temporarily unavailable',
-    })
+    // return res.status(503).json({
+    //   status: 503,
+    //   message: 'Service temporarily unavailable',
+    // })
 
     const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
@@ -3564,4 +3564,96 @@ exports.distributionChangeWareHouse = async (req, res) => {
     console.error('Error uploading NPD data:', error)
     return res.status(500).json({ message: error.message })
   }
+}
+
+exports.updateRunningOrderNewYear = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+
+    if (!req.file) {
+      return res.status(400).json({
+        status: 400,
+        message: 'file is required'
+      })
+    }
+    const distData = await Distribution.find({ period: '202512', status: 'pending', newTrip: 'true' })
+
+    // อ่าน workbook
+    const workbook = xlsx.readFile(req.file.path)
+    // console.log('SheetNames:', workbook.SheetNames)
+
+    // อ่าน sheet แรก
+    const sheetName = workbook.SheetNames[0]
+    const sheet = workbook.Sheets[sheetName]
+
+    // แปลงเป็น JSON
+    const rows = xlsx.utils.sheet_to_json(sheet)
+    const results = []
+
+    for (const dist of distData) {
+
+      const newWarehouse = rows.find(r => r.areaOld === dist.area)
+
+
+      if (!newWarehouse) {
+        console.log(`No new warehouse found for area: ${dist.area}`)
+        continue
+      }
+      // console.log('dist.area:', dist.area, 'newWarehouse:', newWarehouse)
+      const oldId = dist.orderId
+
+      // สมมติ 3 ตัวกลางคือ area
+      const newId =
+        oldId.slice(0, 5) +   // W6901
+        newWarehouse.warehouseNew +               // area ใหม่
+        oldId.slice(8)
+
+      // console.log(`Updating orderId from ${oldId} to ${newId}`)
+
+      const updateResult = await Distribution.updateOne(
+        { orderId: oldId },
+        [
+          {
+            $set: {
+              orderId: newId,
+              area: `${newWarehouse.areaNew}`,
+              toWarehouse: `${newWarehouse.warehouseNew}`,
+              shippingId: `${newWarehouse.areaNew}`,
+              shippingRoute: `${newWarehouse.areaNew}R`,
+              // remark: {
+              //   $cond: [
+              //     { $ifNull: ['$remark', false] },
+              //     { $concat: ['$remark', ' | เขตเก่า ', dist.area] },
+              //     `เขตเก่า ${dist.area}`
+              //   ]
+              // },
+              updatedAt: new Date()
+            }
+          }
+        ]
+      )
+
+      results.push({
+        orderIdOld: oldId,
+        orderIdNew: newId,
+        status: updateResult.matchedCount ? 'updated' : 'not_found'
+      })
+    }
+
+
+
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'updateRunningOrderNewYear',
+      data: results
+    })
+
+  } catch (error) {
+    console.error('Error uploading warehouse data:', error)
+    return res.status(500).json({ message: error.message })
+  }
+
 }
