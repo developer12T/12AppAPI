@@ -2602,7 +2602,7 @@ exports.getRouteEffectiveAll = async (req, res) => {
       ).length
 
       const checkInNotSell = listStore.filter(
-        s => s.status === '1' && s.statusText === 'เยี่ยมแล้ว' || s.statusText === 'ซื้อ'
+        s => s.statusText === 'เยี่ยมแล้ว' || s.statusText === 'ซื้อ' || s.statusText === 'ไม่ซื้อ'
       ).length
 
 
