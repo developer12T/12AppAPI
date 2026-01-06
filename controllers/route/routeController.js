@@ -2593,16 +2593,18 @@ exports.getRouteEffectiveAll = async (req, res) => {
 
       // ✅ ขาย
       const storeSell = listStore.filter(
-        s => s.status === 'sell' || s.statusText === 'ขาย'
+        s => s.status === 'sell' || s.statusText === 'ซื้อ'
       ).length
 
       // ✅ check-in แต่ไม่ขาย
       const checkInNotSell = listStore.filter(
-        s => s.status !== 'sell' && s.statusText !== 'ขาย'
+        s => s.status !== 'sell' && s.statusText !== 'ซื้อ'
       ).length
 
       totalStoreAll += r.storeAll || 0
       totalStorePending += r.storePending || 0
+
+      // console.log('listStore', listStore)
 
       totalStoreSell += storeSell
       totalStoreNotSell += checkInNotSell
