@@ -4,6 +4,7 @@ const { ObjectId } = mongoose.Types
 const { Customer } = require('../../models/cash/master')
 const { uploadFiles } = require('../../utilities/upload')
 const { sequelize, DataTypes } = require('../../config/m3db')
+const { Sequelize } = require('sequelize')
 const { calculateSimilarity } = require('../../utilities/utility')
 const axios = require('axios')
 const multer = require('multer')
@@ -15,7 +16,7 @@ const { getSocket } = require('../../socket')
 const addUpload = multer({ storage: multer.memoryStorage() }).array(
   'storeImages'
 )
-
+const { PromotionStore } = require('../../models/cash/master')
 const { toThaiTime, period } = require('../../utilities/datetime')
 const sharp = require('sharp')
 const xlsx = require('xlsx')
@@ -4218,23 +4219,37 @@ exports.changeAreaStore = async (req, res) => {
         continue
       } else {
         // console.log('row.New_Area.slice(0,2)',row.New_Area.slice(0,2))
-        await Store.updateMany(
-          { area: row.Old_Area },
-          { $set: { area: row.New_Area, zone: row.New_Area.slice(0, 2) } }
-        )
+        // await Store.updateMany(
+        //   { area: row.Old_Area },
+        //   { $set: { area: row.New_Area, zone: row.New_Area.slice(0, 2) } }
+        // )
         const zone = row.New_Area.slice(0, 2)
-        const team = row.New_Area.slice(3, 4)
-        await Customer.update({ OKCFC1: row.Old_Area },
-          { OKCFC1: row.New_Area, OKCFC4: row.New_Area, saleZone: zone, saleTeam: team }
+        const team = `${zone}${row.New_Area.slice(3, 4)}`
+        await Customer.update(
+          {
+            OKCFC1: row.New_Area,
+            OKCFC4: row.New_Area,
+            saleZone: zone,
+            saleTeam: team
+          },
+          {
+            where: {
+              OKCFC1: row.Old_Area
+            }
+          }
         )
-
-
+        await PromotionStore.update(
+          {
+            area: row.New_Area
+          },
+          {
+            where: {
+              area: row.Old_Area
+            }
+          }
+        )
 
       }
-
-
-
-
 
     }
 
@@ -4246,8 +4261,9 @@ exports.changeAreaStore = async (req, res) => {
     return res.status(200).json({
       status: 200,
       message: 'upload excel success',
-      total: rows.length,
       data: rows
+      // total: rows.length,
+      // data: rows
     })
 
   } catch (error) {
@@ -4341,33 +4357,31 @@ exports.addStoreBk228ExcelToErp = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
     const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
 
+    const customerData = await Customer.findAll({
+      attributes: [
+        [Sequelize.fn('DISTINCT', Sequelize.col('OKCUNO')), 'customerNo']
+      ],
+      where: {
+        OKCFC1: 'BK228'
+      },
+      raw: true
+    })
+    const excludeStoreIds = customerData.map(c => c.customerNo)
 
+    // console.log('excludeStoreIds', excludeStoreIds)
 
-    if (!req.file) {
-      return res.status(400).json({
-        status: 400,
-        message: 'file is required'
-      })
-    }
-
-    // buffer ของไฟล์ excel
-    const buffer = req.file.buffer
-
-    // อ่าน workbook
-    const workbook = xlsx.read(buffer, { type: 'buffer' })
-
-    // อ่าน sheet แรก
-    const sheetName = workbook.SheetNames[0]
-    const sheet = workbook.Sheets[sheetName]
-
-    // แปลงเป็น JSON
-    const rows = xlsx.utils.sheet_to_json(sheet)
-
-    const storeIdList = rows.map(row => row.storeId)
-    const storeData = await Store.find({ storeId: { $in: storeIdList } }).lean()
+    const storeData = await Store.find({
+      area: 'BK228',
+      storeId: {
+        $nin: excludeStoreIds
+      }
+      // storeId:'VBK2600105'
+    }).lean()
     const dataUser = await User.findOne({ area: 'CT215', role: 'sale' })
-
+    const results = []
+    const errors = []
     let data = []
     for (const item of storeData) {
       const dataTran = {
@@ -4378,32 +4392,34 @@ exports.addStoreBk228ExcelToErp = async (req, res) => {
         customerChannel: '103',
         customerCoType: item.type ?? '',
         customerAddress1: (
-          item.address +
-          item.subDistrict +
+          item.address ?? '' +
+          item.subDistrict ?? '' +
           // item.subDistrict +
-          item.province +
+          item.province ?? '' +
           item.postCode ?? ''
         ).substring(0, 35),
         customerAddress2: (
-          item.address +
-          item.subDistrict +
+          item.address ?? '' +
+          item.subDistrict ?? '' +
           // item.subDistrict +
-          item.province +
+          item.province ?? '' +
           item.postCode ?? ''
         ).substring(35, 70),
         customerAddress3: (
-          item.address +
-          item.subDistrict +
+          item.address ?? '' +
+          item.subDistrict ?? '' +
           // item.subDistrict +
-          item.province +
+          item.province ?? '' +
           item.postCode ?? ''
         ).substring(70, 105),
         customerAddress4: '',
-        customerPoscode: (item.postCode ?? '').substring(0, 35),
+        customerPoscode: (item.postCode ?? '00000').substring(0, 35),
         customerPhone: item.tel ?? '',
         warehouse: dataUser.warehouse ?? '',
         OKSDST: item.zone ?? '',
-        saleTeam: dataUser.area.slice(0, 2) + dataUser.area[3],
+        saleTeam: dataUser.area
+          ? dataUser.area.slice(0, 2) + dataUser.area.charAt(3)
+          : '',
         OKCFC1: item.area ?? '',
         OKCFC3: item.route ?? '',
         OKCFC6: item.type ?? '',
@@ -4411,9 +4427,9 @@ exports.addStoreBk228ExcelToErp = async (req, res) => {
         creditLimit: '000',
         taxno: item.taxId ?? '',
         saleCode: dataUser.saleCode ?? '',
-        saleZone: dataUser.zone ?? '',
+        saleZone: 'BK',
         OKFRE1: item.postCode,
-        OKECAR: item.postCode.slice(0, 2),
+        OKECAR: item.postCode ? item.postCode.slice(0, 2) : '0',
         OKCFC4: item.area ?? '',
         OKTOWN: item.province,
         shippings: item.shippingAddress.map(u => {
@@ -4432,23 +4448,36 @@ exports.addStoreBk228ExcelToErp = async (req, res) => {
       }
 
       data.push(dataTran)
-      if (item.area != 'IT211') {
-        try {
-          const response = await axios.post(
-            `${process.env.API_URL_12ERP}/customer/insert`,
-            dataTran
-          )
 
-          // ส่งกลับไปให้ client ที่เรียก Express API
-          return res.status(response.status).json(response.data)
-        } catch (error) {
-          if (error.response) {
-            // หาก ERP ส่ง 400 หรือ 500 หรืออื่นๆ กลับมา
-            return res.status(error.response.status).json({
-              message: error.response.data?.message || 'Request Failed',
-              data: error.response.data
-            })
-          }
+      if (item.area === 'IT211') continue
+      const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+      await sleep(1000)
+
+      try {
+        const response = await axios.post(
+          `${process.env.API_URL_12ERP}/customer/insert`,
+          dataTran
+        )
+
+        results.push({
+          item,
+          status: response.status,
+          data: response.data
+        })
+
+      } catch (error) {
+        if (error.response) {
+          errors.push({
+            item,
+            status: error.response.status,
+            message: error.response.data?.message || 'Request Failed',
+            data: error.response.data
+          })
+        } else {
+          errors.push({
+            item,
+            message: error.message
+          })
         }
       }
 
@@ -4490,66 +4519,66 @@ function getDistanceKm(lat1, lon1, lat2, lon2) {
 
 exports.getNearbyStores = async (req, res) => {
   try {
-const { area, lat, long, distance } = req.body
-const channel = req.headers['x-channel']
-const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { area, lat, long, distance } = req.body
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
 
-const centerLat = Number(lat)
-const centerLong = Number(long)
-const maxKm = Number(distance)
+    const centerLat = Number(lat)
+    const centerLong = Number(long)
+    const maxKm = Number(distance)
 
-  const storesRaw = await Store.find({
-  ...(area ? { area } : {}),
-  status: { $nin: ['10', '90'] }
-})
-  .select('storeId name address area latitude longtitude')
-  .lean()
+    const storesRaw = await Store.find({
+      ...(area ? { area } : {}),
+      status: { $nin: ['10', '90'] }
+    })
+      .select('storeId name address area latitude longtitude')
+      .lean()
 
-const stores = storesRaw.map(s => ({
-  storeId: s.storeId,
-  storeName: s.name,
-  storeAddress: s.address,
-  area: s.area,
-  lat: Number(s.latitude),
-  lng: Number(s.longtitude)
-}))
-
-
-const storesInRadius = stores
-  .map(s => {
-    if (s.lat == null || s.lng == null) return null
-
-    const d = getDistanceKm(
-      centerLat,
-      centerLong,
-      Number(s.lat),
-      Number(s.lng)
-    )
-
-    if (d <= maxKm) {
-      return {
-        ...s,
-        distanceKm: Number(d.toFixed(2))
-      }
-    }
-    return null
-  })
-  .filter(Boolean)
-  .sort((a, b) => a.distanceKm - b.distanceKm)
+    const stores = storesRaw.map(s => ({
+      storeId: s.storeId,
+      storeName: s.name,
+      storeAddress: s.address,
+      area: s.area,
+      lat: Number(s.latitude),
+      lng: Number(s.longtitude)
+    }))
 
 
+    const storesInRadius = stores
+      .map(s => {
+        if (s.lat == null || s.lng == null) return null
+
+        const d = getDistanceKm(
+          centerLat,
+          centerLong,
+          Number(s.lat),
+          Number(s.lng)
+        )
+
+        if (d <= maxKm) {
+          return {
+            ...s,
+            distanceKm: Number(d.toFixed(2))
+          }
+        }
+        return null
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.distanceKm - b.distanceKm)
 
 
 
 
 
-res.status(200).json({
-  status: 200,
-  message: 'sucess',
-  data: storesInRadius
-})
 
-      } catch (error) {
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: storesInRadius
+    })
+
+  } catch (error) {
     console.error(error)
     res.status(500).json({ status: 500, message: error.message })
   }
