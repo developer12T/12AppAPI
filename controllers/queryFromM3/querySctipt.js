@@ -47,10 +47,8 @@ SELECT
 FROM 
   [DATA_OMS].[dbo].[DATA_Area] AS DA
 WHERE 
-  DA.CHANNEL_NAME = 'Cash' OR 
-  DA.CHANNEL_NAME = 'PC' AND
-  DA.Sale_Code is not NULL AND
-  DA.Sale_Code != 'ว่าง' 
+  DA.CHANNEL_NAME = 'Cash' 
+  and  DA.Sale_Code != '99999'
   `
   } else if (channel == 'credit') {
     result = await sql.query`
