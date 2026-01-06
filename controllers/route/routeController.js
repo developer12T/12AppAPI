@@ -2593,13 +2593,19 @@ exports.getRouteEffectiveAll = async (req, res) => {
 
       // ✅ ขาย
       const storeSell = listStore.filter(
-        s => s.status === 'sell' || s.statusText === 'ซื้อ'
+        s => s.status === '3' || s.statusText === 'ซื้อ'
       ).length
 
       // ✅ check-in แต่ไม่ขาย
-      const checkInNotSell = listStore.filter(
-        s => s.status !== 'sell' && s.statusText !== 'ซื้อ'
+      const NotSell = listStore.filter(
+        s => s.status === '2' || s.statusText === 'ไม่ซื้อ'
       ).length
+
+      const checkInNotSell = listStore.filter(
+        s => s.status === '1' && s.statusText === 'เยี่ยมแล้ว' || s.statusText === 'ซื้อ'
+      ).length
+
+
 
       totalStoreAll += r.storeAll || 0
       totalStorePending += r.storePending || 0
@@ -2607,7 +2613,7 @@ exports.getRouteEffectiveAll = async (req, res) => {
       // console.log('listStore', listStore)
 
       totalStoreSell += storeSell
-      totalStoreNotSell += checkInNotSell
+      totalStoreNotSell += NotSell
       totalStoreCheckInNotSell += checkInNotSell
 
       sumVisit += checkIn
