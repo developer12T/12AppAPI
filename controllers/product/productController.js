@@ -93,7 +93,7 @@ exports.getProduct = async (req, res) => {
     const { type, group, area, orderId, period, brand, size, flavour, limit } =
       req.body
     const channel = req.headers['x-channel']
-    console.log("body", req.body)
+    // console.log("body", req.body)
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Stock } = getModelsByChannel(channel, res, stockModel)
     const { Distribution } = getModelsByChannel(channel, res, distributionModel)
@@ -180,7 +180,7 @@ exports.getProduct = async (req, res) => {
 
         }
 
-        console.log("filter", filter)
+        // console.log("filter", filter)
 
         products = await Product.find(filter)
           .select(
@@ -241,7 +241,7 @@ exports.getProduct = async (req, res) => {
           filter.brand = 'เติมทิพ'
 
         }
-        console.log("filter", filter)
+        // console.log("filter", filter)
         products = await Product.find(filter).lean()
 
         stock = await Stock.aggregate([
