@@ -1,7 +1,11 @@
 // const { query } = require('express')
 const axios = require('axios')
 const { Route, RouteChangeLog } = require('../../models/cash/route')
-const { period, periodNew, previousPeriod } = require('../../utilities/datetime')
+const {
+  period,
+  periodNew,
+  previousPeriod
+} = require('../../utilities/datetime')
 const { Store } = require('../../models/cash/store')
 const { uploadFilesCheckin } = require('../../utilities/upload')
 const multer = require('multer')
@@ -36,7 +40,8 @@ const moment = require('moment')
 
 exports.getRoute = async (req, res) => {
   try {
-    const { period, area, district, province, routeId, storeId, zone, team } = req.query
+    const { period, area, district, province, routeId, storeId, zone, team } =
+      req.query
     const channel = req.headers['x-channel']
 
     const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
@@ -130,55 +135,55 @@ exports.getRoute = async (req, res) => {
     // If area is not provided (or explicitly empty), group results by day+period
     if ((!area || area === '') && period) {
       const groups = new Map()
-        ; (enrichedRoutes || []).forEach(route => {
-          // Skip routes with area == 'IT211'
-          if (route.area === 'IT211') return
+      ;(enrichedRoutes || []).forEach(route => {
+        // Skip routes with area == 'IT211'
+        if (route.area === 'IT211') return
 
-          // derive zone/team from route (prefer explicit fields, otherwise from area)
-          let zoneKey = route.zone || ''
-          let teamKey = route.team || ''
-          if (route.area) {
-            const a = String(route.area || '')
-            zoneKey = a.substring(0, 2)
-            teamKey = `${a.substring(0, 2)}${a.charAt(3) || ''}`
-          }
+        // derive zone/team from route (prefer explicit fields, otherwise from area)
+        let zoneKey = route.zone || ''
+        let teamKey = route.team || ''
+        if (route.area) {
+          const a = String(route.area || '')
+          zoneKey = a.substring(0, 2)
+          teamKey = `${a.substring(0, 2)}${a.charAt(3) || ''}`
+        }
 
-          // if request includes zone/team filters, skip non-matching routes
-          if (zone && String(zone) !== zoneKey) return
-          if (team && String(team) !== teamKey) return
+        // if request includes zone/team filters, skip non-matching routes
+        if (zone && String(zone) !== zoneKey) return
+        if (team && String(team) !== teamKey) return
 
-          const dayKey = route.day || ''
-          if (!groups.has(dayKey)) {
-            groups.set(dayKey, {
-              day: dayKey,
-              period: period,
-              // routes: [],
-              storeAll: 0,
-              storePending: 0,
-              storeSell: 0,
-              storeNotSell: 0,
-              storeCheckInNotSell: 0,
-              storeTotal: 0
-            })
-          }
+        const dayKey = route.day || ''
+        if (!groups.has(dayKey)) {
+          groups.set(dayKey, {
+            day: dayKey,
+            period: period,
+            // routes: [],
+            storeAll: 0,
+            storePending: 0,
+            storeSell: 0,
+            storeNotSell: 0,
+            storeCheckInNotSell: 0,
+            storeTotal: 0
+          })
+        }
 
-          const grp = groups.get(dayKey)
+        const grp = groups.get(dayKey)
 
-          // accumulate counts from each route (use numeric defaults)
-          const ra = Number(route.storeAll) || 0
-          const rp = Number(route.storePending) || 0
-          const rs = Number(route.storeSell) || 0
-          const rn = Number(route.storeNotSell) || 0
-          const rcn = Number(route.storeCheckInNotSell) || 0
-          const rt = Number(route.storeTotal) || 0
+        // accumulate counts from each route (use numeric defaults)
+        const ra = Number(route.storeAll) || 0
+        const rp = Number(route.storePending) || 0
+        const rs = Number(route.storeSell) || 0
+        const rn = Number(route.storeNotSell) || 0
+        const rcn = Number(route.storeCheckInNotSell) || 0
+        const rt = Number(route.storeTotal) || 0
 
-          grp.storeAll += ra
-          grp.storePending += rp
-          grp.storeSell += rs
-          grp.storeNotSell += rn
-          grp.storeCheckInNotSell += rcn
-          grp.storeTotal += rt
-        })
+        grp.storeAll += ra
+        grp.storePending += rp
+        grp.storeSell += rs
+        grp.storeNotSell += rn
+        grp.storeCheckInNotSell += rcn
+        grp.storeTotal += rt
+      })
 
       // finalize percentage fields for each group
       enrichedRoutes = Array.from(groups.values()).map(g => {
@@ -186,10 +191,16 @@ exports.getRoute = async (req, res) => {
         const storeTotal = g.storeTotal || 0
         const storeSell = g.storeSell || 0
 
-        const percentVisit = storeAll ? parseFloat(((storeTotal / storeAll) * 100).toFixed(2)) : 0
-        const percentEffective = storeAll ? parseFloat(((storeSell / storeAll) * 100).toFixed(2)) : 0
+        const percentVisit = storeAll
+          ? parseFloat(((storeTotal / storeAll) * 100).toFixed(2))
+          : 0
+        const percentEffective = storeAll
+          ? parseFloat(((storeSell / storeAll) * 100).toFixed(2))
+          : 0
         const complete = percentVisit
-        const percentComplete = storeAll ? parseFloat((((storeTotal / storeAll) * 100 * 360) / 100).toFixed(2)) : 0
+        const percentComplete = storeAll
+          ? parseFloat((((storeTotal / storeAll) * 100 * 360) / 100).toFixed(2))
+          : 0
 
         return {
           day: g.day,
@@ -2226,7 +2237,7 @@ exports.getRouteEffective = async (req, res) => {
       )
       xlsx.writeFile(wb, filePath)
       res.download(filePath, err => {
-        fs.unlink(filePath, () => { })
+        fs.unlink(filePath, () => {})
         if (err) console.error(err)
       })
     } else {
@@ -2261,17 +2272,241 @@ exports.getRouteEffective = async (req, res) => {
   }
 }
 
+// exports.getRouteEffectiveAll = async (req, res) => {
+//   try {
+//     const { zone, area, team, period, startDate, endDate } = req.query
+
+//     // ------------------------------
+//     // 📅 PREPARE DATE RANGE
+//     // ------------------------------
+//     let start, end
+
+//     if (startDate) {
+//       start = new Date(startDate)
+//       start.setHours(0, 0, 0, 0)
+//     }
+
+//     if (endDate) {
+//       end = new Date(endDate)
+//       end.setHours(23, 59, 59, 999)
+//     }
+
+//     // ------------------------------
+//     // 🔍 BASE QUERY
+//     // ------------------------------
+//     const query = {
+//       area: { $ne: 'IT211' }
+//     }
+
+//     if (area) query.area = area
+//     if (period) query.period = period
+
+//     const channel = req.headers['x-channel']
+
+//     const { TargetVisit } = getModelsByChannel(channel, res, targetVisitModel)
+//     const { Route } = getModelsByChannel(channel, res, routeModel)
+//     const { Store } = getModelsByChannel(channel, res, storeModel)
+
+//     // ------------------------------
+//     // 📦 LOAD ROUTES
+//     // ------------------------------
+//     let routes = await Route.find(query).populate(
+//       'listStore.storeInfo',
+//       'storeId name address typeName taxId tel'
+//     )
+
+//     // ------------------------------
+//     // 🧭 FILTER BY ZONE
+//     // ------------------------------
+//     if (zone) {
+//       routes = routes.filter(r => r.area.slice(0, 2) === zone)
+//     }
+
+//     if (!routes || routes.length === 0) {
+//       return res.status(404).json({
+//         status: 404,
+//         message: 'Not found route'
+//       })
+//     }
+
+//     // ------------------------------
+//     // 👥 MAP TEAM (OPTIONAL)
+//     // ------------------------------
+//     if (team) {
+//       routes = routes.map(r => {
+//         const teamStr = r.area.substring(0, 2) + r.area.charAt(3)
+//         return {
+//           ...r._doc,
+//           team: teamStr
+//         }
+//       })
+//     }
+
+//     // ------------------------------
+//     // 📅 FILTER listStore BY DATE
+//     // ------------------------------
+//     if (start || end) {
+//       routes = routes.map(r => {
+//         const filteredListStore = (r.listStore || []).filter(ls => {
+//           if (!ls.date) return false
+//           const d = new Date(ls.date)
+//           if (start && d < start) return false
+//           if (end && d > end) return false
+//           return true
+//         })
+
+//         return {
+//           ...r._doc,
+//           listStore: filteredListStore
+//         }
+//       })
+
+//       // ❗ ตัด route ที่ไม่เหลือ store หลัง filter
+//       routes = routes.filter(r => r.listStore.length > 0)
+//     }
+
+//     // ------------------------------
+//     // 📊 CALCULATE SUMMARY
+//     // ------------------------------
+//     let totalVisitPercent = 0
+//     let totalEffectivePercent = 0
+//     let totalStoreAll = 0
+//     let totalStorePending = 0
+//     let totalStoreSell = 0
+//     let totalStoreNotSell = 0
+//     let totalStoreCheckInNotSell = 0
+//     let sumVisit = 0
+//     let count = 0
+
+//     routes.forEach(r => {
+//       const listStore = r.listStore || []
+
+//       const visit = listStore.length
+//       const storeSell = listStore.filter(
+//         s => s.status === 'sell' || s.statusText === 'ขาย'
+//       ).length
+
+//       const storeNotSell = visit - storeSell
+
+//       totalStoreAll += r.storeAll || 0
+//       totalStorePending += r.storePending || 0
+//       totalStoreSell += storeSell
+//       totalStoreNotSell += storeNotSell
+//       totalStoreCheckInNotSell += storeNotSell
+//       sumVisit += visit
+
+//       totalVisitPercent += Number(r.percentVisit) || 0
+//       totalEffectivePercent += Number(r.percentEffective) || 0
+//       count++
+//     })
+
+//     const percentVisitAvg = count > 0 ? totalVisitPercent / count : 0
+//     const percentEffectiveAvg = count > 0 ? totalEffectivePercent / count : 0
+
+//     // ------------------------------
+//     // 🎯 TARGET
+//     // ------------------------------
+//     const targetMatch = {}
+//     if (period) targetMatch.period = period
+//     if (zone) targetMatch.zone = zone
+//     if (area) targetMatch.area = area
+
+//     const targetAgg = await TargetVisit.aggregate([
+//       { $match: targetMatch },
+//       {
+//         $group: {
+//           _id: null,
+//           visitStore: { $sum: '$visitStore' },
+//           saleStore: { $sum: '$saleStore' },
+//           visitStoreperDay: { $sum: '$visitStoreperDay' },
+//           saleStoreperDay: { $sum: '$saleStoreperDay' }
+//         }
+//       }
+//     ])
+
+//     const target = targetAgg[0] || {
+//       visitStore: 0,
+//       saleStore: 0,
+//       visitStoreperDay: 0,
+//       saleStoreperDay: 0
+//     }
+
+//     const visitVsTarget =
+//       target.visitStore > 0 ? (sumVisit / target.visitStore) * 100 : 0
+
+//     const effectiveVsTarget =
+//       target.saleStore > 0 ? (totalStoreSell / target.saleStore) * 100 : 0
+
+//     // ------------------------------
+//     // ✅ RESPONSE
+//     // ------------------------------
+//     return res.status(200).json({
+//       status: 200,
+//       message: 'success',
+//       visit: to2(percentVisitAvg),
+//       effective: to2(percentEffectiveAvg),
+//       totalStoreAll: to2(totalStoreAll),
+//       totalStorePending: to2(totalStorePending),
+//       totalStoreSell: to2(totalStoreSell),
+//       totalStoreNotSell: to2(totalStoreNotSell),
+//       totalStoreCheckInNotSell: to2(sumVisit),
+//       target: {
+//         visit: target.visitStore,
+//         sale: target.saleStore,
+//         visitPerDay: target.visitStoreperDay,
+//         salePerDay: target.saleStoreperDay
+//       },
+//       compare: {
+//         visitVsTarget: to2(visitVsTarget),
+//         effectiveVsTarget: to2(effectiveVsTarget)
+//       }
+//     })
+//   } catch (error) {
+//     console.error('❌ Error:', error)
+//     return res.status(500).json({
+//       status: 500,
+//       message: 'error from server',
+//       error: error.message,
+//       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+//     })
+//   }
+// }
+
 exports.getRouteEffectiveAll = async (req, res) => {
   try {
-    const { zone, area, team, period, day } = req.query
+    const { zone, area, team, period, startDate, endDate } = req.query
 
+    // ------------------------------
+    // 📅 PREPARE DATE RANGE
+    // ------------------------------
+    let start, end
+
+    function getPeriodFromDate (dateStr) {
+      if (!dateStr) return null
+      const d = new Date(dateStr)
+      if (isNaN(d)) return null
+      return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`
+    }
+
+    if (startDate) {
+      start = new Date(startDate)
+      start.setHours(0, 0, 0, 0)
+    }
+
+    if (endDate) {
+      end = new Date(endDate)
+      end.setHours(23, 59, 59, 999)
+    }
+
+    // ------------------------------
+    // 🔍 BASE QUERY
+    // ------------------------------
     const query = {
       area: { $ne: 'IT211' }
     }
 
-    if (area) query.area = { $eq: area }
+    if (area) query.area = area
     if (period) query.period = period
-    if (day) query.day = day
 
     const channel = req.headers['x-channel']
 
@@ -2279,51 +2514,69 @@ exports.getRouteEffectiveAll = async (req, res) => {
     const { Route } = getModelsByChannel(channel, res, routeModel)
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
-    // console.log(query)
-
+    // ------------------------------
+    // 📦 LOAD ROUTES
+    // ------------------------------
     let routes = await Route.find(query).populate(
       'listStore.storeInfo',
       'storeId name address typeName taxId tel'
     )
 
+    // ------------------------------
+    // 🧭 FILTER BY ZONE
+    // ------------------------------
     if (zone) {
-      routes = routes.filter(u => u.area.slice(0, 2) === zone)
-      // console.log(routes)
+      routes = routes.filter(r => r.area.slice(0, 2) === zone)
     }
 
-    if (routes.length == 0) {
+    if (!routes || routes.length === 0) {
       return res.status(404).json({
         status: 404,
         message: 'Not found route'
       })
     }
 
+    // ------------------------------
+    // 👥 MAP TEAM (OPTIONAL)
+    // ------------------------------
     if (team) {
-      routes = routes.map(item => {
-        const teamStr = item.area.substring(0, 2) + item.area.charAt(3)
+      routes = routes.map(r => {
+        const teamStr = r.area.substring(0, 2) + r.area.charAt(3)
         return {
-          id: item.id,
-          period: item.period,
-          area: item.area,
-          team: teamStr,
-          day: item.day,
-          listStore: item.listStore,
-          storeAll: item.storeAll,
-          storePending: item.storePending,
-          storeSell: item.storeSell,
-          storeNotSell: item.storeNotSell,
-          storeCheckInNotSell: item.storeCheckInNotSell,
-          storeTotal: item.storeTotal,
-          percentComplete: item.percentComplete,
-          complete: item.complete,
-          percentVisit: item.percentVisit,
-          percentEffective: item.percentEffective
+          ...r._doc,
+          team: teamStr
         }
       })
     }
 
-    let totalVisit = 0
-    let totalEffective = 0
+    // ------------------------------
+    // 📅 FILTER listStore BY DATE
+    // ------------------------------
+    if (start || end) {
+      routes = routes.map(r => {
+        const filteredListStore = (r.listStore || []).filter(ls => {
+          if (!ls.date) return false
+          const d = new Date(ls.date)
+          if (start && d < start) return false
+          if (end && d > end) return false
+          return true
+        })
+
+        return {
+          ...r._doc,
+          listStore: filteredListStore
+        }
+      })
+
+      // ❗ ตัด route ที่ไม่เหลือ store หลัง filter
+      routes = routes.filter(r => r.listStore.length > 0)
+    }
+
+    // ------------------------------
+    // 📊 CALCULATE SUMMARY
+    // ------------------------------
+    let totalVisitPercent = 0
+    let totalEffectivePercent = 0
     let totalStoreAll = 0
     let totalStorePending = 0
     let totalStoreSell = 0
@@ -2332,52 +2585,55 @@ exports.getRouteEffectiveAll = async (req, res) => {
     let sumVisit = 0
     let count = 0
 
-    // console.log(routes)
-    // 🔹 กรองวันที่ไม่ใช่ 25 หรือ 26 ก่อน
-    const excludedDays = ['25', '26']
+    routes.forEach(r => {
+      const listStore = r.listStore || []
 
-    const routesTranFrom = routes
-      .filter(route => !excludedDays.includes(route.day))
-      .map(u => {
-        const percentVisit = Number(u.percentVisit) || 0
-        const percentEffective = Number(u.percentEffective) || 0
-        const storeAll = Number(u.storeAll) || 0
-        const storePending = Number(u.storePending) || 0
-        const storeSell = Number(u.storeSell) || 0
-        const storeNotSell = Number(u.storeNotSell + u.storeCheckInNotSell) || 0
-        const storeCheckInNotSell = Number(u.storeCheckInNotSell) || 0 // ✅ ชื่อถูกแล้ว
-        const visit = Number(u.storeTotal) || 0
-        // const
+      // ✅ check-in หลัง filter วัน
+      const checkIn = listStore.length
 
-        totalVisit += percentVisit
-        totalEffective += percentEffective
-        totalStoreAll += storeAll
-        totalStorePending += storePending
-        totalStoreSell += storeSell
-        totalStoreNotSell += storeNotSell
-        totalStoreCheckInNotSell += storeCheckInNotSell
-        sumVisit += visit
-        count++
+      // ✅ ขาย
+      const storeSell = listStore.filter(
+        s => s.status === 'sell' || s.statusText === 'ขาย'
+      ).length
 
-        return {
-          area: u.area,
-          percentVisit,
-          percentEffective,
-          storeAll,
-          visit,
-          storePending,
-          storeSell,
-          storeNotSell,
-          storeCheckInNotSell
-        }
-      })
+      // ✅ check-in แต่ไม่ขาย
+      const checkInNotSell = listStore.filter(
+        s => s.status !== 'sell' && s.statusText !== 'ขาย'
+      ).length
 
-    // ✅ สรุปค่าเฉลี่ย
-    const percentVisitAvg = count > 0 ? totalVisit / count : 0
-    const percentEffectiveAvg = count > 0 ? totalEffective / count : 0
+      totalStoreAll += r.storeAll || 0
+      totalStorePending += r.storePending || 0
 
+      totalStoreSell += storeSell
+      totalStoreNotSell += checkInNotSell
+      totalStoreCheckInNotSell += checkInNotSell
+
+      sumVisit += checkIn
+
+      totalVisitPercent += Number(r.percentVisit) || 0
+      totalEffectivePercent += Number(r.percentEffective) || 0
+      count++
+    })
+
+    const percentVisitAvg = count > 0 ? totalVisitPercent / count : 0
+    const percentEffectiveAvg = count > 0 ? totalEffectivePercent / count : 0
+
+    // ✅ period สำหรับ target
+    let targetPeriod = period
+
+    // ถ้าไม่ส่ง period มา แต่ส่ง startDate → ใช้เดือนของ startDate
+    if (!targetPeriod && startDate) {
+      targetPeriod = getPeriodFromDate(startDate)
+    }
+    // ------------------------------
+    // 🎯 TARGET
+    // ------------------------------
     const targetMatch = {}
-    if (period) targetMatch.period = period
+
+
+
+    if (targetPeriod) targetMatch.period = targetPeriod
+    // if (period) targetMatch.period = period
     if (zone) targetMatch.zone = zone
     if (area) targetMatch.area = area
 
@@ -2401,41 +2657,35 @@ exports.getRouteEffectiveAll = async (req, res) => {
       saleStoreperDay: 0
     }
 
-    const targetVisit = target.visitStore
-    const targetEffective = target.saleStore
-    const targetVisitPerDay = target.visitStoreperDay
-    const targetSalePerDay = target.saleStoreperDay
-
-    const visitVsTarget = targetVisit > 0 ? (sumVisit / targetVisit) * 100 : 0
+    const visitVsTarget =
+      target.visitStore > 0 ? (sumVisit / target.visitStore) * 100 : 0
 
     const effectiveVsTarget =
-      targetEffective > 0 ? (totalStoreSell / targetEffective) * 100 : 0
+      target.saleStore > 0 ? (totalStoreSell / target.saleStore) * 100 : 0
 
-    res.status(200).json({
+    // ------------------------------
+    // ✅ RESPONSE
+    // ------------------------------
+    return res.status(200).json({
       status: 200,
-      message: 'sucess',
-      // data: routesTranFrom
+      message: 'success',
       visit: to2(percentVisitAvg),
       effective: to2(percentEffectiveAvg),
+
       totalStoreAll: to2(totalStoreAll),
-
       totalStorePending: to2(totalStorePending),
-      // totalStorePending: to2(totalStoreAll - sumVisit),
 
+      // ✅ ถูกต้องตามช่วงวัน
       totalStoreSell: to2(totalStoreSell),
       totalStoreNotSell: to2(totalStoreNotSell),
-      // totalStoreCheckInNotSell: to2(totalStoreCheckInNotSell)
-      totalStoreCheckInNotSell: to2(sumVisit),
-      // 🎯 target
-      target: target
-        ? {
-          visit: target.visitStore,
-          sale: target.saleStore,
-          visitPerDay: targetVisitPerDay,
-          salePerDay: targetSalePerDay
-        }
-        : null,
-      // 📊 compare (optional)
+      totalStoreCheckInNotSell: to2(totalStoreCheckInNotSell),
+
+      target: {
+        visit: target.visitStore,
+        sale: target.saleStore,
+        visitPerDay: target.visitStoreperDay,
+        salePerDay: target.saleStoreperDay
+      },
       compare: {
         visitVsTarget: to2(visitVsTarget),
         effectiveVsTarget: to2(effectiveVsTarget)
@@ -2443,12 +2693,11 @@ exports.getRouteEffectiveAll = async (req, res) => {
     })
   } catch (error) {
     console.error('❌ Error:', error)
-
-    res.status(500).json({
+    return res.status(500).json({
       status: 500,
       message: 'error from server',
-      error: error.message || error.toString(), // ✅ ป้องกัน circular object
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     })
   }
 }
@@ -2500,12 +2749,12 @@ exports.getRouteEffectiveByDayArea = async (req, res) => {
       // filter team (ต้องอยู่ตรงนี้ ❗)
       ...(team
         ? [
-          {
-            $match: {
-              team3: { $regex: `^${team}`, $options: 'i' }
+            {
+              $match: {
+                team3: { $regex: `^${team}`, $options: 'i' }
+              }
             }
-          }
-        ]
+          ]
         : []),
 
       // แตก store
@@ -2891,7 +3140,7 @@ exports.checkRouteStore = async (req, res) => {
       areaMap[area].del = storeCountMap[area]?.del || 0
     }
 
-    function sortKeys(obj) {
+    function sortKeys (obj) {
       const { area, R, del, ...days } = obj
       const sortedDays = Object.keys(days)
         .filter(k => /^R\d+$/.test(k))
@@ -3308,7 +3557,8 @@ exports.updateRouteAllStore = async (req, res) => {
       )
 
       console.log(
-        `processed ${Math.min(i + BATCH, storeData.length)} / ${storeData.length
+        `processed ${Math.min(i + BATCH, storeData.length)} / ${
+          storeData.length
         }`
       )
     }
@@ -3545,7 +3795,6 @@ exports.insertRouteToRouteChange = async (req, res) => {
         continue
       }
 
-
       const route = {
         id: routeId,
         period: period,
@@ -3715,10 +3964,11 @@ exports.addRouteChangeToRoute = async (req, res) => {
     const channel = req.headers['x-channel']
     const { Route, RouteChange } = getModelsByChannel(channel, res, routeModel)
 
-    const routeChangeData = await RouteChange.find({ period, status: 'approved' }).lean()
+    const routeChangeData = await RouteChange.find({
+      period,
+      status: 'approved'
+    }).lean()
     const routeChangeIdList = [...new Set(routeChangeData.map(r => r.id))]
-
-
 
     const year = parseInt(period.slice(0, 4), 10)
     const month = parseInt(period.slice(4, 6), 10)
@@ -3727,12 +3977,10 @@ exports.addRouteChangeToRoute = async (req, res) => {
       prevDate.getFullYear().toString() +
       String(prevDate.getMonth() + 1).padStart(2, '0')
 
-
     const routeChangePrevIdSet = routeChangeData.map(r => {
       const idPrev = String(r.id)
       return prevPeriod + idPrev.slice(6)
     })
-
 
     const routePrevRaw = await Route.find({
       period: prevPeriod,
@@ -3749,7 +3997,9 @@ exports.addRouteChangeToRoute = async (req, res) => {
     })
     const routePrevIdList = [...new Set(routePrev.map(r => r.id))]
 
-    const mergeRouteIds = [...new Set([...routeChangeIdList, ...routePrevIdList])]
+    const mergeRouteIds = [
+      ...new Set([...routeChangeIdList, ...routePrevIdList])
+    ]
 
     const existRoutes = await Route.find(
       { id: { $in: mergeRouteIds } },
@@ -3922,7 +4172,6 @@ exports.addNewStoreToRoute = async (req, res) => {
       })
     }
 
-
     const exists = await Route.findOne({
       id,
       'listStore.storeInfo': storeData._id
@@ -3934,7 +4183,6 @@ exports.addNewStoreToRoute = async (req, res) => {
         message: 'duplicate store'
       })
     }
-
 
     const count = await RouteChangeLog.countDocuments()
     const transactionId = `RN${String(count + 1).padStart(4, '0')}`
@@ -3991,10 +4239,7 @@ exports.getNewStoreToRoute = async (req, res) => {
       return {
         ...item,
         route: item.routeId.slice(11, 15),
-        location: [
-          Number(item?.longtitude) || 0,
-          Number(item?.latitude) || 0
-        ]
+        location: [Number(item?.longtitude) || 0, Number(item?.latitude) || 0]
       }
     })
 
@@ -4128,7 +4373,6 @@ exports.approveNewStoreToRoute = async (req, res) => {
       message: 'approveNewStoreToRoute success',
       data: routeChangeLog
     })
-
   } catch (error) {
     console.error(error)
     return res.status(500).json({
@@ -4137,7 +4381,6 @@ exports.approveNewStoreToRoute = async (req, res) => {
     })
   }
 }
-
 
 exports.getAreaApproval = async (req, res) => {
   try {
@@ -4153,7 +4396,9 @@ exports.getAreaApproval = async (req, res) => {
 
     const period = req.query.period
     if (!period) {
-      return res.status(400).json({ status: 400, message: 'period is required' })
+      return res
+        .status(400)
+        .json({ status: 400, message: 'period is required' })
     }
 
     // Use DB aggregations to compute summaries server-side and reduce memory
@@ -4192,7 +4437,13 @@ exports.getAreaApproval = async (req, res) => {
             }
           }
         },
-        { $group: { _id: '$area', routeCount: { $sum: 1 }, storeCount: { $sum: '$listStoreSize' } } }
+        {
+          $group: {
+            _id: '$area',
+            routeCount: { $sum: 1 },
+            storeCount: { $sum: '$listStoreSize' }
+          }
+        }
       ]),
 
       // route change: get distinct areas that have changes
@@ -4210,25 +4461,34 @@ exports.getAreaApproval = async (req, res) => {
         { $group: { _id: '$area', count: { $sum: 1 } } }
       ]),
       RouteChange.distinct('area', { period, status: 'pending' }),
-      RouteChange.distinct('area', { period, status: 'approved' }),
+      RouteChange.distinct('area', { period, status: 'approved' })
     ])
-
 
     // Build quick lookup maps from aggregation results
     const routeSummaryByArea = new Map(
-      (routeSummaryAgg || []).map(r => [r._id, { routeCount: r.routeCount || 0, storeCount: r.storeCount || 0 }])
+      (routeSummaryAgg || []).map(r => [
+        r._id,
+        { routeCount: r.routeCount || 0, storeCount: r.storeCount || 0 }
+      ])
     )
 
-    const hasRouteChangeByArea = new Set((routeChangeAreasArr || []).filter(Boolean))
-    const hasRouteChangePendingByArea = new Set((routeChangePendingAreasArr || []).filter(Boolean))
-    const hasRouteChangeApproveByArea = new Set((routeChangeApproveAreasArr || []).filter(Boolean))
-
+    const hasRouteChangeByArea = new Set(
+      (routeChangeAreasArr || []).filter(Boolean)
+    )
+    const hasRouteChangePendingByArea = new Set(
+      (routeChangePendingAreasArr || []).filter(Boolean)
+    )
+    const hasRouteChangeApproveByArea = new Set(
+      (routeChangeApproveAreasArr || []).filter(Boolean)
+    )
 
     const approvedLogCountByArea = new Map(
       (routeChangeLogAgg || []).map(l => [l._id, l.count])
     )
 
-    const storeNewCountByArea = new Map((storeNewAgg || []).map(s => [s._id, s.count]))
+    const storeNewCountByArea = new Map(
+      (storeNewAgg || []).map(s => [s._id, s.count])
+    )
 
     // ---------- ✅ Build result ----------
     let notFoundRoute = 0
@@ -4240,7 +4500,10 @@ exports.getAreaApproval = async (req, res) => {
       const area = u.area
       if (!area) continue
 
-      const routeSummary = routeSummaryByArea.get(area) || { routeCount: 0, storeCount: 0 }
+      const routeSummary = routeSummaryByArea.get(area) || {
+        routeCount: 0,
+        storeCount: 0
+      }
       const storeNewCount = storeNewCountByArea.get(area) || 0
       // const addStoreToRoute = approvedLogCountByArea.get(area) || 0
 
@@ -4263,7 +4526,6 @@ exports.getAreaApproval = async (req, res) => {
         status = 'notchange'
         statusTH = 'ไม่มีการปรับเปลี่ยนรูท'
       }
-
 
       routePev.push({
         area,
@@ -4326,7 +4588,6 @@ exports.approveRouteChange = async (req, res) => {
       status: 200,
       message: 'Update status success'
     })
-
   } catch (error) {
     console.error(error)
     return res.status(500).json({
