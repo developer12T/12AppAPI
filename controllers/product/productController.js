@@ -13,7 +13,7 @@ const {
   productFoodtruckQuery
 } = require('../../controllers/queryFromM3/querySctipt')
 const { group } = require('console')
-const { flatMap } = require('lodash')
+const { flatMap, filter } = require('lodash')
 const distributionModel = require('../../models/cash/distribution')
 const { MongoClient } = require('mongodb')
 const { period } = require('../../utilities/datetime')
@@ -93,7 +93,7 @@ exports.getProduct = async (req, res) => {
     const { type, group, area, orderId, period, brand, size, flavour, limit } =
       req.body
     const channel = req.headers['x-channel']
-
+    console.log("body", req.body)
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Stock } = getModelsByChannel(channel, res, stockModel)
     const { Distribution } = getModelsByChannel(channel, res, distributionModel)
@@ -179,6 +179,9 @@ exports.getProduct = async (req, res) => {
           filter.brand = 'เติมทิพ'
 
         }
+
+        console.log("filter", filter)
+
         products = await Product.find(filter)
           .select(
             'id name group groupCode size brand flavour listUnit statusSale statusRefund statusWithdraw'
@@ -238,7 +241,7 @@ exports.getProduct = async (req, res) => {
           filter.brand = 'เติมทิพ'
 
         }
-
+        console.log("filter", filter)
         products = await Product.find(filter).lean()
 
         stock = await Stock.aggregate([
