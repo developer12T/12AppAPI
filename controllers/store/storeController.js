@@ -4304,40 +4304,61 @@ exports.addStoreBk228Excel = async (req, res) => {
     const rows = xlsx.utils.sheet_to_json(sheet)
 
     const storeIdList = rows.map(row => row.storeId)
-    const storeData = await Store.find({ storeId: { $in: storeIdList } }).lean()
+    const storeData = await Store.find().lean()
+
+
+    let notInMongo = []
+ 
+
+    for (const id of storeIdList) {
+      
+
+      if (storeData.some(c => c.storeId === id)) {
+        continue
+      } else {
+        notInMongo.push(id)
+      }
+    }
+
+   const customerData = await Customer.findAll({
+      attributes: [
+        [Sequelize.fn('DISTINCT', Sequelize.col('OKCUNO')), 'customerNo']
+      ],
+      raw: true
+    })
 
 
     const RunningNumberData = await RunningNumber.findOne({ zone: 'BK' }).select('last')
     let lastRunning = RunningNumberData.last
 
-    const newRows = storeData.map(row => {
-      const { _id, ...rest } = row   // 👈 ตัด ObjectId ออก
+    // const newRows = storeData.map(row => {
+    //   const { _id, ...rest } = row   // 👈 ตัด ObjectId ออก
 
-      const newId = lastRunning.replace(/\d+$/, n =>
-        String(+n + 1).padStart(n.length, '0')
-      )
-      lastRunning = newId
+    //   const newId = lastRunning.replace(/\d+$/, n =>
+    //     String(+n + 1).padStart(n.length, '0')
+    //   )
+    //   lastRunning = newId
 
-      return {
-        ...rest,
-        storeId: newId,
-        area: 'BK228',
-        zone: 'BK'
-      }
-    })
+    //   return {
+    //     ...rest,
+    //     storeId: newId,
+    //     area: 'BK228',
+    //     zone: 'BK'
+    //   }
+    // })
 
-    await Store.insertMany(newRows)
+    // await Store.insertMany(newRows)
 
 
-    await RunningNumber.findOneAndUpdate(
-      { zone: 'BK' },
-      { $set: { last: lastRunning } },
-      { new: true }
-    )
+    // await RunningNumber.findOneAndUpdate(
+    //   { zone: 'BK' },
+    //   { $set: { last: lastRunning } },
+    //   { new: true }
+    // )
     res.status(200).json({
       status: 200,
       message: 'sucess',
-      data: newRows
+      data: notInMongo
     })
 
 
@@ -4379,47 +4400,41 @@ exports.addStoreBk228ExcelToErp = async (req, res) => {
       }
       // storeId:'VBK2600105'
     }).lean()
+
     const dataUser = await User.findOne({ area: 'CT215', role: 'sale' })
     const results = []
     const errors = []
     let data = []
+
+
+
+
     for (const item of storeData) {
+      const rawAddress =
+        (item.address ?? '').trim() +
+        (item.subDistrict ?? '').trim() +
+        (item.province ?? '').trim() +
+        (item.postCode ?? '').trim();
+
+      const fullAddress = rawAddress.trim();
+
+
       const dataTran = {
         Hcase: 1,
         customerNo: item.storeId,
         customerStatus: item.status ?? '',
-        customerName: item.name ?? '',
+        customerName: item.name.substring(0, 35) ?? '',
         customerChannel: '103',
         customerCoType: item.type ?? '',
-        customerAddress1: (
-          item.address ?? '' +
-          item.subDistrict ?? '' +
-          // item.subDistrict +
-          item.province ?? '' +
-          item.postCode ?? ''
-        ).substring(0, 35),
-        customerAddress2: (
-          item.address ?? '' +
-          item.subDistrict ?? '' +
-          // item.subDistrict +
-          item.province ?? '' +
-          item.postCode ?? ''
-        ).substring(35, 70),
-        customerAddress3: (
-          item.address ?? '' +
-          item.subDistrict ?? '' +
-          // item.subDistrict +
-          item.province ?? '' +
-          item.postCode ?? ''
-        ).substring(70, 105),
+        customerAddress1: fullAddress.substring(0, 35),
+        customerAddress2: fullAddress.substring(35, 70),
+        customerAddress3: fullAddress.substring(70, 105),
         customerAddress4: '',
         customerPoscode: (item.postCode ?? '00000').substring(0, 35),
         customerPhone: item.tel ?? '',
         warehouse: dataUser.warehouse ?? '',
         OKSDST: item.zone ?? '',
-        saleTeam: dataUser.area
-          ? dataUser.area.slice(0, 2) + dataUser.area.charAt(3)
-          : '',
+        saleTeam: 'BK2',
         OKCFC1: item.area ?? '',
         OKCFC3: item.route ?? '',
         OKCFC6: item.type ?? '',
@@ -4428,16 +4443,16 @@ exports.addStoreBk228ExcelToErp = async (req, res) => {
         taxno: item.taxId ?? '',
         saleCode: dataUser.saleCode ?? '',
         saleZone: 'BK',
-        OKFRE1: item.postCode,
+        OKFRE1: item.postCode ?? 0,
         OKECAR: item.postCode ? item.postCode.slice(0, 2) : '0',
         OKCFC4: item.area ?? '',
-        OKTOWN: item.province,
+        OKTOWN: item.province.substring(0, 9) ?? '',
         shippings: item.shippingAddress.map(u => {
           return {
             shippingAddress1: (u.address ?? '').substring(0, 35),
-            shippingAddress2: u.district ?? '',
-            shippingAddress3: u.subDistrict ?? '',
-            shippingAddress4: u.province ?? '',
+            shippingAddress2: (u.district ?? '').substring(0, 35),
+            shippingAddress3: (u.subDistrict ?? '').substring(0, 35),
+            shippingAddress4: (u.province ?? '').substring(0, 35),
             shippingPoscode: u.postCode ?? '',
             shippingPhone: item.tel ?? '',
             shippingRoute: u.postCode,
@@ -4452,34 +4467,34 @@ exports.addStoreBk228ExcelToErp = async (req, res) => {
       if (item.area === 'IT211') continue
       const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
       await sleep(1000)
+      console.log('dataTran', dataTran)
+      // try {
+      //   const response = await axios.post(
+      //     `${process.env.API_URL_12ERP}/customer/insert`,
+      //     dataTran
+      //   )
 
-      try {
-        const response = await axios.post(
-          `${process.env.API_URL_12ERP}/customer/insert`,
-          dataTran
-        )
+      //   results.push({
+      //     item,
+      //     status: response.status,
+      //     data: response.data
+      //   })
 
-        results.push({
-          item,
-          status: response.status,
-          data: response.data
-        })
-
-      } catch (error) {
-        if (error.response) {
-          errors.push({
-            item,
-            status: error.response.status,
-            message: error.response.data?.message || 'Request Failed',
-            data: error.response.data
-          })
-        } else {
-          errors.push({
-            item,
-            message: error.message
-          })
-        }
-      }
+      // } catch (error) {
+      //   if (error.response) {
+      //     errors.push({
+      //       item,
+      //       status: error.response.status,
+      //       message: error.response.data?.message || 'Request Failed',
+      //       data: error.response.data
+      //     })
+      //   } else {
+      //     errors.push({
+      //       item,
+      //       message: error.message
+      //     })
+      //   }
+      // }
 
 
     }
@@ -4584,3 +4599,4 @@ exports.getNearbyStores = async (req, res) => {
   }
 
 }
+

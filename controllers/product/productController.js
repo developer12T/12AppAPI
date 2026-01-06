@@ -175,6 +175,10 @@ exports.getProduct = async (req, res) => {
       if (limit === true) {
         const TOP_N = 20
 
+        if (area === 'BK228') {
+          filter.brand = 'เติมทิพ'
+
+        }
         products = await Product.find(filter)
           .select(
             'id name group groupCode size brand flavour listUnit statusSale statusRefund statusWithdraw'
@@ -229,6 +233,12 @@ exports.getProduct = async (req, res) => {
           { allowDiskUse: true }
         )
       } else {
+
+        if (area === 'BK228') {
+          filter.brand = 'เติมทิพ'
+
+        }
+
         products = await Product.find(filter).lean()
 
         stock = await Stock.aggregate([
