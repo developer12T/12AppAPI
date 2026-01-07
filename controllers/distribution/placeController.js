@@ -17,7 +17,7 @@ const {
 const { CIADDR, DROUTE } = require('../../models/cash/master')
 const { stat } = require('fs')
 const { Op } = require('sequelize')
-
+const XLSX = require('xlsx')
 
 exports.getPlace = async (req, res) => {
   try {
@@ -172,7 +172,7 @@ exports.addAllPlace = async (req, res) => {
 
     let type = channel === 'pc' ? 'PC' : 'cash';
 
-    const users = await User.find({ role: 'sale', platformType: type });
+    const users = await User.find({ role: 'sale', platformType: 'CASH' });
     const areaList = [...new Set(users.map(u => u.area).filter(Boolean))];
 
     let data = [];
@@ -181,7 +181,7 @@ exports.addAllPlace = async (req, res) => {
 
     for (const area of areaList) {
       const withdrawList = await Withdraw.find({ Des_Area: area });
-
+      console.log(area)
       const listAddressNew = [];
 
       for (const i of withdrawList) {
@@ -644,5 +644,84 @@ exports.CiaddrAddToWithdraw = async (req, res) => {
     console.log("SQL ERROR =", error.original || error.parent || error);
     if (t) await t.rollback();
     res.status(500).json({ status: '500', message: error.message });
+  }
+}
+
+exports.updatePlaceAddressExcel = async (req, res) => {
+  try {
+
+    const { WH, Des_Area } = req.query
+    const channel = req.headers['x-channel']
+
+    const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
+
+    const emailMap = {
+      '109': 'dc_nr@onetwotrading.co.th',
+      '101': 'dc_np2@onetwotrading.co.th',
+      '102': 'dc_mk@onetwotrading.co.th',
+      '104': 'dc_sr@onetwotrading.co.th',
+      '105': 'dc_samutprakan@onetwotrading.co.th',
+      '106': 'dc_nakhonsawan@onetwotrading.co.th',
+      '103': 'dc_lp@onetwotrading.co.th',
+      '111': 'dc_np2@onetwotrading.co.th',
+      '121': '',
+      '110': '',
+    };
+
+    const file = req.file
+    if (!file) {
+      return res.status(400).json({ status: 400, message: 'No file uploaded' })
+    }
+
+    // ✅ เปิดไฟล์ Excel
+    const workbook = XLSX.readFile(file.path)
+
+    // sheet แรก
+    const sheetName = workbook.SheetNames[0]
+    const sheet = workbook.Sheets[sheetName]
+    const withdrawData = await Withdraw.find()
+    // แปลงเป็น JSON
+    const data = XLSX.utils.sheet_to_json(sheet)
+
+    for (const row of data) {
+      const existing = await Withdraw.find({ Des_Area: row.areaOld })
+
+      if (!existing || existing.length === 0) continue
+
+      const Des_No = row.areaNew
+      const Des_Area = row.areaNew
+      const ROUTE = `${row.areaNew}R`
+
+      let WH = ''
+
+      for (const doc of existing) {
+
+        if (typeof doc.ROUTE === 'string' && doc.ROUTE.includes('R')) {
+          WH = row.selfPickUp
+        } else {
+          WH = row.address
+        }
+
+        const email = emailMap[String(WH).trim()] || ''
+
+        await Withdraw.updateMany(
+          { Des_Area: row.areaOld },
+          { $set: { Des_Area, Des_No, ROUTE, WH, Dc_Email: email } }
+        )
+      }
+
+      console.log(`🔄 UPDATED: ${row.areaOld}`)
+    }
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'updatePlaceAddressExcel',
+      data
+    })
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
   }
 }

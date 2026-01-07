@@ -42,7 +42,8 @@ const {
   getRouteWithdraw,
   syncAddressCIADDR,
   syncAddressDROUTE,
-  CiaddrAddToWithdraw
+  CiaddrAddToWithdraw,
+  updatePlaceAddressExcel
 } = require('../../controllers/distribution/placeController')
 
 const router = express.Router()
@@ -95,6 +96,6 @@ router.post('/syncAddressDROUTE', syncAddressDROUTE)
 router.post('/addNPDProduct', addNPDProduct)
 router.post('/distributionChangeWareHouse', distributionChangeWareHouse)
 
-
+router.post('/updatePlaceAddressExcel', upload.single('file'), updatePlaceAddressExcel)
 router.post('/updateRunningOrderNewYear', upload.single('file'), updateRunningOrderNewYear)
 module.exports = router
