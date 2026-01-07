@@ -56,7 +56,8 @@ const {
   changeAreaStore,
   addStoreBk228Excel,
   addStoreBk228ExcelToErp,
-  getNearbyStores
+  getNearbyStores,
+  changeAreaStoreNew
   // test
 } = require('../../controllers/store/storeController')
 
@@ -136,7 +137,7 @@ router.post('/moveStoreToCash', moveStoreToCash)
 router.post('/getStoreOnRoute', getStoreOnRoute)
 router.post('/addLatLongToDataToHome', addLatLongToDataToHome)
 router.post('/getNearbyStores', getNearbyStores)
-
+router.post('/changeAreaStoreNew', changeAreaStoreNew)
 
 router.post(
   '/changeAreaStore',
