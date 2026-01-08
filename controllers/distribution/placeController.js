@@ -453,7 +453,7 @@ exports.syncAddressDROUTE = async (req, res) => {
     )];
 
     let data = []
-    const withdrawData = await Withdraw.find({})
+    const withdrawData = await Withdraw.find({ZType:'T05'})
 
     const usedRouteCodes = new Set();
     const usedRouteCodesFromDB = new Set(
@@ -474,7 +474,7 @@ exports.syncAddressDROUTE = async (req, res) => {
 
       // ปรับ format ให้เสร็จก่อน
       if (first6.includes('R')) {
-        routeCode = first5 + 'R';
+        routeCode = first5 ;
       } else {
         routeCode = first5;
       }
@@ -493,8 +493,8 @@ exports.syncAddressDROUTE = async (req, res) => {
         coNo: 410,
         DRRUTP: 5,
         routeCode,
-        routeName: row.Des_Name?.slice(0, 40) || '',
-        DRTX15: row.Des_Name?.slice(0, 15) || '',
+        routeName: 'ส่งสินค้า',
+        DRTX15: 'ส่งสินค้า',
         method: row.ZType,
         transection: '',
         DRLMDT: formatDate(),

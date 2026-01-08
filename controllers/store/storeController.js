@@ -5,6 +5,8 @@ const { Customer } = require('../../models/cash/master')
 const { uploadFiles } = require('../../utilities/upload')
 const { sequelize, DataTypes } = require('../../config/m3db')
 const { Sequelize } = require('sequelize')
+const { Op } = require('sequelize')
+
 const { calculateSimilarity } = require('../../utilities/utility')
 const axios = require('axios')
 const multer = require('multer')
@@ -4308,10 +4310,10 @@ exports.addStoreBk228Excel = async (req, res) => {
 
 
     let notInMongo = []
- 
+
 
     for (const id of storeIdList) {
-      
+
 
       if (storeData.some(c => c.storeId === id)) {
         continue
@@ -4320,7 +4322,7 @@ exports.addStoreBk228Excel = async (req, res) => {
       }
     }
 
-   const customerData = await Customer.findAll({
+    const customerData = await Customer.findAll({
       attributes: [
         [Sequelize.fn('DISTINCT', Sequelize.col('OKCUNO')), 'customerNo']
       ],
@@ -4602,24 +4604,37 @@ exports.getNearbyStores = async (req, res) => {
 
 exports.changeAreaStoreNew = async (req, res) => {
   try {
-    const { storeId,area } = req.body
+    const { storeId, area } = req.body
     const channel = req.headers['x-channel']
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
-    const updatedStore = await Store.updateMany(
-      { storeId: storeId },
-      { $set: { area: area },zone:area.slice(0,2) }
+    // const updatedStore = await Store.updateMany(
+    //   { storeId: storeId },
+    //   { $set: { area: area }, zone: area.slice(0, 2) }
+    // )
+
+    await PromotionStore.update(
+      {
+        area: area
+      },
+      {
+        where: {
+          FBCUNO: {
+            [Op.in]: storeId
+          }
+        }
+      }
     )
+
 
     res.status(200).json({
       status: 200,
       message: 'sucess',
-      data: updatedStore
     })
 
 
   } catch (error) {
-        console.error(error)
+    console.error(error)
     res.status(500).json({ status: 500, message: error.message })
   }
 }

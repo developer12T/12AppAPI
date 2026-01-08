@@ -60,7 +60,7 @@ exports.getRoute = async (req, res) => {
     const routes = await Route.find(query).populate(
       'listStore.storeInfo',
       'storeId name address typeName taxId tel'
-    )
+    ).sort({day:1})
 
     // console.log(routes)
 
