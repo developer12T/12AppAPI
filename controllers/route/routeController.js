@@ -133,7 +133,7 @@ exports.getRoute = async (req, res) => {
     // console.log(enrichedRoutes)
 
     // If area is not provided (or explicitly empty), group results by day+period
-    if ((!area || area === '') && period) {
+    if ((!area || area === '') && period && !storeId) {
       const groups = new Map()
       ;(enrichedRoutes || []).forEach(route => {
         // Skip routes with area == 'IT211'
