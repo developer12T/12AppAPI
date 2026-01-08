@@ -4189,12 +4189,12 @@ exports.changeAreaStore = async (req, res) => {
     const { Store } = getModelsByChannel(channel, res, storeModel)
     // const storeData = await Store.find({ area: 'BT211' })
     // 🔴 เช็กไฟล์
-    if (!req.file) {
-      return res.status(400).json({
-        status: 400,
-        message: 'file is required'
-      })
-    }
+    // if (!req.file) {
+    //   return res.status(400).json({
+    //     status: 400,
+    //     message: 'file is required'
+    //   })
+    // }
 
     // buffer ของไฟล์ excel
     const buffer = req.file.buffer
@@ -4600,3 +4600,26 @@ exports.getNearbyStores = async (req, res) => {
 
 }
 
+exports.changeAreaStoreNew = async (req, res) => {
+  try {
+    const { storeId,area } = req.body
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const updatedStore = await Store.updateMany(
+      { storeId: storeId },
+      { $set: { area: area },zone:area.slice(0,2) }
+    )
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: updatedStore
+    })
+
+
+  } catch (error) {
+        console.error(error)
+    res.status(500).json({ status: 500, message: error.message })
+  }
+}

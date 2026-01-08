@@ -81,7 +81,7 @@ exports.downloadUserExcel = async (req, res) => {
     } else if (channel === 'pc') {
       platformType = 'PC'
     }
-    const users = await User.find({ role: 'sale', platformType }).lean();
+    const users = await User.find({ role: 'sale', platformType }).lean().sort({ area: 1 });
     if (!users || users.length === 0) {
       return res.status(404).json({ status: 404, message: 'User not found' });
     }

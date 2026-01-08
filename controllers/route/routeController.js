@@ -133,7 +133,7 @@ exports.getRoute = async (req, res) => {
     // console.log(enrichedRoutes)
 
     // If area is not provided (or explicitly empty), group results by day+period
-    if ((!area || area === '') && period) {
+    if ((!area || area === '') && period && !storeId) {
       const groups = new Map()
       ;(enrichedRoutes || []).forEach(route => {
         // Skip routes with area == 'IT211'
@@ -432,12 +432,167 @@ exports.addFromERP = async (req, res) => {
   }
 }
 
+// exports.addFromERPnew = async (req, res) => {
+//   try {
+//     const channel = req.headers['x-channel']
+//     const { period } = req.body
+//     const result = await routeQuery(channel)
+
+//     const return_arr = []
+
+//     for (const row of result) {
+//       const area = String(row.area ?? '').trim()
+//       const id = String(row.id ?? '').trim()
+//       const day = String(row.day ?? '').trim()
+//       const storeId = String(row.storeId ?? '').trim()
+
+//       const storeInfo = {
+//         storeInfo: storeId,
+//         latitude: '',
+//         longtitude: '',
+//         note: '',
+//         status: '0',
+//         statusText: '',
+//         date: '',
+//         listOrder: []
+//       }
+
+//       let groupFound = false
+
+//       for (const group of return_arr) {
+//         if (group.id === id && group.area === area) {
+//           group.listStore.push(storeInfo)
+//           groupFound = true
+//           break
+//         }
+//       }
+
+//       if (!groupFound) {
+//         return_arr.push({
+//           id,
+//           area,
+//           period,
+//           day,
+//           listStore: [storeInfo]
+//         })
+//       }
+//     }
+
+//     const { Store } = getModelsByChannel(channel, res, storeModel)
+//     const { Route } = getModelsByChannel(channel, res, routeModel)
+//     const route = await Route.find({ period: period })
+//     const routeMap = new Map(route.map(route => [route.id, route]))
+//     let routeId
+//     const latestRoute = route.sort((a, b) => b.id.localeCompare(a.id))[0]
+//     if (!latestRoute) {
+//       routeId = `${period}${return_arr.area}R01`
+//     } else {
+//       const prefix = latestRoute.id.slice(0, 6)
+//       const subfix = (parseInt(latestRoute.id.slice(7)) + 1)
+//         .toString()
+//         .padStart(2, '0')
+//       routeId = prefix + subfix
+//     }
+
+//     for (const storeList of return_arr) {
+//       try {
+//         const existingRoute = routeMap.get(storeList.id)
+
+//         if (existingRoute) {
+//           for (const list of storeList.storeInfo || []) {
+//             const store = await Store.findOne({ storeId: list })
+//             if (!store) {
+//               // console.warn(`Store with storeId ${list} not found`)
+//               continue
+//             }
+
+//             const storeExists = existingRoute.listStore.some(
+//               store => store.storeInfo.toString() === store._id.toString()
+//             )
+//             if (!storeExists) {
+//               const newData = {
+//                 storeInfo: store._id,
+//                 note: '',
+//                 image: '',
+//                 latitude: '',
+//                 longtitude: '',
+//                 status: 0,
+//                 statusText: 'รอเยี่ยม',
+//                 listOrder: [],
+//                 date: ''
+//               }
+//               existingRoute.listStore.push(newData)
+//             }
+//           }
+//           await existingRoute.save()
+//         } else {
+//           const listStore = []
+
+//           for (const storeId of storeList.listStore || []) {
+//             const idStore = storeId.storeInfo
+//             const store = await Store.findOne({ storeId: idStore })
+//             if (store) {
+//               listStore.push({
+//                 storeInfo: store._id,
+//                 latitude: '',
+//                 longtitude: '',
+//                 status: 0,
+//                 statusText: 'รอเยี่ยม',
+//                 note: '',
+//                 date: '',
+//                 listOrder: []
+//               })
+//             } else {
+//               // console.warn(`Store with storeId ${storeId} not found`)
+//             }
+//           }
+
+//           const team = storeList.area.slice(0, 2) + storeList.area.charAt(3)
+//           const zone = storeList.area.slice(0, 2)
+//           const data = {
+//             id: storeList.id,
+//             area: storeList.area,
+//             zone: zone,
+//             team: team,
+//             period: period,
+//             day: storeList.day,
+//             listStore
+//           }
+//           await Route.create(data)
+//         }
+//       } catch (err) {
+//         console.error(
+//           `Error processing storeList with id ${storeList.id}:`,
+//           err.message
+//         )
+//         continue
+//       }
+//     }
+
+//     const io = getSocket()
+//     io.emit('route/addFromERPnew', {})
+
+//     res.status(200).json({
+//       status: 200,
+//       message: 'sucess'
+//       // data: return_arr
+//     })
+//   } catch (error) {
+//     console.error(error)
+//     res.status(500).json({ status: '500', message: error.message })
+//   }
+// }
+
 exports.addFromERPnew = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
     const { period } = req.body
+
     const result = await routeQuery(channel)
 
+    /* ----------------------------------------
+     * 1) group ข้อมูลจาก ERP
+     * --------------------------------------*/
     const return_arr = []
 
     for (const row of result) {
@@ -457,17 +612,11 @@ exports.addFromERPnew = async (req, res) => {
         listOrder: []
       }
 
-      let groupFound = false
+      const group = return_arr.find(g => g.id === id && g.area === area)
 
-      for (const group of return_arr) {
-        if (group.id === id && group.area === area) {
-          group.listStore.push(storeInfo)
-          groupFound = true
-          break
-        }
-      }
-
-      if (!groupFound) {
+      if (group) {
+        group.listStore.push(storeInfo)
+      } else {
         return_arr.push({
           id,
           area,
@@ -478,108 +627,88 @@ exports.addFromERPnew = async (req, res) => {
       }
     }
 
+    /* ----------------------------------------
+     * 2) preload models
+     * --------------------------------------*/
     const { Store } = getModelsByChannel(channel, res, storeModel)
     const { Route } = getModelsByChannel(channel, res, routeModel)
-    const route = await Route.find({ period: period })
-    const routeMap = new Map(route.map(route => [route.id, route]))
-    let routeId
-    const latestRoute = route.sort((a, b) => b.id.localeCompare(a.id))[0]
-    if (!latestRoute) {
-      routeId = `${period}${return_arr.area}R01`
-    } else {
-      const prefix = latestRoute.id.slice(0, 6)
-      const subfix = (parseInt(latestRoute.id.slice(7)) + 1)
-        .toString()
-        .padStart(2, '0')
-      routeId = prefix + subfix
-    }
 
+    /* ----------------------------------------
+     * 3) preload route ที่มีอยู่แล้ว (id + period)
+     * --------------------------------------*/
+    const existingRoutes = await Route.find({ period })
+
+    const routeMap = new Map(
+      existingRoutes.map(r => [`${r.id}|${r.period}`, r])
+    )
+
+    /* ----------------------------------------
+     * 4) loop สร้าง route ใหม่เท่านั้น
+     * --------------------------------------*/
     for (const storeList of return_arr) {
       try {
-        const existingRoute = routeMap.get(storeList.id)
+        const routeKey = `${storeList.id}|${period}`
 
-        if (existingRoute) {
-          for (const list of storeList.storeInfo || []) {
-            const store = await Store.findOne({ storeId: list })
-            if (!store) {
-              // console.warn(`Store with storeId ${list} not found`)
-              continue
-            }
-
-            const storeExists = existingRoute.listStore.some(
-              store => store.storeInfo.toString() === store._id.toString()
-            )
-            if (!storeExists) {
-              const newData = {
-                storeInfo: store._id,
-                note: '',
-                image: '',
-                latitude: '',
-                longtitude: '',
-                status: 0,
-                statusText: 'รอเยี่ยม',
-                listOrder: [],
-                date: ''
-              }
-              existingRoute.listStore.push(newData)
-            }
-          }
-          await existingRoute.save()
-        } else {
-          const listStore = []
-
-          for (const storeId of storeList.listStore || []) {
-            const idStore = storeId.storeInfo
-            const store = await Store.findOne({ storeId: idStore })
-            if (store) {
-              listStore.push({
-                storeInfo: store._id,
-                latitude: '',
-                longtitude: '',
-                status: 0,
-                statusText: 'รอเยี่ยม',
-                note: '',
-                date: '',
-                listOrder: []
-              })
-            } else {
-              // console.warn(`Store with storeId ${storeId} not found`)
-            }
-          }
-
-          const team = storeList.area.slice(0, 2) + storeList.area.charAt(3)
-          const zone = storeList.area.slice(0, 2)
-          const data = {
-            id: storeList.id,
-            area: storeList.area,
-            zone: zone,
-            team: team,
-            period: period,
-            day: storeList.day,
-            listStore
-          }
-          await Route.create(data)
+        // ❌ ถ้ามีอยู่แล้ว → ข้าม (ไม่ update ไม่ create)
+        if (routeMap.has(routeKey)) {
+          continue
         }
+
+        const listStore = []
+
+        for (const storeItem of storeList.listStore || []) {
+          const store = await Store.findOne({
+            storeId: storeItem.storeInfo
+          })
+
+          if (!store) continue
+
+          listStore.push({
+            storeInfo: store._id,
+            latitude: '',
+            longtitude: '',
+            status: 0,
+            statusText: 'รอเยี่ยม',
+            note: '',
+            date: '',
+            listOrder: []
+          })
+        }
+
+        const team = storeList.area.slice(0, 2) + storeList.area.charAt(3)
+        const zone = storeList.area.slice(0, 2)
+
+        await Route.create({
+          id: storeList.id,
+          area: storeList.area,
+          zone,
+          team,
+          period,
+          day: storeList.day,
+          listStore
+        })
       } catch (err) {
-        console.error(
-          `Error processing storeList with id ${storeList.id}:`,
-          err.message
-        )
+        console.error(`Error processing route id ${storeList.id}`, err.message)
         continue
       }
     }
 
+    /* ----------------------------------------
+     * 5) emit socket
+     * --------------------------------------*/
     const io = getSocket()
     io.emit('route/addFromERPnew', {})
 
     res.status(200).json({
       status: 200,
-      message: 'sucess'
-      // data: return_arr
+      message: 'success'
     })
   } catch (error) {
     console.error(error)
-    res.status(500).json({ status: '500', message: error.message })
+    res.status(500).json({
+      status: 500,
+      message: error.message
+    })
   }
 }
 
@@ -2602,10 +2731,11 @@ exports.getRouteEffectiveAll = async (req, res) => {
       ).length
 
       const checkInNotSell = listStore.filter(
-        s => s.status === '1' && s.statusText === 'เยี่ยมแล้ว' || s.statusText === 'ซื้อ'
+        s =>
+          s.statusText === 'เยี่ยมแล้ว' ||
+          s.statusText === 'ซื้อ' ||
+          s.statusText === 'ไม่ซื้อ'
       ).length
-
-
 
       totalStoreAll += r.storeAll || 0
       totalStorePending += r.storePending || 0
@@ -2637,8 +2767,6 @@ exports.getRouteEffectiveAll = async (req, res) => {
     // 🎯 TARGET
     // ------------------------------
     const targetMatch = {}
-
-
 
     if (targetPeriod) targetMatch.period = targetPeriod
     // if (period) targetMatch.period = period

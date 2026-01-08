@@ -1023,9 +1023,17 @@ exports.addStockFromERP = async (req, res) => {
     const { Stock } = getModelsByChannel(channel, res, stockModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
 
-    const users = await User.find({ role: 'sale' })
-      .select('area saleCode warehouse')
-      .lean()
+    let  users = []
+    if (channel === 'cash') {
+      users = await User.find({ role: 'sale', platformType: "CASH", })
+        .select('area saleCode warehouse')
+        .lean()
+    } if (channel === 'pc') {
+      users = await User.find({ role: 'sale', platformType: "PC", })
+        .select('area saleCode warehouse')
+        .lean()
+    }
+
 
     const productId = data.flatMap(item => item.ITEM_CODE)
 
@@ -2863,11 +2871,11 @@ exports.checkOutAdjustStock = async (req, res) => {
     res.status(200).json({
       status: 200,
       message: 'Sucessful',
-      data :newOrder
+      data: newOrder
       // cart
     })
   } catch (error) {
-        console.error(error)
+    console.error(error)
     res.status(500).json({ status: '500', message: error.message })
   }
 }
@@ -5743,7 +5751,7 @@ exports.checkStock = async (req, res) => {
 exports.addStockPc = async (req, res) => {
 
   try {
-    const {period } = req.body
+    const { period } = req.body
     const channel = req.headers['x-channel']
     const cleanPeriod = period.replace('-', '') // "202506"
     const { User } = getModelsByChannel(channel, res, userModel)
@@ -5752,7 +5760,7 @@ exports.addStockPc = async (req, res) => {
 
     const data = await stockPcQuery(channel, period)
 
-    const users = await User.find({ role: 'sale' ,platformType:'PC'})
+    const users = await User.find({ role: 'sale', platformType: 'PC' })
       .select('area saleCode warehouse')
       .lean()
 
@@ -5805,7 +5813,7 @@ exports.addStockPc = async (req, res) => {
         period: cleanPeriod,
         warehouse: item.warehouse,
         listProduct: datastock.map(stock => {
-          
+
           const ctn = factorCtn.find(i => i.id === stock.ITEM_CODE) || {}
           const factor = Number(ctn?.listUnit?.factor)
           const qtyCtn = factor > 0 ? Math.floor(stock.ITEM_QTY / factor) : 0
@@ -5833,9 +5841,9 @@ exports.addStockPc = async (req, res) => {
 
 
     res.status(201).json({
-      status:201,
-      message:'Insert stock sucess',
-      data:result
+      status: 201,
+      message: 'Insert stock sucess',
+      data: result
     })
 
 
