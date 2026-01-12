@@ -3504,7 +3504,7 @@ exports.getStorePage = async (req, res) => {
       limit,
       q // optional search text
     } = req.query
-
+    // console.log('testsssss')
     const channel = req.headers['x-channel']
     const { Store } = getModelsByChannel(channel, res, storeModel)
     const { Route } = getModelsByChannel(channel, res, routeModel)
@@ -3518,7 +3518,7 @@ exports.getStorePage = async (req, res) => {
     if (route) filter.route = route
     if (type && type !== 'all') filter.type = type
 
-    filter.status = { $nin: ['10', '90'] }
+    filter.status = { $nin: [ '90'] }
 
     const qText = (q || '').trim()
     if (qText) {
@@ -3543,6 +3543,9 @@ exports.getStorePage = async (req, res) => {
         .limit(perPage)
         .lean()
     }
+
+    // console.log('filter',filter)
+
 
     const total = await Store.countDocuments(filter)
 
@@ -3715,7 +3718,6 @@ exports.checkNewStoreLatLong = async (req, res) => {
     const { Route } = getModelsByChannel(channel, res, routeModel)
     const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
-
     const dataStoreLatLong = await StoreLatLong.find({ status: 'approved' })
 
     const storeData = await Store.find({
