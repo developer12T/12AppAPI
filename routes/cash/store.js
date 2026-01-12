@@ -57,7 +57,8 @@ const {
   addStoreBk228Excel,
   addStoreBk228ExcelToErp,
   getNearbyStores,
-  changeAreaStoreNew
+  changeAreaStoreNew,
+  changeRouteUseExcel
   // test
 } = require('../../controllers/store/storeController')
 
@@ -83,7 +84,6 @@ router.get('/getLatLongOrderDetail', getLatLongOrderDetail)
 router.post('/approveLatLongStore', approveLatLongStore)
 router.post('/canceledOrderLatLongStore', canceledOrderLatLongStore)
 router.get('/getStorePage', getStorePage)
-
 
 router.post('/addStore', addStore)
 router.post('/updateImage', updateImage)
@@ -155,6 +155,11 @@ router.post(
   addStoreBk228ExcelToErp
 )
 
+router.post(
+  '/changeRouteUseExcel',
+  upload.single('file'), // 👈 ต้องมี และต้องชื่อ file
+  changeRouteUseExcel
+)
 
 router.get('/:storeId', getDetailStore)
 module.exports = router
