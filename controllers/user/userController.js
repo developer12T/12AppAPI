@@ -643,8 +643,8 @@ exports.addUserNew = async (req, res) => {
           qrCodeImage: sale.qrCodeImage,
           period: period(),
           image: '',
-          typeTruck: sale.typeTruck,
-          noTruck: sale.noTruck,
+          typeTruck: sale.typeTruck?? '',
+          noTruck: sale.noTruck?? '',
           platformType: sale.platformType
         });
         await newUser.save();
