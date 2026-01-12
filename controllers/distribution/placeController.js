@@ -453,7 +453,7 @@ exports.syncAddressDROUTE = async (req, res) => {
     )];
 
     let data = []
-    const withdrawData = await Withdraw.find({ZType:'T05'})
+    const withdrawData = await Withdraw.find({ ZType: 'T05' })
 
     const usedRouteCodes = new Set();
     const usedRouteCodesFromDB = new Set(
@@ -474,7 +474,7 @@ exports.syncAddressDROUTE = async (req, res) => {
 
       // ปรับ format ให้เสร็จก่อน
       if (first6.includes('R')) {
-        routeCode = first5 ;
+        routeCode = first5;
       } else {
         routeCode = first5;
       }
@@ -722,6 +722,93 @@ exports.updatePlaceAddressExcel = async (req, res) => {
 
   } catch (error) {
     console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+
+exports.addAddressFromExcel = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
+    // ✅ เปิดไฟล์ Excel
+    const workbook = XLSX.readFile(req.file.path)
+
+    // sheet แรก
+    const sheetName = workbook.SheetNames[0]
+    const sheet = workbook.Sheets[sheetName]
+
+    // แปลงเป็น JSON
+    const dataExcel = XLSX.utils.sheet_to_json(sheet)
+    const emailMap = {
+      '109': 'dc_nr@onetwotrading.co.th',
+      '101': 'dc_np2@onetwotrading.co.th',
+      '102': 'dc_mk@onetwotrading.co.th',
+      '104': 'dc_sr@onetwotrading.co.th',
+      '105': 'dc_samutprakan@onetwotrading.co.th',
+      '106': 'dc_nakhonsawan@onetwotrading.co.th',
+      '103': 'dc_lp@onetwotrading.co.th',
+      '111': 'dc_np2@onetwotrading.co.th',
+      '121': '',
+      '110': '',
+    };
+
+    for (const row of dataExcel) {
+      const area = row.area.slice(0, 5)
+      const address = row.address?.trim() || ''
+
+      const OAADR1 = address.substring(0, 35)
+      const OAADR2 = address.length > 35
+        ? address.substring(35, 70) // ถ้าอยากเผื่อ OAADR2 35 ตัวเหมือนกัน
+        : ''
+      const email = emailMap[String(werehouse).trim()] || ''
+
+      const ciaddrData = {
+        coNo: 410,
+        OAADTH: 4,
+        OAADK1: row.area,
+        OAADK2: '',
+        OAADK3: '',
+        OACONM: row.address,
+        OAADR1: OAADR1,
+        OAADR2: OAADR2,
+        OAADR3: row.werehouse,
+        OAADR4: '',
+        OACSCD: 'TH',
+        OAPONO: area,
+        // OARGDT: row.Des_Date,
+        OALMDT: formatDate(),
+        OACHID: 'MI02',
+        OALMTS: `${Date.now()}`,
+      }
+
+      // data.push(dataTran)
+      const withDraw = {
+        Des_No: '',
+        Des_Name: "",
+        Des_Date: "",
+        Des_Area: area,
+        ZType: "T05",
+        WH: row.werehouse,
+        ROUTE: area,
+        WH1: row.WH1,
+        Dc_Email: email
+      }
+      // await CIADDR.create(dataTran, { transaction: t })  // 🟩 ผูกกับ transaction
+    }
+
+
+
+
+    res.status(201).json({
+      stats: 201,
+      message: 'Add address success',
+      // data: ciaddrData
+
+    })
+
+  } catch (error) {
+    console.log(error)
     res.status(500).json({ status: '500', message: error.message })
   }
 }
