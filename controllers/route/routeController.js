@@ -37,6 +37,7 @@ const { formatDateTimeToThai } = require('../../middleware/order')
 const fs = require('fs')
 const os = require('os')
 const moment = require('moment')
+const { console } = require('inspector')
 
 exports.getRoute = async (req, res) => {
   try {
@@ -60,7 +61,7 @@ exports.getRoute = async (req, res) => {
     const routes = await Route.find(query).populate(
       'listStore.storeInfo',
       'storeId name address typeName taxId tel'
-    ).sort({day:1})
+    ).sort({ day: 1 })
 
     // console.log(routes)
 
@@ -135,55 +136,55 @@ exports.getRoute = async (req, res) => {
     // If area is not provided (or explicitly empty), group results by day+period
     if ((!area || area === '') && period && !storeId) {
       const groups = new Map()
-      ;(enrichedRoutes || []).forEach(route => {
-        // Skip routes with area == 'IT211'
-        if (route.area === 'IT211') return
+        ; (enrichedRoutes || []).forEach(route => {
+          // Skip routes with area == 'IT211'
+          if (route.area === 'IT211') return
 
-        // derive zone/team from route (prefer explicit fields, otherwise from area)
-        let zoneKey = route.zone || ''
-        let teamKey = route.team || ''
-        if (route.area) {
-          const a = String(route.area || '')
-          zoneKey = a.substring(0, 2)
-          teamKey = `${a.substring(0, 2)}${a.charAt(3) || ''}`
-        }
+          // derive zone/team from route (prefer explicit fields, otherwise from area)
+          let zoneKey = route.zone || ''
+          let teamKey = route.team || ''
+          if (route.area) {
+            const a = String(route.area || '')
+            zoneKey = a.substring(0, 2)
+            teamKey = `${a.substring(0, 2)}${a.charAt(3) || ''}`
+          }
 
-        // if request includes zone/team filters, skip non-matching routes
-        if (zone && String(zone) !== zoneKey) return
-        if (team && String(team) !== teamKey) return
+          // if request includes zone/team filters, skip non-matching routes
+          if (zone && String(zone) !== zoneKey) return
+          if (team && String(team) !== teamKey) return
 
-        const dayKey = route.day || ''
-        if (!groups.has(dayKey)) {
-          groups.set(dayKey, {
-            day: dayKey,
-            period: period,
-            // routes: [],
-            storeAll: 0,
-            storePending: 0,
-            storeSell: 0,
-            storeNotSell: 0,
-            storeCheckInNotSell: 0,
-            storeTotal: 0
-          })
-        }
+          const dayKey = route.day || ''
+          if (!groups.has(dayKey)) {
+            groups.set(dayKey, {
+              day: dayKey,
+              period: period,
+              // routes: [],
+              storeAll: 0,
+              storePending: 0,
+              storeSell: 0,
+              storeNotSell: 0,
+              storeCheckInNotSell: 0,
+              storeTotal: 0
+            })
+          }
 
-        const grp = groups.get(dayKey)
+          const grp = groups.get(dayKey)
 
-        // accumulate counts from each route (use numeric defaults)
-        const ra = Number(route.storeAll) || 0
-        const rp = Number(route.storePending) || 0
-        const rs = Number(route.storeSell) || 0
-        const rn = Number(route.storeNotSell) || 0
-        const rcn = Number(route.storeCheckInNotSell) || 0
-        const rt = Number(route.storeTotal) || 0
+          // accumulate counts from each route (use numeric defaults)
+          const ra = Number(route.storeAll) || 0
+          const rp = Number(route.storePending) || 0
+          const rs = Number(route.storeSell) || 0
+          const rn = Number(route.storeNotSell) || 0
+          const rcn = Number(route.storeCheckInNotSell) || 0
+          const rt = Number(route.storeTotal) || 0
 
-        grp.storeAll += ra
-        grp.storePending += rp
-        grp.storeSell += rs
-        grp.storeNotSell += rn
-        grp.storeCheckInNotSell += rcn
-        grp.storeTotal += rt
-      })
+          grp.storeAll += ra
+          grp.storePending += rp
+          grp.storeSell += rs
+          grp.storeNotSell += rn
+          grp.storeCheckInNotSell += rcn
+          grp.storeTotal += rt
+        })
 
       // finalize percentage fields for each group
       enrichedRoutes = Array.from(groups.values()).map(g => {
@@ -2366,7 +2367,7 @@ exports.getRouteEffective = async (req, res) => {
       )
       xlsx.writeFile(wb, filePath)
       res.download(filePath, err => {
-        fs.unlink(filePath, () => {})
+        fs.unlink(filePath, () => { })
         if (err) console.error(err)
       })
     } else {
@@ -2610,7 +2611,7 @@ exports.getRouteEffectiveAll = async (req, res) => {
     // ------------------------------
     let start, end
 
-    function getPeriodFromDate (dateStr) {
+    function getPeriodFromDate(dateStr) {
       if (!dateStr) return null
       const d = new Date(dateStr)
       if (isNaN(d)) return null
@@ -2885,12 +2886,12 @@ exports.getRouteEffectiveByDayArea = async (req, res) => {
       // filter team (ต้องอยู่ตรงนี้ ❗)
       ...(team
         ? [
-            {
-              $match: {
-                team3: { $regex: `^${team}`, $options: 'i' }
-              }
+          {
+            $match: {
+              team3: { $regex: `^${team}`, $options: 'i' }
             }
-          ]
+          }
+        ]
         : []),
 
       // แตก store
@@ -3276,7 +3277,7 @@ exports.checkRouteStore = async (req, res) => {
       areaMap[area].del = storeCountMap[area]?.del || 0
     }
 
-    function sortKeys (obj) {
+    function sortKeys(obj) {
       const { area, R, del, ...days } = obj
       const sortedDays = Object.keys(days)
         .filter(k => /^R\d+$/.test(k))
@@ -3693,8 +3694,7 @@ exports.updateRouteAllStore = async (req, res) => {
       )
 
       console.log(
-        `processed ${Math.min(i + BATCH, storeData.length)} / ${
-          storeData.length
+        `processed ${Math.min(i + BATCH, storeData.length)} / ${storeData.length
         }`
       )
     }
@@ -4731,4 +4731,85 @@ exports.approveRouteChange = async (req, res) => {
       message: error.message
     })
   }
+}
+
+const debug = (...args) => {
+  process.stdout.write('[DEBUG] ' + args.join(' ') + '\n')
+}
+
+exports.addOrderToRoute = async (req, res) => {
+  try {
+
+    const channel = req.headers['x-channel']
+    const { period, area } = req.body
+    const { RouteChangeLog, Route, RouteChange } = getModelsByChannel(
+      channel,
+      res,
+      routeModel
+    )
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const dataOrder = await Order.find({
+      period,
+      'store.area': area,
+      routeId: { $ne: '' },
+      type: 'sale',
+      status: { $ne: 'canceled' }
+    })
+    const storeList = [
+      ...new Set(dataOrder.map(item => item.store.storeId))
+    ]
+    const routeList = [
+      ...new Set(dataOrder.map(item => item.routeId))
+    ]
+    const storeData = await Store.find({ storeId: { $in: storeList } })
+    const routeData = await Route.find({ id: { $in: routeList } })
+
+
+
+    for (const row of routeData) {
+      const existRoute = dataOrder.some(item => item.routeId === row.id)
+
+      if (existRoute) {
+
+        const storeID = storeData.find(item => item.storeId === existRoute.store.storeId)
+        debug('storeID',storeID)
+        // const exitStore = row.listStore.find
+
+        
+      }
+
+
+
+
+    }
+
+
+
+
+
+    res.status(201).json({
+      status: 201,
+      message: 'addOrderToRoute',
+      data: routeData
+    })
+
+
+  } catch (error) {
+    console.error(error)
+    return res.status(500).json({
+      status: 500,
+      message: error.message
+    })
+  }
+}
+
+
+exports.test = async (req , res) => {
+  console.log('wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww')
+  console.log('.....................')
+      res.status(201).json({
+      status: 201,
+      message: 'testหหหห',
+    })
 }
