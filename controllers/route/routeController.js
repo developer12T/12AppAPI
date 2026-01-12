@@ -4767,19 +4767,35 @@ exports.addOrderToRoute = async (req, res) => {
 
 
 
-    for (const row of routeData) {
-      const existRoute = dataOrder.some(item => item.routeId === row.id)
+    for (const row of dataOrder) {
 
-      if (existRoute) {
+      const storeDetail = storeData.find(item => item.storeId === row.store.storeId)
+      const _id = storeDetail._id
 
-        const storeID = storeData.find(item => item.storeId === existRoute.store.storeId)
-        debug('storeID',storeID)
-        // const exitStore = row.listStore.find
-
-        
-      }
-
-
+      await Route.updateOne(
+        {
+          id: row.routeId,
+          'listStore.storeInfo': _id
+        },
+        {
+          $set: {
+            'listStore.$.latitude': row.latitude,
+            'listStore.$.longtitude': row.longitude,
+            'listStore.$.status': '3',
+            'listStore.$.statusText': 'ซื้อ',
+            'listStore.$.date': row.createdAt
+          },
+          $push: {
+            'listStore.$.listOrder': {   // ✅ ต้องมี $ ตรงนี้
+              number: 1,
+              orderId: row.orderId,
+              status: '3',
+              statusText: 'ซื้อ',
+              date: row.createdAt
+            }
+          }
+        }
+      )
 
 
     }
@@ -4791,7 +4807,7 @@ exports.addOrderToRoute = async (req, res) => {
     res.status(201).json({
       status: 201,
       message: 'addOrderToRoute',
-      data: routeData
+      data: dataOrder
     })
 
 
@@ -4805,11 +4821,11 @@ exports.addOrderToRoute = async (req, res) => {
 }
 
 
-exports.test = async (req , res) => {
+exports.test = async (req, res) => {
   console.log('wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww')
   console.log('.....................')
-      res.status(201).json({
-      status: 201,
-      message: 'testหหหห',
-    })
+  res.status(201).json({
+    status: 201,
+    message: 'testหหหห',
+  })
 }
