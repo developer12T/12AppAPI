@@ -45,7 +45,7 @@ const {
   getAreaApproval,
   approveRouteChange,
   addOrderToRoute,
-  test
+  getRouteSetting
 } = require('../../controllers/route/routeController')
 
 const router = express.Router()
@@ -96,6 +96,6 @@ router.get('/getNewStoreToRoute', getNewStoreToRoute)
 router.get('/getAreaApproval', getAreaApproval)
 router.post('/approveRouteChange', approveRouteChange)
 router.post('/addOrderToRoute', addOrderToRoute)
-router.post('/test', test)
+router.get('/getRouteSetting', getRouteSetting)
 
 module.exports = router

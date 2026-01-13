@@ -4819,11 +4819,36 @@ exports.addOrderToRoute = async (req, res) => {
 }
 
 
-exports.test = async (req, res) => {
-  console.log('wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww')
-  console.log('.....................')
-  res.status(201).json({
-    status: 201,
-    message: 'testหหหห',
-  })
+exports.getRouteSetting = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { period } = req.query
+
+    const { RouteChangeLog, Route, RouteChange,RouteSetting } = getModelsByChannel(
+      channel,
+      res,
+      routeModel
+    )
+
+    const routeSetting = await RouteSetting.find({
+      period:period
+    })
+
+
+
+    res.status(200).json({
+      status:200,
+      message:'getRouteSetting',
+      data:routeSetting
+
+    })
+
+
+  } catch (error) {
+    console.error(error)
+    return res.status(500).json({
+      status: 500,
+      message: error.message
+    })
+  }
 }
