@@ -593,7 +593,7 @@ exports.addUserNew = async (req, res) => {
     const channel = req.headers['x-channel']
 
     const { User: UserMain } = getModelsByChannel('user', res, userModel)
-    const { User: UserCash } = getModelsByChannel('cash', res, userModel)
+    const { User: UserCash } = getModelsByChannel(channel, res, userModel)
 
     const tableData = await userQuery(channel)
     const result = []
