@@ -1644,7 +1644,13 @@ exports.OrderToExcel = async (req, res) => {
       status: { $nin: ['canceled'] },
       status: { $in: statusArray },
       type: { $in: ['sale', 'saleNoodle'] },
-      'store.area': { $ne: 'IT211' }
+      'store.area': { $ne: 'IT211' },
+      $expr: {
+        $lte: [
+          { $strLenCP: '$store.storeId' },
+          11
+        ]
+      }
     }
 
     // Order Change
@@ -1739,7 +1745,6 @@ exports.OrderToExcel = async (req, res) => {
     pipeline.push({
       $sort: { statusASC: 1, createdAt: -1 }
     })
-
     const modelOrder = await Order.aggregate(pipeline)
     // console.log(modelOrder)
 

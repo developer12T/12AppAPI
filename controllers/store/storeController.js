@@ -156,8 +156,7 @@ const {
   bueatyStoreQuery
 } = require('../../controllers/queryFromM3/querySctipt')
 const store = require('../../models/cash/store')
-const { trace } = require('console')
-const { console } = require('inspector')
+
 
 exports.getDetailStore = async (req, res) => {
   try {
@@ -1638,6 +1637,7 @@ exports.updateStoreStatus = async (req, res) => {
     )
     const { User } = getModelsByChannel(channel, res, userModel)
     const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
     const store = await Store.findOne({ storeId: storeId })
     // console.log(store)
     if (!store) {
@@ -1663,6 +1663,8 @@ exports.updateStoreStatus = async (req, res) => {
 
     // console.log("oldId",oldId)
     if (status === '20') {
+
+
       await RunningNumber.findOneAndUpdate(
         { zone: store.zone },
         { $set: { last: newId } },
@@ -1710,24 +1712,24 @@ exports.updateStoreStatus = async (req, res) => {
         customerCoType: item.type ?? '',
         customerAddress1: (
           item.address +
-            item.subDistrict +
-            // item.subDistrict +
-            item.province +
-            item.postCode ?? ''
+          item.subDistrict +
+          // item.subDistrict +
+          item.province +
+          item.postCode ?? ''
         ).substring(0, 35),
         customerAddress2: (
           item.address +
-            item.subDistrict +
-            // item.subDistrict +
-            item.province +
-            item.postCode ?? ''
+          item.subDistrict +
+          // item.subDistrict +
+          item.province +
+          item.postCode ?? ''
         ).substring(35, 70),
         customerAddress3: (
           item.address +
-            item.subDistrict +
-            // item.subDistrict +
-            item.province +
-            item.postCode ?? ''
+          item.subDistrict +
+          // item.subDistrict +
+          item.province +
+          item.postCode ?? ''
         ).substring(70, 105),
         customerAddress4: '',
         customerPoscode: (item.postCode ?? '').substring(0, 35),
@@ -1784,6 +1786,20 @@ exports.updateStoreStatus = async (req, res) => {
         }
       }
 
+      const orderData = await Order.find({ 'store.storeId': storeId })
+
+      if (orderData.length > 0) {
+        const orderUpdated = await Order.updateMany(
+          { 'store.storeId': storeId },
+          {
+            $set: {
+              'store.storeId': newId
+            }
+          }
+        )
+      }
+
+
       const io = getSocket()
       // io.emit('store/updateStoreStatus', {
       //   status: 'success',
@@ -1799,7 +1815,7 @@ exports.updateStoreStatus = async (req, res) => {
         module: 'approveStore',
         user: user,
         status: 'approved',
-        id: item.storeId
+        id: item.storeId,
       })
 
       return res.status(200).json({
@@ -2971,7 +2987,7 @@ exports.storeToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
+      fs.unlink(tempPath, () => { })
     })
   } catch (err) {
     console.error(err)
@@ -3630,7 +3646,7 @@ exports.checkRangeLatLong = async (req, res) => {
 
     const dataStoreLatLong = await StoreLatLong.find({ status: 'approved' })
 
-    function calculateDistance (lat1, lon1, lat2, lon2) {
+    function calculateDistance(lat1, lon1, lat2, lon2) {
       const R = 6371 // รัศมีโลก (กิโลเมตร)
 
       const dLat = deg2rad(lat2 - lat1)
@@ -3639,16 +3655,16 @@ exports.checkRangeLatLong = async (req, res) => {
       const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos(deg2rad(lat1)) *
-          Math.cos(deg2rad(lat2)) *
-          Math.sin(dLon / 2) *
-          Math.sin(dLon / 2)
+        Math.cos(deg2rad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2)
 
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 
       return R * c // ระยะทาง (กิโลเมตร)
     }
 
-    function deg2rad (deg) {
+    function deg2rad(deg) {
       return deg * (Math.PI / 180)
     }
 
@@ -3695,7 +3711,7 @@ exports.checkRangeLatLong = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
+      fs.unlink(tempPath, () => { })
     })
 
     // res.status(200).json({
@@ -3898,7 +3914,7 @@ exports.areaStoreM3toMongo = async (req, res) => {
   }
 }
 
-function getDistanceFromLatLonInMeters (lat1, lon1, lat2, lon2) {
+function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
   const R = 6371000 // รัศมีโลก (เมตร)
   const dLat = ((lat2 - lat1) * Math.PI) / 180
   const dLon = ((lon2 - lon1) * Math.PI) / 180
@@ -3906,8 +3922,8 @@ function getDistanceFromLatLonInMeters (lat1, lon1, lat2, lon2) {
   const a =
     Math.sin(dLat / 2) ** 2 +
     Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLon / 2) ** 2
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 
@@ -4611,7 +4627,7 @@ exports.addStoreBk228ExcelToErp = async (req, res) => {
   }
 }
 
-function getDistanceKm (lat1, lon1, lat2, lon2) {
+function getDistanceKm(lat1, lon1, lat2, lon2) {
   const R = 6371 // รัศมีโลก (km)
   const dLat = ((lat2 - lat1) * Math.PI) / 180
   const dLon = ((lon2 - lon1) * Math.PI) / 180
@@ -4619,8 +4635,8 @@ function getDistanceKm (lat1, lon1, lat2, lon2) {
   const a =
     Math.sin(dLat / 2) ** 2 +
     Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLon / 2) ** 2
 
   return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)))
 }
@@ -4717,3 +4733,5 @@ exports.changeAreaStoreNew = async (req, res) => {
     res.status(500).json({ status: 500, message: error.message })
   }
 }
+
+
