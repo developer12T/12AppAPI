@@ -32,12 +32,10 @@ const storeLatLongModel = require('../../models/cash/storeLatLong')
 const { getSocket } = require('../../socket')
 const { getModelsByChannel } = require('../../middleware/channel')
 const path = require('path')
-const { group } = require('console')
 const { formatDateTimeToThai } = require('../../middleware/order')
 const fs = require('fs')
 const os = require('os')
 const moment = require('moment')
-const { console } = require('inspector')
 
 exports.getRoute = async (req, res) => {
   try {

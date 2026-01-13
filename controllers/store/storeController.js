@@ -151,8 +151,7 @@ const {
   bueatyStoreQuery
 } = require('../../controllers/queryFromM3/querySctipt')
 const store = require('../../models/cash/store')
-const { trace } = require('console')
-const { console } = require('inspector')
+
 
 exports.getDetailStore = async (req, res) => {
   try {
