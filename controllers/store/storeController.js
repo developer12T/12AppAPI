@@ -3,12 +3,17 @@ const { Types } = require('mongoose')
 const { ObjectId } = mongoose.Types
 const { Customer } = require('../../models/cash/master')
 const { CustomerBI } = require('../../models/cash/powerBi')
-const { Customer_OMS } = require('../../models/cash/data_oms')
+const { Customer_OMS, Customer_OMS_BK } = require('../../models/cash/data_oms')
 const { Customer_APIM3 } = require('../../models/cash/data_api')
 const { Customer_M3FDBPRD_BK } = require('../../models/cash/M3FDBPRD_BK')
-const { Customer_096 } = require('../../models/cash/data096')
+const { Customer_DC } = require('../../models/cash/data_dc')
+const {
+  Customer_096,
+  Customer_096_BK,
+  Customer_096_TEMP
+} = require('../../models/cash/data096')
 const { uploadFiles } = require('../../utilities/upload')
-const { sequelize, DataTypes } = require('../../config/powerBi')
+const { sequelize, DataTypes } = require('../../config/m3db')
 // const { sequelize, DataTypes } = require('../../config/powerBi')
 const { Sequelize } = require('sequelize')
 const { Op } = require('sequelize')
@@ -3518,7 +3523,7 @@ exports.getStorePage = async (req, res) => {
     if (route) filter.route = route
     if (type && type !== 'all') filter.type = type
 
-    filter.status = { $nin: [ '90'] }
+    filter.status = { $nin: ['90'] }
 
     const qText = (q || '').trim()
     if (qText) {
@@ -3545,7 +3550,6 @@ exports.getStorePage = async (req, res) => {
     }
 
     // console.log('filter',filter)
-
 
     const total = await Store.countDocuments(filter)
 
@@ -4310,7 +4314,7 @@ exports.changeRouteUseExcel = async (req, res) => {
         if (!cusCode) continue
 
         try {
-          const [affected] = await CustomerBI.update(
+          const [affected] = await Customer.update(
             {
               OKCFC1: row.CUS_AREA?.trim(),
               OKCFC4: row.CUS_AREA?.trim(),
@@ -4323,6 +4327,19 @@ exports.changeRouteUseExcel = async (req, res) => {
               transaction
             }
           )
+          // await Customer_OMS_BK.update(
+          //   {
+          //     OKCFC1: row.CUS_AREA?.trim(),
+          //     OKCFC4: row.CUS_AREA?.trim(),
+          //     saleZone: row.CUS_ZONE?.trim(),
+          //     saleTeam: row.CUS_TEAM?.trim(),
+          //     saleCode: row.SALE?.trim()
+          //   },
+          //   {
+          //     where: { customerNo: cusCode },
+          //     transaction
+          //   }
+          // )
 
           if (affected === 0) {
             notFound.push(cusCode)

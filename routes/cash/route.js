@@ -96,6 +96,6 @@ router.get('/getNewStoreToRoute', getNewStoreToRoute)
 router.get('/getAreaApproval', getAreaApproval)
 router.post('/approveRouteChange', approveRouteChange)
 router.post('/addOrderToRoute', addOrderToRoute)
-router.post('/test', test)
+router.get('/test', test)
 
 module.exports = router
