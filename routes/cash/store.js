@@ -59,7 +59,8 @@ const {
   getNearbyStores,
   changeAreaStoreNew,
   changeRouteUseExcel,
-  addQrCodeToStore
+  addQrCodeToStore,
+  getQrCodeStore
   // test
 } = require('../../controllers/store/storeController')
 
@@ -140,6 +141,7 @@ router.post('/addLatLongToDataToHome', addLatLongToDataToHome)
 router.post('/getNearbyStores', getNearbyStores)
 router.post('/changeAreaStoreNew', changeAreaStoreNew)
 router.post('/addQrCodeToStore', addQrCodeToStore)
+router.post('/getQrCodeStore', getQrCodeStore)
 router.post(
   '/changeAreaStore',
   upload.single('file'), // 👈 ต้องมี และต้องชื่อ file

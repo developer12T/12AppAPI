@@ -4740,10 +4740,24 @@ exports.addQrCodeToStore = async (req, res) => {
     const { storeId, area } = req.body
     const channel = req.headers['x-channel']
     const { Store } = getModelsByChannel(channel, res, storeModel)
-    const encryptedStoreId= encrypt(storeId)
-    const text = encryptedStoreId
+    // 1️⃣ encrypt storeId
+    const encryptedStoreId = encrypt(storeId)
 
-    const qrBase64 = await QRCode.toDataURL(text)
+    // 2️⃣ generate QR (Base64)
+    const qrBase64 = await QRCode.toDataURL(encryptedStoreId)
+
+    // 3️⃣ ตัด prefix ออกให้เหลือ base64 ล้วน
+    const base64Image = qrBase64.replace(
+      /^data:image\/png;base64,/,
+      ''
+    )
+
+    // 4️⃣ บันทึกเป็นไฟล์ (optional)
+    fs.writeFileSync(
+      `qrcode-${storeId}.png`,
+      base64Image,
+      'base64'
+    )
 
     res.status(200).json({
       status: 200,
@@ -4757,4 +4771,37 @@ exports.addQrCodeToStore = async (req, res) => {
   }
 }
 
+
+exports.getQrCodeStore = async (req, res) => {
+  try {
+    const { storeId } = req.body
+
+    if (!storeId) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found storeId'
+      })
+    }
+
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+
+    const storeIdDecrypt = decrypt(storeId)
+    const storeData = await Store.findOne({ storeId: storeIdDecrypt })
+
+
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: storeData
+    })
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: 500, message: error.message })
+  }
+}
 
