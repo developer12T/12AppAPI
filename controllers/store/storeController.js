@@ -156,8 +156,8 @@ const {
   bueatyStoreQuery
 } = require('../../controllers/queryFromM3/querySctipt')
 const store = require('../../models/cash/store')
-
-
+const QRCode = require('qrcode')
+const { encrypt, decrypt } = require('../../middleware/authen');
 exports.getDetailStore = async (req, res) => {
   try {
     const { storeId } = req.params
@@ -4728,6 +4728,29 @@ exports.changeAreaStoreNew = async (req, res) => {
       status: 200,
       message: 'sucess'
     })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: 500, message: error.message })
+  }
+}
+
+
+exports.addQrCodeToStore = async (req, res) => {
+  try {
+    const { storeId, area } = req.body
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const encryptedStoreId= encrypt(storeId)
+    const text = encryptedStoreId
+
+    const qrBase64 = await QRCode.toDataURL(text)
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: qrBase64
+    })
+
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: 500, message: error.message })
