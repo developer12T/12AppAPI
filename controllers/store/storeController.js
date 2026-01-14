@@ -48,7 +48,11 @@ const {
   routeQueryOne,
   updateLatLong
 } = require('../../controllers/queryFromM3/querySctipt')
-
+const {
+  generateOrderId,
+  generateOrderIdFoodTruck,
+  generateOrderIdDammy
+} = require('../../utilities/genetateId')
 // ===== helper: สร้างไดเรกทอรี + เซฟไฟล์ buffer เป็น .webp =====
 // async function saveImageBufferToWebp({ buffer, destDir, baseName }) {
 //   await fsp.mkdir(destDir, { recursive: true })
@@ -161,7 +165,8 @@ const {
   bueatyStoreQuery
 } = require('../../controllers/queryFromM3/querySctipt')
 const store = require('../../models/cash/store')
-
+const QRCode = require('qrcode')
+const { encrypt, decrypt } = require('../../middleware/authen');
 exports.getDetailStore = async (req, res) => {
   try {
     const { storeId } = req.params
@@ -1791,14 +1796,23 @@ exports.updateStoreStatus = async (req, res) => {
       const orderData = await Order.find({ 'store.storeId': storeId })
 
       if (orderData.length > 0) {
-        const orderUpdated = await Order.updateMany(
-          { 'store.storeId': storeId },
-          {
-            $set: {
-              'store.storeId': newId
+
+        for (const row of orderData) {
+
+          const orderId = await generateOrderId(row.store.area, row.sale.warehouse, channel, res)
+          await Order.findOneAndUpdate(
+            { 'store.storeId': storeId },
+            {
+              $set: {
+                'store.storeId': newId,
+                orderId:orderId,
+                status:'pending',
+                statusTH:'รอนำเข้า'
+              }
             }
-          }
-        )
+          )
+
+        }
       }
 
       const io = getSocket()
@@ -4737,3 +4751,75 @@ exports.changeAreaStoreNew = async (req, res) => {
     res.status(500).json({ status: 500, message: error.message })
   }
 }
+
+
+exports.addQrCodeToStore = async (req, res) => {
+  try {
+    const { storeId, area } = req.body
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    // 1️⃣ encrypt storeId
+    const encryptedStoreId = encrypt(storeId)
+
+    // 2️⃣ generate QR (Base64)
+    const qrBase64 = await QRCode.toDataURL(encryptedStoreId)
+
+    // 3️⃣ ตัด prefix ออกให้เหลือ base64 ล้วน
+    const base64Image = qrBase64.replace(
+      /^data:image\/png;base64,/,
+      ''
+    )
+
+    // 4️⃣ บันทึกเป็นไฟล์ (optional)
+    fs.writeFileSync(
+      `qrcode-${storeId}.png`,
+      base64Image,
+      'base64'
+    )
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: qrBase64
+    })
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: 500, message: error.message })
+  }
+}
+
+
+exports.getQrCodeStore = async (req, res) => {
+  try {
+    const { storeId } = req.body
+
+    if (!storeId) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found storeId'
+      })
+    }
+
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+
+    const storeIdDecrypt = decrypt(storeId)
+    const storeData = await Store.findOne({ storeId: storeIdDecrypt })
+
+
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: storeData
+    })
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: 500, message: error.message })
+  }
+}
+

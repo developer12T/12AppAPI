@@ -98,7 +98,7 @@ const generateOrderId = async (area, warehouse, channel, res) => {
   const latestOrder = await Order.findOne({
     'store.area': { $regex: area, $options: 'i' },
     createdAt: { $gte: start, $lt: end },
-    status: { $nin: ['canceled', 'reject'] }
+    status: { $nin: ['canceled', 'reject','wait approve'] }
   })
     .sort({ orderId: -1 })
     .select('orderId')
@@ -113,6 +113,40 @@ const generateOrderId = async (area, warehouse, channel, res) => {
     .toString()
     .padStart(4, '0')}`
 }
+
+const generateOrderIdDammy = async (area, warehouse, channel, res) => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth() // 0–11
+
+  const currentYear = year + 543
+  const currentMonth = (month + 1).toString().padStart(2, '0')
+
+  const { Order } = getModelsByChannel(channel, res, orderModel)
+
+  const start = new Date(year, month, 1)       // 1st of this month
+  const end   = new Date(year, month + 1, 1)   // 1st of next month
+
+  const latestOrder = await Order.findOne({
+    'store.area': { $regex: area, $options: 'i' },
+    createdAt: { $gte: start, $lt: end },
+  })
+    .sort({ orderId: -1 })
+    .select('orderId')
+
+  const runningNumber = latestOrder
+    ? parseInt(latestOrder.orderId.slice(-4)) + 1
+    : 1
+
+  return `DR${currentYear
+    .toString()
+    .slice(2, 4)}${currentMonth}13${warehouse}${runningNumber
+    .toString()
+    .padStart(4, '0')}`
+}
+
+
+
 
 const generateRefundId = async (area, warehouse, channel, res) => {
   const now = new Date()
@@ -421,6 +455,7 @@ const generateOrderIdFoodTruck = async (area, warehouse, channel, res) => {
 
 module.exports = {
   generateOrderId,
+  generateOrderIdDammy,
   generateRefundId,
   generateDistributionId,
   generateGiveawaysId,

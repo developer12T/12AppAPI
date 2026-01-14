@@ -1,11 +1,11 @@
 const moment = require('moment')
 
-function period () {
+function period() {
   const date = moment().format('YYYYMM', 'th')
   return date
 }
 
-function periodNew () {
+function periodNew() {
   const date = moment().format('YYYYMM', 'th')
   return date
 }
@@ -20,14 +20,14 @@ const previousPeriod = period => {
   return `${prevYear}${prevMonth.toString().padStart(2, '0')}`
 }
 
-function timestamp () {
+function timestamp() {
   const date = new Date()
   return `${date.getFullYear()}${(date.getMonth() + 1)
     .toString()
     .padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`
 }
 
-function rangeDate (period) {
+function rangeDate(period) {
   if (!period || period.length !== 6) {
     throw new Error('Invalid period format! Use YYYYMM')
   }
@@ -38,7 +38,7 @@ function rangeDate (period) {
   return { startDate, endDate }
 }
 
-function getCurrentTimeFormatted () {
+function getCurrentTimeFormatted() {
   const now = new Date()
   const hours = String(now.getHours()).padStart(2, '0')
   const minutes = String(now.getMinutes()).padStart(2, '0')
@@ -46,7 +46,7 @@ function getCurrentTimeFormatted () {
   return `${hours}${minutes}${seconds}`
 }
 
-function formatDate () {
+function formatDate() {
   const now = new Date()
   const year = now.getFullYear()
   const month = String(now.getMonth() + 1).padStart(2, '0') // Months are zero-indexed
@@ -70,6 +70,35 @@ function formatDateToYYYYMMDD(date) {
   return `${year}${month}${day}`;
 }
 
+function generateDates(startDate, days) {
+  // console.log('startDate',startDate)
+  if (!startDate || typeof startDate !== 'string') {
+    throw new Error(`Invalid startDate: ${startDate}`)
+  }
+  
+  const start = new Date(`${startDate}T00:00:00Z`)
+
+  if (isNaN(start.getTime())) {
+    throw new Error(`Invalid date format: ${startDate}`)
+  }
+
+  const result = []
+
+  for (let i = 0; i <= days; i++) {
+    
+    const d = new Date(start)
+    d.setUTCDate(start.getUTCDate() + i)
+    result.push({
+      date:d.toISOString().slice(0, 10),
+      day:String(i + 1).padStart(2,'0')
+    })
+  }
+
+  return result
+}
+
+
+
 
 module.exports = {
   period,
@@ -80,5 +109,6 @@ module.exports = {
   getCurrentTimeFormatted,
   toThaiTime,
   formatDateToYYYYMMDD,
-  periodNew
+  periodNew,
+  generateDates
 }

@@ -47,6 +47,17 @@ const {
   updateProCodeInOrder
 } = require('../../controllers/sale/orderController')
 
+
+
+const { 
+  checkOutV2,
+
+  } = require('../../controllers/sale/orderControllerV2')
+
+
+
+
+
 const router = express.Router()
 
 router.get('/all', getOrder)
@@ -54,6 +65,8 @@ router.get('/detail/:orderId', getDetail)
 router.post('/updateStatus', updateStatus)
 router.post('/checkout', checkout)
 router.post('/checkOutSale', checkOutSale)
+
+router.post('/checkOutV2', checkOutV2)
 router.post('/addSlip', addSlip)
 router.get('/reflashOrder', reflashOrder)
 router.get('/updateOrderDistribution', updateOrderDistribution)
