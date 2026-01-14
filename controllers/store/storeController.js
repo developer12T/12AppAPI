@@ -43,7 +43,11 @@ const {
   routeQueryOne,
   updateLatLong
 } = require('../../controllers/queryFromM3/querySctipt')
-
+const {
+  generateOrderId,
+  generateOrderIdFoodTruck,
+  generateOrderIdDammy
+} = require('../../utilities/genetateId')
 // ===== helper: สร้างไดเรกทอรี + เซฟไฟล์ buffer เป็น .webp =====
 // async function saveImageBufferToWebp({ buffer, destDir, baseName }) {
 //   await fsp.mkdir(destDir, { recursive: true })
@@ -1789,14 +1793,23 @@ exports.updateStoreStatus = async (req, res) => {
       const orderData = await Order.find({ 'store.storeId': storeId })
 
       if (orderData.length > 0) {
-        const orderUpdated = await Order.updateMany(
-          { 'store.storeId': storeId },
-          {
-            $set: {
-              'store.storeId': newId
+
+        for (const row of orderData) {
+
+          const orderId = await generateOrderId(row.store.area, row.sale.warehouse, channel, res)
+          await Order.findOneAndUpdate(
+            { 'store.storeId': storeId },
+            {
+              $set: {
+                'store.storeId': newId,
+                orderId:orderId,
+                status:'pending',
+                statusTH:'รอนำเข้า'
+              }
             }
-          }
-        )
+          )
+
+        }
       }
 
 
