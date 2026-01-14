@@ -4,7 +4,8 @@ const { Route, RouteChangeLog } = require('../../models/cash/route')
 const {
   period,
   periodNew,
-  previousPeriod
+  previousPeriod,
+  generateDates
 } = require('../../utilities/datetime')
 const { Store } = require('../../models/cash/store')
 const { uploadFilesCheckin } = require('../../utilities/upload')
@@ -253,7 +254,7 @@ exports.getRouteLock = async (req, res) => {
     const channel = req.headers['x-channel']
 
     const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
-    const { Route,RouteSetting } = getModelsByChannel(channel, res, routeModel)
+    const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
 
     if (!period) {
       return res
@@ -261,7 +262,12 @@ exports.getRouteLock = async (req, res) => {
         .json({ status: 400, message: 'period is required' })
     }
 
-    const routeSetting = await RouteSetting.find({period:period})
+    const routeSetting = await RouteSetting.findOne({ period: period })
+
+
+    const dates = generateDates(routeSetting.startDate, 25)
+
+
 
     const query = { period }
     if (area) query.area = area
@@ -295,9 +301,33 @@ exports.getRouteLock = async (req, res) => {
 
           return matchDistrict && matchProvince && matchStoreId
         })
+
+        const dateMacth = dates.find(
+          u => String(u.day) === String(route.day)
+        )
+
+        const thaiDate = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Bangkok',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        }).format(new Date())
+
+        if (dateMacth.date === thaiDate) {
+          canSell = true
+        } else {
+          canSell = false
+        }
+
+
+
         // console.log(route)
         return {
           ...route.toObject(),
+
+          canSell  ,
+          dateMacth:dateMacth.date,
+          thaiDate,
           listStore: filteredListStore
         }
       })
@@ -319,7 +349,26 @@ exports.getRouteLock = async (req, res) => {
       const enrichedListStore = route.listStore.map(itemRaw => {
         const item = itemRaw.toObject ? itemRaw.toObject() : itemRaw
 
-        // console.log(item)
+        // const dateMacth = dates.find(
+        //   u => String(u.day) === String(route.day)
+        // )
+
+        // if (dateMacth.length === 0){
+        //   continue
+        // }
+
+        // const thaiDate = new Intl.DateTimeFormat('en-CA', {
+        //   timeZone: 'Asia/Bangkok',
+        //   year: 'numeric',
+        //   month: '2-digit',
+        //   day: '2-digit'
+        // }).format(new Date())
+
+        // if (dateMacth.date === thaiDate) {
+        //   canSell = true
+        // } else {
+        //   canSell = false
+        // }
 
         const storeInfo = item.storeInfo?.toObject
           ? item.storeInfo.toObject()
@@ -329,7 +378,8 @@ exports.getRouteLock = async (req, res) => {
         // console.log(item)
         return {
           ...item,
-          storeInfo,
+          // canSell || false,
+          // storeInfo,
           storeType: type || []
         }
       })
@@ -431,10 +481,16 @@ exports.getRouteLock = async (req, res) => {
     }
 
     if (area && period && !routeId && !storeId && !province) {
-      enrichedRoutes = (enrichedRoutes || []).map(item => ({
-        ...item,
-        listStore: []
-      }))
+      enrichedRoutes = (enrichedRoutes || []).map(item => {
+
+        return {
+          ...item,
+          // canSell,
+          // dateMacth,
+          // thaiDate,
+          listStore: []
+        }
+      })
     }
 
     // enrichedRoutes = (enrichedRoutes || []).map(item => ({
@@ -5050,22 +5106,22 @@ exports.getRouteSetting = async (req, res) => {
     const channel = req.headers['x-channel']
     const { period } = req.query
 
-    const { RouteChangeLog, Route, RouteChange,RouteSetting } = getModelsByChannel(
+    const { RouteChangeLog, Route, RouteChange, RouteSetting } = getModelsByChannel(
       channel,
       res,
       routeModel
     )
 
     const routeSetting = await RouteSetting.find({
-      period:period
+      period: period
     })
 
 
 
     res.status(200).json({
-      status:200,
-      message:'getRouteSetting',
-      data:routeSetting
+      status: 200,
+      message: 'getRouteSetting',
+      data: routeSetting
 
     })
 
