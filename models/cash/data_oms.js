@@ -502,7 +502,57 @@ const Customer_OMS_BK = sequelize.define(
   }
 )
 
+const DATA_ROUTE = sequelize.define(
+  'DATA_ROUTE',
+  {
+    customerNo: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'CUSCODE'
+    },
+    saleZone: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'CUS_ZONE'
+    },
+    saleTeam: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'HEAD_AREA'
+    },
+    OKCFC4: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'AREA_MASTER'
+    },
+    OKCFC1: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'AREA_NEW'
+    },
+    saleCode: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'SALE_CODE'
+    }
+  },
+  {
+    freezeTableName: true,
+    timestamps: false,
+    createdAt: false,
+    updatedAt: false,
+    primaryKey: false
+  }
+)
+
 module.exports = {
   Customer_OMS,
-  Customer_OMS_BK
+  Customer_OMS_BK,
+  DATA_ROUTE
 }
