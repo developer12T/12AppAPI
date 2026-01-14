@@ -1,16 +1,16 @@
 const { Sequelize, DataTypes, QueryTypes } = require('sequelize')
 const mssql = require('mssql')
 const {
-  POWERBI_DATABASE,
-  POWERBI_HOST,
-  POWERBI_USER,
-  POWERBI_PASSWORD
-} = require('../config/index')
+  MS_SQL_DC,
+  MS_SQL_SERVER,
+  MS_SQL_USER,
+  MS_SQL_PASSWORD
+} = require('./index')
 
 const sequelize = new Sequelize(
-  POWERBI_DATABASE,
-  POWERBI_USER,
-  POWERBI_PASSWORD,
+  MS_SQL_DC,
+  MS_SQL_USER,
+  MS_SQL_PASSWORD,
   {
     pool: {
       max: 20,
@@ -22,7 +22,7 @@ const sequelize = new Sequelize(
     benchmark: true,
     logging: (sql, ms) => console.log(`[SQL ${ms}ms]`, sql),
     dialect: 'mssql',
-    host: POWERBI_HOST,
+    host: MS_SQL_SERVER,
     dialectOptions: {
       options: {
         requestTimeout: 300000, // ✅ ปล่อยได้นาน 5 นาที
@@ -32,7 +32,7 @@ const sequelize = new Sequelize(
           minVersion: 'TLSv1'
         }
       }
-    },
+    }
     // define: {
     //   noPrimaryKey: true
     // }
@@ -40,7 +40,7 @@ const sequelize = new Sequelize(
 )
 
 module.exports = {
-  sequelizeBI: sequelize,
+  sequelize: sequelize,
   DataTypes: DataTypes,
   QueryTypes: QueryTypes,
   mssql: mssql

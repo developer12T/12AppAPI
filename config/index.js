@@ -23,12 +23,14 @@ module.exports = {
   MS_SQL_DATABASE: process.env.MS_SQL_DATABASE,
   MS_SQL_DATABASE_OMS: process.env.MS_SQL_DATABASE_OMS,
   MS_SQL_OMS: process.env.MS_SQL_OMS,
+  MS_SQL_DC: process.env.MS_SQL_DC,
   MS_SQL_M3FDBPRD: process.env.MS_SQL_M3FDBPRD,
 
-  MS_SQL_USER_296: process.env.MS_SQL_USER_296,
-  MS_SQL_PASSWORD_296: process.env.MS_SQL_PASSWORD_296,
-  MS_SQL_SERVER_296: process.env.MS_SQL_SERVER_296,
-  MS_SQL_DATABASE_296: process.env.MS_SQL_DATABASE_296,
+  MS_SQL_USER_096: process.env.MS_SQL_USER_096,
+  MS_SQL_PASSWORD_096: process.env.MS_SQL_PASSWORD_096,
+  MS_SQL_SERVER_096: process.env.MS_SQL_SERVER_096,
+  MS_SQL_DATABASE_096: process.env.MS_SQL_DATABASE_096,
+  // MS_SQL_DATABASE_296: process.env.MS_SQL_DATABASE_096,
 
 
   MY_SQL_USER: process.env.MY_SQL_USER,
