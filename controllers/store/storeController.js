@@ -18,7 +18,7 @@ const {
   Customer_096_TEMP
 } = require('../../models/cash/data096')
 const { uploadFiles } = require('../../utilities/upload')
-const { sequelize, DataTypes } = require('../../config/M3FBPRD_BK')
+const { sequelize, DataTypes } = require('../../config/m3db')
 // const { sequelize, DataTypes } = require('../../config/powerBi')
 const { Sequelize } = require('sequelize')
 const { Op } = require('sequelize')
@@ -167,6 +167,7 @@ const {
 const store = require('../../models/cash/store')
 const QRCode = require('qrcode')
 const { encrypt, decrypt } = require('../../middleware/authen');
+
 exports.getDetailStore = async (req, res) => {
   try {
     const { storeId } = req.params
@@ -201,6 +202,7 @@ exports.getDetailStore = async (req, res) => {
     res.status(500).json({ status: '500', message: error.message })
   }
 }
+
 exports.getPendingStore = async (req, res) => {
   try {
     const channel = req.headers['x-channel'] // 'credit' or 'cash'
@@ -4347,7 +4349,7 @@ exports.changeRouteUseExcel = async (req, res) => {
         try {
 
           const [affected] =
-           await Customer_M3FDBPRD_BK.update(
+           await Customer.update(
             {
               OKCFC1: row.CUS_AREA?.trim(),
               OKCFC4: row.CUS_AREA?.trim(),
