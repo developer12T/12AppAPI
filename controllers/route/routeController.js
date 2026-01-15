@@ -1240,7 +1240,7 @@ exports.checkIn = async (req, res) => {
         {
           $set: {
             'listStore.$.note': note,
-            'listStore.$.image': image,
+            // 'listStore.$.image': image,
             'listStore.$.latitude': latitude,
             'listStore.$.longtitude': longtitude,
             'listStore.$.status': '2',
