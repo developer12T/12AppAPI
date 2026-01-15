@@ -48,7 +48,7 @@ const {
     groupStoreType,
     routeQuery,
     routeQueryOne,
-    updateLatLong
+    updateLatLong,getDataRoute
 } = require('../../controllers/queryFromM3/querySctipt')
 const {
     generateOrderId,

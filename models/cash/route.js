@@ -144,12 +144,16 @@ const RouteChangeLogSchema = new mongoose.Schema({
 const RouteSettingSchema = new mongoose.Schema({
   area: { type: String },
   period: { type: String, required: true },
-  isLockRoute: { type: Boolean, required: true },
+  lock: { type: Boolean, required: true },
   startDate: { type: String, required: true },
   lockRoute: [{
     id: { type: String, unique: true, required: true },
-    route: { type: String, },
-    lock : {type : Boolean},
+    route: { type: String,required: true },
+    lock : { type: Boolean, required: true },
+    listStore:[{
+      storeId: {type : String},
+      lock: { type: Boolean, required: true  }
+    }]
 
   }],
 

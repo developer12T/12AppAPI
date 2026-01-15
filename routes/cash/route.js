@@ -49,6 +49,13 @@ const {
   getRouteLock
 } = require('../../controllers/route/routeController')
 
+const {
+  updateAreaByDataRoute
+} = require('../../controllers/route/routeControllerV2')
+
+
+
+
 const router = express.Router()
 
 router.get('/getRoute', getRoute)
@@ -99,4 +106,6 @@ router.post('/approveRouteChange', approveRouteChange)
 router.post('/addOrderToRoute', addOrderToRoute)
 router.get('/getRouteSetting', getRouteSetting)
 router.get('/getRouteLock', getRouteLock)
+
+router.post('/updateAreaByDataRoute', updateAreaByDataRoute)
 module.exports = router
