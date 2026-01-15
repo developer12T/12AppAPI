@@ -135,13 +135,13 @@ const orderSchema = new mongoose.Schema(
     status: {
       type: String,
       require: true,
-      enum: ['pending', 'completed', 'canceled', 'rejected'],
+      enum: ['pending', 'completed', 'canceled', 'rejected','wait approve'],
       default: 'pending'
     },
     statusTH: {
       type: String,
       require: true,
-      enum: ['รอนำเข้า', 'สำเร็จ', 'ยกเลิก', 'ถูกปฏิเสธ','รอชำระ'],
+      enum: ['รอนำเข้า', 'สำเร็จ', 'ยกเลิก', 'ถูกปฏิเสธ','รอชำระ','รออนุมัติร้านค้า'],
       default: 'รอนำเข้า'
     },
     listProduct: [listOrderProductSchema],

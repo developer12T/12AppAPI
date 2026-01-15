@@ -590,85 +590,83 @@ exports.addUserManeger = async (req, res) => {
 
 exports.addUserNew = async (req, res) => {
   try {
-    const channel = req.headers['x-channel'];
+    const channel = req.headers['x-channel']
 
+    const { User: UserMain } = getModelsByChannel('user', res, userModel)
+    const { User: UserCash } = getModelsByChannel(channel, res, userModel)
 
-    const { User } = getModelsByChannel('user', res, userModel);
+    const tableData = await userQuery(channel)
+    const result = []
 
-    const tableData = await userQuery(channel);
-    const tableMap = new Map(tableData.map(item => [item.saleCode, item]));
-    const mongoUsers = await User.find();
-    const result = [];
-
-    // STEP 1: เพิ่มหรืออัปเดต
     for (const sale of tableData) {
-      const existingUser = await User.findOne({ saleCode: sale.saleCode });
+      // เช็คใน DB หลัก
+      const existsMain = await UserMain.findOne({ saleCode: sale.saleCode })
+      // เช็คใน DB cash
+      const existsCash = await UserCash.findOne({ saleCode: sale.saleCode })
 
-      if (existingUser) {
-        let isModified = false;
-        const fields = [
-          'salePayer', 'username', 'firstName', 'surName', 'password',
-          'tel', 'zone', 'area', 'warehouse', 'role', 'status', 'qrCodeImage', 'typeTruck', 'noTruck'
-        ];
-
-        for (const field of fields) {
-          const incomingValue = field === 'password' ? encrypt(sale.password) : sale[field];
-          if (existingUser[field] !== incomingValue) {
-            existingUser[field] = incomingValue;
-            isModified = true;
-          }
-        }
-
-        if (isModified) {
-          existingUser.period = period();
-          await existingUser.save();
-          result.push(existingUser);
-        }
-      } else {
-        const encryptedPassword = encrypt(sale.password);
-
-        const newUser = new User({
-          saleCode: sale.saleCode,
-          salePayer: sale.salePayer,
-          username: sale.username,
-          firstName: sale.firstName,
-          surName: sale.surName,
-          password: encryptedPassword,
-          tel: sale.tel,
-          zone: sale.zone,
-          area: sale.area,
-          warehouse: sale.warehouse,
-          role: sale.role,
-          status: sale.status,
-          qrCodeImage: sale.qrCodeImage,
-          period: period(),
-          image: '',
-          typeTruck: sale.typeTruck,
-          noTruck: sale.noTruck,
-          platformType: sale.platformType
-        });
-        await newUser.save();
-        result.push(newUser);
+      if (existsMain && existsCash) {
+        continue
       }
+
+      const encryptedPassword = encrypt(sale.password)
+
+      const userPayload = {
+        saleCode: sale.saleCode,
+        salePayer: sale.salePayer,
+        username: sale.username,
+        firstName: sale.firstName,
+        surName: sale.surName,
+        password: encryptedPassword,
+        tel: sale.tel,
+        zone: sale.zone,
+        area: sale.area,
+        warehouse: sale.warehouse,
+        role: sale.role,
+        status: sale.status,
+        qrCodeImage: sale.qrCodeImage,
+        period: period(),
+        image: '',
+        typeTruck: sale.typeTruck ?? '',
+        noTruck: sale.noTruck ?? '',
+        platformType: sale.platformType
+      }
+
+      // เพิ่ม DB หลัก
+      if (!existsMain) {
+        const userMain = new UserMain(userPayload)
+        await userMain.save()
+      }
+
+      // เพิ่ม DB cash
+      if (!existsCash) {
+        const userCash = new UserCash(userPayload)
+        await userCash.save()
+      }
+
+      result.push({
+        saleCode: sale.saleCode,
+        createdMain: !existsMain,
+        createdCash: !existsCash
+      })
     }
 
     res.status(200).json({
       status: 200,
-      message: 'Sync User Success',
+      message: 'Sync User Success (user + cash)',
       data: result
-    });
+    })
   } catch (error) {
     console.error('❌ Error:', error)
 
     res.status(500).json({
       status: 500,
       message: 'error from server',
-      error: error.message || error.toString(), // ✅ ป้องกัน circular object
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+      error: error.message || error.toString(),
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     })
   }
+}
 
-};
 
 exports.addUserArray = async (req, res) => {
   try {

@@ -57,7 +57,10 @@ const {
   addStoreBk228Excel,
   addStoreBk228ExcelToErp,
   getNearbyStores,
-  changeAreaStoreNew
+  changeAreaStoreNew,
+  changeRouteUseExcel,
+  addQrCodeToStore,
+  getQrCodeStore
   // test
 } = require('../../controllers/store/storeController')
 
@@ -72,6 +75,11 @@ const {
   addVisit
 } = require('../../controllers/store/callCardController')
 
+const {
+  updateStoreStatusV2
+} = require('../../controllers/store/storeControllerV2')
+
+
 const router = express.Router()
 router.get('/storeToExcel', storeToExcel)
 router.get('/getLatLongOrderPending', getLatLongOrderPending)
@@ -84,7 +92,6 @@ router.post('/approveLatLongStore', approveLatLongStore)
 router.post('/canceledOrderLatLongStore', canceledOrderLatLongStore)
 router.get('/getStorePage', getStorePage)
 
-
 router.post('/addStore', addStore)
 router.post('/updateImage', updateImage)
 router.post('/insertStoreToM3', insertStoreToM3)
@@ -93,6 +100,8 @@ router.post('/addFromERPnew', addFromERPnew)
 router.patch('/editStore/:storeId', editStore)
 router.post('/checkIn/:storeId', checkInStore)
 router.post('/updateStoreStatus', updateStoreStatus)
+router.post('/updateStoreStatusV2', updateStoreStatusV2)
+
 router.post('/rejectStore', rejectStore)
 router.post('/getShipping', getShipping)
 router.post('/addAndUpdateStore', addAndUpdateStore)
@@ -138,7 +147,8 @@ router.post('/getStoreOnRoute', getStoreOnRoute)
 router.post('/addLatLongToDataToHome', addLatLongToDataToHome)
 router.post('/getNearbyStores', getNearbyStores)
 router.post('/changeAreaStoreNew', changeAreaStoreNew)
-
+router.post('/addQrCodeToStore', addQrCodeToStore)
+router.post('/getQrCodeStore', getQrCodeStore)
 router.post(
   '/changeAreaStore',
   upload.single('file'), // 👈 ต้องมี และต้องชื่อ file
@@ -155,6 +165,11 @@ router.post(
   addStoreBk228ExcelToErp
 )
 
+router.post(
+  '/changeRouteUseExcel',
+  upload.single('file'), // 👈 ต้องมี และต้องชื่อ file
+  changeRouteUseExcel
+)
 
 router.get('/:storeId', getDetailStore)
 module.exports = router

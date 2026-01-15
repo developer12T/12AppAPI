@@ -263,12 +263,12 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-        .map(item => item.price)
-        .reduce((sum, price) => sum + price, 0)
+          .map(item => item.price)
+          .reduce((sum, price) => sum + price, 0)
       : 0
 
     // ✅ ช่วยฟังก์ชัน: เช็คว่า createAt ตั้งแต่ Aug-2025 ขึ้นไปไหม
-    function isAug2025OrLater(createAt) {
+    function isAug2025OrLater (createAt) {
       if (!createAt) return false
 
       // case: "YYYYMM" เช่น "202508"
@@ -289,14 +289,14 @@ exports.checkout = async (req, res) => {
     // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-        storeData.address,
-        storeData.subDistrict && `ต.${storeData.subDistrict}`,
-        storeData.district && `อ.${storeData.district}`,
-        storeData.province && `จ.${storeData.province}`,
-        storeData.postCode
-      ]
-        .filter(Boolean)
-        .join(' ')
+          storeData.address,
+          storeData.subDistrict && `ต.${storeData.subDistrict}`,
+          storeData.district && `อ.${storeData.district}`,
+          storeData.province && `จ.${storeData.province}`,
+          storeData.postCode
+        ]
+          .filter(Boolean)
+          .join(' ')
       : storeData.address
 
     // const addressFinal = `${storeData.address} ต.${storeData.subDistrict} อ.${storeData.district} จ.${province} ${postCode}`
@@ -535,7 +535,6 @@ exports.checkout = async (req, res) => {
   }
 }
 
-
 exports.checkOutSale = async (req, res) => {
   // const transaction = await sequelize.transaction();
   try {
@@ -705,12 +704,12 @@ exports.checkOutSale = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-        .map(item => item.price)
-        .reduce((sum, price) => sum + price, 0)
+          .map(item => item.price)
+          .reduce((sum, price) => sum + price, 0)
       : 0
 
     // ✅ ช่วยฟังก์ชัน: เช็คว่า createAt ตั้งแต่ Aug-2025 ขึ้นไปไหม
-    function isAug2025OrLater(createAt) {
+    function isAug2025OrLater (createAt) {
       if (!createAt) return false
 
       // case: "YYYYMM" เช่น "202508"
@@ -731,14 +730,14 @@ exports.checkOutSale = async (req, res) => {
     // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-        storeData.address,
-        storeData.subDistrict && `ต.${storeData.subDistrict}`,
-        storeData.district && `อ.${storeData.district}`,
-        storeData.province && `จ.${storeData.province}`,
-        storeData.postCode
-      ]
-        .filter(Boolean)
-        .join(' ')
+          storeData.address,
+          storeData.subDistrict && `ต.${storeData.subDistrict}`,
+          storeData.district && `อ.${storeData.district}`,
+          storeData.province && `จ.${storeData.province}`,
+          storeData.postCode
+        ]
+          .filter(Boolean)
+          .join(' ')
       : storeData.address
 
     // const addressFinal = `${storeData.address} ต.${storeData.subDistrict} อ.${storeData.district} จ.${province} ${postCode}`
@@ -975,8 +974,6 @@ exports.checkOutSale = async (req, res) => {
     res.status(500).json({ status: '500', message: error.message })
   }
 }
-
-
 
 exports.reflashOrder = async (req, res) => {
   try {
@@ -1428,7 +1425,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -1644,7 +1641,10 @@ exports.OrderToExcel = async (req, res) => {
       status: { $nin: ['canceled'] },
       status: { $in: statusArray },
       type: { $in: ['sale', 'saleNoodle'] },
-      'store.area': { $ne: 'IT211' }
+      'store.area': { $ne: 'IT211' },
+      $expr: {
+        $lte: [{ $strLenCP: '$store.storeId' }, 11]
+      }
     }
 
     // Order Change
@@ -1739,7 +1739,6 @@ exports.OrderToExcel = async (req, res) => {
     pipeline.push({
       $sort: { statusASC: 1, createdAt: -1 }
     })
-
     const modelOrder = await Order.aggregate(pipeline)
     // console.log(modelOrder)
 
@@ -1822,7 +1821,7 @@ exports.OrderToExcel = async (req, res) => {
 
     const tranFromOrder = modelOrder.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD(date) {
+      function formatDateToThaiYYYYMMDD (date) {
         const d = new Date(date)
         d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1945,7 +1944,7 @@ exports.OrderToExcel = async (req, res) => {
 
     const tranFromChange = modelChange.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD(date) {
+      function formatDateToThaiYYYYMMDD (date) {
         const d = new Date(date)
         d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -2215,7 +2214,7 @@ exports.OrderToExcel = async (req, res) => {
         message: 'Not Found Order'
       })
     }
-    function yyyymmddToDdMmYyyy(dateString) {
+    function yyyymmddToDdMmYyyy (dateString) {
       // สมมติ dateString คือ '20250804'
       const year = dateString.slice(0, 4)
       const month = dateString.slice(4, 6)
@@ -2257,7 +2256,7 @@ exports.OrderToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       }
     )
 
@@ -3026,7 +3025,7 @@ exports.getSummarybyArea = async (req, res) => {
 
       // console.log(dataRefund)
 
-      function groupByMonthAndSum(data) {
+      function groupByMonthAndSum (data) {
         return data.reduce((acc, item) => {
           // ดึงเดือนจาก createdAtThai (หรือใช้ createdAt ก็ได้ถ้าเป็น Date)
           const date = new Date(item.createdAt)
@@ -3695,8 +3694,9 @@ exports.erpApiCheckOrderDistrabution = async (req, res) => {
 
         const ReceiveQty = Object.values(
           Receive.reduce((acc, cur) => {
-            const key = `${cur.coNo}_${cur.withdrawUnit
-              }_${cur.productId.trim()}`
+            const key = `${cur.coNo}_${
+              cur.withdrawUnit
+            }_${cur.productId.trim()}`
             if (!acc[key]) {
               acc[key] = { ...cur }
             } else {
@@ -4308,8 +4308,8 @@ exports.getSummaryProduct = async (req, res) => {
 
       const percentStore = allStoreCount?.constStore
         ? (((storeCount?.count || 0) / allStoreCount.constStore) * 100).toFixed(
-          2
-        )
+            2
+          )
         : 0
 
       return {
@@ -5502,28 +5502,28 @@ exports.checkOrderCancelM3 = async (req, res) => {
       const type = saleSet.has(id)
         ? 'Sale'
         : refundSet.has(id)
-          ? 'Refund'
-          : changeSet.has(id)
-            ? 'Change'
-            : ''
+        ? 'Refund'
+        : changeSet.has(id)
+        ? 'Change'
+        : ''
 
       const typeId =
         type === 'Sale'
           ? 'A31'
           : type === 'Refund'
-            ? 'A34'
-            : type === 'Change'
-              ? 'B31'
-              : ''
+          ? 'A34'
+          : type === 'Change'
+          ? 'B31'
+          : ''
 
       const statusTablet =
         type === 'Sale'
           ? saleStatusMap.get(id) ?? ''
           : type === 'Refund'
-            ? refundStatusMap.get(id) ?? ''
-            : type === 'Change'
-              ? changeStatusMap.get(id) ?? ''
-              : ''
+          ? refundStatusMap.get(id) ?? ''
+          : type === 'Change'
+          ? changeStatusMap.get(id) ?? ''
+          : ''
 
       return { orderId: id, type, typeId, statusTablet }
     })
@@ -5545,7 +5545,7 @@ exports.checkOrderCancelM3 = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
 
     // res.status(200).json({
@@ -6124,7 +6124,7 @@ exports.orderPowerBI = async (req, res) => {
           }
 
           // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-          fs.unlink(tempPath, () => { })
+          fs.unlink(tempPath, () => {})
         }
       )
     } else {
@@ -6284,7 +6284,6 @@ exports.updateStatusOrderDistribution = async (req, res) => {
       message: 'Sucess'
       // data: data
     })
-
   } catch (error) {
     console.error('Error in updateStatusOrderDistribution:', error)
     res.status(500).json({
@@ -6972,7 +6971,7 @@ exports.getOrderExcelNew = async (req, res) => {
     dataGiveArray = sortProduct(dataGiveArray, 'productGroup')
 
     if (excel == 'true') {
-      function zeroToDash(value) {
+      function zeroToDash (value) {
         return value === 0 ? '-' : value
       }
       const dataSaleFinal = dataSaleArray.map(item => {
@@ -7064,7 +7063,7 @@ exports.getOrderExcelNew = async (req, res) => {
           }
         }
         // ลบไฟล์ทิ้งหลังจบ (สำเร็จหรือไม่ก็ตาม)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       })
     } else {
       return res.status(200).json({
@@ -7138,14 +7137,14 @@ exports.updateAddressInOrder = async (req, res) => {
 
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-        storeData.address,
-        storeData.subDistrict && `ต.${storeData.subDistrict}`,
-        storeData.district && `อ.${storeData.district}`,
-        storeData.province && `จ.${storeData.province}`,
-        storeData.postCode
-      ]
-        .filter(Boolean)
-        .join(' ')
+          storeData.address,
+          storeData.subDistrict && `ต.${storeData.subDistrict}`,
+          storeData.district && `อ.${storeData.district}`,
+          storeData.province && `จ.${storeData.province}`,
+          storeData.postCode
+        ]
+          .filter(Boolean)
+          .join(' ')
       : storeData.address
 
     for (i of dataOrder) {
@@ -7488,100 +7487,93 @@ exports.m3ToOrderMongo = async (req, res) => {
   }
 }
 
-
-function getNestedValue(obj, path) {
-  return path.split('.').reduce((o, k) => (o ? o[k] : undefined), obj);
+function getNestedValue (obj, path) {
+  return path.split('.').reduce((o, k) => (o ? o[k] : undefined), obj)
 }
 
 exports.editOrderSale = async (req, res) => {
   try {
-    const { orderId } = req.params;
-    const { name, address, taxId, tel, user } = req.body;
+    const { orderId } = req.params
+    const { name, address, taxId, tel, user } = req.body
 
     if (!user) {
       return res.status(401).json({
         status: 401,
-        message: "user is required"
+        message: 'user is required'
       })
     }
 
     const data = {
-      "store.name": name,
-      "store.address": address,
-      "store.taxId": taxId,
-      "store.tel": tel
-    };
+      'store.name': name,
+      'store.address': address,
+      'store.taxId': taxId,
+      'store.tel': tel
+    }
 
     // clean empty fields
     Object.keys(data).forEach(key => {
-      if (!data[key]) delete data[key];
-    });
+      if (!data[key]) delete data[key]
+    })
 
-    const channel = req.headers["x-channel"];
-    const { Order, OrderHisLog } = getModelsByChannel(channel, res, orderModel);
+    const channel = req.headers['x-channel']
+    const { Order, OrderHisLog } = getModelsByChannel(channel, res, orderModel)
 
-    const dataOrder = await Order.findOne({ orderId });
+    const dataOrder = await Order.findOne({ orderId })
     if (!dataOrder) {
-      return res.status(404).json({ status: 404, message: "Not found order" });
+      return res.status(404).json({ status: 404, message: 'Not found order' })
     }
 
     // history detect changes
     const editableFields = [
-      "store.name",
-      "store.address",
-      "store.taxId",
-      "store.tel",
-    ];
+      'store.name',
+      'store.address',
+      'store.taxId',
+      'store.tel'
+    ]
 
     const history = {
       editPerson: user,
-      editAt: new Date(),
-    };
+      editAt: new Date()
+    }
 
     editableFields.forEach(field => {
-      const oldVal = getNestedValue(dataOrder, field);
-      const newVal = data[field]; // new value stored as "store.name"
+      const oldVal = getNestedValue(dataOrder, field)
+      const newVal = data[field] // new value stored as "store.name"
 
       if (newVal !== undefined && newVal !== oldVal) {
-        const key = field.split(".")[1];  // name, address, taxId, tel
-        history[key] = newVal;
-        history[key + "Old"] = oldVal;
+        const key = field.split('.')[1] // name, address, taxId, tel
+        history[key] = newVal
+        history[key + 'Old'] = oldVal
       }
-    });
+    })
 
     // nothing changed
     if (Object.keys(history).length === 2) {
       return res.status(400).json({
         status: 400,
-        message: "Nothing changed"
-      });
+        message: 'Nothing changed'
+      })
     }
 
     // update
-    await Order.findOneAndUpdate(
-      { orderId },
-      { $set: data },
-      { new: true }
-    );
+    await Order.findOneAndUpdate({ orderId }, { $set: data }, { new: true })
 
-    await OrderHisLog.create(history);
+    await OrderHisLog.create(history)
 
     return res.status(200).json({
       status: 200,
-      message: "update success",
+      message: 'update success',
       data: history
-    });
-
+    })
   } catch (error) {
-    console.error(error);
+    console.error(error)
     res.status(500).json({
       status: 500,
-      message: "Server error",
+      message: 'Server error',
       error: error.message
-    });
+    })
   }
-};
-
+}
 
 exports.updateProCodeInOrder = async (req, res) => {
   try {
@@ -7596,37 +7588,31 @@ exports.updateProCodeInOrder = async (req, res) => {
     const orderData = await Order.find({ period: period })
     const promotionData = await Promotion.find({ status: 'active' })
 
-
     let data = []
 
-
     for (const item of orderData) {
-
       for (const promo of item.listPromotions) {
-        console.log("old proCode:", promo.proCode);
+        console.log('old proCode:', promo.proCode)
 
         // 👉 แก้ค่าที่ต้องการ
-        promo.proCode = 'FV1P';
+        promo.proCode = 'FV1P'
       }
 
       // 👉 SAVE document กลับ MongoDB
-      await item.save();
+      await item.save()
     }
-
 
     res.status(201).json({
       status: 200,
       message: 'updateProCodeInOrder success',
       data: orderData
     })
-
-
   } catch (error) {
-    console.error(error);
+    console.error(error)
     res.status(500).json({
       status: 500,
-      message: "Server error",
+      message: 'Server error',
       error: error.message
-    });
+    })
   }
 }

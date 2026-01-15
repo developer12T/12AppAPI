@@ -453,7 +453,7 @@ exports.syncAddressDROUTE = async (req, res) => {
     )];
 
     let data = []
-    const withdrawData = await Withdraw.find({ZType:'T05'})
+    const withdrawData = await Withdraw.find({ ZType: 'T05' })
 
     const usedRouteCodes = new Set();
     const usedRouteCodesFromDB = new Set(
@@ -474,7 +474,7 @@ exports.syncAddressDROUTE = async (req, res) => {
 
       // ปรับ format ให้เสร็จก่อน
       if (first6.includes('R')) {
-        routeCode = first5 ;
+        routeCode = first5;
       } else {
         routeCode = first5;
       }
@@ -723,5 +723,133 @@ exports.updatePlaceAddressExcel = async (req, res) => {
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+
+exports.addAddressFromExcel = async (req, res) => {
+  const t = await sequelize.transaction()
+
+  try {
+    const channel = req.headers['x-channel']
+    const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
+
+    // 📄 อ่าน Excel
+    const workbook = XLSX.readFile(req.file.path)
+    const sheetName = workbook.SheetNames[0]
+    const sheet = workbook.Sheets[sheetName]
+    const dataExcel = XLSX.utils.sheet_to_json(sheet)
+
+    const emailMap = {
+      '109': 'dc_nr@onetwotrading.co.th',
+      '101': 'dc_np2@onetwotrading.co.th',
+      '102': 'dc_mk@onetwotrading.co.th',
+      '104': 'dc_sr@onetwotrading.co.th',
+      '105': 'dc_samutprakan@onetwotrading.co.th',
+      '106': 'dc_nakhonsawan@onetwotrading.co.th',
+      '103': 'dc_lp@onetwotrading.co.th',
+      '111': 'dc_np2@onetwotrading.co.th',
+      '121': '',
+      '110': '',
+    }
+
+    let inserted = 0
+    let skipped = 0
+
+    for (const row of dataExcel) {
+      if (!row.area || !row.address) {
+        skipped++
+        continue
+      }
+
+      const area = row.area.slice(0, 5)
+      const address = row.address.trim()
+
+      const OAADR1 = address.slice(0, 35)
+      const OAADR2 = address.length > 35 ? address.slice(35, 70) : ''
+      const email = emailMap[String(row.werehouse).trim()] || ''
+
+      // 🔍 ดักซ้ำ CIADDR
+      const existCIADDR = await CIADDR.findOne({
+        where: {
+          OAPONO: area,
+          OAADK1: row.area
+        }
+      })
+
+      if (existCIADDR) {
+        skipped++
+        continue
+      }
+
+      // 🔍 ดักซ้ำ Withdraw
+      const existWithdraw = await Withdraw.findOne({
+        Des_No: row.area,
+        Des_Area: area
+      })
+
+      if (existWithdraw) {
+        skipped++
+        continue
+      }
+
+      const ciaddrData = {
+        coNo: 410,
+        OAADTH: 0,
+        OAADK1: row.area,
+        OAADK2: '',
+        OAADK3: '',
+        OACONM: row.address,
+        OAADR1,
+        OAADR2,
+        OAADR3: row.werehouse,
+        OAADR4: '',
+        OACSCD: 'TH',
+        OAPONO: area,
+        OALMDT: formatDate(),
+        OACHID: 'MI02',
+        OALMTS: `${Date.now()}`
+      }
+
+      console.log('ciaddrData',ciaddrData)
+
+      const withDraw = {
+        Des_No: row.area,
+        Des_Name: row.address,
+        Des_Date: '20260112',
+        Des_Area: area,
+        ZType: 'T05',
+        WH: row.werehouse,
+        ROUTE: area,
+        WH1: row.WH1,
+        Dc_Email: email
+      }
+
+      console.log("")
+      await CIADDR.create(ciaddrData)
+      await Withdraw.create(withDraw)
+
+      inserted++
+    }
+
+    // ✅ commit เมื่อทุกอย่างผ่าน
+    // await t.commit()
+
+    res.status(201).json({
+      status: 201,
+      message: 'Add address success',
+      inserted,
+      skipped
+    })
+
+  } catch (error) {
+    // ❌ rollback ถ้ามี error
+    await t.rollback()
+    console.error(error)
+
+    res.status(500).json({
+      status: 500,
+      message: error.message
+    })
   }
 }

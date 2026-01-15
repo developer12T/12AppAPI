@@ -2,8 +2,24 @@ const mongoose = require('mongoose')
 const { Types } = require('mongoose')
 const { ObjectId } = mongoose.Types
 const { Customer } = require('../../models/cash/master')
+const { CustomerBI } = require('../../models/cash/powerBi')
+const {
+  Customer_OMS,
+  Customer_OMS_BK,
+  DATA_ROUTE
+} = require('../../models/cash/data_oms')
+
+const { Customer_APIM3 } = require('../../models/cash/data_api')
+const { Customer_M3FDBPRD_BK } = require('../../models/cash/M3FDBPRD_BK')
+const { Customer_DC } = require('../../models/cash/data_dc')
+const {
+  Customer_096,
+  Customer_096_BK,
+  Customer_096_TEMP
+} = require('../../models/cash/data096')
 const { uploadFiles } = require('../../utilities/upload')
 const { sequelize, DataTypes } = require('../../config/m3db')
+// const { sequelize, DataTypes } = require('../../config/powerBi')
 const { Sequelize } = require('sequelize')
 const { Op } = require('sequelize')
 
@@ -32,7 +48,11 @@ const {
   routeQueryOne,
   updateLatLong
 } = require('../../controllers/queryFromM3/querySctipt')
-
+const {
+  generateOrderId,
+  generateOrderIdFoodTruck,
+  generateOrderIdDammy
+} = require('../../utilities/genetateId')
 // ===== helper: สร้างไดเรกทอรี + เซฟไฟล์ buffer เป็น .webp =====
 // async function saveImageBufferToWebp({ buffer, destDir, baseName }) {
 //   await fsp.mkdir(destDir, { recursive: true })
@@ -145,8 +165,8 @@ const {
   bueatyStoreQuery
 } = require('../../controllers/queryFromM3/querySctipt')
 const store = require('../../models/cash/store')
-const { trace } = require('console')
-const { console } = require('inspector')
+const QRCode = require('qrcode')
+const { encrypt, decrypt } = require('../../middleware/authen');
 
 exports.getDetailStore = async (req, res) => {
   try {
@@ -182,6 +202,7 @@ exports.getDetailStore = async (req, res) => {
     res.status(500).json({ status: '500', message: error.message })
   }
 }
+
 exports.getPendingStore = async (req, res) => {
   try {
     const channel = req.headers['x-channel'] // 'credit' or 'cash'
@@ -975,20 +996,20 @@ exports.editStore = async (req, res) => {
           coNo: 410,
           customerNo: storeId
         }
-      });
+      })
 
       if (!m3Store) {
         return res.status(404).json({
           status: 404,
           message: 'Store not found in M3'
         })
-
       }
-
     }
 
     if (!oldStore) {
-      return res.status(404).json({ status: '404', message: 'Store not found mongo' });
+      return res
+        .status(404)
+        .json({ status: '404', message: 'Store not found mongo' })
     }
 
     const editableFields = [
@@ -1064,10 +1085,10 @@ exports.editStore = async (req, res) => {
 
     // ---- NAME ----
     if (data.name) {
-      const nameStr = updatedStore.name ?? '';
-      updateData.OKALCU = nameStr.slice(0, 10);
-      updateData.customerName = nameStr.slice(0, 36);
-      updateData.customerAddress4 = nameStr.slice(36, 72);
+      const nameStr = updatedStore.name ?? ''
+      updateData.OKALCU = nameStr.slice(0, 10)
+      updateData.customerName = nameStr.slice(0, 36)
+      updateData.customerAddress4 = nameStr.slice(36, 72)
     }
 
     if (data.taxId) {
@@ -1081,10 +1102,13 @@ exports.editStore = async (req, res) => {
     // ---- ADDRESS ----
     if (data.address || data.subDistrict || data.province || data.postCode) {
       const fullAddress =
-        (updatedStore.address ?? '') + '' +
-        (updatedStore.subDistrict ?? '') + '' +
-        (updatedStore.province ?? '') + '' +
-        (updatedStore.postCode ?? '');
+        (updatedStore.address ?? '') +
+        '' +
+        (updatedStore.subDistrict ?? '') +
+        '' +
+        (updatedStore.province ?? '') +
+        '' +
+        (updatedStore.postCode ?? '')
 
       updateData.customerAddress1 = fullAddress.slice(0, 35)
       updateData.customerAddress2 = fullAddress.slice(35, 70)
@@ -1624,6 +1648,7 @@ exports.updateStoreStatus = async (req, res) => {
     )
     const { User } = getModelsByChannel(channel, res, userModel)
     const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
     const store = await Store.findOne({ storeId: storeId })
     // console.log(store)
     if (!store) {
@@ -1696,24 +1721,24 @@ exports.updateStoreStatus = async (req, res) => {
         customerCoType: item.type ?? '',
         customerAddress1: (
           item.address +
-          item.subDistrict +
-          // item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+            item.subDistrict +
+            // item.subDistrict +
+            item.province +
+            item.postCode ?? ''
         ).substring(0, 35),
         customerAddress2: (
           item.address +
-          item.subDistrict +
-          // item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+            item.subDistrict +
+            // item.subDistrict +
+            item.province +
+            item.postCode ?? ''
         ).substring(35, 70),
         customerAddress3: (
           item.address +
-          item.subDistrict +
-          // item.subDistrict +
-          item.province +
-          item.postCode ?? ''
+            item.subDistrict +
+            // item.subDistrict +
+            item.province +
+            item.postCode ?? ''
         ).substring(70, 105),
         customerAddress4: '',
         customerPoscode: (item.postCode ?? '').substring(0, 35),
@@ -1769,6 +1794,28 @@ exports.updateStoreStatus = async (req, res) => {
           }
         }
       }
+
+      // const orderData = await Order.find({ 'store.storeId': storeId })
+
+      // if (orderData.length > 0) {
+
+      //   for (const row of orderData) {
+
+      //     const orderId = await generateOrderId(row.store.area, row.sale.warehouse, channel, res)
+      //     await Order.findOneAndUpdate(
+      //       { 'store.storeId': storeId },
+      //       {
+      //         $set: {
+      //           'store.storeId': newId,
+      //           orderId:orderId,
+      //           status:'pending',
+      //           statusTH:'รอนำเข้า'
+      //         }
+      //       }
+      //     )
+
+      //   }
+      // }
 
       const io = getSocket()
       // io.emit('store/updateStoreStatus', {
@@ -2957,7 +3004,7 @@ exports.storeToExcel = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
   } catch (err) {
     console.error(err)
@@ -3495,7 +3542,7 @@ exports.getStorePage = async (req, res) => {
       limit,
       q // optional search text
     } = req.query
-
+    // console.log('testsssss')
     const channel = req.headers['x-channel']
     const { Store } = getModelsByChannel(channel, res, storeModel)
     const { Route } = getModelsByChannel(channel, res, routeModel)
@@ -3509,7 +3556,7 @@ exports.getStorePage = async (req, res) => {
     if (route) filter.route = route
     if (type && type !== 'all') filter.type = type
 
-    filter.status = { $nin: ['10', '90'] }
+    filter.status = { $nin: ['90'] }
 
     const qText = (q || '').trim()
     if (qText) {
@@ -3534,6 +3581,8 @@ exports.getStorePage = async (req, res) => {
         .limit(perPage)
         .lean()
     }
+
+    // console.log('filter',filter)
 
     const total = await Store.countDocuments(filter)
 
@@ -3614,7 +3663,7 @@ exports.checkRangeLatLong = async (req, res) => {
 
     const dataStoreLatLong = await StoreLatLong.find({ status: 'approved' })
 
-    function calculateDistance(lat1, lon1, lat2, lon2) {
+    function calculateDistance (lat1, lon1, lat2, lon2) {
       const R = 6371 // รัศมีโลก (กิโลเมตร)
 
       const dLat = deg2rad(lat2 - lat1)
@@ -3623,16 +3672,16 @@ exports.checkRangeLatLong = async (req, res) => {
       const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos(deg2rad(lat1)) *
-        Math.cos(deg2rad(lat2)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2)
+          Math.cos(deg2rad(lat2)) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2)
 
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 
       return R * c // ระยะทาง (กิโลเมตร)
     }
 
-    function deg2rad(deg) {
+    function deg2rad (deg) {
       return deg * (Math.PI / 180)
     }
 
@@ -3679,7 +3728,7 @@ exports.checkRangeLatLong = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => { })
+      fs.unlink(tempPath, () => {})
     })
 
     // res.status(200).json({
@@ -3706,7 +3755,6 @@ exports.checkNewStoreLatLong = async (req, res) => {
     const { Route } = getModelsByChannel(channel, res, routeModel)
     const { StoreLatLong } = getModelsByChannel(channel, res, storeLatLongModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
-
     const dataStoreLatLong = await StoreLatLong.find({ status: 'approved' })
 
     const storeData = await Store.find({
@@ -3883,7 +3931,7 @@ exports.areaStoreM3toMongo = async (req, res) => {
   }
 }
 
-function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
+function getDistanceFromLatLonInMeters (lat1, lon1, lat2, lon2) {
   const R = 6371000 // รัศมีโลก (เมตร)
   const dLat = ((lat2 - lat1) * Math.PI) / 180
   const dLon = ((lon2 - lon1) * Math.PI) / 180
@@ -3891,8 +3939,8 @@ function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
   const a =
     Math.sin(dLat / 2) ** 2 +
     Math.cos((lat1 * Math.PI) / 180) *
-    Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLon / 2) ** 2
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 
@@ -4139,7 +4187,6 @@ exports.getStoreOnRoute = async (req, res) => {
 
 exports.addLatLongToDataToHome = async (req, res) => {
   try {
-
     const channel = req.headers['x-channel']
     const { Store } = getModelsByChannel(channel, res, storeModel)
     const { Route } = getModelsByChannel(channel, res, routeModel)
@@ -4149,29 +4196,27 @@ exports.addLatLongToDataToHome = async (req, res) => {
       { $match: { status: 'approved' } },
       {
         $group: {
-          _id: "$storeId",
-          latestUpdatedAt: { $max: "$updatedAt" },
-          latitude: { $first: "$latitude" },
-          longtitude: { $first: "$longtitude" }
-
+          _id: '$storeId',
+          latestUpdatedAt: { $max: '$updatedAt' },
+          latitude: { $first: '$latitude' },
+          longtitude: { $first: '$longtitude' }
         }
       }
     ])
-    await updateLatLong(channel, storeData.map(item => ({
-      customerCode: item._id,
-      latitude: item.latitude,
-      longtitude: item.longtitude
-    })))
-
-
-
+    await updateLatLong(
+      channel,
+      storeData.map(item => ({
+        customerCode: item._id,
+        latitude: item.latitude,
+        longtitude: item.longtitude
+      }))
+    )
 
     res.status(200).json({
       status: 200,
       message: 'sucess',
       data: storeData
     })
-
   } catch (error) {
     console.error('❌ Error:', error)
 
@@ -4183,7 +4228,6 @@ exports.addLatLongToDataToHome = async (req, res) => {
     })
   }
 }
-
 
 exports.changeAreaStore = async (req, res) => {
   try {
@@ -4211,10 +4255,14 @@ exports.changeAreaStore = async (req, res) => {
     // แปลงเป็น JSON
     const rows = xlsx.utils.sheet_to_json(sheet)
     const storeIdList = rows.map(row => row.Old_Area)
-    const storeData = await Store.find({ area: { $in: storeIdList } }).select('storeId area')
+    const storeData = await Store.find({ area: { $in: storeIdList } }).select(
+      'storeId area'
+    )
 
     for (const row of rows) {
-      const existingStore = storeData.filter(store => store.area === row.Old_Area)
+      const existingStore = storeData.filter(
+        store => store.area === row.Old_Area
+      )
 
       if (existingStore.length === 0) {
         // console.log(`⚠️ ไม่พบร้านที่มี Area: ${row.Old_Area}`)
@@ -4250,15 +4298,8 @@ exports.changeAreaStore = async (req, res) => {
             }
           }
         )
-
       }
-
     }
-
-
-
-
-
 
     return res.status(200).json({
       status: 200,
@@ -4267,7 +4308,6 @@ exports.changeAreaStore = async (req, res) => {
       // total: rows.length,
       // data: rows
     })
-
   } catch (error) {
     console.error('❌ Error:', error)
 
@@ -4280,10 +4320,111 @@ exports.changeAreaStore = async (req, res) => {
   }
 }
 
+exports.changeRouteUseExcel = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        status: 400,
+        message: 'file is required'
+      })
+    }
+
+    // 📄 อ่าน Excel
+    const workbook = xlsx.read(req.file.buffer, { type: 'buffer' })
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    const rows = xlsx.utils.sheet_to_json(sheet, { defval: '' })
+
+    let updated = 0
+    let notFound = []
+    let errors = []
+
+    // (แนะนำ) ใช้ transaction
+    const transaction = await sequelize.transaction()
+
+    try {
+      for (const row of rows) {
+        const cusCode = String(row.CUSCODE || '').trim()
+        if (!cusCode) continue
+
+        try {
+
+          const [affected] =
+           await Customer.update(
+            {
+              OKCFC1: row.CUS_AREA?.trim(),
+              OKCFC4: row.CUS_AREA?.trim(),
+              saleZone: row.CUS_ZONE?.trim(),
+              saleTeam: row.CUS_TEAM?.trim(),
+              saleCode: row.SALE?.trim()
+            },
+            {
+              where: { customerNo: cusCode },
+              transaction
+            }
+          )
+
+          // await Customer_096_BK.update(
+          //   {
+          //     OKCFC1: row.CUS_AREA?.trim(),
+          //     OKCFC4: row.CUS_AREA?.trim(),
+          //     saleZone: row.CUS_ZONE?.trim(),
+          //     saleTeam: row.CUS_TEAM?.trim(),
+          //     saleCode: row.SALE?.trim()
+          //   },
+          //   {
+          //     where: { customerNo: cusCode },
+          //     transaction
+          //   }
+          // )
+
+          if (affected === 0) {
+            notFound.push(cusCode)
+          } else {
+            updated++
+          }
+        } catch (err) {
+          errors.push({
+            CUSCODE: cusCode,
+            error: err.message
+          })
+        }
+      }
+
+      await transaction.commit()
+    } catch (err) {
+      await transaction.rollback()
+      throw err
+    }
+
+    return res.status(200).json({
+      status: 200,
+      message: 'update customer from excel success',
+      summary: {
+        total: rows.length,
+        updated,
+        notFound: notFound.length,
+        error: errors.length
+      },
+      notFound,
+      errors
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+    return res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message
+    })
+  }
+}
 exports.addStoreBk228Excel = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
-    const { Store, RunningNumber } = getModelsByChannel(channel, res, storeModel)
+    const { Store, RunningNumber } = getModelsByChannel(
+      channel,
+      res,
+      storeModel
+    )
 
     if (!req.file) {
       return res.status(400).json({
@@ -4308,13 +4449,9 @@ exports.addStoreBk228Excel = async (req, res) => {
     const storeIdList = rows.map(row => row.storeId)
     const storeData = await Store.find().lean()
 
-
     let notInMongo = []
 
-
     for (const id of storeIdList) {
-
-
       if (storeData.some(c => c.storeId === id)) {
         continue
       } else {
@@ -4329,8 +4466,9 @@ exports.addStoreBk228Excel = async (req, res) => {
       raw: true
     })
 
-
-    const RunningNumberData = await RunningNumber.findOne({ zone: 'BK' }).select('last')
+    const RunningNumberData = await RunningNumber.findOne({
+      zone: 'BK'
+    }).select('last')
     let lastRunning = RunningNumberData.last
 
     // const newRows = storeData.map(row => {
@@ -4351,7 +4489,6 @@ exports.addStoreBk228Excel = async (req, res) => {
 
     // await Store.insertMany(newRows)
 
-
     // await RunningNumber.findOneAndUpdate(
     //   { zone: 'BK' },
     //   { $set: { last: lastRunning } },
@@ -4362,8 +4499,6 @@ exports.addStoreBk228Excel = async (req, res) => {
       message: 'sucess',
       data: notInMongo
     })
-
-
   } catch (error) {
     console.error('❌ Error:', error)
 
@@ -4408,18 +4543,14 @@ exports.addStoreBk228ExcelToErp = async (req, res) => {
     const errors = []
     let data = []
 
-
-
-
     for (const item of storeData) {
       const rawAddress =
         (item.address ?? '').trim() +
         (item.subDistrict ?? '').trim() +
         (item.province ?? '').trim() +
-        (item.postCode ?? '').trim();
+        (item.postCode ?? '').trim()
 
-      const fullAddress = rawAddress.trim();
-
+      const fullAddress = rawAddress.trim()
 
       const dataTran = {
         Hcase: 1,
@@ -4467,7 +4598,7 @@ exports.addStoreBk228ExcelToErp = async (req, res) => {
       data.push(dataTran)
 
       if (item.area === 'IT211') continue
-      const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+      const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
       await sleep(1000)
       console.log('dataTran', dataTran)
       // try {
@@ -4497,8 +4628,6 @@ exports.addStoreBk228ExcelToErp = async (req, res) => {
       //     })
       //   }
       // }
-
-
     }
 
     res.status(200).json({
@@ -4506,7 +4635,6 @@ exports.addStoreBk228ExcelToErp = async (req, res) => {
       message: 'sucess',
       data: data
     })
-
   } catch (error) {
     console.error('❌ Error:', error)
 
@@ -4519,20 +4647,19 @@ exports.addStoreBk228ExcelToErp = async (req, res) => {
   }
 }
 
-function getDistanceKm(lat1, lon1, lat2, lon2) {
+function getDistanceKm (lat1, lon1, lat2, lon2) {
   const R = 6371 // รัศมีโลก (km)
-  const dLat = (lat2 - lat1) * Math.PI / 180
-  const dLon = (lon2 - lon1) * Math.PI / 180
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLon = ((lon2 - lon1) * Math.PI) / 180
 
   const a =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * Math.PI / 180) *
-    Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) ** 2
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2
 
   return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)))
 }
-
 
 exports.getNearbyStores = async (req, res) => {
   try {
@@ -4560,7 +4687,6 @@ exports.getNearbyStores = async (req, res) => {
       lng: Number(s.longtitude)
     }))
 
-
     const storesInRadius = stores
       .map(s => {
         if (s.lat == null || s.lng == null) return null
@@ -4583,23 +4709,15 @@ exports.getNearbyStores = async (req, res) => {
       .filter(Boolean)
       .sort((a, b) => a.distanceKm - b.distanceKm)
 
-
-
-
-
-
-
     res.status(200).json({
       status: 200,
       message: 'sucess',
       data: storesInRadius
     })
-
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: 500, message: error.message })
   }
-
 }
 
 exports.changeAreaStoreNew = async (req, res) => {
@@ -4626,15 +4744,84 @@ exports.changeAreaStoreNew = async (req, res) => {
       }
     )
 
+    res.status(200).json({
+      status: 200,
+      message: 'sucess'
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: 500, message: error.message })
+  }
+}
+
+
+exports.addQrCodeToStore = async (req, res) => {
+  try {
+    const { storeId, area } = req.body
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    // 1️⃣ encrypt storeId
+    const encryptedStoreId = encrypt(storeId)
+
+    // 2️⃣ generate QR (Base64)
+    const qrBase64 = await QRCode.toDataURL(encryptedStoreId)
+
+    // 3️⃣ ตัด prefix ออกให้เหลือ base64 ล้วน
+    const base64Image = qrBase64.replace(
+      /^data:image\/png;base64,/,
+      ''
+    )
+
+    // 4️⃣ บันทึกเป็นไฟล์ (optional)
+    fs.writeFileSync(
+      `qrcode-${storeId}.png`,
+      base64Image,
+      'base64'
+    )
 
     res.status(200).json({
       status: 200,
       message: 'sucess',
+      data: qrBase64
     })
-
 
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: 500, message: error.message })
   }
 }
+
+
+exports.getQrCodeStore = async (req, res) => {
+  try {
+    const { storeId } = req.body
+
+    if (!storeId) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found storeId'
+      })
+    }
+
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+
+    const storeIdDecrypt = decrypt(storeId)
+    const storeData = await Store.findOne({ storeId: storeIdDecrypt })
+
+
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: storeData
+    })
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: 500, message: error.message })
+  }
+}
+

@@ -1,0 +1,405 @@
+const mongoose = require('mongoose')
+const { Types } = require('mongoose')
+const { ObjectId } = mongoose.Types
+const { Customer } = require('../../models/cash/master')
+const { CustomerBI } = require('../../models/cash/powerBi')
+const { Customer_OMS, Customer_OMS_BK } = require('../../models/cash/data_oms')
+const { Customer_APIM3 } = require('../../models/cash/data_api')
+const { Customer_M3FDBPRD_BK } = require('../../models/cash/M3FDBPRD_BK')
+const { Customer_DC } = require('../../models/cash/data_dc')
+const {
+    Customer_096,
+    Customer_096_BK,
+    Customer_096_TEMP
+} = require('../../models/cash/data096')
+const { uploadFiles } = require('../../utilities/upload')
+const { sequelize, DataTypes } = require('../../config/m3db')
+// const { sequelize, DataTypes } = require('../../config/powerBi')
+const { Sequelize } = require('sequelize')
+const { Op } = require('sequelize')
+
+const { calculateSimilarity } = require('../../utilities/utility')
+const axios = require('axios')
+const multer = require('multer')
+const userModel = require('../../models/cash/user')
+const storeLatLongModel = require('../../models/cash/storeLatLong')
+const ExcelJS = require('exceljs')
+const { generateOrderIdStoreLatLong } = require('../../utilities/genetateId')
+const { getSocket } = require('../../socket')
+const addUpload = multer({ storage: multer.memoryStorage() }).array(
+    'storeImages'
+)
+
+const {
+    to2,
+    updateStockMongo,
+    generateDateList
+} = require('../../middleware/order')
+
+const { PromotionStore } = require('../../models/cash/master')
+const { toThaiTime, period } = require('../../utilities/datetime')
+const sharp = require('sharp')
+const xlsx = require('xlsx')
+
+const sql = require('mssql')
+const {
+    storeQuery,
+    storeQueryFilter,
+    groupStoreType,
+    routeQuery,
+    routeQueryOne,
+    updateLatLong
+} = require('../../controllers/queryFromM3/querySctipt')
+const {
+    generateOrderId,
+    generateOrderIdFoodTruck,
+    generateOrderIdDammy
+} = require('../../utilities/genetateId')
+const orderModel = require('../../models/cash/sale')
+const storeModel = require('../../models/cash/store')
+const routeModel = require('../../models/cash/route')
+const refundModel = require('../../models/cash/refund')
+const approveLogModel = require('../../models/cash/approveLog')
+// const userModel = require('../../models/cash/user')
+const DistributionModel = require('../../models/cash/distribution')
+const promotionModel = require('../../models/cash/promotion')
+const { getModelsByChannel } = require('../../middleware/channel')
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
+const { v4: uuidv4 } = require('uuid')
+const { rangeDate } = require('../../utilities/datetime')
+
+exports.updateStoreStatusV2 = async (req, res) => {
+    try {
+        const { storeId, status, user } = req.body
+        const channel = req.headers['x-channel']
+        const { RunningNumber, Store } = getModelsByChannel(
+            channel,
+            res,
+            storeModel
+        )
+        const { User } = getModelsByChannel(channel, res, userModel)
+        const { ApproveLogs } = getModelsByChannel(channel, res, approveLogModel)
+        const { Order } = getModelsByChannel(channel, res, orderModel)
+        const { Promotion, PromotionShelf, Quota } = getModelsByChannel(
+            channel,
+            res,
+            promotionModel
+        )
+        const store = await Store.findOne({ storeId: storeId })
+        // console.log(store)
+        if (!store) {
+            return res.status(404).json({
+                status: 404,
+                message: 'Not found store'
+            })
+        }
+        const storeZone = store.area.substring(0, 2)
+        const maxRunningAll = await RunningNumber.findOne({
+            zone: storeZone
+        }).select('last')
+
+        // console.log(maxRunningAll)
+
+        const oldId = maxRunningAll
+        // console.log(oldId, 'oldId')
+        const newId = oldId.last.replace(/\d+$/, n =>
+            String(+n + 1).padStart(n.length, '0')
+        )
+
+        // console.log(newId, 'newId')
+
+        // console.log("oldId",oldId)
+        if (status === '20') {
+
+
+            await RunningNumber.findOneAndUpdate(
+                { zone: store.zone },
+                { $set: { last: newId } },
+                { new: true }
+            )
+            await Store.findOneAndUpdate(
+                { _id: store._id },
+                {
+                    $set: {
+                        storeId: newId,
+                        status: status,
+                        updatedDate: Date(),
+                        'approve.dateAction': new Date(),
+                        'approve.appPerson': user
+                    }
+                },
+                { new: true }
+            )
+
+            const item = await Store.findOne({ storeId: newId, area: store.area })
+            // const item = await Store.findOne({ storeId: storeId, area: store.area })
+            const dataUser = await User.findOne({ area: store.area, role: 'sale' })
+
+            if (!item) {
+                return res.status(404).json({
+                    json: 404,
+                    message: 'Not found Store'
+                })
+            }
+
+            // if (!item.postCode) {
+            //   return res.status(404).json({
+            //     json: 404,
+            //     message: 'Not found postCode'
+            //   })
+            // }
+
+            // console.log((item.province ?? '').substring(0, 35))
+            const dataTran = {
+                Hcase: 1,
+                customerNo: item.storeId,
+                customerStatus: item.status ?? '',
+                customerName: item.name ?? '',
+                customerChannel: '103',
+                customerCoType: item.type ?? '',
+                customerAddress1: (
+                    item.address +
+                    item.subDistrict +
+                    // item.subDistrict +
+                    item.province +
+                    item.postCode ?? ''
+                ).substring(0, 35),
+                customerAddress2: (
+                    item.address +
+                    item.subDistrict +
+                    // item.subDistrict +
+                    item.province +
+                    item.postCode ?? ''
+                ).substring(35, 70),
+                customerAddress3: (
+                    item.address +
+                    item.subDistrict +
+                    // item.subDistrict +
+                    item.province +
+                    item.postCode ?? ''
+                ).substring(70, 105),
+                customerAddress4: '',
+                customerPoscode: (item.postCode ?? '').substring(0, 35),
+                customerPhone: item.tel ?? '',
+                warehouse: dataUser.warehouse ?? '',
+                OKSDST: item.zone ?? '',
+                saleTeam: dataUser.area.slice(0, 2) + dataUser.area[3],
+                OKCFC1: item.area ?? '',
+                OKCFC3: item.route ?? '',
+                OKCFC6: item.type ?? '',
+                salePayer: dataUser.salePayer ?? '',
+                creditLimit: '000',
+                taxno: item.taxId ?? '',
+                saleCode: dataUser.saleCode ?? '',
+                saleZone: dataUser.zone ?? '',
+                OKFRE1: item.postCode,
+                OKECAR: item.postCode.slice(0, 2),
+                OKCFC4: item.area ?? '',
+                OKTOWN: item.province,
+                shippings: item.shippingAddress.map(u => {
+                    return {
+                        shippingAddress1: (u.address ?? '').substring(0, 35),
+                        shippingAddress2: u.district ?? '',
+                        shippingAddress3: u.subDistrict ?? '',
+                        shippingAddress4: u.province ?? '',
+                        shippingPoscode: u.postCode ?? '',
+                        shippingPhone: item.tel ?? '',
+                        shippingRoute: u.postCode,
+                        OPGEOX: u.latitude,
+                        OPGEOY: u.longtitude
+                    }
+                })
+            }
+
+            // console.log(dataTran)
+
+            if (item.area != 'IT211') {
+                try {
+                    const response = await axios.post(
+                        `${process.env.API_URL_12ERP}/customer/insert`,
+                        dataTran
+                    )
+
+                    // ส่งกลับไปให้ client ที่เรียก Express API
+                    return res.status(response.status).json(response.data)
+                } catch (error) {
+                    if (error.response) {
+                        // หาก ERP ส่ง 400 หรือ 500 หรืออื่นๆ กลับมา
+                        return res.status(error.response.status).json({
+                            message: error.response.data?.message || 'Request Failed',
+                            data: error.response.data
+                        })
+                    }
+                }
+            }
+
+            const orderData = await Order.find({ 'store.storeId': storeId })
+            if (orderData.length > 0) {
+                for (const row of orderData) {
+                    const orderId = await generateOrderId(row.store.area, row.sale.warehouse, channel, res)
+                    await Order.findOneAndUpdate(
+                        { 'store.storeId': storeId },
+                        {
+                            $set: {
+                                'store.storeId': newId,
+                                orderId: orderId,
+                                status: 'pending',
+                                statusTH: 'รอนำเข้า'
+                            }
+                        }
+                    )
+
+                    if (row.listPromotions.length > 0) {
+                        for (const pro of row.listPromotions) {
+                            const promotionDetail = await Promotion.findOne({ proId: pro.proId })
+                            if (promotionDetail &&
+                                promotionDetail.applicableTo.isNewStore === true) {
+
+                                await Promotion.updateOne(
+                                    {
+                                        proId: pro.proId,
+                                    },
+                                    {
+                                        $addToSet: {
+                                            'applicableTo.completeStoreNew': newId
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+
+            const io = getSocket()
+            // io.emit('store/updateStoreStatus', {
+            //   status: 'success',
+            //   data: newId
+            // })
+
+            //   return res.status(500).json({
+            //     message: 'Internal Server Error',
+            //     error: error.message
+            //   })
+            // }
+            await ApproveLogs.create({
+                module: 'approveStore',
+                user: user,
+                status: 'approved',
+                id: item.storeId,
+            })
+
+            return res.status(200).json({
+                status: 200,
+                message: 'update Store Status sucess',
+                storeId: item.storeId
+            })
+        } else {
+            await Store.findOneAndUpdate(
+                { _id: store._id },
+                {
+                    $set: {
+                        status: status,
+                        updatedDate: Date(),
+                        'approve.dateAction': new Date(),
+                        'approve.appPerson': user
+                    }
+                },
+                { new: true }
+            )
+
+            const orderData = await Order.find({ 'store.storeId': storeId })
+
+            if (orderData.length > 0) {
+
+                for (const row of orderData) {
+
+                    if (row.listProduct.length > 0) {
+                        for (const product of row.listProduct) {
+                            const updateResult = await updateStockMongo(
+                                product,
+                                row.store.area,
+                                row.period,
+                                'orderCanceled',
+                                channel,
+                                res
+                            )
+                            if (updateResult) return
+                        }
+                    }
+
+                    if (row.listPromotions.length > 0) {
+                        for (const item of row.listPromotions) {
+                            const promotionDetail =
+                                (await Promotion.findOne({ proId: item.proId })) ||
+                                new Promotion({ proId: item.proId })
+                            const storeIdToRemove = row.store.storeId
+                            if (promotionDetail.applicableTo?.isNewStore === true) {
+                                promotionDetail.applicableTo.completeStoreNew =
+                                    promotionDetail.applicableTo.completeStoreNew?.filter(
+                                        storeId => storeId !== storeIdToRemove
+                                    ) || []
+                            } else if (promotionDetail.applicableTo?.isbeauty === true) {
+                                promotionDetail.applicableTo.completeStoreBeauty =
+                                    promotionDetail.applicableTo.completeStoreBeauty?.filter(
+                                        storeId => storeId !== storeIdToRemove
+                                    ) || []
+                            }
+                            await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
+                            for (const u of item.listProduct) {
+                                const updateResult = await updateStockMongo(
+                                    u,
+                                    row.store.area,
+                                    row.period,
+                                    'orderCanceled',
+                                    channel,
+                                    res
+                                )
+                                if (updateResult) return
+                            }
+                        }
+                    }
+                }
+
+                await Order.updateMany(
+                    { 'store.storeId': storeId },
+                    {
+                        $set: {
+                            status: 'canceled',
+                            statusTH: 'ยกเลิก'
+                        }
+                    }
+                )
+
+            }
+
+
+
+
+
+            await ApproveLogs.create({
+                module: 'approveStore',
+                user: user,
+                status: 'rejected',
+                id: storeId
+            })
+
+            res.status(200).json({
+                status: 200,
+                message: 'Reject Store successful'
+            })
+        }
+    } catch (error) {
+        console.error('❌ Error:', error)
+
+        res.status(500).json({
+            status: 500,
+            message: 'error from server',
+            error: error.message || error.toString(), // ✅ ป้องกัน circular object
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+        })
+    }
+}
