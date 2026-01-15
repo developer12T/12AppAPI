@@ -1795,27 +1795,27 @@ exports.updateStoreStatus = async (req, res) => {
         }
       }
 
-      const orderData = await Order.find({ 'store.storeId': storeId })
+      // const orderData = await Order.find({ 'store.storeId': storeId })
 
-      if (orderData.length > 0) {
+      // if (orderData.length > 0) {
 
-        for (const row of orderData) {
+      //   for (const row of orderData) {
 
-          const orderId = await generateOrderId(row.store.area, row.sale.warehouse, channel, res)
-          await Order.findOneAndUpdate(
-            { 'store.storeId': storeId },
-            {
-              $set: {
-                'store.storeId': newId,
-                orderId:orderId,
-                status:'pending',
-                statusTH:'รอนำเข้า'
-              }
-            }
-          )
+      //     const orderId = await generateOrderId(row.store.area, row.sale.warehouse, channel, res)
+      //     await Order.findOneAndUpdate(
+      //       { 'store.storeId': storeId },
+      //       {
+      //         $set: {
+      //           'store.storeId': newId,
+      //           orderId:orderId,
+      //           status:'pending',
+      //           statusTH:'รอนำเข้า'
+      //         }
+      //       }
+      //     )
 
-        }
-      }
+      //   }
+      // }
 
       const io = getSocket()
       // io.emit('store/updateStoreStatus', {

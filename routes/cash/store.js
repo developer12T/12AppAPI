@@ -75,6 +75,11 @@ const {
   addVisit
 } = require('../../controllers/store/callCardController')
 
+const {
+  updateStoreStatusV2
+} = require('../../controllers/store/storeControllerV2')
+
+
 const router = express.Router()
 router.get('/storeToExcel', storeToExcel)
 router.get('/getLatLongOrderPending', getLatLongOrderPending)
@@ -95,6 +100,8 @@ router.post('/addFromERPnew', addFromERPnew)
 router.patch('/editStore/:storeId', editStore)
 router.post('/checkIn/:storeId', checkInStore)
 router.post('/updateStoreStatus', updateStoreStatus)
+router.post('/updateStoreStatusV2', updateStoreStatusV2)
+
 router.post('/rejectStore', rejectStore)
 router.post('/getShipping', getShipping)
 router.post('/addAndUpdateStore', addAndUpdateStore)

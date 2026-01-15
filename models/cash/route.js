@@ -142,9 +142,18 @@ const RouteChangeLogSchema = new mongoose.Schema({
 })
 
 const RouteSettingSchema = new mongoose.Schema({
+  area: { type: String },
   period: { type: String, required: true },
-  lockRoute: { type: Boolean, required: true },
+  isLockRoute: { type: Boolean, required: true },
   startDate: { type: String, required: true },
+  lockRoute: [{
+    id: { type: String, unique: true, required: true },
+    route: { type: String, },
+    lock : {type : Boolean},
+
+  }],
+
+
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 })
