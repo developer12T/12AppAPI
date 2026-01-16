@@ -543,36 +543,36 @@ exports.storeQuery = async function (channel) {
       status: 'Agree',
       date: new Date()
     }
-      ; (mainData = {
-        storeId: splitData.storeId,
-        name: splitData.name,
-        taxId: splitData.taxId,
-        tel: splitData.tel,
-        route: splitData.route,
-        type: splitData.type,
-        typeName: splitData.typeName,
-        address: splitData.address,
-        district: splitData.district,
-        subDistrict: splitData.subDistrict,
-        province: splitData.province,
-        provinceCode: splitData.provinceCode,
-        'postCode ': splitData.postCode,
-        zone: splitData.zone,
-        area: splitData.area,
-        latitude: splitData.latitude,
-        longtitude: splitData.longtitude,
-        lineId: '',
-        'note ': '',
-        approve: approveData,
-        status: splitData.status,
-        policyConsent: poliAgree,
-        imageList: [],
-        shippingAddress: splitData.shippingAddress,
-        checkIn: {},
-        createdAt: splitData.createdAt,
-        updatedDate: Date()
-      }),
-        data.push(mainData)
+    ;(mainData = {
+      storeId: splitData.storeId,
+      name: splitData.name,
+      taxId: splitData.taxId,
+      tel: splitData.tel,
+      route: splitData.route,
+      type: splitData.type,
+      typeName: splitData.typeName,
+      address: splitData.address,
+      district: splitData.district,
+      subDistrict: splitData.subDistrict,
+      province: splitData.province,
+      provinceCode: splitData.provinceCode,
+      'postCode ': splitData.postCode,
+      zone: splitData.zone,
+      area: splitData.area,
+      latitude: splitData.latitude,
+      longtitude: splitData.longtitude,
+      lineId: '',
+      'note ': '',
+      approve: approveData,
+      status: splitData.status,
+      policyConsent: poliAgree,
+      imageList: [],
+      shippingAddress: splitData.shippingAddress,
+      checkIn: {},
+      createdAt: splitData.createdAt,
+      updatedDate: Date()
+    }),
+      data.push(mainData)
   }
 
   return data
@@ -768,36 +768,36 @@ exports.storeQueryFilter = async function (channel, storeId) {
       status: 'Agree',
       date: new Date()
     }
-      ; (mainData = {
-        storeId: splitData.storeId,
-        name: splitData.name,
-        taxId: splitData.taxId,
-        tel: splitData.tel,
-        route: splitData.route,
-        type: splitData.type,
-        typeName: splitData.typeName,
-        address: splitData.address,
-        district: splitData.district,
-        subDistrict: splitData.subDistrict,
-        province: splitData.province,
-        provinceCode: splitData.provinceCode,
-        'postCode ': splitData.postCode,
-        zone: splitData.zone,
-        area: splitData.area,
-        latitude: splitData.latitude,
-        longtitude: splitData.longtitude,
-        lineId: '',
-        'note ': '',
-        approve: approveData,
-        status: '20',
-        policyConsent: poliAgree,
-        imageList: [],
-        shippingAddress: splitData.shippingAddress,
-        checkIn: {},
-        createdAt: splitData.createdAt,
-        updatedDate: Date()
-      }),
-        data.push(mainData)
+    ;(mainData = {
+      storeId: splitData.storeId,
+      name: splitData.name,
+      taxId: splitData.taxId,
+      tel: splitData.tel,
+      route: splitData.route,
+      type: splitData.type,
+      typeName: splitData.typeName,
+      address: splitData.address,
+      district: splitData.district,
+      subDistrict: splitData.subDistrict,
+      province: splitData.province,
+      provinceCode: splitData.provinceCode,
+      'postCode ': splitData.postCode,
+      zone: splitData.zone,
+      area: splitData.area,
+      latitude: splitData.latitude,
+      longtitude: splitData.longtitude,
+      lineId: '',
+      'note ': '',
+      approve: approveData,
+      status: '20',
+      policyConsent: poliAgree,
+      imageList: [],
+      shippingAddress: splitData.shippingAddress,
+      checkIn: {},
+      createdAt: splitData.createdAt,
+      updatedDate: Date()
+    }),
+      data.push(mainData)
   }
 
   return data
@@ -1129,7 +1129,7 @@ exports.dataUpsertSendMoney = async function (channel, data, primaryKeys = []) {
     ].join(', ')
 
     const sql = `
-      INSERT INTO \`v_payin_test\`
+      INSERT INTO \`v_payin\`
       (${insertFields})
       VALUES (${insertPlaceholders})
       ON DUPLICATE KEY UPDATE
@@ -1412,7 +1412,7 @@ exports.stockQuery = async function (channel, period, wereHouse) {
   let result = ''
   if (channel == 'cash') {
     if (wereHouse) {
-      ; `
+      ;`
   SELECT WH, 
   ITEM_CODE, 
   SUM(ITEM_QTY) AS ITEM_QTY
@@ -1555,10 +1555,6 @@ where PROVINCE like '%ฉะเชิงเทรา%' and AREA_NEW = 'ET211'
   return result.recordset
 }
 
-
-
-
-
 exports.wereHouseQuery = async function (channel) {
   const config = {
     user: process.env.MS_SQL_USER,
@@ -1627,7 +1623,7 @@ exports.stockPcQuery = async function (channel, period, wereHouse) {
   let result = ''
   if (channel === 'cash' || channel === 'pc') {
     if (wereHouse) {
-      ; `
+      ;`
   SELECT WH, 
   ITEM_CODE, 
   SUM(ITEM_QTY) AS ITEM_QTY
