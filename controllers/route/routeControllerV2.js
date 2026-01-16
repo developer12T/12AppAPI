@@ -193,9 +193,12 @@ exports.getRouteLock = async (req, res) => {
         .json({ status: 400, message: 'period is required' })
     }
 
-    const routeSetting = await RouteSetting.findOne({ period: period })
+    if (area) {
+      const routeSetting = await RouteSetting.findOne({ period: period, area: area })
 
-    const dates = generateDates(routeSetting.startDate, 25)
+      dates = generateDates(routeSetting.startDate, 25)
+    }
+
 
     const query = { period }
     if (area) query.area = area
@@ -599,4 +602,7 @@ exports.getRouteSetting = async (req, res) => {
     res.status(500).json({ status: 500, message: error.message })
   }
 }
+
+
+
 
