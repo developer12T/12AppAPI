@@ -152,6 +152,7 @@ const RouteSettingSchema = new mongoose.Schema({
     lock : { type: Boolean, required: true },
     listStore:[{
       storeId: {type : String},
+      storeInfo: {type : String},
       lock: { type: Boolean, required: true  }
     }]
 

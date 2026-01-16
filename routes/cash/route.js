@@ -51,7 +51,8 @@ const {
 } = require('../../controllers/route/routeController')
 
 const {
-  updateAreaByDataRoute
+  updateAreaByDataRoute,
+  addRouteSettings
 } = require('../../controllers/route/routeControllerV2')
 
 
@@ -110,4 +111,5 @@ router.get('/getRouteSetting', getRouteSetting)
 router.get('/getRouteLock', getRouteLock)
 
 router.post('/updateAreaByDataRoute', updateAreaByDataRoute)
+router.post('/addRouteSettings', addRouteSettings)
 module.exports = router

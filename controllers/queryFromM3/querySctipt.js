@@ -1547,7 +1547,7 @@ exports.getDataRoute = async function () {
 
   result = await sql.query`
 SELECT distinct CUSCODE FROM [dbo].[DATA_ROUTE]
-where PROVINCE like '%นครนายก%' and AREA_NEW = 'ET211'
+where PROVINCE like '%ฉะเชิงเทรา%' and AREA_NEW = 'ET211'
 
    `
 

@@ -38,6 +38,7 @@ const { formatDateTimeToThai } = require('../../middleware/order')
 const fs = require('fs')
 const os = require('os')
 const moment = require('moment')
+const { flatMap } = require('lodash')
 
 
 
@@ -92,4 +93,87 @@ exports.updateAreaByDataRoute = async (req, res) => {
 }
 
 
-// exports.
+exports.addRouteSettings = async (req, res) => {
+  try {
+    const { period, lock, startDate } = req.body
+    const channel = req.headers['x-channel']
+    const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { User } = getModelsByChannel('cash', res, userModel)
+
+    const routeLockExit = await RouteSetting.find({period:period}).select("area")
+    const areaExitList = routeLockExit.flatMap(item => item.area)
+
+    const userData = await User.find({ role: "sale", platformType: 'CASH' ,area:{$nin:areaExitList}})
+
+    const routeData = await Route.find({ period: period })
+    const storeIdObj = [...new Set(routeData.flatMap(item =>
+      item.listStore.map(u => u.storeInfo)
+    ))]
+    const storeData = await Store.find({
+      _id: { $in: storeIdObj }
+    })
+    let areaList = []
+    for (const user of userData) {
+
+      let lockRoute = []
+
+      const routeUser = routeData.filter(item => item.area === user.area)
+
+      for (const row of routeUser) {
+
+
+        const listStore = []
+        for (const item of row.listStore) {
+          const storeDetail = storeData.find(
+            s => s._id.toString() === item.storeInfo
+          )
+          const storeTran = {
+            // _id: 
+            storeId: storeDetail.storeId,
+            storeInfo : storeDetail._id,
+            lock: lock
+          }
+
+          listStore.push(storeTran)
+
+        }
+        const lockRouteTran = {
+          id: row.id,
+          route: row.day,
+          lock: lock,
+          listStore
+        }
+        lockRoute.push(lockRouteTran)
+      }
+
+      const dataTran = {
+        area: user.area,
+        period: period,
+        lock: true,
+        startDate: startDate,
+        lockRoute: lockRoute,
+      }
+      areaList.push(user.area)
+      await RouteSetting.create(dataTran)
+    }
+
+
+
+
+
+    res.status(200).json({
+      status: 201,
+      message: `add to ${areaList} ${period} addRouteSettings success `,
+      // message:'sssssssssssssssss'
+    })
+
+  } catch (error) {
+    console.error('error:', error)
+    return res.status(500).json({
+      status: 500,
+      message: 'Server error',
+      error: error.message
+    })
+  }
+}
