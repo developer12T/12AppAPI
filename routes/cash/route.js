@@ -45,7 +45,6 @@ const {
   getAreaApproval,
   approveRouteChange,
   addOrderToRoute,
-  getRouteSetting,
 
   getStoreCheckinByDayArea
 } = require('../../controllers/route/routeController')
@@ -54,7 +53,8 @@ const {
   updateAreaByDataRoute,
   addRouteSettings,
   getRouteLock,
-  editLockRoute
+  editLockRoute,
+  getRouteSetting
 } = require('../../controllers/route/routeControllerV2')
 
 
@@ -115,4 +115,5 @@ router.get('/getRouteLock', getRouteLock)
 router.post('/updateAreaByDataRoute', updateAreaByDataRoute)
 router.post('/addRouteSettings', addRouteSettings)
 router.post('/editLockRoute', editLockRoute)
+router.post('/getRouteSetting', getRouteSetting)
 module.exports = router

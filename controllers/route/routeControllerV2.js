@@ -534,3 +534,31 @@ exports.editLockRoute = async (req, res) => {
     res.status(500).json({ status: 500, message: error.message })
   }
 }
+
+
+exports.getRouteSetting = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { period, area } = req.query
+    const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
+
+    let query = { period }
+
+    if (area) {
+      query.area = area
+    }
+
+    const routeSettingData = await RouteSetting.find(query)
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'getRouteSetting',
+      data: routeSettingData
+    })
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: 500, message: error.message })
+  }
+}
