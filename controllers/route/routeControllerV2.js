@@ -441,99 +441,136 @@ exports.getRouteLock = async (req, res) => {
 exports.editLockRoute = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
-    const { period, area, id, storeId, lock, editType } = req.body
-    const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
-    const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
+    const { period, area, id, storeId, lock, editType, startDate } = req.body
+    const { RouteSetting } = getModelsByChannel(channel, res, routeModel)
 
-    if (!period || !area) {
+    // =========================
+    // 1. Validate base
+    // =========================
+    if (!period) {
       return res.status(400).json({
         status: 400,
-        message: 'not found period, area'
+        message: 'not found period'
       })
     }
 
-    const routeSettingData = await RouteSetting.findOne({ period, area })
-
+    const routeSettingData = await RouteSetting.findOne({ period })
     if (!routeSettingData) {
-      return res.status(400).json({
-        status: 400,
-        message: 'not found id'
+      return res.status(404).json({
+        status: 404,
+        message: 'RouteSetting not found'
       })
     }
 
-    if (editType === 'area') {
-      if (!area) {
+    // =========================
+    // 2. Switch by editType
+    // =========================
+    let result
+
+    switch (editType) {
+
+      case 'area':
+        if (!area) {
+          return res.status(400).json({
+            status: 400,
+            message: 'not found area'
+          })
+        }
+
+        result = await RouteSetting.updateOne(
+          { period, area },
+          { $set: { lock } }
+        )
+        break
+
+      case 'id':
+        if (!area || !id) {
+          return res.status(400).json({
+            status: 400,
+            message: 'not found area, id'
+          })
+        }
+
+        result = await RouteSetting.updateOne(
+          { period, area, 'lockRoute.id': id },
+          { $set: { 'lockRoute.$.lock': lock } }
+        )
+        break
+
+      case 'store':
+        if (!area || !id || !storeId) {
+          return res.status(400).json({
+            status: 400,
+            message: 'not found area, id, storeId'
+          })
+        }
+
+        result = await RouteSetting.updateOne(
+          { period, area },
+          {
+            $set: {
+              'lockRoute.$[route].listStore.$[store].lock': lock
+            }
+          },
+          {
+            arrayFilters: [
+              { 'route.id': id },
+              { 'store.storeId': storeId }
+            ]
+          }
+        )
+        break
+
+      case 'startDate':
+        if (!startDate) {
+          return res.status(400).json({
+            status: 400,
+            message: 'not found startDate'
+          })
+        }
+
+        const query = { period }
+        if (area) query.area = area
+
+        result = await RouteSetting.updateMany(
+          query,
+          { $set: { startDate } }
+        )
+        break
+
+      default:
         return res.status(400).json({
           status: 400,
-          message: 'not found area'
+          message: `invalid editType: ${editType}`
         })
-      }
-      await RouteSetting.updateOne(
-        { period, area },
-        {
-          $set: {
-            lock: lock
-          }
-        }
-      )
-
-    } else if (editType === 'id') {
-      if (!area || !id) {
-        return res.status(400).json({
-          status: 400,
-          message: 'not found area, id'
-        })
-      }
-      await RouteSetting.updateOne(
-        { period, area, 'lockRoute.id': id },
-        {
-          $set: {
-            'lockRoute.$.lock': lock
-          }
-        }
-      )
-
-
-
-    } else if (editType === 'store') {
-      if (!area || !id || !storeId)
-        return res.status(400).json({
-          status: 400,
-          message: 'not found area, id, storeId'
-        })
-
-      await RouteSetting.updateOne(
-        { period, area },
-        {
-          $set: {
-            'lockRoute.$[route].listStore.$[store].lock': lock
-          }
-        },
-        {
-          arrayFilters: [
-            { 'route.id': id },
-            { 'store.storeId': storeId }
-          ]
-        }
-      )
-
-
     }
 
 
+    if (!result || result.modifiedCount === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'no document found to update'
+      })
+    }
 
 
-    res.status(200).json({
+    // =========================
+    // 3. Success
+    // =========================
+    return res.status(200).json({
       status: 200,
-      message: 'editLockRoute success',
-      // data: routeSettingData
+      message: 'editLockRoute success'
     })
 
   } catch (error) {
-    console.error(error)
-    res.status(500).json({ status: 500, message: error.message })
+    console.error('[editLockRoute]', error)
+    return res.status(500).json({
+      status: 500,
+      message: error.message
+    })
   }
 }
+
 
 
 exports.getRouteSetting = async (req, res) => {
@@ -562,3 +599,4 @@ exports.getRouteSetting = async (req, res) => {
     res.status(500).json({ status: 500, message: error.message })
   }
 }
+
