@@ -193,8 +193,10 @@ exports.getRouteLock = async (req, res) => {
         .json({ status: 400, message: 'period is required' })
     }
 
+    let routeSetting = []
+
     if (area) {
-      const routeSetting = await RouteSetting.findOne({ period: period, area: area })
+      routeSetting = await RouteSetting.findOne({ period: period, area: area })
 
       dates = generateDates(routeSetting.startDate, 25)
     }
@@ -218,6 +220,7 @@ exports.getRouteLock = async (req, res) => {
     const filteredRoutes = routes
       .map(route => {
         const filteredListStore = route.listStore.filter(store => {
+
           const addr = (store.storeInfo?.address || '').toLowerCase()
 
           const matchDistrict = district
@@ -250,19 +253,51 @@ exports.getRouteLock = async (req, res) => {
           canSell = false
         }
 
-        // console.log(route)
+        const checkLockRoute = routeSetting.lockRoute.find(item => item.id === route.id)
+        const lockRoute = checkLockRoute.lock
+        const listStore = filteredListStore.map(item => {
+
+          const lockStore = checkLockRoute.listStore.find(u => u.storeId === item.storeInfo.storeId).lock
+
+
+          return {
+            storeInfo: {
+              _id: item.storeInfo._id,
+              storeId: item.storeInfo.storeId,
+              name: item.storeInfo.name,
+              taxId: item.storeInfo.taxId,
+              tel: item.storeInfo.tel,
+              typeName: item.storeInfo.typeName,
+              address: item.storeInfo.address,
+            },
+            lockStore: lockStore,
+            note: item.note,
+            image: item.image,
+            latitude: item.latitude,
+            longtitude: item.longtitude,
+            status: item.status,
+            statusText: item.statusText,
+            date: item.date,
+            listOrder: item.listOrder,
+            _id: item._id,
+            storeType: item.storeType
+          }
+        })
+
+
+
+
         return {
           ...route.toObject(),
-
+          lockRoute: lockRoute,
           canSell,
           dateMacth: dateMacth.date,
           thaiDate,
-          listStore: filteredListStore
+          listStore: listStore
         }
       })
       .filter(route => route.listStore.length > 0)
 
-    // console.log(filteredRoutes)
 
     const allStoreIds = filteredRoutes.flatMap(route =>
       route.listStore.map(s => s.storeInfo?.storeId).filter(Boolean)
@@ -416,7 +451,7 @@ exports.getRouteLock = async (req, res) => {
           // canSell,
           // dateMacth,
           // thaiDate,
-          listStore: []
+          // listStore: []
         }
       })
     }
