@@ -479,8 +479,8 @@ exports.getRouteLock = async (req, res) => {
 exports.editLockRoute = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
-    const { period, area, id, storeId, lock, editType, startDate } = req.body
-    const { RouteSetting } = getModelsByChannel(channel, res, routeModel)
+    const { period, area, id, storeId, lock, editType, startDate, user } = req.body
+    const { RouteSetting, RouteSettingLog } = getModelsByChannel(channel, res, routeModel)
 
     // =========================
     // 1. Validate base
@@ -504,7 +504,7 @@ exports.editLockRoute = async (req, res) => {
     // 2. Switch by editType
     // =========================
     let result
-
+    let routeSettingLog = {}
     switch (editType) {
 
       case 'area':
@@ -519,6 +519,15 @@ exports.editLockRoute = async (req, res) => {
           { period, area },
           { $set: { lock } }
         )
+        routeSettingLog = {
+          period: period,
+          area: area,
+          lock: lock,
+          editType: editType,
+          user: user
+        }
+
+
         break
 
       case 'id':
@@ -533,6 +542,17 @@ exports.editLockRoute = async (req, res) => {
           { period, area, 'lockRoute.id': id },
           { $set: { 'lockRoute.$.lock': lock } }
         )
+
+        routeSettingLog = {
+          period: period,
+          area: area,
+          id: id,
+          lock: lock,
+          editType: editType,
+          user: user
+        }
+
+
         break
 
       case 'store':
@@ -557,6 +577,17 @@ exports.editLockRoute = async (req, res) => {
             ]
           }
         )
+
+        routeSettingLog = {
+          period: period,
+          area: area,
+          id: id,
+          storeId: storeId,
+          lock: lock,
+          editType: editType,
+          user: user
+        }
+
         break
 
       case 'startDate':
@@ -574,6 +605,16 @@ exports.editLockRoute = async (req, res) => {
           query,
           { $set: { startDate } }
         )
+
+        routeSettingLog = {
+          period: period,
+          area: area ?? 'all',
+          startDate: startDate,
+          editType: editType,
+          user: user
+        }
+
+
         break
 
       default:
@@ -584,12 +625,16 @@ exports.editLockRoute = async (req, res) => {
     }
 
 
-    if (!result || result.modifiedCount === 0) {
+    if (!result || result.matchedCount === 0) {
       return res.status(404).json({
         status: 404,
-        message: 'no document found to update'
+        message: 'document not found'
       })
     }
+
+
+    await RouteSettingLog.create(routeSettingLog)
+
 
 
     // =========================
@@ -626,6 +671,7 @@ exports.getRouteSetting = async (req, res) => {
     const routeSettingData = await RouteSetting.find(query)
 
 
+
     res.status(200).json({
       status: 200,
       message: 'getRouteSetting',
@@ -637,7 +683,3 @@ exports.getRouteSetting = async (req, res) => {
     res.status(500).json({ status: 500, message: error.message })
   }
 }
-
-
-
-

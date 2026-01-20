@@ -139,6 +139,8 @@ const RouteChangeLogSchema = new mongoose.Schema({
   status: { type: String, required: true },
   statusTH: { type: String, required: true },
   approve: approveSchema,
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
 })
 
 const RouteSettingSchema = new mongoose.Schema({
@@ -148,12 +150,12 @@ const RouteSettingSchema = new mongoose.Schema({
   startDate: { type: String, required: true },
   lockRoute: [{
     id: { type: String, unique: true, required: true },
-    route: { type: String,required: true },
-    lock : { type: Boolean, required: true },
-    listStore:[{
-      storeId: {type : String},
-      storeInfo: {type : String},
-      lock: { type: Boolean, required: true  }
+    route: { type: String, required: true },
+    lock: { type: Boolean, required: true },
+    listStore: [{
+      storeId: { type: String },
+      storeInfo: { type: String },
+      lock: { type: Boolean, required: true }
     }]
 
   }],
@@ -163,7 +165,18 @@ const RouteSettingSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 })
 
-
+const RouteSettingLogSchema = new mongoose.Schema({
+  area: { type: String },
+  period: { type: String, required: true },
+  id: { type: String },
+  storeId : { type: String },
+  editType : { type: String },
+  startDate: { type: String, },
+  lock : { type: Boolean,},
+  user :{ type: String },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+})
 
 
 
@@ -183,5 +196,6 @@ module.exports = (conn) => {
     RouteChange: conn.model('RouteChange', RouteChangeSchema),
     RouteChangeLog: conn.model('RouteChangeLog', RouteChangeLogSchema),
     RouteSetting: conn.model('RouteSetting', RouteSettingSchema),
+    RouteSettingLog : conn.model('RouteSettingLog', RouteSettingLogSchema),
   };
 };
