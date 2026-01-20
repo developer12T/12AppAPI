@@ -1638,13 +1638,11 @@ exports.OrderToExcel = async (req, res) => {
         $gte: startTH,
         $lte: endTH
       },
-      status: { $nin: ['canceled'] },
+      status: { $nin: ['canceled','wait approve'] },
       status: { $in: statusArray },
       type: { $in: ['sale', 'saleNoodle'] },
       'store.area': { $ne: 'IT211' },
-      $expr: {
-        $lte: [{ $strLenCP: '$store.storeId' }, 11]
-      }
+
     }
 
     // Order Change
