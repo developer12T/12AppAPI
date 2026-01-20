@@ -1028,8 +1028,8 @@ exports.reflashOrder = async (req, res) => {
 
 exports.getOrder = async (req, res) => {
   try {
-    const { type, area, store, period, start, end, zone } = req.query
-
+    const {  area, store, period, start, end, zone } = req.query
+    let {type} = req.query
     const channel = req.headers['x-channel']
 
     const { Order } = getModelsByChannel(channel, res, orderModel)
@@ -1090,8 +1090,12 @@ exports.getOrder = async (req, res) => {
     //   query['store.storeId'] = store
     // }
 
+    if (type === 'sale') {
+      type = ['sale','saleNoodle']
+    }
+
     const matchQuery = {
-      type,
+      type : {$in : type },
       ...areaQuery, // zone หรือ store.area ตามที่คุณเซ็ตไว้
       ...(store ? { 'store.storeId': store } : {}),
       ...(period ? { period } : {}),
@@ -1100,7 +1104,7 @@ exports.getOrder = async (req, res) => {
 
     // console.log(matchQuery)
 
-    // console.log(matchQuery)
+    console.log(matchQuery)
 
     // const order = await Order.aggregate([
     //   {
