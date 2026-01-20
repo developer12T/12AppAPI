@@ -562,13 +562,13 @@ exports.editLockRoute = async (req, res) => {
         )
 
         routeSettingLog = {
-            period: period,
-            area: area,
-            id: id,
-            lock: lock,
-            editType: editType,
-            user: user
-          }
+          period: period,
+          area: area,
+          id: id,
+          lock: lock,
+          editType: editType,
+          user: user
+        }
 
 
         break
@@ -687,6 +687,98 @@ exports.getRouteSetting = async (req, res) => {
     }
 
     const routeSettingData = await RouteSetting.find(query)
+
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'getRouteSetting',
+      data: routeSettingData
+    })
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: 500, message: error.message })
+  }
+}
+
+
+exports.autoLockRouteChange = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { period } = req.body
+    const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
+
+    const routeSettingData = await RouteSetting.find({ period: period })
+
+
+    for (const route of routeSettingData) {
+
+      const dates = generateDates(route.startDate, 25)
+
+
+
+
+      const thaiDate = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Bangkok',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(new Date())
+
+      for (const item of route.lockRoute) {
+
+        const dateMacth = dates.find(u => String(u.day) === String(item.route))
+        let canSell = ''
+        if (dateMacth.date === thaiDate) {
+          canSell = true
+        } else {
+          canSell = false
+        }
+
+
+        if (canSell === true) {
+          result = await RouteSetting.updateOne(
+            { period, area:route.area },
+            {
+              $set: {
+                'lockRoute.$[route].lock': canSell,
+                'lockRoute.$[route].listStore.$[].lock': canSell
+              }
+            },
+            {
+              arrayFilters: [
+                { 'route.id': item.id }
+              ]
+            }
+          )
+        } else if (canSell === false) {
+          result = await RouteSetting.updateOne(
+            { period, area:route.area },
+            {
+              $set: {
+                'lockRoute.$[route].lock': canSell,
+                'lockRoute.$[route].listStore.$[].lock': canSell
+              }
+            },
+            {
+              arrayFilters: [
+                { 'route.id': item.id }
+              ]
+            }
+          )
+
+        }
+
+
+
+
+
+
+
+      }
+
+    }
 
 
 
