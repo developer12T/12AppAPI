@@ -517,8 +517,16 @@ exports.editLockRoute = async (req, res) => {
 
         result = await RouteSetting.updateOne(
           { period, area },
-          { $set: { lock } }
+          {
+            $set: {
+              lock: lock,
+              'lockRoute.$[].lock': lock,
+              'lockRoute.$[].listStore.$[].lock': lock
+            }
+          }
         )
+
+
         routeSettingLog = {
           period: period,
           area: area,
@@ -539,18 +547,28 @@ exports.editLockRoute = async (req, res) => {
         }
 
         result = await RouteSetting.updateOne(
-          { period, area, 'lockRoute.id': id },
-          { $set: { 'lockRoute.$.lock': lock } }
+          { period, area },
+          {
+            $set: {
+              'lockRoute.$[route].lock': lock,
+              'lockRoute.$[route].listStore.$[].lock': lock
+            }
+          },
+          {
+            arrayFilters: [
+              { 'route.id': id }
+            ]
+          }
         )
 
         routeSettingLog = {
-          period: period,
-          area: area,
-          id: id,
-          lock: lock,
-          editType: editType,
-          user: user
-        }
+            period: period,
+            area: area,
+            id: id,
+            lock: lock,
+            editType: editType,
+            user: user
+          }
 
 
         break
