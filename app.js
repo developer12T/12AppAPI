@@ -8,7 +8,7 @@ const app = express()
 const {
   startCronJobErpApiCheck,
   startCronJobErpApiCheckDisribution,
-
+  startCronJobAutoLockRouteChange,
   startCronJobreStoreStockDaily,
   startCronJobMemory,
 
@@ -28,7 +28,7 @@ if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
   startCronJobUpdateStatusDistribution()
   // startCronJobUpdateSendmoney()
 }
-
+startCronJobAutoLockRouteChange()
 // startCronJobUpdateSendmoney()
 // startCronJobInsertDistribution()
 // startCronJobUpdateStatusDistribution()

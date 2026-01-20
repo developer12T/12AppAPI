@@ -27,7 +27,7 @@ const path = require('path')
 const { sequelize, DataTypes } = require('../../config/m3db')
 const { Op, fn, literal, where, col } = require('sequelize')
 const { getSocket } = require('../../socket')
-
+const routeModel = require('../../models/cash/route')
 const userModel = require('../../models/cash/user')
 const distributionModel = require('../../models/cash/distribution')
 const sendmoneyModel = require('../../models/cash/sendmoney')
@@ -59,7 +59,7 @@ const { create } = require('lodash')
 
 const pathLog = '/controllers/sale/conjobLog/'
 
-async function checkMemoryAndClear (channel = 'cash') {
+async function checkMemoryAndClear(channel = 'cash') {
   const logFile = path.join(process.cwd(), `${pathLog}startCronJobMemory.txt`)
   const now = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
   try {
@@ -88,7 +88,7 @@ async function checkMemoryAndClear (channel = 'cash') {
   }
 }
 
-async function erpApiCheckOrderJob (channel = 'cash') {
+async function erpApiCheckOrderJob(channel = 'cash') {
   const logFile = path.join(
     process.cwd(),
     `${pathLog}startCronJobErpApiCheck.txt`
@@ -313,7 +313,7 @@ async function erpApiCheckOrderJob (channel = 'cash') {
   }
 }
 
-async function erpApiCheckDisributionM3Job (channel = 'cash') {
+async function erpApiCheckDisributionM3Job(channel = 'cash') {
   try {
     const { Distribution } = getModelsByChannel(channel, null, disributionModel)
 
@@ -395,7 +395,7 @@ async function erpApiCheckDisributionM3Job (channel = 'cash') {
   }
 }
 
-async function DeleteCartDaily (channel = 'cash') {
+async function DeleteCartDaily(channel = 'cash') {
   // เปิด session สำหรับ transaction
   // const session = await mongoose.startSession();
   // session.startTransaction();
@@ -535,7 +535,7 @@ async function DeleteCartDaily (channel = 'cash') {
   }
 }
 
-async function reStoreStock (channel = 'cash') {
+async function reStoreStock(channel = 'cash') {
   const logFile = path.join(
     process.cwd(),
     `${pathLog}startCronJobreStoreStockDaily.txt`
@@ -568,7 +568,7 @@ async function reStoreStock (channel = 'cash') {
   }
 }
 
-async function updateOrderPowerBI (channel = 'cash') {
+async function updateOrderPowerBI(channel = 'cash') {
   const logFile = path.join(
     process.cwd(),
     `${pathLog}startCronJobUpdateOrderPowerBI.txt`
@@ -633,13 +633,97 @@ async function updateOrderPowerBI (channel = 'cash') {
   } catch (err) {
     console.error(err)
     fs.appendFileSync(logFile, `[${nowLog}] ❌ Job failed: ${err.message}\n`)
-    // return res.status(500).json({ status: 500, message: err.message })
   }
 }
 
+async function autoLockRouteChange(channel = 'cash') {
+  const logFile = path.join(
+    process.cwd(),
+    `${pathLog}autoLockRouteChange.txt`
+  )
+  const nowLog = new Date().toLocaleString('th-TH', {
+    timeZone: 'Asia/Bangkok'
+  })
+  try {
+
+    const periodStr = period()
+    const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
+    const routeSettingData = await RouteSetting.find({ period: periodStr })
+
+    for (const route of routeSettingData) {
+      const dates = generateDates(route.startDate, 25)
+      const thaiDate = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Bangkok',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(new Date())
+
+      for (const item of route.lockRoute) {
+
+        const dateMacth = dates.find(u => String(u.day) === String(item.route))
+        let canSell = ''
+        if (dateMacth.date === thaiDate) {
+          canSell = true
+        } else {
+          canSell = false
+        }
+
+        const result = await RouteSetting.updateOne(
+          { periodStr, area: route.area },
+          {
+            $set: {
+              'lockRoute.$[route].lock': canSell,
+              'lockRoute.$[route].listStore.$[].lock': canSell
+            }
+          },
+          {
+            arrayFilters: [
+              { 'route.id': item.id }
+            ]
+          }
+        )
+
+      }
+    }
+
+    fs.appendFileSync(
+      logFile,
+      `[${nowLog}] ✅ Job completed autoLockRouteChange\n`
+    )
+
+  } catch (err) {
+    console.error(err)
+    fs.appendFileSync(logFile, `[${nowLog}] ❌ Job failed: ${err.message}\n`)
+  }
+
+}
+
+const startCronJobAutoLockRouteChange = () => {
+  cron.schedule(
+    '0 4 * * *',   // ⏰ 04:00
+    async () => {
+      console.log(
+        'Running cron job startCronJobAutoLockRouteChange Now:',
+        new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+      )
+      await autoLockRouteChange()
+    },
+    {
+      timezone: 'Asia/Bangkok'
+    }
+  )
+
+}
+
+
+
+
+
+
 const startCronJobInsertDistribution = () => {
   cron.schedule(
-    '0 21 * * *', // 👉 ทุก 1 นาที
+    '0 21 * * *',
     async () => {
       console.log(
         'Running cron job startCronJobInsertDistribution Now:',
@@ -780,7 +864,7 @@ const startCronJobreStoreStockDaily = () => {
 //   )
 // }
 
-async function updateSendmoney (channel = 'cash') {
+async function updateSendmoney(channel = 'cash') {
   const logFile = path.join(process.cwd(), `${pathLog}updateSendmoney.txt`)
   const nowLog = new Date().toLocaleString('th-TH', {
     timeZone: 'Asia/Bangkok'
@@ -993,7 +1077,7 @@ async function updateSendmoney (channel = 'cash') {
   }
 }
 
-async function updateStatusOrderDistribution (channel = 'cash') {
+async function updateStatusOrderDistribution(channel = 'cash') {
   const logFile = path.join(
     process.cwd(),
     `${pathLog}updateStatusOrderDistribution.txt`
@@ -1081,7 +1165,7 @@ async function updateStatusOrderDistribution (channel = 'cash') {
   }
 }
 
-async function updateOrderDistribution (channel = 'cash') {
+async function updateOrderDistribution(channel = 'cash') {
   const logFile = path.join(
     process.cwd(),
     `${pathLog}startCronJobUpdateOrderDistribution.txt`
@@ -1130,7 +1214,7 @@ async function updateOrderDistribution (channel = 'cash') {
 module.exports = {
   startCronJobErpApiCheck,
   startCronJobErpApiCheckDisribution,
-
+  startCronJobAutoLockRouteChange,
   startCronJobInsertPowerBI,
 
   startCronJobInsertDistribution,

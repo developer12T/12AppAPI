@@ -163,7 +163,11 @@ const RouteSettingSchema = new mongoose.Schema({
 
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
-})
+},
+  {
+    timestamps: true
+  })
+
 
 const RouteSettingLogSchema = new mongoose.Schema({
   area: { type: String },
@@ -176,7 +180,10 @@ const RouteSettingLogSchema = new mongoose.Schema({
   user :{ type: String },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
-})
+},
+  {
+    timestamps: true
+  })
 
 
 

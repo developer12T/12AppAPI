@@ -709,16 +709,12 @@ exports.autoLockRouteChange = async (req, res) => {
     const { period } = req.body
     const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
 
-    const routeSettingData = await RouteSetting.find({ period: period })
+    const routeSettingData = await RouteSetting.find({ period: period ,area:{$in:['IT211']}})
 
 
     for (const route of routeSettingData) {
 
       const dates = generateDates(route.startDate, 25)
-
-
-
-
       const thaiDate = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Bangkok',
         year: 'numeric',
@@ -736,9 +732,7 @@ exports.autoLockRouteChange = async (req, res) => {
           canSell = false
         }
 
-
-        if (canSell === true) {
-          result = await RouteSetting.updateOne(
+        const  result = await RouteSetting.updateOne(
             { period, area:route.area },
             {
               $set: {
@@ -752,30 +746,7 @@ exports.autoLockRouteChange = async (req, res) => {
               ]
             }
           )
-        } else if (canSell === false) {
-          result = await RouteSetting.updateOne(
-            { period, area:route.area },
-            {
-              $set: {
-                'lockRoute.$[route].lock': canSell,
-                'lockRoute.$[route].listStore.$[].lock': canSell
-              }
-            },
-            {
-              arrayFilters: [
-                { 'route.id': item.id }
-              ]
-            }
-          )
-
-        }
-
-
-
-
-
-
-
+      
       }
 
     }
