@@ -1129,7 +1129,7 @@ exports.dataUpsertSendMoney = async function (channel, data, primaryKeys = []) {
     ].join(', ')
 
     const sql = `
-      INSERT INTO \`v_payin_test\`
+      INSERT INTO \`v_payin\`
       (${insertFields})
       VALUES (${insertPlaceholders})
       ON DUPLICATE KEY UPDATE
@@ -1524,6 +1524,30 @@ cus_area as area
 
  FROM [DATA_BEAUTY].[dbo].[DATA_BEAUTY_CUSTOMER]
 WHERE CUS_STATUS = 'N'
+
+   `
+
+  await sql.close()
+  return result.recordset
+}
+
+exports.getDataRoute = async function () {
+  const config = {
+    user: process.env.MS_SQL_USER,
+    password: process.env.MS_SQL_PASSWORD,
+    server: process.env.MS_SQL_SERVER,
+    database: process.env.MS_SQL_DATABASE_OMS,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  }
+  // console.log(RouteId)
+  await sql.connect(config)
+
+  result = await sql.query`
+SELECT distinct CUSCODE FROM [dbo].[DATA_ROUTE]
+where PROVINCE like '%ฉะเชิงเทรา%' and AREA_NEW = 'ET211'
 
    `
 

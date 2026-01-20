@@ -170,9 +170,9 @@ exports.addAllPlace = async (req, res) => {
     const { User } = getModelsByChannel('user', res, userModel);
     const { Place, Withdraw } = getModelsByChannel(channel, res, distributionModel);
 
-    let type = channel === 'pc' ? 'PC' : 'cash';
+    let type = channel === 'pc' ? 'PC' : 'CASH';
 
-    const users = await User.find({ role: 'sale', platformType: 'CASH' });
+    const users = await User.find({ role: 'sale', platformType: type });
     const areaList = [...new Set(users.map(u => u.area).filter(Boolean))];
 
     let data = [];
@@ -359,7 +359,7 @@ exports.syncAddressCIADDR = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
     const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
-
+    const { User } = getModelsByChannel('user', res, userModel)
     t = await CIADDR.sequelize.transaction();   // 🟦 กำหนดค่าใน try
 
     const CIADDRdata = await CIADDR.findAll()
@@ -525,11 +525,19 @@ exports.syncAddressDROUTE = async (req, res) => {
 
 exports.CiaddrAddToWithdraw = async (req, res) => {
   try {
-
-    const { Withdraw } = getModelsByChannel('pc', res, distributionModel)
+    const channel = req.headers['x-channel']
+    const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
     const { User } = getModelsByChannel('user', res, userModel)
+    let platformType = ''
+    if (channel === 'cash') {
+      platformType = 'CASH'
+    } else if (channel === 'pc') {
+      platformType = 'PC'
+    }
 
-    const userData = await User.find({ role: "sale", platformType: 'PC' })
+    console.log('platformType',platformType)
+
+    const userData = await User.find({ role: "sale" ,platformType:platformType})
     // console.log(platformType)
     const area = userData.map(item => {
       return {
@@ -580,11 +588,10 @@ exports.CiaddrAddToWithdraw = async (req, res) => {
       '121': '',
       '110': '',
     };
-
     for (const row of area) {
-      const list = CIADDRroute.filter(item => item.werehouse === row.warehouse)
-
+      const list = CIADDRroute.filter(item => item.OAPONO === row.area)
       for (const item of list) {
+
 
         if (desSet.has(item.OAADK1)) continue
         if (!item.OAADR3) continue
@@ -608,19 +615,9 @@ exports.CiaddrAddToWithdraw = async (req, res) => {
         // 🔥 Check ก่อน Insert
         // -----------------------
         const existing = await Withdraw.findOne({ Des_No: item.OAADK1 })
-
+        // console.log('test',item.OAADK1)
         if (existing) {
-          // มีแล้ว → Update ให้เท่ากับข้อมูลใหม่
-          await Withdraw.update(
-            {
-              Des_Name: item.name,
-              WH: item.OAADR3,
-              ROUTE: item.OAPONO,
-              Dc_Email
-            },
-            { where: { Des_No: item.OAADK1 } }
-          )
-          console.log(`🔄 UPDATED: ${item.OAADK1}`)
+
         } else {
           // ไม่มี → Insert ใหม่
           await Withdraw.create(dataTran)

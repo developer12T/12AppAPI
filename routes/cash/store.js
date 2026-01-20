@@ -76,7 +76,8 @@ const {
 } = require('../../controllers/store/callCardController')
 
 const {
-  updateStoreStatusV2
+  updateStoreStatusV2,
+  addStorePcToCash
 } = require('../../controllers/store/storeControllerV2')
 
 
@@ -101,6 +102,7 @@ router.patch('/editStore/:storeId', editStore)
 router.post('/checkIn/:storeId', checkInStore)
 router.post('/updateStoreStatus', updateStoreStatus)
 router.post('/updateStoreStatusV2', updateStoreStatusV2)
+router.post('/addStorePcToCash', addStorePcToCash)
 
 router.post('/rejectStore', rejectStore)
 router.post('/getShipping', getShipping)
