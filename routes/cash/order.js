@@ -47,7 +47,11 @@ const {
   updateProCodeInOrder,
 } = require('../../controllers/sale/orderController')
 
-const { checkOutV2 } = require('../../controllers/sale/orderControllerV2')
+const { 
+  checkOutV2,
+  getBillNewStore
+
+ } = require('../../controllers/sale/orderControllerV2')
 
 const router = express.Router()
 
@@ -104,6 +108,9 @@ router.post('/updateUserSaleInOrder', updateUserSaleInOrder)
 router.post('/m3ToOrderMongo', m3ToOrderMongo)
 
 router.post('/updateProCodeInOrder', updateProCodeInOrder)
+router.get('/getBillNewStore', getBillNewStore)
+
+
 
 router.patch('/editOrderSale/:orderId', editOrderSale)
 
