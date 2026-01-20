@@ -4845,111 +4845,6 @@ exports.getStoreCheckinByDayArea = async (req, res) => {
       })
     }
 
-    // 📌 แปลง date เป็นช่วงเวลา (Asia/Bangkok)
-    const startDate = new Date(`${date}T00:00:00.000Z`)
-    const endDate = new Date(`${date}T23:59:59.999Z`)
-
-    // const pipeline = [
-    //   // 1️⃣ match route by area
-    //   { $match: { area } },
-
-    //   // 2️⃣ unwind store
-    //   {
-    //     $unwind: {
-    //       path: '$listStore',
-    //       preserveNullAndEmptyArrays: false
-    //     }
-    //   },
-
-    //   // 3️⃣ แปลง date → day string (เหมือน summary)
-    //   {
-    //     $addFields: {
-    //       checkinDay: {
-    //         $dateToString: {
-    //           format: '%d-%m-%Y',
-    //           date: '$listStore.date',
-    //           timezone: 'Asia/Bangkok'
-    //         }
-    //       }
-    //     }
-    //   },
-
-    //   // 4️⃣ match ด้วย string day
-    //   {
-    //     $match: {
-    //       checkinDay: date // "08-01-2026"
-    //     }
-    //   },
-
-    //   // 5️⃣ convert storeInfo → ObjectId
-    //   {
-    //     $addFields: {
-    //       storeObjId: { $toObjectId: '$listStore.storeInfo' }
-    //     }
-    //   },
-
-    //   // 6️⃣ lookup store
-    //   {
-    //     $lookup: {
-    //       from: 'stores',
-    //       localField: 'storeObjId',
-    //       foreignField: '_id',
-    //       as: 'storeDetail'
-    //     }
-    //   },
-
-    //   // 7️⃣ lookup order (optional)
-    //   {
-    //     $lookup: {
-    //       from: 'orders',
-    //       localField: 'listStore.listOrder.orderId',
-    //       foreignField: 'orderId',
-    //       as: 'order'
-    //     }
-    //   },
-
-    //   // 8️⃣ output
-    //   {
-    //     $project: {
-    //       _id: 0,
-    //       area: '$area',
-    //       zone: '$zone',
-
-    //       storeId: { $arrayElemAt: ['$storeDetail.storeId', 0] },
-    //       storeName: { $arrayElemAt: ['$storeDetail.name', 0] },
-    //       phone: { $arrayElemAt: ['$storeDetail.tel', 0] },
-
-    //       status: '$listStore.status',
-    //       statusText: '$listStore.statusText',
-
-    //       orderId: { $arrayElemAt: ['$listStore.listOrder.orderId', 0] },
-    //       sum: {
-    //         $ifNull: [{ $arrayElemAt: ['$order.total', 0] }, 0]
-    //       },
-
-    //       mapLink: {
-    //         $concat: [
-    //           'https://maps.google.com/?q=',
-    //           { $toString: { $arrayElemAt: ['$storeDetail.latitude', 0] } },
-    //           ',',
-    //           { $toString: { $arrayElemAt: ['$storeDetail.longtitude', 0] } }
-    //         ]
-    //       },
-
-    //       imageLink: '$listStore.image',
-
-    //       checkinDatetime: {
-    //         $dateToString: {
-    //           date: '$listStore.date',
-    //           format: '%Y-%m-%d %H:%M:%S',
-    //           timezone: 'Asia/Bangkok'
-    //         }
-    //       }
-    //     }
-    //   },
-
-    //   { $sort: { checkinDatetime: 1 } }
-    // ]
 
     const pipeline = [
       // 1️⃣ match route by area
@@ -5032,6 +4927,7 @@ exports.getStoreCheckinByDayArea = async (req, res) => {
           // ===== STORE INFO =====
           storeId: { $arrayElemAt: ['$storeDetail.storeId', 0] },
           storeName: { $arrayElemAt: ['$storeDetail.name', 0] },
+          storeAddress: { $arrayElemAt: ['$storeDetail.address', 0] },
           phone: { $arrayElemAt: ['$storeDetail.tel', 0] },
 
           status: '$listStore.status',
