@@ -48,7 +48,7 @@ const {
     groupStoreType,
     routeQuery,
     routeQueryOne,
-    updateLatLong,getDataRoute
+    updateLatLong, getDataRoute
 } = require('../../controllers/queryFromM3/querySctipt')
 const {
     generateOrderId,
@@ -401,5 +401,162 @@ exports.updateStoreStatusV2 = async (req, res) => {
             error: error.message || error.toString(), // ✅ ป้องกัน circular object
             stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
         })
+    }
+}
+
+exports.addStorePcToCash = async (req, res) => {
+    try {
+        const { storeId, area } = req.body
+        const channel = req.headers['x-channel']
+        const {
+            RunningNumber: RunningNumberCash,
+            Store: StoreCash
+        } = getModelsByChannel(channel, res, storeModel)
+
+        const {
+            RunningNumber: RunningNumberPC,
+            Store: StorePC
+        } = getModelsByChannel('pc', res, storeModel)
+        const { User } = getModelsByChannel(channel, res, userModel)
+
+
+
+        // const storesCash = await StoreCash.find({ area: 'IT211' })
+        const storesPc = await StorePC.findOne({ storeId: storeId }).lean()
+        const dataUser = await User.findOne({ area: area, role: 'sale' })
+        const storeZone = area.substring(0, 2)
+        const maxRunningAll = await RunningNumberCash.findOne({
+            zone: storeZone
+        }).select('last')
+
+        const oldId = maxRunningAll
+
+        const newId = oldId.last.replace(/\d+$/, n =>
+            String(+n + 1).padStart(n.length, '0')
+        )
+
+
+        const dataToCash = {
+            ...storesPc,
+            storeId: newId,
+            storeIdOld: storeId,
+            zone: storeZone,
+            area: area
+
+        }
+
+        const existed = await StoreCash.findOne({
+            storeIdOld: storesPc.storeId
+        })
+
+        if (existed) {
+            return res.status(409).json({
+                message: 'store already exists in cash',
+                storeId: existed.storeId
+            })
+        }
+
+        await StoreCash.create(dataToCash)
+
+
+        await RunningNumberCash.findOneAndUpdate(
+            { zone: storeZone },
+            { $set: { last: newId } },
+            { new: true }
+        )
+
+        const dataTran = {
+            Hcase: 1,
+            customerNo: dataToCash.storeId,
+            customerStatus: dataToCash.status ?? '',
+            customerName: dataToCash.name ?? '',
+            customerChannel: '103',
+            customerCoType: dataToCash.type ?? '',
+            customerAddress1: (
+                dataToCash.address +
+                dataToCash.subDistrict +
+                // item.subDistrict +
+                dataToCash.province +
+                dataToCash.postCode ?? ''
+            ).substring(0, 35),
+            customerAddress2: (
+                dataToCash.address +
+                dataToCash.subDistrict +
+                // item.subDistrict +
+                dataToCash.province +
+                dataToCash.postCode ?? ''
+            ).substring(35, 70),
+            customerAddress3: (
+                dataToCash.address +
+                dataToCash.subDistrict +
+                // item.subDistrict +
+                dataToCash.province +
+                dataToCash.postCode ?? ''
+            ).substring(70, 105),
+            customerAddress4: '',
+            customerPoscode: (dataToCash.postCode ?? '').substring(0, 35),
+            customerPhone: dataToCash.tel ?? '',
+            warehouse: dataUser.warehouse ?? '',
+            OKSDST: dataToCash.zone ?? '',
+            saleTeam: dataUser.area.slice(0, 2) + dataUser.area[3],
+            OKCFC1: dataToCash.area ?? '',
+            OKCFC3: dataToCash.route ?? '',
+            OKCFC6: dataToCash.type ?? '',
+            salePayer: dataUser.salePayer ?? '',
+            creditLimit: '000',
+            taxno: dataToCash.taxId ?? '',
+            saleCode: dataUser.saleCode ?? '',
+            saleZone: dataUser.zone ?? '',
+            OKFRE1: dataToCash.postCode,
+            OKECAR: dataToCash.postCode.slice(0, 2),
+            OKCFC4: dataToCash.area ?? '',
+            OKTOWN: dataToCash.province,
+            shippings: dataToCash.shippingAddress.map(u => {
+                return {
+                    shippingAddress1: (u.address ?? '').substring(0, 35),
+                    shippingAddress2: u.district ?? '',
+                    shippingAddress3: u.subDistrict ?? '',
+                    shippingAddress4: u.province ?? '',
+                    shippingPoscode: u.postCode ?? '',
+                    shippingPhone: dataToCash.tel ?? '',
+                    shippingRoute: u.postCode,
+                    OPGEOX: u.latitude,
+                    OPGEOY: u.longtitude
+                }
+            })
+        }
+
+
+        if (dataToCash.area != 'IT211') {
+            try {
+                const response = await axios.post(
+                    `${process.env.API_URL_12ERP}/customer/insert`,
+                    dataTran
+                )
+
+                // ส่งกลับไปให้ client ที่เรียก Express API
+                return res.status(response.status).json(response.data)
+            } catch (error) {
+                if (error.response) {
+                    // หาก ERP ส่ง 400 หรือ 500 หรืออื่นๆ กลับมา
+                    return res.status(error.response.status).json({
+                        message: error.response.data?.message || 'Request Failed',
+                        data: error.response.data
+                    })
+                }
+            }
+        }
+
+
+
+        res.status(201).json({
+            status: 201,
+            message: 'addStorePcToCash',
+            data: storesPc,
+            dataCash: dataToCash
+        })
+    } catch (error) {
+        console.error(error)
+        res.status(500).json({ status: 500, message: error.message })
     }
 }
