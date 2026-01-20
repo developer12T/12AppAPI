@@ -246,10 +246,10 @@ exports.checkOutV2 = async (req, res) => {
 
       if (storeId.length > 11) {
         orderId = await generateOrderIdDammy(area, sale.warehouse, channel, res)
-        approveStore = false 
+        approveStore = false
       } else {
         orderId = await generateOrderId(area, sale.warehouse, channel, res)
-        approveStore = true 
+        approveStore = true
       }
 
 
@@ -549,6 +549,36 @@ exports.checkOutV2 = async (req, res) => {
     })
   } catch (error) {
     // await transaction.rollback()
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.getBillNewStore = async (req, res) => {
+  try {
+    const { area } = req.query
+    const channel = req.headers['x-channel']
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+
+    let query = {status:'wait approve'}
+
+    if (area) {
+      query['store.area'] = area
+    }
+
+    // console.log('query',query)
+
+    const dataOrder = await Order.find(query)
+
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'getbillNewStore',
+      data: dataOrder
+    })
+
+  } catch (error) {
     console.error(error)
     res.status(500).json({ status: '500', message: error.message })
   }
