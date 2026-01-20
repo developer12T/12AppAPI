@@ -3429,36 +3429,45 @@ exports.addRouteIt = async (req, res) => {
     const dataStore = await Store.find({
       area: 'IT211',
       status: { $ne: '90' },
-      createdAt: { $gte: startOfDay, $lt: endOfDay }
+      // createdAt: { $gte: startOfDay, $lt: endOfDay }
     })
+
+    const ROUTE_DAYS = 25
+    const STORE_PER_DAY = 13
 
     let route = []
 
-    for (let i = 1; i <= 1; i++) {
-      const idx2 = String(i).padStart(2, '0') // "01".."25"
+    for (let i = 1; i <= ROUTE_DAYS; i++) {
+      const start = (i - 1) * STORE_PER_DAY
+      const end = start + STORE_PER_DAY
+
+      const dayStores = dataStore.slice(start, end)
+
       const data = {
-        id: `${period}IT211R${idx2}`,
-        period: period,
+        id: `${period}IT211R${String(i).padStart(2, '0')}`,
+        period,
         area: 'IT211',
-        day: i,
-        listStore: dataStore.map(item => {
-          return {
-            storeInfo: item._id,
-            note: '',
-            image: '',
-            latitude: '',
-            longtitude: '',
-            status: 0,
-            statusText: 'รอเยี่ยม',
-            listOrder: [],
-            date: ''
-          }
-        })
+        day: String(i).padStart(2, '0'),
+        team: 'IT1',
+        zone: 'IT',
+        listStore: dayStores.map(item => ({
+          storeInfo: item._id,
+          note: '',
+          image: '',
+          latitude: '',
+          longtitude: '',
+          status: 0,
+          statusText: 'รอเยี่ยม',
+          listOrder: [],
+          date: ''
+        }))
       }
+
       route.push(data)
     }
 
-    Route.create(route)
+
+    await Route.create(route)
 
     res.status(200).json({
       status: 200,
@@ -4506,7 +4515,7 @@ exports.approveNewStoreToRoute = async (req, res) => {
         $addToSet: {
           'lockRoute.$[route].listStore': {
             storeId: routeChangeLog.storeId,
-            storeInfo : storeData._id.toString(),
+            storeInfo: storeData._id.toString(),
             lock: true
           }
         }
