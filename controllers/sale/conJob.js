@@ -1,7 +1,7 @@
 const cron = require('node-cron')
 // const { erpApiCheckOrder,erpApiCheckDisributionM3 } = require('../../controllers/sale/orderController')
 const { OrderToExcelConJob } = require('../../controllers/sale/orderController')
-const { period, rangeDate } = require('../../utilities/datetime')
+const { period, rangeDate,generateDates } = require('../../utilities/datetime')
 const {
   to2,
   updateStockMongo,
@@ -647,9 +647,9 @@ async function autoLockRouteChange(channel = 'cash') {
   try {
 
     const periodStr = period()
-    const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
+    const { Route, RouteSetting } = getModelsByChannel(channel, null, routeModel)
     const routeSettingData = await RouteSetting.find({ period: periodStr })
-
+    // console.log('routeSettingData',routeSettingData)
     for (const route of routeSettingData) {
       const dates = generateDates(route.startDate, 25)
       const thaiDate = new Intl.DateTimeFormat('en-CA', {
@@ -668,9 +668,8 @@ async function autoLockRouteChange(channel = 'cash') {
         } else {
           canSell = false
         }
-
         const result = await RouteSetting.updateOne(
-          { periodStr, area: route.area },
+          { period:periodStr, area: route.area },
           {
             $set: {
               'lockRoute.$[route].lock': canSell,
@@ -686,7 +685,7 @@ async function autoLockRouteChange(channel = 'cash') {
 
       }
     }
-
+    console.log('✅ Job completed autoLockRouteChange')
     fs.appendFileSync(
       logFile,
       `[${nowLog}] ✅ Job completed autoLockRouteChange\n`
@@ -702,6 +701,7 @@ async function autoLockRouteChange(channel = 'cash') {
 const startCronJobAutoLockRouteChange = () => {
   cron.schedule(
     '0 4 * * *',   // ⏰ 04:00
+    // '*/2 * * * *',   // ⏰ ทุก 2 นาที
     async () => {
       console.log(
         'Running cron job startCronJobAutoLockRouteChange Now:',
