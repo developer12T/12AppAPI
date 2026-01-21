@@ -80,8 +80,8 @@ async function checkInRoute(data, channel, res) {
         let updateData = {
             "listStore.$.note": data.note || '',
             // "listStore.$.image": '',
-            "listStore.$.latitude": data.latitude,
-            "listStore.$.longtitude": data.longitude,
+            // "listStore.$.latitude": data.latitude,
+            // "listStore.$.longtitude": data.longitude,
             "listStore.$.status": '3',
             "listStore.$.statusText": 'ซื้อ',
             "listStore.$.date": new Date()
@@ -199,8 +199,8 @@ async function checkInSale(data, channel, res) {
         let updateData = {
             "listStore.$.note": data.note || '',
             // "listStore.$.image": '',
-            "listStore.$.latitude": data.latitude,
-            "listStore.$.longtitude": data.longitude,
+            // "listStore.$.latitude": data.latitude,
+            // "listStore.$.longtitude": data.longitude,
             "listStore.$.status": '3',
             "listStore.$.statusText": 'ซื้อ',
             "listStore.$.date": new Date()
