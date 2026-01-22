@@ -87,7 +87,7 @@ exports.updateStoreStatusV2 = async (req, res) => {
             res,
             promotionModel
         )
-        const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
+        const { Route, RouteSetting, RouteChangeLog } = getModelsByChannel(channel, res, routeModel)
         const store = await Store.findOne({ storeId: storeId })
         // console.log(store)
         if (!store) {
@@ -273,25 +273,45 @@ exports.updateStoreStatusV2 = async (req, res) => {
                     }
                 }
             }
-
             // const period = period()
-            // const exists = await RouteSetting.findOne({
-            //     period,
-            //     area,
-            //     lockRoute: {
-            //         $elemMatch: {
-            //             id,
-            //             listStore: {
-            //                 $elemMatch: {
-            //                     storeId
+            // const existRouteChangeLog = await RouteChangeLog.findOne({ status: 'approved', period: period, storeId: storeId })
+            // if (existRouteChangeLog) {
+            //     const exists = await RouteSetting.findOne({
+            //         period,
+            //         area: existRouteChangeLog.area,
+            //         lockRoute: {
+            //             $elemMatch: {
+            //                 routeId: existRouteChangeLog.routeId,
+            //                 listStore: {
+            //                     $elemMatch: {
+            //                         storeInfo: existRouteChangeLog.storeInfo
+            //                     }
             //                 }
             //             }
             //         }
+            //     }).lean()
+
+            //     if (exists) {
+            //         const result = await RouteSetting.updateOne(
+            //             {
+            //                 period,
+            //                 area: existRouteChangeLog.area
+            //             },
+            //             {
+            //                 $set: {
+            //                     'lockRoute.$[route].listStore.$[store].storeId': newId
+            //                 }
+            //             },
+            //             {
+            //                 arrayFilters: [
+            //                     { 'route.routeId': existRouteChangeLog.routeId }, // หรือ route.id ตาม schema
+            //                     { 'store.storeId': oldStoreId }
+            //                 ]
+            //             }
+            //         )
+
             //     }
-            // }).lean()
 
-
-            // if (exists) {
 
             // }
 
@@ -304,11 +324,14 @@ exports.updateStoreStatusV2 = async (req, res) => {
 
 
 
+
+
+
             const io = getSocket()
-            // io.emit('store/updateStoreStatus', {
-            //   status: 'success',
-            //   data: newId
-            // })
+            io.emit('store/updateStoreStatus', {
+                status: 'success',
+                data: newId
+            })
 
             //   return res.status(500).json({
             //     message: 'Internal Server Error',
