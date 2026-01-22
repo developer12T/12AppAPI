@@ -719,6 +719,9 @@ exports.editLockRoute = async (req, res) => {
     await RouteSettingLog.create(routeSettingLog)
 
 
+    const io = getSocket()
+    io.emit('route/editLockRoute', {})
+
 
     // =========================
     // 3. Success
