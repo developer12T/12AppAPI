@@ -4351,6 +4351,8 @@ exports.addNewStoreToRoute = async (req, res) => {
     const count = await RouteChangeLog.countDocuments()
     const transactionId = `RN${String(count + 1).padStart(4, '0')}`
 
+    // console.log(storeData)
+
     const transaction = {
       id: transactionId,
       area: routeData.area,
@@ -4358,6 +4360,7 @@ exports.addNewStoreToRoute = async (req, res) => {
       team: routeData.team,
       period: period,
       storeId: storeId,
+      storeInfo: storeData._id,
       name: storeData.name,
       latitude: storeData.latitude,
       longtitude: storeData.longtitude,
