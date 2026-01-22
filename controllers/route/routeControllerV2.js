@@ -465,10 +465,12 @@ exports.getRouteLock = async (req, res) => {
     // const io = getSocket()
     // io.emit('route/getRoute', {});
 
+
     res.status(200).json({
       status: 200,
       message: 'Success',
-      data: enrichedRoutes
+      data: enrichedRoutes,
+      saleOutRoute:routeSetting.saleOutRoute
     })
   } catch (err) {
     console.error(err)

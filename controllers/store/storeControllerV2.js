@@ -87,6 +87,7 @@ exports.updateStoreStatusV2 = async (req, res) => {
             res,
             promotionModel
         )
+        const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
         const store = await Store.findOne({ storeId: storeId })
         // console.log(store)
         if (!store) {
@@ -272,6 +273,35 @@ exports.updateStoreStatusV2 = async (req, res) => {
                     }
                 }
             }
+
+            // const period = period()
+            // const exists = await RouteSetting.findOne({
+            //     period,
+            //     area,
+            //     lockRoute: {
+            //         $elemMatch: {
+            //             id,
+            //             listStore: {
+            //                 $elemMatch: {
+            //                     storeId
+            //                 }
+            //             }
+            //         }
+            //     }
+            // }).lean()
+
+
+            // if (exists) {
+
+            // }
+
+
+
+
+
+
+
+
 
 
             const io = getSocket()
