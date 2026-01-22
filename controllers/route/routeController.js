@@ -4290,7 +4290,7 @@ exports.getRouteChange = async (req, res) => {
 
 exports.addNewStoreToRoute = async (req, res) => {
   try {
-    const { id, storeId } = req.body
+    const { id, storeId,period } = req.body
     const channel = req.headers['x-channel']
     const { Route, RouteChange, RouteChangeLog } = getModelsByChannel(
       channel,
@@ -4327,7 +4327,7 @@ exports.addNewStoreToRoute = async (req, res) => {
         $gte: startMonth,
         $lt: nextMonth
       },
-      status: '20'
+      status: {$in:['20','10']}
     })
     if (!storeData) {
       return res.status(404).json({
@@ -4356,7 +4356,7 @@ exports.addNewStoreToRoute = async (req, res) => {
       area: routeData.area,
       zone: routeData.zone,
       team: routeData.team,
-      period: period(),
+      period: period,
       storeId: storeId,
       name: storeData.name,
       latitude: storeData.latitude,

@@ -772,7 +772,7 @@ exports.autoLockRouteChange = async (req, res) => {
     const { period } = req.body
     const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
 
-    const routeSettingData = await RouteSetting.find({ period: period, area: { $in: ['IT211'] } })
+    const routeSettingData = await RouteSetting.find({ period: period })
 
 
     for (const route of routeSettingData) {
@@ -827,3 +827,4 @@ exports.autoLockRouteChange = async (req, res) => {
     res.status(500).json({ status: 500, message: error.message })
   }
 }
+
