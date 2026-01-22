@@ -87,6 +87,7 @@ exports.updateStoreStatusV2 = async (req, res) => {
             res,
             promotionModel
         )
+        const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
         const store = await Store.findOne({ storeId: storeId })
         // console.log(store)
         if (!store) {
@@ -272,6 +273,35 @@ exports.updateStoreStatusV2 = async (req, res) => {
                     }
                 }
             }
+
+            // const period = period()
+            // const exists = await RouteSetting.findOne({
+            //     period,
+            //     area,
+            //     lockRoute: {
+            //         $elemMatch: {
+            //             id,
+            //             listStore: {
+            //                 $elemMatch: {
+            //                     storeId
+            //                 }
+            //             }
+            //         }
+            //     }
+            // }).lean()
+
+
+            // if (exists) {
+
+            // }
+
+
+
+
+
+
+
+
 
 
             const io = getSocket()
@@ -555,6 +585,53 @@ exports.addStorePcToCash = async (req, res) => {
             data: storesPc,
             dataCash: dataToCash
         })
+    } catch (error) {
+        console.error(error)
+        res.status(500).json({ status: 500, message: error.message })
+    }
+}
+
+
+exports.updateStoreRouteAreaFromM3 = async (req, res) => {
+    try {
+        const channel = req.headers['x-channel']
+        const { Store } = getModelsByChannel(channel, res, storeModel)
+
+        // const storeData = await Store.find().
+        const storeDataM3 = await Customer.findAll({
+            attributes: ['customerNo', 'OKCFC1', 'OKCFC3'],
+            raw: true
+        })
+
+        const trimmedData = storeDataM3.map(row => ({
+            customerNo: row.customerNo?.trim(),
+            area: row.OKCFC1?.trim(),
+            zone: row.OKCFC1?.trim().slice(0, 2),
+            route: row.OKCFC3?.trim()
+        }))
+
+        const bulkOps = trimmedData.map(row => ({
+            updateMany: {
+                filter: { storeId: row.customerNo },
+                update: {
+                    $set: {
+                        area: row.area,
+                        zone: row.zone,
+                        route: row.route
+                    }
+                }
+            }
+        }))
+
+        await Store.bulkWrite(bulkOps)
+
+
+        res.status(200).json({
+            status: 200,
+            message: 'update success',
+            data: trimmedData
+        })
+
     } catch (error) {
         console.error(error)
         res.status(500).json({ status: 500, message: error.message })

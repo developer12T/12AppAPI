@@ -465,10 +465,12 @@ exports.getRouteLock = async (req, res) => {
     // const io = getSocket()
     // io.emit('route/getRoute', {});
 
+
     res.status(200).json({
       status: 200,
       message: 'Success',
-      data: enrichedRoutes
+      data: enrichedRoutes,
+      saleOutRoute:routeSetting.saleOutRoute
     })
   } catch (err) {
     console.error(err)
@@ -503,6 +505,8 @@ exports.editLockRoute = async (req, res) => {
     // =========================
     // 2. Switch by editType
     // =========================
+    let exists = {}
+    const query = { period }
     let result
     let routeSettingLog = {}
     switch (editType) {
@@ -514,6 +518,16 @@ exports.editLockRoute = async (req, res) => {
             message: 'not found area'
           })
         }
+
+        exists = await RouteSetting.findOne({ period, area })
+
+        if (!exists) {
+          return res.status(404).json({
+            status: 404,
+            message: 'area not found (nothing to update)'
+          })
+        }
+
 
         result = await RouteSetting.updateOne(
           { period, area },
@@ -539,12 +553,29 @@ exports.editLockRoute = async (req, res) => {
         break
 
       case 'id':
-        if (!area || !id) {
+        if (!period || !area || !id) {
           return res.status(400).json({
             status: 400,
-            message: 'not found area, id'
+            message: 'not found period, area, id'
           })
         }
+        exists = await RouteSetting.findOne({
+          period,
+          area,
+          lockRoute: {
+            $elemMatch: {
+              id
+            }
+          }
+        })
+        
+        if (!exists) {
+          return res.status(404).json({
+            status: 404,
+            message: 'route not found (nothing to update)'
+          })
+        }
+
 
         result = await RouteSetting.updateOne(
           { period, area },
@@ -578,6 +609,28 @@ exports.editLockRoute = async (req, res) => {
           return res.status(400).json({
             status: 400,
             message: 'not found area, id, storeId'
+          })
+        }
+
+        exists = await RouteSetting.findOne({
+          period,
+          area,
+          lockRoute: {
+            $elemMatch: {
+              id,
+              listStore: {
+                $elemMatch: {
+                  storeId
+                }
+              }
+            }
+          }
+        }).lean()
+
+        if (!exists) {
+          return res.status(404).json({
+            status: 404,
+            message: 'route or store not found (nothing to update)'
           })
         }
 
@@ -616,7 +669,7 @@ exports.editLockRoute = async (req, res) => {
           })
         }
 
-        const query = { period }
+
         if (area) query.area = area
 
         result = await RouteSetting.updateMany(
@@ -635,6 +688,25 @@ exports.editLockRoute = async (req, res) => {
 
         break
 
+      case 'saleOutRoute':
+
+        if (area) query.area = area
+
+        result = await RouteSetting.updateMany(
+          query,
+          { $set: { saleOutRoute: lock } }
+        )
+
+        routeSettingLog = {
+          period: period,
+          area: area ?? 'all',
+          editType: editType,
+          user: user
+        }
+
+
+        break
+
       default:
         return res.status(400).json({
           status: 400,
@@ -642,13 +714,6 @@ exports.editLockRoute = async (req, res) => {
         })
     }
 
-
-    if (!result || result.matchedCount === 0) {
-      return res.status(404).json({
-        status: 404,
-        message: 'document not found'
-      })
-    }
 
 
     await RouteSettingLog.create(routeSettingLog)
@@ -709,7 +774,7 @@ exports.autoLockRouteChange = async (req, res) => {
     const { period } = req.body
     const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
 
-    const routeSettingData = await RouteSetting.find({ period: period ,area:{$in:['IT211']}})
+    const routeSettingData = await RouteSetting.find({ period: period })
 
 
     for (const route of routeSettingData) {
@@ -732,21 +797,21 @@ exports.autoLockRouteChange = async (req, res) => {
           canSell = false
         }
 
-        const  result = await RouteSetting.updateOne(
-            { period, area:route.area },
-            {
-              $set: {
-                'lockRoute.$[route].lock': canSell,
-                'lockRoute.$[route].listStore.$[].lock': canSell
-              }
-            },
-            {
-              arrayFilters: [
-                { 'route.id': item.id }
-              ]
+        const result = await RouteSetting.updateOne(
+          { period, area: route.area },
+          {
+            $set: {
+              'lockRoute.$[route].lock': canSell,
+              'lockRoute.$[route].listStore.$[].lock': canSell
             }
-          )
-      
+          },
+          {
+            arrayFilters: [
+              { 'route.id': item.id }
+            ]
+          }
+        )
+
       }
 
     }
@@ -764,3 +829,4 @@ exports.autoLockRouteChange = async (req, res) => {
     res.status(500).json({ status: 500, message: error.message })
   }
 }
+
