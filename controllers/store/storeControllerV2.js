@@ -273,47 +273,46 @@ exports.updateStoreStatusV2 = async (req, res) => {
                     }
                 }
             }
-            // const period = period()
-            // const existRouteChangeLog = await RouteChangeLog.findOne({ status: 'approved', period: period, storeId: storeId })
-            // if (existRouteChangeLog) {
-            //     const exists = await RouteSetting.findOne({
-            //         period,
-            //         area: existRouteChangeLog.area,
-            //         lockRoute: {
-            //             $elemMatch: {
-            //                 routeId: existRouteChangeLog.routeId,
-            //                 listStore: {
-            //                     $elemMatch: {
-            //                         storeInfo: existRouteChangeLog.storeInfo
-            //                     }
-            //                 }
-            //             }
-            //         }
-            //     }).lean()
+            const existRouteChangeLog = await RouteChangeLog.findOne({ status: 'approved', period: period(), storeId: storeId })
+            if (existRouteChangeLog) {
+                const exists = await RouteSetting.findOne({
+                    period:period(),
+                    area: existRouteChangeLog.area,
+                    lockRoute: {
+                        $elemMatch: {
+                            routeId: existRouteChangeLog.routeId,
+                            listStore: {
+                                $elemMatch: {
+                                    storeInfo: existRouteChangeLog.storeInfo
+                                }
+                            }
+                        }
+                    }
+                }).lean()
 
-            //     if (exists) {
-            //         const result = await RouteSetting.updateOne(
-            //             {
-            //                 period,
-            //                 area: existRouteChangeLog.area
-            //             },
-            //             {
-            //                 $set: {
-            //                     'lockRoute.$[route].listStore.$[store].storeId': newId
-            //                 }
-            //             },
-            //             {
-            //                 arrayFilters: [
-            //                     { 'route.routeId': existRouteChangeLog.routeId }, // หรือ route.id ตาม schema
-            //                     { 'store.storeId': oldStoreId }
-            //                 ]
-            //             }
-            //         )
+                if (exists) {
+                    const result = await RouteSetting.updateOne(
+                        {
+                            period:period(),
+                            area: existRouteChangeLog.area
+                        },
+                        {
+                            $set: {
+                                'lockRoute.$[route].listStore.$[store].storeId': newId
+                            }
+                        },
+                        {
+                            arrayFilters: [
+                                { 'route.routeId': existRouteChangeLog.routeId }, // หรือ route.id ตาม schema
+                                { 'store.storeInfo': existRouteChangeLog.storeInfo }
+                            ]
+                        }
+                    )
 
-            //     }
+                }
 
 
-            // }
+            }
 
 
 

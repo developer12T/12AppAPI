@@ -470,7 +470,7 @@ exports.getRouteLock = async (req, res) => {
       status: 200,
       message: 'Success',
       data: enrichedRoutes,
-      saleOutRoute:routeSetting.saleOutRoute
+      saleOutRoute: routeSetting.saleOutRoute
     })
   } catch (err) {
     console.error(err)
@@ -568,7 +568,7 @@ exports.editLockRoute = async (req, res) => {
             }
           }
         })
-        
+
         if (!exists) {
           return res.status(404).json({
             status: 404,
@@ -720,7 +720,10 @@ exports.editLockRoute = async (req, res) => {
 
 
     const io = getSocket()
-    io.emit('route/editLockRoute', {})
+    io.emit('route/editLockRoute', {
+      status: 200,
+      message: 'editLockRoute success'
+    })
 
 
     // =========================
