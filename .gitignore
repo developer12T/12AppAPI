@@ -6,6 +6,7 @@
 .area_status
 .Order
 /controlllers/sale/conjobLog/
+autoLockRouteChange.txt
 startCronJobErpApiCheck.txt
 startCronJobUpdateOrderDistribution.txt
 updateStatusOrderDistribution.txt
