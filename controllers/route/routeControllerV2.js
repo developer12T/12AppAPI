@@ -710,7 +710,11 @@ exports.editLockRoute = async (req, res) => {
     const io = getSocket()
     io.emit('route/editLockRoute', {
       status: 200,
-      message: 'editLockRoute success'
+      message: 'editLockRoute success',
+      area:area,
+      period:period,
+      editType:editType,
+      lock:lock
     })
 
 
@@ -824,3 +828,25 @@ exports.autoLockRouteChange = async (req, res) => {
   }
 }
 
+exports.getSaleOutRoute = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { area,period } = req.query
+    const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
+
+    const routeSettingData = await RouteSetting.findOne({ period: period,area:area })
+
+
+
+
+    res.status(200).json({
+      status:200,
+      message:'getsaleOutRoute',
+      saleOutRoute:routeSettingData.saleOutRoute
+    })
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: 500, message: error.message })
+  }
+}

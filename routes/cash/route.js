@@ -55,7 +55,8 @@ const {
   getRouteLock,
   editLockRoute,
   getRouteSetting,
-  autoLockRouteChange
+  autoLockRouteChange,
+  getSaleOutRoute
 } = require('../../controllers/route/routeControllerV2')
 
 
@@ -118,4 +119,6 @@ router.post('/addRouteSettings', addRouteSettings)
 router.post('/editLockRoute', editLockRoute)
 router.post('/getRouteSetting', getRouteSetting)
 router.post('/autoLockRouteChange', autoLockRouteChange)
+
+router.get('/getSaleOutRoute', getSaleOutRoute)
 module.exports = router

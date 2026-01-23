@@ -276,11 +276,11 @@ exports.updateStoreStatusV2 = async (req, res) => {
             const existRouteChangeLog = await RouteChangeLog.findOne({ status: 'approved', period: period(), storeId: storeId })
             if (existRouteChangeLog) {
                 const exists = await RouteSetting.findOne({
-                    period:period(),
+                    period: period(),
                     area: existRouteChangeLog.area,
                     lockRoute: {
                         $elemMatch: {
-                            routeId: existRouteChangeLog.routeId,
+                            id: existRouteChangeLog.routeId,
                             listStore: {
                                 $elemMatch: {
                                     storeInfo: existRouteChangeLog.storeInfo
@@ -290,10 +290,11 @@ exports.updateStoreStatusV2 = async (req, res) => {
                     }
                 }).lean()
 
-                if (exists) {
+
+                if (exists !== null) {
                     const result = await RouteSetting.updateOne(
                         {
-                            period:period(),
+                            period: period(),
                             area: existRouteChangeLog.area
                         },
                         {
@@ -303,7 +304,7 @@ exports.updateStoreStatusV2 = async (req, res) => {
                         },
                         {
                             arrayFilters: [
-                                { 'route.routeId': existRouteChangeLog.routeId }, // หรือ route.id ตาม schema
+                                { 'route.id': existRouteChangeLog.routeId }, // หรือ route.id ตาม schema
                                 { 'store.storeInfo': existRouteChangeLog.storeInfo }
                             ]
                         }
@@ -313,18 +314,6 @@ exports.updateStoreStatusV2 = async (req, res) => {
 
 
             }
-
-
-
-
-
-
-
-
-
-
-
-
 
             const io = getSocket()
             io.emit('store/updateStoreStatus', {
@@ -428,6 +417,48 @@ exports.updateStoreStatusV2 = async (req, res) => {
 
             }
 
+            const existRouteChangeLog = await RouteChangeLog.findOne({
+                status: 'approved',
+                period: period(),
+                storeId
+            })
+
+            if (!existRouteChangeLog) return
+
+            // ลบ store ออกจาก Route
+            await Route.updateOne(
+                {
+                    period: period(),
+                    id: existRouteChangeLog.routeId
+                },
+                {
+                    $pull: {
+                        listStore: {
+                            storeInfo: existRouteChangeLog.storeInfo
+                        }
+                    }
+                }
+            )
+
+            // ลบ store ออกจาก RouteSetting
+            await RouteSetting.updateOne(
+                {
+                    period: period(),
+                    area: existRouteChangeLog.area
+                },
+                {
+                    $pull: {
+                        'lockRoute.$[route].listStore': {
+                            storeId: existRouteChangeLog.storeId
+                        }
+                    }
+                },
+                {
+                    arrayFilters: [
+                        { 'route.id': existRouteChangeLog.routeId }
+                    ]
+                }
+            )
 
 
 
