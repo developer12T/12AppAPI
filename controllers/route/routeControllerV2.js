@@ -448,22 +448,10 @@ exports.getRouteLock = async (req, res) => {
       enrichedRoutes = (enrichedRoutes || []).map(item => {
         return {
           ...item,
-          // canSell,
-          // dateMacth,
-          // thaiDate,
-          // listStore: []
+          listStore: []
         }
       })
     }
-
-    // enrichedRoutes = (enrichedRoutes || []).map(item => ({
-    //   ...item,
-    //   listStore: []
-    // }))
-
-    // }
-    // const io = getSocket()
-    // io.emit('route/getRoute', {});
 
 
     res.status(200).json({
