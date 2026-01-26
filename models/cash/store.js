@@ -144,6 +144,7 @@ const editHisSchema = mongoose.Schema({
   provinceCodeOld: { type: String },
   postCode: { type: String },
   postCodeOld: { type: String },
+  period:{ type: String },
   status: { type: String },
   statusTH: { type: String },
   editAt: { type: Date, default: Date.now },

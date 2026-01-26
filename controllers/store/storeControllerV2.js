@@ -53,7 +53,8 @@ const {
 const {
     generateOrderId,
     generateOrderIdFoodTruck,
-    generateOrderIdDammy
+    generateOrderIdDammy,
+    getNextStoreEditNumber
 } = require('../../utilities/genetateId')
 const orderModel = require('../../models/cash/sale')
 const storeModel = require('../../models/cash/store')
@@ -795,14 +796,18 @@ exports.requestStoreUpdate = async (req, res) => {
         //   { new: true }
         // )
 
-        // const updatedStore = await Store.findOne({ storeId: storeId })
+        const updatedStore = await Store.findOne({ storeId: storeId })
 
         delete history.editPerson
 
+        const number = await getNextStoreEditNumber(channel, res)
+
+
         const historyFinal = {
-            number,
+            number: number,
             storeId,
-            editPerson,
+            // editPerson,
+            period: period(),
             status: 'pending',
             statusTH: 'รออนุมัติ',
             ...history
@@ -854,7 +859,7 @@ exports.requestStoreUpdate = async (req, res) => {
         // })
 
         res.status(200).json({
-            status: '200',
+            status: '201',
             message: 'Store updated successfully',
             data: updatedStore
         })
@@ -866,12 +871,142 @@ exports.requestStoreUpdate = async (req, res) => {
 
 
 exports.approveRequestStoreUpdate = async (req, res) => {
-    try {
-        // const { num }
+  try {
+    const channel = req.headers['x-channel']
+    const { Store, StoreHisLog } = getModelsByChannel(channel, res, storeModel)
+    const { number, period, status, editPerson } = req.body
 
+    const exitsHis = await StoreHisLog.findOne({
+      number,
+      period,
+      status: 'pending'
+    })
 
-    } catch (error) {
-        console.error(error)
-        res.status(500).json({ status: '500', message: 'Server error' })
+    if (!exitsHis) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Request not found or already processed'
+      })
     }
+
+    // ❌ reject
+    if (status !== true) {
+      await exitsHis.updateOne({
+        $set: {
+          status: 'canceled',
+          statusTH: 'ไม่อนุมัติ',
+          editPerson
+        }
+      })
+
+      return res.status(200).json({
+        status: 200,
+        message: 'Rejected'
+      })
+    }
+
+    // -----------------------
+    // UPDATE STORE
+    // -----------------------
+    const updateStoreData = {}
+
+    const fields = [
+      'name',
+      'taxId',
+      'tel',
+      'address',
+      'subDistrict',
+      'district',
+      'province',
+      'provinceCode',
+      'postCode'
+    ]
+
+    for (const field of fields) {
+      if (exitsHis[field] !== undefined) {
+        updateStoreData[field] = exitsHis[field]
+      }
+    }
+
+    const updatedStore = await Store.findOneAndUpdate(
+      { storeId: exitsHis.storeId },
+      { $set: updateStoreData },
+      { new: true }
+    )
+
+    if (!updatedStore) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Store not found'
+      })
+    }
+
+    // -----------------------
+    // UPDATE M3 (Customer)
+    // -----------------------
+    const updateData = {}
+
+    if (updatedStore.name) {
+      const nameStr = updatedStore.name
+      updateData.OKALCU = nameStr.slice(0, 10)
+      updateData.customerName = nameStr.slice(0, 36)
+      updateData.customerAddress4 = nameStr.slice(36, 72)
+    }
+
+    if (updatedStore.taxId) {
+      updateData.taxno = updatedStore.taxId
+    }
+
+    if (updatedStore.tel) {
+      updateData.customerPhone = updatedStore.tel
+    }
+
+    if (
+      updatedStore.address ||
+      updatedStore.subDistrict ||
+      updatedStore.province ||
+      updatedStore.postCode
+    ) {
+      const fullAddress =
+        (updatedStore.address ?? '') +
+        (updatedStore.subDistrict ?? '') +
+        (updatedStore.province ?? '') +
+        (updatedStore.postCode ?? '')
+
+      updateData.customerAddress1 = fullAddress.slice(0, 35)
+      updateData.customerAddress2 = fullAddress.slice(35, 70)
+      updateData.customerAddress3 = fullAddress.slice(70, 105)
+    }
+
+    if (Object.keys(updateData).length > 0) {
+      await Customer.update(updateData, {
+        where: {
+          coNo: 410,
+          customerNo: exitsHis.storeId
+        }
+      })
+    }
+
+    // -----------------------
+    // UPDATE HISTORY STATUS
+    // -----------------------
+    await exitsHis.updateOne({
+      $set: {
+        status: 'approved',
+        statusTH: 'อนุมัติ',
+        editPerson
+      }
+    })
+
+    res.status(200).json({
+      status: 200,
+      message: 'Approved'
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({
+      status: 500,
+      message: 'Server error'
+    })
+  }
 }
