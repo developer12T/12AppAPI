@@ -690,3 +690,188 @@ exports.updateStoreRouteAreaFromM3 = async (req, res) => {
         res.status(500).json({ status: 500, message: error.message })
     }
 }
+
+
+exports.requestStoreUpdate = async (req, res) => {
+    // const { storeId, name, taxId, tel, address, subDistrict, district, province, provinceCode, postCode, user } = req.body
+
+    try {
+        const storeId = req.body.storeId
+        const data = req.body
+        Object.keys(data).forEach(key => {
+            if (data[key] === '' || data[key] === null || data[key] === undefined) {
+                delete data[key]
+            }
+        })
+
+        if (!data.user) {
+            return res.status(401).json({
+                status: 401,
+                message: 'user is required'
+            })
+        }
+
+        const channel = req.headers['x-channel']
+        const { Store, StoreHisLog } = getModelsByChannel(channel, res, storeModel)
+
+        // 1) ดึงข้อมูลเดิม
+        const oldStore = await Store.findOne({ storeId: storeId })
+
+        // if (oldStore.area !== 'IT211') {
+        //   const m3Store = await Customer.findOne({
+        //     where: {
+        //       coNo: 410,
+        //       customerNo: storeId
+        //     }
+        //   })
+
+        //   if (!m3Store) {
+        //     return res.status(404).json({
+        //       status: 404,
+        //       message: 'Store not found in M3'
+        //     })
+        //   }
+        // }
+
+        if (!oldStore) {
+            return res
+                .status(404)
+                .json({ status: '404', message: 'Store not found mongo' })
+        }
+
+        const editableFields = [
+            'storeId',
+            'name',
+            'taxId',
+            'tel',
+            'address',
+            'subDistrict',
+            'district',
+            'province',
+            'provinceCode',
+            'postCode'
+        ]
+
+        // History ที่จะบันทึก
+        const history = {
+            editPerson: req.user,
+            editAt: new Date()
+        }
+
+        // ตรวจว่า field ไหนมีการแก้จริง
+        editableFields.forEach(field => {
+            const oldVal = oldStore[field]
+            const newVal = data[field]
+
+            // เงื่อนไข: มีค่าใหม่ + ไม่เท่าค่าเก่า = ถือว่าแก้ไข
+            if (
+                newVal !== undefined &&
+                newVal !== null &&
+                newVal !== '' &&
+                newVal !== oldVal
+            ) {
+                history[field] = newVal
+                history[field + 'Old'] = oldVal
+            }
+        })
+
+        const editPerson = data.user
+        // console.log(editPerson)
+        // ถ้าไม่มีฟิลด์ไหนถูกแก้ → แจ้งว่าไม่มีการเปลี่ยนแปลง
+        if (Object.keys(history).length === 2) {
+            // มีแค่ editPerson + editAt
+            return res.status(400).json({
+                status: '400',
+                message: 'Nothing changed'
+            })
+        }
+
+        // console.log('data', data)
+
+        // อัปเดตร้าน
+        // const updatedStore = await Store.findOneAndUpdate(
+        //   { storeId: storeId },
+        //   { $set: data },
+        //   { new: true }
+        // )
+
+        // const updatedStore = await Store.findOne({ storeId: storeId })
+
+        delete history.editPerson
+
+        const historyFinal = {
+            number,
+            storeId,
+            editPerson,
+            status: 'pending',
+            statusTH: 'รออนุมัติ',
+            ...history
+        }
+
+        // บันทึกประวัติการแก้ไข
+        await StoreHisLog.create(historyFinal)
+
+        const updateData = {}
+
+        // ---- NAME ----
+        if (data.name) {
+            const nameStr = updatedStore.name ?? ''
+            updateData.OKALCU = nameStr.slice(0, 10)
+            updateData.customerName = nameStr.slice(0, 36)
+            updateData.customerAddress4 = nameStr.slice(36, 72)
+        }
+
+        if (data.taxId) {
+            updateData.taxno = data.taxId
+        }
+
+        if (data.tel) {
+            updateData.customerPhone = data.tel
+        }
+
+        // ---- ADDRESS ----
+        if (data.address || data.subDistrict || data.province || data.postCode) {
+            const fullAddress =
+                (updatedStore.address ?? '') +
+                '' +
+                (updatedStore.subDistrict ?? '') +
+                '' +
+                (updatedStore.province ?? '') +
+                '' +
+                (updatedStore.postCode ?? '')
+
+            updateData.customerAddress1 = fullAddress.slice(0, 35)
+            updateData.customerAddress2 = fullAddress.slice(35, 70)
+            updateData.customerAddress3 = fullAddress.slice(70, 105)
+        }
+
+        // ---- UPDATE ครั้งเดียว ----
+        // await Customer.update(updateData, {
+        //   where: {
+        //     coNo: 410,
+        //     customerNo: storeId
+        //   }
+        // })
+
+        res.status(200).json({
+            status: '200',
+            message: 'Store updated successfully',
+            data: updatedStore
+        })
+    } catch (error) {
+        console.error(error)
+        res.status(500).json({ status: '500', message: 'Server error' })
+    }
+}
+
+
+exports.approveRequestStoreUpdate = async (req, res) => {
+    try {
+        // const { num }
+
+
+    } catch (error) {
+        console.error(error)
+        res.status(500).json({ status: '500', message: 'Server error' })
+    }
+}
