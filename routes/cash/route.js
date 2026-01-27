@@ -57,11 +57,7 @@ const {
   getRouteSetting,
   autoLockRouteChange,
   getSaleOutRoute,
-<<<<<<< HEAD
-  updateSaleOutRoute
-=======
   getCurrentRouteLock
->>>>>>> 34979e0094104ab8da50cbd37d7adfe21b69ca95
 } = require('../../controllers/route/routeControllerV2')
 
 const router = express.Router()
