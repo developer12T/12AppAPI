@@ -711,10 +711,10 @@ exports.editLockRoute = async (req, res) => {
     io.emit('route/editLockRoute', {
       status: 200,
       message: 'editLockRoute success',
-      area:area,
-      period:period,
-      editType:editType,
-      lock:lock
+      area: area,
+      period: period,
+      editType: editType,
+      lock: lock
     })
 
 
@@ -831,18 +831,53 @@ exports.autoLockRouteChange = async (req, res) => {
 exports.getSaleOutRoute = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
-    const { area,period } = req.query
+    const { area, period } = req.query
     const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
 
-    const routeSettingData = await RouteSetting.findOne({ period: period,area:area })
+    const routeSettingData = await RouteSetting.findOne({ period: period, area: area })
 
 
 
 
     res.status(200).json({
-      status:200,
-      message:'getsaleOutRoute',
-      saleOutRoute:routeSettingData.saleOutRoute
+      status: 200,
+      message: 'getsaleOutRoute',
+      saleOutRoute: routeSettingData.saleOutRoute
+    })
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: 500, message: error.message })
+  }
+}
+
+exports.getCurrentRouteLock = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { area, period } = req.query
+    const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
+
+    const RouteSettingData = await RouteSetting.findOne({ area: area, period: period })
+
+    const thaiDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Bangkok',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(new Date())
+    const dates = generateDates(RouteSettingData.startDate, 24)
+
+    const dateMacth = dates.find(u => String(u.date) === String(thaiDate))
+
+
+    const routeData = await Route.findOne({area:area,period:period,day:dateMacth.day})
+
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'getCurrentRouteLock',
+      data: routeData
     })
 
   } catch (error) {
