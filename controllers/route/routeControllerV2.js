@@ -810,6 +810,14 @@ exports.getCurrentRouteLock = async (req, res) => {
 
     const RouteSettingData = await RouteSetting.findOne({ area: area, period: period })
 
+    if (!RouteSettingData){
+      return res.status(404).json({
+        status:200,
+        message:'Not found RouteSetting'
+      })
+    }
+
+
     const thaiDate = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Bangkok',
       year: 'numeric',
@@ -821,27 +829,20 @@ exports.getCurrentRouteLock = async (req, res) => {
     const dateMacth = dates.find(u => String(u.date) === String(thaiDate))
 
 
-    const routeData = await Route.findOne({area:area,period:period,day:dateMacth.day})
 
 
 
     res.status(200).json({
       status: 200,
       message: 'getCurrentRouteLock',
-      data: routeData
+      data: `R${dateMacth.day}`
     })
 
-    res.status(200).json({
-      status: 200,
-      message: 'getsaleOutRoute',
-      saleOutRoute: routeSettingData.saleOutRoute
-    })
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: 500, message: error.message })
   }
 }
-
 exports.updateSaleOutRoute = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
