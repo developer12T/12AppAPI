@@ -4544,12 +4544,9 @@ exports.approveNewStoreToRoute = async (req, res) => {
 
     const io = getSocket()
     io.emit('route/approveNewStoreToRoute', {
-      status: '200',
-      message: 'approveNewStoreToRoute success',
-      data: {
         area: RouteChangeLog.area,
-        period: RouteChangeLog.period
-      }
+        period: RouteChangeLog.period,
+        status:status
     })
 
 
