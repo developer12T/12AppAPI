@@ -198,7 +198,7 @@ exports.getRouteLock = async (req, res) => {
     if (area) {
       routeSetting = await RouteSetting.findOne({ period: period, area: area })
 
-      dates = generateDates(routeSetting.startDate, 25)
+      dates = generateDates(routeSetting.startDate, 24)
     }
 
 
@@ -777,7 +777,7 @@ exports.autoLockRouteChange = async (req, res) => {
 
     for (const route of routeSettingData) {
 
-      const dates = generateDates(route.startDate, 25)
+      const dates = generateDates(route.startDate, 24)
       const thaiDate = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Bangkok',
         year: 'numeric',
