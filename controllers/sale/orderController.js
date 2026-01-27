@@ -5686,7 +5686,6 @@ exports.getTarget = async (req, res) => {
       })
     ])
 
-    // console.log(dataTarget)
 
     const totalSendmoney = (dataSendmoney ?? []).reduce(
       (sum, item) => sum + (Number(item?.sendmoney) || 0),

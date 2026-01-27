@@ -651,7 +651,7 @@ async function autoLockRouteChange(channel = 'cash') {
     const routeSettingData = await RouteSetting.find({ period: periodStr })
     // console.log('routeSettingData',routeSettingData)
     for (const route of routeSettingData) {
-      const dates = generateDates(route.startDate, 25)
+      const dates = generateDates(route.startDate, 24)
       const thaiDate = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Bangkok',
         year: 'numeric',

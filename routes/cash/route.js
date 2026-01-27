@@ -57,7 +57,11 @@ const {
   getRouteSetting,
   autoLockRouteChange,
   getSaleOutRoute,
+<<<<<<< HEAD
   updateSaleOutRoute
+=======
+  getCurrentRouteLock
+>>>>>>> 34979e0094104ab8da50cbd37d7adfe21b69ca95
 } = require('../../controllers/route/routeControllerV2')
 
 const router = express.Router()
@@ -99,7 +103,7 @@ router.post('/deleteStoreToRouteChange', deleteStoreToRouteChange)
 router.post('/addRouteChangeToRoute', addRouteChangeToRoute)
 router.post('/addTargetRoute', addTargetRoute)
 router.post('/getRouteEffectiveByDay', getRouteEffectiveByDayArea)
-
+router.get('/getCurrentRouteLock', getCurrentRouteLock)
 router.get('/getRouteChange', getRouteChange)
 router.post('/addNewStoreToRoute', addNewStoreToRoute)
 router.post('/approveNewStoreToRoute', approveNewStoreToRoute)
