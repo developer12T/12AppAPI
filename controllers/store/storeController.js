@@ -3601,7 +3601,7 @@ exports.getStorePage = async (req, res) => {
     else if (type === 'R') {
       filter.route = type
     }
-    console.log(filter)
+    
     filter.status = { $nin: ['90'] }
 
     const qText = (q || '').trim()
