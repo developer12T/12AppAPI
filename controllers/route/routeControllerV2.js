@@ -40,12 +40,8 @@ const os = require('os')
 const moment = require('moment')
 const { flatMap } = require('lodash')
 
-
-
-
 exports.updateAreaByDataRoute = async (req, res) => {
   try {
-
     // const { Store, TypeStore } = getModelsByChannel('cash', res, storeModel)
     // const dataRoute = await getDataRoute()
 
@@ -71,15 +67,11 @@ exports.updateAreaByDataRoute = async (req, res) => {
     //   }
     // )
 
-
-
     res.status(201).json({
       status: 201,
-      message: 'updateAreaByDataRoute',
+      message: 'updateAreaByDataRoute'
       // data: storeIdList,
-
     })
-
   } catch (error) {
     console.error('❌ Error:', error)
 
@@ -92,7 +84,6 @@ exports.updateAreaByDataRoute = async (req, res) => {
   }
 }
 
-
 exports.addRouteSettings = async (req, res) => {
   try {
     const { period, lock, startDate } = req.body
@@ -101,42 +92,46 @@ exports.addRouteSettings = async (req, res) => {
     const { Store } = getModelsByChannel(channel, res, storeModel)
     const { User } = getModelsByChannel('cash', res, userModel)
 
-    const routeLockExit = await RouteSetting.find({ period: period }).select("area")
+    const routeLockExit = await RouteSetting.find({ period: period }).select(
+      'area'
+    )
     const areaExitList = routeLockExit.flatMap(item => item.area)
 
-    const userData = await User.find({ role: "sale", platformType: 'CASH', area: { $nin: areaExitList } })
+    const userData = await User.find({
+      role: 'sale',
+      platformType: 'CASH',
+      area: { $nin: areaExitList }
+    })
 
     const routeData = await Route.find({ period: period })
-    const storeIdObj = [...new Set(routeData.flatMap(item =>
-      item.listStore.map(u => u.storeInfo)
-    ))]
+    const storeIdObj = [
+      ...new Set(
+        routeData.flatMap(item => item.listStore.map(u => u.storeInfo))
+      )
+    ]
     const storeData = await Store.find({
       _id: { $in: storeIdObj }
     })
     let areaList = []
     for (const user of userData) {
-
       let lockRoute = []
 
       const routeUser = routeData.filter(item => item.area === user.area)
 
       for (const row of routeUser) {
-
-
         const listStore = []
         for (const item of row.listStore) {
           const storeDetail = storeData.find(
             s => s._id.toString() === item.storeInfo
           )
           const storeTran = {
-            // _id: 
+            // _id:
             storeId: storeDetail.storeId,
             storeInfo: storeDetail._id,
             lock: lock
           }
 
           listStore.push(storeTran)
-
         }
         const lockRouteTran = {
           id: row.id,
@@ -152,22 +147,17 @@ exports.addRouteSettings = async (req, res) => {
         period: period,
         lock: true,
         startDate: startDate,
-        lockRoute: lockRoute,
+        lockRoute: lockRoute
       }
       areaList.push(user.area)
       await RouteSetting.create(dataTran)
     }
 
-
-
-
-
     res.status(200).json({
       status: 201,
-      message: `add to ${areaList} ${period} addRouteSettings success `,
+      message: `add to ${areaList} ${period} addRouteSettings success `
       // message:'sssssssssssssssss'
     })
-
   } catch (error) {
     console.error('error:', error)
     return res.status(500).json({
@@ -201,7 +191,6 @@ exports.getRouteLock = async (req, res) => {
       dates = generateDates(routeSetting.startDate, 25)
     }
 
-
     const query = { period }
     if (area) query.area = area
     if (routeId) query.id = routeId
@@ -220,7 +209,6 @@ exports.getRouteLock = async (req, res) => {
     const filteredRoutes = routes
       .map(route => {
         const filteredListStore = route.listStore.filter(store => {
-
           const addr = (store.storeInfo?.address || '').toLowerCase()
 
           const matchDistrict = district
@@ -253,12 +241,14 @@ exports.getRouteLock = async (req, res) => {
           canSell = false
         }
 
-        const checkLockRoute = routeSetting.lockRoute.find(item => item.id === route.id)
+        const checkLockRoute = routeSetting.lockRoute.find(
+          item => item.id === route.id
+        )
         const lockRoute = checkLockRoute.lock
         const listStore = filteredListStore.map(item => {
-
-          const lockStore = checkLockRoute.listStore.find(u => u.storeId === item.storeInfo.storeId).lock
-
+          const lockStore = checkLockRoute.listStore.find(
+            u => u.storeId === item.storeInfo.storeId
+          ).lock
 
           return {
             storeInfo: {
@@ -268,7 +258,7 @@ exports.getRouteLock = async (req, res) => {
               taxId: item.storeInfo.taxId,
               tel: item.storeInfo.tel,
               typeName: item.storeInfo.typeName,
-              address: item.storeInfo.address,
+              address: item.storeInfo.address
             },
             lockStore: lockStore,
             note: item.note,
@@ -284,9 +274,6 @@ exports.getRouteLock = async (req, res) => {
           }
         })
 
-
-
-
         return {
           ...route.toObject(),
           lockRoute: lockRoute,
@@ -297,7 +284,6 @@ exports.getRouteLock = async (req, res) => {
         }
       })
       .filter(route => route.listStore.length > 0)
-
 
     const allStoreIds = filteredRoutes.flatMap(route =>
       route.listStore.map(s => s.storeInfo?.storeId).filter(Boolean)
@@ -359,55 +345,55 @@ exports.getRouteLock = async (req, res) => {
     // If area is not provided (or explicitly empty), group results by day+period
     if ((!area || area === '') && period && !storeId) {
       const groups = new Map()
-        ; (enrichedRoutes || []).forEach(route => {
-          // Skip routes with area == 'IT211'
-          if (route.area === 'IT211') return
+      ;(enrichedRoutes || []).forEach(route => {
+        // Skip routes with area == 'IT211'
+        if (route.area === 'IT211') return
 
-          // derive zone/team from route (prefer explicit fields, otherwise from area)
-          let zoneKey = route.zone || ''
-          let teamKey = route.team || ''
-          if (route.area) {
-            const a = String(route.area || '')
-            zoneKey = a.substring(0, 2)
-            teamKey = `${a.substring(0, 2)}${a.charAt(3) || ''}`
-          }
+        // derive zone/team from route (prefer explicit fields, otherwise from area)
+        let zoneKey = route.zone || ''
+        let teamKey = route.team || ''
+        if (route.area) {
+          const a = String(route.area || '')
+          zoneKey = a.substring(0, 2)
+          teamKey = `${a.substring(0, 2)}${a.charAt(3) || ''}`
+        }
 
-          // if request includes zone/team filters, skip non-matching routes
-          if (zone && String(zone) !== zoneKey) return
-          if (team && String(team) !== teamKey) return
+        // if request includes zone/team filters, skip non-matching routes
+        if (zone && String(zone) !== zoneKey) return
+        if (team && String(team) !== teamKey) return
 
-          const dayKey = route.day || ''
-          if (!groups.has(dayKey)) {
-            groups.set(dayKey, {
-              day: dayKey,
-              period: period,
-              // routes: [],
-              storeAll: 0,
-              storePending: 0,
-              storeSell: 0,
-              storeNotSell: 0,
-              storeCheckInNotSell: 0,
-              storeTotal: 0
-            })
-          }
+        const dayKey = route.day || ''
+        if (!groups.has(dayKey)) {
+          groups.set(dayKey, {
+            day: dayKey,
+            period: period,
+            // routes: [],
+            storeAll: 0,
+            storePending: 0,
+            storeSell: 0,
+            storeNotSell: 0,
+            storeCheckInNotSell: 0,
+            storeTotal: 0
+          })
+        }
 
-          const grp = groups.get(dayKey)
+        const grp = groups.get(dayKey)
 
-          // accumulate counts from each route (use numeric defaults)
-          const ra = Number(route.storeAll) || 0
-          const rp = Number(route.storePending) || 0
-          const rs = Number(route.storeSell) || 0
-          const rn = Number(route.storeNotSell) || 0
-          const rcn = Number(route.storeCheckInNotSell) || 0
-          const rt = Number(route.storeTotal) || 0
+        // accumulate counts from each route (use numeric defaults)
+        const ra = Number(route.storeAll) || 0
+        const rp = Number(route.storePending) || 0
+        const rs = Number(route.storeSell) || 0
+        const rn = Number(route.storeNotSell) || 0
+        const rcn = Number(route.storeCheckInNotSell) || 0
+        const rt = Number(route.storeTotal) || 0
 
-          grp.storeAll += ra
-          grp.storePending += rp
-          grp.storeSell += rs
-          grp.storeNotSell += rn
-          grp.storeCheckInNotSell += rcn
-          grp.storeTotal += rt
-        })
+        grp.storeAll += ra
+        grp.storePending += rp
+        grp.storeSell += rs
+        grp.storeNotSell += rn
+        grp.storeCheckInNotSell += rcn
+        grp.storeTotal += rt
+      })
 
       // finalize percentage fields for each group
       enrichedRoutes = Array.from(groups.values()).map(g => {
@@ -453,7 +439,6 @@ exports.getRouteLock = async (req, res) => {
       })
     }
 
-
     res.status(200).json({
       status: 200,
       message: 'Success',
@@ -469,8 +454,13 @@ exports.getRouteLock = async (req, res) => {
 exports.editLockRoute = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
-    const { period, area, id, storeId, lock, editType, startDate, user } = req.body
-    const { RouteSetting, RouteSettingLog } = getModelsByChannel(channel, res, routeModel)
+    const { period, area, id, storeId, lock, editType, startDate, user } =
+      req.body
+    const { RouteSetting, RouteSettingLog } = getModelsByChannel(
+      channel,
+      res,
+      routeModel
+    )
 
     // =========================
     // 1. Validate base
@@ -498,7 +488,6 @@ exports.editLockRoute = async (req, res) => {
     let result
     let routeSettingLog = {}
     switch (editType) {
-
       case 'area':
         if (!area) {
           return res.status(400).json({
@@ -516,7 +505,6 @@ exports.editLockRoute = async (req, res) => {
           })
         }
 
-
         result = await RouteSetting.updateOne(
           { period, area },
           {
@@ -528,7 +516,6 @@ exports.editLockRoute = async (req, res) => {
           }
         )
 
-
         routeSettingLog = {
           period: period,
           area: area,
@@ -536,7 +523,6 @@ exports.editLockRoute = async (req, res) => {
           editType: editType,
           user: user
         }
-
 
         break
 
@@ -564,7 +550,6 @@ exports.editLockRoute = async (req, res) => {
           })
         }
 
-
         result = await RouteSetting.updateOne(
           { period, area },
           {
@@ -574,9 +559,7 @@ exports.editLockRoute = async (req, res) => {
             }
           },
           {
-            arrayFilters: [
-              { 'route.id': id }
-            ]
+            arrayFilters: [{ 'route.id': id }]
           }
         )
 
@@ -588,7 +571,6 @@ exports.editLockRoute = async (req, res) => {
           editType: editType,
           user: user
         }
-
 
         break
 
@@ -630,10 +612,7 @@ exports.editLockRoute = async (req, res) => {
             }
           },
           {
-            arrayFilters: [
-              { 'route.id': id },
-              { 'store.storeId': storeId }
-            ]
+            arrayFilters: [{ 'route.id': id }, { 'store.storeId': storeId }]
           }
         )
 
@@ -657,13 +636,9 @@ exports.editLockRoute = async (req, res) => {
           })
         }
 
-
         if (area) query.area = area
 
-        result = await RouteSetting.updateMany(
-          query,
-          { $set: { startDate } }
-        )
+        result = await RouteSetting.updateMany(query, { $set: { startDate } })
 
         routeSettingLog = {
           period: period,
@@ -673,17 +648,14 @@ exports.editLockRoute = async (req, res) => {
           user: user
         }
 
-
         break
 
       case 'saleOutRoute':
-
         if (area) query.area = area
 
-        result = await RouteSetting.updateMany(
-          query,
-          { $set: { saleOutRoute: lock } }
-        )
+        result = await RouteSetting.updateMany(query, {
+          $set: { saleOutRoute: lock }
+        })
 
         routeSettingLog = {
           period: period,
@@ -691,7 +663,6 @@ exports.editLockRoute = async (req, res) => {
           editType: editType,
           user: user
         }
-
 
         break
 
@@ -702,21 +673,17 @@ exports.editLockRoute = async (req, res) => {
         })
     }
 
-
-
     await RouteSettingLog.create(routeSettingLog)
-
 
     const io = getSocket()
     io.emit('route/editLockRoute', {
       status: 200,
       message: 'editLockRoute success',
-      area:area,
-      period:period,
-      editType:editType,
-      lock:lock
+      area: area,
+      period: period,
+      editType: editType,
+      lock: lock
     })
-
 
     // =========================
     // 3. Success
@@ -725,7 +692,6 @@ exports.editLockRoute = async (req, res) => {
       status: 200,
       message: 'editLockRoute success'
     })
-
   } catch (error) {
     console.error('[editLockRoute]', error)
     return res.status(500).json({
@@ -734,8 +700,6 @@ exports.editLockRoute = async (req, res) => {
     })
   }
 }
-
-
 
 exports.getRouteSetting = async (req, res) => {
   try {
@@ -751,20 +715,16 @@ exports.getRouteSetting = async (req, res) => {
 
     const routeSettingData = await RouteSetting.find(query)
 
-
-
     res.status(200).json({
       status: 200,
       message: 'getRouteSetting',
       data: routeSettingData
     })
-
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: 500, message: error.message })
   }
 }
-
 
 exports.autoLockRouteChange = async (req, res) => {
   try {
@@ -774,9 +734,7 @@ exports.autoLockRouteChange = async (req, res) => {
 
     const routeSettingData = await RouteSetting.find({ period: period })
 
-
     for (const route of routeSettingData) {
-
       const dates = generateDates(route.startDate, 25)
       const thaiDate = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Bangkok',
@@ -786,7 +744,6 @@ exports.autoLockRouteChange = async (req, res) => {
       }).format(new Date())
 
       for (const item of route.lockRoute) {
-
         const dateMacth = dates.find(u => String(u.day) === String(item.route))
         let canSell = ''
         if (dateMacth.date === thaiDate) {
@@ -804,24 +761,17 @@ exports.autoLockRouteChange = async (req, res) => {
             }
           },
           {
-            arrayFilters: [
-              { 'route.id': item.id }
-            ]
+            arrayFilters: [{ 'route.id': item.id }]
           }
         )
-
       }
-
     }
-
-
 
     res.status(200).json({
       status: 200,
       message: 'getRouteSetting',
       data: routeSettingData
     })
-
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: 500, message: error.message })
@@ -831,22 +781,79 @@ exports.autoLockRouteChange = async (req, res) => {
 exports.getSaleOutRoute = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
-    const { area,period } = req.query
+    const { area, period } = req.query
     const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
 
-    const routeSettingData = await RouteSetting.findOne({ period: period,area:area })
-
-
-
-
-    res.status(200).json({
-      status:200,
-      message:'getsaleOutRoute',
-      saleOutRoute:routeSettingData.saleOutRoute
+    const routeSettingData = await RouteSetting.findOne({
+      period: period,
+      area: area
     })
 
+    res.status(200).json({
+      status: 200,
+      message: 'getsaleOutRoute',
+      saleOutRoute: routeSettingData.saleOutRoute
+    })
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: 500, message: error.message })
+  }
+}
+
+exports.updateSaleOutRoute = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    // const {} = req.query
+    const { saleOutRoute, area, period } = req.body
+
+    if (!area || !period) {
+      return res.status(400).json({
+        status: 400,
+        message: 'area and period are required'
+      })
+    }
+
+    if (typeof saleOutRoute !== 'boolean') {
+      return res.status(400).json({
+        status: 400,
+        message: 'saleOutRoute must be boolean'
+      })
+    }
+
+    const { RouteSetting } = getModelsByChannel(channel, res, routeModel)
+
+    const updated = await RouteSetting.findOneAndUpdate(
+      { area, period },
+      { $set: { saleOutRoute } },
+      { new: true }
+    )
+
+    if (!updated) {
+      return res.status(404).json({
+        status: 404,
+        message: 'RouteSetting not found'
+      })
+    }
+
+    // 🔔 emit socket
+    const io = getSocket()
+    io.emit('route/updateSaleOutRoute', {
+      area,
+      period,
+      saleOutRoute,
+      updatedAt: Date.now()
+    })
+
+    res.status(200).json({
+      status: 200,
+      message: 'updateSaleOutRoute success',
+      saleOutRoute: updated.saleOutRoute
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({
+      status: 500,
+      message: error.message
+    })
   }
 }
