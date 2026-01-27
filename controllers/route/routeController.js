@@ -4543,6 +4543,13 @@ exports.approveNewStoreToRoute = async (req, res) => {
       })
     }
 
+      const io = getSocket()
+      io.emit('route/approveNewStoreToRoute', {
+        status: '200',
+        message: 'approveNewStoreToRoute success'
+      })
+
+
     return res.status(200).json({
       status: 200,
       message: 'approveNewStoreToRoute success',
