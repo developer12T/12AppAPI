@@ -735,7 +735,6 @@ exports.autoLockRouteChange = async (req, res) => {
     const routeSettingData = await RouteSetting.find({ period: period })
 
     for (const route of routeSettingData) {
-
       const dates = generateDates(route.startDate, 24)
       const thaiDate = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Bangkok',
@@ -785,17 +784,16 @@ exports.getSaleOutRoute = async (req, res) => {
     const { area, period } = req.query
     const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
 
-    const routeSettingData = await RouteSetting.findOne({ period: period, area: area })
-
-
-
+    const routeSettingData = await RouteSetting.findOne({
+      period: period,
+      area: area
+    })
 
     res.status(200).json({
       status: 200,
       message: 'getsaleOutRoute',
       saleOutRoute: routeSettingData.saleOutRoute
     })
-
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: 500, message: error.message })
@@ -808,7 +806,10 @@ exports.getCurrentRouteLock = async (req, res) => {
     const { area, period } = req.query
     const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
 
-    const RouteSettingData = await RouteSetting.findOne({ area: area, period: period })
+    const RouteSettingData = await RouteSetting.findOne({
+      area: area,
+      period: period
+    })
 
     const thaiDate = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Bangkok',
@@ -820,21 +821,16 @@ exports.getCurrentRouteLock = async (req, res) => {
 
     const dateMacth = dates.find(u => String(u.date) === String(thaiDate))
 
-
-    const routeData = await Route.findOne({area:area,period:period,day:dateMacth.day})
-
-
+    const routeData = await Route.findOne({
+      area: area,
+      period: period,
+      day: dateMacth.day
+    })
 
     res.status(200).json({
       status: 200,
       message: 'getCurrentRouteLock',
       data: routeData
-    })
-
-    res.status(200).json({
-      status: 200,
-      message: 'getsaleOutRoute',
-      saleOutRoute: routeSettingData.saleOutRoute
     })
   } catch (error) {
     console.error(error)
