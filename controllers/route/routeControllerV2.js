@@ -345,55 +345,55 @@ exports.getRouteLock = async (req, res) => {
     // If area is not provided (or explicitly empty), group results by day+period
     if ((!area || area === '') && period && !storeId) {
       const groups = new Map()
-      ;(enrichedRoutes || []).forEach(route => {
-        // Skip routes with area == 'IT211'
-        if (route.area === 'IT211') return
+        ; (enrichedRoutes || []).forEach(route => {
+          // Skip routes with area == 'IT211'
+          if (route.area === 'IT211') return
 
-        // derive zone/team from route (prefer explicit fields, otherwise from area)
-        let zoneKey = route.zone || ''
-        let teamKey = route.team || ''
-        if (route.area) {
-          const a = String(route.area || '')
-          zoneKey = a.substring(0, 2)
-          teamKey = `${a.substring(0, 2)}${a.charAt(3) || ''}`
-        }
+          // derive zone/team from route (prefer explicit fields, otherwise from area)
+          let zoneKey = route.zone || ''
+          let teamKey = route.team || ''
+          if (route.area) {
+            const a = String(route.area || '')
+            zoneKey = a.substring(0, 2)
+            teamKey = `${a.substring(0, 2)}${a.charAt(3) || ''}`
+          }
 
-        // if request includes zone/team filters, skip non-matching routes
-        if (zone && String(zone) !== zoneKey) return
-        if (team && String(team) !== teamKey) return
+          // if request includes zone/team filters, skip non-matching routes
+          if (zone && String(zone) !== zoneKey) return
+          if (team && String(team) !== teamKey) return
 
-        const dayKey = route.day || ''
-        if (!groups.has(dayKey)) {
-          groups.set(dayKey, {
-            day: dayKey,
-            period: period,
-            // routes: [],
-            storeAll: 0,
-            storePending: 0,
-            storeSell: 0,
-            storeNotSell: 0,
-            storeCheckInNotSell: 0,
-            storeTotal: 0
-          })
-        }
+          const dayKey = route.day || ''
+          if (!groups.has(dayKey)) {
+            groups.set(dayKey, {
+              day: dayKey,
+              period: period,
+              // routes: [],
+              storeAll: 0,
+              storePending: 0,
+              storeSell: 0,
+              storeNotSell: 0,
+              storeCheckInNotSell: 0,
+              storeTotal: 0
+            })
+          }
 
-        const grp = groups.get(dayKey)
+          const grp = groups.get(dayKey)
 
-        // accumulate counts from each route (use numeric defaults)
-        const ra = Number(route.storeAll) || 0
-        const rp = Number(route.storePending) || 0
-        const rs = Number(route.storeSell) || 0
-        const rn = Number(route.storeNotSell) || 0
-        const rcn = Number(route.storeCheckInNotSell) || 0
-        const rt = Number(route.storeTotal) || 0
+          // accumulate counts from each route (use numeric defaults)
+          const ra = Number(route.storeAll) || 0
+          const rp = Number(route.storePending) || 0
+          const rs = Number(route.storeSell) || 0
+          const rn = Number(route.storeNotSell) || 0
+          const rcn = Number(route.storeCheckInNotSell) || 0
+          const rt = Number(route.storeTotal) || 0
 
-        grp.storeAll += ra
-        grp.storePending += rp
-        grp.storeSell += rs
-        grp.storeNotSell += rn
-        grp.storeCheckInNotSell += rcn
-        grp.storeTotal += rt
-      })
+          grp.storeAll += ra
+          grp.storePending += rp
+          grp.storeSell += rs
+          grp.storeNotSell += rn
+          grp.storeCheckInNotSell += rcn
+          grp.storeTotal += rt
+        })
 
       // finalize percentage fields for each group
       enrichedRoutes = Array.from(groups.values()).map(g => {
@@ -749,10 +749,15 @@ exports.autoLockRouteChange = async (req, res) => {
       for (const item of route.lockRoute) {
         const dateMacth = dates.find(u => String(u.day) === String(item.route))
         let canSell = ''
+
+        if (!dateMacth || !dateMacth.date) {
+          continue
+        }
+
         if (dateMacth.date === thaiDate) {
-          canSell = true
-        } else {
           canSell = false
+        } else {
+          canSell = true
         }
 
         const result = await RouteSetting.updateOne(

@@ -312,7 +312,7 @@ exports.checkOutV2 = async (req, res) => {
     // const addressFinal = `${storeData.address} ต.${storeData.subDistrict} อ.${storeData.district} จ.${province} ${postCode}`
 
     if (approveStore === false) {
-      orderStatus = 'wait approve'
+      orderStatus = 'waitApprove'
       orderStatusTH = 'รออนุมัติร้านค้า'
     } else {
       orderStatus = 'pending'
@@ -560,7 +560,7 @@ exports.getBillNewStore = async (req, res) => {
     const channel = req.headers['x-channel']
     const { Order } = getModelsByChannel(channel, res, orderModel)
 
-    let query = {status:'wait approve'}
+    let query = {status:'waitApprove'}
 
     if (area) {
       query['store.area'] = area
