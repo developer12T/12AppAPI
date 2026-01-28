@@ -357,7 +357,11 @@ exports.getStore = async (req, res) => {
         $gte: startMonth,
         $lt: nextMonth
       }
-    } else {
+    } else if (type === 'R') {
+      query.route = 'R'
+    }
+
+    else {
       query.status = { $nin: ['10', '90'] }
     } // ถ้า type=all ไม่ต้อง filter createdAt เลย
 
@@ -3591,8 +3595,13 @@ exports.getStorePage = async (req, res) => {
     const filter = {}
     if (area) filter.area = area
     if (route) filter.route = route
-    if (type && type !== 'all') filter.type = type
-
+    if (type && type !== 'all' && type !== 'R') {
+      filter.type = type
+    }
+    else if (type === 'R') {
+      filter.route = type
+    }
+    
     filter.status = { $nin: ['90'] }
 
     const qText = (q || '').trim()
