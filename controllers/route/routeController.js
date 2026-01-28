@@ -2787,7 +2787,7 @@ exports.getRouteEffectiveAll = async (req, res) => {
     }
 
     const visitVsTarget =
-      target.visitStore > 0 ? (sumVisit / target.visitStore) * 100 : 0
+      target.visitStore > 0 ? (totalStoreCheckInNotSell / target.visitStore) * 100 : 0
 
     const effectiveVsTarget =
       target.saleStore > 0 ? (totalStoreSell / target.saleStore) * 100 : 0
