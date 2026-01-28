@@ -335,12 +335,12 @@ exports.checkOutV2 = async (req, res) => {
         warehouse: sale.warehouse
       },
       store: {
-        storeId: storeData.storeId,
-        name: storeData.name,
-        type: storeData.type,
-        address: addressFinal,
-        taxId: storeData.taxId,
-        tel: storeData.tel,
+        storeId: storeData.storeId || '',
+        name: storeData.name || '',
+        type: storeData.type || '',
+        address: addressFinal || '',
+        taxId: storeData.taxId || '',
+        tel: storeData.tel || '',
         area: sale.area,
         zone: sale.zone
       },
@@ -375,7 +375,6 @@ exports.checkOutV2 = async (req, res) => {
     //   channel,
     //   res
     // )
-
     const checkIn = await checkInRoute(
       {
         storeId: storeId,
