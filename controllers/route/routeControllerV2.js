@@ -680,7 +680,9 @@ exports.editLockRoute = async (req, res) => {
       status: 200,
       message: 'editLockRoute success',
       area: area,
+      routeID: id,
       period: period,
+      storeId: storeId,
       editType: editType,
       lock: lock,
       updatedAt: Date.now()
