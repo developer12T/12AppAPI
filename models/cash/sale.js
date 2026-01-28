@@ -135,7 +135,7 @@ const orderSchema = new mongoose.Schema(
     status: {
       type: String,
       require: true,
-      enum: ['pending', 'completed', 'canceled', 'rejected','wait approve'],
+      enum: ['pending', 'completed', 'canceled', 'rejected','waitApprove'],
       default: 'pending'
     },
     statusTH: {

@@ -99,7 +99,7 @@ const generateOrderId = async (area, warehouse, channel, res) => {
   const latestOrder = await Order.findOne({
     'store.area': { $regex: area, $options: 'i' },
     createdAt: { $gte: start, $lt: end },
-    status: { $nin: ['canceled', 'reject', 'wait approve'] }
+    status: { $nin: ['canceled', 'reject', 'waitApprove'] }
   })
     .sort({ orderId: -1 })
     .select('orderId')
