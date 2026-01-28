@@ -664,9 +664,9 @@ async function autoLockRouteChange(channel = 'cash') {
         const dateMacth = dates.find(u => String(u.day) === String(item.route))
         let canSell = ''
         if (dateMacth.date === thaiDate) {
-          canSell = true
-        } else {
           canSell = false
+        } else {
+          canSell = true
         }
         const result = await RouteSetting.updateOne(
           { period:periodStr, area: route.area },
