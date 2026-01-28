@@ -682,7 +682,8 @@ exports.editLockRoute = async (req, res) => {
       area: area,
       period: period,
       editType: editType,
-      lock: lock
+      lock: lock,
+      updatedAt: Date.now()
     })
 
     // =========================
@@ -811,13 +812,12 @@ exports.getCurrentRouteLock = async (req, res) => {
       period: period
     })
 
-    if (!RouteSettingData){
+    if (!RouteSettingData) {
       return res.status(404).json({
-        status:200,
-        message:'Not found RouteSetting'
+        status: 200,
+        message: 'Not found RouteSetting'
       })
     }
-
 
     const thaiDate = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Bangkok',
@@ -828,10 +828,6 @@ exports.getCurrentRouteLock = async (req, res) => {
     const dates = generateDates(RouteSettingData.startDate, 24)
 
     const dateMacth = dates.find(u => String(u.date) === String(thaiDate))
-
-
-
-
 
     res.status(200).json({
       status: 200,
