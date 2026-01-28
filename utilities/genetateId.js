@@ -103,7 +103,7 @@ const generateOrderId = async (area, warehouse, channel, res) => {
   })
     .sort({ orderId: -1 })
     .select('orderId')
-
+  // console.log('latestOrder',latestOrder)
   const runningNumber = latestOrder
     ? parseInt(latestOrder.orderId.slice(-4)) + 1
     : 1

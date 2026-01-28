@@ -254,7 +254,7 @@ exports.checkOutV2 = async (req, res) => {
 
 
     }
-
+    // console.log('orderId',orderId)
     let storeData = {}
 
     if (channel !== 'pc') {
