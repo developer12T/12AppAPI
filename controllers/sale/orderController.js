@@ -316,12 +316,12 @@ exports.checkout = async (req, res) => {
         warehouse: sale.warehouse
       },
       store: {
-        storeId: storeData.storeId,
-        name: storeData.name,
-        type: storeData.type,
-        address: addressFinal,
-        taxId: storeData.taxId,
-        tel: storeData.tel,
+        storeId: storeData.storeId || '',
+        name: storeData.name || '',
+        type: storeData.type || '',
+        address: addressFinal || '',
+        taxId: storeData.taxId || '',
+        tel: storeData.tel || '',
         area: sale.area,
         zone: sale.zone
       },
@@ -356,6 +356,7 @@ exports.checkout = async (req, res) => {
     //   channel,
     //   res
     // )
+    // console.log('checkOut', newOrder)
 
     const checkIn = await checkInRoute(
       {
@@ -1335,7 +1336,7 @@ exports.updateStatus = async (req, res) => {
 
     const channel = req.headers['x-channel']
     const { Route } = getModelsByChannel(channel, res, routeModel)
-  
+
     const { Promotion } = getModelsByChannel(channel, res, promotionModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
@@ -1455,7 +1456,7 @@ exports.updateStatus = async (req, res) => {
 
     if (updatedOrder.routeId) {
 
-      const storeData = await Store.findOne({storeId:updatedOrder.store.storeId}).select('_id storeId')
+      const storeData = await Store.findOne({ storeId: updatedOrder.store.storeId }).select('_id storeId')
 
       const route = await Route.findOneAndUpdate(
         { id: updatedOrder.routeId, 'listStore.storeInfo': storeData._id },
