@@ -196,7 +196,8 @@ const generateDistributionId = async (
 
   // คำนวณ "เดือนเป้าหมาย" (ถ้า newtrip ให้เลื่อนไปเดือนถัดไป และข้ามปีได้)
   const target = new Date(now)
-  if (newtrip) target.setMonth(target.getMonth() + 1) // auto handle Dec -> Jan
+  target.setDate(1) // กัน overflow ของเดือน
+  if (newtrip) target.setMonth(target.getMonth() + 1)
 
   const targetYearAD = target.getFullYear() // ค.ศ.
   const targetMonth = target.getMonth() + 1 // 1..12
