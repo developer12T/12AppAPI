@@ -206,7 +206,7 @@ exports.checkout = async (req, res) => {
         latitude: '',
         longtitude: ''
       },
-      note: note,
+      note: note ? note : '',
       latitude: '',
       longitude: '',
       listProduct,
