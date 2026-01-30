@@ -1336,7 +1336,7 @@ exports.saveSendmoney = async (req, res) => {
     await dataUpsertSendMoney(
       'cash',
       mysqlData,
-      ['datemonth', 'wh'] // 🔑 primary key ตาม column จริง
+      // ['datemonth', 'wh'] // 🔑 primary key ตาม column จริง
     )
 
     res.status(200).json({
