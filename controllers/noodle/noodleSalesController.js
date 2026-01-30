@@ -143,7 +143,7 @@ exports.checkout = async (req, res) => {
     const exitOrder = await Order.findOne({
       'store.area': area,
       type: 'saleNoodle',
-      status: { $in: ['pending', 'paid'] },
+      // status: { $in: ['pending', 'paid'] },
       createdAt: { $gte: start, $lte: end }
     })
       .sort({ createdAt: -1 })
