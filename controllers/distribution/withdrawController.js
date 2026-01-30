@@ -49,7 +49,7 @@ const { orderBy, reduce } = require('lodash')
 exports.checkout = async (req, res) => {
   const transaction = await sequelize.transaction()
   try {
-    return
+    // return
     const {
       type,
       area,
