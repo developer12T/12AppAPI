@@ -77,7 +77,10 @@ const {
 
 const {
   updateStoreStatusV2,
-  addStorePcToCash
+  addStorePcToCash,
+  updateStoreRouteAreaFromM3,
+  requestStoreUpdate,
+  approveRequestStoreUpdate
 } = require('../../controllers/store/storeControllerV2')
 
 
@@ -99,6 +102,8 @@ router.post('/insertStoreToM3', insertStoreToM3)
 router.post('/addFromERP', addFromERP)
 router.post('/addFromERPnew', addFromERPnew)
 router.patch('/editStore/:storeId', editStore)
+router.post('/requestStoreUpdate', requestStoreUpdate)
+router.post('/approveRequestStoreUpdate', approveRequestStoreUpdate)
 router.post('/checkIn/:storeId', checkInStore)
 router.post('/updateStoreStatus', updateStoreStatus)
 router.post('/updateStoreStatusV2', updateStoreStatusV2)
@@ -142,6 +147,7 @@ router.get('/checkRangeLatLong', checkRangeLatLong)
 router.get('/checkNewStoreLatLong', checkNewStoreLatLong)
 router.post('/updateAreaStore', updateAreaStore)
 
+router.post('/updateStoreRouteAreaFromM3', updateStoreRouteAreaFromM3)
 router.post('/areaStoreM3toMongo', areaStoreM3toMongo)
 router.post('/checkLatLongByStore', checkLatLongByStore)
 router.post('/moveStoreToCash', moveStoreToCash)

@@ -357,7 +357,11 @@ exports.getStore = async (req, res) => {
         $gte: startMonth,
         $lt: nextMonth
       }
-    } else {
+    } else if (type === 'R') {
+      query.route = 'R'
+    }
+
+    else {
       query.status = { $nin: ['10', '90'] }
     } // ถ้า type=all ไม่ต้อง filter createdAt เลย
 
@@ -3582,7 +3586,7 @@ exports.getStorePage = async (req, res) => {
     // console.log('testsssss')
     const channel = req.headers['x-channel']
     const { Store } = getModelsByChannel(channel, res, storeModel)
-    const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { Route,RouteSetting } = getModelsByChannel(channel, res, routeModel)
 
     const pageNum = Math.max(parseInt(page, 10) || 1, 1)
     const perPage = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100)
@@ -3591,10 +3595,22 @@ exports.getStorePage = async (req, res) => {
     const filter = {}
     if (area) filter.area = area
     if (route) filter.route = route
-    if (type && type !== 'all') filter.type = type
-
+    if (type && type !== 'all' && type !== 'R') {
+      filter.type = type
+    }
+    else if (type === 'R') {
+      const periodStr = period()
+      if (area) {
+        const routeSettingData = await RouteSetting.findOne({period:periodStr,area:area})
+        if (routeSettingData.saleOutRoute === false) {
+          filter.route = type
+        } 
+      }
+    }
+    
+    
     filter.status = { $nin: ['90'] }
-
+    // console.log('filter',filter)
     const qText = (q || '').trim()
     if (qText) {
       filter.$or = [

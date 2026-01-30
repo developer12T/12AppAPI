@@ -137,55 +137,55 @@ exports.getRoute = async (req, res) => {
     // If area is not provided (or explicitly empty), group results by day+period
     if ((!area || area === '') && period && !storeId) {
       const groups = new Map()
-      ;(enrichedRoutes || []).forEach(route => {
-        // Skip routes with area == 'IT211'
-        if (route.area === 'IT211') return
+        ; (enrichedRoutes || []).forEach(route => {
+          // Skip routes with area == 'IT211'
+          if (route.area === 'IT211') return
 
-        // derive zone/team from route (prefer explicit fields, otherwise from area)
-        let zoneKey = route.zone || ''
-        let teamKey = route.team || ''
-        if (route.area) {
-          const a = String(route.area || '')
-          zoneKey = a.substring(0, 2)
-          teamKey = `${a.substring(0, 2)}${a.charAt(3) || ''}`
-        }
+          // derive zone/team from route (prefer explicit fields, otherwise from area)
+          let zoneKey = route.zone || ''
+          let teamKey = route.team || ''
+          if (route.area) {
+            const a = String(route.area || '')
+            zoneKey = a.substring(0, 2)
+            teamKey = `${a.substring(0, 2)}${a.charAt(3) || ''}`
+          }
 
-        // if request includes zone/team filters, skip non-matching routes
-        if (zone && String(zone) !== zoneKey) return
-        if (team && String(team) !== teamKey) return
+          // if request includes zone/team filters, skip non-matching routes
+          if (zone && String(zone) !== zoneKey) return
+          if (team && String(team) !== teamKey) return
 
-        const dayKey = route.day || ''
-        if (!groups.has(dayKey)) {
-          groups.set(dayKey, {
-            day: dayKey,
-            period: period,
-            // routes: [],
-            storeAll: 0,
-            storePending: 0,
-            storeSell: 0,
-            storeNotSell: 0,
-            storeCheckInNotSell: 0,
-            storeTotal: 0
-          })
-        }
+          const dayKey = route.day || ''
+          if (!groups.has(dayKey)) {
+            groups.set(dayKey, {
+              day: dayKey,
+              period: period,
+              // routes: [],
+              storeAll: 0,
+              storePending: 0,
+              storeSell: 0,
+              storeNotSell: 0,
+              storeCheckInNotSell: 0,
+              storeTotal: 0
+            })
+          }
 
-        const grp = groups.get(dayKey)
+          const grp = groups.get(dayKey)
 
-        // accumulate counts from each route (use numeric defaults)
-        const ra = Number(route.storeAll) || 0
-        const rp = Number(route.storePending) || 0
-        const rs = Number(route.storeSell) || 0
-        const rn = Number(route.storeNotSell) || 0
-        const rcn = Number(route.storeCheckInNotSell) || 0
-        const rt = Number(route.storeTotal) || 0
+          // accumulate counts from each route (use numeric defaults)
+          const ra = Number(route.storeAll) || 0
+          const rp = Number(route.storePending) || 0
+          const rs = Number(route.storeSell) || 0
+          const rn = Number(route.storeNotSell) || 0
+          const rcn = Number(route.storeCheckInNotSell) || 0
+          const rt = Number(route.storeTotal) || 0
 
-        grp.storeAll += ra
-        grp.storePending += rp
-        grp.storeSell += rs
-        grp.storeNotSell += rn
-        grp.storeCheckInNotSell += rcn
-        grp.storeTotal += rt
-      })
+          grp.storeAll += ra
+          grp.storePending += rp
+          grp.storeSell += rs
+          grp.storeNotSell += rn
+          grp.storeCheckInNotSell += rcn
+          grp.storeTotal += rt
+        })
 
       // finalize percentage fields for each group
       enrichedRoutes = Array.from(groups.values()).map(g => {
@@ -228,15 +228,6 @@ exports.getRoute = async (req, res) => {
         listStore: []
       }))
     }
-
-    // enrichedRoutes = (enrichedRoutes || []).map(item => ({
-    //   ...item,
-    //   listStore: []
-    // }))
-
-    // }
-    // const io = getSocket()
-    // io.emit('route/getRoute', {});
 
     res.status(200).json({
       status: 200,
@@ -2368,7 +2359,7 @@ exports.getRouteEffective = async (req, res) => {
       )
       xlsx.writeFile(wb, filePath)
       res.download(filePath, err => {
-        fs.unlink(filePath, () => {})
+        fs.unlink(filePath, () => { })
         if (err) console.error(err)
       })
     } else {
@@ -2612,7 +2603,7 @@ exports.getRouteEffectiveAll = async (req, res) => {
     // ------------------------------
     let start, end
 
-    function getPeriodFromDate (dateStr) {
+    function getPeriodFromDate(dateStr) {
       if (!dateStr) return null
       const d = new Date(dateStr)
       if (isNaN(d)) return null
@@ -2796,7 +2787,7 @@ exports.getRouteEffectiveAll = async (req, res) => {
     }
 
     const visitVsTarget =
-      target.visitStore > 0 ? (sumVisit / target.visitStore) * 100 : 0
+      target.visitStore > 0 ? (totalStoreCheckInNotSell / target.visitStore) * 100 : 0
 
     const effectiveVsTarget =
       target.saleStore > 0 ? (totalStoreSell / target.saleStore) * 100 : 0
@@ -2887,12 +2878,12 @@ exports.getRouteEffectiveByDayArea = async (req, res) => {
       // filter team (ต้องอยู่ตรงนี้ ❗)
       ...(team
         ? [
-            {
-              $match: {
-                team3: { $regex: `^${team}`, $options: 'i' }
-              }
+          {
+            $match: {
+              team3: { $regex: `^${team}`, $options: 'i' }
             }
-          ]
+          }
+        ]
         : []),
 
       // แตก store
@@ -3278,7 +3269,7 @@ exports.checkRouteStore = async (req, res) => {
       areaMap[area].del = storeCountMap[area]?.del || 0
     }
 
-    function sortKeys (obj) {
+    function sortKeys(obj) {
       const { area, R, del, ...days } = obj
       const sortedDays = Object.keys(days)
         .filter(k => /^R\d+$/.test(k))
@@ -3708,8 +3699,7 @@ exports.updateRouteAllStore = async (req, res) => {
       )
 
       console.log(
-        `processed ${Math.min(i + BATCH, storeData.length)} / ${
-          storeData.length
+        `processed ${Math.min(i + BATCH, storeData.length)} / ${storeData.length
         }`
       )
     }
@@ -3933,45 +3923,59 @@ exports.insertRouteToRouteChange = async (req, res) => {
     const prevPeriod =
       prevDate.getFullYear().toString() +
       String(prevDate.getMonth() + 1).padStart(2, '0')
-    const routePrev = await Route.find({ period: prevPeriod })
-    const routeChangeData = await RouteChange.find({ period: period })
+    const routePrev = await Route.find({ period: prevPeriod, area: 'IT211' })
+    const routeChangeData = await RouteChange.find({
+      period: period,
+      area: 'IT211'
+    })
     const dataRouteChange = []
 
     for (const item of routePrev) {
-      const day = String(item.day).padStart(2, '0')
-      const routeId = `${period}${item.area}R${day}`
+      const TOTAL_DAYS = 24
 
-      const exitRoute = routeChangeData.find(u => u.id === routeId)
-      if (exitRoute) {
-        continue
+      for (let d = 1; d <= TOTAL_DAYS; d++) {
+        const day = String(d).padStart(2, '0')
+        const routeId = `${period}${item.area}R${day}`
+
+        // ❗ ถ้ามีอยู่แล้วใน routeChangeData → ข้าม
+        const existRoute = routeChangeData.find(u => u.id === routeId)
+        if (existRoute) continue
+
+        // หา route เดิมของวันนั้น (ถ้ามี)
+        const prevRoute = routePrev.find(r => Number(r.day) === d)
+
+        const route = {
+          id: routeId,
+          period: period,
+          area: item.area,
+          zone: item.zone,
+          team: item.team,
+          day: d,
+          listStore: []
+        }
+
+        // ถ้ามี route เดิม → คัดลอกร้าน
+        if (prevRoute?.listStore?.length) {
+          for (const store of prevRoute.listStore) {
+            if (!store.storeInfo) continue
+
+            route.listStore.push({
+              storeInfo: store.storeInfo,
+              note: '',
+              image: '',
+              latitude: '',
+              longtitude: '',
+              status: '0',
+              statusText: 'รอเยี่ยม',
+              date: '',
+              listOrder: []
+            })
+          }
+        }
+
+        dataRouteChange.push(route)
+        await RouteChange.create(route)
       }
-
-      const route = {
-        id: routeId,
-        period: period,
-        area: item.area,
-        zone: item.zone,
-        team: item.team,
-        day: item.day,
-        listStore: []
-      }
-
-      for (const store of item.listStore) {
-        route.listStore.push({
-          storeInfo: store.storeInfo,
-          note: '',
-          image: '',
-          latitude: '',
-          longtitude: '',
-          status: '0',
-          statusText: 'รอเยี่ยม',
-          date: '',
-          listOrder: []
-        })
-      }
-
-      dataRouteChange.push(route)
-      RouteChange.create(route)
     }
 
     res.status(201).json({
@@ -4275,15 +4279,34 @@ exports.getRouteChange = async (req, res) => {
   }
 }
 
+const orderTimestamps = {}
+
+
 exports.addNewStoreToRoute = async (req, res) => {
   try {
-    const { id, storeId } = req.body
+
+    const { id, storeId, period } = req.body
     const channel = req.headers['x-channel']
     const { Route, RouteChange, RouteChangeLog } = getModelsByChannel(
       channel,
       res,
       routeModel
     )
+
+    const now = Date.now()
+    const lastUpdate = orderTimestamps[storeId] || 0
+    const ONE_MINUTE = 60 * 1000
+
+    if (now - lastUpdate < ONE_MINUTE) {
+      return res.status(429).json({
+        status: 429,
+        message:
+          'This order was updated less than 1 minute ago. Please try again later!'
+      })
+    }
+    orderTimestamps[storeId] = now
+
+
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
     const currentDate = new Date()
@@ -4314,7 +4337,7 @@ exports.addNewStoreToRoute = async (req, res) => {
         $gte: startMonth,
         $lt: nextMonth
       },
-      status: '20'
+      status: { $in: ['20', '10'] }
     })
     if (!storeData) {
       return res.status(404).json({
@@ -4338,13 +4361,16 @@ exports.addNewStoreToRoute = async (req, res) => {
     const count = await RouteChangeLog.countDocuments()
     const transactionId = `RN${String(count + 1).padStart(4, '0')}`
 
+    // console.log(storeData)
+
     const transaction = {
       id: transactionId,
       area: routeData.area,
       zone: routeData.zone,
       team: routeData.team,
-      period: period(),
+      period: period,
       storeId: storeId,
+      storeInfo: storeData._id,
       name: storeData.name,
       latitude: storeData.latitude,
       longtitude: storeData.longtitude,
@@ -4535,10 +4561,22 @@ exports.approveNewStoreToRoute = async (req, res) => {
       })
     }
 
+    const io = getSocket()
+    io.emit('route/approveNewStoreToRoute', {
+      area: routeChangeLog.area,
+      period: routeChangeLog.period,
+      status: status,
+      updatedAt: Date.now()
+    })
+
     return res.status(200).json({
       status: 200,
       message: 'approveNewStoreToRoute success',
-      data: routeChangeLog
+      data: {
+        area: routeChangeLog.area,
+        period: routeChangeLog.period,
+        status: status
+      }
     })
   } catch (error) {
     console.error(error)

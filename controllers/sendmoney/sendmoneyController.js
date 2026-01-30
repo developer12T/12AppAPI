@@ -1331,15 +1331,12 @@ exports.saveSendmoney = async (req, res) => {
   try {
     const { data } = req.body
 
-
-
     const mysqlData = data.map(item => mapToMySql(item, v_payinMap))
-
 
     await dataUpsertSendMoney(
       'cash',
       mysqlData,
-      ['datemonth', 'wh'] // 🔑 primary key ตาม column จริง
+      // ['datemonth', 'wh'] // 🔑 primary key ตาม column จริง
     )
 
     res.status(200).json({
@@ -1388,9 +1385,8 @@ exports.sendmoneySumByArea = async (req, res) => {
         areas.push(u.area)
       }
     })
-    // const areas = await User.find({ role: 'sale' }).distinct(
-    //   'area firstName surName'
-    // )
+
+    console.log(areas)
 
     const matchMain = {
       createdAt: { $gte: startDate, $lt: endDate },
@@ -1533,7 +1529,7 @@ exports.sendmoneyToExcel = async (req, res) => {
     const { Refund } = getModelsByChannel(channel, res, refundModel)
     const { SendMoney } = getModelsByChannel(channel, res, sendmoneyModel)
 
-    function formatDDMMYYYY(dateStr) {
+    function formatDDMMYYYY (dateStr) {
       const y = dateStr.slice(0, 4)
       const m = dateStr.slice(4, 6)
       const d = dateStr.slice(6, 8)
@@ -1617,7 +1613,8 @@ exports.sendmoneyToExcel = async (req, res) => {
           type: { $in: ['saleNoodle', 'sale'] },
           'store.area': { $in: areas },
           status: { $nin: ['canceled', 'delete'] }
-        }},
+        }
+      },
       { $match: matchMain },
       {
         $project: {
@@ -2013,7 +2010,7 @@ exports.fixSendmoney = async (req, res) => {
   }
 }
 
-function transformExcelData(excelData) {
+function transformExcelData (excelData) {
   // ต้องมีอย่างน้อย 2 แถว (หัวตาราง + วันที่)
   if (!excelData || excelData.length < 2) {
     throw new Error('Invalid Excel format – missing header rows')
@@ -2059,7 +2056,7 @@ function transformExcelData(excelData) {
   return result
 }
 
-function convertToFullMonthArr(data, year, month) {
+function convertToFullMonthArr (data, year, month) {
   const fullMonthArray = []
 
   const filtered = data.filter(row => row.Zone !== 'รวม' && row.Zone !== '')

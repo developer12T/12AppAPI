@@ -263,12 +263,12 @@ exports.checkout = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-          .map(item => item.price)
-          .reduce((sum, price) => sum + price, 0)
+        .map(item => item.price)
+        .reduce((sum, price) => sum + price, 0)
       : 0
 
     // ✅ ช่วยฟังก์ชัน: เช็คว่า createAt ตั้งแต่ Aug-2025 ขึ้นไปไหม
-    function isAug2025OrLater (createAt) {
+    function isAug2025OrLater(createAt) {
       if (!createAt) return false
 
       // case: "YYYYMM" เช่น "202508"
@@ -289,14 +289,14 @@ exports.checkout = async (req, res) => {
     // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-          storeData.address,
-          storeData.subDistrict && `ต.${storeData.subDistrict}`,
-          storeData.district && `อ.${storeData.district}`,
-          storeData.province && `จ.${storeData.province}`,
-          storeData.postCode
-        ]
-          .filter(Boolean)
-          .join(' ')
+        storeData.address,
+        storeData.subDistrict && `ต.${storeData.subDistrict}`,
+        storeData.district && `อ.${storeData.district}`,
+        storeData.province && `จ.${storeData.province}`,
+        storeData.postCode
+      ]
+        .filter(Boolean)
+        .join(' ')
       : storeData.address
 
     // const addressFinal = `${storeData.address} ต.${storeData.subDistrict} อ.${storeData.district} จ.${province} ${postCode}`
@@ -316,12 +316,12 @@ exports.checkout = async (req, res) => {
         warehouse: sale.warehouse
       },
       store: {
-        storeId: storeData.storeId,
-        name: storeData.name,
-        type: storeData.type,
-        address: addressFinal,
-        taxId: storeData.taxId,
-        tel: storeData.tel,
+        storeId: storeData.storeId || '',
+        name: storeData.name || '',
+        type: storeData.type || '',
+        address: addressFinal || '',
+        taxId: storeData.taxId || '',
+        tel: storeData.tel || '',
         area: sale.area,
         zone: sale.zone
       },
@@ -356,6 +356,7 @@ exports.checkout = async (req, res) => {
     //   channel,
     //   res
     // )
+    // console.log('checkOut', newOrder)
 
     const checkIn = await checkInRoute(
       {
@@ -704,12 +705,12 @@ exports.checkOutSale = async (req, res) => {
       })) || {}
     const discountProduct = promotionshelf?.length
       ? promotionshelf
-          .map(item => item.price)
-          .reduce((sum, price) => sum + price, 0)
+        .map(item => item.price)
+        .reduce((sum, price) => sum + price, 0)
       : 0
 
     // ✅ ช่วยฟังก์ชัน: เช็คว่า createAt ตั้งแต่ Aug-2025 ขึ้นไปไหม
-    function isAug2025OrLater (createAt) {
+    function isAug2025OrLater(createAt) {
       if (!createAt) return false
 
       // case: "YYYYMM" เช่น "202508"
@@ -730,14 +731,14 @@ exports.checkOutSale = async (req, res) => {
     // ✅ ต่อ address + subDistrict เฉพาะเมื่อถึงเกณฑ์
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-          storeData.address,
-          storeData.subDistrict && `ต.${storeData.subDistrict}`,
-          storeData.district && `อ.${storeData.district}`,
-          storeData.province && `จ.${storeData.province}`,
-          storeData.postCode
-        ]
-          .filter(Boolean)
-          .join(' ')
+        storeData.address,
+        storeData.subDistrict && `ต.${storeData.subDistrict}`,
+        storeData.district && `อ.${storeData.district}`,
+        storeData.province && `จ.${storeData.province}`,
+        storeData.postCode
+      ]
+        .filter(Boolean)
+        .join(' ')
       : storeData.address
 
     // const addressFinal = `${storeData.address} ต.${storeData.subDistrict} อ.${storeData.district} จ.${province} ${postCode}`
@@ -1028,8 +1029,8 @@ exports.reflashOrder = async (req, res) => {
 
 exports.getOrder = async (req, res) => {
   try {
-    const {  area, store, period, start, end, zone } = req.query
-    let {type} = req.query
+    const { area, store, period, start, end, zone } = req.query
+    let { type } = req.query
     const channel = req.headers['x-channel']
 
     const { Order } = getModelsByChannel(channel, res, orderModel)
@@ -1091,11 +1092,11 @@ exports.getOrder = async (req, res) => {
     // }
 
     if (type === 'sale') {
-      type = ['sale','saleNoodle']
+      type = ['sale', 'saleNoodle']
     }
 
     const matchQuery = {
-      type : {$in : type },
+      type: { $in: type },
       ...areaQuery, // zone หรือ store.area ตามที่คุณเซ็ตไว้
       ...(store ? { 'store.storeId': store } : {}),
       ...(period ? { period } : {}),
@@ -1334,11 +1335,13 @@ exports.updateStatus = async (req, res) => {
     const { orderId, status } = req.body
 
     const channel = req.headers['x-channel']
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+
     const { Promotion } = getModelsByChannel(channel, res, promotionModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
     const { Stock } = getModelsByChannel(channel, res, stockModel)
-
+    const { Store } = getModelsByChannel(channel, res, storeModel)
     if (!orderId || !status) {
       // await session.abortTransaction();
       // session.endSession();
@@ -1429,7 +1432,7 @@ exports.updateStatus = async (req, res) => {
               storeId => storeId !== storeIdToRemove
             ) || []
         }
-        await promotionDetail.save().catch(() => {}) // ถ้าเป็น doc ใหม่ต้อง .save()
+        await promotionDetail.save().catch(() => { }) // ถ้าเป็น doc ใหม่ต้อง .save()
         for (const u of item.listProduct) {
           // await updateStockMongo(u, order.store.area, order.period, 'orderCanceled', channel)
           const updateResult = await updateStockMongo(
@@ -1450,6 +1453,25 @@ exports.updateStatus = async (req, res) => {
       { $set: { status, statusTH, orderId: newOrderId } },
       { new: true }
     )
+
+    if (updatedOrder.routeId) {
+
+      const storeData = await Store.findOne({ storeId: updatedOrder.store.storeId }).select('_id storeId')
+
+      const route = await Route.findOneAndUpdate(
+        { id: updatedOrder.routeId, 'listStore.storeInfo': storeData._id },
+        {
+          $set: {
+            'listStore.$.status': '1',
+            'listStore.$.statusText': 'เยี่ยมแล้ว',
+          }
+        },
+        { new: true }
+      )
+
+
+    }
+
 
     // await session.commitTransaction();
     // session.endSession();
@@ -1642,7 +1664,7 @@ exports.OrderToExcel = async (req, res) => {
         $gte: startTH,
         $lte: endTH
       },
-      status: { $nin: ['canceled','wait approve'] },
+      status: { $nin: ['canceled', 'waitApprove'] },
       status: { $in: statusArray },
       type: { $in: ['sale', 'saleNoodle'] },
       'store.area': { $ne: 'IT211' },
@@ -1823,7 +1845,7 @@ exports.OrderToExcel = async (req, res) => {
 
     const tranFromOrder = modelOrder.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD (date) {
+      function formatDateToThaiYYYYMMDD(date) {
         const d = new Date(date)
         d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1946,7 +1968,7 @@ exports.OrderToExcel = async (req, res) => {
 
     const tranFromChange = modelChange.flatMap(order => {
       let counterOrder = 0
-      function formatDateToThaiYYYYMMDD (date) {
+      function formatDateToThaiYYYYMMDD(date) {
         const d = new Date(date)
         d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -2216,7 +2238,7 @@ exports.OrderToExcel = async (req, res) => {
         message: 'Not Found Order'
       })
     }
-    function yyyymmddToDdMmYyyy (dateString) {
+    function yyyymmddToDdMmYyyy(dateString) {
       // สมมติ dateString คือ '20250804'
       const year = dateString.slice(0, 4)
       const month = dateString.slice(4, 6)
@@ -2258,7 +2280,7 @@ exports.OrderToExcel = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => {})
+        fs.unlink(tempPath, () => { })
       }
     )
 
@@ -3027,7 +3049,7 @@ exports.getSummarybyArea = async (req, res) => {
 
       // console.log(dataRefund)
 
-      function groupByMonthAndSum (data) {
+      function groupByMonthAndSum(data) {
         return data.reduce((acc, item) => {
           // ดึงเดือนจาก createdAtThai (หรือใช้ createdAt ก็ได้ถ้าเป็น Date)
           const date = new Date(item.createdAt)
@@ -3696,9 +3718,8 @@ exports.erpApiCheckOrderDistrabution = async (req, res) => {
 
         const ReceiveQty = Object.values(
           Receive.reduce((acc, cur) => {
-            const key = `${cur.coNo}_${
-              cur.withdrawUnit
-            }_${cur.productId.trim()}`
+            const key = `${cur.coNo}_${cur.withdrawUnit
+              }_${cur.productId.trim()}`
             if (!acc[key]) {
               acc[key] = { ...cur }
             } else {
@@ -4310,8 +4331,8 @@ exports.getSummaryProduct = async (req, res) => {
 
       const percentStore = allStoreCount?.constStore
         ? (((storeCount?.count || 0) / allStoreCount.constStore) * 100).toFixed(
-            2
-          )
+          2
+        )
         : 0
 
       return {
@@ -5504,28 +5525,28 @@ exports.checkOrderCancelM3 = async (req, res) => {
       const type = saleSet.has(id)
         ? 'Sale'
         : refundSet.has(id)
-        ? 'Refund'
-        : changeSet.has(id)
-        ? 'Change'
-        : ''
+          ? 'Refund'
+          : changeSet.has(id)
+            ? 'Change'
+            : ''
 
       const typeId =
         type === 'Sale'
           ? 'A31'
           : type === 'Refund'
-          ? 'A34'
-          : type === 'Change'
-          ? 'B31'
-          : ''
+            ? 'A34'
+            : type === 'Change'
+              ? 'B31'
+              : ''
 
       const statusTablet =
         type === 'Sale'
           ? saleStatusMap.get(id) ?? ''
           : type === 'Refund'
-          ? refundStatusMap.get(id) ?? ''
-          : type === 'Change'
-          ? changeStatusMap.get(id) ?? ''
-          : ''
+            ? refundStatusMap.get(id) ?? ''
+            : type === 'Change'
+              ? changeStatusMap.get(id) ?? ''
+              : ''
 
       return { orderId: id, type, typeId, statusTablet }
     })
@@ -5547,7 +5568,7 @@ exports.checkOrderCancelM3 = async (req, res) => {
       }
 
       // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-      fs.unlink(tempPath, () => {})
+      fs.unlink(tempPath, () => { })
     })
 
     // res.status(200).json({
@@ -5686,7 +5707,6 @@ exports.getTarget = async (req, res) => {
       })
     ])
 
-    // console.log(dataTarget)
 
     const totalSendmoney = (dataSendmoney ?? []).reduce(
       (sum, item) => sum + (Number(item?.sendmoney) || 0),
@@ -6126,7 +6146,7 @@ exports.orderPowerBI = async (req, res) => {
           }
 
           // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-          fs.unlink(tempPath, () => {})
+          fs.unlink(tempPath, () => { })
         }
       )
     } else {
@@ -6973,7 +6993,7 @@ exports.getOrderExcelNew = async (req, res) => {
     dataGiveArray = sortProduct(dataGiveArray, 'productGroup')
 
     if (excel == 'true') {
-      function zeroToDash (value) {
+      function zeroToDash(value) {
         return value === 0 ? '-' : value
       }
       const dataSaleFinal = dataSaleArray.map(item => {
@@ -7065,7 +7085,7 @@ exports.getOrderExcelNew = async (req, res) => {
           }
         }
         // ลบไฟล์ทิ้งหลังจบ (สำเร็จหรือไม่ก็ตาม)
-        fs.unlink(tempPath, () => {})
+        fs.unlink(tempPath, () => { })
       })
     } else {
       return res.status(200).json({
@@ -7139,14 +7159,14 @@ exports.updateAddressInOrder = async (req, res) => {
 
     const addressFinal = isAug2025OrLater(storeData.createdAt)
       ? [
-          storeData.address,
-          storeData.subDistrict && `ต.${storeData.subDistrict}`,
-          storeData.district && `อ.${storeData.district}`,
-          storeData.province && `จ.${storeData.province}`,
-          storeData.postCode
-        ]
-          .filter(Boolean)
-          .join(' ')
+        storeData.address,
+        storeData.subDistrict && `ต.${storeData.subDistrict}`,
+        storeData.district && `อ.${storeData.district}`,
+        storeData.province && `จ.${storeData.province}`,
+        storeData.postCode
+      ]
+        .filter(Boolean)
+        .join(' ')
       : storeData.address
 
     for (i of dataOrder) {
@@ -7489,7 +7509,7 @@ exports.m3ToOrderMongo = async (req, res) => {
   }
 }
 
-function getNestedValue (obj, path) {
+function getNestedValue(obj, path) {
   return path.split('.').reduce((o, k) => (o ? o[k] : undefined), obj)
 }
 

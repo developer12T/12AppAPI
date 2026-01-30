@@ -254,7 +254,7 @@ exports.checkOutV2 = async (req, res) => {
 
 
     }
-
+    // console.log('orderId',orderId)
     let storeData = {}
 
     if (channel !== 'pc') {
@@ -312,7 +312,7 @@ exports.checkOutV2 = async (req, res) => {
     // const addressFinal = `${storeData.address} ต.${storeData.subDistrict} อ.${storeData.district} จ.${province} ${postCode}`
 
     if (approveStore === false) {
-      orderStatus = 'wait approve'
+      orderStatus = 'waitApprove'
       orderStatusTH = 'รออนุมัติร้านค้า'
     } else {
       orderStatus = 'pending'
@@ -335,12 +335,12 @@ exports.checkOutV2 = async (req, res) => {
         warehouse: sale.warehouse
       },
       store: {
-        storeId: storeData.storeId,
-        name: storeData.name,
-        type: storeData.type,
-        address: addressFinal,
-        taxId: storeData.taxId,
-        tel: storeData.tel,
+        storeId: storeData.storeId || '',
+        name: storeData.name || '',
+        type: storeData.type || '',
+        address: addressFinal || '',
+        taxId: storeData.taxId || '',
+        tel: storeData.tel || '',
         area: sale.area,
         zone: sale.zone
       },
@@ -375,7 +375,6 @@ exports.checkOutV2 = async (req, res) => {
     //   channel,
     //   res
     // )
-
     const checkIn = await checkInRoute(
       {
         storeId: storeId,
@@ -560,7 +559,7 @@ exports.getBillNewStore = async (req, res) => {
     const channel = req.headers['x-channel']
     const { Order } = getModelsByChannel(channel, res, orderModel)
 
-    let query = {status:'wait approve'}
+    let query = {status:'waitApprove'}
 
     if (area) {
       query['store.area'] = area

@@ -651,7 +651,7 @@ async function autoLockRouteChange(channel = 'cash') {
     const routeSettingData = await RouteSetting.find({ period: periodStr })
     // console.log('routeSettingData',routeSettingData)
     for (const route of routeSettingData) {
-      const dates = generateDates(route.startDate, 25)
+      const dates = generateDates(route.startDate, 24)
       const thaiDate = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Bangkok',
         year: 'numeric',
@@ -664,9 +664,9 @@ async function autoLockRouteChange(channel = 'cash') {
         const dateMacth = dates.find(u => String(u.day) === String(item.route))
         let canSell = ''
         if (dateMacth.date === thaiDate) {
-          canSell = true
-        } else {
           canSell = false
+        } else {
+          canSell = true
         }
         const result = await RouteSetting.updateOne(
           { period:periodStr, area: route.area },

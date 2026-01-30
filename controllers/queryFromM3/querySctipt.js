@@ -1100,7 +1100,49 @@ exports.dataPowerBiQueryInsert = async function (channel, data) {
   }
 }
 
-exports.dataUpsertSendMoney = async function (channel, data, primaryKeys = []) {
+// exports.dataUpsertSendMoney = async function (channel, data, primaryKeys = []) {
+//   const config = {
+//     host: process.env.MY_SQL_SERVER,
+//     user: process.env.MY_SQL_USER,
+//     password: process.env.MY_SQL_PASSWORD,
+//     database: process.env.MY_SQL_DATABASE
+//   }
+
+//   const connection = await mysql.createConnection(config)
+
+//   for (const item of data) {
+//     const keys = Array.isArray(primaryKeys) ? primaryKeys : [primaryKeys]
+
+//     const allFields = Object.keys(item)
+
+//     // ---------- INSERT ----------
+//     const insertFields = allFields.map(f => `\`${f}\``).join(', ')
+//     const insertPlaceholders = allFields.map(() => '?').join(', ')
+//     const insertValues = allFields.map(f => item[f])
+
+//     // ---------- UPDATE ----------
+//     const updateFields = allFields.filter(f => !keys.includes(f))
+
+//     const updateClause = [
+//       ...updateFields.map(f => `\`${f}\` = VALUES(\`${f}\`)`),
+//       '`period` = NOW()' // ⭐ สำคัญ: เวลาตอนอัปเดต
+//     ].join(', ')
+
+//     const sql = `
+//       INSERT INTO \`v_payin\`
+//       (${insertFields})
+//       VALUES (${insertPlaceholders})
+//       ON DUPLICATE KEY UPDATE
+//       ${updateClause}
+//     `
+
+//     await connection.execute(sql, insertValues)
+//   }
+
+//   await connection.end()
+// }
+
+exports.dataUpsertSendMoney = async function (channel, data) {
   const config = {
     host: process.env.MY_SQL_SERVER,
     user: process.env.MY_SQL_USER,
@@ -1111,8 +1153,6 @@ exports.dataUpsertSendMoney = async function (channel, data, primaryKeys = []) {
   const connection = await mysql.createConnection(config)
 
   for (const item of data) {
-    const keys = Array.isArray(primaryKeys) ? primaryKeys : [primaryKeys]
-
     const allFields = Object.keys(item)
 
     // ---------- INSERT ----------
@@ -1121,12 +1161,12 @@ exports.dataUpsertSendMoney = async function (channel, data, primaryKeys = []) {
     const insertValues = allFields.map(f => item[f])
 
     // ---------- UPDATE ----------
-    const updateFields = allFields.filter(f => !keys.includes(f))
+    // 🔑 key = wh + datemonth (ห้าม update)
+    const updateFields = allFields.filter(f => !['wh', 'datemonth'].includes(f))
 
-    const updateClause = [
-      ...updateFields.map(f => `\`${f}\` = VALUES(\`${f}\`)`),
-      '`period` = NOW()' // ⭐ สำคัญ: เวลาตอนอัปเดต
-    ].join(', ')
+    const updateClause = updateFields
+      .map(f => `\`${f}\` = VALUES(\`${f}\`)`)
+      .join(', ')
 
     const sql = `
       INSERT INTO \`v_payin\`

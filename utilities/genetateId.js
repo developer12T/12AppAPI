@@ -12,6 +12,7 @@ const giveawayModel = require('../models/cash/give')
 const stockModel = require('../models/cash/stock')
 const promotionModel = require('../models/cash/promotion')
 const campaignModel = require('../models/cash/campaign')
+const storeModel = require('../models/cash/store')
 const { getModelsByChannel } = require('../middleware/channel')
 const noodleSaleModel = require("../models/foodtruck/noodleSale");
 // const { sequelize, DataTypes } = require('../config/m3db')
@@ -60,7 +61,7 @@ const generateStockId = async (area, warehouse, channel, res) => {
   const { AdjustStock } = getModelsByChannel(channel, res, stockModel)
 
   const start = new Date(year, month, 1)         // เช่น 2025-11-01
-  const end   = new Date(year, month + 1, 1)     // เช่น 2025-12-01 หรือ 2026-01-01 (auto overflow)
+  const end = new Date(year, month + 1, 1)     // เช่น 2025-12-01 หรือ 2026-01-01 (auto overflow)
 
   const latestOrder = await AdjustStock.findOne({
     area: area,
@@ -93,16 +94,16 @@ const generateOrderId = async (area, warehouse, channel, res) => {
   const { Order } = getModelsByChannel(channel, res, orderModel)
 
   const start = new Date(year, month, 1)       // 1st of this month
-  const end   = new Date(year, month + 1, 1)   // 1st of next month
+  const end = new Date(year, month + 1, 1)   // 1st of next month
 
   const latestOrder = await Order.findOne({
     'store.area': { $regex: area, $options: 'i' },
     createdAt: { $gte: start, $lt: end },
-    status: { $nin: ['canceled', 'reject','wait approve'] }
+    status: { $nin: ['canceled', 'reject', 'waitApprove'] }
   })
     .sort({ orderId: -1 })
     .select('orderId')
-
+  // console.log('latestOrder',latestOrder)
   const runningNumber = latestOrder
     ? parseInt(latestOrder.orderId.slice(-4)) + 1
     : 1
@@ -110,8 +111,8 @@ const generateOrderId = async (area, warehouse, channel, res) => {
   return `${currentYear
     .toString()
     .slice(2, 4)}${currentMonth}13${warehouse}${runningNumber
-    .toString()
-    .padStart(4, '0')}`
+      .toString()
+      .padStart(4, '0')}`
 }
 
 const generateOrderIdDammy = async (area, warehouse, channel, res) => {
@@ -125,7 +126,7 @@ const generateOrderIdDammy = async (area, warehouse, channel, res) => {
   const { Order } = getModelsByChannel(channel, res, orderModel)
 
   const start = new Date(year, month, 1)       // 1st of this month
-  const end   = new Date(year, month + 1, 1)   // 1st of next month
+  const end = new Date(year, month + 1, 1)   // 1st of next month
 
   const latestOrder = await Order.findOne({
     'store.area': { $regex: area, $options: 'i' },
@@ -141,8 +142,8 @@ const generateOrderIdDammy = async (area, warehouse, channel, res) => {
   return `DR${currentYear
     .toString()
     .slice(2, 4)}${currentMonth}13${warehouse}${runningNumber
-    .toString()
-    .padStart(4, '0')}`
+      .toString()
+      .padStart(4, '0')}`
 }
 
 
@@ -286,7 +287,7 @@ const generateDistributionIdCredit = async (
   const latestOrder = await Distribution.findOne({
     area,
     orderId: { $regex: `^${prefix}` }, // เช่น ^W6809{warehouse}
-    withdrawType:withdrawType
+    withdrawType: withdrawType
   })
     .sort({ orderId: -1 })
     .select('orderId')
@@ -425,7 +426,7 @@ const generateOrderIdFoodTruck = async (area, warehouse, channel, res) => {
 
   // สร้างช่วงวันที่ด้วย date object (ไม่ต้องใช้ string)
   const start = new Date(year, month, 1)      // เช่น 2025-11-01
-  const end   = new Date(year, month + 1, 1)  // เดือนถัดไป (Auto overflow → Jan next year)
+  const end = new Date(year, month + 1, 1)  // เดือนถัดไป (Auto overflow → Jan next year)
 
   const latestOrder = await Order.findOne({
     'store.area': area,
@@ -448,6 +449,50 @@ const generateOrderIdFoodTruck = async (area, warehouse, channel, res) => {
 }
 
 
+async function getNextStoreEditNumber(channel, res) {
+  const { RunningNumber } = getModelsByChannel(
+    channel,
+    res,
+    storeModel
+  )
+
+  const running = await RunningNumber.findOneAndUpdate(
+    {
+      type: 'editStore',
+      name: 'cash',
+      zone: 'ALL'
+    },
+    [
+      {
+        $set: {
+          last: {
+            $concat: [
+              'SE',
+              {
+                $toString: {
+                  $add: [
+                    {
+                      $toLong: {
+                        $substrBytes: ['$last', 2, -1] // ตัด "SE"
+                      }
+                    },
+                    1
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    ],
+    { new: true }
+  )
+
+  return running.last
+}
+
+
+
 
 
 
@@ -465,5 +510,6 @@ module.exports = {
   generateCampaignId,
   generateDistributionIdCredit,
   generateOrderIdStoreLatLong,
-  generateOrderIdFoodTruck
+  generateOrderIdFoodTruck,
+  getNextStoreEditNumber
 }
