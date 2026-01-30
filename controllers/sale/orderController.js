@@ -1090,18 +1090,24 @@ exports.getOrder = async (req, res) => {
     // if (store) {
     //   query['store.storeId'] = store
     // }
+    let typeCondition
 
     if (type === 'sale') {
-      type = ['sale', 'saleNoodle']
+      typeCondition = { $in: ['sale', 'saleNoodle'] }
+    } else if (Array.isArray(type)) {
+      typeCondition = { $in: type }
+    } else if (type) {
+      typeCondition = type // ค่าเดียว ไม่ต้องใช้ $in
     }
 
     const matchQuery = {
-      type: { $in: type },
-      ...areaQuery, // zone หรือ store.area ตามที่คุณเซ็ตไว้
+      ...(typeCondition ? { type: typeCondition } : {}),
+      ...areaQuery,
       ...(store ? { 'store.storeId': store } : {}),
       ...(period ? { period } : {}),
       createdAt: { $gte: startDate, $lt: endDate }
     }
+
 
     // console.log(matchQuery)
 
