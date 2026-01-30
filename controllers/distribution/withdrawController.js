@@ -1776,16 +1776,32 @@ exports.cancelWithdraw = async (req, res) => {
     })
   }
 }
+const withdrawTimestamps = {}
 
 exports.approveWithdraw = async (req, res) => {
   try {
     const { orderId, status, user, role } = req.body
     let statusStr = status === true ? 'approved' : 'rejected'
     let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ'
-    // return res.status(503).json({
-    //   status: 503,
-    //   message: 'Service temporarily unavailable',
-    // })
+
+    
+    const now = Date.now()
+    const lastUpdate = withdrawTimestamps[orderId] || 0
+    const ONE_MINUTE = 15 * 1000
+
+    if (now - lastUpdate < ONE_MINUTE) {
+      return res.status(429).json({
+        status: 429,
+        message:
+          'This order was updated less than 15 second ago. Please try again later!'
+      })
+    }
+    withdrawTimestamps[orderId] = now
+
+    setTimeout(() => {
+      delete withdrawTimestamps[orderId]
+    }, ONE_MINUTE)
+
     const channel = req.headers['x-channel']
     const { Distribution, WereHouse } = getModelsByChannel(
       channel,
