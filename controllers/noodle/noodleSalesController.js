@@ -27,7 +27,7 @@ const orderTimestamps = {}
 exports.checkout = async (req, res) => {
   // const transaction = await sequelize.transaction();
   try {
-    const { type, area, storeId, period, payment } = req.body
+    const { type, area, storeId, period,note, payment } = req.body
 
     const channel = req.headers['x-channel']
     const { Order } = getModelsByChannel(channel, res, orderModel)
@@ -206,7 +206,7 @@ exports.checkout = async (req, res) => {
         latitude: '',
         longtitude: ''
       },
-      note: '',
+      note: note,
       latitude: '',
       longitude: '',
       listProduct,
