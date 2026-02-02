@@ -663,6 +663,12 @@ async function autoLockRouteChange(channel = 'cash') {
 
         const dateMacth = dates.find(u => String(u.day) === String(item.route))
         let canSell = ''
+
+
+        if (!dateMacth || !dateMacth.date) {
+          continue
+        }
+
         if (dateMacth.date === thaiDate) {
           canSell = false
         } else {
