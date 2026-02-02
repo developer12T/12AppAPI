@@ -800,6 +800,13 @@ exports.getSaleOutRoute = async (req, res) => {
       area: area
     })
 
+    if (!routeSettingData){
+      return res.status(404).json({
+        status:404,
+        message:"not found routeSettingData"
+      })
+    }
+
     res.status(200).json({
       status: 200,
       message: 'getsaleOutRoute',
