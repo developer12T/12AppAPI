@@ -300,7 +300,8 @@ exports.updateStoreStatusV2 = async (req, res) => {
                         },
                         {
                             $set: {
-                                'lockRoute.$[route].listStore.$[store].storeId': newId
+                                'lockRoute.$[route].listStore.$[store].storeId': newId,
+                                'lockRoute.$[route].listStore.$[store].lock': true
                             }
                         },
                         {
