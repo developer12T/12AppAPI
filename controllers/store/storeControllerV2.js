@@ -300,14 +300,14 @@ exports.updateStoreStatusV2 = async (req, res) => {
                         },
                         {
                             $set: {
-                                'lockRoute.$[route].listStore.$[store].storeId': newId,
-                                'lockRoute.$[route].listStore.$[store].lock': true
+                                'lockRoute.$[r].listStore.$[s].storeId': newId,
+                                'lockRoute.$[r].listStore.$[s].lock': false
                             }
                         },
                         {
                             arrayFilters: [
-                                { 'route.id': existRouteChangeLog.routeId }, // หรือ route.id ตาม schema
-                                { 'store.storeInfo': existRouteChangeLog.storeInfo }
+                                { 'r.id': existRouteChangeLog.routeId },        // <-- lockRoute.id
+                                { 's.storeInfo': existRouteChangeLog.storeInfo } // <-- listStore.storeInfo
                             ]
                         }
                     )
@@ -872,142 +872,142 @@ exports.requestStoreUpdate = async (req, res) => {
 
 
 exports.approveRequestStoreUpdate = async (req, res) => {
-  try {
-    const channel = req.headers['x-channel']
-    const { Store, StoreHisLog } = getModelsByChannel(channel, res, storeModel)
-    const { number, period, status, editPerson } = req.body
+    try {
+        const channel = req.headers['x-channel']
+        const { Store, StoreHisLog } = getModelsByChannel(channel, res, storeModel)
+        const { number, period, status, editPerson } = req.body
 
-    const exitsHis = await StoreHisLog.findOne({
-      number,
-      period,
-      status: 'pending'
-    })
+        const exitsHis = await StoreHisLog.findOne({
+            number,
+            period,
+            status: 'pending'
+        })
 
-    if (!exitsHis) {
-      return res.status(404).json({
-        status: 404,
-        message: 'Request not found or already processed'
-      })
-    }
-
-    // ❌ reject
-    if (status !== true) {
-      await exitsHis.updateOne({
-        $set: {
-          status: 'canceled',
-          statusTH: 'ไม่อนุมัติ',
-          editPerson
+        if (!exitsHis) {
+            return res.status(404).json({
+                status: 404,
+                message: 'Request not found or already processed'
+            })
         }
-      })
 
-      return res.status(200).json({
-        status: 200,
-        message: 'Rejected'
-      })
-    }
+        // ❌ reject
+        if (status !== true) {
+            await exitsHis.updateOne({
+                $set: {
+                    status: 'canceled',
+                    statusTH: 'ไม่อนุมัติ',
+                    editPerson
+                }
+            })
 
-    // -----------------------
-    // UPDATE STORE
-    // -----------------------
-    const updateStoreData = {}
-
-    const fields = [
-      'name',
-      'taxId',
-      'tel',
-      'address',
-      'subDistrict',
-      'district',
-      'province',
-      'provinceCode',
-      'postCode'
-    ]
-
-    for (const field of fields) {
-      if (exitsHis[field] !== undefined) {
-        updateStoreData[field] = exitsHis[field]
-      }
-    }
-
-    const updatedStore = await Store.findOneAndUpdate(
-      { storeId: exitsHis.storeId },
-      { $set: updateStoreData },
-      { new: true }
-    )
-
-    if (!updatedStore) {
-      return res.status(404).json({
-        status: 404,
-        message: 'Store not found'
-      })
-    }
-
-    // -----------------------
-    // UPDATE M3 (Customer)
-    // -----------------------
-    const updateData = {}
-
-    if (updatedStore.name) {
-      const nameStr = updatedStore.name
-      updateData.OKALCU = nameStr.slice(0, 10)
-      updateData.customerName = nameStr.slice(0, 36)
-      updateData.customerAddress4 = nameStr.slice(36, 72)
-    }
-
-    if (updatedStore.taxId) {
-      updateData.taxno = updatedStore.taxId
-    }
-
-    if (updatedStore.tel) {
-      updateData.customerPhone = updatedStore.tel
-    }
-
-    if (
-      updatedStore.address ||
-      updatedStore.subDistrict ||
-      updatedStore.province ||
-      updatedStore.postCode
-    ) {
-      const fullAddress =
-        (updatedStore.address ?? '') +
-        (updatedStore.subDistrict ?? '') +
-        (updatedStore.province ?? '') +
-        (updatedStore.postCode ?? '')
-
-      updateData.customerAddress1 = fullAddress.slice(0, 35)
-      updateData.customerAddress2 = fullAddress.slice(35, 70)
-      updateData.customerAddress3 = fullAddress.slice(70, 105)
-    }
-
-    if (Object.keys(updateData).length > 0) {
-      await Customer.update(updateData, {
-        where: {
-          coNo: 410,
-          customerNo: exitsHis.storeId
+            return res.status(200).json({
+                status: 200,
+                message: 'Rejected'
+            })
         }
-      })
+
+        // -----------------------
+        // UPDATE STORE
+        // -----------------------
+        const updateStoreData = {}
+
+        const fields = [
+            'name',
+            'taxId',
+            'tel',
+            'address',
+            'subDistrict',
+            'district',
+            'province',
+            'provinceCode',
+            'postCode'
+        ]
+
+        for (const field of fields) {
+            if (exitsHis[field] !== undefined) {
+                updateStoreData[field] = exitsHis[field]
+            }
+        }
+
+        const updatedStore = await Store.findOneAndUpdate(
+            { storeId: exitsHis.storeId },
+            { $set: updateStoreData },
+            { new: true }
+        )
+
+        if (!updatedStore) {
+            return res.status(404).json({
+                status: 404,
+                message: 'Store not found'
+            })
+        }
+
+        // -----------------------
+        // UPDATE M3 (Customer)
+        // -----------------------
+        const updateData = {}
+
+        if (updatedStore.name) {
+            const nameStr = updatedStore.name
+            updateData.OKALCU = nameStr.slice(0, 10)
+            updateData.customerName = nameStr.slice(0, 36)
+            updateData.customerAddress4 = nameStr.slice(36, 72)
+        }
+
+        if (updatedStore.taxId) {
+            updateData.taxno = updatedStore.taxId
+        }
+
+        if (updatedStore.tel) {
+            updateData.customerPhone = updatedStore.tel
+        }
+
+        if (
+            updatedStore.address ||
+            updatedStore.subDistrict ||
+            updatedStore.province ||
+            updatedStore.postCode
+        ) {
+            const fullAddress =
+                (updatedStore.address ?? '') +
+                (updatedStore.subDistrict ?? '') +
+                (updatedStore.province ?? '') +
+                (updatedStore.postCode ?? '')
+
+            updateData.customerAddress1 = fullAddress.slice(0, 35)
+            updateData.customerAddress2 = fullAddress.slice(35, 70)
+            updateData.customerAddress3 = fullAddress.slice(70, 105)
+        }
+
+        if (Object.keys(updateData).length > 0) {
+            await Customer.update(updateData, {
+                where: {
+                    coNo: 410,
+                    customerNo: exitsHis.storeId
+                }
+            })
+        }
+
+        // -----------------------
+        // UPDATE HISTORY STATUS
+        // -----------------------
+        await exitsHis.updateOne({
+            $set: {
+                status: 'approved',
+                statusTH: 'อนุมัติ',
+                editPerson
+            }
+        })
+
+        res.status(200).json({
+            status: 200,
+            message: 'Approved'
+        })
+    } catch (error) {
+        console.error(error)
+        res.status(500).json({
+            status: 500,
+            message: 'Server error'
+        })
     }
-
-    // -----------------------
-    // UPDATE HISTORY STATUS
-    // -----------------------
-    await exitsHis.updateOne({
-      $set: {
-        status: 'approved',
-        statusTH: 'อนุมัติ',
-        editPerson
-      }
-    })
-
-    res.status(200).json({
-      status: 200,
-      message: 'Approved'
-    })
-  } catch (error) {
-    console.error(error)
-    res.status(500).json({
-      status: 500,
-      message: 'Server error'
-    })
-  }
 }

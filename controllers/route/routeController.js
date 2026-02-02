@@ -4545,7 +4545,7 @@ exports.approveNewStoreToRoute = async (req, res) => {
           'lockRoute.$[route].listStore': {
             storeId: routeChangeLog.storeId,
             storeInfo: storeData._id.toString(),
-            lock: true
+            lock: false
           }
         }
       },

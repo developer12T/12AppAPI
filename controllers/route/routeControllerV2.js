@@ -253,7 +253,6 @@ exports.getRouteLock = async (req, res) => {
           const lockStore = checkLockRoute.listStore.find(
             u => u.storeId === item.storeInfo.storeId
           ).lock
-
           return {
             storeInfo: {
               _id: item.storeInfo._id,
