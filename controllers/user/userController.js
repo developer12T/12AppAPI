@@ -594,7 +594,6 @@ exports.addUserNew = async (req, res) => {
 
     const { User: UserMain } = getModelsByChannel('user', res, userModel)
     const { User: UserCash } = getModelsByChannel(channel, res, userModel)
-
     const tableData = await userQuery(channel)
     const result = []
 
@@ -611,19 +610,19 @@ exports.addUserNew = async (req, res) => {
       const encryptedPassword = encrypt(sale.password)
 
       const userPayload = {
-        saleCode: sale.saleCode,
-        salePayer: sale.salePayer,
-        username: sale.username,
-        firstName: sale.firstName,
-        surName: sale.surName,
+        saleCode: sale.saleCode?? '',
+        salePayer: sale.salePayer?? '',
+        username: sale.username?? '',
+        firstName: sale.firstName?? '',
+        surName: sale.surName?? '',
         password: encryptedPassword,
-        tel: sale.tel,
-        zone: sale.zone,
-        area: sale.area,
-        warehouse: sale.warehouse,
-        role: sale.role,
-        status: sale.status,
-        qrCodeImage: sale.qrCodeImage,
+        tel: sale.tel?? '',
+        zone: sale.zone?? '',
+        area: sale.area?? '',
+        warehouse: sale.warehouse?? '',
+        role: sale.role?? '',
+        status: sale.status?? '',
+        qrCodeImage: sale.qrCodeImage?? '',
         period: period(),
         image: '',
         typeTruck: sale.typeTruck ?? '',
