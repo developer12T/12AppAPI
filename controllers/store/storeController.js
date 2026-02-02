@@ -3590,27 +3590,30 @@ exports.getStorePage = async (req, res) => {
 
     const pageNum = Math.max(parseInt(page, 10) || 1, 1)
     const perPage = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100)
+    const typeStr = type.find(t => t === 'R') || ''
 
     // ประกอบ filter แบบใส่เฉพาะคีย์ที่มีค่า
     const filter = {}
     if (area) filter.area = area
     if (route) filter.route = route
-    if (type && type !== 'all' && type !== 'R') {
-      filter.type = type
+    if (typeStr && typeStr !== 'all' && typeStr !== 'R') {
+      
+      filter.type = typeStr
     }
-    else if (type === 'R') {
+    else if (typeStr === 'R') {
       const periodStr = period()
       if (area) {
         const routeSettingData = await RouteSetting.findOne({period:periodStr,area:area})
         if (routeSettingData.saleOutRoute === false) {
-          filter.route = type
+          filter.route = typeStr
+          
         } 
       }
     }
     
     
     filter.status = { $nin: ['90'] }
-    // console.log('filter',filter)
+    console.log('filter',filter)
     const qText = (q || '').trim()
     if (qText) {
       filter.$or = [

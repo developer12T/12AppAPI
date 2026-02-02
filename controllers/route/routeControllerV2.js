@@ -118,6 +118,10 @@ exports.addRouteSettings = async (req, res) => {
 
       const routeUser = routeData.filter(item => item.area === user.area)
 
+      if (routeUser.length === 0) {
+        continue
+      }
+
       for (const row of routeUser) {
         const listStore = []
         for (const item of row.listStore) {
