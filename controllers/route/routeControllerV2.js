@@ -839,6 +839,13 @@ exports.getCurrentRouteLock = async (req, res) => {
     const dates = generateDates(RouteSettingData.startDate, 24)
 
     const dateMacth = dates.find(u => String(u.date) === String(thaiDate))
+    // console.log('dateMacth',dateMacth)
+    if (!dateMacth) {
+      return res.status(404).json({
+        status:404,
+        message:'Not found dateMacth'
+      })
+    }
 
     res.status(200).json({
       status: 200,
