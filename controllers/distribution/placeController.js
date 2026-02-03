@@ -181,7 +181,7 @@ exports.addAllPlace = async (req, res) => {
 
     for (const area of areaList) {
       const withdrawList = await Withdraw.find({ Des_Area: area });
-      console.log(area)
+      // console.log(area)
       const listAddressNew = [];
 
       for (const i of withdrawList) {

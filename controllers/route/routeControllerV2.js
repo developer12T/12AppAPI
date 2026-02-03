@@ -187,16 +187,18 @@ exports.getRouteLock = async (req, res) => {
         .json({ status: 400, message: 'period is required' })
     }
 
+    const storeData = await Store.findOne({storeId:storeId})
+
     let routeSetting = []
 
-    if (area) {
-      routeSetting = await RouteSetting.findOne({ period: period, area: area })
 
-      dates = generateDates(routeSetting.startDate, 24)
-    }
+    routeSetting = await RouteSetting.findOne({ period: period, area: storeData?.area ?? area })
+
+    dates = generateDates(routeSetting.startDate, 24)
+
 
     const query = { period }
-    if (area) query.area = area
+    query.area = storeData?.area ?? area
     if (routeId) query.id = routeId
 
     const routes = await Route.find(query)
