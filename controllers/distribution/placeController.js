@@ -166,28 +166,38 @@ exports.getType = async (req, res) => {
 
 exports.addAllPlace = async (req, res) => {
   try {
-    const channel = req.headers['x-channel'];
-    const { User } = getModelsByChannel('user', res, userModel);
-    const { Place, Withdraw } = getModelsByChannel(channel, res, distributionModel);
+    const channel = req.headers['x-channel']
+    const { User } = getModelsByChannel('user', res, userModel)
+    const { Place, Withdraw } = getModelsByChannel(channel, res, distributionModel)
 
-    let type = channel === 'pc' ? 'PC' : 'CASH';
+    const type = channel === 'pc' ? 'PC' : 'CASH'
 
-    const users = await User.find({ role: 'sale', platformType: type });
-    const areaList = [...new Set(users.map(u => u.area).filter(Boolean))];
+    const users = await User.find({ role: 'sale', platformType: type })
+    const areaList = [...new Set(users.map(u => u.area).filter(Boolean))]
 
-    let data = [];
-    let areaAdded = [];
-    let areaUpdated = [];
+    const placePayloads = []   // ⭐ เตรียมข้อมูลทั้งหมดก่อน
+    const areaAdded = []
+    const areaUpdated = []
 
+    // ==================================================
+    // STEP 1: BUILD + VALIDATE DATA (ยังไม่แตะ Place)
+    // ==================================================
     for (const area of areaList) {
-      const withdrawList = await Withdraw.find({ Des_Area: area });
-      // console.log(area)
-      const listAddressNew = [];
+      const withdrawList = await Withdraw.find({ Des_Area: area })
 
-      for (const i of withdrawList) {
-        const isPickup = i.ZType === 'T04';
+      if (!withdrawList.length) {
+        console.warn(`⚠️ No withdraw data for area ${area}`)
+        continue
+      }
 
-        listAddressNew.push({
+      const listAddressNew = withdrawList.map(i => {
+        if (!i.ZType || !i.Des_Area) {
+          throw new Error(`Invalid withdraw data in area ${area}`)
+        }
+
+        const isPickup = i.ZType === 'T04'
+
+        return {
           type: i.ZType,
           typeNameTH: isPickup ? i.Des_Name : 'ส่งสินค้า',
           typeNameEN: isPickup ? 'pickup' : 'delivery',
@@ -204,81 +214,94 @@ exports.addAllPlace = async (req, res) => {
             normal: i.WH,
             clearance: i.WH1
           }
-        });
+        }
+      })
+
+      placePayloads.push({
+        area,
+        listAddress: listAddressNew
+      })
+    }
+
+    // ⭐ Final checkpoint
+    if (!placePayloads.length) {
+      throw new Error('No valid place payloads to process')
+    }
+
+    // ==================================================
+    // STEP 2: COMMIT (ปลอดภัยแล้ว ค่อยแตะ Place)
+    // ==================================================
+    for (const payload of placePayloads) {
+      const { area, listAddress } = payload
+
+      const place = await Place.findOne({ area })
+
+      if (!place) {
+        await Place.create(payload)
+        areaAdded.push(area)
+        continue
       }
 
-      const place = await Place.findOne({ area });
+      // UPDATE / INSERT listAddress
+      const existingMap = new Map(
+        place.listAddress.map(x => [
+          `${x.type}-${x.shippingId}-${x.route}`,
+          x
+        ])
+      )
 
-      // ----------------------------------
-      // 🔹 CREATE NEW
-      // ----------------------------------
-      if (!place) {
-        const newData = { area, listAddress: listAddressNew };
-        await Place.create(newData);
-        data.push(newData);
-        areaAdded.push(area);
-      } else {
-        // ----------------------------------
-        // 🔸 UPDATE หรือ INSERT รายการใหม่
-        // ----------------------------------
-        const existingMap = new Map(
-          place.listAddress.map(x => [
-            `${x.type}-${x.shippingId}-${x.route}`,
-            x
-          ])
-        );
+      let updated = false
 
-        let updated = false;
+      for (const item of listAddress) {
+        const key = `${item.type}-${item.shippingId}-${item.route}`
+        const exist = existingMap.get(key)
 
-        for (const item of listAddressNew) {
-          const key = `${item.type}-${item.shippingId}-${item.route}`;
-          const exist = existingMap.get(key);
+        if (!exist) {
+          place.listAddress.push(item)
+          updated = true
+        } else {
+          const changed =
+            exist.name !== item.name ||
+            exist.typeNameTH !== item.typeNameTH ||
+            exist.typeNameEN !== item.typeNameEN ||
+            exist.warehouse.normal !== item.warehouse.normal ||
+            exist.warehouse.clearance !== item.warehouse.clearance
 
-          if (!exist) {
-            // INSERT ใหม่
-            place.listAddress.push(item);
-            updated = true;
-            areaUpdated.push(area);
-            console.log(`🆕 INSERTED Place: ${area} -> ${key}`);
-          } else {
-            // UPDATE ถ้าค่ามีการเปลี่ยนแปลง
-            const changed =
-              exist.name !== item.name ||
-              exist.typeNameTH !== item.typeNameTH ||
-              exist.typeNameEN !== item.typeNameEN ||
-              exist.warehouse.normal !== item.warehouse.normal ||
-              exist.warehouse.clearance !== item.warehouse.clearance;
-
-            if (changed) {
-              Object.assign(exist, item);
-              updated = true;
-              areaUpdated.push(area);
-              console.log(`🔄 UPDATED Place: ${area} -> ${key}`);
-            }
+          if (changed) {
+            Object.assign(exist, item)
+            updated = true
           }
         }
+      }
 
-        if (updated) {
-          await place.save();
-        }
+      if (updated) {
+        await place.save()
+        areaUpdated.push(area)
       }
     }
 
-    const io = getSocket();
-    io.emit('distribution/place/addAllPlace', {});
+    // ==================================================
+    // SOCKET + RESPONSE
+    // ==================================================
+    const io = getSocket()
+    io.emit('distribution/place/addAllPlace', {})
 
     res.status(200).json({
       status: 200,
       message: `Added: ${areaAdded.length}, Updated: ${areaUpdated.length}`,
       addedArea: areaAdded,
       updatedArea: areaUpdated
-    });
+    })
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ status: '500', message: error.message });
+    console.error(error)
+    res.status(500).json({
+      status: 500,
+      message: error.message
+    })
   }
-};
+}
+
 
 
 
