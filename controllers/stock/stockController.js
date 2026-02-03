@@ -1017,7 +1017,7 @@ exports.addStockFromERP = async (req, res) => {
     const { period } = req.body
     const channel = req.headers['x-channel']
     const data = await stockQuery(channel, period)
-    // console.log(data)
+    console.log(data)
     const cleanPeriod = period.replace('-', '') // "202506"
     const { User } = getModelsByChannel(channel, res, userModel)
     const { Stock } = getModelsByChannel(channel, res, stockModel)
