@@ -149,7 +149,7 @@ const RouteSettingSchema = new mongoose.Schema({
   period: { type: String, required: true },
   lock: { type: Boolean, required: true },
   startDate: { type: String, required: true },
-  saleOutRoute: { type: Boolean, required: true, default: true },
+  saleOutRoute: { type: Boolean, required: true, default: false },
   lockRoute: [{
     id: { type: String, unique: true, required: true },
     route: { type: String, required: true },
