@@ -194,8 +194,10 @@ exports.getRouteLock = async (req, res) => {
 
     routeSetting = await RouteSetting.findOne({ period: period, area: storeData?.area ?? area })
 
-    dates = generateDates(routeSetting.startDate, 24)
+    dates = generateDates(routeSetting.startDate, 26)
 
+
+    // console.log("routeSetting",routeSetting)
 
     const query = { period }
     query.area = storeData?.area ?? area
@@ -743,7 +745,7 @@ exports.autoLockRouteChange = async (req, res) => {
     const routeSettingData = await RouteSetting.find({ period: period })
 
     for (const route of routeSettingData) {
-      const dates = generateDates(route.startDate, 24)
+      const dates = generateDates(route.startDate, 26)
       const thaiDate = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Bangkok',
         year: 'numeric',
@@ -844,7 +846,7 @@ exports.getCurrentRouteLock = async (req, res) => {
       month: '2-digit',
       day: '2-digit'
     }).format(new Date())
-    const dates = generateDates(RouteSettingData.startDate, 24)
+    const dates = generateDates(RouteSettingData.startDate, 26)
 
     const dateMacth = dates.find(u => String(u.date) === String(thaiDate))
     // console.log('dateMacth',dateMacth)
