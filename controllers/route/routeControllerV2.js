@@ -945,35 +945,44 @@ exports.getStoreCheckinByDayAreaCredit = async (req, res) => {
       })
     }
 
-      dataCredit = await getRouteCreditArea(date, area)
-      const storeList = dataCredit.flatMap(item => item.cus_code)
-      const storeUnique = [...new Set(storeList)]
-      const storeDetail = await getStoreDetailCredit(storeUnique)
-      data = dataCredit.map(item => {
+    const dataCredit = await getRouteCreditArea(date, area, 'date')
+    const storeList = dataCredit.flatMap(item => item.cus_code)
+    const storeUnique = [...new Set(storeList)]
+    const storeDetail = await getStoreDetailCredit(storeUnique)
+    data = dataCredit.map(item => {
 
-        const storeData = storeDetail.find(u =>
-          String(u.storeId).trim() === String(item.cus_code).trim()
-        )
-        // console.log(storeData)
+      const storeData = storeDetail.find(u =>
+        String(u.storeId).trim() === String(item.cus_code).trim()
+      )
 
-        return {
-          routeDay: item.route.padStart(2, '0'),
-          period: period,
-          area: item.area,
-          zone: item.area.slice(0, 3),
-          storeId: item.cus_code,
-          storeName: storeData?.storeName ?? '',
-          storeAddress: storeData?.storeAddress ?? '',
-          phone: storeData?.phone ?? '',
-          status: '3',
-          statusText: 'ซิ้อ',
-          orderId: item.cono,
-          sum: item.price,
-          mapLink: `https://maps.google.com/?q=${item.latitude},${item.longitude}`,
-          imageLink: '',
-          checkinDatetime: toThaiTime(item.check_in)
-        }
-      })
+      let status = ''
+      let statusText = ''
+      if (!item.cono || item.cono === '-' || item.cono === '') {
+        status = '2'
+        statusText = 'ไม่ซิ้อ'
+      } else {
+        status = '3'
+        statusText = 'ซิ้อ'
+      }
+
+      return {
+        routeDay: item.route.padStart(2, '0'),
+        period: period,
+        area: item.area,
+        zone: item.area.slice(0, 3),
+        storeId: item.cus_code,
+        storeName: storeData?.storeName ?? '',
+        storeAddress: storeData?.storeAddress ?? '',
+        phone: storeData?.phone ?? '',
+        status: status,
+        statusText: statusText,
+        orderId: item.cono,
+        sum: item.price,
+        mapLink: `https://maps.google.com/?q=${item.latitude},${item.longitude}`,
+        imageLink: '',
+        checkinDatetime: item.check_in
+      }
+    })
 
 
 
@@ -989,5 +998,66 @@ exports.getStoreCheckinByDayAreaCredit = async (req, res) => {
       message: 'error from server',
       error: error.message
     })
+  }
+}
+
+
+exports.polylineRouteCredit = async (req, res) => {
+  try {
+    const { area, period, startDate, endDate } = req.query
+    const dataCredit = await getRouteCreditArea('', area, 'start', startDate, endDate)
+    const storeList = dataCredit.flatMap(item => item.cus_code)
+    const storeUnique = [...new Set(storeList)]
+    const storeDetail = await getStoreDetailCredit(storeUnique)
+
+    if (dataCredit.length === 0) {
+      return res.status(404).json({
+        status:404,
+        message:'not found dataCredit',
+      })
+    }
+
+    const data = dataCredit.map(item => {
+      let status = ''
+      let statusText = ''
+      if (!item.cono || item.cono === '-' || item.cono === '') {
+        status = '2'
+        statusText = 'ไม่ซิ้อ'
+      } else {
+        status = '3'
+        statusText = 'ซิ้อ'
+      }
+
+      const storeData = storeDetail.find(u =>
+        String(u.storeId).trim() === String(item.cus_code).trim()
+      )
+
+      return {
+        storeId: item.cus_code,
+        storeName: storeData.storeName,
+        route: item.route.padStart(2, '0'),
+        statusText: statusText,
+        status: status,
+        image: '',
+        note: item.comment_,
+        date: toThaiTime(item.check_in),
+        location: [
+          Number(item.longitude),
+          Number(item.latitude)
+
+        ]
+      }
+    })
+
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: data
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: 500, message: 'Internal server error' })
   }
 }

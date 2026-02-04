@@ -59,7 +59,8 @@ const {
   getSaleOutRoute,
   getCurrentRouteLock,
   updateSaleOutRoute,
-  getStoreCheckinByDayAreaCredit
+  getStoreCheckinByDayAreaCredit,
+  polylineRouteCredit
 } = require('../../controllers/route/routeControllerV2')
 
 const router = express.Router()
@@ -114,6 +115,9 @@ router.post('/getStoreCheckinByDayArea', getStoreCheckinByDayArea)
 router.post('/getStoreCheckinByDayAreaCredit', getStoreCheckinByDayAreaCredit)
 router.get('/getRouteSetting', getRouteSetting)
 router.get('/getRouteLock', getRouteLock)
+router.get('/polylineRouteCredit', polylineRouteCredit)
+
+
 
 router.post('/updateAreaByDataRoute', updateAreaByDataRoute)
 router.post('/addRouteSettings', addRouteSettings)

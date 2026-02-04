@@ -1774,7 +1774,7 @@ exports.getAreaCredit = async function () {
   }
 }
 
-exports.getRouteCreditArea = async function (date, area) {
+exports.getRouteCreditArea = async function (date, area, type, startDate, endDate) {
   const year = date.slice(6, 10) // "2025"
   const month = date.slice(3, 5) // "09"
   const day = date.slice(0, 2)
@@ -1789,18 +1789,49 @@ exports.getRouteCreditArea = async function (date, area) {
 
   try {
     let query = ''
-    if (area) {
-      query = `
+    if (type === 'date') {
+      if (area) {
+        query = `
       SELECT * FROM report_visit
       where check_in like '${formatted}' and area = '${area}'
       order by check_in
     `
-    } else {
-      query = `
+      } else {
+        query = `
         SELECT * FROM report_visit
-        where check_in like ${formatted} 
+        where check_in like '${formatted} 
         order by check_in
     `
+      }
+    } else if (type === 'start') {
+
+      const startYear = startDate.slice(0, 4)
+      const startMonth = startDate.slice(4, 6)
+      const startDay = startDate.slice(6, 8)
+      const startDateStr = `${startYear}-${startMonth}-${startDay}`
+
+      const endYear = endDate.slice(0, 4)
+      const endMonth = endDate.slice(4, 6)
+      const endDay = endDate.slice(6, 8)
+      const endDateStr = `${endYear}-${endMonth}-${endDay}`
+
+      if (endDateStr === startDateStr) {
+        query = `
+      SELECT * FROM report_visit
+        WHERE check_in like '%${endDateStr}%'
+          AND area like '${area}'
+        order by check_in
+      `
+      } else {
+        query = `
+      SELECT * FROM report_visit
+        WHERE check_in >= '${startDateStr}'
+          AND check_in < '${endDateStr}'
+          AND area = '${area}'
+        order by check_in
+      `
+      }
+
     }
 
 
