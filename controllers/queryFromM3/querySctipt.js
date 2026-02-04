@@ -1745,3 +1745,31 @@ exports.getZoneCredit = async function () {
     await connection.end() // ⭐ สำคัญมาก
   }
 }
+
+exports.getAreaCredit = async function () {
+
+  const config = {
+    host: process.env.MY_SQL_SERVER,
+    user: process.env.MY_SQL_USER,
+    password: process.env.MY_SQL_PASSWORD,
+    database: process.env.MY_SQL_DATABASE
+  }
+
+  const connection = await mysql.createConnection(config)
+
+  try {
+    const query = `
+      SELECT * 
+      FROM c_area
+    `
+
+    const [rows] = await connection.execute(query)
+
+    return rows
+  } catch (err) {
+    console.error('MySQL error:', err)
+    throw err
+  } finally {
+    await connection.end() // ⭐ สำคัญมาก
+  }
+}
