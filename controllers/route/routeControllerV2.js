@@ -5,7 +5,8 @@ const {
   period,
   periodNew,
   previousPeriod,
-  generateDates
+  generateDates,
+  toThaiTime
 } = require('../../utilities/datetime')
 // const { Store } = require('../../models/cash/store')
 const { uploadFilesCheckin } = require('../../utilities/upload')
@@ -21,7 +22,9 @@ const sql = require('mssql')
 const {
   routeQuery,
   routeQueryOne,
-  getDataRoute
+  getDataRoute,
+  getRouteCreditArea,
+  getStoreDetailCredit
 } = require('../../controllers/queryFromM3/querySctipt')
 const userModel = require('../../models/cash/user')
 const targetVisitModel = require('../../models/cash/targetVisit')
@@ -187,7 +190,7 @@ exports.getRouteLock = async (req, res) => {
         .json({ status: 400, message: 'period is required' })
     }
 
-    const storeData = await Store.findOne({storeId:storeId})
+    const storeData = await Store.findOne({ storeId: storeId })
 
     let routeSetting = []
 
@@ -804,10 +807,10 @@ exports.getSaleOutRoute = async (req, res) => {
       area: area
     })
 
-    if (!routeSettingData){
+    if (!routeSettingData) {
       return res.status(404).json({
-        status:404,
-        message:"not found routeSettingData"
+        status: 404,
+        message: "not found routeSettingData"
       })
     }
 
@@ -852,8 +855,8 @@ exports.getCurrentRouteLock = async (req, res) => {
     // console.log('dateMacth',dateMacth)
     if (!dateMacth) {
       return res.status(404).json({
-        status:404,
-        message:'Not found dateMacth'
+        status: 404,
+        message: 'Not found dateMacth'
       })
     }
 
@@ -921,6 +924,70 @@ exports.updateSaleOutRoute = async (req, res) => {
     res.status(500).json({
       status: 500,
       message: error.message
+    })
+  }
+}
+
+
+
+exports.getStoreCheckinByDayAreaCredit = async (req, res) => {
+  try {
+    const { area, date } = req.body
+    const channel = req.headers['x-channel']
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+
+    const period = `${date.slice(6, 10)}${date.slice(3, 5)}`
+
+    if (!area || !date) {
+      return res.status(400).json({
+        status: 400,
+        message: 'area and date are required'
+      })
+    }
+
+      dataCredit = await getRouteCreditArea(date, area)
+      const storeList = dataCredit.flatMap(item => item.cus_code)
+      const storeUnique = [...new Set(storeList)]
+      const storeDetail = await getStoreDetailCredit(storeUnique)
+      data = dataCredit.map(item => {
+
+        const storeData = storeDetail.find(u =>
+          String(u.storeId).trim() === String(item.cus_code).trim()
+        )
+        // console.log(storeData)
+
+        return {
+          routeDay: item.route.padStart(2, '0'),
+          period: period,
+          area: item.area,
+          zone: item.area.slice(0, 3),
+          storeId: item.cus_code,
+          storeName: storeData?.storeName ?? '',
+          storeAddress: storeData?.storeAddress ?? '',
+          phone: storeData?.phone ?? '',
+          status: '3',
+          statusText: 'ซิ้อ',
+          orderId: item.cono,
+          sum: item.price,
+          mapLink: `https://maps.google.com/?q=${item.latitude},${item.longitude}`,
+          imageLink: '',
+          checkinDatetime: toThaiTime(item.check_in)
+        }
+      })
+
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message
     })
   }
 }

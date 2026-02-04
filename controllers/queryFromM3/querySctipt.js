@@ -1773,3 +1773,89 @@ exports.getAreaCredit = async function () {
     await connection.end() // ⭐ สำคัญมาก
   }
 }
+
+exports.getRouteCreditArea = async function (date, area) {
+  const year = date.slice(6, 10) // "2025"
+  const month = date.slice(3, 5) // "09"
+  const day = date.slice(0, 2)
+  const formatted = `%${year}-${month}-${day}%`
+  const config = {
+    host: process.env.MY_SQL_SERVER,
+    user: process.env.MY_SQL_USER,
+    password: process.env.MY_SQL_PASSWORD,
+    database: process.env.MY_SQL_DATABASE
+  }
+  const connection = await mysql.createConnection(config)
+
+  try {
+    let query = ''
+    if (area) {
+      query = `
+      SELECT * FROM report_visit
+      where check_in like '${formatted}' and area = '${area}'
+      order by check_in
+    `
+    } else {
+      query = `
+        SELECT * FROM report_visit
+        where check_in like ${formatted} 
+        order by check_in
+    `
+    }
+
+
+    const [rows] = await connection.execute(query)
+
+    return rows
+  } catch (err) {
+    console.error('MySQL error:', err)
+    throw err
+  } finally {
+    await connection.end() // ⭐ สำคัญมาก
+  }
+}
+
+
+exports.getStoreDetailCredit = async function (storeId) {
+  if (!storeId?.length) return []
+
+  const config = {
+    user: process.env.MS_SQL_USER,
+    password: process.env.MS_SQL_PASSWORD,
+    server: process.env.MS_SQL_SERVER,
+    database: process.env.MS_SQL_DATABASE_OMS,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  }
+
+  await sql.connect(config)
+
+  try {
+    const request = new sql.Request()
+
+    // สร้าง @id0, @id1, ...
+    const params = storeId.map((id, i) => {
+      const key = `id${i}`
+      request.input(key, sql.VarChar, id)
+      return `@${key}`
+    }).join(',')
+
+    const query = `
+      select 
+      RTRIM(LTRIM(OKCUNO)) as storeId,  
+        RTRIM(LTRIM(OKCUNM)) as storeName,
+        (OKCUA1 + OKCUA2 + OKCUA3 + OKCUA4) as storeAddress  ,
+        RTRIM(LTRIM(OKPHNO)) as phone
+        from ocusma 
+      WHERE OKCUNO IN (${params})
+    `
+
+    const result = await request.query(query)
+
+    return result.recordset
+  } finally {
+    await sql.close()
+  }
+}
