@@ -12,7 +12,7 @@ const bcrypt = require('bcrypt')
 const axios = require('axios')
 const userModel = require('../../models/cash/user')
 const { getModelsByChannel } = require('../../middleware/channel')
-const { userQuery, userQueryFilter, userQueryManeger, userQueryOne, userPcSample } = require('../../controllers/queryFromM3/querySctipt');
+const { userQuery, userQueryFilter, userQueryManeger, userQueryOne, userPcSample, getZoneCredit } = require('../../controllers/queryFromM3/querySctipt');
 const user = require('../../models/cash/user');
 const { getSocket } = require('../../socket')
 const { encrypt, decrypt } = require('../../middleware/authen');
@@ -610,19 +610,19 @@ exports.addUserNew = async (req, res) => {
       const encryptedPassword = encrypt(sale.password)
 
       const userPayload = {
-        saleCode: sale.saleCode?? '',
-        salePayer: sale.salePayer?? '',
-        username: sale.username?? '',
-        firstName: sale.firstName?? '',
-        surName: sale.surName?? '',
+        saleCode: sale.saleCode ?? '',
+        salePayer: sale.salePayer ?? '',
+        username: sale.username ?? '',
+        firstName: sale.firstName ?? '',
+        surName: sale.surName ?? '',
         password: encryptedPassword,
-        tel: sale.tel?? '',
-        zone: sale.zone?? '',
-        area: sale.area?? '',
-        warehouse: sale.warehouse?? '',
-        role: sale.role?? '',
-        status: sale.status?? '',
-        qrCodeImage: sale.qrCodeImage?? '',
+        tel: sale.tel ?? '',
+        zone: sale.zone ?? '',
+        area: sale.area ?? '',
+        warehouse: sale.warehouse ?? '',
+        role: sale.role ?? '',
+        status: sale.status ?? '',
+        qrCodeImage: sale.qrCodeImage ?? '',
         period: period(),
         image: '',
         typeTruck: sale.typeTruck ?? '',
@@ -1107,25 +1107,36 @@ exports.getArea = async (req, res) => {
 
 exports.getZone = async (req, res) => {
   try {
+    const channel = req.headers['x-channel'];
     const { role } = req.body
-    const channel = 'user'
     const { User } = getModelsByChannel(channel, res, userModel);
     let match = { role };
+    let userData = []
+    if (channel === 'cash') {
+      userData = await User.aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: "$zone"
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            zone: "$_id"
+          }
+        }
+      ]);
+    } else if (channel === 'credit') {
+      const userCredit = await getZoneCredit()
+      // console.log('userCredit',userCredit)
+      userData = userCredit.map(item => {
+        return {
+          zone:item.id_zone
+        }
+      })
+    }
 
-    const userData = await User.aggregate([
-      { $match: match },
-      {
-        $group: {
-          _id: "$zone"
-        }
-      },
-      {
-        $project: {
-          _id: 0,
-          zone: "$_id"
-        }
-      }
-    ]);
 
 
 
@@ -1281,9 +1292,9 @@ exports.updateUserPcToPromotionStore = async (req, res) => {
     }
 
     res.status(201).json({
-      status:201,
-      message:'updateUserPcToPromotionStore success',
-      data:dataPromotionStore
+      status: 201,
+      message: 'updateUserPcToPromotionStore success',
+      data: dataPromotionStore
     })
 
 
@@ -1298,3 +1309,4 @@ exports.updateUserPcToPromotionStore = async (req, res) => {
     })
   }
 }
+
