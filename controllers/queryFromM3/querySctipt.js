@@ -1731,8 +1731,9 @@ exports.getZoneCredit = async function () {
 
   try {
     const query = `
-      SELECT * 
-      FROM c_zone
+            SELECT *
+      FROM forecast_zone
+      WHERE channel_code ='CR'
     `
 
     const [rows] = await connection.execute(query)

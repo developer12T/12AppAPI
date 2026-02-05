@@ -1155,7 +1155,7 @@ exports.getZoneCredit = async (req, res) => {
     // console.log('userCredit',userCredit)
     userData = userCredit.map(item => {
       return {
-        zone: item.id_zone
+        zone: item.code_zone
       }
     })
 
