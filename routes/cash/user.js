@@ -14,14 +14,17 @@ const {
   deleteUserArray,
   addUserArray,
   getAreaAll,
- checkUserLogin,
- getTeam,
- downloadUserExcel,
- addUserPcSample,
- getArea,
- getZone,
- addUserPcToPromotionStore,
- updateUserPcToPromotionStore
+  checkUserLogin,
+  getTeam,
+  downloadUserExcel,
+  addUserPcSample,
+  getArea,
+  getZone,
+  addUserPcToPromotionStore,
+  updateUserPcToPromotionStore,
+  getAreaCredit,
+  getZoneCredit,
+  getTeamCredit
 } = require('../../controllers/user/userController')
 
 const router = express.Router()
@@ -48,4 +51,7 @@ router.post('/getArea', getArea)
 router.post('/getZone', getZone)
 router.post('/addUserPcToPromotionStore', addUserPcToPromotionStore)
 router.post('/updateUserPcToPromotionStore', updateUserPcToPromotionStore)
+router.post('/getAreaCredit', getAreaCredit)
+router.post('/getZoneCredit', getZoneCredit)
+router.get('/getTeamCredit', getTeamCredit)
 module.exports = router

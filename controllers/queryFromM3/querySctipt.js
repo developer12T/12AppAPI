@@ -1,7 +1,14 @@
 const sql = require('mssql')
 const mysql = require('mysql2/promise')
 require('dotenv').config()
-
+const {
+  period,
+  periodNew,
+  previousPeriod,
+  generateDates,
+  toThaiTime,
+  rangeDate
+} = require('../../utilities/datetime')
 exports.userQuery = async function (channel) {
   const config = {
     user: process.env.MS_SQL_USER,
@@ -543,36 +550,36 @@ exports.storeQuery = async function (channel) {
       status: 'Agree',
       date: new Date()
     }
-    ;(mainData = {
-      storeId: splitData.storeId,
-      name: splitData.name,
-      taxId: splitData.taxId,
-      tel: splitData.tel,
-      route: splitData.route,
-      type: splitData.type,
-      typeName: splitData.typeName,
-      address: splitData.address,
-      district: splitData.district,
-      subDistrict: splitData.subDistrict,
-      province: splitData.province,
-      provinceCode: splitData.provinceCode,
-      'postCode ': splitData.postCode,
-      zone: splitData.zone,
-      area: splitData.area,
-      latitude: splitData.latitude,
-      longtitude: splitData.longtitude,
-      lineId: '',
-      'note ': '',
-      approve: approveData,
-      status: splitData.status,
-      policyConsent: poliAgree,
-      imageList: [],
-      shippingAddress: splitData.shippingAddress,
-      checkIn: {},
-      createdAt: splitData.createdAt,
-      updatedDate: Date()
-    }),
-      data.push(mainData)
+      ; (mainData = {
+        storeId: splitData.storeId,
+        name: splitData.name,
+        taxId: splitData.taxId,
+        tel: splitData.tel,
+        route: splitData.route,
+        type: splitData.type,
+        typeName: splitData.typeName,
+        address: splitData.address,
+        district: splitData.district,
+        subDistrict: splitData.subDistrict,
+        province: splitData.province,
+        provinceCode: splitData.provinceCode,
+        'postCode ': splitData.postCode,
+        zone: splitData.zone,
+        area: splitData.area,
+        latitude: splitData.latitude,
+        longtitude: splitData.longtitude,
+        lineId: '',
+        'note ': '',
+        approve: approveData,
+        status: splitData.status,
+        policyConsent: poliAgree,
+        imageList: [],
+        shippingAddress: splitData.shippingAddress,
+        checkIn: {},
+        createdAt: splitData.createdAt,
+        updatedDate: Date()
+      }),
+        data.push(mainData)
   }
 
   return data
@@ -768,36 +775,36 @@ exports.storeQueryFilter = async function (channel, storeId) {
       status: 'Agree',
       date: new Date()
     }
-    ;(mainData = {
-      storeId: splitData.storeId,
-      name: splitData.name,
-      taxId: splitData.taxId,
-      tel: splitData.tel,
-      route: splitData.route,
-      type: splitData.type,
-      typeName: splitData.typeName,
-      address: splitData.address,
-      district: splitData.district,
-      subDistrict: splitData.subDistrict,
-      province: splitData.province,
-      provinceCode: splitData.provinceCode,
-      'postCode ': splitData.postCode,
-      zone: splitData.zone,
-      area: splitData.area,
-      latitude: splitData.latitude,
-      longtitude: splitData.longtitude,
-      lineId: '',
-      'note ': '',
-      approve: approveData,
-      status: '20',
-      policyConsent: poliAgree,
-      imageList: [],
-      shippingAddress: splitData.shippingAddress,
-      checkIn: {},
-      createdAt: splitData.createdAt,
-      updatedDate: Date()
-    }),
-      data.push(mainData)
+      ; (mainData = {
+        storeId: splitData.storeId,
+        name: splitData.name,
+        taxId: splitData.taxId,
+        tel: splitData.tel,
+        route: splitData.route,
+        type: splitData.type,
+        typeName: splitData.typeName,
+        address: splitData.address,
+        district: splitData.district,
+        subDistrict: splitData.subDistrict,
+        province: splitData.province,
+        provinceCode: splitData.provinceCode,
+        'postCode ': splitData.postCode,
+        zone: splitData.zone,
+        area: splitData.area,
+        latitude: splitData.latitude,
+        longtitude: splitData.longtitude,
+        lineId: '',
+        'note ': '',
+        approve: approveData,
+        status: '20',
+        policyConsent: poliAgree,
+        imageList: [],
+        shippingAddress: splitData.shippingAddress,
+        checkIn: {},
+        createdAt: splitData.createdAt,
+        updatedDate: Date()
+      }),
+        data.push(mainData)
   }
 
   return data
@@ -1451,7 +1458,7 @@ exports.stockQuery = async function (channel, period, wereHouse) {
   let result = ''
   if (channel == 'cash') {
     if (wereHouse) {
-      ;`
+      ; `
   SELECT WH, 
   ITEM_CODE, 
   SUM(ITEM_QTY) AS ITEM_QTY
@@ -1662,7 +1669,7 @@ exports.stockPcQuery = async function (channel, period, wereHouse) {
   let result = ''
   if (channel === 'cash' || channel === 'pc') {
     if (wereHouse) {
-      ;`
+      ; `
   SELECT WH, 
   ITEM_CODE, 
   SUM(ITEM_QTY) AS ITEM_QTY
@@ -1715,5 +1722,240 @@ exports.updateLatLong = async function (channel, storeList) {
           long = @long
       WHERE customerCode = @customerCode
     `)
+  }
+}
+
+exports.getZoneCredit = async function () {
+
+  const config = {
+    host: process.env.MY_SQL_SERVER,
+    user: process.env.MY_SQL_USER,
+    password: process.env.MY_SQL_PASSWORD,
+    database: process.env.MY_SQL_DATABASE
+  }
+
+  const connection = await mysql.createConnection(config)
+
+  try {
+    const query = `
+            SELECT *
+      FROM forecast_zone
+      WHERE channel_code ='CR'
+    `
+
+    const [rows] = await connection.execute(query)
+
+    return rows
+  } catch (err) {
+    console.error('MySQL error:', err)
+    throw err
+  } finally {
+    await connection.end() // ⭐ สำคัญมาก
+  }
+}
+
+
+exports.getTeamCredit = async function (zone) {
+
+  const config = {
+    host: process.env.MY_SQL_SERVER,
+    user: process.env.MY_SQL_USER,
+    password: process.env.MY_SQL_PASSWORD,
+    database: process.env.MY_SQL_DATABASE
+  }
+
+  const connection = await mysql.createConnection(config)
+
+  try {
+    const query = `
+            SELECT * FROM forecast_area
+              where channel ='CR' and zone = '${zone}'
+    `
+
+    const [rows] = await connection.execute(query)
+
+    return rows
+  } catch (err) {
+    console.error('MySQL error:', err)
+    throw err
+  } finally {
+    await connection.end() // ⭐ สำคัญมาก
+  }
+}
+
+
+
+exports.getAreaCredit = async function (zone, team) {
+
+  const config = {
+    host: process.env.MY_SQL_SERVER,
+    user: process.env.MY_SQL_USER,
+    password: process.env.MY_SQL_PASSWORD,
+    database: process.env.MY_SQL_DATABASE
+  }
+
+  const connection = await mysql.createConnection(config)
+
+  try {
+
+    let where = `where channel ='CR' and zone = '${zone}' `
+
+    if (team) {
+      where += `and team = '${team}'`
+    }
+
+    const query = `
+      SELECT * FROM forecast_area
+      ${where}
+    `
+
+    const [rows] = await connection.execute(query)
+
+    return rows
+  } catch (err) {
+    console.error('MySQL error:', err)
+    throw err
+  } finally {
+    await connection.end() // ⭐ สำคัญมาก
+  }
+}
+
+exports.getRouteCreditArea = async function (date, area, type, startDate, endDate, period) {
+  const year = date.slice(6, 10) // "2025"
+  const month = date.slice(3, 5) // "09"
+  const day = date.slice(0, 2)
+  const formatted = `%${year}-${month}-${day}%`
+  const config = {
+    host: process.env.MY_SQL_SERVER,
+    user: process.env.MY_SQL_USER,
+    password: process.env.MY_SQL_PASSWORD,
+    database: process.env.MY_SQL_DATABASE
+  }
+  const connection = await mysql.createConnection(config)
+
+  try {
+    let query = ''
+    if (type === 'date') {
+      if (area) {
+        query = `
+      SELECT * FROM report_visit
+      where check_in like '${formatted}' and area = '${area}'
+      order by check_in
+    `
+      } else {
+        query = `
+        SELECT * FROM report_visit
+        where check_in like '${formatted} 
+        order by check_in
+    `
+      }
+    } else if (type === 'start') {
+
+      const startYear = startDate.slice(0, 4)
+      const startMonth = startDate.slice(4, 6)
+      const startDay = startDate.slice(6, 8)
+      const startDateStr = `${startYear}-${startMonth}-${startDay}`
+
+      const endYear = endDate.slice(0, 4)
+      const endMonth = endDate.slice(4, 6)
+      const endDay = endDate.slice(6, 8)
+      const endDateStr = `${endYear}-${endMonth}-${endDay}`
+
+      if (endDateStr === startDateStr) {
+        query = `
+      SELECT * FROM report_visit
+        WHERE check_in like '%${endDateStr}%'
+          AND area like '${area}'
+        order by check_in
+      `
+      } else {
+        query = `
+      SELECT * FROM report_visit
+        WHERE check_in >= '${startDateStr}'
+          AND check_in < '${endDateStr}'
+          AND area = '${area}'
+        order by check_in
+      `
+      }
+
+    } else if (type === 'period') {
+
+      function toMySQLThaiDateTime(date) {
+        return new Date(date)
+          .toLocaleString('sv-SE', { timeZone: 'Asia/Bangkok' })
+          .replace('T', ' ')
+      }
+
+      const { startDate, endDate } = rangeDate(period)
+
+      const startDateSQL = toMySQLThaiDateTime(startDate)
+      const endDateSQL = toMySQLThaiDateTime(endDate)
+
+      query = `
+        SELECT *,DATE_FORMAT(check_in, '%d-%m-%Y') AS check_in_date
+        FROM report_visit
+        WHERE check_in >= '${startDateSQL}'
+          AND check_in <  '${endDateSQL}'
+          AND area = '${area}'
+        ORDER BY check_in
+      `
+
+
+    }
+
+
+    const [rows] = await connection.execute(query)
+
+    return rows
+  } catch (err) {
+    console.error('MySQL error:', err)
+    throw err
+  } finally {
+    await connection.end() // ⭐ สำคัญมาก
+  }
+}
+
+
+exports.getStoreDetailCredit = async function (storeId) {
+  if (!storeId?.length) return []
+
+  const config = {
+    user: process.env.MS_SQL_USER,
+    password: process.env.MS_SQL_PASSWORD,
+    server: process.env.MS_SQL_SERVER,
+    database: process.env.MS_SQL_DATABASE_OMS,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  }
+
+  await sql.connect(config)
+
+  try {
+    const request = new sql.Request()
+
+    // สร้าง @id0, @id1, ...
+    const params = storeId.map((id, i) => {
+      const key = `id${i}`
+      request.input(key, sql.VarChar, id)
+      return `@${key}`
+    }).join(',')
+
+    const query = `
+      select 
+      RTRIM(LTRIM(OKCUNO)) as storeId,  
+        RTRIM(LTRIM(OKCUNM)) as storeName,
+        (OKCUA1 + OKCUA2 + OKCUA3 + OKCUA4) as storeAddress  ,
+        RTRIM(LTRIM(OKPHNO)) as phone
+        from ocusma 
+      WHERE OKCUNO IN (${params})
+    `
+
+    const result = await request.query(query)
+
+    return result.recordset
+  } finally {
+    await sql.close()
   }
 }

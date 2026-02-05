@@ -12,7 +12,7 @@ const bcrypt = require('bcrypt')
 const axios = require('axios')
 const userModel = require('../../models/cash/user')
 const { getModelsByChannel } = require('../../middleware/channel')
-const { userQuery, userQueryFilter, userQueryManeger, userQueryOne, userPcSample } = require('../../controllers/queryFromM3/querySctipt');
+const { userQuery, userQueryFilter, userQueryManeger, userQueryOne, userPcSample, getZoneCredit, getAreaCredit, getTeamCredit } = require('../../controllers/queryFromM3/querySctipt');
 const user = require('../../models/cash/user');
 const { getSocket } = require('../../socket')
 const { encrypt, decrypt } = require('../../middleware/authen');
@@ -610,19 +610,19 @@ exports.addUserNew = async (req, res) => {
       const encryptedPassword = encrypt(sale.password)
 
       const userPayload = {
-        saleCode: sale.saleCode?? '',
-        salePayer: sale.salePayer?? '',
-        username: sale.username?? '',
-        firstName: sale.firstName?? '',
-        surName: sale.surName?? '',
+        saleCode: sale.saleCode ?? '',
+        salePayer: sale.salePayer ?? '',
+        username: sale.username ?? '',
+        firstName: sale.firstName ?? '',
+        surName: sale.surName ?? '',
         password: encryptedPassword,
-        tel: sale.tel?? '',
-        zone: sale.zone?? '',
-        area: sale.area?? '',
-        warehouse: sale.warehouse?? '',
-        role: sale.role?? '',
-        status: sale.status?? '',
-        qrCodeImage: sale.qrCodeImage?? '',
+        tel: sale.tel ?? '',
+        zone: sale.zone ?? '',
+        area: sale.area ?? '',
+        warehouse: sale.warehouse ?? '',
+        role: sale.role ?? '',
+        status: sale.status ?? '',
+        qrCodeImage: sale.qrCodeImage ?? '',
         period: period(),
         image: '',
         typeTruck: sale.typeTruck ?? '',
@@ -1127,8 +1127,6 @@ exports.getZone = async (req, res) => {
       }
     ]);
 
-
-
     res.status(200).json({
       status: 200,
       message: 'sucess',
@@ -1145,6 +1143,39 @@ exports.getZone = async (req, res) => {
       error: error.message || error.toString(), // ✅ ป้องกัน circular object
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
+  }
+}
+
+
+
+exports.getZoneCredit = async (req, res) => {
+  try {
+
+    const userCredit = await getZoneCredit()
+    // console.log('userCredit',userCredit)
+    userData = userCredit.map(item => {
+      return {
+        zone: item.code_zone
+      }
+    })
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: userData
+    })
+
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+
   }
 }
 
@@ -1281,11 +1312,75 @@ exports.updateUserPcToPromotionStore = async (req, res) => {
     }
 
     res.status(201).json({
-      status:201,
-      message:'updateUserPcToPromotionStore success',
-      data:dataPromotionStore
+      status: 201,
+      message: 'updateUserPcToPromotionStore success',
+      data: dataPromotionStore
     })
 
+
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+}
+
+exports.getAreaCredit = async (req, res) => {
+  try {
+
+    const { role, platformType, zone, team } = req.body
+
+
+    const userCredit = await getAreaCredit(zone, team)
+    // console.log('userCredit',userCredit)
+    const userData = userCredit.map(item => {
+      return {
+        area: item.area,
+        team: item.team
+      }
+    })
+
+    res.status(200).json({
+      status: 200,
+      message: 'getAreaCredit',
+      data: userData
+    })
+
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+}
+
+exports.getTeamCredit = async (req, res) => {
+  try {
+
+    const { zone, platformType } = req.query
+
+    const dataCredit = await getTeamCredit(zone)
+
+    const data = [...new Set(dataCredit.map(item => item.team))].map(team => (
+      {
+        saleTeam: team
+      }
+    ))
+
+    res.status(200).json({
+      status: 200,
+      message: "sucess",
+      data: data
+    })
 
   } catch (error) {
     console.error('❌ Error:', error)

@@ -58,7 +58,10 @@ const {
   autoLockRouteChange,
   getSaleOutRoute,
   getCurrentRouteLock,
-  updateSaleOutRoute
+  updateSaleOutRoute,
+  getStoreCheckinByDayAreaCredit,
+  polylineRouteCredit,
+  getRouteEffectiveByDayAreaCredit
 } = require('../../controllers/route/routeControllerV2')
 
 const router = express.Router()
@@ -100,6 +103,7 @@ router.post('/deleteStoreToRouteChange', deleteStoreToRouteChange)
 router.post('/addRouteChangeToRoute', addRouteChangeToRoute)
 router.post('/addTargetRoute', addTargetRoute)
 router.post('/getRouteEffectiveByDay', getRouteEffectiveByDayArea)
+router.post('/getRouteEffectiveByDayCredit', getRouteEffectiveByDayAreaCredit)
 router.get('/getCurrentRouteLock', getCurrentRouteLock)
 router.get('/getRouteChange', getRouteChange)
 router.post('/addNewStoreToRoute', addNewStoreToRoute)
@@ -110,8 +114,12 @@ router.get('/getAreaApproval', getAreaApproval)
 router.post('/approveRouteChange', approveRouteChange)
 router.post('/addOrderToRoute', addOrderToRoute)
 router.post('/getStoreCheckinByDayArea', getStoreCheckinByDayArea)
+router.post('/getStoreCheckinByDayAreaCredit', getStoreCheckinByDayAreaCredit)
 router.get('/getRouteSetting', getRouteSetting)
 router.get('/getRouteLock', getRouteLock)
+router.get('/polylineRouteCredit', polylineRouteCredit)
+
+
 
 router.post('/updateAreaByDataRoute', updateAreaByDataRoute)
 router.post('/addRouteSettings', addRouteSettings)
