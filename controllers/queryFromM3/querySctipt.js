@@ -1778,7 +1778,7 @@ exports.getTeamCredit = async function (zone) {
 
 
 
-exports.getAreaCredit = async function () {
+exports.getAreaCredit = async function (zone, team) {
 
   const config = {
     host: process.env.MY_SQL_SERVER,
@@ -1790,9 +1790,16 @@ exports.getAreaCredit = async function () {
   const connection = await mysql.createConnection(config)
 
   try {
+
+    let where = `where channel ='CR' and zone = '${zone}' `
+
+    if (team) {
+      where += `and team = '${team}'`
+    }
+
     const query = `
-      SELECT * 
-      FROM c_area
+      SELECT * FROM forecast_area
+      ${where}
     `
 
     const [rows] = await connection.execute(query)

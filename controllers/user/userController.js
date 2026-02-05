@@ -1333,12 +1333,15 @@ exports.updateUserPcToPromotionStore = async (req, res) => {
 exports.getAreaCredit = async (req, res) => {
   try {
 
-    const userCredit = await getAreaCredit()
+    const { role, platformType, zone, team } = req.body
+
+
+    const userCredit = await getAreaCredit(zone, team)
     // console.log('userCredit',userCredit)
     const userData = userCredit.map(item => {
       return {
-        area: item.id_area,
-        team: ''
+        area: item.area,
+        team: item.team
       }
     })
 
@@ -1367,11 +1370,11 @@ exports.getTeamCredit = async (req, res) => {
 
     const dataCredit = await getTeamCredit(zone)
 
-    const data = dataCredit.map(item => {
-      return {
-        saleTeam: item.team
+    const data = [...new Set(dataCredit.map(item => item.team))].map(team => (
+      {
+        saleTeam: team
       }
-    })
+    ))
 
     res.status(200).json({
       status: 200,
