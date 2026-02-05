@@ -12,7 +12,7 @@ const bcrypt = require('bcrypt')
 const axios = require('axios')
 const userModel = require('../../models/cash/user')
 const { getModelsByChannel } = require('../../middleware/channel')
-const { userQuery, userQueryFilter, userQueryManeger, userQueryOne, userPcSample, getZoneCredit, getAreaCredit } = require('../../controllers/queryFromM3/querySctipt');
+const { userQuery, userQueryFilter, userQueryManeger, userQueryOne, userPcSample, getZoneCredit, getAreaCredit, getTeamCredit } = require('../../controllers/queryFromM3/querySctipt');
 const user = require('../../models/cash/user');
 const { getSocket } = require('../../socket')
 const { encrypt, decrypt } = require('../../middleware/authen');
@@ -1346,6 +1346,37 @@ exports.getAreaCredit = async (req, res) => {
       status: 200,
       message: 'getAreaCredit',
       data: userData
+    })
+
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+}
+
+exports.getTeamCredit = async (req, res) => {
+  try {
+
+    const { zone, platformType } = req.query
+
+    const dataCredit = await getTeamCredit(zone)
+
+    const data = dataCredit.map(item => {
+      return {
+        saleTeam: item.team
+      }
+    })
+
+    res.status(200).json({
+      status: 200,
+      message: "sucess",
+      data: data
     })
 
   } catch (error) {
