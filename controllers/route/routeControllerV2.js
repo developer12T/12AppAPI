@@ -6,7 +6,8 @@ const {
   periodNew,
   previousPeriod,
   generateDates,
-  toThaiTime
+  toThaiTime,
+  rangeDate
 } = require('../../utilities/datetime')
 // const { Store } = require('../../models/cash/store')
 const { uploadFilesCheckin } = require('../../utilities/upload')
@@ -1012,8 +1013,8 @@ exports.polylineRouteCredit = async (req, res) => {
 
     if (dataCredit.length === 0) {
       return res.status(404).json({
-        status:404,
-        message:'not found dataCredit',
+        status: 404,
+        message: 'not found dataCredit',
       })
     }
 
@@ -1056,6 +1057,35 @@ exports.polylineRouteCredit = async (req, res) => {
       message: 'success',
       data: data
     })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: 500, message: 'Internal server error' })
+  }
+}
+
+exports.getRouteEffectiveByDayAreaCredit = async (req, res) => {
+  try {
+    const { area, zone, team, period } = req.body
+
+    const { startDate, endDate } = rangeDate(period)
+
+    const dataCredit = await getRouteCreditArea('', area, 'period', startDate, endDate, period)
+
+    for (row in dataCredit) {
+
+    }
+
+
+
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'getRouteEffectiveByDayAreaCredit',
+      data: dataCredit
+    })
+
+
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: 500, message: 'Internal server error' })

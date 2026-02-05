@@ -587,7 +587,7 @@ exports.addFromERPnew = async (req, res) => {
      * 1) group ข้อมูลจาก ERP
      * --------------------------------------*/
     const return_arr = []
-
+    let routeIdList = []
     for (const row of result) {
       const area = String(row.area ?? '').trim()
       const id = String(row.id ?? '').trim()
@@ -670,6 +670,8 @@ exports.addFromERPnew = async (req, res) => {
 
         const team = storeList.area.slice(0, 2) + storeList.area.charAt(3)
         const zone = storeList.area.slice(0, 2)
+
+        routeIdList.push(storeList.id)
 
         await Route.create({
           id: storeList.id,

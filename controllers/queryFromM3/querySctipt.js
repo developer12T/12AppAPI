@@ -1,7 +1,14 @@
 const sql = require('mssql')
 const mysql = require('mysql2/promise')
 require('dotenv').config()
-
+const {
+  period,
+  periodNew,
+  previousPeriod,
+  generateDates,
+  toThaiTime,
+  rangeDate
+} = require('../../utilities/datetime')
 exports.userQuery = async function (channel) {
   const config = {
     user: process.env.MS_SQL_USER,
@@ -1813,7 +1820,7 @@ exports.getAreaCredit = async function (zone, team) {
   }
 }
 
-exports.getRouteCreditArea = async function (date, area, type, startDate, endDate) {
+exports.getRouteCreditArea = async function (date, area, type, startDate, endDate, period) {
   const year = date.slice(6, 10) // "2025"
   const month = date.slice(3, 5) // "09"
   const day = date.slice(0, 2)
@@ -1870,6 +1877,29 @@ exports.getRouteCreditArea = async function (date, area, type, startDate, endDat
         order by check_in
       `
       }
+
+    } else if (type === 'period') {
+
+      function toMySQLThaiDateTime(date) {
+        return new Date(date)
+          .toLocaleString('sv-SE', { timeZone: 'Asia/Bangkok' })
+          .replace('T', ' ')
+      }
+
+      const { startDate, endDate } = rangeDate(period)
+
+      const startDateSQL = toMySQLThaiDateTime(startDate)
+      const endDateSQL = toMySQLThaiDateTime(endDate)
+
+      query = `
+        SELECT *
+        FROM report_visit
+        WHERE check_in >= '${startDateSQL}'
+          AND check_in <  '${endDateSQL}'
+          AND area = '${area}'
+        ORDER BY check_in
+      `
+
 
     }
 
