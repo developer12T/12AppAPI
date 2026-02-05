@@ -300,6 +300,22 @@ exports.checkout = async (req, res) => {
         period: period,
         area: area
       })
+
+      const withdrawData = await Withdraw.findOne({
+        Des_Area: area,
+        ZType: 'T04',
+        newTrip: newtrip
+      })
+
+      if (withdrawData) {
+        newOrder.fromWarehouse = withdrawData.WH
+        newOrder.shippingId = withdrawData.Des_No
+        newOrder.shippingRoute = withdrawData.ROUTE
+        newOrder.shippingName = withdrawData.name
+      }
+
+
+
       newOrder.newTrip = 'true'
       if (getNpd) {
         if (getNpd.isReceived == 'false') {
@@ -1784,7 +1800,7 @@ exports.approveWithdraw = async (req, res) => {
     let statusStr = status === true ? 'approved' : 'rejected'
     let statusThStr = status === true ? 'อนุมัติ' : 'ไม่อนุมัติ'
 
-    
+
     const now = Date.now()
     const lastUpdate = withdrawTimestamps[orderId] || 0
     const ONE_MINUTE = 15 * 1000
