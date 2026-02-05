@@ -1892,7 +1892,7 @@ exports.getRouteCreditArea = async function (date, area, type, startDate, endDat
       const endDateSQL = toMySQLThaiDateTime(endDate)
 
       query = `
-        SELECT *
+        SELECT *,DATE_FORMAT(check_in, '%d-%m-%Y') AS check_in_date
         FROM report_visit
         WHERE check_in >= '${startDateSQL}'
           AND check_in <  '${endDateSQL}'
