@@ -12,7 +12,7 @@ const bcrypt = require('bcrypt')
 const axios = require('axios')
 const userModel = require('../../models/cash/user')
 const { getModelsByChannel } = require('../../middleware/channel')
-const { userQuery, userQueryFilter, userQueryManeger, userQueryOne, userPcSample, getZoneCredit,getAreaCredit } = require('../../controllers/queryFromM3/querySctipt');
+const { userQuery, userQueryFilter, userQueryManeger, userQueryOne, userPcSample, getZoneCredit, getAreaCredit } = require('../../controllers/queryFromM3/querySctipt');
 const user = require('../../models/cash/user');
 const { getSocket } = require('../../socket')
 const { encrypt, decrypt } = require('../../middleware/authen');
@@ -1107,38 +1107,25 @@ exports.getArea = async (req, res) => {
 
 exports.getZone = async (req, res) => {
   try {
-    const channel = req.headers['x-channel'];
     const { role } = req.body
+    const channel = 'user'
     const { User } = getModelsByChannel(channel, res, userModel);
     let match = { role };
-    let userData = []
-    if (channel === 'cash') {
-      userData = await User.aggregate([
-        { $match: match },
-        {
-          $group: {
-            _id: "$zone"
-          }
-        },
-        {
-          $project: {
-            _id: 0,
-            zone: "$_id"
-          }
+
+    const userData = await User.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: "$zone"
         }
-      ]);
-    } else if (channel === 'credit') {
-      const userCredit = await getZoneCredit()
-      // console.log('userCredit',userCredit)
-      userData = userCredit.map(item => {
-        return {
-          zone:item.id_zone
+      },
+      {
+        $project: {
+          _id: 0,
+          zone: "$_id"
         }
-      })
-    }
-
-
-
+      }
+    ]);
 
     res.status(200).json({
       status: 200,
@@ -1156,6 +1143,39 @@ exports.getZone = async (req, res) => {
       error: error.message || error.toString(), // ✅ ป้องกัน circular object
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
+  }
+}
+
+
+
+exports.getZoneCredit = async (req, res) => {
+  try {
+
+    const userCredit = await getZoneCredit()
+    // console.log('userCredit',userCredit)
+    userData = userCredit.map(item => {
+      return {
+        zone: item.id_zone
+      }
+    })
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'sucess',
+      data: userData
+    })
+
+  } catch (error) {
+    console.error('❌ Error:', error)
+
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(), // ✅ ป้องกัน circular object
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+
   }
 }
 
@@ -1310,26 +1330,26 @@ exports.updateUserPcToPromotionStore = async (req, res) => {
   }
 }
 
-exports.getAreaCredit = async (req ,res) => {
- try {
-  
-      const userCredit = await getAreaCredit()
-      // console.log('userCredit',userCredit)
-      const userData = userCredit.map(item => {
-        return {
-          area:item.id_area,
-          team:''
-        }
-      })
+exports.getAreaCredit = async (req, res) => {
+  try {
 
-      res.status(200).json({
-        status:200,
-        message:'getAreaCredit',
-        data:userData
-      })
+    const userCredit = await getAreaCredit()
+    // console.log('userCredit',userCredit)
+    const userData = userCredit.map(item => {
+      return {
+        area: item.id_area,
+        team: ''
+      }
+    })
 
- } catch (error) {
-      console.error('❌ Error:', error)
+    res.status(200).json({
+      status: 200,
+      message: 'getAreaCredit',
+      data: userData
+    })
+
+  } catch (error) {
+    console.error('❌ Error:', error)
 
     res.status(500).json({
       status: 500,
@@ -1337,5 +1357,5 @@ exports.getAreaCredit = async (req ,res) => {
       error: error.message || error.toString(), // ✅ ป้องกัน circular object
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
- }
+  }
 }
