@@ -3485,18 +3485,58 @@ exports.addStoreOneToRoute = async (req, res) => {
   try {
     const { storeId, routeId } = req.body
     const channel = req.headers['x-channel']
-    const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
-    const storeData = await Store.findOne({ storeId: storeId })
+    if (!Array.isArray(storeId) || storeId.length === 0) {
+      return res.status(400).json({
+        status: 400,
+        message: 'storeId must be a non-empty array, e.g. ["IT228001", "IT228002"]'
+      })
+    }
 
-    for (const i of routeId) {
-      const routeData = await Route.findOne({ id: i }) // ถ้า id เป็น unique
+    const storeIdUnique = [...new Set(storeId)]
 
-      if (!routeData) continue // ตรวจสอบว่ามีข้อมูลจริง
+    const storeData = await Store.find({ storeId: { $in: storeIdUnique } })
+    if (storeData.length !== storeIdUnique.length) {
+      const foundIds = storeData.map(s => s.storeId)
+      const missingIds = storeIdUnique.filter(id => !foundIds.includes(id))
 
-      const newData = {
-        storeInfo: storeData._id,
+      return res.status(404).json({
+        status: 404,
+        message: 'Some storeId not found',
+        missingStore: missingIds
+      })
+    }
+
+    const routeData = await Route.findOne({ id: routeId })
+    if (!routeData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found routeId'
+      })
+    }
+
+    const storeListOBJ = routeData.listStore.flatMap(item => item.storeInfo)
+    const storeInRoute = await Store.find({ _id: { $in: storeListOBJ } }).select('storeId')
+    const storeIdSet = new Set(storeInRoute.map(item => item.storeId))
+
+    const dupStore = storeIdUnique.filter(id => storeIdSet.has(id))
+    if (dupStore.length > 0) {
+      return res.status(409).json({
+        status: 409,
+        message: 'Duplicate store in route',
+        duplicatedStore: dupStore
+      })
+    }
+
+    // เก็บ store สำหรับ RouteSetting
+    const routeSettingStores = []
+
+    for (const item of storeData) {
+      // เพิ่มเข้า route
+      routeData.listStore.push({
+        storeInfo: item._id,
         note: '',
         image: '',
         latitude: '',
@@ -3505,26 +3545,44 @@ exports.addStoreOneToRoute = async (req, res) => {
         statusText: 'รอเยี่ยม',
         listOrder: [],
         date: ''
-      }
+      })
 
-      routeData.listStore.push(newData)
-
-      await routeData.save() // สำคัญ: บันทึกกลับเข้า MongoDB
+      // เตรียมข้อมูลสำหรับ RouteSetting
+      routeSettingStores.push({
+        storeId: item.storeId,
+        storeInfo: item._id.toString(),
+        lock: true
+      })
     }
+
+    // ✅ update RouteSetting ครั้งเดียว
+    await RouteSetting.updateOne(
+      { period: routeData.period, area: routeData.area },
+      {
+        $addToSet: {
+          'lockRoute.$[route].listStore': { $each: routeSettingStores }
+        }
+      },
+      {
+        arrayFilters: [{ 'route.id': routeId }]
+      }
+    )
+
+    // ✅ save route ครั้งเดียว
+    await routeData.save()
 
     res.status(200).json({
       status: 200,
-      message: 'sucess'
-      // data: newData
+      message: 'success',
+      totalAdded: storeData.length,
+      data: routeData
     })
   } catch (error) {
     console.error('❌ Error:', error)
-
     res.status(500).json({
       status: 500,
       message: 'error from server',
-      error: error.message || error.toString(), // ✅ ป้องกัน circular object
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+      error: error.message
     })
   }
 }
