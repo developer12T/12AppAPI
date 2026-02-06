@@ -71,28 +71,28 @@ const path = require('path')
 const { v4: uuidv4 } = require('uuid')
 const { rangeDate } = require('../../utilities/datetime')
 
-const storeTimestamps = {}
+// const storeTimestamps = {}
 
 exports.updateStoreStatusV2 = async (req, res) => {
     try {
         const { storeId, status, user } = req.body
 
-        const now = Date.now()
-        const lastUpdate = storeTimestamps[storeId] || 0
-        const ONE_MINUTE = 30 * 1000
+        // const now = Date.now()
+        // const lastUpdate = storeTimestamps[storeId] || 0
+        // const ONE_MINUTE = 30 * 1000
 
-        if (now - lastUpdate < ONE_MINUTE) {
-            return res.status(429).json({
-                status: 429,
-                message:
-                    'This order was updated less than 30 sec ago. Please try again later!'
-            })
-        }
-        storeTimestamps[storeId] = now
+        // if (now - lastUpdate < ONE_MINUTE) {
+        //     return res.status(429).json({
+        //         status: 429,
+        //         message:
+        //             'This order was updated less than 30 sec ago. Please try again later!'
+        //     })
+        // }
+        // storeTimestamps[storeId] = now
 
-        setTimeout(() => {
-            delete storeTimestamps[storeId]
-        }, ONE_MINUTE)
+        // setTimeout(() => {
+        //     delete storeTimestamps[storeId]
+        // }, ONE_MINUTE)
 
         const channel = req.headers['x-channel']
         const { RunningNumber, Store } = getModelsByChannel(
@@ -1023,6 +1023,105 @@ exports.approveRequestStoreUpdate = async (req, res) => {
             status: 200,
             message: 'Approved'
         })
+    } catch (error) {
+        console.error(error)
+        res.status(500).json({
+            status: 500,
+            message: 'Server error'
+        })
+    }
+}
+
+exports.getBk228OldStore = async (req, res) => {
+    try {
+        const channel = req.headers['x-channel']
+        const { Store } = getModelsByChannel(channel, res, storeModel)
+
+        const dateLimit = new Date('2026-01-02T00:00:00+07:00')
+
+        const [dataBk228, dataAll] = await Promise.all([
+            Store.find(
+                { area: 'BK228', createdAt: { $lt: dateLimit } },
+                'storeId name date province'
+            ).lean(),
+            Store.find(
+                { area: { $ne: 'BK228' }, createdAt: { $lt: dateLimit } },
+                'storeId name date province area'
+            ).lean()
+        ])
+
+        // -------- helper --------
+        const normalize = v => (v ?? '').toString().trim()
+        const normalizeDate = d =>
+            d instanceof Date ? d.toISOString().slice(0, 10) : normalize(d)
+
+        const buildKey = o =>
+            [
+                normalize(o.name),
+                normalizeDate(o.date),
+                normalize(o.province)
+            ].join('|')
+
+        // -------- build map --------
+        const allMap = new Map()
+        for (const u of dataAll) {
+            allMap.set(buildKey(u), u)
+        }
+
+        const data = []
+        const missing = []
+
+        // -------- single loop --------
+        for (const item of dataBk228) {
+            const key = buildKey(item)
+            const exitsStore = allMap.get(key)
+
+            if (!exitsStore) {
+                missing.push({
+                    storeId: item.storeId,
+                    name: item.name,
+                    date: item.date,
+                    province: item.province
+                })
+                continue
+            }
+
+            data.push({
+                StoreIDBk228: item.storeId,
+                storeOld: exitsStore.storeId,
+                areaOld: exitsStore.area
+            })
+        }
+
+        const wb = xlsx.utils.book_new()
+        const ws = xlsx.utils.json_to_sheet(data)
+        xlsx.utils.book_append_sheet(wb, ws, `sheet`)
+
+        const tempPath = path.join(os.tmpdir(), `OldBk228.xlsx`)
+        xlsx.writeFile(wb, tempPath)
+
+        res.download(tempPath, `OldBk228.xlsx`, err => {
+            if (err) {
+                console.error('❌ Download error:', err)
+                // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+                if (!res.headersSent) {
+                    res.status(500).send('Download failed')
+                }
+            }
+
+            // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+            fs.unlink(tempPath, () => { })
+        })
+
+
+
+
+        // res.status(200).json({
+        //     status: 200,
+        //     message: 'getBk228OldStore',
+        //     data,
+        //     missing
+        // })
     } catch (error) {
         console.error(error)
         res.status(500).json({

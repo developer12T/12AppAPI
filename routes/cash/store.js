@@ -80,7 +80,8 @@ const {
   addStorePcToCash,
   updateStoreRouteAreaFromM3,
   requestStoreUpdate,
-  approveRequestStoreUpdate
+  approveRequestStoreUpdate,
+  getBk228OldStore
 } = require('../../controllers/store/storeControllerV2')
 
 
@@ -130,6 +131,7 @@ router.post('/fixStatusStore', fixStatusStore)
 router.post('/updateStatusM3ToMongo', updateStatusM3ToMongo)
 router.post('/getPendingStore', getPendingStore)
 router.post('/addStoreFromM3', addStoreFromM3)
+router.post('/getBk228OldStore', getBk228OldStore)
 // router.get('/test', test)
 
 router.post('/addCallCard', addCallCard)
