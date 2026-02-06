@@ -1,7 +1,14 @@
 const sql = require('mssql')
 const mysql = require('mysql2/promise')
 require('dotenv').config()
-
+const {
+  period,
+  periodNew,
+  previousPeriod,
+  generateDates,
+  toThaiTime,
+  rangeDate
+} = require('../../utilities/datetime')
 exports.userQuery = async function (channel) {
   const config = {
     user: process.env.MS_SQL_USER,
@@ -1731,8 +1738,9 @@ exports.getZoneCredit = async function () {
 
   try {
     const query = `
-      SELECT * 
-      FROM c_zone
+            SELECT *
+      FROM forecast_zone
+      WHERE channel_code ='CR'
     `
 
     const [rows] = await connection.execute(query)
@@ -1746,7 +1754,8 @@ exports.getZoneCredit = async function () {
   }
 }
 
-exports.getAreaCredit = async function () {
+
+exports.getTeamCredit = async function (zone) {
 
   const config = {
     host: process.env.MY_SQL_SERVER,
@@ -1759,8 +1768,8 @@ exports.getAreaCredit = async function () {
 
   try {
     const query = `
-      SELECT * 
-      FROM c_area
+            SELECT * FROM forecast_area
+              where channel ='CR' and zone = '${zone}'
     `
 
     const [rows] = await connection.execute(query)
@@ -1774,7 +1783,44 @@ exports.getAreaCredit = async function () {
   }
 }
 
-exports.getRouteCreditArea = async function (date, area, type, startDate, endDate) {
+
+
+exports.getAreaCredit = async function (zone, team) {
+
+  const config = {
+    host: process.env.MY_SQL_SERVER,
+    user: process.env.MY_SQL_USER,
+    password: process.env.MY_SQL_PASSWORD,
+    database: process.env.MY_SQL_DATABASE
+  }
+
+  const connection = await mysql.createConnection(config)
+
+  try {
+
+    let where = `where channel ='CR' and zone = '${zone}' `
+
+    if (team) {
+      where += `and team = '${team}'`
+    }
+
+    const query = `
+      SELECT * FROM forecast_area
+      ${where}
+    `
+
+    const [rows] = await connection.execute(query)
+
+    return rows
+  } catch (err) {
+    console.error('MySQL error:', err)
+    throw err
+  } finally {
+    await connection.end() // ⭐ สำคัญมาก
+  }
+}
+
+exports.getRouteCreditArea = async function (date, area, type, startDate, endDate, period) {
   const year = date.slice(6, 10) // "2025"
   const month = date.slice(3, 5) // "09"
   const day = date.slice(0, 2)
@@ -1831,6 +1877,29 @@ exports.getRouteCreditArea = async function (date, area, type, startDate, endDat
         order by check_in
       `
       }
+
+    } else if (type === 'period') {
+
+      function toMySQLThaiDateTime(date) {
+        return new Date(date)
+          .toLocaleString('sv-SE', { timeZone: 'Asia/Bangkok' })
+          .replace('T', ' ')
+      }
+
+      const { startDate, endDate } = rangeDate(period)
+
+      const startDateSQL = toMySQLThaiDateTime(startDate)
+      const endDateSQL = toMySQLThaiDateTime(endDate)
+
+      query = `
+        SELECT *,DATE_FORMAT(check_in, '%d-%m-%Y') AS check_in_date
+        FROM report_visit
+        WHERE check_in >= '${startDateSQL}'
+          AND check_in <  '${endDateSQL}'
+          AND area = '${area}'
+        ORDER BY check_in
+      `
+
 
     }
 

@@ -6,7 +6,8 @@ const {
   periodNew,
   previousPeriod,
   generateDates,
-  toThaiTime
+  toThaiTime,
+  rangeDate
 } = require('../../utilities/datetime')
 // const { Store } = require('../../models/cash/store')
 const { uploadFilesCheckin } = require('../../utilities/upload')
@@ -1005,15 +1006,25 @@ exports.getStoreCheckinByDayAreaCredit = async (req, res) => {
 exports.polylineRouteCredit = async (req, res) => {
   try {
     const { area, period, startDate, endDate } = req.query
-    const dataCredit = await getRouteCreditArea('', area, 'start', startDate, endDate)
+    let dataCredit = []
+    if (startDate, endDate) {
+
+      dataCredit = await getRouteCreditArea('', area, 'start', startDate, endDate)
+    } else {
+
+      dataCredit = await getRouteCreditArea('', area, 'period', '', '', period)
+    }
+
+
+
     const storeList = dataCredit.flatMap(item => item.cus_code)
     const storeUnique = [...new Set(storeList)]
     const storeDetail = await getStoreDetailCredit(storeUnique)
 
     if (dataCredit.length === 0) {
       return res.status(404).json({
-        status:404,
-        message:'not found dataCredit',
+        status: 404,
+        message: 'not found dataCredit',
       })
     }
 
@@ -1056,6 +1067,95 @@ exports.polylineRouteCredit = async (req, res) => {
       message: 'success',
       data: data
     })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: 500, message: 'Internal server error' })
+  }
+}
+
+exports.getRouteEffectiveByDayAreaCredit = async (req, res) => {
+  try {
+    const { area, zone, team, period } = req.body
+
+    const { startDate, endDate } = rangeDate(period)
+
+    const dataCredit = await getRouteCreditArea('', area, 'period', '', '', period)
+
+    const listDate = [...new Set(dataCredit.flatMap(item => item.check_in_date))]
+
+    let data = []
+
+    let totalStoreCheckIn = 0
+    let totalStoreSell = 0
+    let totalStoreVisit = 0
+    let totalStoreNotSell = 0
+    let totalStorePending = 0
+
+    for (const row of listDate) {
+
+      let storeCheckIn = 0
+      let storeSell = 0
+      let storeVisit = 0
+      let storeNotSell = 0
+      let storePending = 0
+      const groupDate = dataCredit.filter(item => item.check_in_date === row)
+
+      for (const item of groupDate) {
+        let status = 0
+        let statusText = 0
+        if (!item.cono || item.cono === '-' || item.cono === '') {
+          status = '2'
+          statusText = 'ไม่ซิ้อ'
+        } else {
+          status = '3'
+          statusText = 'ซิ้อ'
+        }
+
+        if (status === '3') storeSell++, totalStoreSell++
+        if (status === '2') storeNotSell++, totalStoreNotSell++
+        totalStoreCheckIn++
+        totalStoreVisit++
+        storeCheckIn++
+        storeVisit++
+
+      }
+      const dataTran = {
+        storeCheckIn: storeCheckIn,
+        storeSell: storeSell,
+        storeVisit: storeVisit,
+        storeNotSell: storeNotSell,
+        storePending: storePending,
+        day: row,
+        period: period,
+        area: area
+      }
+
+      data.push(dataTran)
+
+    }
+
+    const total = {
+      day: 'Total',
+      period: period,
+      area: area,
+      storeCheckIn: totalStoreCheckIn,
+      storeSell: totalStoreSell,
+      storeVisit: totalStoreVisit,
+      storeNotSell: totalStoreNotSell,
+      storePending: totalStorePending,
+
+    }
+
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'getRouteEffectiveByDayAreaCredit',
+      data: data,
+      total
+    })
+
+
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: 500, message: 'Internal server error' })
