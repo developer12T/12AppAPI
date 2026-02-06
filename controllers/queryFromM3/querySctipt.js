@@ -1798,14 +1798,17 @@ exports.getAreaCredit = async function (zone, team) {
 
   try {
 
-    let where = `where channel ='CR' and zone = '${zone}' `
+    let where = `where area like '%${zone}%' `
 
     if (team) {
-      where += `and team = '${team}'`
+      where += `
+      and LEFT(area, 2) = '${team.slice(0, 2)}'
+      AND SUBSTRING(area, 3, 1) = '${team.slice(2, 3)}'
+        `
     }
 
     const query = `
-      SELECT * FROM forecast_area
+      SELECT distinct area FROM report_visit
       ${where}
     `
 
