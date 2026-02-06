@@ -20,6 +20,8 @@ const { period } = require('../../utilities/datetime')
 const xlsx = require('xlsx')
 const os = require('os')
 const approveLogModel = require('../../models/cash/approveLog')
+const userModel = require('../../models/cash/user')
+const skufocusModel = require('../../models/cash/skufocus')
 
 exports.getProductAll = async (req, res) => {
   try {
@@ -177,7 +179,6 @@ exports.getProduct = async (req, res) => {
 
         if (area === 'BK228') {
           filter.brand = 'เติมทิพ'
-
         }
 
         // console.log("filter", filter)
@@ -236,10 +237,8 @@ exports.getProduct = async (req, res) => {
           { allowDiskUse: true }
         )
       } else {
-
         if (area === 'BK228') {
           filter.brand = 'เติมทิพ'
-
         }
         // console.log("filter", filter)
         products = await Product.find(filter).lean()
@@ -392,7 +391,7 @@ exports.getFilters = async (req, res) => {
       sensitivity: 'base'
     })
 
-    function cleanList(list) {
+    function cleanList (list) {
       const arr = Array.isArray(list) ? list : []
       const filtered = arr
         .map(v => (typeof v === 'string' ? v.trim() : v))
@@ -404,7 +403,7 @@ exports.getFilters = async (req, res) => {
 
     const firstAttr = attributes[0] ?? {} // ปลอดภัยกว่า attributes.length เช็คทีเดียว
 
-    function sortSizesAscGFirst(list) {
+    function sortSizesAscGFirst (list) {
       const UNIT_PRIORITY = { G: 0, KG: 1, L: 2 } // อยากให้ L ไปท้ายสุดกว่าก็ปรับเลขได้
       const coll = new Intl.Collator('th-TH', {
         numeric: true,
@@ -532,7 +531,9 @@ exports.updateStatus = async (req, res) => {
         .status(400)
         .json({ status: '400', message: 'id, type, status are required!' })
     }
+
     let product = {}
+
     if (type === 'sale') {
       product = await Product.findOneAndUpdate(
         { id },
@@ -1574,7 +1575,7 @@ exports.productCheckPrice = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       })
     } else {
       res.status(200).json({
@@ -1659,7 +1660,6 @@ exports.getProductPage = async (req, res) => {
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Stock } = getModelsByChannel(channel, res, stockModel)
 
-
     // -------------------------------
     // Utility
     // -------------------------------
@@ -1726,7 +1726,6 @@ exports.getProductPage = async (req, res) => {
       filter.$and = andConditions
     }
 
-
     if (query && String(query).trim()) {
       const q = String(query).trim()
       const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') // escape + i
@@ -1759,7 +1758,6 @@ exports.getProductPage = async (req, res) => {
     // -------------------------------
     if (area === 'BK228') {
       filter.brand = 'เติมทิพ'
-
     }
     let rawProducts = await Product.find(filter).sort({ sizeNumber: 1 }).lean()
     // console.log('filter', filter)
@@ -1809,7 +1807,6 @@ exports.getProductPage = async (req, res) => {
       const endIndex = startIndex + perPage
       products = rawProducts.slice(startIndex, endIndex)
     }
-
 
     // console.log("products",products)
 
@@ -1885,6 +1882,95 @@ exports.getProductPage = async (req, res) => {
   }
 }
 
+exports.addskufocus = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { zone, listProduct, target, period } = req.body
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { SkuFocus } = getModelsByChannel(channel, res, skufocusModel)
+
+    // 1️⃣ หา user ตาม zone
+    const users = await User.find({
+      zone: { $in: zone },
+      area: { $ne: '' }
+    })
+      .select('area')
+      .lean()
+
+    const areas = [...new Set(users.map(u => u.area))]
+    if (!areas.length) {
+      return res.json({ message: 'ไม่พบ area ใน zone ที่ส่งมา' })
+    }
+
+    // 2️⃣ ดึง product ตาม listProduct
+    const products = await Product.find({
+      id: { $in: listProduct }
+    }).lean()
+
+    if (!products.length) {
+      return res.json({ message: 'ไม่พบสินค้าใน Product' })
+    }
+
+    // 3️⃣ เตรียม bulk operations
+    const bulkOps = []
+
+    for (const area of areas) {
+      for (const p of products) {
+        bulkOps.push({
+          updateOne: {
+            filter: {
+              area,
+              target,
+              period,
+              'listProduct.id': { $ne: p.id } // ❗ กันซ้ำ
+            },
+            update: {
+              $push: {
+                listProduct: {
+                  id: p.id,
+                  name: p.name,
+                  groupCode: p.groupCode,
+                  group: p.group,
+                  groupCodeM3: p.groupCodeM3,
+                  groupM3: p.groupM3,
+                  brandCode: p.brandCode,
+                  brand: p.brand,
+                  size: p.size,
+                  flavourCode: p.flavourCode,
+                  flavour: p.flavour,
+                  type: p.type,
+                  weightGross: p.weightGross,
+                  weightNet: p.weightNet,
+                  target: target,
+                  statusSale: p.statusSale,
+                  statusWithdraw: p.statusWithdraw,
+                  statusRefund: p.statusRefund,
+                  statusRefundDmg: p.statusRefundDmg
+                }
+              }
+            },
+            upsert: true
+          }
+        })
+      }
+    }
+
+    if (bulkOps.length) {
+      await SkuFocus.bulkWrite(bulkOps)
+    }
+
+    res.json({
+      message: 'เพิ่ม SKU Focus สำเร็จ',
+      areaCount: areas.length,
+      productCount: products.length
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
 exports.addSizeNumber = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
@@ -1918,5 +2004,83 @@ exports.addSizeNumber = async (req, res) => {
   } catch (error) {
     console.error(error)
     res.status(500).json({ status: '501', message: error.message })
+  }
+}
+
+exports.getSkuFocusWithSales = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { area, startDate, endDate } = req.body
+
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { SkuFocus } = getModelsByChannel(channel, res, skufocusModel)
+
+    const start = new Date(`${startDate}T00:00:00.000Z`)
+    const end = new Date(`${endDate}T23:59:59.999Z`)
+
+    // 1️⃣ รวมยอดขายจาก Order
+    const sales = await Order.aggregate([
+      {
+        $match: {
+          'store.area': area,
+          status: { $nin: ['Voided', 'Cancelled'] },
+          createdAt: {
+            $gte: new Date(start),
+            $lte: new Date(end)
+          }
+        }
+      },
+      { $unwind: '$listProduct' },
+      {
+        $group: {
+          _id: {
+            productId: '$listProduct.id',
+            unit: '$listProduct.unit'
+          },
+          qty: { $sum: '$listProduct.qty' },
+          unitName: { $first: '$listProduct.unitName' }
+        }
+      },
+      {
+        $group: {
+          _id: '$_id.productId',
+          sold: {
+            $push: {
+              unit: '$_id.unit',
+              unitName: '$unitName',
+              qty: '$qty'
+            }
+          }
+        }
+      }
+    ])
+
+    // console.log('sales', sales)
+
+    // map ไว้ lookup เร็ว ๆ
+    const saleMap = new Map(sales.map(i => [i._id, i.sold]))
+
+    // 2️⃣ ดึง SkuFocus
+    const skuFocus = await SkuFocus.findOne({ area }).lean()
+
+    if (!skuFocus) {
+      return res.json({ area, listProduct: [] })
+    }
+
+    // 3️⃣ merge ข้อมูล
+    const result = skuFocus.listProduct.map(p => ({
+      ...p,
+      sold: saleMap.get(p.id) || [] // ไม่เคยขาย → []
+    }))
+
+    res.json({
+      area,
+      period: skuFocus.period,
+      target: skuFocus.target,
+      listProduct: result
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ message: error.message })
   }
 }
