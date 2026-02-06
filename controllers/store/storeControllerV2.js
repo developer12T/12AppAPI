@@ -1042,11 +1042,11 @@ exports.getBk228OldStore = async (req, res) => {
         const [dataBk228, dataAll] = await Promise.all([
             Store.find(
                 { area: 'BK228', createdAt: { $lt: dateLimit } },
-                'storeId name date province'
+                'storeId name createdAt province tel type typeName address subDistrict district provinceCode taxId latitude longtitude'
             ).lean(),
             Store.find(
-                { area: { $ne: 'BK228' }, createdAt: { $lt: dateLimit } },
-                'storeId name date province area'
+                { area: { $nin: ['BK228', 'IT211'] }, createdAt: { $lt: dateLimit } },
+                'storeId name createdAt province area tel type address subDistrict district provinceCode taxId latitude longtitude'
             ).lean()
         ])
 
@@ -1055,36 +1055,49 @@ exports.getBk228OldStore = async (req, res) => {
         const normalizeDate = d =>
             d instanceof Date ? d.toISOString().slice(0, 10) : normalize(d)
 
-        const buildKey = o =>
-            [
-                normalize(o.name),
-                normalizeDate(o.date),
-                normalize(o.province)
-            ].join('|')
-
-        // -------- build map --------
-        const allMap = new Map()
-        for (const u of dataAll) {
-            allMap.set(buildKey(u), u)
-        }
+        const isMatch = (a, b) =>
+            normalize(a.name) === normalize(b.name) &&
+            normalizeDate(a.createdAt) === normalizeDate(b.createdAt) &&
+            normalize(a.tel) === normalize(b.tel) &&
+            normalize(a.type) === normalize(b.type) &&
+            normalize(a.address) === normalize(b.address) &&
+            normalize(a.subDistrict) === normalize(b.subDistrict) &&
+            normalize(a.district) === normalize(b.district) &&
+            normalize(a.provinceCode) === normalize(b.provinceCode) &&
+            normalize(a.taxId) === normalize(b.taxId)
 
         const data = []
         const missing = []
+        const multiple = []
 
-        // -------- single loop --------
+        // -------- main loop --------
         for (const item of dataBk228) {
-            const key = buildKey(item)
-            const exitsStore = allMap.get(key)
+            const matches = dataAll.filter(u => isMatch(item, u))
 
-            if (!exitsStore) {
+            if (matches.length === 0) {
                 missing.push({
                     storeId: item.storeId,
                     name: item.name,
-                    date: item.date,
-                    province: item.province
+                    createdAt: item.createdAt
                 })
                 continue
             }
+
+            if (matches.length > 1) {
+                multiple.push({
+                    storeIdBk228: item.storeId,
+                    name: item.name,
+                    count: matches.length,
+                    candidates: matches.map(m => ({
+                        storeId: m.storeId,
+                        area: m.area
+                    }))
+                })
+                continue
+            }
+
+            // ✅ match ได้ 1 ร้านพอดี
+            const exitsStore = matches[0]
 
             data.push({
                 StoreIDBk228: item.storeId,
@@ -1092,35 +1105,72 @@ exports.getBk228OldStore = async (req, res) => {
                 areaOld: exitsStore.area
             })
         }
+        const storeOldCount = new Map()
+
+        for (const row of data) {
+            storeOldCount.set(
+                row.storeOld,
+                (storeOldCount.get(row.storeOld) || 0) + 1
+            )
+        }
+
+
+        const duplicatedStoreOld = []
+
+        for (const [storeOld, count] of storeOldCount.entries()) {
+            if (count > 1) {
+                duplicatedStoreOld.push({
+                    storeOld,
+                    count,
+                    bk228Stores: data
+                        .filter(d => d.storeOld === storeOld)
+                        .map(d => d.StoreIDBk228)
+                })
+            }
+        }
+        console.log('❗ duplicated storeOld:', duplicatedStoreOld.length)
+        console.table(duplicatedStoreOld)
+
 
         const wb = xlsx.utils.book_new()
-        const ws = xlsx.utils.json_to_sheet(data)
-        xlsx.utils.book_append_sheet(wb, ws, `sheet`)
 
-        const tempPath = path.join(os.tmpdir(), `OldBk228.xlsx`)
+        // แปลง data เป็น worksheet
+        const ws = xlsx.utils.json_to_sheet(data)
+
+        // เพิ่ม sheet เข้า workbook
+        xlsx.utils.book_append_sheet(wb, ws, 'sheet')
+
+        // path ไฟล์ชั่วคราว
+        const tempPath = path.join(os.tmpdir(), 'OldBk228.xlsx')
+
+        // เขียนไฟล์
         xlsx.writeFile(wb, tempPath)
 
-        res.download(tempPath, `OldBk228.xlsx`, err => {
+        // ส่งไฟล์ให้ client ดาวน์โหลด
+        res.download(tempPath, 'OldBk228.xlsx', err => {
             if (err) {
                 console.error('❌ Download error:', err)
-                // อย่าพยายามส่ง response ซ้ำถ้า header ถูกส่งแล้ว
+                // อย่าส่ง response ซ้ำถ้า header ถูกส่งไปแล้ว
                 if (!res.headersSent) {
                     res.status(500).send('Download failed')
                 }
             }
 
-            // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
+            // ✅ ลบไฟล์ทิ้งหลังส่งเสร็จ (หรือส่งไม่สำเร็จ)
             fs.unlink(tempPath, () => { })
         })
-
-
 
 
         // res.status(200).json({
         //     status: 200,
         //     message: 'getBk228OldStore',
+        //     totalBk228: dataBk228.length,
+        //     matched: data.length,
+        //     missing: missing.length,
+        //     multiple: multiple.length,
         //     data,
-        //     missing
+        //     missing,
+        //     multiple
         // })
     } catch (error) {
         console.error(error)
