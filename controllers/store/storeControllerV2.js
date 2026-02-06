@@ -71,28 +71,28 @@ const path = require('path')
 const { v4: uuidv4 } = require('uuid')
 const { rangeDate } = require('../../utilities/datetime')
 
-// const storeTimestamps = {}
+const storeTimestamps = {}
 
 exports.updateStoreStatusV2 = async (req, res) => {
     try {
         const { storeId, status, user } = req.body
 
-        // const now = Date.now()
-        // const lastUpdate = storeTimestamps[storeId] || 0
-        // const ONE_MINUTE = 30 * 1000
+        const now = Date.now()
+        const lastUpdate = storeTimestamps[storeId] || 0
+        const ONE_MINUTE = 30 * 1000
 
-        // if (now - lastUpdate < ONE_MINUTE) {
-        //     return res.status(429).json({
-        //         status: 429,
-        //         message:
-        //             'This order was updated less than 30 sec ago. Please try again later!'
-        //     })
-        // }
-        // storeTimestamps[storeId] = now
+        if (now - lastUpdate < ONE_MINUTE) {
+            return res.status(429).json({
+                status: 429,
+                message:
+                    'This order was updated less than 30 sec ago. Please try again later!'
+            })
+        }
+        storeTimestamps[storeId] = now
 
-        // setTimeout(() => {
-        //     delete storeTimestamps[storeId]
-        // }, ONE_MINUTE)
+        setTimeout(() => {
+            delete storeTimestamps[storeId]
+        }, ONE_MINUTE)
 
         const channel = req.headers['x-channel']
         const { RunningNumber, Store } = getModelsByChannel(
