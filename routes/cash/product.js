@@ -24,7 +24,9 @@ const {
   checkPriceProductOrder,
   getProductPage,
   addFromERPFoodtruck,
-  addSizeNumber
+  addSizeNumber,
+  addskufocus,
+  getSkuFocusWithSales
 } = require('../../controllers/product/productController')
 
 const router = express.Router()
@@ -56,4 +58,7 @@ router.post('/checkPriceProductOrder', checkPriceProductOrder)
 router.post('/getProductPage', getProductPage)
 router.post('/addFromERPFoodtruck', addFromERPFoodtruck)
 router.post('/addSizeNumber', addSizeNumber)
+router.post('/addskufocus', addskufocus)
+router.post('/getSkuFocusWithSales', getSkuFocusWithSales)
+
 module.exports = router
