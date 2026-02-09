@@ -257,12 +257,12 @@ exports.updateStoreStatusV2 = async (req, res) => {
                 }
             }
 
-            const orderData = await Order.find({ 'store.storeId': storeId })
+            const orderData = await Order.find({ 'store.storeId': storeId, status: 'waitApprove', 'store.area': item.area })
             if (orderData.length > 0) {
                 for (const row of orderData) {
                     const orderId = await generateOrderId(row.store.area, row.sale.warehouse, channel, res)
                     await Order.findOneAndUpdate(
-                        { 'store.storeId': storeId },
+                        { _id: row._id },
                         {
                             $set: {
                                 'store.storeId': newId,
@@ -361,7 +361,7 @@ exports.updateStoreStatusV2 = async (req, res) => {
                 storeId: item.storeId
             })
         } else {
-            await Store.findOneAndUpdate(
+            const storeNew = await Store.findOneAndUpdate(
                 { _id: store._id },
                 {
                     $set: {
@@ -374,7 +374,8 @@ exports.updateStoreStatusV2 = async (req, res) => {
                 { new: true }
             )
 
-            const orderData = await Order.find({ 'store.storeId': storeId })
+            const orderData = await Order.find({ 'store.storeId': storeId, status: 'waitApprove', 'store.area': storeNew.area })
+
 
             if (orderData.length > 0) {
 
@@ -445,45 +446,44 @@ exports.updateStoreStatusV2 = async (req, res) => {
                 storeId
             })
 
-            if (!existRouteChangeLog) return
 
-            // ลบ store ออกจาก Route
-            await Route.updateOne(
-                {
-                    period: period(),
-                    id: existRouteChangeLog.routeId
-                },
-                {
-                    $pull: {
-                        listStore: {
-                            storeInfo: existRouteChangeLog.storeInfo
+            if (existRouteChangeLog) {
+
+                // ลบ store ออกจาก Route
+                await Route.updateOne(
+                    {
+                        period: period(),
+                        id: existRouteChangeLog.routeId
+                    },
+                    {
+                        $pull: {
+                            listStore: {
+                                storeInfo: existRouteChangeLog.storeInfo
+                            }
                         }
                     }
-                }
-            )
+                )
 
-            // ลบ store ออกจาก RouteSetting
-            await RouteSetting.updateOne(
-                {
-                    period: period(),
-                    area: existRouteChangeLog.area
-                },
-                {
-                    $pull: {
-                        'lockRoute.$[route].listStore': {
-                            storeId: existRouteChangeLog.storeId
+                // ลบ store ออกจาก RouteSetting
+                await RouteSetting.updateOne(
+                    {
+                        period: period(),
+                        area: existRouteChangeLog.area
+                    },
+                    {
+                        $pull: {
+                            'lockRoute.$[route].listStore': {
+                                storeId: existRouteChangeLog.storeId
+                            }
                         }
+                    },
+                    {
+                        arrayFilters: [
+                            { 'route.id': existRouteChangeLog.routeId }
+                        ]
                     }
-                },
-                {
-                    arrayFilters: [
-                        { 'route.id': existRouteChangeLog.routeId }
-                    ]
-                }
-            )
-
-
-
+                )
+            }
 
             await ApproveLogs.create({
                 module: 'approveStore',
