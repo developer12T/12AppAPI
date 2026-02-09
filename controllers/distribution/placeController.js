@@ -183,7 +183,7 @@ exports.addAllPlace = async (req, res) => {
     // STEP 1: BUILD + VALIDATE DATA (ยังไม่แตะ Place)
     // ==================================================
     for (const area of areaList) {
-      const withdrawList = await Withdraw.find({ Des_Area: area })
+      const withdrawList = await Withdraw.find({ Des_Area: area, newTrip: { $nin: [true] } })
 
       if (!withdrawList.length) {
         console.warn(`⚠️ No withdraw data for area ${area}`)
@@ -558,9 +558,9 @@ exports.CiaddrAddToWithdraw = async (req, res) => {
       platformType = 'PC'
     }
 
-    console.log('platformType',platformType)
+    console.log('platformType', platformType)
 
-    const userData = await User.find({ role: "sale" ,platformType:platformType})
+    const userData = await User.find({ role: "sale", platformType: platformType })
     // console.log(platformType)
     const area = userData.map(item => {
       return {
@@ -831,7 +831,7 @@ exports.addAddressFromExcel = async (req, res) => {
         OALMTS: `${Date.now()}`
       }
 
-      console.log('ciaddrData',ciaddrData)
+      console.log('ciaddrData', ciaddrData)
 
       const withDraw = {
         Des_No: row.area,
