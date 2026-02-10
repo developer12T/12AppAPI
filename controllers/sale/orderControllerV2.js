@@ -601,18 +601,33 @@ exports.waitApproveToPending = async (req, res) => {
     }
 
 
+    const checkStoreData = await Store.findOne({ storeId: storeId })
+
+    if (checkStoreData) {
+      return res.status(409).json({
+        status: 409,
+        message: 'This store is not approved yet'
+      })
+    }
+
+
     const storeData = await Store.findOne({
       name: orderData[0].store.name,
       area: orderData[0].store.area,
-    })
+      type: orderData[0].store.type,
+    }).sort({ createdAt: -1 })
 
-
+    // console.log(storeData)
     if (!storeData) {
       return res.status(404).json({
         status: 404,
         message: 'Not found storeData'
       })
     }
+
+
+
+
     const data = []
     if (orderData.length > 0) {
       for (const row of orderData) {

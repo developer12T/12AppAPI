@@ -48,7 +48,6 @@ const {
   calculateStockSummary
 } = require('../../middleware/order')
 const { getSocket } = require('../../socket')
-const { group, error } = require('console')
 const fetchArea = async warehouse => {
   try {
     const WarehouseData = await Warehouse.findAll({
@@ -1023,7 +1022,7 @@ exports.addStockFromERP = async (req, res) => {
     const { Stock } = getModelsByChannel(channel, res, stockModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
 
-    let  users = []
+    let users = []
     if (channel === 'cash') {
       users = await User.find({ role: 'sale', platformType: "CASH", })
         .select('area saleCode warehouse')
