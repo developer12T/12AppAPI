@@ -391,7 +391,7 @@ exports.getFilters = async (req, res) => {
       sensitivity: 'base'
     })
 
-    function cleanList(list) {
+    function cleanList (list) {
       const arr = Array.isArray(list) ? list : []
       const filtered = arr
         .map(v => (typeof v === 'string' ? v.trim() : v))
@@ -403,7 +403,7 @@ exports.getFilters = async (req, res) => {
 
     const firstAttr = attributes[0] ?? {} // ปลอดภัยกว่า attributes.length เช็คทีเดียว
 
-    function sortSizesAscGFirst(list) {
+    function sortSizesAscGFirst (list) {
       const UNIT_PRIORITY = { G: 0, KG: 1, L: 2 } // อยากให้ L ไปท้ายสุดกว่าก็ปรับเลขได้
       const coll = new Intl.Collator('th-TH', {
         numeric: true,
@@ -1575,7 +1575,7 @@ exports.productCheckPrice = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => { })
+        fs.unlink(tempPath, () => {})
       })
     } else {
       res.status(200).json({
@@ -1891,11 +1891,12 @@ exports.addskufocus = async (req, res) => {
     const { User } = getModelsByChannel(channel, res, userModel)
     const { SkuFocus } = getModelsByChannel(channel, res, skufocusModel)
 
+    // 1️⃣ resolve areas (area > zone)
     let areas = []
 
-    // 1️⃣ กำหนด area
-    if (zone && zone.length) {
-      // 👉 ใช้ zone หา area
+    if (area && area.length) {
+      areas = Array.isArray(area) ? area : [area]
+    } else if (zone && zone.length) {
       const users = await User.find({
         zone: { $in: zone },
         area: { $ne: '' }
@@ -1904,13 +1905,12 @@ exports.addskufocus = async (req, res) => {
         .lean()
 
       areas = [...new Set(users.map(u => u.area))]
-    } else if (area) {
-      // 👉 ใช้ area ที่ส่งมาแทน
-      areas = Array.isArray(area) ? area : [area]
     }
 
     if (!areas.length) {
-      return res.status(400).json({ message: 'ไม่พบ area ที่ใช้งานได้' })
+      return res.status(400).json({
+        message: 'ต้องระบุ area หรือ zone อย่างน้อย 1 ค่า'
+      })
     }
 
     // 2️⃣ ดึง product
@@ -1919,15 +1919,17 @@ exports.addskufocus = async (req, res) => {
     }).lean()
 
     if (!products.length) {
-      return res.status(400).json({ message: 'ไม่พบสินค้าใน Product' })
+      return res.status(400).json({
+        message: 'ไม่พบสินค้าใน Product'
+      })
     }
 
-    // 3️⃣ bulk operations
+    // 3️⃣ bulk ops
     const bulkOps = []
+
     for (const a of areas) {
       let doc = await SkuFocus.findOne({ area: a, period })
 
-      // 1️⃣ ถ้ายังไม่มี document → สร้างก่อน
       if (!doc) {
         doc = await SkuFocus.create({
           area: a,
@@ -1937,17 +1939,12 @@ exports.addskufocus = async (req, res) => {
         })
       }
 
-      // 2️⃣ ค่อย push product (กันซ้ำ)
       for (const p of products) {
         bulkOps.push({
           updateOne: {
             filter: {
               _id: doc._id,
-              listProduct: {
-                $not: {
-                  $elemMatch: { id: p.id }
-                }
-              }
+              'listProduct.id': { $ne: p.id }
             },
             update: {
               $push: {
@@ -1974,7 +1971,10 @@ exports.addskufocus = async (req, res) => {
     })
   } catch (error) {
     console.error(error)
-    res.status(500).json({ status: '500', message: error.message })
+    res.status(500).json({
+      status: '500',
+      message: error.message
+    })
   }
 }
 
