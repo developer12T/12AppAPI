@@ -258,11 +258,17 @@ exports.checkOutV2 = async (req, res) => {
     let storeData = {}
 
     if (channel !== 'pc') {
-      storeData =
-        (await Store.findOne({
-          storeId: cart.storeId,
-          area: cart.area
-        }).lean()) || {}
+      storeData = await Store.findOne({
+        storeId: cart.storeId,
+        area: cart.area
+      }).lean()
+
+      if (!storeData) {
+        return res.status(404).json({
+          status: 404,
+          message: 'Not found store'
+        })
+      }
     }
 
     const promotionshelf =
@@ -335,7 +341,7 @@ exports.checkOutV2 = async (req, res) => {
         warehouse: sale.warehouse
       },
       store: {
-        storeId: storeData.storeId || '',
+        storeId: storeId || '',
         name: storeData.name || '',
         type: storeData.type || '',
         address: addressFinal || '',
@@ -641,19 +647,19 @@ exports.waitApproveToPending = async (req, res) => {
 
         data.push(dataTran)
 
-        console.log("row._id", row._id)
-        // await Order.collection.updateOne(
-        //   { 'store.storeId': row._id },
-        //   {
-        //     $set: {
-        //       'store.storeId': storeData.storeId,
-        //       orderId: orderId,
-        //       status: 'pending',
-        //       statusTH: 'รอนำเข้า',
-        //       createdAt: new Date()
-        //     }
-        //   }
-        // )
+        const now = new Date()
+        await Order.collection.updateOne(
+          { _id: row._id },
+          {
+            $set: {
+              'store.storeId': storeData.storeId,
+              orderId,
+              status: 'pending',
+              statusTH: 'รอนำเข้า',
+              createdAt: now
+            }
+          }
+        )
 
       }
     }
