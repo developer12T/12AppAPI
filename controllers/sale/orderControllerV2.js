@@ -137,13 +137,13 @@ exports.checkOutV2 = async (req, res) => {
 
     const now = Date.now()
     const lastUpdate = orderTimestamps[storeId] || 0
-    const ONE_MINUTE = 60 * 1000
+    const ONE_MINUTE = 3 * 1000
 
     if (now - lastUpdate < ONE_MINUTE) {
       return res.status(429).json({
         status: 429,
         message:
-          'This order was updated less than 1 minute ago. Please try again later!'
+          'This order was updated less than 3 seconds ago. Please try again later!'
       })
     }
     orderTimestamps[storeId] = now
@@ -640,17 +640,20 @@ exports.waitApproveToPending = async (req, res) => {
         }
 
         data.push(dataTran)
-        await Order.findOneAndUpdate(
-          { 'store.storeId': storeId },
-          {
-            $set: {
-              'store.storeId': storeData.storeId,
-              orderId: orderId,
-              status: 'pending',
-              statusTH: 'รอนำเข้า'
-            }
-          }
-        )
+
+        console.log("row._id", row._id)
+        // await Order.collection.updateOne(
+        //   { 'store.storeId': row._id },
+        //   {
+        //     $set: {
+        //       'store.storeId': storeData.storeId,
+        //       orderId: orderId,
+        //       status: 'pending',
+        //       statusTH: 'รอนำเข้า',
+        //       createdAt: new Date()
+        //     }
+        //   }
+        // )
 
       }
     }
