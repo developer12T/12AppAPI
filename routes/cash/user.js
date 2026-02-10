@@ -24,7 +24,8 @@ const {
   updateUserPcToPromotionStore,
   getAreaCredit,
   getZoneCredit,
-  getTeamCredit
+  getTeamCredit,
+  getAreaByZone
 } = require('../../controllers/user/userController')
 
 const router = express.Router()
@@ -48,6 +49,7 @@ router.get('/getTeam', getTeam)
 router.get('/downloadUserExcel', downloadUserExcel)
 router.post('/addUserPcSample', addUserPcSample)
 router.post('/getArea', getArea)
+router.post('/getAreaByZone', getAreaByZone)
 router.post('/getZone', getZone)
 router.post('/addUserPcToPromotionStore', addUserPcToPromotionStore)
 router.post('/updateUserPcToPromotionStore', updateUserPcToPromotionStore)

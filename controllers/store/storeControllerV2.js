@@ -73,6 +73,7 @@ const { rangeDate } = require('../../utilities/datetime')
 
 const storeTimestamps = {}
 
+
 exports.updateStoreStatusV2 = async (req, res) => {
     try {
         const { storeId, status, user } = req.body
@@ -508,6 +509,7 @@ exports.updateStoreStatusV2 = async (req, res) => {
         })
     }
 }
+
 
 exports.addStorePcToCash = async (req, res) => {
     try {

@@ -1,9 +1,13 @@
 // const { User } = require('../../models/cash/user')
-const { period, previousPeriod, formatDate } = require('../../utilities/datetime')
-const sql = require('mssql');
-const fs = require('fs');
-const dayjs = require('dayjs');
-const XLSX = require('xlsx');
+const {
+  period,
+  previousPeriod,
+  formatDate
+} = require('../../utilities/datetime')
+const sql = require('mssql')
+const fs = require('fs')
+const dayjs = require('dayjs')
+const XLSX = require('xlsx')
 const { uploadFiles } = require('../../utilities/upload')
 const multer = require('multer')
 const path = require('path')
@@ -12,86 +16,98 @@ const bcrypt = require('bcrypt')
 const axios = require('axios')
 const userModel = require('../../models/cash/user')
 const { getModelsByChannel } = require('../../middleware/channel')
-const { userQuery, userQueryFilter, userQueryManeger, userQueryOne, userPcSample, getZoneCredit, getAreaCredit, getTeamCredit } = require('../../controllers/queryFromM3/querySctipt');
-const user = require('../../models/cash/user');
-const { getSocket } = require('../../socket')
-const { encrypt, decrypt } = require('../../middleware/authen');
 const {
-  PromotionStore,
+  userQuery,
+  userQueryFilter,
+  userQueryManeger,
+  userQueryOne,
+  userPcSample,
+  getZoneCredit,
+  getAreaCredit,
+  getTeamCredit
+} = require('../../controllers/queryFromM3/querySctipt')
+const user = require('../../models/cash/user')
+const { getSocket } = require('../../socket')
+const { encrypt, decrypt } = require('../../middleware/authen')
+const { PromotionStore } = require('../../models/cash/master')
+const { where } = require('sequelize')
+const { Op } = require('sequelize')
 
-} = require('../../models/cash/master');
-const { where } = require('sequelize');
-const { Op } = require("sequelize");
-
-function exportUsersToXlsx(data, sheetName = 'Sheet1') {
-  const worksheet = XLSX.utils.json_to_sheet(data);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+function exportUsersToXlsx (data, sheetName = 'Sheet1') {
+  const worksheet = XLSX.utils.json_to_sheet(data)
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName)
 
   // สร้าง buffer จาก workbook แทนการเขียนไฟล์
-  return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
 }
 
 exports.getUser = async (req, res) => {
   try {
-    const channel = req.headers['x-channel'];
-    const { User } = getModelsByChannel('user', res, userModel);
+    const channel = req.headers['x-channel']
+    const { User } = getModelsByChannel('user', res, userModel)
 
     const users = await User.find({})
-      .select('-_id saleCode salePayer username firstName password surName tel zone area warehouse role qrCodeImage updatedAt')
-      .lean();
+      .select(
+        '-_id saleCode salePayer username firstName password surName tel zone area warehouse role qrCodeImage updatedAt'
+      )
+      .lean()
 
     const usersWithTHTime = users.map(item => {
-      let decryptedPassword = '';
+      let decryptedPassword = ''
       try {
-        decryptedPassword = decrypt(item.password);
+        decryptedPassword = decrypt(item.password)
       } catch (err) {
-        decryptedPassword = '[decrypt error]';
+        decryptedPassword = '[decrypt error]'
       }
 
       return {
         ...item,
         password: decryptedPassword,
-        updatedAt: new Date(new Date(item.updatedAt).getTime() + 7 * 60 * 60 * 1000)
-      };
-    });
+        updatedAt: new Date(
+          new Date(item.updatedAt).getTime() + 7 * 60 * 60 * 1000
+        )
+      }
+    })
 
     if (!users || users.length === 0) {
-      return res.status(404).json({ status: 404, message: 'User is empty!' });
+      return res.status(404).json({ status: 404, message: 'User is empty!' })
     }
 
     res.status(200).json({
       status: 200,
       message: 'successful!',
       data: usersWithTHTime
-    });
+    })
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ status: 500, message: error.message });
+    console.error(error)
+    res.status(500).json({ status: 500, message: error.message })
   }
-};
+}
 
 exports.downloadUserExcel = async (req, res) => {
   try {
-    const channel = req.headers['x-channel'];
-    const { User } = getModelsByChannel('user', res, userModel);
+    const channel = req.headers['x-channel']
+    const { User } = getModelsByChannel('user', res, userModel)
     let platformType = ''
     if (channel === 'cash') {
       platformType = 'CASH'
     } else if (channel === 'pc') {
       platformType = 'PC'
     }
-    const users = await User.find({ role: 'sale', platformType }).lean().sort({ area: 1 });
+    const users = await User.find({ role: 'sale', platformType })
+      .lean()
+      .sort({ area: 1 })
     if (!users || users.length === 0) {
-      return res.status(404).json({ status: 404, message: 'User not found' });
+      return res.status(404).json({ status: 404, message: 'User not found' })
     }
 
     const formattedUsers = users.map(user => {
-      let password = '';
+      let password = ''
       try {
-        password = decrypt(user.password);
+        password = decrypt(user.password)
       } catch {
-        password = '[decrypt error]';
+        password = '[decrypt error]'
       }
 
       return {
@@ -105,25 +121,28 @@ exports.downloadUserExcel = async (req, res) => {
         area: user.area,
         warehouse: user.warehouse,
         role: user.role,
-        updatedAt: new Date(new Date(user.updatedAt).getTime() + 7 * 60 * 60 * 1000).toISOString()
-      };
-    });
+        updatedAt: new Date(
+          new Date(user.updatedAt).getTime() + 7 * 60 * 60 * 1000
+        ).toISOString()
+      }
+    })
 
-    const buffer = exportUsersToXlsx(formattedUsers, 'Users');
+    const buffer = exportUsersToXlsx(formattedUsers, 'Users')
 
-    res.setHeader('Content-Disposition', 'attachment; filename="user-export.xlsx"');
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    return res.send(buffer);
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="user-export.xlsx"'
+    )
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    return res.send(buffer)
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ status: 500, message: err.message });
+    console.error(err)
+    return res.status(500).json({ status: 500, message: err.message })
   }
-};
-
-
-
-
-
+}
 
 exports.editUser = async (req, res) => {
   try {
@@ -316,10 +335,10 @@ exports.addUserOne = async (req, res) => {
     const { area } = req.body
     const channel = req.headers['x-channel']
     const { User } = getModelsByChannel(channel, res, userModel)
-    const tableData = await userQueryOne(channel, area);
+    const tableData = await userQueryOne(channel, area)
 
     for (const sale of tableData) {
-      const encryptedPassword = encrypt(sale.password);
+      const encryptedPassword = encrypt(sale.password)
 
       await User.create({
         saleCode: sale.saleCode,
@@ -338,10 +357,8 @@ exports.addUserOne = async (req, res) => {
         image: '',
         typeTruck: sale.typeTruck,
         noTruck: sale.noTruck
-      });
+      })
     }
-
-
 
     res.status(200).json({
       status: 200,
@@ -349,7 +366,6 @@ exports.addUserOne = async (req, res) => {
       data: tableData
     })
   } catch (error) {
-
     console.error('❌ Error:', error)
 
     res.status(500).json({
@@ -358,9 +374,7 @@ exports.addUserOne = async (req, res) => {
       error: error.message || error.toString(), // ✅ ป้องกัน circular object
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
-
   }
-
 }
 
 exports.updateUserOne = async (req, res) => {
@@ -369,9 +383,6 @@ exports.updateUserOne = async (req, res) => {
     const { User } = getModelsByChannel(channel, res, userModel)
     // const user = await User.findOne({saleCode:req.body.saleCode})
 
-
-
-
     if (!req.body.username) {
       return res.status(400).json({
         status: 400,
@@ -379,8 +390,7 @@ exports.updateUserOne = async (req, res) => {
       })
     }
 
-
-    const encryptedPassword = encrypt(req.body.password);
+    const encryptedPassword = encrypt(req.body.password)
     const user = await User.updateOne(
       { username: req.body.username },
       {
@@ -416,7 +426,6 @@ exports.updateUserOne = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.addAndUpdateUser = async (req, res) => {
@@ -508,23 +517,22 @@ exports.addAndUpdateUser = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
 
 exports.addUserManeger = async (req, res) => {
   try {
-    const channelHeader = req.headers['x-channel'];
-    const tableData = await userQueryManeger(channelHeader);
+    const channelHeader = req.headers['x-channel']
+    const tableData = await userQueryManeger(channelHeader)
 
-    let update = 0;
-    let addNew = 0;
+    let update = 0
+    let addNew = 0
 
-    const { User } = getModelsByChannel('user', res, userModel);
+    const { User } = getModelsByChannel('user', res, userModel)
 
     for (const m3 of tableData) {
-      const encryptedPassword = encrypt('2020'); // 🔐 รหัสผ่านเริ่มต้น
+      const encryptedPassword = encrypt('2020') // 🔐 รหัสผ่านเริ่มต้น
 
-      const existingUser = await User.findOne({ username: m3.username });
+      const existingUser = await User.findOne({ username: m3.username })
 
       if (existingUser) {
         // อัปเดตข้อมูล
@@ -545,8 +553,8 @@ exports.addUserManeger = async (req, res) => {
               status: m3.status
             }
           }
-        );
-        update += 1;
+        )
+        update += 1
       } else {
         // เพิ่มใหม่
         let platformType = ''
@@ -570,8 +578,8 @@ exports.addUserManeger = async (req, res) => {
           role: m3.role,
           status: m3.status,
           platformType: platformType
-        });
-        addNew += 1;
+        })
+        addNew += 1
       }
     }
 
@@ -580,13 +588,12 @@ exports.addUserManeger = async (req, res) => {
       message: 'successful',
       updated: update,
       added: addNew
-    });
+    })
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ status: 500, message: error.message });
+    console.error(error)
+    res.status(500).json({ status: 500, message: error.message })
   }
-};
-
+}
 
 exports.addUserNew = async (req, res) => {
   try {
@@ -666,24 +673,23 @@ exports.addUserNew = async (req, res) => {
   }
 }
 
-
 exports.addUserArray = async (req, res) => {
   try {
     const { area } = req.body
     const channel = req.headers['x-channel']
     const data = await userQueryFilter(channel, area)
     const { User } = getModelsByChannel(channel, res, userModel)
-    let areaInDb = [];
-    let areaInserted = [];
+    let areaInDb = []
+    let areaInserted = []
 
     for (const item of data) {
-      const mongoUser = await User.findOne({ area: item.area });
+      const mongoUser = await User.findOne({ area: item.area })
 
       if (!mongoUser) {
-        await new User(item).save();
-        areaInserted.push(item.area);
+        await new User(item).save()
+        areaInserted.push(item.area)
       } else {
-        areaInDb.push(item.area);
+        areaInDb.push(item.area)
       }
     }
 
@@ -691,7 +697,7 @@ exports.addUserArray = async (req, res) => {
       return res.status(404).json({
         status: 404,
         message: 'Not found area'
-      });
+      })
     }
 
     res.status(200).json({
@@ -710,10 +716,7 @@ exports.addUserArray = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
-
-
 
 exports.updateUserArray = async (req, res) => {
   try {
@@ -723,7 +726,7 @@ exports.updateUserArray = async (req, res) => {
 
     const { User } = getModelsByChannel(channel, res, userModel)
     for (const item of data) {
-      const mongoUser = await User.findOne({ area: item.area });
+      const mongoUser = await User.findOne({ area: item.area })
       if (mongoUser) {
         userNew = await User.updateOne(
           { area: item.area },
@@ -769,26 +772,24 @@ exports.updateUserArray = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
-
 
 exports.deleteUserArray = async (req, res) => {
   try {
-    const { area } = req.body; // array: ['BE212', 'BE213']
-    const channel = req.headers['x-channel'];
-    const { User } = getModelsByChannel(channel, res, userModel);
+    const { area } = req.body // array: ['BE212', 'BE213']
+    const channel = req.headers['x-channel']
+    const { User } = getModelsByChannel(channel, res, userModel)
 
-    const usersToDelete = await User.find({ area: { $in: area } });
-    const deletedAreas = usersToDelete.map(user => user.area);
+    const usersToDelete = await User.find({ area: { $in: area } })
+    const deletedAreas = usersToDelete.map(user => user.area)
 
-    await User.deleteMany({ area: { $in: area } });
+    await User.deleteMany({ area: { $in: area } })
 
     res.status(200).json({
       status: 200,
       message: 'Deleted successfully',
       deletedAreas: deletedAreas
-    });
+    })
   } catch (error) {
     console.error('❌ Error:', error)
 
@@ -799,14 +800,12 @@ exports.deleteUserArray = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
 }
-
 
 exports.getAreaAll = async (req, res) => {
   try {
-    const channel = req.headers['x-channel'];
-    const { User } = getModelsByChannel(channel, res, userModel);
+    const channel = req.headers['x-channel']
+    const { User } = getModelsByChannel(channel, res, userModel)
 
     const data = await User.aggregate([
       {
@@ -832,7 +831,7 @@ exports.getAreaAll = async (req, res) => {
       status: 200,
       message: 'successfully',
       data: data
-    });
+    })
   } catch (error) {
     console.error('❌ Error:', error)
 
@@ -843,15 +842,12 @@ exports.getAreaAll = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
-
 }
-
 
 exports.checkUserLogin = async (req, res) => {
   try {
-    const channel = req.headers['x-channel'];
-    const { User } = getModelsByChannel(channel, res, userModel);
+    const channel = req.headers['x-channel']
+    const { User } = getModelsByChannel(channel, res, userModel)
 
     const dataUser = await User.aggregate([
       {
@@ -861,9 +857,9 @@ exports.checkUserLogin = async (req, res) => {
         $addFields: {
           fullName: {
             $concat: [
-              { $ifNull: ["$firstName", ""] },
-              " ",
-              { $ifNull: ["$surName", ""] }
+              { $ifNull: ['$firstName', ''] },
+              ' ',
+              { $ifNull: ['$surName', ''] }
             ]
           }
         }
@@ -876,13 +872,10 @@ exports.checkUserLogin = async (req, res) => {
           saleCode: 1,
           salePayer: 1,
           fullName: 1,
-          updatedAt: 1,
+          updatedAt: 1
         }
       }
-    ]);
-
-
-
+    ])
 
     const exportData = dataUser.map(user => ({
       zone: user.zone,
@@ -891,22 +884,23 @@ exports.checkUserLogin = async (req, res) => {
       salePayer: user.salePayer,
       fullName: user.fullName,
       updatedAt: dayjs(user.updatedAt).format('YYYY-MM-DD HH:mm:ss')
-    }));
+    }))
 
     // Export to Excel
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
-    XLSX.writeFile(workbook, "dataUser.xlsx");
+    const worksheet = XLSX.utils.json_to_sheet(exportData)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Users')
+    XLSX.writeFile(workbook, 'dataUser.xlsx')
 
-    console.log("✅ สร้างไฟล์ Excel: dataUser.xlsx ด้วยวันที่ฟอร์แมตเรียบร้อยแล้ว");
-
+    console.log(
+      '✅ สร้างไฟล์ Excel: dataUser.xlsx ด้วยวันที่ฟอร์แมตเรียบร้อยแล้ว'
+    )
 
     res.status(200).json({
       status: 200,
       message: 'successfully',
       data: dataUser
-    });
+    })
   } catch (error) {
     console.error('❌ Error:', error)
 
@@ -917,14 +911,13 @@ exports.checkUserLogin = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
-};
+}
 
 exports.getTeam = async (req, res) => {
   try {
     const { zone, platformType } = req.query
-    const channel = req.headers['x-channel'];
-    const { User } = getModelsByChannel('user', res, userModel);
+    const channel = req.headers['x-channel']
+    const { User } = getModelsByChannel('user', res, userModel)
 
     const dataUser = await User.aggregate([
       { $match: { zone: zone, platformType: platformType } },
@@ -932,8 +925,8 @@ exports.getTeam = async (req, res) => {
         $group: {
           _id: {
             $concat: [
-              { $substr: ['$area', 0, 2] },    // 2 ตัวแรก
-              { $substr: ['$area', 3, 1] }     // ตัวที่ 4 (index เริ่ม 0)
+              { $substr: ['$area', 0, 2] }, // 2 ตัวแรก
+              { $substr: ['$area', 3, 1] } // ตัวที่ 4 (index เริ่ม 0)
             ]
           }
         }
@@ -945,11 +938,9 @@ exports.getTeam = async (req, res) => {
           saleTeam: '$_id'
         }
       }
-    ]);
-
+    ])
 
     if (dataUser.length == 0) {
-
       return res.status(404).json({
         status: 404,
         message: 'Not found team'
@@ -971,19 +962,17 @@ exports.getTeam = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
-
-
 }
 
 exports.addUserPcSample = async (req, res) => {
   try {
     const channel = 'user'
-    const { User } = getModelsByChannel(channel, res, userModel);
+    const { User } = getModelsByChannel(channel, res, userModel)
 
     const data = await userPcSample(channel)
 
     for (const item of data) {
-      await User.create(item);
+      await User.create(item)
     }
 
     res.status(200).json({
@@ -1001,16 +990,81 @@ exports.addUserPcSample = async (req, res) => {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
   }
+}
 
+exports.getAreaByZone = async (req, res) => {
+  try {
+    const { role, platformType, zone } = req.body
+    const channel = 'user'
+    const { User } = getModelsByChannel(channel, res, userModel)
+
+    if (!zone || !Array.isArray(zone) || !zone.length) {
+      return res.status(400).json({
+        status: 400,
+        message: 'zone must be array เช่น ["BK","CT"]'
+      })
+    }
+
+    const match = {
+      zone: { $in: zone },
+      area: { $nin: [null, ''] } // ✅ ไม่เอา area ว่าง
+    }
+
+    // ADMIN เห็นทุก platform
+    if (platformType === 'ADMIN') {
+      match.platformType = { $in: ['CASH', 'PC'] }
+    } else {
+      match.platformType = platformType
+      match.role = role
+    }
+
+    const data = await User.aggregate([
+      { $match: match },
+      {
+        $project: {
+          _id: 0,
+          area: 1,
+          zone: 1,
+          team: {
+            $concat: [
+              { $substr: ['$area', 0, 2] }, // BK
+              { $substr: ['$area', 3, 1] } // 2
+            ]
+          }
+        }
+      },
+      {
+        $group: {
+          _id: '$area',
+          area: { $first: '$area' },
+          zone: { $first: '$zone' },
+          team: { $first: '$team' }
+        }
+      },
+      { $sort: { area: 1 } }
+    ])
+
+    res.status(200).json({
+      status: 200,
+      message: 'get area by zone success',
+      data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message
+    })
+  }
 }
 
 exports.getArea = async (req, res) => {
   try {
     const { role, platformType, zone, team } = req.body
     const channel = 'user'
-    const { User } = getModelsByChannel(channel, res, userModel);
-    let match = { role, platformType };
-
+    const { User } = getModelsByChannel(channel, res, userModel)
+    let match = { role, platformType }
 
     if (!zone) {
       let getZone = []
@@ -1019,8 +1073,8 @@ exports.getArea = async (req, res) => {
           { $match: { role: role } },
           {
             $group: {
-              _id: "$zone",
-              zone: { $first: "$zone" }
+              _id: '$zone',
+              zone: { $first: '$zone' }
             }
           },
           { $project: { _id: 0, zone: 1 } },
@@ -1031,8 +1085,8 @@ exports.getArea = async (req, res) => {
           { $match: match },
           {
             $group: {
-              _id: "$zone",
-              zone: { $first: "$zone" }
+              _id: '$zone',
+              zone: { $first: '$zone' }
             }
           },
           { $project: { _id: 0, zone: 1 } },
@@ -1053,16 +1107,16 @@ exports.getArea = async (req, res) => {
         $eq: [
           {
             $concat: [
-              { $substr: ["$area", 0, 2] },   // 2 ตัวแรก
-              { $substr: ["$area", 3, 1] }    // ตัวที่ 4
+              { $substr: ['$area', 0, 2] }, // 2 ตัวแรก
+              { $substr: ['$area', 3, 1] } // ตัวที่ 4
             ]
           },
           team
         ]
-      };
+      }
     }
 
-    if (zone) match.zone = zone;
+    if (zone) match.zone = zone
     if (platformType === 'ADMIN') {
       match.platformType = { $in: ['CASH', 'PC'] }
     }
@@ -1078,21 +1132,19 @@ exports.getArea = async (req, res) => {
           area: 1,
           team: {
             $concat: [
-              { $substr: ["$area", 0, 2] },  // ตัว 1–2
-              { $substr: ["$area", 3, 1] }   // ตัวที่ 4
+              { $substr: ['$area', 0, 2] }, // ตัว 1–2
+              { $substr: ['$area', 3, 1] } // ตัวที่ 4
             ]
           }
         }
       }
-    ]);
-
+    ])
 
     res.status(200).json({
       status: 200,
       message: 'sucess',
       data: userData
     })
-
   } catch (error) {
     console.error('❌ Error:', error)
 
@@ -1109,31 +1161,29 @@ exports.getZone = async (req, res) => {
   try {
     const { role } = req.body
     const channel = 'user'
-    const { User } = getModelsByChannel(channel, res, userModel);
-    let match = { role };
+    const { User } = getModelsByChannel(channel, res, userModel)
+    let match = { role }
 
     const userData = await User.aggregate([
       { $match: match },
       {
         $group: {
-          _id: "$zone"
+          _id: '$zone'
         }
       },
       {
         $project: {
           _id: 0,
-          zone: "$_id"
+          zone: '$_id'
         }
       }
-    ]);
+    ])
 
     res.status(200).json({
       status: 200,
       message: 'sucess',
       data: userData
     })
-
-
   } catch (error) {
     console.error('❌ Error:', error)
 
@@ -1145,38 +1195,34 @@ exports.getZone = async (req, res) => {
     })
   }
 }
-
-
 
 exports.getZoneCredit = async (req, res) => {
   try {
     const { role } = req.body
     const channel = 'user'
-    const { User } = getModelsByChannel(channel, res, userModel);
-    let match = { role };
+    const { User } = getModelsByChannel(channel, res, userModel)
+    let match = { role }
 
     const userData = await User.aggregate([
       { $match: match },
       {
         $group: {
-          _id: "$zone"
+          _id: '$zone'
         }
       },
       {
         $project: {
           _id: 0,
-          zone: "$_id"
+          zone: '$_id'
         }
       }
-    ]);
+    ])
 
     res.status(200).json({
       status: 200,
       message: 'sucess',
       data: userData
     })
-
-
   } catch (error) {
     console.error('❌ Error:', error)
 
@@ -1189,11 +1235,10 @@ exports.getZoneCredit = async (req, res) => {
   }
 }
 
-
 exports.addUserPcToPromotionStore = async (req, res) => {
   try {
     const { proCode } = req.body
-    const { User } = getModelsByChannel('user', res, userModel);
+    const { User } = getModelsByChannel('user', res, userModel)
 
     if (!proCode) {
       return res.status(404).json({
@@ -1202,20 +1247,21 @@ exports.addUserPcToPromotionStore = async (req, res) => {
       })
     }
 
-    const dataUser = await User.find({ role: "sale", platformType: "PC", area: { $ne: 'PC999' } })
+    const dataUser = await User.find({
+      role: 'sale',
+      platformType: 'PC',
+      area: { $ne: 'PC999' }
+    })
 
-    const salePayerList = [
-      ...new Set(dataUser.flatMap(item => item.salePayer))
-    ];
+    const salePayerList = [...new Set(dataUser.flatMap(item => item.salePayer))]
     const dataPromotionStore = await PromotionStore.findAll({
       where: {
         FBCUNO: { [Op.in]: salePayerList },
         proId: proCode
       }
-    });
+    })
 
     // console.log("dataPromotionStore", dataPromotionStore)
-
 
     let data = []
 
@@ -1226,7 +1272,7 @@ exports.addUserPcToPromotionStore = async (req, res) => {
 
       const promotionStore = dataPromotionStore.find(
         item => item.FBCUNO?.trim() === row.salePayer?.trim()
-      );
+      )
 
       if (!promotionStore) {
         const dataTran = {
@@ -1269,12 +1315,10 @@ exports.addUserPcToPromotionStore = async (req, res) => {
           FBCHNO: '11',
           FBCHID: 'CRS610S1',
           FBPRI2: 5
-
         }
         data.push(dataTran)
         await PromotionStore.create(dataTran)
       }
-
     }
 
     res.status(201).json({
@@ -1296,19 +1340,20 @@ exports.addUserPcToPromotionStore = async (req, res) => {
 
 exports.updateUserPcToPromotionStore = async (req, res) => {
   try {
+    const { User } = getModelsByChannel('user', res, userModel)
 
-    const { User } = getModelsByChannel('user', res, userModel);
+    const dataUser = await User.find({
+      role: 'sale',
+      platformType: 'PC',
+      area: { $ne: 'PC999' }
+    })
 
-    const dataUser = await User.find({ role: "sale", platformType: "PC", area: { $ne: 'PC999' } })
-
-    const salePayerList = [
-      ...new Set(dataUser.flatMap(item => item.salePayer))
-    ];
+    const salePayerList = [...new Set(dataUser.flatMap(item => item.salePayer))]
     const dataPromotionStore = await PromotionStore.findAll({
       where: {
-        FBCUNO: { [Op.in]: salePayerList },
+        FBCUNO: { [Op.in]: salePayerList }
       }
-    });
+    })
 
     for (const row of dataUser) {
       if (!row.salePayer) {
@@ -1317,8 +1362,7 @@ exports.updateUserPcToPromotionStore = async (req, res) => {
 
       const promotionStore = dataPromotionStore.filter(
         item => item.FBCUNO?.trim() === row.salePayer?.trim()
-      );
-
+      )
     }
 
     res.status(201).json({
@@ -1326,8 +1370,6 @@ exports.updateUserPcToPromotionStore = async (req, res) => {
       message: 'updateUserPcToPromotionStore success',
       data: dataPromotionStore
     })
-
-
   } catch (error) {
     console.error('❌ Error:', error)
 
@@ -1342,9 +1384,7 @@ exports.updateUserPcToPromotionStore = async (req, res) => {
 
 exports.getAreaCredit = async (req, res) => {
   try {
-
     const { role, platformType, zone, team } = req.body
-
 
     const userCredit = await getAreaCredit(zone, team)
     // console.log('userCredit',userCredit)
@@ -1360,7 +1400,6 @@ exports.getAreaCredit = async (req, res) => {
       message: 'getAreaCredit',
       data: userData
     })
-
   } catch (error) {
     console.error('❌ Error:', error)
 
@@ -1375,23 +1414,19 @@ exports.getAreaCredit = async (req, res) => {
 
 exports.getTeamCredit = async (req, res) => {
   try {
-
     const { zone, platformType } = req.query
 
     const dataCredit = await getTeamCredit(zone)
 
-    const data = [...new Set(dataCredit.map(item => item.team))].map(team => (
-      {
-        saleTeam: team
-      }
-    ))
+    const data = [...new Set(dataCredit.map(item => item.team))].map(team => ({
+      saleTeam: team
+    }))
 
     res.status(200).json({
       status: 200,
-      message: "sucess",
+      message: 'sucess',
       data: data
     })
-
   } catch (error) {
     console.error('❌ Error:', error)
 
