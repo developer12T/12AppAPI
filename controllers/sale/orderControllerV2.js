@@ -137,13 +137,13 @@ exports.checkOutV2 = async (req, res) => {
 
     const now = Date.now()
     const lastUpdate = orderTimestamps[storeId] || 0
-    const ONE_MINUTE = 60 * 1000
+    const ONE_MINUTE = 3 * 1000
 
     if (now - lastUpdate < ONE_MINUTE) {
       return res.status(429).json({
         status: 429,
         message:
-          'This order was updated less than 1 minute ago. Please try again later!'
+          'This order was updated less than 3 seconds ago. Please try again later!'
       })
     }
     orderTimestamps[storeId] = now
@@ -258,11 +258,17 @@ exports.checkOutV2 = async (req, res) => {
     let storeData = {}
 
     if (channel !== 'pc') {
-      storeData =
-        (await Store.findOne({
-          storeId: cart.storeId,
-          area: cart.area
-        }).lean()) || {}
+      storeData = await Store.findOne({
+        storeId: cart.storeId,
+        area: cart.area
+      }).lean()
+
+      if (!storeData) {
+        return res.status(404).json({
+          status: 404,
+          message: 'Not found store'
+        })
+      }
     }
 
     const promotionshelf =
@@ -335,7 +341,7 @@ exports.checkOutV2 = async (req, res) => {
         warehouse: sale.warehouse
       },
       store: {
-        storeId: storeData.storeId || '',
+        storeId: storeId || '',
         name: storeData.name || '',
         type: storeData.type || '',
         address: addressFinal || '',
@@ -640,14 +646,17 @@ exports.waitApproveToPending = async (req, res) => {
         }
 
         data.push(dataTran)
-        await Order.findOneAndUpdate(
-          { 'store.storeId': storeId },
+
+        const now = new Date()
+        await Order.collection.updateOne(
+          { _id: row._id },
           {
             $set: {
               'store.storeId': storeData.storeId,
-              orderId: orderId,
+              orderId,
               status: 'pending',
-              statusTH: 'รอนำเข้า'
+              statusTH: 'รอนำเข้า',
+              createdAt: now
             }
           }
         )
