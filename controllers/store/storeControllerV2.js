@@ -377,7 +377,7 @@ exports.updateStoreStatusV2 = async (req, res) => {
                 { new: true }
             )
 
-            const orderData = await Order.find({ 'store.storeId': storeId, status: 'waitApprove', 'store.area': storeNew.area })
+            const orderData = await Order.find({ 'store.storeId': storeId, 'store.area': storeNew.area })
 
 
             if (orderData.length > 0) {
@@ -386,16 +386,25 @@ exports.updateStoreStatusV2 = async (req, res) => {
 
                     if (row.listProduct.length > 0) {
                         for (const product of row.listProduct) {
-                            const updateResult = await updateStockMongo(
-                                product,
-                                row.store.area,
-                                row.period,
-                                'orderCanceled',
-                                channel,
-                                res
-                            )
-                            if (updateResult) return
+                            try {
+                                await updateStockMongo(
+                                    product,
+                                    row.store.area,
+                                    row.period,
+                                    'orderCanceled',
+                                    channel,
+                                    res
+                                )
+                            } catch (err) {
+                                console.error(
+                                    '[updateStockMongo error]',
+                                    product?.sku || product,
+                                    err.message
+                                )
+                                continue // ข้ามไปตัวถัดไป
+                            }
                         }
+
                     }
 
                     if (row.listPromotions.length > 0) {
