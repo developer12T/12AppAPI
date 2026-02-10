@@ -26,7 +26,9 @@ const {
   addFromERPFoodtruck,
   addSizeNumber,
   addskufocus,
-  getSkuFocusWithSales
+  getSkuFocusWithSales,
+  getSkuProduct,
+  deleteSKUProduct
 } = require('../../controllers/product/productController')
 
 const router = express.Router()
@@ -60,5 +62,8 @@ router.post('/addFromERPFoodtruck', addFromERPFoodtruck)
 router.post('/addSizeNumber', addSizeNumber)
 router.post('/addskufocus', addskufocus)
 router.post('/getSkuFocusWithSales', getSkuFocusWithSales)
+
+router.get('/getSkuProduct', getSkuProduct)
+router.patch('/deleteSKUProduct', deleteSKUProduct)
 
 module.exports = router

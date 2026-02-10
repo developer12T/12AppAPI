@@ -46,7 +46,9 @@ const {
   approveRouteChange,
   addOrderToRoute,
 
-  getStoreCheckinByDayArea
+  getStoreCheckinByDayArea,
+  getProductSoldByDayArea,
+  getProductSoldByDayAreaSKU
 } = require('../../controllers/route/routeController')
 
 const {
@@ -86,6 +88,7 @@ router.post('/getRouteEffective', getRouteEffective)
 router.get('/getRouteEffectiveAll', getRouteEffectiveAll)
 router.get('/getZone', getAreaInRoute)
 router.get('/getArea', getZoneInRoute)
+// router.get('/getAreav2', getZoneArrayInRoute)
 router.get('/getRouteByArea', getRouteByArea)
 router.post('/addFromERPnew', addFromERPnew)
 router.post('/addFromERPOne', addFromERPOne)
@@ -119,8 +122,6 @@ router.get('/getRouteSetting', getRouteSetting)
 router.get('/getRouteLock', getRouteLock)
 router.get('/polylineRouteCredit', polylineRouteCredit)
 
-
-
 router.post('/updateAreaByDataRoute', updateAreaByDataRoute)
 router.post('/addRouteSettings', addRouteSettings)
 router.post('/editLockRoute', editLockRoute)
@@ -129,4 +130,8 @@ router.post('/autoLockRouteChange', autoLockRouteChange)
 
 router.get('/getSaleOutRoute', getSaleOutRoute)
 router.post('/updateSaleOutRoute', updateSaleOutRoute)
+
+router.post('/getProductSoldByDayArea', getProductSoldByDayArea)
+router.post('/getProductSoldByDayAreaSKU', getProductSoldByDayAreaSKU)
+
 module.exports = router

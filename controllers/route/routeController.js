@@ -37,6 +37,7 @@ const { formatDateTimeToThai } = require('../../middleware/order')
 const fs = require('fs')
 const os = require('os')
 const moment = require('moment')
+const skufocusModel = require('../../models/cash/skufocus')
 
 exports.getRoute = async (req, res) => {
   try {
@@ -137,55 +138,55 @@ exports.getRoute = async (req, res) => {
     // If area is not provided (or explicitly empty), group results by day+period
     if ((!area || area === '') && period && !storeId) {
       const groups = new Map()
-        ; (enrichedRoutes || []).forEach(route => {
-          // Skip routes with area == 'IT211'
-          if (route.area === 'IT211') return
+      ;(enrichedRoutes || []).forEach(route => {
+        // Skip routes with area == 'IT211'
+        if (route.area === 'IT211') return
 
-          // derive zone/team from route (prefer explicit fields, otherwise from area)
-          let zoneKey = route.zone || ''
-          let teamKey = route.team || ''
-          if (route.area) {
-            const a = String(route.area || '')
-            zoneKey = a.substring(0, 2)
-            teamKey = `${a.substring(0, 2)}${a.charAt(3) || ''}`
-          }
+        // derive zone/team from route (prefer explicit fields, otherwise from area)
+        let zoneKey = route.zone || ''
+        let teamKey = route.team || ''
+        if (route.area) {
+          const a = String(route.area || '')
+          zoneKey = a.substring(0, 2)
+          teamKey = `${a.substring(0, 2)}${a.charAt(3) || ''}`
+        }
 
-          // if request includes zone/team filters, skip non-matching routes
-          if (zone && String(zone) !== zoneKey) return
-          if (team && String(team) !== teamKey) return
+        // if request includes zone/team filters, skip non-matching routes
+        if (zone && String(zone) !== zoneKey) return
+        if (team && String(team) !== teamKey) return
 
-          const dayKey = route.day || ''
-          if (!groups.has(dayKey)) {
-            groups.set(dayKey, {
-              day: dayKey,
-              period: period,
-              // routes: [],
-              storeAll: 0,
-              storePending: 0,
-              storeSell: 0,
-              storeNotSell: 0,
-              storeCheckInNotSell: 0,
-              storeTotal: 0
-            })
-          }
+        const dayKey = route.day || ''
+        if (!groups.has(dayKey)) {
+          groups.set(dayKey, {
+            day: dayKey,
+            period: period,
+            // routes: [],
+            storeAll: 0,
+            storePending: 0,
+            storeSell: 0,
+            storeNotSell: 0,
+            storeCheckInNotSell: 0,
+            storeTotal: 0
+          })
+        }
 
-          const grp = groups.get(dayKey)
+        const grp = groups.get(dayKey)
 
-          // accumulate counts from each route (use numeric defaults)
-          const ra = Number(route.storeAll) || 0
-          const rp = Number(route.storePending) || 0
-          const rs = Number(route.storeSell) || 0
-          const rn = Number(route.storeNotSell) || 0
-          const rcn = Number(route.storeCheckInNotSell) || 0
-          const rt = Number(route.storeTotal) || 0
+        // accumulate counts from each route (use numeric defaults)
+        const ra = Number(route.storeAll) || 0
+        const rp = Number(route.storePending) || 0
+        const rs = Number(route.storeSell) || 0
+        const rn = Number(route.storeNotSell) || 0
+        const rcn = Number(route.storeCheckInNotSell) || 0
+        const rt = Number(route.storeTotal) || 0
 
-          grp.storeAll += ra
-          grp.storePending += rp
-          grp.storeSell += rs
-          grp.storeNotSell += rn
-          grp.storeCheckInNotSell += rcn
-          grp.storeTotal += rt
-        })
+        grp.storeAll += ra
+        grp.storePending += rp
+        grp.storeSell += rs
+        grp.storeNotSell += rn
+        grp.storeCheckInNotSell += rcn
+        grp.storeTotal += rt
+      })
 
       // finalize percentage fields for each group
       enrichedRoutes = Array.from(groups.values()).map(g => {
@@ -2361,7 +2362,7 @@ exports.getRouteEffective = async (req, res) => {
       )
       xlsx.writeFile(wb, filePath)
       res.download(filePath, err => {
-        fs.unlink(filePath, () => { })
+        fs.unlink(filePath, () => {})
         if (err) console.error(err)
       })
     } else {
@@ -2605,7 +2606,7 @@ exports.getRouteEffectiveAll = async (req, res) => {
     // ------------------------------
     let start, end
 
-    function getPeriodFromDate(dateStr) {
+    function getPeriodFromDate (dateStr) {
       if (!dateStr) return null
       const d = new Date(dateStr)
       if (isNaN(d)) return null
@@ -2789,7 +2790,9 @@ exports.getRouteEffectiveAll = async (req, res) => {
     }
 
     const visitVsTarget =
-      target.visitStore > 0 ? (totalStoreCheckInNotSell / target.visitStore) * 100 : 0
+      target.visitStore > 0
+        ? (totalStoreCheckInNotSell / target.visitStore) * 100
+        : 0
 
     const effectiveVsTarget =
       target.saleStore > 0 ? (totalStoreSell / target.saleStore) * 100 : 0
@@ -2880,12 +2883,12 @@ exports.getRouteEffectiveByDayArea = async (req, res) => {
       // filter team (ต้องอยู่ตรงนี้ ❗)
       ...(team
         ? [
-          {
-            $match: {
-              team3: { $regex: `^${team}`, $options: 'i' }
+            {
+              $match: {
+                team3: { $regex: `^${team}`, $options: 'i' }
+              }
             }
-          }
-        ]
+          ]
         : []),
 
       // แตก store
@@ -2894,8 +2897,8 @@ exports.getRouteEffectiveByDayArea = async (req, res) => {
       // เอาเฉพาะร้านที่ check-in แล้ว
       {
         $match: {
-          'listStore.date': { $ne: null, $exists: true },
-          zone: { $ne: 'IT' }
+          'listStore.date': { $ne: null, $exists: true }
+          // zone: { $ne: 'IT' }
         }
       },
 
@@ -3132,6 +3135,104 @@ exports.getZoneInRoute = async (req, res) => {
   }
 }
 
+exports.getZoneArrayInRoute = async (req, res) => {
+  try {
+    const { zone, period, team } = req.query
+    const channel = req.headers['x-channel']
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+
+    if (!period) {
+      return res.status(400).json({
+        status: 400,
+        message: 'period is required'
+      })
+    }
+
+    // ✅ normalize zone → array
+    let zoneArray = []
+    if (zone) {
+      zoneArray = Array.isArray(zone)
+        ? zone
+        : typeof zone === 'string'
+        ? zone.split(',').map(z => z.trim())
+        : []
+    }
+
+    const pipeline = [
+      // 1️⃣ filter period ก่อน (ลด data)
+      {
+        $match: { period }
+      },
+
+      // 2️⃣ derive zone / team จาก area
+      {
+        $addFields: {
+          zone2: { $substrCP: ['$area', 0, 2] },
+          team3: {
+            $concat: [
+              { $substrCP: ['$area', 0, 2] },
+              { $substrCP: ['$area', 3, 1] }
+            ]
+          }
+        }
+      }
+    ]
+
+    // 3️⃣ filter zone
+    if (zoneArray.length) {
+      pipeline.push({
+        $match: { zone2: { $in: zoneArray } }
+      })
+    }
+
+    // 4️⃣ filter team
+    if (team) {
+      pipeline.push({
+        $match: { team3: team }
+      })
+    }
+
+    // 5️⃣ distinct area
+    pipeline.push(
+      {
+        $group: { _id: '$area' }
+      },
+      {
+        $project: {
+          _id: 0,
+          area: '$_id'
+        }
+      },
+      {
+        $sort: { area: 1 }
+      }
+    )
+
+    const routes = await Route.aggregate(pipeline)
+
+    if (!routes.length) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found area in route'
+      })
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: routes
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    })
+  }
+}
+
 exports.getRouteByArea = async (req, res) => {
   try {
     const { area, period } = req.query
@@ -3271,7 +3372,7 @@ exports.checkRouteStore = async (req, res) => {
       areaMap[area].del = storeCountMap[area]?.del || 0
     }
 
-    function sortKeys(obj) {
+    function sortKeys (obj) {
       const { area, R, del, ...days } = obj
       const sortedDays = Object.keys(days)
         .filter(k => /^R\d+$/.test(k))
@@ -3491,7 +3592,8 @@ exports.addStoreOneToRoute = async (req, res) => {
     if (!Array.isArray(storeId) || storeId.length === 0) {
       return res.status(400).json({
         status: 400,
-        message: 'storeId must be a non-empty array, e.g. ["IT228001", "IT228002"]'
+        message:
+          'storeId must be a non-empty array, e.g. ["IT228001", "IT228002"]'
       })
     }
 
@@ -3518,7 +3620,9 @@ exports.addStoreOneToRoute = async (req, res) => {
     }
 
     const storeListOBJ = routeData.listStore.flatMap(item => item.storeInfo)
-    const storeInRoute = await Store.find({ _id: { $in: storeListOBJ } }).select('storeId')
+    const storeInRoute = await Store.find({
+      _id: { $in: storeListOBJ }
+    }).select('storeId')
     const storeIdSet = new Set(storeInRoute.map(item => item.storeId))
 
     const dupStore = storeIdUnique.filter(id => storeIdSet.has(id))
@@ -3759,7 +3863,8 @@ exports.updateRouteAllStore = async (req, res) => {
       )
 
       console.log(
-        `processed ${Math.min(i + BATCH, storeData.length)} / ${storeData.length
+        `processed ${Math.min(i + BATCH, storeData.length)} / ${
+          storeData.length
         }`
       )
     }
@@ -4341,10 +4446,8 @@ exports.getRouteChange = async (req, res) => {
 
 const orderTimestamps = {}
 
-
 exports.addNewStoreToRoute = async (req, res) => {
   try {
-
     const { id, storeId, period } = req.body
     const channel = req.headers['x-channel']
     const { Route, RouteChange, RouteChangeLog } = getModelsByChannel(
@@ -4365,7 +4468,6 @@ exports.addNewStoreToRoute = async (req, res) => {
       })
     }
     orderTimestamps[storeId] = now
-
 
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
@@ -5065,6 +5167,308 @@ exports.getStoreCheckinByDayArea = async (req, res) => {
     ]
 
     const data = await Route.aggregate(pipeline)
+
+    res.status(200).json({
+      status: 200,
+      message: 'success',
+      data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message
+    })
+  }
+}
+
+exports.getProductSoldByDayArea = async (req, res) => {
+  try {
+    const { area, date } = req.body
+    const channel = req.headers['x-channel']
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { SkuFocus } = getModelsByChannel(channel, res, skufocusModel)
+
+    if (!area || !date) {
+      return res.status(400).json({
+        status: 400,
+        message: 'area and date are required'
+      })
+    }
+
+    const pipeline = [
+      // 1️⃣ match route by area
+      { $match: { area } },
+
+      // 2️⃣ unwind store
+      { $unwind: '$listStore' },
+
+      // 3️⃣ แปลงวันที่เป็น day string
+      {
+        $addFields: {
+          checkinDay: {
+            $dateToString: {
+              format: '%d-%m-%Y',
+              date: '$listStore.date',
+              timezone: 'Asia/Bangkok'
+            }
+          }
+        }
+      },
+
+      // 4️⃣ match day
+      { $match: { checkinDay: date } },
+
+      // 5️⃣ ดึง orderId ตัวแรก
+      {
+        $addFields: {
+          orderId: { $arrayElemAt: ['$listStore.listOrder.orderId', 0] }
+        }
+      },
+
+      // ❗ กันเคสไม่มี order
+      { $match: { orderId: { $ne: null } } },
+
+      // 6️⃣ lookup Order
+      {
+        $lookup: {
+          from: 'orders',
+          localField: 'orderId',
+          foreignField: 'orderId',
+          as: 'order'
+        }
+      },
+
+      // 7️⃣ unwind order
+      { $unwind: '$order' },
+
+      // 8️⃣ unwind listProduct
+      { $unwind: '$order.listProduct' },
+
+      // ✅ 9️⃣ คำนวณ unitOrder (ตอนนี้ unit มีแล้ว)
+      {
+        $addFields: {
+          unitOrder: {
+            $switch: {
+              branches: [
+                { case: { $eq: ['$order.listProduct.unit', 'CTN'] }, then: 1 },
+                { case: { $eq: ['$order.listProduct.unit', 'PCS'] }, then: 3 }
+              ],
+              default: 2
+            }
+          }
+        }
+      },
+
+      // 🔟 sort: CTN → อื่น → PCS, qty มาก → น้อย
+      {
+        $sort: {
+          unitOrder: 1,
+          'order.listProduct.qty': -1
+        }
+      },
+
+      {
+        $project: {
+          _id: 0,
+
+          // context
+          area: '$area',
+          zone: '$zone',
+          period: '$period',
+          orderId: '$order.orderId',
+
+          // product info
+          id: '$order.listProduct.id',
+          name: '$order.listProduct.name',
+          qty: '$order.listProduct.qty',
+          amount: '$order.listProduct.amount',
+          unit: '$order.listProduct.unit',
+          unitName: '$order.listProduct.unitName',
+
+          // check-in time
+          checkinDatetime: {
+            $dateToString: {
+              date: '$listStore.date',
+              format: '%Y-%m-%d %H:%M:%S',
+              timezone: 'Asia/Bangkok'
+            }
+          }
+        }
+      }
+    ]
+
+    const data = await Route.aggregate(pipeline)
+
+    res.status(200).json({
+      status: 200,
+      message: 'success',
+      data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message
+    })
+  }
+}
+
+exports.getProductSoldByDayAreaSKU = async (req, res) => {
+  try {
+    const { area, date } = req.body
+    const channel = req.headers['x-channel']
+
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { SkuFocus } = getModelsByChannel(channel, res, skufocusModel)
+
+    if (!area || !date) {
+      return res.status(400).json({
+        status: 400,
+        message: 'area and date are required'
+      })
+    }
+
+    const pipeline = [
+      // 1️⃣ ยึด SkuFocus เป็นหลัก
+      {
+        $match: { area }
+      },
+
+      // 2️⃣ แตก SKU Focus
+      {
+        $unwind: '$listProduct'
+      },
+
+      // 3️⃣ lookup Route + Order (LEFT JOIN)
+      {
+        $lookup: {
+          from: 'routes',
+          let: {
+            area: '$area',
+            skuId: '$listProduct.id'
+          },
+          pipeline: [
+            { $match: { $expr: { $eq: ['$area', '$$area'] } } },
+            { $unwind: '$listStore' },
+
+            // แปลงวันที่
+            {
+              $addFields: {
+                checkinDay: {
+                  $dateToString: {
+                    format: '%d-%m-%Y',
+                    date: '$listStore.date',
+                    timezone: 'Asia/Bangkok'
+                  }
+                }
+              }
+            },
+
+            { $match: { checkinDay: date } },
+
+            // ดึง orderId
+            {
+              $addFields: {
+                orderId: {
+                  $arrayElemAt: ['$listStore.listOrder.orderId', 0]
+                }
+              }
+            },
+
+            { $match: { orderId: { $ne: null } } },
+
+            // lookup order
+            {
+              $lookup: {
+                from: 'orders',
+                localField: 'orderId',
+                foreignField: 'orderId',
+                as: 'order'
+              }
+            },
+            { $unwind: '$order' },
+            { $unwind: '$order.listProduct' },
+
+            // 🔒 match เฉพาะ SKU Focus ตัวนี้
+            {
+              $match: {
+                $expr: {
+                  $eq: ['$order.listProduct.id', '$$skuId']
+                }
+              }
+            },
+
+            // รวมยอดขาย
+            {
+              $group: {
+                _id: null,
+                qty: { $sum: '$order.listProduct.qty' },
+                amount: { $sum: '$order.listProduct.amount' },
+                unit: { $first: '$order.listProduct.unit' }, // 👈 เพิ่ม
+
+                // ✅ เก็บ orderId ทุกตัว (ไม่ซ้ำ)
+                listOrder: { $addToSet: '$order.orderId' }
+              }
+            }
+          ],
+          as: 'sales'
+        }
+      },
+
+      // 4️⃣ แปลง sales → default 0
+      {
+        $addFields: {
+          qty: {
+            $ifNull: [{ $arrayElemAt: ['$sales.qty', 0] }, 0]
+          },
+          amount: {
+            $ifNull: [{ $arrayElemAt: ['$sales.amount', 0] }, 0]
+          },
+          unit: {
+            $cond: [
+              {
+                $gt: [{ $ifNull: [{ $arrayElemAt: ['$sales.qty', 0] }, 0] }, 0]
+              },
+              { $arrayElemAt: ['$sales.unit', 0] },
+              'PCS' // 👈 default
+            ]
+          },
+
+          // ✅ listOrder
+          listOrder: {
+            $ifNull: [{ $arrayElemAt: ['$sales.listOrder', 0] }, []]
+          }
+        }
+      },
+
+      // 5️⃣ project output
+      {
+        $project: {
+          _id: 0,
+
+          area: '$area',
+          period: '$period',
+
+          id: '$listProduct.id',
+          name: '$listProduct.name',
+          target: '$listProduct.target',
+
+          qty: 1,
+          amount: 1,
+          unit: 1, // 👈 ส่งออก
+
+          listOrder: 1
+        }
+      },
+
+      { $sort: { id: 1 } }
+    ]
+
+    const data = await SkuFocus.aggregate(pipeline)
 
     res.status(200).json({
       status: 200,

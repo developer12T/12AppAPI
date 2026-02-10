@@ -73,6 +73,7 @@ const { rangeDate } = require('../../utilities/datetime')
 
 const storeTimestamps = {}
 
+
 exports.updateStoreStatusV2 = async (req, res) => {
     try {
         const { storeId, status, user } = req.body
@@ -236,16 +237,15 @@ exports.updateStoreStatusV2 = async (req, res) => {
             }
 
             // console.log(dataTran)
-
             if (item.area != 'IT211') {
                 try {
-                    const response = await axios.post(
+                    response = await axios.post(
                         `${process.env.API_URL_12ERP}/customer/insert`,
                         dataTran
                     )
 
                     // ส่งกลับไปให้ client ที่เรียก Express API
-                    return res.status(response.status).json(response.data)
+                    // return res.status(response.status).json(response.data)
                 } catch (error) {
                     if (error.response) {
                         // หาก ERP ส่ง 400 หรือ 500 หรืออื่นๆ กลับมา
@@ -261,14 +261,17 @@ exports.updateStoreStatusV2 = async (req, res) => {
             if (orderData.length > 0) {
                 for (const row of orderData) {
                     const orderId = await generateOrderId(row.store.area, row.sale.warehouse, channel, res)
-                    await Order.findOneAndUpdate(
+                    const now = new Date()
+
+                    await Order.collection.updateOne(
                         { _id: row._id },
                         {
                             $set: {
                                 'store.storeId': newId,
-                                orderId: orderId,
+                                orderId,
                                 status: 'pending',
-                                statusTH: 'รอนำเข้า'
+                                statusTH: 'รอนำเข้า',
+                                createdAt: now
                             }
                         }
                     )
@@ -354,7 +357,7 @@ exports.updateStoreStatusV2 = async (req, res) => {
                 status: 'approved',
                 id: item.storeId,
             })
-
+            // return res.status(response.status).json(response.data)
             return res.status(200).json({
                 status: 200,
                 message: 'update Store Status sucess',
@@ -374,7 +377,7 @@ exports.updateStoreStatusV2 = async (req, res) => {
                 { new: true }
             )
 
-            const orderData = await Order.find({ 'store.storeId': storeId, status: 'waitApprove', 'store.area': storeNew.area })
+            const orderData = await Order.find({ 'store.storeId': storeId, 'store.area': storeNew.area })
 
 
             if (orderData.length > 0) {
@@ -383,16 +386,25 @@ exports.updateStoreStatusV2 = async (req, res) => {
 
                     if (row.listProduct.length > 0) {
                         for (const product of row.listProduct) {
-                            const updateResult = await updateStockMongo(
-                                product,
-                                row.store.area,
-                                row.period,
-                                'orderCanceled',
-                                channel,
-                                res
-                            )
-                            if (updateResult) return
+                            try {
+                                await updateStockMongo(
+                                    product,
+                                    row.store.area,
+                                    row.period,
+                                    'orderCanceled',
+                                    channel,
+                                    res
+                                )
+                            } catch (err) {
+                                console.error(
+                                    '[updateStockMongo error]',
+                                    product?.sku || product,
+                                    err.message
+                                )
+                                continue // ข้ามไปตัวถัดไป
+                            }
                         }
+
                     }
 
                     if (row.listPromotions.length > 0) {
@@ -508,6 +520,7 @@ exports.updateStoreStatusV2 = async (req, res) => {
         })
     }
 }
+
 
 exports.addStorePcToCash = async (req, res) => {
     try {

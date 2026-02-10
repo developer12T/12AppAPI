@@ -114,7 +114,7 @@ exports.checkOutV2 = async (req, res) => {
     const channel = req.headers['x-channel']
 
     const { Cart } = getModelsByChannel(channel, res, cartModel)
-    const { User } = getModelsByChannel(channel, res, userModel)
+    const { User } = getModelsByChannel('user', res, userModel)
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
@@ -137,13 +137,13 @@ exports.checkOutV2 = async (req, res) => {
 
     const now = Date.now()
     const lastUpdate = orderTimestamps[storeId] || 0
-    const ONE_MINUTE = 60 * 1000
+    const ONE_MINUTE = 3 * 1000
 
     if (now - lastUpdate < ONE_MINUTE) {
       return res.status(429).json({
         status: 429,
         message:
-          'This order was updated less than 1 minute ago. Please try again later!'
+          'This order was updated less than 3 seconds ago. Please try again later!'
       })
     }
     orderTimestamps[storeId] = now
@@ -157,9 +157,11 @@ exports.checkOutV2 = async (req, res) => {
     if (!cart || cart.listProduct.length === 0) {
       return res.status(404).json({ status: 404, message: 'Cart is empty!' })
     }
+
     const sale = await User.findOne({ area }).select(
       'firstName surName warehouse tel saleCode salePayer area zone'
     )
+
     if (!sale) {
       return res
         .status(404)
@@ -257,12 +259,21 @@ exports.checkOutV2 = async (req, res) => {
     // console.log('orderId',orderId)
     let storeData = {}
 
+    console.log('/order/checkOutV2/cart.storeId', cart.storeId)
+
     if (channel !== 'pc') {
-      storeData =
-        (await Store.findOne({
-          storeId: cart.storeId,
-          area: cart.area
-        }).lean()) || {}
+      storeData = await Store.findOne({
+        storeId: cart.storeId,
+        area: cart.area
+      }).lean()
+
+      if (!storeData) {
+        return res.status(404).json({
+          status: 404,
+          message: 'Not found store'
+
+        })
+      }
     }
 
     const promotionshelf =
@@ -335,7 +346,7 @@ exports.checkOutV2 = async (req, res) => {
         warehouse: sale.warehouse
       },
       store: {
-        storeId: storeData.storeId || '',
+        storeId: storeId || '',
         name: storeData.name || '',
         type: storeData.type || '',
         address: addressFinal || '',
@@ -488,6 +499,61 @@ exports.checkOutV2 = async (req, res) => {
       { $set: { qty: 0 } }
     )
     await Cart.deleteOne({ type, area, storeId })
+
+    // if (approveStore === false) {
+
+
+    //   const listMail = [
+    //     { zone: 'BK', mail: process.env.BK_MAIL },
+    //     { zone: 'CT', mail: process.env.CT_MAIL },
+    //     { zone: 'ET', mail: process.env.ET_MAIL },
+    //     { zone: 'NE', mail: process.env.NE_MAIL },
+    //     { zone: 'NH', mail: process.env.NH_MAIL },
+    //     { zone: 'SH', mail: process.env.SH_MAIL },
+    //   ]
+
+
+
+
+    //   if (distributionTran.area !== 'IT211') {
+    //     if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
+
+    //       sendEmail({
+    //         to: email?.Dc_Email ?? '',
+    //         cc: process.env.IT_MAIL,
+    //         subject: `${distributionTran.orderId ?? ''} 12App cash`,
+    //         html: `
+    //     <h1>แจ้งการส่งใบขอเบิกผ่านทางอีเมล</h1>
+    //     <p>
+    //       <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh ?? ''} ${type}<br>
+    //       <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId ?? ''}<br>
+    //       <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName ?? ''
+    //           }<br>
+    //       <strong>จัดส่ง:</strong> ${(distributionTran.fromWarehouse ?? '') +
+    //           '-' +
+    //           (wereHouseName?.wh_name ?? '')
+    //           }<br>
+    //       <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse ?? ''
+    //           }-${distributionTran.shippingName ?? ''}<br>
+    //       <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate ?? ''}<br>
+    //       <strong>เขต:</strong> ${distributionTran.area ?? ''}<br>
+    //       <strong>ชื่อ:</strong> ${userData?.firstName ?? ''} ${userData?.surName ?? ''
+    //           }<br>
+    //       <strong>เบอร์โทรศัพท์เซลล์:</strong> ${userData?.tel ?? ''}<br>
+    //       <strong>หมายเหตุ:</strong> ${distributionTran.remark ?? ''}
+    //     </p>
+    //   `
+    //       })
+
+    //     }
+    //   }
+
+    // }
+
+
+
+
+
     const currentDate = new Date()
     let query = {}
     const promoIds = newOrder.listPromotions.map(u => u.proId)
@@ -640,14 +706,17 @@ exports.waitApproveToPending = async (req, res) => {
         }
 
         data.push(dataTran)
-        await Order.findOneAndUpdate(
-          { 'store.storeId': storeId },
+
+        const now = new Date()
+        await Order.collection.updateOne(
+          { _id: row._id },
           {
             $set: {
               'store.storeId': storeData.storeId,
-              orderId: orderId,
+              orderId,
               status: 'pending',
-              statusTH: 'รอนำเข้า'
+              statusTH: 'รอนำเข้า',
+              createdAt: now
             }
           }
         )
