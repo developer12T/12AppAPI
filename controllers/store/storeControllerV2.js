@@ -236,7 +236,6 @@ exports.updateStoreStatusV2 = async (req, res) => {
             }
 
             // console.log(dataTran)
-            let response
             if (item.area != 'IT211') {
                 try {
                     response = await axios.post(
@@ -357,12 +356,12 @@ exports.updateStoreStatusV2 = async (req, res) => {
                 status: 'approved',
                 id: item.storeId,
             })
-            return res.status(response.status).json(response.data)
-            // return res.status(200).json({
-            //     status: 200,
-            //     message: 'update Store Status sucess',
-            //     storeId: item.storeId
-            // })
+            // return res.status(response.status).json(response.data)
+            return res.status(200).json({
+                status: 200,
+                message: 'update Store Status sucess',
+                storeId: item.storeId
+            })
         } else {
             const storeNew = await Store.findOneAndUpdate(
                 { _id: store._id },
