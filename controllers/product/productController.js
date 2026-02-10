@@ -1885,72 +1885,79 @@ exports.getProductPage = async (req, res) => {
 exports.addskufocus = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
-    const { zone, listProduct, target, period } = req.body
+    const { zone, area, listProduct, target, period } = req.body
+
     const { Product } = getModelsByChannel(channel, res, productModel)
     const { User } = getModelsByChannel(channel, res, userModel)
     const { SkuFocus } = getModelsByChannel(channel, res, skufocusModel)
 
-    // 1️⃣ หา user ตาม zone
-    const users = await User.find({
-      zone: { $in: zone },
-      area: { $ne: '' }
-    })
-      .select('area')
-      .lean()
+    let areas = []
 
-    const areas = [...new Set(users.map(u => u.area))]
-    if (!areas.length) {
-      return res.json({ message: 'ไม่พบ area ใน zone ที่ส่งมา' })
+    // 1️⃣ กำหนด area
+    if (zone && zone.length) {
+      // 👉 ใช้ zone หา area
+      const users = await User.find({
+        zone: { $in: zone },
+        area: { $ne: '' }
+      })
+        .select('area')
+        .lean()
+
+      areas = [...new Set(users.map(u => u.area))]
+    } else if (area) {
+      // 👉 ใช้ area ที่ส่งมาแทน
+      areas = Array.isArray(area) ? area : [area]
     }
 
-    // 2️⃣ ดึง product ตาม listProduct
+    if (!areas.length) {
+      return res.status(400).json({ message: 'ไม่พบ area ที่ใช้งานได้' })
+    }
+
+    // 2️⃣ ดึง product
     const products = await Product.find({
       id: { $in: listProduct }
     }).lean()
 
     if (!products.length) {
-      return res.json({ message: 'ไม่พบสินค้าใน Product' })
+      return res.status(400).json({ message: 'ไม่พบสินค้าใน Product' })
     }
 
-    // 3️⃣ เตรียม bulk operations
+    // 3️⃣ bulk operations
     const bulkOps = []
+    for (const a of areas) {
+      let doc = await SkuFocus.findOne({ area: a, period })
 
-    for (const area of areas) {
+      // 1️⃣ ถ้ายังไม่มี document → สร้างก่อน
+      if (!doc) {
+        doc = await SkuFocus.create({
+          area: a,
+          period,
+          target,
+          listProduct: []
+        })
+      }
+
+      // 2️⃣ ค่อย push product (กันซ้ำ)
       for (const p of products) {
         bulkOps.push({
           updateOne: {
             filter: {
-              area,
-              target,
-              period,
-              'listProduct.id': { $ne: p.id } // ❗ กันซ้ำ
+              _id: doc._id,
+              listProduct: {
+                $not: {
+                  $elemMatch: { id: p.id }
+                }
+              }
             },
             update: {
               $push: {
                 listProduct: {
                   id: p.id,
                   name: p.name,
-                  groupCode: p.groupCode,
-                  group: p.group,
-                  groupCodeM3: p.groupCodeM3,
-                  groupM3: p.groupM3,
-                  brandCode: p.brandCode,
-                  brand: p.brand,
-                  size: p.size,
-                  flavourCode: p.flavourCode,
-                  flavour: p.flavour,
-                  type: p.type,
-                  weightGross: p.weightGross,
-                  weightNet: p.weightNet,
-                  target: target,
-                  statusSale: p.statusSale,
-                  statusWithdraw: p.statusWithdraw,
-                  statusRefund: p.statusRefund,
-                  statusRefundDmg: p.statusRefundDmg
+                  target
                 }
               }
-            },
-            upsert: true
+            }
           }
         })
       }
@@ -2003,7 +2010,34 @@ exports.addSizeNumber = async (req, res) => {
     })
   } catch (error) {
     console.error(error)
-    res.status(500).json({ status: '501', message: error.message })
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.deleteSKUProduct = async (req, res) => {
+  try {
+    const { productId } = req.body
+    const channel = req.headers['x-channel']
+
+    const { SkuFocus } = getModelsByChannel(channel, res, skufocusModel)
+
+    const result = await SkuFocus.updateMany(
+      { 'listProduct.id': productId },
+      { $pull: { listProduct: { id: productId } } }
+    )
+
+    res.json({
+      status: 200,
+      message: 'deleteSKUProduct item Success',
+      matchedCount: result.matchedCount,
+      modifiedCount: result.modifiedCount
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({
+      status: 500,
+      message: error.message
+    })
   }
 }
 
@@ -2082,5 +2116,83 @@ exports.getSkuFocusWithSales = async (req, res) => {
   } catch (error) {
     console.error(error)
     res.status(500).json({ message: error.message })
+  }
+}
+
+exports.getSkuProduct = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { period } = req.query
+
+    if (!period) {
+      return res.status(400).json({ message: 'period is required' })
+    }
+
+    const { SkuFocus } = getModelsByChannel(channel, res, skufocusModel)
+
+    const data = await SkuFocus.aggregate([
+      // 1️⃣ filter เฉพาะ period
+      {
+        $match: { period }
+      },
+
+      // 2️⃣ แตก listProduct
+      {
+        $unwind: '$listProduct'
+      },
+
+      // 3️⃣ derive zone จาก area
+      {
+        $addFields: {
+          zone: { $substr: ['$area', 0, 2] }
+        }
+      },
+
+      // 4️⃣ group แค่ productId
+      {
+        $group: {
+          _id: '$listProduct.id',
+          name: { $first: '$listProduct.name' },
+          target: { $first: '$listProduct.target' },
+          image: {
+            $first: {
+              $concat: [
+                'https://apps.onetwotrading.co.th/images/products/',
+                '$listProduct.id',
+                '.webp'
+              ]
+            }
+          },
+          // รวม area และ zone แบบไม่ซ้ำ
+          area: { $addToSet: '$area' },
+          zone: { $addToSet: '$zone' }
+        }
+      },
+
+      // 5️⃣ reshape output
+      {
+        $project: {
+          _id: 0,
+          id: '$_id',
+          name: 1,
+          image: 1,
+          target: 1,
+          area: 1,
+          zone: 1
+        }
+      },
+
+      { $sort: { id: 1 } }
+    ])
+
+    res.json({
+      period,
+      total: data.length,
+      listProduct: data
+      // this:"test"
+    })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: err.message })
   }
 }

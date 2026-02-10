@@ -137,55 +137,55 @@ exports.getRoute = async (req, res) => {
     // If area is not provided (or explicitly empty), group results by day+period
     if ((!area || area === '') && period && !storeId) {
       const groups = new Map()
-        ; (enrichedRoutes || []).forEach(route => {
-          // Skip routes with area == 'IT211'
-          if (route.area === 'IT211') return
+      ;(enrichedRoutes || []).forEach(route => {
+        // Skip routes with area == 'IT211'
+        if (route.area === 'IT211') return
 
-          // derive zone/team from route (prefer explicit fields, otherwise from area)
-          let zoneKey = route.zone || ''
-          let teamKey = route.team || ''
-          if (route.area) {
-            const a = String(route.area || '')
-            zoneKey = a.substring(0, 2)
-            teamKey = `${a.substring(0, 2)}${a.charAt(3) || ''}`
-          }
+        // derive zone/team from route (prefer explicit fields, otherwise from area)
+        let zoneKey = route.zone || ''
+        let teamKey = route.team || ''
+        if (route.area) {
+          const a = String(route.area || '')
+          zoneKey = a.substring(0, 2)
+          teamKey = `${a.substring(0, 2)}${a.charAt(3) || ''}`
+        }
 
-          // if request includes zone/team filters, skip non-matching routes
-          if (zone && String(zone) !== zoneKey) return
-          if (team && String(team) !== teamKey) return
+        // if request includes zone/team filters, skip non-matching routes
+        if (zone && String(zone) !== zoneKey) return
+        if (team && String(team) !== teamKey) return
 
-          const dayKey = route.day || ''
-          if (!groups.has(dayKey)) {
-            groups.set(dayKey, {
-              day: dayKey,
-              period: period,
-              // routes: [],
-              storeAll: 0,
-              storePending: 0,
-              storeSell: 0,
-              storeNotSell: 0,
-              storeCheckInNotSell: 0,
-              storeTotal: 0
-            })
-          }
+        const dayKey = route.day || ''
+        if (!groups.has(dayKey)) {
+          groups.set(dayKey, {
+            day: dayKey,
+            period: period,
+            // routes: [],
+            storeAll: 0,
+            storePending: 0,
+            storeSell: 0,
+            storeNotSell: 0,
+            storeCheckInNotSell: 0,
+            storeTotal: 0
+          })
+        }
 
-          const grp = groups.get(dayKey)
+        const grp = groups.get(dayKey)
 
-          // accumulate counts from each route (use numeric defaults)
-          const ra = Number(route.storeAll) || 0
-          const rp = Number(route.storePending) || 0
-          const rs = Number(route.storeSell) || 0
-          const rn = Number(route.storeNotSell) || 0
-          const rcn = Number(route.storeCheckInNotSell) || 0
-          const rt = Number(route.storeTotal) || 0
+        // accumulate counts from each route (use numeric defaults)
+        const ra = Number(route.storeAll) || 0
+        const rp = Number(route.storePending) || 0
+        const rs = Number(route.storeSell) || 0
+        const rn = Number(route.storeNotSell) || 0
+        const rcn = Number(route.storeCheckInNotSell) || 0
+        const rt = Number(route.storeTotal) || 0
 
-          grp.storeAll += ra
-          grp.storePending += rp
-          grp.storeSell += rs
-          grp.storeNotSell += rn
-          grp.storeCheckInNotSell += rcn
-          grp.storeTotal += rt
-        })
+        grp.storeAll += ra
+        grp.storePending += rp
+        grp.storeSell += rs
+        grp.storeNotSell += rn
+        grp.storeCheckInNotSell += rcn
+        grp.storeTotal += rt
+      })
 
       // finalize percentage fields for each group
       enrichedRoutes = Array.from(groups.values()).map(g => {
@@ -2361,7 +2361,7 @@ exports.getRouteEffective = async (req, res) => {
       )
       xlsx.writeFile(wb, filePath)
       res.download(filePath, err => {
-        fs.unlink(filePath, () => { })
+        fs.unlink(filePath, () => {})
         if (err) console.error(err)
       })
     } else {
@@ -2605,7 +2605,7 @@ exports.getRouteEffectiveAll = async (req, res) => {
     // ------------------------------
     let start, end
 
-    function getPeriodFromDate(dateStr) {
+    function getPeriodFromDate (dateStr) {
       if (!dateStr) return null
       const d = new Date(dateStr)
       if (isNaN(d)) return null
@@ -2789,7 +2789,9 @@ exports.getRouteEffectiveAll = async (req, res) => {
     }
 
     const visitVsTarget =
-      target.visitStore > 0 ? (totalStoreCheckInNotSell / target.visitStore) * 100 : 0
+      target.visitStore > 0
+        ? (totalStoreCheckInNotSell / target.visitStore) * 100
+        : 0
 
     const effectiveVsTarget =
       target.saleStore > 0 ? (totalStoreSell / target.saleStore) * 100 : 0
@@ -2880,12 +2882,12 @@ exports.getRouteEffectiveByDayArea = async (req, res) => {
       // filter team (ต้องอยู่ตรงนี้ ❗)
       ...(team
         ? [
-          {
-            $match: {
-              team3: { $regex: `^${team}`, $options: 'i' }
+            {
+              $match: {
+                team3: { $regex: `^${team}`, $options: 'i' }
+              }
             }
-          }
-        ]
+          ]
         : []),
 
       // แตก store
@@ -3271,7 +3273,7 @@ exports.checkRouteStore = async (req, res) => {
       areaMap[area].del = storeCountMap[area]?.del || 0
     }
 
-    function sortKeys(obj) {
+    function sortKeys (obj) {
       const { area, R, del, ...days } = obj
       const sortedDays = Object.keys(days)
         .filter(k => /^R\d+$/.test(k))
@@ -3701,7 +3703,8 @@ exports.updateRouteAllStore = async (req, res) => {
       )
 
       console.log(
-        `processed ${Math.min(i + BATCH, storeData.length)} / ${storeData.length
+        `processed ${Math.min(i + BATCH, storeData.length)} / ${
+          storeData.length
         }`
       )
     }
@@ -4283,10 +4286,8 @@ exports.getRouteChange = async (req, res) => {
 
 const orderTimestamps = {}
 
-
 exports.addNewStoreToRoute = async (req, res) => {
   try {
-
     const { id, storeId, period } = req.body
     const channel = req.headers['x-channel']
     const { Route, RouteChange, RouteChangeLog } = getModelsByChannel(
@@ -4307,7 +4308,6 @@ exports.addNewStoreToRoute = async (req, res) => {
       })
     }
     orderTimestamps[storeId] = now
-
 
     const { Store } = getModelsByChannel(channel, res, storeModel)
 
@@ -4995,6 +4995,169 @@ exports.getStoreCheckinByDayArea = async (req, res) => {
           imageLink: '$listStore.image',
 
           // ===== CHECK-IN TIME =====
+          checkinDatetime: {
+            $dateToString: {
+              date: '$listStore.date',
+              format: '%Y-%m-%d %H:%M:%S',
+              timezone: 'Asia/Bangkok'
+            }
+          }
+        }
+      }
+    ]
+
+    const data = await Route.aggregate(pipeline)
+
+    res.status(200).json({
+      status: 200,
+      message: 'success',
+      data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message
+    })
+  }
+}
+
+exports.getProductSoldByDayArea = async (req, res) => {
+  try {
+    const { area, date } = req.body
+    const channel = req.headers['x-channel']
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+
+    if (!area || !date) {
+      return res.status(400).json({
+        status: 400,
+        message: 'area and date are required'
+      })
+    }
+
+    const pipeline = [
+      // 1️⃣ match route by area
+      { $match: { area } },
+
+      // 2️⃣ unwind store
+      { $unwind: '$listStore' },
+
+      // 3️⃣ แปลงวันที่เป็น day string
+      {
+        $addFields: {
+          checkinDay: {
+            $dateToString: {
+              format: '%d-%m-%Y',
+              date: '$listStore.date',
+              timezone: 'Asia/Bangkok'
+            }
+          }
+        }
+      },
+
+      // 4️⃣ match day
+      { $match: { checkinDay: date } },
+
+      // 5️⃣ ดึง orderId ตัวแรก
+      {
+        $addFields: {
+          orderId: { $arrayElemAt: ['$listStore.listOrder.orderId', 0] }
+        }
+      },
+
+      // ❗ กันเคสไม่มี order
+      { $match: { orderId: { $ne: null } } },
+
+      // 6️⃣ lookup Order
+      {
+        $lookup: {
+          from: 'orders',
+          localField: 'orderId',
+          foreignField: 'orderId',
+          as: 'order'
+        }
+      },
+
+      // 7️⃣ unwind order
+      { $unwind: '$order' },
+
+      // 8️⃣ unwind listProduct
+      { $unwind: '$order.listProduct' },
+
+      // ✅ 9️⃣ คำนวณ unitOrder (ตอนนี้ unit มีแล้ว)
+      {
+        $addFields: {
+          unitOrder: {
+            $switch: {
+              branches: [
+                { case: { $eq: ['$order.listProduct.unit', 'CTN'] }, then: 1 },
+                { case: { $eq: ['$order.listProduct.unit', 'PCS'] }, then: 3 }
+              ],
+              default: 2
+            }
+          }
+        }
+      },
+
+      // 🔟 sort: CTN → อื่น → PCS, qty มาก → น้อย
+      {
+        $sort: {
+          unitOrder: 1,
+          'order.listProduct.qty': -1
+        }
+      },
+
+      // 1️⃣1️⃣ project output (ค่อยลบ unitOrder)
+      // {
+      //   $project: {
+      //     _id: 0,
+      //     unitOrder: 0,
+
+      //     // context
+      //     area: '$area',
+      //     zone: '$zone',
+      //     period: '$period',
+      //     orderId: '$order.orderId',
+
+      //     // product info
+      //     id: '$order.listProduct.id',
+      //     name: '$order.listProduct.name',
+      //     qty: '$order.listProduct.qty',
+      //     amount: '$order.listProduct.amount',
+      //     unit: '$order.listProduct.unit',
+      //     unitName: '$order.listProduct.unitName',
+
+      //     // check-in time
+      //     checkinDatetime: {
+      //       $dateToString: {
+      //         date: '$listStore.date',
+      //         format: '%Y-%m-%d %H:%M:%S',
+      //         timezone: 'Asia/Bangkok'
+      //       }
+      //     }
+      //   }
+      // }
+      {
+        $project: {
+          _id: 0,
+
+          // context
+          area: '$area',
+          zone: '$zone',
+          period: '$period',
+          orderId: '$order.orderId',
+
+          // product info
+          id: '$order.listProduct.id',
+          name: '$order.listProduct.name',
+          qty: '$order.listProduct.qty',
+          amount: '$order.listProduct.amount',
+          unit: '$order.listProduct.unit',
+          unitName: '$order.listProduct.unitName',
+
+          // check-in time
           checkinDatetime: {
             $dateToString: {
               date: '$listStore.date',

@@ -46,7 +46,8 @@ const {
   approveRouteChange,
   addOrderToRoute,
 
-  getStoreCheckinByDayArea
+  getStoreCheckinByDayArea,
+  getProductSoldByDayArea
 } = require('../../controllers/route/routeController')
 
 const {
@@ -61,7 +62,8 @@ const {
   updateSaleOutRoute,
   getStoreCheckinByDayAreaCredit,
   polylineRouteCredit,
-  getRouteEffectiveByDayAreaCredit
+  getRouteEffectiveByDayAreaCredit,
+
 } = require('../../controllers/route/routeControllerV2')
 
 const router = express.Router()
@@ -129,4 +131,7 @@ router.post('/autoLockRouteChange', autoLockRouteChange)
 
 router.get('/getSaleOutRoute', getSaleOutRoute)
 router.post('/updateSaleOutRoute', updateSaleOutRoute)
+
+router.post('/getProductSoldByDayArea', getProductSoldByDayArea)
+
 module.exports = router
