@@ -559,7 +559,7 @@ exports.getBillNewStore = async (req, res) => {
     const channel = req.headers['x-channel']
     const { Order } = getModelsByChannel(channel, res, orderModel)
 
-    let query = {status:'waitApprove'}
+    let query = { status: 'waitApprove' }
 
     if (area) {
       query['store.area'] = area
@@ -576,6 +576,91 @@ exports.getBillNewStore = async (req, res) => {
       message: 'getbillNewStore',
       data: dataOrder
     })
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
+
+exports.waitApproveToPending = async (req, res) => {
+  try {
+
+    const { storeId } = req.body
+    const channel = req.headers['x-channel']
+    const { User } = getModelsByChannel(channel, res, userModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
+    const orderData = await Order.find({ 'store.storeId': storeId, status: 'waitApprove' })
+
+    if (orderData.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found storeId in order',
+      })
+    }
+
+
+    const checkStoreData = await Store.findOne({ storeId: storeId })
+
+    if (checkStoreData) {
+      return res.status(409).json({
+        status: 409,
+        message: 'This store is not approved yet'
+      })
+    }
+
+
+    const storeData = await Store.findOne({
+      name: orderData[0].store.name,
+      area: orderData[0].store.area,
+      type: orderData[0].store.type,
+    }).sort({ createdAt: -1 })
+
+    // console.log(storeData)
+    if (!storeData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found storeData'
+      })
+    }
+
+
+
+
+    const data = []
+    if (orderData.length > 0) {
+      for (const row of orderData) {
+        const orderId = await generateOrderId(row.store.area, row.sale.warehouse, channel, res)
+
+
+        const dataTran = {
+          orderIdOld: row.orderId,
+          orderIdNew: orderId,
+        }
+
+        data.push(dataTran)
+        await Order.findOneAndUpdate(
+          { 'store.storeId': storeId },
+          {
+            $set: {
+              'store.storeId': storeData.storeId,
+              orderId: orderId,
+              status: 'pending',
+              statusTH: 'รอนำเข้า'
+            }
+          }
+        )
+
+      }
+    }
+
+    res.status(200).json({
+      status: 200,
+      message: 'waitApproveToPending',
+      data: data
+    })
+
 
   } catch (error) {
     console.error(error)

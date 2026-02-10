@@ -1150,21 +1150,32 @@ exports.getZone = async (req, res) => {
 
 exports.getZoneCredit = async (req, res) => {
   try {
+    const { role } = req.body
+    const channel = 'user'
+    const { User } = getModelsByChannel(channel, res, userModel);
+    let match = { role };
 
-    const userCredit = await getZoneCredit()
-    // console.log('userCredit',userCredit)
-    userData = userCredit.map(item => {
-      return {
-        zone: item.code_zone
+    const userData = await User.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: "$zone"
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          zone: "$_id"
+        }
       }
-    })
-
+    ]);
 
     res.status(200).json({
       status: 200,
       message: 'sucess',
       data: userData
     })
+
 
   } catch (error) {
     console.error('❌ Error:', error)
@@ -1175,7 +1186,6 @@ exports.getZoneCredit = async (req, res) => {
       error: error.message || error.toString(), // ✅ ป้องกัน circular object
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
     })
-
   }
 }
 

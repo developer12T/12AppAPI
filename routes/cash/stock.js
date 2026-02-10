@@ -34,6 +34,12 @@ const {
   checkOutAdjustStock
 } = require('../../controllers/stock/stockController')
 
+const {
+  addProductToPreTrip
+} = require('../../controllers/stock/stockControllerV2')
+
+
+
 const router = express.Router()
 
 router.post('/add', addStock)
@@ -75,4 +81,7 @@ router.post('/addStockByArea', addStockByArea)
 router.post('/checkStock', checkStock)
 router.post('/addStockPc', addStockPc)
 router.post('/checkOutAdjustStock', checkOutAdjustStock)
+
+
+router.post('/addProductToPreTrip', addProductToPreTrip)
 module.exports = router

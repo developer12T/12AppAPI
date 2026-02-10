@@ -47,11 +47,12 @@ const {
   updateProCodeInOrder,
 } = require('../../controllers/sale/orderController')
 
-const { 
+const {
   checkOutV2,
-  getBillNewStore
+  getBillNewStore,
+  waitApproveToPending
 
- } = require('../../controllers/sale/orderControllerV2')
+} = require('../../controllers/sale/orderControllerV2')
 
 const router = express.Router()
 
@@ -79,6 +80,7 @@ router.post('/getSummarybyGroup', getSummarybyGroup)
 router.get('/erpApiCheck', erpApiCheckOrder)
 router.get('/erpApiCheckOrderDistrabution', erpApiCheckOrderDistrabution)
 router.get('/updateCompletedOrder', updateCompletedOrder)
+router.post('/waitApproveToPending', waitApproveToPending)
 // router.get('/erpApiCheckDisributionM3', erpApiCheckDisributionM3)
 
 router.post('/getSummarybyChoice', getSummarybyChoice)
