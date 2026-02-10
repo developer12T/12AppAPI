@@ -1768,8 +1768,11 @@ exports.getTeamCredit = async function (zone) {
 
   try {
     const query = `
-            SELECT * FROM forecast_area
-              where channel ='CR' and zone = '${zone}'
+            SELECT DISTINCT
+            CONCAT('${zone}', SUBSTRING(area, 4, 1)) AS team
+          FROM report_visit
+          WHERE area LIKE '${zone}%'
+          ORDER BY team
     `
 
     const [rows] = await connection.execute(query)
@@ -1798,7 +1801,7 @@ exports.getAreaCredit = async function (zone, team) {
 
   try {
 
-    let where = `where area like '%${zone}%' `
+    let where = `where area like '%${zone}1%' `
 
     if (team) {
       where += `
@@ -1810,9 +1813,10 @@ exports.getAreaCredit = async function (zone, team) {
     const query = `
       SELECT distinct area FROM report_visit
       ${where}
+      order by area
     `
 
-    console.log('query', query)
+    console.log(query)
 
     const [rows] = await connection.execute(query)
 
