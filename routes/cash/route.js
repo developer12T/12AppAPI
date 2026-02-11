@@ -48,7 +48,9 @@ const {
 
   getStoreCheckinByDayArea,
   getProductSoldByDayArea,
-  getProductSoldByDayAreaSKU
+  getProductSoldByDayAreaSKU,
+  getProductSKUReport,
+  getOrdersByAreaAndItem
 } = require('../../controllers/route/routeController')
 
 const {
@@ -133,5 +135,7 @@ router.post('/updateSaleOutRoute', updateSaleOutRoute)
 
 router.post('/getProductSoldByDayArea', getProductSoldByDayArea)
 router.post('/getProductSoldByDayAreaSKU', getProductSoldByDayAreaSKU)
+router.post('/getProductSKUReport', getProductSKUReport)
+router.post('/getOrdersByAreaAndItem', getOrdersByAreaAndItem)
 
 module.exports = router
