@@ -48,7 +48,9 @@ const {
 
   getStoreCheckinByDayArea,
   getProductSoldByDayArea,
-  getProductSoldByDayAreaSKU
+  getProductSoldByDayAreaSKU,
+  getProductSKUReport,
+  getOrdersByAreaAndItem
 } = require('../../controllers/route/routeController')
 
 const {
@@ -63,7 +65,8 @@ const {
   updateSaleOutRoute,
   getStoreCheckinByDayAreaCredit,
   polylineRouteCredit,
-  getRouteEffectiveByDayAreaCredit
+  getRouteEffectiveByDayAreaCredit,
+
 } = require('../../controllers/route/routeControllerV2')
 
 const router = express.Router()
@@ -133,5 +136,8 @@ router.post('/updateSaleOutRoute', updateSaleOutRoute)
 
 router.post('/getProductSoldByDayArea', getProductSoldByDayArea)
 router.post('/getProductSoldByDayAreaSKU', getProductSoldByDayAreaSKU)
+router.post('/getProductSKUReport', getProductSKUReport)
+router.post('/getOrdersByAreaAndItem', getOrdersByAreaAndItem)
+
 
 module.exports = router
