@@ -10,7 +10,9 @@ const { getSocket } = require('../../socket')
 const { getModelsByChannel } = require('../../middleware/channel')
 const {
   productQuery,
-  productFoodtruckQuery
+  productFoodtruckQuery,
+  addTargetProductQuery,
+  addTargetQuery
 } = require('../../controllers/queryFromM3/querySctipt')
 const { group } = require('console')
 const { flatMap, filter } = require('lodash')
@@ -22,6 +24,9 @@ const os = require('os')
 const approveLogModel = require('../../models/cash/approveLog')
 const userModel = require('../../models/cash/user')
 const skufocusModel = require('../../models/cash/skufocus')
+const targetProductModel = require('../../models/cash/targetProduct')
+const targetModel = require('../../models/cash/target')
+
 
 exports.getProductAll = async (req, res) => {
   try {
@@ -391,7 +396,7 @@ exports.getFilters = async (req, res) => {
       sensitivity: 'base'
     })
 
-    function cleanList (list) {
+    function cleanList(list) {
       const arr = Array.isArray(list) ? list : []
       const filtered = arr
         .map(v => (typeof v === 'string' ? v.trim() : v))
@@ -403,7 +408,7 @@ exports.getFilters = async (req, res) => {
 
     const firstAttr = attributes[0] ?? {} // ปลอดภัยกว่า attributes.length เช็คทีเดียว
 
-    function sortSizesAscGFirst (list) {
+    function sortSizesAscGFirst(list) {
       const UNIT_PRIORITY = { G: 0, KG: 1, L: 2 } // อยากให้ L ไปท้ายสุดกว่าก็ปรับเลขได้
       const coll = new Intl.Collator('th-TH', {
         numeric: true,
@@ -1575,7 +1580,7 @@ exports.productCheckPrice = async (req, res) => {
         }
 
         // ✅ ลบไฟล์ทิ้งหลังจากส่งเสร็จ (หรือส่งไม่สำเร็จ)
-        fs.unlink(tempPath, () => {})
+        fs.unlink(tempPath, () => { })
       })
     } else {
       res.status(200).json({
@@ -2194,5 +2199,103 @@ exports.getSkuProduct = async (req, res) => {
   } catch (err) {
     console.error(err)
     res.status(500).json({ message: err.message })
+  }
+}
+
+
+exports.addTargetProduct = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { period } = req.body
+
+    const { targetProduct } = getModelsByChannel(channel, res, targetProductModel)
+
+    const exitsTargetProduct = await targetProduct.find({ period: period })
+    const targetData = await addTargetProductQuery(period)
+
+    let addData = []
+    for (const row of targetData) {
+
+      const exitsId = exitsTargetProduct.find(item => item.id === row.id)
+
+      if (!exitsId) {
+        const dataTran = {
+          id: row.id,
+          zone: row.zone,
+          area: row.area,
+          ch: row.ch,
+          grp_target: row.grp_target,
+          tg: row.tg,
+          all_qty_target: row.all_qty_target,
+          all_amt_target: row.all_amt_target,
+          period: period
+        }
+
+        await targetProduct.create(dataTran)
+
+        addData.push(dataTran)
+
+      }
+
+    }
+
+
+    res.status(200).json({
+      status: 201,
+      message: 'addTargetProduct',
+      data: addData
+    })
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ message: error.message })
+  }
+}
+
+
+exports.addTarget = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { period } = req.body
+
+    const { Target } = getModelsByChannel(channel, res, targetModel)
+    const targetDataQuery = await addTargetQuery(period)
+
+    const dataTarget = await Target.find({ period: period })
+
+    if (dataTarget.length === 0) {
+
+      for (const row of targetDataQuery) {
+
+        const dataTran = {
+          TG_ZONE: row.TG_ZONE,
+          TG_AREA: row.TG_AREA,
+          TG_TEAM: row.TG_TEAM,
+          TG_DATE: row.TG_DATE,
+          TG_PERIOD: row.TG_PERIOD,
+          TG_CHANNEL: row.TG_CHANNEL,
+          TG_AMOUNT: row.TG_AMOUNT,
+          TG_SALE: row.TG_SALE,
+          TG_MT: row.TG_MT
+        }
+
+        await Target.create(dataTran)
+
+      }
+
+
+    }
+
+
+
+    res.status(200).json({
+      status: 201,
+      message: 'addTargetProduct',
+    })
+
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ message: error.message })
   }
 }

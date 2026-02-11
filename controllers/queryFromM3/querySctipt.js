@@ -1968,3 +1968,51 @@ exports.getStoreDetailCredit = async function (storeId) {
     await sql.close()
   }
 }
+
+
+exports.addTargetProductQuery = async function (period) {
+
+  const config = {
+    host: process.env.MY_SQL_SERVER,
+    user: process.env.MY_SQL_USER,
+    password: process.env.MY_SQL_PASSWORD,
+    database: process.env.MY_SQL_DATABASE
+  }
+
+  const connection = await mysql.createConnection(config)
+
+  const query = `
+      SELECT * FROM sale_target_mobile
+        where period = ${period}
+      `
+
+  const [result] = await connection.execute(query)
+
+  return result
+
+}
+
+exports.addTargetQuery = async function (period) {
+  const config = {
+    user: process.env.M3_BK_USER,
+    password: process.env.M3_BK_PASSWORD,
+    server: process.env.M3_BK_SERVER,
+    database: process.env.M3_BK_DATABASE,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  }
+  // console.log(RouteId)
+  await sql.connect(config)
+
+  const query = `SELECT * from fTarget
+                where TG_PERIOD = '${period}'`
+
+  const result = await sql.query(query)
+
+
+  await sql.close()
+
+  return result.recordset
+}
