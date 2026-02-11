@@ -29,7 +29,8 @@ const {
   getSkuFocusWithSales,
   getSkuProduct,
   deleteSKUProduct,
-  addTargetProduct
+  addTargetProduct,
+  addTarget
 } = require('../../controllers/product/productController')
 
 const router = express.Router()
@@ -70,4 +71,5 @@ router.patch('/deleteSKUProduct', deleteSKUProduct)
 
 
 router.post('/addTargetProduct', addTargetProduct)
+router.post('/addTarget', addTarget)
 module.exports = router

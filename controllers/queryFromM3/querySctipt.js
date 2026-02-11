@@ -1991,3 +1991,28 @@ exports.addTargetProductQuery = async function (period) {
   return result
 
 }
+
+exports.addTargetQuery = async function (period) {
+  const config = {
+    user: process.env.M3_BK_USER,
+    password: process.env.M3_BK_PASSWORD,
+    server: process.env.M3_BK_SERVER,
+    database: process.env.M3_BK_DATABASE,
+    options: {
+      encrypt: false,
+      trustServerCertificate: true
+    }
+  }
+  // console.log(RouteId)
+  await sql.connect(config)
+
+  const query = `SELECT * from fTarget
+                where TG_PERIOD = '${period}'`
+
+  const result = await sql.query(query)
+
+
+  await sql.close()
+
+  return result.recordset
+}

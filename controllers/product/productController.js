@@ -11,7 +11,8 @@ const { getModelsByChannel } = require('../../middleware/channel')
 const {
   productQuery,
   productFoodtruckQuery,
-  addTargetProductQuery
+  addTargetProductQuery,
+  addTargetQuery
 } = require('../../controllers/queryFromM3/querySctipt')
 const { group } = require('console')
 const { flatMap, filter } = require('lodash')
@@ -24,6 +25,8 @@ const approveLogModel = require('../../models/cash/approveLog')
 const userModel = require('../../models/cash/user')
 const skufocusModel = require('../../models/cash/skufocus')
 const targetProductModel = require('../../models/cash/targetProduct')
+const targetModel = require('../../models/cash/target')
+
 
 exports.getProductAll = async (req, res) => {
   try {
@@ -2237,13 +2240,59 @@ exports.addTargetProduct = async (req, res) => {
     }
 
 
-
-
     res.status(200).json({
-      status: 200,
+      status: 201,
       message: 'addTargetProduct',
       data: addData
     })
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ message: error.message })
+  }
+}
+
+
+exports.addTarget = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { period } = req.body
+
+    const { Target } = getModelsByChannel(channel, res, targetModel)
+    const targetDataQuery = await addTargetQuery(period)
+
+    const dataTarget = await Target.find({ period: period })
+
+    if (dataTarget.length === 0) {
+
+      for (const row of targetDataQuery) {
+
+        const dataTran = {
+          TG_ZONE: row.TG_ZONE,
+          TG_AREA: row.TG_AREA,
+          TG_TEAM: row.TG_TEAM,
+          TG_DATE: row.TG_DATE,
+          TG_PERIOD: row.TG_PERIOD,
+          TG_CHANNEL: row.TG_CHANNEL,
+          TG_AMOUNT: row.TG_AMOUNT,
+          TG_SALE: row.TG_SALE,
+          TG_MT: row.TG_MT
+        }
+
+        await Target.create(dataTran)
+
+      }
+
+
+    }
+
+
+
+    res.status(200).json({
+      status: 201,
+      message: 'addTargetProduct',
+    })
+
 
   } catch (error) {
     console.error(error)
