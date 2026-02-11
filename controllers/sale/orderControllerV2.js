@@ -89,7 +89,7 @@ const os = require('os')
 const fs = require('fs')
 const target = require('../../models/cash/target')
 const product = require('../../models/cash/product')
-
+const { sendEmail } = require('../../middleware/order')
 
 const orderTimestamps = {}
 
@@ -500,55 +500,72 @@ exports.checkOutV2 = async (req, res) => {
     )
     await Cart.deleteOne({ type, area, storeId })
 
-    // if (approveStore === false) {
+    if (approveStore === false) {
+      const listMail = [
+        { zone: 'BK', mail: process.env.BK_MAIL },
+        { zone: 'CT', mail: process.env.CT_MAIL },
+        { zone: 'ET', mail: process.env.ET_MAIL },
+        { zone: 'NE', mail: process.env.NE_MAIL },
+        { zone: 'NH', mail: process.env.NH_MAIL },
+        { zone: 'SH', mail: process.env.SH_MAIL },
+        { zone: 'IT', mail: process.env.IT_MAIL },
+      ]
+
+      if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
+        const getMail = listMail.find(item => item.zone === newOrder.store.zone)
+
+        if (getMail) {
+
+          const team = `${newOrder.store.zone}${newOrder.store.area.charAt(3)}`
+          const formatThaiDate = (date) =>
+            new Date(date).toLocaleString('th-TH', {
+              timeZone: 'Asia/Bangkok',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit'
+            })
+
+          const createDate = formatThaiDate(new Date())
+          const toMail = getMail?.mail
+          const ccMail = process.env.IT_MAIL
+
+          if (!toMail && !ccMail) {
+            console.warn('❌ Skip sendEmail: no recipient', {
+              zone: newOrder.store.zone,
+              toMail,
+              ccMail
+            })
+            return
+          }
 
 
-    //   const listMail = [
-    //     { zone: 'BK', mail: process.env.BK_MAIL },
-    //     { zone: 'CT', mail: process.env.CT_MAIL },
-    //     { zone: 'ET', mail: process.env.ET_MAIL },
-    //     { zone: 'NE', mail: process.env.NE_MAIL },
-    //     { zone: 'NH', mail: process.env.NH_MAIL },
-    //     { zone: 'SH', mail: process.env.SH_MAIL },
-    //   ]
+          await sendEmail({
+            to: toMail,
+            cc: ccMail,
+            subject: `แจ้งการเปิดบิลร้านค้าใหม่ (เทสระบบ) ${newOrder.store.area}`,
+            html: `
+        <h1>แจ้งการเปิดบิลร้านค้าใหม่ (เทสระบบ) ${newOrder.store.area}</h1>
+        <p>
+          <strong>วันที่เปิดบิล:</strong> ${createDate || ''}<br>
+          <strong>เลขที่บิลก่อนอนุมัติ:</strong> ${newOrder.orderId}<br>
+          <strong>ชื่อร้าน:</strong> ${newOrder.store.name || ''}<br>
+          <strong>ที่อยู่:</strong> ${addressFinal || ''}<br>
+          <strong>เขต:</strong> ${newOrder.store.area || ''}<br>
+          <strong>ทีม:</strong> ${team || ''}<br>
+          <strong>โซน:</strong> ${newOrder.store.zone || ''}<br>
+          <strong>ยอด:</strong> ${newOrder.total || ''} บาท<br>
+          <strong>ชื่อเซลล์:</strong> ${newOrder.sale.name || ''}<br>
+          <strong>เบอร์โทรศัพท์เซลล์:</strong> ${newOrder.sale.tel || ''}
+        </p>
+      `
+          })
 
-
-
-
-    //   if (distributionTran.area !== 'IT211') {
-    //     if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
-
-    //       sendEmail({
-    //         to: email?.Dc_Email ?? '',
-    //         cc: process.env.IT_MAIL,
-    //         subject: `${distributionTran.orderId ?? ''} 12App cash`,
-    //         html: `
-    //     <h1>แจ้งการส่งใบขอเบิกผ่านทางอีเมล</h1>
-    //     <p>
-    //       <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh ?? ''} ${type}<br>
-    //       <strong>เลขที่ใบเบิก:</strong> ${distributionTran.orderId ?? ''}<br>
-    //       <strong>ประเภทการจัดส่ง:</strong> ${distributionTran.orderTypeName ?? ''
-    //           }<br>
-    //       <strong>จัดส่ง:</strong> ${(distributionTran.fromWarehouse ?? '') +
-    //           '-' +
-    //           (wereHouseName?.wh_name ?? '')
-    //           }<br>
-    //       <strong>สถานที่จัดส่ง:</strong> ${distributionTran.toWarehouse ?? ''
-    //           }-${distributionTran.shippingName ?? ''}<br>
-    //       <strong>วันที่จัดส่ง:</strong> ${distributionTran.sendDate ?? ''}<br>
-    //       <strong>เขต:</strong> ${distributionTran.area ?? ''}<br>
-    //       <strong>ชื่อ:</strong> ${userData?.firstName ?? ''} ${userData?.surName ?? ''
-    //           }<br>
-    //       <strong>เบอร์โทรศัพท์เซลล์:</strong> ${userData?.tel ?? ''}<br>
-    //       <strong>หมายเหตุ:</strong> ${distributionTran.remark ?? ''}
-    //     </p>
-    //   `
-    //       })
-
-    //     }
-    //   }
-
-    // }
+        }
+      }
+    }
 
 
 
