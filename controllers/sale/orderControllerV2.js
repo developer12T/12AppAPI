@@ -545,9 +545,9 @@ exports.checkOutV2 = async (req, res) => {
           await sendEmail({
             to: toMail,
             cc: ccMail,
-            subject: `แจ้งการเปิดบิลร้านค้าใหม่ (เทสระบบ) ${newOrder.store.area}`,
+            subject: `แจ้งการเปิดบิลร้านค้าใหม่ ${newOrder.store.area}`,
             html: `
-        <h1>แจ้งการเปิดบิลร้านค้าใหม่ (เทสระบบ) ${newOrder.store.area}</h1>
+        <h1>แจ้งการเปิดบิลร้านค้าใหม่ ${newOrder.store.area}</h1>
         <p>
           <strong>วันที่เปิดบิล:</strong> ${createDate || ''}<br>
           <strong>เลขที่บิลก่อนอนุมัติ:</strong> ${newOrder.orderId}<br>
