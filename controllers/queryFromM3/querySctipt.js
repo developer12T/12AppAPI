@@ -1968,3 +1968,26 @@ exports.getStoreDetailCredit = async function (storeId) {
     await sql.close()
   }
 }
+
+
+exports.addTargetProductQuery = async function (period) {
+
+  const config = {
+    host: process.env.MY_SQL_SERVER,
+    user: process.env.MY_SQL_USER,
+    password: process.env.MY_SQL_PASSWORD,
+    database: process.env.MY_SQL_DATABASE
+  }
+
+  const connection = await mysql.createConnection(config)
+
+  const query = `
+      SELECT * FROM sale_target_mobile
+        where period = ${period}
+      `
+
+  const [result] = await connection.execute(query)
+
+  return result
+
+}
