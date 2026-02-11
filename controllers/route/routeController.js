@@ -5484,3 +5484,224 @@ exports.getProductSoldByDayAreaSKU = async (req, res) => {
     })
   }
 }
+
+exports.getProductSKUReport = async (req, res) => {
+  try {
+    const { period } = req.body
+    const channel = req.headers['x-channel']
+
+    const { Route } = getModelsByChannel(channel, res, routeModel)
+    const { SkuFocus } = getModelsByChannel(channel, res, skufocusModel)
+
+    const year = Number(period.substring(0, 4))
+    const month = Number(period.substring(4, 6))
+
+    const startDate = new Date(Date.UTC(year, month - 1, 1))
+    const endDate = new Date(Date.UTC(year, month, 1))
+
+    console.l
+
+    const pipeline = [
+      // 1️⃣ เอาเฉพาะ period
+      // {
+      //   $match: {
+      //     createdAt: {
+      //       $gte: startDate,
+      //       $lt: endDate
+      //     }
+      //   }
+      // },
+
+      // 2️⃣ แตก SKU
+      { $unwind: '$listProduct' },
+
+      // 3️⃣ lookup ยอดขาย
+      {
+        $lookup: {
+          from: 'routes',
+          let: {
+            area: '$area',
+            skuId: '$listProduct.id'
+          },
+          pipeline: [
+            { $match: { $expr: { $eq: ['$area', '$$area'] } } },
+            { $unwind: '$listStore' },
+            {
+              $addFields: {
+                orderId: {
+                  $arrayElemAt: ['$listStore.listOrder.orderId', 0]
+                }
+              }
+            },
+            { $match: { orderId: { $ne: null } } },
+            {
+              $lookup: {
+                from: 'orders',
+                localField: 'orderId',
+                foreignField: 'orderId',
+                as: 'order'
+              }
+            },
+            { $unwind: '$order' },
+            { $unwind: '$order.listProduct' },
+            {
+              $match: {
+                $expr: {
+                  $eq: ['$order.listProduct.id', '$$skuId']
+                },
+                createdAt: {
+                  $gte: startDate,
+                  $lt: endDate
+                }
+              }
+            },
+            {
+              $group: {
+                _id: null,
+                qty: { $sum: '$order.listProduct.qty' }
+              }
+            }
+          ],
+          as: 'sales'
+        }
+      },
+
+      // 4️⃣ default qty = 0
+      {
+        $addFields: {
+          qty: {
+            $ifNull: [{ $arrayElemAt: ['$sales.qty', 0] }, 0]
+          }
+        }
+      },
+
+      // ✅ 5️⃣ project เป็น flat row
+      {
+        $project: {
+          _id: 0,
+          period,
+          area: 1,
+          itemCode: '$listProduct.id',
+          itemName: '$listProduct.name',
+          qty: 1
+        }
+      },
+
+      { $sort: { area: 1, itemCode: 1 } }
+    ]
+
+    const data = await SkuFocus.aggregate(pipeline)
+
+    res.status(200).json({
+      status: 200,
+      message: 'success',
+      data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message
+    })
+  }
+}
+
+exports.getOrdersByAreaAndItem = async (req, res) => {
+  try {
+    const { area, itemCode, period } = req.body
+    const channel = req.headers['x-channel']
+
+    if (!area || !itemCode || !period) {
+      return res.status(400).json({
+        status: 400,
+        message: 'area, itemCode and period are required'
+      })
+    }
+
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+
+    const year = Number(period.substring(0, 4))
+    const month = Number(period.substring(4, 6))
+
+    const startDate = new Date(Date.UTC(year, month - 1, 1))
+    const endDate = new Date(Date.UTC(year, month, 1))
+
+    const pipeline = [
+      // 1️⃣ filter area + sku ก่อน
+      {
+        $match: {
+          'store.area': area,
+          'listProduct.id': itemCode
+          // createdAt: {
+          //   $gte: startDate,
+          //   $lt: endDate
+          // }
+        }
+      },
+
+      // 2️⃣ แตกสินค้า
+      { $unwind: '$listProduct' },
+
+      // 3️⃣ match sku อีกครั้งหลัง unwind
+      {
+        $match: {
+          'listProduct.id': itemCode
+        }
+      },
+
+      // 4️⃣ รวม qty ต่อ order
+      {
+        $group: {
+          _id: '$orderId',
+          orderId: { $first: '$orderId' },
+          storeId: { $first: '$store.storeId' },
+          storeName: { $first: '$store.name' },
+          createdAt: { $first: '$createdAt' }, // ✅ เก็บ raw date
+          qty: { $sum: '$listProduct.qty' },
+          amount: { $sum: '$listProduct.amount' },
+          unit: { $first: '$listProduct.unit' },
+          unitName: { $first: '$listProduct.unitName' }
+        }
+      },
+
+      // 5️⃣ project + format date
+      {
+        $project: {
+          _id: 0,
+          orderId: 1,
+          storeId: 1,
+          storeName: 1,
+          qty: 1,
+          amount: 1,
+          unit: 1,
+          unitName: 1,
+          date: {
+            $dateToString: {
+              format: '%Y-%m-%d',
+              date: '$createdAt',
+              timezone: 'Asia/Bangkok'
+            }
+          }
+        }
+      },
+
+      { $sort: { createdAt: 1 } } // 🔥 ดีกว่า sort ตาม orderId
+    ]
+
+    const data = await Order.aggregate(pipeline)
+
+    res.status(200).json({
+      status: 200,
+      message: 'success',
+      data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message
+    })
+  }
+}
