@@ -45,6 +45,9 @@ const path = require('path')
 const os = require('os')
 const fs = require('fs')
 const { orderBy, reduce } = require('lodash')
+const { WithdrawCash } = require('../../models/cash/powerBi')
+
+
 
 exports.checkout = async (req, res) => {
   const transaction = await sequelize.transaction()
@@ -3689,4 +3692,55 @@ exports.updateRunningOrderNewYear = async (req, res) => {
     return res.status(500).json({ message: error.message })
   }
 
+}
+
+
+exports.updateSendDataOnWithdrawCash = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { year } = req.body
+    const { Distribution } = getModelsByChannel(channel, res, distributionModel)
+    const withdrawList = await WithdrawCash.findAll({
+      where: {
+        WD_DATE: {
+          [Op.like]: `${year}%`
+        }
+      },
+      raw: true
+    })
+
+    const listDist = [...new Set(withdrawList.flatMap(item => item.WD_NO))]
+
+    const orderData = await Distribution.find({ orderId: { $in: listDist } })
+
+    for (const row of orderData) {
+
+      await WithdrawCash.update(
+        {
+          SEND_DATE: row.sendDate,
+          CHANNEL: 'CASH'
+
+        },
+        {
+          where: {
+            WD_NO: row.orderId,
+          }
+        }
+      )
+    }
+
+
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'updateSendDataOnWithdrawCash',
+    })
+
+
+
+  } catch (error) {
+    console.error('Error uploading warehouse data:', error)
+    return res.status(500).json({ message: error.message })
+  }
 }

@@ -141,7 +141,7 @@ module.exports.getPeriodFromDate = function (createdAt) {
   return `${year}${month}`
 }
 
-async function checkProductInStock (Stock, area, period, id) {
+async function checkProductInStock(Stock, area, period, id) {
   const stock = await Stock.findOne({
     area: area,
     period: period,
@@ -253,7 +253,7 @@ module.exports.updateStockMongo = async function (
     throw new Error('Invalid stock update type: ' + type)
 
   // Utility: Check enough balance before deduct
-  async function checkBalanceEnough (area, period, id, pcsNeed) {
+  async function checkBalanceEnough(area, period, id, pcsNeed) {
     const stockDoc = await Stock.findOne(
       { area, period, 'listProduct.productId': id },
       { 'listProduct.$': 1 }
@@ -670,7 +670,7 @@ module.exports.sendEmail = async function ({ to, cc, subject, html }) {
     console.error('❌ Failed to send email:', err.message)
   }
 }
-function calculateStockSummary (productDetail, listUnitStock) {
+function calculateStockSummary(productDetail, listUnitStock) {
   const start = new Date(startDate)
   const end = new Date(endDate)
   const dates = []
@@ -686,7 +686,7 @@ function calculateStockSummary (productDetail, listUnitStock) {
   return dates
 }
 
-function calculateStockSummary (productDetail, listUnitStock) {
+function calculateStockSummary(productDetail, listUnitStock) {
   // helper เอา factor ของหน่วยจาก productDetail.listUnit
   const getFactor = unit => {
     const unitObj = productDetail.listUnit.find(item => item.unit === unit)
@@ -779,7 +779,7 @@ const getOrders = async (areaList, res, channel, type, start, end) => {
     type: { $in: ['sale'] },
     'store.area': { $ne: 'IT211' }
   }
-  
+
   if (start && end) {
     match['createdAt'] = { $gte: start, $lte: end }
   }
@@ -928,12 +928,10 @@ const distributionSendEmail = async (orderDetail, res, channel) => {
             <strong>ประเภทการเบิก:</strong> ${withdrawTypeTh}<br> 
             <strong>เลขที่ใบเบิก:</strong> ${orderDetail.orderId}<br>
             <strong>ประเภทการจัดส่ง:</strong> ${orderDetail.orderTypeName}<br>
-            <strong>จัดส่ง:</strong> ${orderDetail.fromWarehouse}${
-      '-' + wereHouseName?.wh_name || ''
-    }<br>
-            <strong>สถานที่จัดส่ง:</strong> ${orderDetail.toWarehouse}-${
-      orderDetail.shippingName
-    }<br>
+            <strong>จัดส่ง:</strong> ${orderDetail.fromWarehouse}${'-' + wereHouseName?.wh_name || ''
+      }<br>
+            <strong>สถานที่จัดส่ง:</strong> ${orderDetail.toWarehouse}-${orderDetail.shippingName
+      }<br>
             <strong>วันที่จัดส่ง:</strong> ${orderDetail.sendDate}<br>
             <strong>เขต:</strong> ${orderDetail.area}<br>
             <strong>ชื่อ:</strong> ${userData.firstName} ${userData.surName}<br>
@@ -944,7 +942,7 @@ const distributionSendEmail = async (orderDetail, res, channel) => {
   })
 }
 
-function yyyymmddToDdMmYyyy (dateString) {
+function yyyymmddToDdMmYyyy(dateString) {
   // สมมติ dateString คือ '20250804'
   const year = dateString.slice(0, 4)
   const month = dateString.slice(4, 6)
@@ -1102,7 +1100,7 @@ const dataPowerBi = async (
 
   const storeData = await Store.find({ storeId: { $in: storeIdList } })
 
-  function formatDateToThaiYYYYMMDD (date) {
+  function formatDateToThaiYYYYMMDD(date) {
     const d = new Date(date)
     d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1362,7 +1360,7 @@ const dataWithdraw = async (channel, status, startDate, endDate) => {
 
   const productDetails = await Product.find()
 
-  function formatDateToThaiYYYYMMDD (date) {
+  function formatDateToThaiYYYYMMDD(date) {
     const d = new Date(date)
     d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
@@ -1449,6 +1447,7 @@ const dataWithdraw = async (channel, status, startDate, endDate) => {
             break
         }
 
+
         return {
           COMP_NO: '410',
           WD_DATE: createdAtDate,
@@ -1481,7 +1480,10 @@ const dataWithdraw = async (channel, status, startDate, endDate) => {
           STATUS_TH: order.statusTH,
           IS_NEWTRIP: order.newTrip?.toUpperCase?.() || '',
           IS_NPD: product.isNPD ? 'TRUE' : 'FALSE',
-          REMARK_WAREHOUSE: order.remarkWarehouse?.remark || ''
+          REMARK_WAREHOUSE: order.remarkWarehouse?.remark || '',
+          SEND_DATE: order.sendDate,
+          CHANNEL: channel.toUpperCase()
+
         }
       })
       .filter(Boolean)

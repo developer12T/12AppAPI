@@ -1,7 +1,7 @@
 const cron = require('node-cron')
 // const { erpApiCheckOrder,erpApiCheckDisributionM3 } = require('../../controllers/sale/orderController')
 const { OrderToExcelConJob } = require('../../controllers/sale/orderController')
-const { period, rangeDate,generateDates } = require('../../utilities/datetime')
+const { period, rangeDate, generateDates } = require('../../utilities/datetime')
 const {
   to2,
   updateStockMongo,
@@ -675,7 +675,7 @@ async function autoLockRouteChange(channel = 'cash') {
           canSell = true
         }
         const result = await RouteSetting.updateOne(
-          { period:periodStr, area: route.area },
+          { period: periodStr, area: route.area },
           {
             $set: {
               'lockRoute.$[route].lock': canSell,
@@ -730,12 +730,15 @@ const startCronJobAutoLockRouteChange = () => {
 const startCronJobInsertDistribution = () => {
   cron.schedule(
     '0 21 * * *',
+    // '*/2 * * * *',   // ⏰ ทุก 2 นาที
     async () => {
       console.log(
         'Running cron job startCronJobInsertDistribution Now:',
         new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
       )
-      await updateOrderDistribution()
+      await updateOrderDistribution(channel = 'cash')
+      await updateOrderDistribution(channel = 'pc')
+
     },
     {
       timezone: 'Asia/Bangkok'
@@ -746,14 +749,15 @@ const startCronJobInsertDistribution = () => {
 const startCronJobUpdateStatusDistribution = () => {
   cron.schedule(
     '0 21 * * *', // 👉 00:00 AM (เวลาไทย)
-    // "*/3 * * * *",
+    // '*/2 * * * *',   // ⏰ ทุก 2 นาที
 
     async () => {
       console.log(
         'Running cron job startCronJobUpdateStatusDistribution at 21:00 AM Thai time. Now:',
         new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
       )
-      await updateStatusOrderDistribution()
+      await updateStatusOrderDistribution(channel = 'cash')
+      await updateStatusOrderDistribution(channel = 'pc')
     },
     {
       timezone: 'Asia/Bangkok' // 👈 สำคัญมาก
@@ -1083,10 +1087,10 @@ async function updateSendmoney(channel = 'cash') {
   }
 }
 
-async function updateStatusOrderDistribution(channel = 'cash') {
+async function updateStatusOrderDistribution(channel) {
   const logFile = path.join(
     process.cwd(),
-    `${pathLog}updateStatusOrderDistribution.txt`
+    `${pathLog}updateStatusOrderDistribution${channel.toUpperCase()}.txt`
   )
 
   const nowLog = new Date().toLocaleString('th-TH', {
@@ -1105,15 +1109,20 @@ async function updateStatusOrderDistribution(channel = 'cash') {
     // ✅ 1. ดึงข้อมูลจาก WithdrawCash
     const withdrawList = await WithdrawCash.findAll({
       where: {
-        // WD_STATUS: '22',
-        [Op.or]: [{ WD_STATUS: '22' }, { STATUS: 'canceled' }],
+        [Op.or]: [
+          { WD_STATUS: '22' },
+          { STATUS: 'canceled' }
+        ],
         [Op.and]: [
           where(fn('MONTH', col('WD_DATE')), currentMonth),
-          where(fn('YEAR', col('WD_DATE')), currentYear)
+          where(fn('YEAR', col('WD_DATE')), currentYear),
+          where(col('CHANNEL'), channel.toUpperCase())
         ]
       },
       raw: true
     })
+
+    // console.log(`channel ${channel}`, withdrawList)
     // ✅ 2. สร้าง list WD_NO
     const wdNos = [...new Set(withdrawList.map(i => i.WD_NO))]
 
@@ -1163,7 +1172,7 @@ async function updateStatusOrderDistribution(channel = 'cash') {
     }
     fs.appendFileSync(
       logFile,
-      `[${nowLog}] ✅ Job completed updatePowerBiSucess\n`
+      `[${nowLog}] ✅ Job completed updatePowerBiSucess${channel.toUpperCase()}\n`
     )
   } catch (error) {
     console.error(error)
@@ -1171,10 +1180,10 @@ async function updateStatusOrderDistribution(channel = 'cash') {
   }
 }
 
-async function updateOrderDistribution(channel = 'cash') {
+async function updateOrderDistribution(channel) {
   const logFile = path.join(
     process.cwd(),
-    `${pathLog}startCronJobUpdateOrderDistribution.txt`
+    `${pathLog}startCronJobUpdateOrderDistribution${channel.toUpperCase()}.txt`
   )
 
   const nowLog = new Date().toLocaleString('th-TH', {
@@ -1208,7 +1217,7 @@ async function updateOrderDistribution(channel = 'cash') {
     await dataWithdrawInsert(channel, allTransactions)
     fs.appendFileSync(
       logFile,
-      `[${nowLog}] ✅ Job completed dataWithdrawInsert\n`
+      `[${nowLog}] ✅ Job completed dataWithdrawInsert ${channel.toUpperCase()}\n`
     )
   } catch (error) {
     console.error(error)
@@ -1216,6 +1225,8 @@ async function updateOrderDistribution(channel = 'cash') {
     // return res.status(500).json({ status: 500, message: err.message })
   }
 }
+
+
 
 module.exports = {
   startCronJobErpApiCheck,
@@ -1228,6 +1239,6 @@ module.exports = {
 
   startCronJobDeleteCartDaily,
   startCronJobreStoreStockDaily,
-  startCronJobMemory
+  startCronJobMemory,
   // startCronJobUpdateSendmoney
 }
