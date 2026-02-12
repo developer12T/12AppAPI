@@ -1447,6 +1447,7 @@ const dataWithdraw = async (channel, status, startDate, endDate) => {
             break
         }
 
+
         return {
           COMP_NO: '410',
           WD_DATE: createdAtDate,
@@ -1481,7 +1482,7 @@ const dataWithdraw = async (channel, status, startDate, endDate) => {
           IS_NPD: product.isNPD ? 'TRUE' : 'FALSE',
           REMARK_WAREHOUSE: order.remarkWarehouse?.remark || '',
           SEND_DATE: order.sendDate,
-          CHANNEL: 'CASH'
+          CHANNEL: channel.toUpperCase()
 
         }
       })

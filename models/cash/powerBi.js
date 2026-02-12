@@ -56,6 +56,11 @@ const WithdrawCash = sequelizeBI.define(
       type: DataTypes.STRING,
       allowNull: false,
       field: 'IS_NPD'
+    },
+    SEND_DATE: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'SEND_DATE'
     }
   },
   {
