@@ -1730,18 +1730,7 @@ exports.OrderToExcel = async (req, res) => {
           }
         }
       }
-      // {
-      //   $project: {
-      //     // ดึงเฉพาะที่ต้องใช้
-      //     createdAt: 1,
-      //     orderId: 1,
-      //     sale: 1,
-      //     store: 1,
-      //     // team3: 1,
-      //     listProduct: 1,
-      //     listPromotions: 1
-      //   }
-      // }
+
     ]
     if (team) {
       pipeline.push({
@@ -1769,6 +1758,12 @@ exports.OrderToExcel = async (req, res) => {
     pipeline.push({
       $sort: { statusASC: 1, createdAt: -1 }
     })
+
+
+    if (area.startsWith('FT')) {
+      pipeline[0].$match.status.$in.push('success')
+    }
+
     const modelOrder = await Order.aggregate(pipeline)
     // console.log(modelOrder)
 
