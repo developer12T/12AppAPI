@@ -1161,3 +1161,62 @@ exports.getRouteEffectiveByDayAreaCredit = async (req, res) => {
     res.status(500).json({ status: 500, message: 'Internal server error' })
   }
 }
+
+exports.delStoreOneInRoute = async (req, res) => {
+  try {
+    const { storeId, routeId } = req.body
+    const channel = req.headers['x-channel']
+    const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const routeData = await Route.findOne({ id: routeId })
+
+    if (!routeData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found route'
+      })
+    }
+
+    const storeListOBJ = routeData.listStore.flatMap(item => item.storeInfo)
+    const storeInRoute = await Store.find({
+      _id: { $in: storeListOBJ }
+    }).select('storeId')
+    const storeIdSet = storeInRoute.map(item => item.storeId)
+
+    if (!storeIdSet.includes(storeId)) {
+      return res.status(409).json({
+        status: 409,
+        message: 'Not found store in route'
+      })
+    }
+    const routeSetting = await RouteSetting.findOne(
+      {
+        period: routeData.period,
+        area: routeData.area,
+        "lockRoute.listStore.storeId": storeId
+      }
+    )
+    if (!routeSetting) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found routeSetting'
+      })
+    }
+
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: storeIdSet
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message
+    })
+  }
+}
