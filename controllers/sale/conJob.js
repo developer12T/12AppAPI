@@ -1116,11 +1116,13 @@ async function updateStatusOrderDistribution(channel) {
         [Op.and]: [
           where(fn('MONTH', col('WD_DATE')), currentMonth),
           where(fn('YEAR', col('WD_DATE')), currentYear),
-          where(col('SEND_DATE'), channel.toUpperCase())
+          where(col('CHANNEL'), channel.toUpperCase())
         ]
       },
       raw: true
     })
+
+    // console.log(`channel ${channel}`, withdrawList)
     // ✅ 2. สร้าง list WD_NO
     const wdNos = [...new Set(withdrawList.map(i => i.WD_NO))]
 

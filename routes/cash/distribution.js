@@ -30,7 +30,8 @@ const {
   uploadNPDData,
   addNPDProduct,
   distributionChangeWareHouse,
-  updateRunningOrderNewYear
+  updateRunningOrderNewYear,
+  updateSendDataOnWithdrawCash
 } = require('../../controllers/distribution/withdrawController')
 const {
   getPlace,
@@ -96,6 +97,8 @@ router.post('/syncAddressCIADDR', syncAddressCIADDR)
 router.post('/syncAddressDROUTE', syncAddressDROUTE)
 router.post('/addNPDProduct', addNPDProduct)
 router.post('/distributionChangeWareHouse', distributionChangeWareHouse)
+router.post('/updateSendDataOnWithdrawCash', updateSendDataOnWithdrawCash)
+
 
 router.post('/updatePlaceAddressExcel', upload.single('file'), updatePlaceAddressExcel)
 router.post('/updateRunningOrderNewYear', upload.single('file'), updateRunningOrderNewYear)
