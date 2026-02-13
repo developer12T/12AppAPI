@@ -3533,9 +3533,9 @@ exports.uploadNPDData = async (req, res) => {
 
 exports.addNPDProduct = async (req, res) => {
   try {
-    const now = new Date()
-    const period =
-      now.getFullYear().toString() + String(now.getMonth() + 1).padStart(2, '0')
+
+    const { period, productId, qty, unit } = req.body
+
     const channel = req.headers['x-channel']
     const { Npd } = getModelsByChannel(channel, res, npdModel)
     const { User } = getModelsByChannel('user', res, userModel)
@@ -3543,7 +3543,7 @@ exports.addNPDProduct = async (req, res) => {
     const userData = await User.find({
       platformType: 'CASH',
       role: 'sale',
-      zone: { $ne: 'SH' }
+      // zone: { $ne: 'SH' }
     })
 
     for (const item of userData) {
@@ -3552,9 +3552,9 @@ exports.addNPDProduct = async (req, res) => {
         period: period,
         npd: [
           {
-            productId: '10010201058',
-            qty: 3,
-            unit: 'CTN'
+            productId: productId,
+            qty: qty,
+            unit: unit
           }
         ]
       }
