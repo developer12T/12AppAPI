@@ -7,7 +7,8 @@ const {
   previousPeriod,
   generateDates,
   toThaiTime,
-  rangeDate
+  rangeDate,
+  formatThaiSQL
 } = require('../../utilities/datetime')
 // const { Store } = require('../../models/cash/store')
 const { uploadFilesCheckin } = require('../../utilities/upload')
@@ -38,12 +39,14 @@ const storeLatLongModel = require('../../models/cash/storeLatLong')
 const { getSocket } = require('../../socket')
 const { getModelsByChannel } = require('../../middleware/channel')
 const path = require('path')
-const { formatDateTimeToThai } = require('../../middleware/order')
+const { formatDateTimeToThai, toThaiDateOrDefault } = require('../../middleware/order')
 const fs = require('fs')
 const os = require('os')
 const moment = require('moment')
 const { flatMap } = require('lodash')
-
+const { WithdrawCash, ROUTE_DETAIL,
+  ROUTE_STORE,
+  ROUTE_ORDER } = require('../../models/cash/powerBi')
 exports.updateAreaByDataRoute = async (req, res) => {
   try {
     // const { Store, TypeStore } = getModelsByChannel('cash', res, storeModel)
@@ -1211,6 +1214,174 @@ exports.delStoreOneInRoute = async (req, res) => {
       message: 'success',
       data: storeIdSet
     })
+  } catch (error) {
+    console.error('❌ Error:', error)
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message
+    })
+  }
+}
+
+exports.addRouteToM3DBPRD_BK = async (req, res) => {
+  try {
+    const { period } = req.body
+    const channel = req.headers['x-channel']
+    const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+
+    const routeData = await Route.find({ period: period, area: 'BK225' })
+    const storeObj = [...new Set(routeData.flatMap(item => item.listStore.flatMap(row => row.storeInfo)))]
+
+    const orderData = await Order.find({
+      period: period, routeId: { $nin: '' },
+      status: { $in: ['pending', 'completed'] }
+    })
+
+
+    const storeData = await Store.find({
+      _id: {
+        $in: storeObj
+      }
+    }).select('_id storeId name')
+
+
+    let routeList = []
+    let storeList = []
+    let orderList = []
+
+    const routeBulk = routeData.map(row => {
+
+      return {
+        ROUTE_ID: row.id,
+        PERIOD: row.period,
+        AREA: row.area,
+        ZONE: row.zone,
+        TEAM: row.team,
+        DAY: row.day
+      }
+    })
+
+    // await ROUTE_DETAIL.bulkCreate(routeBulk)
+
+    const storeBulk = routeData.flatMap(row => row.listStore.map(item => {
+
+      const storeExit = storeData.find(u => String(u._id) === item.storeInfo)
+
+      const thailandTime = new Date(
+        new Date(item.date).toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })
+      )
+
+      const value = toThaiDateOrDefault(item?.date)
+
+      console.log('CHECKIN TYPE:', typeof value)
+      console.log('CHECKIN VALUE:', value)
+
+
+      return {
+        ROUTE_ID: row.id,
+        STORE_ID: storeExit?.storeId || '',
+        // storeInfo: item.storeInfo,
+        STORE_NAME: storeExit?.name || '',
+        NOTE: item?.note | '',
+        // image: item.image,
+        LATITUDE: Number(item.latitude),
+        LONGITUDE: Number(item.longtitude),
+        STATUS: item.status,
+        STATUS_TEXT: item.statusText,
+        CHECKIN: toThaiDateOrDefault(item?.date)
+      }
+    }))
+
+    // await ROUTE_STORE.bulkCreate(storeBulk)
+
+
+
+    // for (const row of routeData) {
+
+    //   const dataRoute = {
+    //     ROUTE_ID: row.id,
+    //     PERIOD: row.period,
+    //     AREA: row.area,
+    //     ZONE: row.zone,
+    //     TEAM: row.team,
+    //     DAY: row.day
+
+    //   }
+
+    //   await ROUTE_DETAIL.create(dataRoute)
+
+    //   // console.log(dataRoute)
+
+    //   routeList.push(dataRoute)
+
+
+
+    //   for (const item of row.listStore) {
+
+    //     const storeExit = storeData.find(u => String(u._id) === item.storeInfo)
+
+    //     const dataStore = {
+    //       routeId: row.id,
+    //       storeId: storeExit?.storeId | '',
+    //       // storeInfo: item.storeInfo,
+    //       storeName: storeExit?.name | '',
+    //       note: item?.note | '',
+    //       image: item.image,
+    //       latitude: item.latitude,
+    //       longtitude: item.longtitude,
+    //       status: item.status,
+    //       statusText: item.statusText,
+    //       dateCheckin: item.date
+
+    //     }
+
+    //     storeList.push(dataStore)
+    //     for (const order of item.listOrder) {
+
+
+    //       const orderDetail = orderData.find(m => m.orderId === order.orderId)
+
+    //       if (!orderDetail) {
+    //         continue
+    //       }
+
+    //       const dataOrder = {
+    //         routeId: row.id,
+    //         storeId: orderDetail.store.storeId,
+    //         storeName: orderDetail.store.name,
+    //         area: orderDetail.store.area,
+    //         zone: orderDetail.store.zone,
+    //         province: orderDetail.shipping.province,
+    //         latitude: orderDetail.latitude,
+    //         longitude: orderDetail.longitude,
+    //         saleName: orderDetail.sale.name,
+    //         warehouse: orderDetail.sale.warehouse,
+    //         total: orderDetail.total,
+    //         createdAt: formatDateTimeToThai(orderDetail.createdAt)
+    //       }
+
+
+    //       orderList.push(dataOrder)
+    //     }
+
+    //   }
+
+    // }
+
+
+    res.status(201).json({
+      status: 201,
+      message: 'addRouteToM3DBPRD_BK',
+      data: storeBulk
+      // data: storeList
+      // data: orderData
+    })
+
+
+
   } catch (error) {
     console.error('❌ Error:', error)
     res.status(500).json({

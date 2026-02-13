@@ -3547,19 +3547,25 @@ exports.addNPDProduct = async (req, res) => {
     })
 
     for (const item of userData) {
-      const dataTran = {
+
+      const exists = await Npd.findOne({
         area: item.area,
-        period: period,
+        period: period
+      })
+
+      if (exists) continue
+
+      await Npd.create({
+        area: item.area,
+        period,
         npd: [
           {
-            productId: productId,
-            qty: qty,
-            unit: unit
+            productId,
+            qty,
+            unit
           }
         ]
-      }
-
-      Npd.create(dataTran)
+      })
     }
 
     res.status(200).json({
