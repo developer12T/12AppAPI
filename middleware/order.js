@@ -444,30 +444,21 @@ module.exports.updateStockMongo = async function (
       }
     }
     let incObj = {}
-
-    let query = {
-      area,
-      period,
-      listProduct: {
-        $elemMatch: {
-          productId: id
-        }
-      }
-    }
-
     if (stockType === 'IN') {
       incObj['listProduct.$[elem].balancePcs'] = +factorPcsQty
       incObj['listProduct.$[elem].balanceCtn'] = +factorCtnQty
     } else if (stockType === 'OUT') {
       incObj['listProduct.$[elem].balancePcs'] = -factorPcsQty
       incObj['listProduct.$[elem].balanceCtn'] = -factorCtnQty
-
-      query.listProduct.$elemMatch.balancePcs = { $gte: factorPcsQty }
     }
 
     if (Object.keys(incObj).length > 0) {
       await Stock.findOneAndUpdate(
-        query,
+        {
+          area: area,
+          period: period,
+          'listProduct.productId': id
+        },
         { $inc: incObj },
         {
           arrayFilters: [{ 'elem.productId': id }],
