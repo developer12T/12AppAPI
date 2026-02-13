@@ -332,7 +332,7 @@ exports.getSoup = async (req, res) => {
     }).sort({ id: 1 })
 
     const data = dataProduct.map(item => {
-      const unit = item.listUnit.find(u => u.unit === 'PCS')
+      const unit = item.listUnit.find(u => u.unit === 'SET')
 
       return {
         id: item.id,
