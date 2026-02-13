@@ -5485,13 +5485,142 @@ exports.getProductSoldByDayAreaSKU = async (req, res) => {
   }
 }
 
+// exports.getProductSKUReport = async (req, res) => {
+//   try {
+//     const { period } = req.body
+//     const channel = req.headers['x-channel']
+
+//     const { Route } = getModelsByChannel(channel, res, routeModel)
+//     const { SkuFocus } = getModelsByChannel(channel, res, skufocusModel)
+//     const { Product } = getModelsByChannel(channel, res, productModel)
+
+//     const year = Number(period.substring(0, 4))
+//     const month = Number(period.substring(4, 6))
+
+//     const startDate = new Date(Date.UTC(year, month - 1, 1))
+//     const endDate = new Date(Date.UTC(year, month, 1))
+
+//     const pipeline = [
+//       // 1️⃣ เอาเฉพาะ period
+//       // {
+//       //   $match: {
+//       //     createdAt: {
+//       //       $gte: startDate,
+//       //       $lt: endDate
+//       //     }
+//       //   }
+//       // },
+
+//       // 2️⃣ แตก SKU
+//       { $unwind: '$listProduct' },
+
+//       // 3️⃣ lookup ยอดขาย
+//       {
+//         $lookup: {
+//           from: 'routes',
+//           let: {
+//             area: '$area',
+//             skuId: '$listProduct.id'
+//           },
+//           pipeline: [
+//             { $match: { $expr: { $eq: ['$area', '$$area'] } } },
+//             { $unwind: '$listStore' },
+//             {
+//               $addFields: {
+//                 orderId: {
+//                   $arrayElemAt: ['$listStore.listOrder.orderId', 0]
+//                 }
+//               }
+//             },
+//             { $match: { orderId: { $ne: null } } },
+//             {
+//               $lookup: {
+//                 from: 'orders',
+//                 localField: 'orderId',
+//                 foreignField: 'orderId',
+//                 as: 'order'
+//               }
+//             },
+//             { $unwind: '$order' },
+//             { $unwind: '$order.listProduct' },
+//             {
+//               $match: {
+//                 $expr: {
+//                   $eq: ['$order.listProduct.id', '$$skuId']
+//                 },
+//                 createdAt: {
+//                   $gte: startDate,
+//                   $lt: endDate
+//                 }
+//               }
+//             },
+//             {
+//               $group: {
+//                 _id: null,
+//                 qty: { $sum: '$order.listProduct.qty' }
+//               }
+//             }
+//           ],
+//           as: 'sales'
+//         }
+//       },
+
+//       // 4️⃣ default qty = 0
+//       {
+//         $addFields: {
+//           qty: {
+//             $ifNull: [{ $arrayElemAt: ['$sales.qty', 0] }, 0]
+//           }
+//         }
+//       },
+
+//       // ✅ 5️⃣ project เป็น flat row
+//       {
+//         $project: {
+//           _id: 0,
+//           period,
+//           area: 1,
+//           itemCode: '$listProduct.id',
+//           itemName: '$listProduct.name',
+//           qty: 1
+//         }
+//       },
+
+//       { $sort: { area: 1, itemCode: 1 } }
+//     ]
+
+//     const data = await SkuFocus.aggregate(pipeline)
+
+//     res.status(200).json({
+//       status: 200,
+//       message: 'success',
+//       data
+//     })
+//   } catch (error) {
+//     console.error('❌ Error:', error)
+//     res.status(500).json({
+//       status: 500,
+//       message: 'error from server',
+//       error: error.message
+//     })
+//   }
+// }
+
 exports.getProductSKUReport = async (req, res) => {
   try {
     const { period } = req.body
     const channel = req.headers['x-channel']
 
-    const { Route } = getModelsByChannel(channel, res, routeModel)
+    if (!period || period.length !== 6) {
+      return res.status(400).json({
+        status: 400,
+        message: 'Invalid period format (YYYYMM required)'
+      })
+    }
+
     const { SkuFocus } = getModelsByChannel(channel, res, skufocusModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
 
     const year = Number(period.substring(0, 4))
     const month = Number(period.substring(4, 6))
@@ -5499,107 +5628,135 @@ exports.getProductSKUReport = async (req, res) => {
     const startDate = new Date(Date.UTC(year, month - 1, 1))
     const endDate = new Date(Date.UTC(year, month, 1))
 
-    console.l
-
-    const pipeline = [
-      // 1️⃣ เอาเฉพาะ period
-      // {
-      //   $match: {
-      //     createdAt: {
-      //       $gte: startDate,
-      //       $lt: endDate
-      //     }
-      //   }
-      // },
-
-      // 2️⃣ แตก SKU
-      { $unwind: '$listProduct' },
-
-      // 3️⃣ lookup ยอดขาย
+    // ==========================
+    // 1️⃣ Aggregate sales
+    // ==========================
+    const salesPipeline = [
       {
-        $lookup: {
-          from: 'routes',
-          let: {
-            area: '$area',
-            skuId: '$listProduct.id'
-          },
-          pipeline: [
-            { $match: { $expr: { $eq: ['$area', '$$area'] } } },
-            { $unwind: '$listStore' },
-            {
-              $addFields: {
-                orderId: {
-                  $arrayElemAt: ['$listStore.listOrder.orderId', 0]
-                }
-              }
-            },
-            { $match: { orderId: { $ne: null } } },
-            {
-              $lookup: {
-                from: 'orders',
-                localField: 'orderId',
-                foreignField: 'orderId',
-                as: 'order'
-              }
-            },
-            { $unwind: '$order' },
-            { $unwind: '$order.listProduct' },
-            {
-              $match: {
-                $expr: {
-                  $eq: ['$order.listProduct.id', '$$skuId']
-                },
-                createdAt: {
-                  $gte: startDate,
-                  $lt: endDate
-                }
-              }
-            },
-            {
-              $group: {
-                _id: null,
-                qty: { $sum: '$order.listProduct.qty' }
-              }
-            }
-          ],
-          as: 'sales'
+        $match: {
+          createdAt: { $gte: startDate, $lt: endDate }
         }
       },
 
-      // 4️⃣ default qty = 0
+      { $unwind: '$listProduct' },
+
+      {
+        $lookup: {
+          from: 'products',
+          localField: 'listProduct.id',
+          foreignField: 'id',
+          as: 'product'
+        }
+      },
+
+      {
+        $unwind: {
+          path: '$product',
+          preserveNullAndEmptyArrays: true // กัน crash ถ้าไม่มี product
+        }
+      },
+
       {
         $addFields: {
-          qty: {
-            $ifNull: [{ $arrayElemAt: ['$sales.qty', 0] }, 0]
+          matchedUnit: {
+            $arrayElemAt: [
+              {
+                $filter: {
+                  input: '$product.listUnit',
+                  as: 'u',
+                  cond: { $eq: ['$$u.unit', '$listProduct.unit'] }
+                }
+              },
+              0
+            ]
           }
         }
       },
 
-      // ✅ 5️⃣ project เป็น flat row
       {
-        $project: {
-          _id: 0,
-          period,
-          area: 1,
-          itemCode: '$listProduct.id',
-          itemName: '$listProduct.name',
-          qty: 1
+        $addFields: {
+          factor: { $ifNull: ['$matchedUnit.factor', 1] },
+          convertedQty: {
+            $multiply: [
+              '$listProduct.qty',
+              { $ifNull: ['$matchedUnit.factor', 1] }
+            ]
+          }
         }
       },
 
-      { $sort: { area: 1, itemCode: 1 } }
+      {
+        $group: {
+          _id: {
+            area: '$store.area',
+            skuId: '$listProduct.id'
+          },
+          qty: { $sum: '$convertedQty' }
+        }
+      },
+
+      {
+        $project: {
+          _id: 0,
+          area: '$_id.area',
+          itemCode: '$_id.skuId',
+          qty: 1
+        }
+      }
     ]
 
-    const data = await SkuFocus.aggregate(pipeline)
+    const salesData = await Order.aggregate(salesPipeline)
 
-    res.status(200).json({
+    // ==========================
+    // 2️⃣ Load SkuFocus (filter period)
+    // ==========================
+    const focusData = await SkuFocus.find({ period }).lean()
+
+    // ==========================
+    // 3️⃣ Map sales
+    // ==========================
+    const salesMap = new Map()
+
+    for (const s of salesData) {
+      salesMap.set(`${s.area}_${s.itemCode}`, s.qty)
+    }
+
+    console.log(salesMap)
+
+    // ==========================
+    // 4️⃣ Build result
+    // ==========================
+    const result = []
+
+    for (const f of focusData) {
+      for (const p of f.listProduct || []) {
+        const key = `${f.area}_${p.id}`
+
+        result.push({
+          period,
+          area: f.area,
+          itemCode: p.id,
+          itemName: p.name,
+          qty: salesMap.get(key) || 0
+        })
+      }
+    }
+
+    console.log(result)
+
+    result.sort(
+      (a, b) =>
+        a.area.localeCompare(b.area) || a.itemCode.localeCompare(b.itemCode)
+    )
+
+    return res.status(200).json({
       status: 200,
       message: 'success',
-      data
+      data: result
     })
   } catch (error) {
     console.error('❌ Error:', error)
-    res.status(500).json({
+    return res.status(500).json({
       status: 500,
       message: 'error from server',
       error: error.message
@@ -5632,11 +5789,11 @@ exports.getOrdersByAreaAndItem = async (req, res) => {
       {
         $match: {
           'store.area': area,
-          'listProduct.id': itemCode
-          // createdAt: {
-          //   $gte: startDate,
-          //   $lt: endDate
-          // }
+          'listProduct.id': itemCode,
+          createdAt: {
+            $gte: startDate,
+            $lt: endDate
+          }
         }
       },
 
@@ -5659,7 +5816,7 @@ exports.getOrdersByAreaAndItem = async (req, res) => {
           storeName: { $first: '$store.name' },
           createdAt: { $first: '$createdAt' }, // ✅ เก็บ raw date
           qty: { $sum: '$listProduct.qty' },
-          amount: { $sum: '$listProduct.amount' },
+          amount: { $sum: '$total' },
           unit: { $first: '$listProduct.unit' },
           unitName: { $first: '$listProduct.unitName' }
         }
@@ -5686,7 +5843,7 @@ exports.getOrdersByAreaAndItem = async (req, res) => {
         }
       },
 
-      { $sort: { createdAt: 1 } } // 🔥 ดีกว่า sort ตาม orderId
+      { $sort: { date: 1 } } // 🔥 ดีกว่า sort ตาม orderId
     ]
 
     const data = await Order.aggregate(pipeline)

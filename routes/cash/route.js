@@ -66,7 +66,8 @@ const {
   getStoreCheckinByDayAreaCredit,
   polylineRouteCredit,
   getRouteEffectiveByDayAreaCredit,
-  delStoreOneInRoute
+  delStoreOneInRoute,
+  addRouteToM3DBPRD_BK
 } = require('../../controllers/route/routeControllerV2')
 
 const router = express.Router()
@@ -139,5 +140,5 @@ router.post('/getProductSoldByDayAreaSKU', getProductSoldByDayAreaSKU)
 router.post('/getProductSKUReport', getProductSKUReport)
 router.post('/getOrdersByAreaAndItem', getOrdersByAreaAndItem)
 router.post('/delStoreOneInRoute', delStoreOneInRoute)
-
+router.post('/addRouteToM3DBPRD_BK', addRouteToM3DBPRD_BK)
 module.exports = router

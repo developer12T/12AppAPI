@@ -328,7 +328,217 @@ const CustomerBI = sequelizeBI.define(
   }
 )
 
+
+const ROUTE_DETAIL = sequelizeBI.define(
+  'ROUTE_DETAIL',
+  {
+    ROUTE_ID: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'ROUTE_ID'
+    },
+    PERIOD: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: false,
+      field: 'PERIOD'
+    },
+    AREA: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: false,
+      field: 'AREA'
+    },
+    ZONE: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: false,
+      field: 'ZONE'
+    },
+    TEAM: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: false,
+      field: 'TEAM'
+    },
+    DAY: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: false,
+      field: 'DAY'
+    },
+  },
+  {
+    tableName: 'ROUTE_DETAIL', // 👈 ชื่อตารางจริง
+    schema: 'dbo', // 👈 สำคัญ
+    timestamps: false,
+    freezeTableName: true
+  }
+)
+
+
+const ROUTE_STORE = sequelizeBI.define(
+  'ROUTE_STORE',
+  {
+    ROUTE_ID: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'ROUTE_ID'
+    },
+    STORE_ID: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: false,
+      field: 'STORE_ID'
+    },
+    STORE_NAME: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: false,
+      field: 'STORE_NAME'
+    },
+    NOTE: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: false,
+      field: 'NOTE'
+    },
+    LATITUDE: {
+      type: DataTypes.NUMBER,
+      allowNull: false,
+      primaryKey: false,
+      field: 'LATITUDE'
+    },
+    LONGITUDE: {
+      type: DataTypes.NUMBER,
+      allowNull: false,
+      primaryKey: false,
+      field: 'LONGITUDE'
+    },
+    STATUS: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: false,
+      field: 'STATUS'
+    },
+    STATUS_TEXT: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: false,
+      field: 'STATUS_TEXT'
+    },
+    CHECKIN: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      primaryKey: false,
+      field: 'CHECKIN'
+    }
+  },
+  {
+    tableName: 'ROUTE_STORE', // 👈 ชื่อตารางจริง
+    schema: 'dbo', // 👈 สำคัญ
+    timestamps: false,
+    freezeTableName: true
+  }
+)
+
+const ROUTE_ORDER = sequelizeBI.define(
+  'ROUTE_ORDER',
+  {
+    ROUTE_ID: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: true,
+      field: 'ROUTE_ID'
+    },
+    STORE_ID: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: false,
+      field: 'STORE_ID'
+    },
+    STORE_NAME: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: false,
+      field: 'STORE_NAME'
+    },
+    AREA: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: false,
+      field: 'AREA'
+    },
+    ZONE: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: false,
+      field: 'ZONE'
+    },
+    PROVINCE: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: false,
+      field: 'PROVINCE'
+    },
+    LATITUDE: {
+      type: DataTypes.NUMBER,
+      allowNull: false,
+      primaryKey: false,
+      field: 'LATITUDE'
+    },
+    LONGITUDE: {
+      type: DataTypes.NUMBER,
+      allowNull: false,
+      primaryKey: false,
+      field: 'LONGITUDE'
+    },
+    SALE_NAME: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: false,
+      field: 'SALE_NAME'
+    },
+    WAREHOUSE: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      primaryKey: false,
+      field: 'WAREHOUSE'
+    },
+    TOTAL: {
+      type: DataTypes.NUMBER,
+      allowNull: false,
+      primaryKey: false,
+      field: 'TOTAL'
+    },
+    CREATED_AT: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      primaryKey: false,
+      field: 'CREATED_AT'
+    },
+
+
+  },
+  {
+    tableName: 'ROUTE_ORDER', // 👈 ชื่อตารางจริง
+    schema: 'dbo', // 👈 สำคัญ
+    timestamps: false,
+    freezeTableName: true
+  }
+)
+
+
+
+
+
+
 module.exports = {
   WithdrawCash,
-  CustomerBI
+  CustomerBI,
+  ROUTE_DETAIL,
+  ROUTE_STORE,
+  ROUTE_ORDER
 }
