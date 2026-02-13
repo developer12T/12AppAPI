@@ -8,7 +8,8 @@ const {
   generateDates,
   toThaiTime,
   rangeDate,
-  formatThaiSQL
+  formatThaiSQL,
+  toThaiDateOrDefault
 } = require('../../utilities/datetime')
 // const { Store } = require('../../models/cash/store')
 const { uploadFilesCheckin } = require('../../utilities/upload')
@@ -39,7 +40,6 @@ const storeLatLongModel = require('../../models/cash/storeLatLong')
 const { getSocket } = require('../../socket')
 const { getModelsByChannel } = require('../../middleware/channel')
 const path = require('path')
-const { formatDateTimeToThai, toThaiDateOrDefault } = require('../../middleware/order')
 const fs = require('fs')
 const os = require('os')
 const moment = require('moment')
@@ -1270,9 +1270,6 @@ exports.addRouteToM3DBPRD_BK = async (req, res) => {
 
       const storeExit = storeData.find(u => String(u._id) === item.storeInfo)
 
-      const thailandTime = new Date(
-        new Date(item.date).toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })
-      )
 
       const value = toThaiDateOrDefault(item?.date)
 
@@ -1285,7 +1282,7 @@ exports.addRouteToM3DBPRD_BK = async (req, res) => {
         STORE_ID: storeExit?.storeId || '',
         // storeInfo: item.storeInfo,
         STORE_NAME: storeExit?.name || '',
-        NOTE: item?.note | '',
+        NOTE: item?.note || '',
         // image: item.image,
         LATITUDE: Number(item.latitude),
         LONGITUDE: Number(item.longtitude),
@@ -1295,7 +1292,7 @@ exports.addRouteToM3DBPRD_BK = async (req, res) => {
       }
     }))
 
-    // await ROUTE_STORE.bulkCreate(storeBulk)
+    await ROUTE_STORE.bulkCreate(storeBulk)
 
 
 
