@@ -50,8 +50,8 @@ const {
 const {
   checkOutV2,
   getBillNewStore,
-  waitApproveToPending
-
+  waitApproveToPending,
+  orderEditUser
 } = require('../../controllers/sale/orderControllerV2')
 
 const router = express.Router()
@@ -113,7 +113,7 @@ router.post('/updateProCodeInOrder', updateProCodeInOrder)
 router.get('/getBillNewStore', getBillNewStore)
 
 
-
+router.patch('/orderEditUser/', orderEditUser)
 router.patch('/editOrderSale/:orderId', editOrderSale)
 
 module.exports = router
