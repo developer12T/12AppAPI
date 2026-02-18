@@ -29,6 +29,7 @@ const {
   getRouteCreditArea,
   getStoreDetailCredit
 } = require('../../controllers/queryFromM3/querySctipt')
+
 const userModel = require('../../models/cash/user')
 const targetVisitModel = require('../../models/cash/targetVisit')
 const orderModel = require('../../models/cash/sale')
@@ -1228,160 +1229,172 @@ exports.addRouteToM3DBPRD_BK = async (req, res) => {
   try {
     const { period } = req.body
     const channel = req.headers['x-channel']
-    const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
+
+    const { Route } = getModelsByChannel(channel, res, routeModel)
     const { Store } = getModelsByChannel(channel, res, storeModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
 
-    const routeData = await Route.find({ period: period, area: 'BK225' })
-    const storeObj = [...new Set(routeData.flatMap(item => item.listStore.flatMap(row => row.storeInfo)))]
+    const routeData = await Route.find({ period })
+
+    if (!routeData.length) {
+      return res.status(200).json({ message: 'No route data' })
+    }
+
+    const routeIds = routeData.map(r => r.id)
+
+    // -------------------------
+    // PREPARE LOOKUPS
+    // -------------------------
+
+    const storeObj = [
+      ...new Set(
+        routeData.flatMap(r =>
+          r.listStore.map(s => s.storeInfo)
+        )
+      )
+    ]
 
     const orderData = await Order.find({
-      period: period, routeId: { $nin: '' },
-      status: { $in: ['pending', 'completed'] }
+      period,
+      routeId: { $nin: '' },
     })
 
+    const orderMap = new Map(orderData.map(o => [o.orderId, o]))
 
     const storeData = await Store.find({
-      _id: {
-        $in: storeObj
-      }
+      _id: { $in: storeObj }
     }).select('_id storeId name')
 
+    const storeMap = new Map(
+      storeData.map(s => [String(s._id), s])
+    )
 
-    let routeList = []
-    let storeList = []
-    let orderList = []
+    // -------------------------
+    // 1️⃣ ROUTE BULK
+    // -------------------------
 
-    const routeBulk = routeData.map(row => {
-
-      return {
-        ROUTE_ID: row.id,
-        PERIOD: row.period,
-        AREA: row.area,
-        ZONE: row.zone,
-        TEAM: row.team,
-        DAY: row.day
-      }
-    })
-
-    // await ROUTE_DETAIL.bulkCreate(routeBulk)
-
-    const storeBulk = routeData.flatMap(row => row.listStore.map(item => {
-
-      const storeExit = storeData.find(u => String(u._id) === item.storeInfo)
-
-
-      const value = toThaiDateOrDefault(item?.date)
-
-      console.log('CHECKIN TYPE:', typeof value)
-      console.log('CHECKIN VALUE:', value)
-
-
-      return {
-        ROUTE_ID: row.id,
-        STORE_ID: storeExit?.storeId || '',
-        // storeInfo: item.storeInfo,
-        STORE_NAME: storeExit?.name || '',
-        NOTE: item?.note || '',
-        // image: item.image,
-        LATITUDE: Number(item.latitude),
-        LONGITUDE: Number(item.longtitude),
-        STATUS: item.status,
-        STATUS_TEXT: item.statusText,
-        CHECKIN: toThaiDateOrDefault(item?.date)
-      }
+    const routeBulk = routeData.map(row => ({
+      ROUTE_ID: row.id,
+      PERIOD: row.period,
+      AREA: row.area,
+      ZONE: row.zone,
+      TEAM: row.team,
+      DAY: row.day
     }))
 
-    await ROUTE_STORE.bulkCreate(storeBulk)
-
-
-
-    // for (const row of routeData) {
-
-    //   const dataRoute = {
-    //     ROUTE_ID: row.id,
-    //     PERIOD: row.period,
-    //     AREA: row.area,
-    //     ZONE: row.zone,
-    //     TEAM: row.team,
-    //     DAY: row.day
-
-    //   }
-
-    //   await ROUTE_DETAIL.create(dataRoute)
-
-    //   // console.log(dataRoute)
-
-    //   routeList.push(dataRoute)
-
-
-
-    //   for (const item of row.listStore) {
-
-    //     const storeExit = storeData.find(u => String(u._id) === item.storeInfo)
-
-    //     const dataStore = {
-    //       routeId: row.id,
-    //       storeId: storeExit?.storeId | '',
-    //       // storeInfo: item.storeInfo,
-    //       storeName: storeExit?.name | '',
-    //       note: item?.note | '',
-    //       image: item.image,
-    //       latitude: item.latitude,
-    //       longtitude: item.longtitude,
-    //       status: item.status,
-    //       statusText: item.statusText,
-    //       dateCheckin: item.date
-
-    //     }
-
-    //     storeList.push(dataStore)
-    //     for (const order of item.listOrder) {
-
-
-    //       const orderDetail = orderData.find(m => m.orderId === order.orderId)
-
-    //       if (!orderDetail) {
-    //         continue
-    //       }
-
-    //       const dataOrder = {
-    //         routeId: row.id,
-    //         storeId: orderDetail.store.storeId,
-    //         storeName: orderDetail.store.name,
-    //         area: orderDetail.store.area,
-    //         zone: orderDetail.store.zone,
-    //         province: orderDetail.shipping.province,
-    //         latitude: orderDetail.latitude,
-    //         longitude: orderDetail.longitude,
-    //         saleName: orderDetail.sale.name,
-    //         warehouse: orderDetail.sale.warehouse,
-    //         total: orderDetail.total,
-    //         createdAt: formatDateTimeToThai(orderDetail.createdAt)
-    //       }
-
-
-    //       orderList.push(dataOrder)
-    //     }
-
-    //   }
-
-    // }
-
-
-    res.status(201).json({
-      status: 201,
-      message: 'addRouteToM3DBPRD_BK',
-      data: storeBulk
-      // data: storeList
-      // data: orderData
+    const existingRoutes = await ROUTE_DETAIL.findAll({
+      where: { ROUTE_ID: routeIds },
+      attributes: ['ROUTE_ID'],
+      raw: true
     })
 
+    const routeSet = new Set(existingRoutes.map(r => r.ROUTE_ID))
 
+    const filteredRouteBulk = routeBulk.filter(
+      r => !routeSet.has(r.ROUTE_ID)
+    )
+
+    if (filteredRouteBulk.length) {
+      await ROUTE_DETAIL.bulkCreate(filteredRouteBulk)
+    }
+
+    // -------------------------
+    // 2️⃣ STORE BULK
+    // -------------------------
+
+    const storeBulk = routeData.flatMap(row =>
+      row.listStore.map(item => {
+        const storeExit = storeMap.get(String(item.storeInfo))
+
+        return {
+          ROUTE_ID: row.id,
+          STORE_ID: storeExit?.storeId || '',
+          STORE_NAME: storeExit?.name || '',
+          NOTE: item?.note || '',
+          LATITUDE: Number(item.latitude),
+          LONGITUDE: Number(item.longtitude),
+          STATUS: item.status,
+          STATUS_TEXT: item.statusText,
+          CHECKIN: toThaiDateOrDefault(item?.date)
+        }
+      })
+    )
+
+    const existingStores = await ROUTE_STORE.findAll({
+      where: { ROUTE_ID: routeIds },
+      attributes: ['ROUTE_ID', 'STORE_ID'],
+      raw: true
+    })
+
+    const storeSet = new Set(
+      existingStores.map(r => `${r.ROUTE_ID}_${r.STORE_ID}`)
+    )
+
+    const filteredStoreBulk = storeBulk.filter(
+      r => !storeSet.has(`${r.ROUTE_ID}_${r.STORE_ID}`)
+    )
+
+    if (filteredStoreBulk.length) {
+      await ROUTE_STORE.bulkCreate(filteredStoreBulk)
+    }
+
+    // -------------------------
+    // 3️⃣ ORDER BULK
+    // -------------------------
+
+    const orderBulk = routeData.flatMap(row =>
+      row.listStore.flatMap(item =>
+        item.listOrder
+          .map(order => {
+            const orderDetail = orderMap.get(order.orderId)
+            if (!orderDetail) return null
+
+            return {
+
+              ROUTE_ID: row.id,
+              ORDER_ID: orderDetail.orderId,
+              STORE_ID: orderDetail.store.storeId,
+              STORE_NAME: orderDetail.store.name,
+              AREA: orderDetail.store.area,
+              ZONE: orderDetail.store.zone,
+              PROVINCE: orderDetail.shipping?.province || '',
+              LATITUDE: orderDetail.latitude,
+              LONGITUDE: orderDetail.longitude,
+              SALE_NAME: orderDetail.sale.name,
+              WAREHOUSE: orderDetail.sale.warehouse,
+              TOTAL: orderDetail.total,
+              CREATED_AT: toThaiDateOrDefault(orderDetail.createdAt)
+            }
+          })
+          .filter(Boolean)
+      )
+    )
+
+    const existingOrders = await ROUTE_ORDER.findAll({
+      where: { ROUTE_ID: routeIds },
+      attributes: ['ORDER_ID'],
+      raw: true
+    })
+
+    const orderSet = new Set(existingOrders.map(r => r.ORDER_ID))
+
+    const filteredOrderBulk = orderBulk.filter(
+      r => !orderSet.has(r.ORDER_ID)
+    )
+
+    if (filteredOrderBulk.length) {
+      await ROUTE_ORDER.bulkCreate(filteredOrderBulk)
+    }
+
+
+    return res.status(201).json({
+      status: 201,
+      message: 'addRouteToM3DBPRD_BK'
+    })
 
   } catch (error) {
     console.error('❌ Error:', error)
-    res.status(500).json({
+    return res.status(500).json({
       status: 500,
       message: 'error from server',
       error: error.message

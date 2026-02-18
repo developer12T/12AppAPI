@@ -430,7 +430,7 @@ const ROUTE_STORE = sequelizeBI.define(
       field: 'STATUS_TEXT'
     },
     CHECKIN: {
-      type: DataTypes.DATE,
+      type: DataTypes.STRING,
       allowNull: false,
       primaryKey: false,
       field: 'CHECKIN'
@@ -453,6 +453,14 @@ const ROUTE_ORDER = sequelizeBI.define(
       primaryKey: true,
       field: 'ROUTE_ID'
     },
+
+    ORDER_ID: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      // primaryKey: true,
+      field: 'ORDER_ID'
+    },
+
     STORE_ID: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -514,7 +522,7 @@ const ROUTE_ORDER = sequelizeBI.define(
       field: 'TOTAL'
     },
     CREATED_AT: {
-      type: DataTypes.DATE,
+      type: DataTypes.STRING,
       allowNull: false,
       primaryKey: false,
       field: 'CREATED_AT'
