@@ -5862,3 +5862,249 @@ exports.getOrdersByAreaAndItem = async (req, res) => {
     })
   }
 }
+
+exports.getProductSKUReportByOrder = async (req, res) => {
+  try {
+    const { period, area } = req.body
+    const channel = req.headers['x-channel']
+
+    if (!period || period.length !== 6) {
+      return res.status(400).json({
+        status: 400,
+        message: 'Invalid period format (YYYYMM required)'
+      })
+    }
+
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+
+    const year = Number(period.substring(0, 4))
+    const month = Number(period.substring(4, 6))
+    const startDate = new Date(Date.UTC(year, month - 1, 1))
+    const endDate = new Date(Date.UTC(year, month, 1))
+
+    const pipeline = [
+      // --------------------------------------------------
+      // 1️⃣ FILTER ORDER
+      // --------------------------------------------------
+      {
+        $match: {
+          'store.area': area,
+          createdAt: { $gte: startDate, $lt: endDate }
+        }
+      },
+
+      // --------------------------------------------------
+      // 2️⃣ SKU FOCUS MASTER
+      // --------------------------------------------------
+      {
+        $lookup: {
+          from: 'skufocus',
+          let: { area: '$store.area', period: period },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$area', '$$area'] },
+                    { $eq: ['$period', '$$period'] }
+                  ]
+                }
+              }
+            },
+            { $unwind: '$listProduct' },
+            {
+              $project: {
+                _id: 0,
+                skuId: '$listProduct.id',
+                skuName: '$listProduct.name',
+                target: '$listProduct.target'
+              }
+            }
+          ],
+          as: 'skuFocusList'
+        }
+      },
+
+      // --------------------------------------------------
+      // 3️⃣ PRODUCT MASTER (FOR UNIT FACTOR)
+      // --------------------------------------------------
+      {
+        $lookup: {
+          from: 'products',
+          localField: 'listProduct.id',
+          foreignField: 'id',
+          as: 'productMaster'
+        }
+      },
+
+      // --------------------------------------------------
+      // 4️⃣ KEEP ONLY ORDERS WITH FOCUS SKU
+      // --------------------------------------------------
+      {
+        $match: {
+          $expr: {
+            $gt: [
+              {
+                $size: {
+                  $setIntersection: [
+                    {
+                      $map: {
+                        input: '$listProduct',
+                        as: 'p',
+                        in: { $toString: '$$p.id' }
+                      }
+                    },
+                    {
+                      $map: {
+                        input: '$skuFocusList',
+                        as: 's',
+                        in: { $toString: '$$s.skuId' }
+                      }
+                    }
+                  ]
+                }
+              },
+              0
+            ]
+          }
+        }
+      },
+
+      // --------------------------------------------------
+      // 5️⃣ BUILD PCS PER SKU
+      // --------------------------------------------------
+      {
+        $addFields: {
+          items: {
+            $arrayToObject: {
+              $map: {
+                input: '$skuFocusList',
+                as: 'sku',
+                in: {
+                  k: '$$sku.skuId',
+                  v: {
+                    $let: {
+                      vars: {
+                        // lines ของ sku นี้ใน order
+                        lines: {
+                          $filter: {
+                            input: '$listProduct',
+                            as: 'p',
+                            cond: {
+                              $eq: [
+                                { $toString: '$$p.id' },
+                                { $toString: '$$sku.skuId' }
+                              ]
+                            }
+                          }
+                        },
+
+                        // product master
+                        product: {
+                          $first: {
+                            $filter: {
+                              input: '$productMaster',
+                              as: 'pm',
+                              cond: {
+                                $eq: [
+                                  { $toString: '$$pm.id' },
+                                  { $toString: '$$sku.skuId' }
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      },
+                      in: {
+                        skuId: '$$sku.skuId',
+                        skuName: '$$sku.skuName',
+                        target: '$$sku.target',
+
+                        pcs: {
+                          $sum: {
+                            $map: {
+                              input: '$$lines',
+                              as: 'line',
+                              in: {
+                                $let: {
+                                  vars: {
+                                    factor: {
+                                      $first: {
+                                        $map: {
+                                          input: {
+                                            $filter: {
+                                              input: '$$product.listUnit',
+                                              as: 'u',
+                                              cond: {
+                                                $eq: ['$$u.unit', '$$line.unit']
+                                              }
+                                            }
+                                          },
+                                          as: 'f',
+                                          in: '$$f.factor'
+                                        }
+                                      }
+                                    }
+                                  },
+                                  in: {
+                                    $multiply: [
+                                      '$$line.qty',
+                                      { $ifNull: ['$$factor', 1] }
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+
+      // --------------------------------------------------
+      // 6️⃣ OUTPUT
+      // --------------------------------------------------
+      {
+        $project: {
+          _id: 0,
+          date: {
+            $dateToString: {
+              format: '%Y-%m-%d',
+              date: '$createdAt',
+              timezone: 'Asia/Bangkok'
+            }
+          },
+          orderId: 1,
+          storeId: '$store.storeId',
+          storeName: '$store.name',
+          area: '$store.area',
+          amount: '$total',
+          items: 1
+        }
+      },
+
+      { $sort: { date: 1, orderId: 1 } }
+    ]
+
+    const rows = await Order.aggregate(pipeline)
+    const columns = rows.length ? Object.values(rows[0].items) : []
+
+    return res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: { rows, columns }
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({
+      status: 500,
+      message: 'server error'
+    })
+  }
+}
