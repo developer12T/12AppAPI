@@ -50,7 +50,8 @@ const {
   getProductSoldByDayArea,
   getProductSoldByDayAreaSKU,
   getProductSKUReport,
-  getOrdersByAreaAndItem
+  getOrdersByAreaAndItem,
+  getProductSKUReportByOrder
 } = require('../../controllers/route/routeController')
 
 const {
@@ -139,6 +140,7 @@ router.post('/getProductSoldByDayArea', getProductSoldByDayArea)
 router.post('/getProductSoldByDayAreaSKU', getProductSoldByDayAreaSKU)
 router.post('/getProductSKUReport', getProductSKUReport)
 router.post('/getOrdersByAreaAndItem', getOrdersByAreaAndItem)
+router.post('/getProductSKUReportByOrder', getProductSKUReportByOrder)
 router.post('/delStoreOneInRoute', delStoreOneInRoute)
 router.post('/addRouteToM3DBPRD_BK', addRouteToM3DBPRD_BK)
 module.exports = router
