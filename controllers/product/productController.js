@@ -12,7 +12,8 @@ const {
   productQuery,
   productFoodtruckQuery,
   addTargetProductQuery,
-  addTargetQuery
+  addTargetQuery,
+  productQueryFilter
 } = require('../../controllers/queryFromM3/querySctipt')
 const { group } = require('console')
 const { flatMap, filter } = require('lodash')
@@ -588,53 +589,75 @@ exports.updateStatus = async (req, res) => {
 exports.addProduct = async (req, res) => {
   try {
     const {
-      id,
-      name,
-      group,
-      groupCode,
-      groupCodeM3,
-      groupM3,
-      brand,
-      brandCode,
-      size,
-      flavour,
-      flavourCode,
-      type,
-      image,
-      weightGross,
-      weightNet,
-      statusSale,
-      statusWithdraw,
-      statusRefund,
-      listUnit
+      productId,
     } = req.body
     const channel = req.headers['x-channel']
     const { Product } = getModelsByChannel(channel, res, productModel)
-    const newProduct = new Product({
-      id,
-      name,
-      group,
-      groupCode,
-      groupCodeM3,
-      groupM3,
-      brand,
-      brandCode,
-      size,
-      flavour,
-      flavourCode,
-      type,
-      image,
-      weightGross,
-      weightNet,
-      statusSale,
-      statusWithdraw,
-      statusRefund,
-      listUnit
-    })
-    await newProduct.save()
-    res.status(200).json({
-      status: 200,
-      message: 'Add Product successful!'
+
+    const exits = await Product.findOne({ id: productId })
+
+    if (exits) {
+      return res.status(409).json({
+        status: 409,
+        message: 'Found in mongo'
+      })
+    }
+
+    const parseGram = sizeStr => {
+      const match = sizeStr.match(/^([\d.]+)(?:-[A-Z])?\s*(KG|G|g|kg)?/i)
+      if (!match) return 0
+      const value = parseFloat(match[1])
+      const unit = (match[2] || 'G').toUpperCase()
+      return unit === 'KG' ? value * 1000 : value
+    }
+
+
+
+
+    const productDetail = await productQueryFilter(productId)
+    const productOne = productDetail[0]
+    const sizeNumber = parseGram(productOne.size || '')
+    const productTran = {
+      id: productOne.id,
+      name: productOne.name,
+      groupCode: productOne.groupCode,
+      group: productOne.group,
+      groupCodeM3: productOne.groupCodeM3,
+      groupM3: productOne.groupM3,
+      brandCode: productOne.brandCode,
+      brand: productOne.brand,
+      size: productOne.size,
+      flavourCode: productOne.flavourCode,
+      flavour: productOne.flavour,
+      type: productOne.type,
+      weightGross: productOne.weightGross,
+      weightNet: productOne.weightNet,
+      statusSale: productOne.statusSale,
+      statusWithdraw: productOne.statusWithdraw,
+      statusRefund: productOne.statusRefund,
+      statusRefundDmg: productOne.statusRefundDamage,
+      image: "",
+      listUnit: (productOne.unitList ?? []).map(item => ({
+        unit: item.unit,
+        name: item.name,
+        factor: 0,
+        price: {
+          sale: item.pricePerUnitSale,
+          refund: item.pricePerUnitRefund,
+          refundDmg: item.pricePerUnitRefundDamage,
+          change: 0
+        }
+      })),
+      sizeNumber: sizeNumber
+    }
+
+    await Product.create(productTran)
+
+
+    res.status(201).json({
+      status: 201,
+      message: 'Add Product successful!',
+      data: productOne,
     })
   } catch (error) {
     console.error('Error updating store:', error)

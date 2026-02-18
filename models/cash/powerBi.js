@@ -406,13 +406,13 @@ const ROUTE_STORE = sequelizeBI.define(
       field: 'NOTE'
     },
     LATITUDE: {
-      type: DataTypes.NUMBER,
+      type: DataTypes.FLOAT,
       allowNull: false,
       primaryKey: false,
       field: 'LATITUDE'
     },
     LONGITUDE: {
-      type: DataTypes.NUMBER,
+      type: DataTypes.FLOAT,
       allowNull: false,
       primaryKey: false,
       field: 'LONGITUDE'
@@ -492,13 +492,13 @@ const ROUTE_ORDER = sequelizeBI.define(
       field: 'PROVINCE'
     },
     LATITUDE: {
-      type: DataTypes.NUMBER,
+      type: DataTypes.FLOAT,
       allowNull: false,
       primaryKey: false,
       field: 'LATITUDE'
     },
     LONGITUDE: {
-      type: DataTypes.NUMBER,
+      type: DataTypes.FLOAT,
       allowNull: false,
       primaryKey: false,
       field: 'LONGITUDE'
