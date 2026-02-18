@@ -9,6 +9,7 @@ const {
   toThaiTime,
   rangeDate
 } = require('../../utilities/datetime')
+const product = require('../../models/cash/product')
 exports.userQuery = async function (channel) {
   const config = {
     user: process.env.MS_SQL_USER,
@@ -935,6 +936,127 @@ exports.productQuery = async function (channel) {
   await sql.close()
   return returnArr
 }
+
+
+exports.productQueryFilter = async function (productId) {
+  const config = {
+    host: process.env.MY_SQL_SERVER,
+    user: process.env.MY_SQL_USER,
+    password: process.env.MY_SQL_PASSWORD,
+    database: process.env.MY_SQL_DATABASE
+  }
+
+  const connection = await mysql.createConnection(config)
+
+
+  const id = name => connection.escapeId(name)
+  const query = `
+      SELECT 
+      ITNO AS id,
+      NAME_BILL as name,
+      GRP as GRP_CODE,
+      -- g.GRP_DESC as \`group\`,
+      gp.GRP_DESC as \`group\`,
+      GREPORT AS groupCodeM3,
+      gM3.GRP_DESC AS groupM3,
+      Brand as BRAND_CODE,
+      BRAND_DESC as brand,
+      WEIGHT AS size,
+      FLAVOUR as FLAVOUR_CODE,
+      FAV_DESC as flavour,
+      FACT as factor,
+      case 
+      when IS_OPEN = 'Y' then "ไม่แถม"
+      when IS_OPEN = 'N' then "แถม"
+      WHEN LEFT(ITNO, 2) = '60' THEN 'พรีเมียม'
+      END AS type ,
+      CTN_Gross,
+      CTN_Net,
+      IS_OPEN as statusSale,
+      IS_OPEN3 as statusRefund,
+      IS_OPEN4 as statusRefundDamage,
+      IS_OPEN5 as statusWithdraw,
+      unit_cal as unit ,
+      UNIT_CODE as nameEng,
+      UNIT_DESC as nameThai,
+      PRICE as pricePerUnitSale ,
+      price3 as pricePerUnitRefund ,
+      price3 as pricePerUnitRefundDamage ,
+      price5 as pricePerUnitChange 
+      from m_product a
+      LEFT JOIN c_group g ON a.GRP = g.GRP_CODE
+      LEFT JOIN item_group_report gM3 ON a.GREPORT = gM3.GRP_CODE
+      LEFT JOIN m_unit u ON a.unit_cal = u.UNIT_CODE_BC
+      LEFT JOIN ca_factor c ON a.ITNO = c.itemcode 
+      LEFT JOIN m_flavour f ON a.FLAVOUR = f.FAV_CODE 
+      LEFT JOIN c_brand b ON a.Brand = b.BRAND_CODE
+      LEFT JOIN m_prd_group gp ON a.GRP = gp.GRP_CODE
+      where ITNO = ${productId}
+      `
+  // console.log(query)
+
+
+  const [result] = await connection.execute(query)
+
+  const returnArr = []
+
+  for (const row of result) {
+    // console.log(row)
+    const id = String(row.id).trim()
+    const unitId = parseInt(row.unit)
+    const unit = row.nameEng?.trim() || ''
+    const name = row.nameThai?.trim() || ''
+    const priceSale = row.pricePerUnitSale
+    const priceRefund = row.pricePerUnitRefund
+    const priceRefundDmg = row.pricePerUnitRefundDamage
+    const priceChange = row.pricePerUnitChange
+
+    const existingItem = returnArr.find(item => item.id === id)
+
+    const unitData = {
+      id: unitId,
+      unit: unit,
+      name: name,
+      pricePerUnitSale: priceSale,
+      pricePerUnitRefund: priceRefund,
+      pricePerUnitRefundDamage: priceRefundDmg,
+      pricePerUnitChange: priceChange
+    }
+    // console.log(unitData)
+    if (existingItem) {
+      existingItem.unitList.push(unitData)
+    } else {
+      const newItem = {
+        id: id,
+        name: row.name?.trim() || '',
+        groupCode: row.GRP_CODE?.trim() || '',
+        group: row.group?.trim() || '',
+        groupCodeM3: row.groupCodeM3?.trim() || '',
+        groupM3: row.groupM3?.trim() || '',
+        brandCode: row.BRAND_CODE?.trim() || '',
+        brand: row.brand?.trim() || '',
+        size: row.size?.trim() || '',
+        flavourCode: row.FLAVOUR_CODE?.trim() || '',
+        flavour: row.flavour?.trim() || '',
+        type: row.type?.trim() || '',
+        weightGross: row.CTN_Gross?.toString().trim() || 0,
+        weightNet: row.CTN_Net?.toString().trim() || 0,
+        statusSale: row.statusSale?.trim() || '',
+        statusRefund: row.statusRefund?.trim() || '',
+        statusRefundDamage: row.statusRefundDamage?.trim() || '',
+        statusWithdraw: row.statusWithdraw?.trim() || '',
+        unitList: [unitData]
+      }
+
+      returnArr.push(newItem)
+    }
+  }
+
+  await sql.close()
+  return returnArr
+
+}
+
 
 exports.routeQuery = async function (channel, area) {
   const config = {

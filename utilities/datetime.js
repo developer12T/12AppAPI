@@ -120,22 +120,25 @@ function formatThaiSQL(dateInput) {
   return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
 }
 
-
 function toThaiDateOrDefault(dateInput) {
+  let d
 
   if (!dateInput) {
-    // 1970-01-01 07:00:00 Bangkok
-    return new Date('1970-01-01T00:00:00Z')
+    d = new Date(0)
+  } else {
+    d = new Date(dateInput)
+    if (isNaN(d)) return null
   }
 
-  const thaiTime = new Date(
-    new Date(dateInput).toLocaleString('en-US', {
-      timeZone: 'Asia/Bangkok'
-    })
-  )
+  const utc = d.getTime() + (d.getTimezoneOffset() * 60000)
+  const thai = new Date(utc + (7 * 60 * 60000))
 
-  return thaiTime
+  const pad = n => String(n).padStart(2, '0')
+
+  return `${thai.getFullYear()}-${pad(thai.getMonth() + 1)}-${pad(thai.getDate())} `
+    + `${pad(thai.getHours())}:${pad(thai.getMinutes())}:${pad(thai.getSeconds())}`
 }
+
 
 
 module.exports = {

@@ -138,55 +138,55 @@ exports.getRoute = async (req, res) => {
     // If area is not provided (or explicitly empty), group results by day+period
     if ((!area || area === '') && period && !storeId) {
       const groups = new Map()
-      ;(enrichedRoutes || []).forEach(route => {
-        // Skip routes with area == 'IT211'
-        if (route.area === 'IT211') return
+        ; (enrichedRoutes || []).forEach(route => {
+          // Skip routes with area == 'IT211'
+          if (route.area === 'IT211') return
 
-        // derive zone/team from route (prefer explicit fields, otherwise from area)
-        let zoneKey = route.zone || ''
-        let teamKey = route.team || ''
-        if (route.area) {
-          const a = String(route.area || '')
-          zoneKey = a.substring(0, 2)
-          teamKey = `${a.substring(0, 2)}${a.charAt(3) || ''}`
-        }
+          // derive zone/team from route (prefer explicit fields, otherwise from area)
+          let zoneKey = route.zone || ''
+          let teamKey = route.team || ''
+          if (route.area) {
+            const a = String(route.area || '')
+            zoneKey = a.substring(0, 2)
+            teamKey = `${a.substring(0, 2)}${a.charAt(3) || ''}`
+          }
 
-        // if request includes zone/team filters, skip non-matching routes
-        if (zone && String(zone) !== zoneKey) return
-        if (team && String(team) !== teamKey) return
+          // if request includes zone/team filters, skip non-matching routes
+          if (zone && String(zone) !== zoneKey) return
+          if (team && String(team) !== teamKey) return
 
-        const dayKey = route.day || ''
-        if (!groups.has(dayKey)) {
-          groups.set(dayKey, {
-            day: dayKey,
-            period: period,
-            // routes: [],
-            storeAll: 0,
-            storePending: 0,
-            storeSell: 0,
-            storeNotSell: 0,
-            storeCheckInNotSell: 0,
-            storeTotal: 0
-          })
-        }
+          const dayKey = route.day || ''
+          if (!groups.has(dayKey)) {
+            groups.set(dayKey, {
+              day: dayKey,
+              period: period,
+              // routes: [],
+              storeAll: 0,
+              storePending: 0,
+              storeSell: 0,
+              storeNotSell: 0,
+              storeCheckInNotSell: 0,
+              storeTotal: 0
+            })
+          }
 
-        const grp = groups.get(dayKey)
+          const grp = groups.get(dayKey)
 
-        // accumulate counts from each route (use numeric defaults)
-        const ra = Number(route.storeAll) || 0
-        const rp = Number(route.storePending) || 0
-        const rs = Number(route.storeSell) || 0
-        const rn = Number(route.storeNotSell) || 0
-        const rcn = Number(route.storeCheckInNotSell) || 0
-        const rt = Number(route.storeTotal) || 0
+          // accumulate counts from each route (use numeric defaults)
+          const ra = Number(route.storeAll) || 0
+          const rp = Number(route.storePending) || 0
+          const rs = Number(route.storeSell) || 0
+          const rn = Number(route.storeNotSell) || 0
+          const rcn = Number(route.storeCheckInNotSell) || 0
+          const rt = Number(route.storeTotal) || 0
 
-        grp.storeAll += ra
-        grp.storePending += rp
-        grp.storeSell += rs
-        grp.storeNotSell += rn
-        grp.storeCheckInNotSell += rcn
-        grp.storeTotal += rt
-      })
+          grp.storeAll += ra
+          grp.storePending += rp
+          grp.storeSell += rs
+          grp.storeNotSell += rn
+          grp.storeCheckInNotSell += rcn
+          grp.storeTotal += rt
+        })
 
       // finalize percentage fields for each group
       enrichedRoutes = Array.from(groups.values()).map(g => {
@@ -664,7 +664,7 @@ exports.addFromERPnew = async (req, res) => {
             status: 0,
             statusText: 'รอเยี่ยม',
             note: '',
-            date: '',
+            date: new Date(),
             listOrder: []
           })
         }
@@ -2362,7 +2362,7 @@ exports.getRouteEffective = async (req, res) => {
       )
       xlsx.writeFile(wb, filePath)
       res.download(filePath, err => {
-        fs.unlink(filePath, () => {})
+        fs.unlink(filePath, () => { })
         if (err) console.error(err)
       })
     } else {
@@ -2606,7 +2606,7 @@ exports.getRouteEffectiveAll = async (req, res) => {
     // ------------------------------
     let start, end
 
-    function getPeriodFromDate (dateStr) {
+    function getPeriodFromDate(dateStr) {
       if (!dateStr) return null
       const d = new Date(dateStr)
       if (isNaN(d)) return null
@@ -2883,12 +2883,12 @@ exports.getRouteEffectiveByDayArea = async (req, res) => {
       // filter team (ต้องอยู่ตรงนี้ ❗)
       ...(team
         ? [
-            {
-              $match: {
-                team3: { $regex: `^${team}`, $options: 'i' }
-              }
+          {
+            $match: {
+              team3: { $regex: `^${team}`, $options: 'i' }
             }
-          ]
+          }
+        ]
         : []),
 
       // แตก store
@@ -3154,8 +3154,8 @@ exports.getZoneArrayInRoute = async (req, res) => {
       zoneArray = Array.isArray(zone)
         ? zone
         : typeof zone === 'string'
-        ? zone.split(',').map(z => z.trim())
-        : []
+          ? zone.split(',').map(z => z.trim())
+          : []
     }
 
     const pipeline = [
@@ -3372,7 +3372,7 @@ exports.checkRouteStore = async (req, res) => {
       areaMap[area].del = storeCountMap[area]?.del || 0
     }
 
-    function sortKeys (obj) {
+    function sortKeys(obj) {
       const { area, R, del, ...days } = obj
       const sortedDays = Object.keys(days)
         .filter(k => /^R\d+$/.test(k))
@@ -3556,7 +3556,7 @@ exports.addRouteIt = async (req, res) => {
           status: 0,
           statusText: 'รอเยี่ยม',
           listOrder: [],
-          date: ''
+          date: new Date()
         }))
       }
 
@@ -3863,8 +3863,7 @@ exports.updateRouteAllStore = async (req, res) => {
       )
 
       console.log(
-        `processed ${Math.min(i + BATCH, storeData.length)} / ${
-          storeData.length
+        `processed ${Math.min(i + BATCH, storeData.length)} / ${storeData.length
         }`
       )
     }
@@ -5859,6 +5858,252 @@ exports.getOrdersByAreaAndItem = async (req, res) => {
       status: 500,
       message: 'error from server',
       error: error.message
+    })
+  }
+}
+
+exports.getProductSKUReportByOrder = async (req, res) => {
+  try {
+    const { period, area } = req.body
+    const channel = req.headers['x-channel']
+
+    if (!period || period.length !== 6) {
+      return res.status(400).json({
+        status: 400,
+        message: 'Invalid period format (YYYYMM required)'
+      })
+    }
+
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+
+    const year = Number(period.substring(0, 4))
+    const month = Number(period.substring(4, 6))
+    const startDate = new Date(Date.UTC(year, month - 1, 1))
+    const endDate = new Date(Date.UTC(year, month, 1))
+
+    const pipeline = [
+      // --------------------------------------------------
+      // 1️⃣ FILTER ORDER
+      // --------------------------------------------------
+      {
+        $match: {
+          'store.area': area,
+          createdAt: { $gte: startDate, $lt: endDate }
+        }
+      },
+
+      // --------------------------------------------------
+      // 2️⃣ SKU FOCUS MASTER
+      // --------------------------------------------------
+      {
+        $lookup: {
+          from: 'skufocus',
+          let: { area: '$store.area', period: period },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$area', '$$area'] },
+                    { $eq: ['$period', '$$period'] }
+                  ]
+                }
+              }
+            },
+            { $unwind: '$listProduct' },
+            {
+              $project: {
+                _id: 0,
+                skuId: '$listProduct.id',
+                skuName: '$listProduct.name',
+                target: '$listProduct.target'
+              }
+            }
+          ],
+          as: 'skuFocusList'
+        }
+      },
+
+      // --------------------------------------------------
+      // 3️⃣ PRODUCT MASTER (FOR UNIT FACTOR)
+      // --------------------------------------------------
+      {
+        $lookup: {
+          from: 'products',
+          localField: 'listProduct.id',
+          foreignField: 'id',
+          as: 'productMaster'
+        }
+      },
+
+      // --------------------------------------------------
+      // 4️⃣ KEEP ONLY ORDERS WITH FOCUS SKU
+      // --------------------------------------------------
+      {
+        $match: {
+          $expr: {
+            $gt: [
+              {
+                $size: {
+                  $setIntersection: [
+                    {
+                      $map: {
+                        input: '$listProduct',
+                        as: 'p',
+                        in: { $toString: '$$p.id' }
+                      }
+                    },
+                    {
+                      $map: {
+                        input: '$skuFocusList',
+                        as: 's',
+                        in: { $toString: '$$s.skuId' }
+                      }
+                    }
+                  ]
+                }
+              },
+              0
+            ]
+          }
+        }
+      },
+
+      // --------------------------------------------------
+      // 5️⃣ BUILD PCS PER SKU
+      // --------------------------------------------------
+      {
+        $addFields: {
+          items: {
+            $arrayToObject: {
+              $map: {
+                input: '$skuFocusList',
+                as: 'sku',
+                in: {
+                  k: '$$sku.skuId',
+                  v: {
+                    $let: {
+                      vars: {
+                        // lines ของ sku นี้ใน order
+                        lines: {
+                          $filter: {
+                            input: '$listProduct',
+                            as: 'p',
+                            cond: {
+                              $eq: [
+                                { $toString: '$$p.id' },
+                                { $toString: '$$sku.skuId' }
+                              ]
+                            }
+                          }
+                        },
+
+                        // product master
+                        product: {
+                          $first: {
+                            $filter: {
+                              input: '$productMaster',
+                              as: 'pm',
+                              cond: {
+                                $eq: [
+                                  { $toString: '$$pm.id' },
+                                  { $toString: '$$sku.skuId' }
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      },
+                      in: {
+                        skuId: '$$sku.skuId',
+                        skuName: '$$sku.skuName',
+                        target: '$$sku.target',
+
+                        pcs: {
+                          $sum: {
+                            $map: {
+                              input: '$$lines',
+                              as: 'line',
+                              in: {
+                                $let: {
+                                  vars: {
+                                    factor: {
+                                      $first: {
+                                        $map: {
+                                          input: {
+                                            $filter: {
+                                              input: '$$product.listUnit',
+                                              as: 'u',
+                                              cond: {
+                                                $eq: ['$$u.unit', '$$line.unit']
+                                              }
+                                            }
+                                          },
+                                          as: 'f',
+                                          in: '$$f.factor'
+                                        }
+                                      }
+                                    }
+                                  },
+                                  in: {
+                                    $multiply: [
+                                      '$$line.qty',
+                                      { $ifNull: ['$$factor', 1] }
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+
+      // --------------------------------------------------
+      // 6️⃣ OUTPUT
+      // --------------------------------------------------
+      {
+        $project: {
+          _id: 0,
+          date: {
+            $dateToString: {
+              format: '%Y-%m-%d',
+              date: '$createdAt',
+              timezone: 'Asia/Bangkok'
+            }
+          },
+          orderId: 1,
+          storeId: '$store.storeId',
+          storeName: '$store.name',
+          area: '$store.area',
+          amount: '$total',
+          items: 1
+        }
+      },
+
+      { $sort: { date: 1, orderId: 1 } }
+    ]
+
+    const rows = await Order.aggregate(pipeline)
+    const columns = rows.length ? Object.values(rows[0].items) : []
+
+    return res.status(200).json({
+      status: 200,
+      message: 'success',
+      data: { rows, columns }
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({
+      status: 500,
+      message: 'server error'
     })
   }
 }
