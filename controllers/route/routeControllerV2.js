@@ -1353,6 +1353,7 @@ exports.addRouteToM3DBPRD_BK = async (req, res) => {
 
               ROUTE_ID: row.id,
               ORDER_ID: orderDetail.orderId,
+              STATUS: orderDetail.status,
               STORE_ID: orderDetail.store.storeId,
               STORE_NAME: orderDetail.store.name,
               AREA: orderDetail.store.area,

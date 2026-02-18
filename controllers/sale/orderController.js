@@ -1470,6 +1470,7 @@ exports.updateStatus = async (req, res) => {
           $set: {
             'listStore.$.status': '1',
             'listStore.$.statusText': 'เยี่ยมแล้ว',
+            'listStore.$.date': new Date()
           }
         },
         { new: true }

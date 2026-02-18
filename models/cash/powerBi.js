@@ -461,6 +461,14 @@ const ROUTE_ORDER = sequelizeBI.define(
       field: 'ORDER_ID'
     },
 
+    STATUS: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      // primaryKey: true,
+      field: 'STATUS'
+    },
+
+
     STORE_ID: {
       type: DataTypes.STRING,
       allowNull: false,
