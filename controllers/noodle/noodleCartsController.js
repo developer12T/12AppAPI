@@ -26,10 +26,11 @@ exports.addNoodleCart = async (req, res) => {
       sku,
       price,
       qty,
-      unit,
       time,
       remark
     } = req.body
+
+    const unit = 'SET'
     const channel = req.headers['x-channel']
 
     const { Product } = getModelsByChannel(channel, res, productModel)
@@ -176,7 +177,8 @@ exports.deleteProductNoodle = async (req, res) => {
   // session.startTransaction();
   try {
     const channel = req.headers['x-channel']
-    const { type, area, storeId, id, sku, unit } = req.body
+    const { type, area, storeId, id, sku } = req.body
+    const unit = 'SET'
     const { NoodleCart } = getModelsByChannel(channel, res, noodleCartModel)
     const storeIdAndId = `${type}_${id}_${unit}`
     const now = Date.now()
@@ -330,7 +332,7 @@ exports.getSoup = async (req, res) => {
     }).sort({ id: 1 })
 
     const data = dataProduct.map(item => {
-      const unit = item.listUnit.find(u => u.unit === 'PCS')
+      const unit = item.listUnit.find(u => u.unit === 'SET')
 
       return {
         id: item.id,

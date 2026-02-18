@@ -75,7 +75,7 @@ function generateDates(startDate, days) {
   if (!startDate || typeof startDate !== 'string') {
     throw new Error(`Invalid startDate: ${startDate}`)
   }
-  
+
   const start = new Date(`${startDate}T00:00:00Z`)
 
   if (isNaN(start.getTime())) {
@@ -85,19 +85,57 @@ function generateDates(startDate, days) {
   const result = []
 
   for (let i = 0; i <= days; i++) {
-    
+
     const d = new Date(start)
     d.setUTCDate(start.getUTCDate() + i)
     result.push({
-      date:d.toISOString().slice(0, 10),
-      day:String(i + 1).padStart(2,'0')
+      date: d.toISOString().slice(0, 10),
+      day: String(i + 1).padStart(2, '0')
     })
   }
 
   return result
 }
 
+function formatThaiSQL(dateInput) {
 
+  // ถ้าไม่มีค่า
+  if (!dateInput) {
+    return '1970-01-01 07:00:00'
+  }
+
+  const d = new Date(
+    new Date(dateInput).toLocaleString('en-US', {
+      timeZone: 'Asia/Bangkok'
+    })
+  )
+
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mi = String(d.getMinutes()).padStart(2, '0')
+  const ss = String(d.getSeconds()).padStart(2, '0')
+
+  return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
+}
+
+
+function toThaiDateOrDefault(dateInput) {
+
+  if (!dateInput) {
+    // 1970-01-01 07:00:00 Bangkok
+    return new Date('1970-01-01T00:00:00Z')
+  }
+
+  const thaiTime = new Date(
+    new Date(dateInput).toLocaleString('en-US', {
+      timeZone: 'Asia/Bangkok'
+    })
+  )
+
+  return thaiTime
+}
 
 
 module.exports = {
@@ -110,5 +148,7 @@ module.exports = {
   toThaiTime,
   formatDateToYYYYMMDD,
   periodNew,
-  generateDates
+  generateDates,
+  formatThaiSQL,
+  toThaiDateOrDefault
 }

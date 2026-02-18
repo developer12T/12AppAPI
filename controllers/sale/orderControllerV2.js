@@ -753,3 +753,45 @@ exports.waitApproveToPending = async (req, res) => {
     res.status(500).json({ status: '500', message: error.message })
   }
 }
+
+
+exports.orderEditUser = async (req, res) => {
+  try {
+    const { period, area } = req.body
+    const channel = req.headers['x-channel']
+    const { User } = getModelsByChannel('user', res, userModel)
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Store, TypeStore } = getModelsByChannel(channel, res, storeModel)
+
+    const userData = await User.findOne({ area: area, role: 'sale' })
+    const orderData = await Order.find({ 'store.area': area, period: period })
+
+    const name = `${userData.firstName} ${userData.surName}`
+
+    await Order.updateMany(
+      { 'store.area': area, period: period },
+      {
+        $set: {
+          'sale.saleCode': userData.saleCode,
+          'sale.salePayer': userData.salePayer,
+          'sale.name': name,
+          'sale.tel': userData.tel,
+          'sale.warehouse': userData.warehouse
+        }
+      }
+    )
+
+
+
+
+    res.status(200).json({
+      status: 200,
+      message: 'orderEditUser',
+      data: orderData
+    })
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ status: '500', message: error.message })
+  }
+}
