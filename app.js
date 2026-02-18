@@ -16,6 +16,7 @@ const {
   startCronJobUpdateStatusDistribution,
 
   startCronJobInsertPowerBI,
+  startCronJobUpdateRouteToM3DBPRD_BK
   // startCronJobUpdateSendmoney
 } = require('../12AppAPI/controllers/sale/conJob')
 
@@ -26,9 +27,11 @@ if (process.env.CA_DB_URI === process.env.UAT_CHECK) {
   // startCronJobMemory()
   startCronJobInsertDistribution()
   startCronJobUpdateStatusDistribution()
+  startCronJobUpdateRouteToM3DBPRD_BK()
   // startCronJobUpdateSendmoney()
 }
 startCronJobAutoLockRouteChange()
+
 // startCronJobInsertDistribution()
 // startCronJobUpdateSendmoney()
 // startCronJobUpdateStatusDistribution()
