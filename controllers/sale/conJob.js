@@ -750,12 +750,12 @@ const startCronJobInsertDistribution = () => {
 
 const startCronJobUpdateStatusDistribution = () => {
   cron.schedule(
-    '0 21 * * *', // 👉 00:00 AM (เวลาไทย)
+    '15 21 * * *', // 👉 00:00 AM (เวลาไทย)
     // '*/2 * * * *',   // ⏰ ทุก 2 นาที
 
     async () => {
       console.log(
-        'Running cron job startCronJobUpdateStatusDistribution at 21:00 AM Thai time. Now:',
+        'Running cron job startCronJobUpdateStatusDistribution at 21:15 AM Thai time. Now:',
         new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
       )
       await updateStatusOrderDistribution(channel = 'cash')
