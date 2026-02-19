@@ -611,8 +611,11 @@ exports.CiaddrAddToWithdraw = async (req, res) => {
       '121': '',
       '110': '',
     };
+
+    // console.log(CIADDRroute)
     for (const row of area) {
       const list = CIADDRroute.filter(item => item.OAPONO === row.area)
+      // console.log(' row.area', row.area)
       for (const item of list) {
 
 
@@ -643,7 +646,7 @@ exports.CiaddrAddToWithdraw = async (req, res) => {
 
         } else {
           // ไม่มี → Insert ใหม่
-          await Withdraw.create(dataTran)
+          // await Withdraw.create(dataTran)
           console.log(`🆕 INSERTED: ${item.OAADK1}`)
           data.push(dataTran)
         }
@@ -865,6 +868,97 @@ exports.addAddressFromExcel = async (req, res) => {
   } catch (error) {
     // ❌ rollback ถ้ามี error
     await t.rollback()
+    console.error(error)
+
+    res.status(500).json({
+      status: 500,
+      message: error.message
+    })
+  }
+}
+
+exports.addAddressToWithdraw = async (req, res) => {
+  try {
+    const { addressId } = req.body
+    const channel = req.headers['x-channel']
+    const { Withdraw } = getModelsByChannel(channel, res, distributionModel)
+    const { User } = getModelsByChannel('user', res, userModel)
+
+    const userData = await User.findOne({ warehouse: addressId.slice(2, 5) })
+
+    const CIADDRdata = await CIADDR.findOne({
+      where: {
+        OAADK1: addressId
+      }
+    });
+
+    if (!CIADDRdata) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Not found in CIADDR'
+      })
+    }
+
+
+    const emailMap = {
+      '109': 'dc_nr@onetwotrading.co.th',
+      '101': 'dc_np2@onetwotrading.co.th',
+      '102': 'dc_mk@onetwotrading.co.th',
+      '104': 'dc_sr@onetwotrading.co.th',
+      '105': 'dc_samutprakan@onetwotrading.co.th',
+      '106': 'dc_nakhonsawan@onetwotrading.co.th',
+      '103': 'dc_lp@onetwotrading.co.th',
+      '111': 'dc_np2@onetwotrading.co.th',
+      '121': '',
+      '110': '',
+    }
+
+    const OAADK1Clean = CIADDRdata.OAADK1?.replace(/\s+/g, '') || ""
+    const OAPONOClean = CIADDRdata.OAPONO?.replace(/\s+/g, '') || ""
+    const werehouse = CIADDRdata.OAADK1.slice(2, 5)
+
+    const CIADDRroute = {
+      OAADK1: OAADK1Clean,
+      OAPONO: OAPONOClean,
+      werehouse: werehouse,
+      name: CIADDRdata.OACONM,
+      OAADR3: CIADDRdata.OAADR3
+    }
+
+
+    const ZType = CIADDRroute.name?.includes('รับของเอง') ? 'T04' : 'T05'
+    const Dc_Email = emailMap[CIADDRroute.OAADR3] ?? ''
+
+    const dataTran = {
+      Des_No: CIADDRroute.OAADK1,
+      Des_Name: CIADDRroute.name,
+      Des_Date: '20250101',
+      ZType,
+      Des_Area: userData.area,
+      WH: CIADDRroute.OAADR3,
+      ROUTE: CIADDRroute.OAPONO,
+      WH1: '',
+      Dc_Email
+    }
+
+    const existWithdraw = await Withdraw.findOne({ Des_No: addressId })
+
+    if (existWithdraw) {
+      return res.status(409).json({
+        status: 409,
+        message: 'Already found in withdraw'
+      })
+    }
+
+    await Withdraw.create(dataTran)
+
+    res.status(201).json({
+      status: 201,
+      message: 'addAddressToWithdraw',
+      data: dataTran
+    })
+
+  } catch (error) {
     console.error(error)
 
     res.status(500).json({
