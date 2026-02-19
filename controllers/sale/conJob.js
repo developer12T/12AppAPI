@@ -1323,7 +1323,7 @@ async function updateRouteToM3DBPRD_BK(channel = 'cash') {
 
 
     console.log("✅ Job completed updateRouteToM3DBPRD_BK")
-    fs.appendFileSync(logFile, `[${nowLog}] ✅ Job completed updateSendmoney\n`)
+    fs.appendFileSync(logFile, `[${nowLog}] ✅ Job completed updateRouteToM3DBPRD_BK\n`)
 
   } catch (error) {
     fs.appendFileSync(logFile, `[${nowLog}] ❌ Job failed: ${error.message}\n`)
