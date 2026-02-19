@@ -750,12 +750,12 @@ const startCronJobInsertDistribution = () => {
 
 const startCronJobUpdateStatusDistribution = () => {
   cron.schedule(
-    '0 21 * * *', // 👉 00:00 AM (เวลาไทย)
+    '15 21 * * *', // 👉 00:00 AM (เวลาไทย)
     // '*/2 * * * *',   // ⏰ ทุก 2 นาที
 
     async () => {
       console.log(
-        'Running cron job startCronJobUpdateStatusDistribution at 21:00 AM Thai time. Now:',
+        'Running cron job startCronJobUpdateStatusDistribution at 21:15 AM Thai time. Now:',
         new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
       )
       await updateStatusOrderDistribution(channel = 'cash')
@@ -1102,7 +1102,7 @@ async function updateRouteToM3DBPRD_BK(channel = 'cash') {
     const { Store } = getModelsByChannel(channel, null, storeModel)
     const { Order } = getModelsByChannel(channel, null, orderModel)
 
-    const routeData = await Route.find({ period: periodstr })
+    const routeData = await Route.find({ period: periodstr, area: { $nin: ['IT211'] } })
 
     if (!routeData.length) {
       return res.status(200).json({ message: 'No route data' })
@@ -1185,8 +1185,8 @@ async function updateRouteToM3DBPRD_BK(channel = 'cash') {
             STORE_ID: storeExit?.storeId || '',
             STORE_NAME: storeExit?.name || '',
             NOTE: item?.note || '',
-            LATITUDE: Number(item.latitude),
-            LONGITUDE: Number(item.longtitude),
+            LATITUDE: Number(item.latitude) || 0,
+            LONGITUDE: Number(item.longtitude) || 0,
             STATUS: item.status,
             STATUS_TEXT: item.statusText,
             CHECKIN: toThaiDateOrDefault(item?.date)
@@ -1269,8 +1269,8 @@ async function updateRouteToM3DBPRD_BK(channel = 'cash') {
               AREA: orderDetail.store.area,
               ZONE: orderDetail.store.zone,
               PROVINCE: orderDetail.shipping?.province ?? '',
-              LATITUDE: orderDetail.latitude,
-              LONGITUDE: orderDetail.longitude,
+              LATITUDE: Number(orderDetail.latitude) || 0,
+              LONGITUDE: Number(orderDetail.longitude) || 0,
               SALE_NAME: orderDetail.sale.name,
               WAREHOUSE: orderDetail.sale.warehouse,
               TOTAL: orderDetail.total.toFixed(10),
@@ -1323,7 +1323,7 @@ async function updateRouteToM3DBPRD_BK(channel = 'cash') {
 
 
     console.log("✅ Job completed updateRouteToM3DBPRD_BK")
-    fs.appendFileSync(logFile, `[${nowLog}] ✅ Job completed updateSendmoney\n`)
+    fs.appendFileSync(logFile, `[${nowLog}] ✅ Job completed updateRouteToM3DBPRD_BK\n`)
 
   } catch (error) {
     fs.appendFileSync(logFile, `[${nowLog}] ❌ Job failed: ${error.message}\n`)
@@ -1495,7 +1495,7 @@ async function updateOrderDistribution(channel) {
     await dataWithdrawInsert(channel, allTransactions)
     fs.appendFileSync(
       logFile,
-      `[${nowLog}] ✅ Job completed dataWithdrawInsert ${channel.toUpperCase()}\n`
+      `[${nowLog}] ✅ Job completed dataWithdrawInsert startDate,endDate = ${startDate} ${channel.toUpperCase()}\n`
     )
   } catch (error) {
     console.error(error)

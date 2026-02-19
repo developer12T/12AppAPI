@@ -222,10 +222,19 @@ exports.getRouteLock = async (req, res) => {
 
     let data = []
 
+    const thaiDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Bangkok',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(new Date())
+
     const filteredRoutes = routes
       .map(route => {
-        const filteredListStore = route.listStore.filter(store => {
-          const addr = (store.storeInfo?.address || '').toLowerCase()
+
+        // ---------- filter store ----------
+        const filteredListStore = (route.listStore ?? []).filter(store => {
+          const addr = (store?.storeInfo?.address ?? '').toLowerCase()
 
           const matchDistrict = district
             ? addr.includes(district.toLowerCase())
@@ -236,69 +245,73 @@ exports.getRouteLock = async (req, res) => {
             : true
 
           const matchStoreId = storeId
-            ? store.storeInfo?.storeId === storeId
+            ? store?.storeInfo?.storeId === storeId
             : true
 
           return matchDistrict && matchProvince && matchStoreId
         })
 
-        const dateMacth = dates.find(u => String(u.day) === String(route.day))
-
-        const thaiDate = new Intl.DateTimeFormat('en-CA', {
-          timeZone: 'Asia/Bangkok',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit'
-        }).format(new Date())
-
-        if (dateMacth.date === thaiDate) {
-          canSell = true
-        } else {
-          canSell = false
-        }
-
-        const checkLockRoute = routeSetting.lockRoute.find(
-          item => item.id === route.id
+        // ---------- date match ----------
+        const dateMatch = dates?.find(
+          u => String(u?.day) === String(route?.day)
         )
-        const lockRoute = checkLockRoute.lock
+
+        const canSell = dateMatch?.date === thaiDate
+
+        // ---------- lock route ----------
+        const lockRouteData = routeSetting?.lockRoute?.find(
+          item => item?.id === route?.id
+        )
+
+        const lockRoute = lockRouteData?.lock ?? false
+
+        // สร้าง map เพื่อ lookup store lock เร็วขึ้น
+        const lockStoreMap = new Map(
+          (lockRouteData?.listStore ?? []).map(s => [s.storeId, s.lock])
+        )
+
+        // ---------- map store ----------
         const listStore = filteredListStore.map(item => {
-          const lockStore = checkLockRoute.listStore.find(
-            u => u.storeId === item.storeInfo.storeId
-          ).lock
+
+          const storeInfo = item?.storeInfo ?? {}
+
+          const lockStore = lockStoreMap.get(storeInfo.storeId) ?? false
+
           return {
             storeInfo: {
-              _id: item.storeInfo._id,
-              storeId: item.storeInfo.storeId,
-              name: item.storeInfo.name,
-              taxId: item.storeInfo.taxId,
-              tel: item.storeInfo.tel,
-              typeName: item.storeInfo.typeName,
-              address: item.storeInfo.address
+              _id: storeInfo._id,
+              storeId: storeInfo.storeId,
+              name: storeInfo.name,
+              taxId: storeInfo.taxId,
+              tel: storeInfo.tel,
+              typeName: storeInfo.typeName,
+              address: storeInfo.address
             },
-            lockStore: lockStore,
-            note: item.note,
-            image: item.image,
-            latitude: item.latitude,
-            longtitude: item.longtitude,
-            status: item.status,
-            statusText: item.statusText,
-            date: item.date,
-            listOrder: item.listOrder,
-            _id: item._id,
-            storeType: item.storeType
+            lockStore,
+            note: item?.note,
+            image: item?.image,
+            latitude: item?.latitude,
+            longtitude: item?.longtitude,
+            status: item?.status,
+            statusText: item?.statusText,
+            date: item?.date,
+            listOrder: item?.listOrder ?? [],
+            _id: item?._id,
+            storeType: item?.storeType
           }
         })
 
         return {
           ...route.toObject(),
-          lockRoute: lockRoute,
+          lockRoute,
           canSell,
-          dateMacth: dateMacth.date,
+          dateMatch: dateMatch?.date ?? null,
           thaiDate,
-          listStore: listStore
+          listStore
         }
       })
       .filter(route => route.listStore.length > 0)
+
 
     const allStoreIds = filteredRoutes.flatMap(route =>
       route.listStore.map(s => s.storeInfo?.storeId).filter(Boolean)
@@ -1234,7 +1247,10 @@ exports.addRouteToM3DBPRD_BK = async (req, res) => {
     const { Store } = getModelsByChannel(channel, res, storeModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
 
-    const routeData = await Route.find({ period })
+    const routeData = await Route.find({
+      period: period,
+      area: { $nin: ['IT211'] }
+    });
 
     if (!routeData.length) {
       return res.status(200).json({ message: 'No route data' })
@@ -1311,8 +1327,8 @@ exports.addRouteToM3DBPRD_BK = async (req, res) => {
           STORE_ID: storeExit?.storeId || '',
           STORE_NAME: storeExit?.name || '',
           NOTE: item?.note || '',
-          LATITUDE: Number(item.latitude),
-          LONGITUDE: Number(item.longtitude),
+          LATITUDE: Number(item.latitude) || 0,
+          LONGITUDE: Number(item.longtitude) || 0,
           STATUS: item.status,
           STATUS_TEXT: item.statusText,
           CHECKIN: toThaiDateOrDefault(item?.date)
@@ -1359,8 +1375,8 @@ exports.addRouteToM3DBPRD_BK = async (req, res) => {
               AREA: orderDetail.store.area,
               ZONE: orderDetail.store.zone,
               PROVINCE: orderDetail.shipping?.province || '',
-              LATITUDE: orderDetail.latitude,
-              LONGITUDE: orderDetail.longitude,
+              LATITUDE: Number(orderDetail.latitude) || 0,
+              LONGITUDE: Number(orderDetail.longitude) || 0,
               SALE_NAME: orderDetail.sale.name,
               WAREHOUSE: orderDetail.sale.warehouse,
               TOTAL: orderDetail.total,
@@ -1390,7 +1406,8 @@ exports.addRouteToM3DBPRD_BK = async (req, res) => {
 
     return res.status(201).json({
       status: 201,
-      message: 'addRouteToM3DBPRD_BK'
+      message: 'addRouteToM3DBPRD_BK',
+      // data: filteredStoreBulk
     })
 
   } catch (error) {
@@ -1413,7 +1430,7 @@ exports.updateRouteToM3DBPRD_BK = async (req, res) => {
     const { Store } = getModelsByChannel(channel, res, storeModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
 
-    const routeData = await Route.find({ period })
+    const routeData = await Route.find({ period: period, area: { $nin: ['IT211'] } })
 
     if (!routeData.length) {
       return res.status(200).json({ message: 'No route data' })
