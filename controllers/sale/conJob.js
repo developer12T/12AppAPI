@@ -1102,7 +1102,7 @@ async function updateRouteToM3DBPRD_BK(channel = 'cash') {
     const { Store } = getModelsByChannel(channel, null, storeModel)
     const { Order } = getModelsByChannel(channel, null, orderModel)
 
-    const routeData = await Route.find({ period: periodstr })
+    const routeData = await Route.find({ period: periodstr, area: { $nin: ['IT211'] } })
 
     if (!routeData.length) {
       return res.status(200).json({ message: 'No route data' })

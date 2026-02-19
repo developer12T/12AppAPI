@@ -1247,7 +1247,10 @@ exports.addRouteToM3DBPRD_BK = async (req, res) => {
     const { Store } = getModelsByChannel(channel, res, storeModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
 
-    const routeData = await Route.find({ period })
+    const routeData = await Route.find({
+      period: period,
+      area: { $nin: ['IT211'] }
+    });
 
     if (!routeData.length) {
       return res.status(200).json({ message: 'No route data' })
@@ -1324,8 +1327,8 @@ exports.addRouteToM3DBPRD_BK = async (req, res) => {
           STORE_ID: storeExit?.storeId || '',
           STORE_NAME: storeExit?.name || '',
           NOTE: item?.note || '',
-          LATITUDE: Number(item.latitude),
-          LONGITUDE: Number(item.longtitude),
+          LATITUDE: Number(item.latitude) || 0,
+          LONGITUDE: Number(item.longtitude) || 0,
           STATUS: item.status,
           STATUS_TEXT: item.statusText,
           CHECKIN: toThaiDateOrDefault(item?.date)
@@ -1372,8 +1375,8 @@ exports.addRouteToM3DBPRD_BK = async (req, res) => {
               AREA: orderDetail.store.area,
               ZONE: orderDetail.store.zone,
               PROVINCE: orderDetail.shipping?.province || '',
-              LATITUDE: orderDetail.latitude,
-              LONGITUDE: orderDetail.longitude,
+              LATITUDE: Number(orderDetail.latitude) || 0,
+              LONGITUDE: Number(orderDetail.longitude) || 0,
               SALE_NAME: orderDetail.sale.name,
               WAREHOUSE: orderDetail.sale.warehouse,
               TOTAL: orderDetail.total,
@@ -1403,7 +1406,8 @@ exports.addRouteToM3DBPRD_BK = async (req, res) => {
 
     return res.status(201).json({
       status: 201,
-      message: 'addRouteToM3DBPRD_BK'
+      message: 'addRouteToM3DBPRD_BK',
+      // data: filteredStoreBulk
     })
 
   } catch (error) {
@@ -1426,7 +1430,7 @@ exports.updateRouteToM3DBPRD_BK = async (req, res) => {
     const { Store } = getModelsByChannel(channel, res, storeModel)
     const { Order } = getModelsByChannel(channel, res, orderModel)
 
-    const routeData = await Route.find({ period })
+    const routeData = await Route.find({ period: period, area: { $nin: ['IT211'] } })
 
     if (!routeData.length) {
       return res.status(200).json({ message: 'No route data' })
