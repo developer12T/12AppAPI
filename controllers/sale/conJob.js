@@ -1495,7 +1495,7 @@ async function updateOrderDistribution(channel) {
     await dataWithdrawInsert(channel, allTransactions)
     fs.appendFileSync(
       logFile,
-      `[${nowLog}] ✅ Job completed dataWithdrawInsert ${channel.toUpperCase()}\n`
+      `[${nowLog}] ✅ Job completed dataWithdrawInsert startDate,endDate = ${startDate} ${channel.toUpperCase()}\n`
     )
   } catch (error) {
     console.error(error)
