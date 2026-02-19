@@ -1479,11 +1479,12 @@ async function updateOrderDistribution(channel) {
     const month = String(thailand.getMonth() + 1).padStart(2, '0')
     const day = String(thailand.getDate()).padStart(2, '0')
 
+    const diffDay = String(thailand.getDate() - 4).padStart(2, '0')
     // ใช้วันวันนี้เป็น start/end
     const nextDay = String(thailand.getDate()).padStart(2, '0')
 
     const startDate = `${year}${month}${day}`
-    const endDate = `${year}${month}${day}`
+    const endDate = `${year}${month}${diffDay}`
     const status = ''
 
     const allTransactions = await dataWithdraw(
@@ -1495,7 +1496,7 @@ async function updateOrderDistribution(channel) {
     await dataWithdrawInsert(channel, allTransactions)
     fs.appendFileSync(
       logFile,
-      `[${nowLog}] ✅ Job completed dataWithdrawInsert startDate,endDate = ${startDate} ${channel.toUpperCase()}\n`
+      `[${nowLog}] ✅ Job completed dataWithdrawInsert startDate = ${startDate} endDate = ${endDate}   ${channel.toUpperCase()}\n`
     )
   } catch (error) {
     console.error(error)
