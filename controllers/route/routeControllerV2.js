@@ -1436,19 +1436,18 @@ exports.updateRouteToM3DBPRD_BK = async (req, res) => {
       return res.status(200).json({ message: 'No route data' })
     }
 
-    // -------------------------
-    // เวลาไทยวันนี้
-    // -------------------------
-    const now = new Date()
-    const utc = now.getTime() + now.getTimezoneOffset() * 60000
-    const thailand = new Date(utc + 7 * 60 * 60000)
+    const { startDate, endDate } = rangeDate(period)
 
-    const year = thailand.getFullYear()
-    const month = String(thailand.getMonth() + 1).padStart(2, '0')
-    const day = String(thailand.getDate()).padStart(2, '0')
+    const yearStart = startDate.getFullYear()
+    const monthStart = String(startDate.getMonth() + 1).padStart(2, '0')
+    const dayStart = String(startDate.getDate()).padStart(2, '0')
 
-    const startTH = new Date(`${year}-${month}-${day}T00:00:00+07:00`)
-    const endTH = new Date(`${year}-${month}-${day}T23:59:59.999+07:00`)
+    const yearEnd = endDate.getFullYear()
+    const monthEnd = String(endDate.getMonth() + 1).padStart(2, '0')
+    const dayEnd = String(endDate.getDate()).padStart(2, '0')
+
+    const startTH = new Date(`${yearStart}-${monthStart}-${dayStart}T00:00:00+07:00`)
+    const endTH = new Date(`${yearEnd}-${monthEnd}-${dayEnd}T23:59:59.999+07:00`)
 
     const routeIds = routeData.map(r => r.id)
 
