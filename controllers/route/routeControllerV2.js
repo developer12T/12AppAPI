@@ -1196,9 +1196,9 @@ exports.delStoreOneInRoute = async (req, res) => {
     const channel = req.headers['x-channel']
     const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
     const { Store } = getModelsByChannel(channel, res, storeModel)
-
+    const { Order } = getModelsByChannel(channel, res, orderModel)
     const routeData = await Route.findOne({ id: routeId })
-
+    const period = routeId.slice(0, 6)
     if (!routeData) {
       return res.status(404).json({
         status: 404,
@@ -1233,11 +1233,59 @@ exports.delStoreOneInRoute = async (req, res) => {
     }
 
 
+    const exitOrder = await Order.find({ period: period, routeId: routeId, 'store.storeId': storeId })
+
+    if (exitOrder.length > 0) {
+      return res.status(409).json({
+        status: 409,
+        message: 'Already have order'
+      })
+    }
+
+
+    const storeData = storeInRoute.find(item => item.storeId === storeId)
+
+    if (!storeData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Store data not found'
+      })
+    }
+
+
+    await Route.updateOne(
+      { id: routeId },
+      {
+        $pull: {
+          listStore: { storeInfo: storeData._id }
+        }
+      }
+    )
+
+
+    await RouteSetting.updateOne(
+      {
+        period: routeData.period,
+        area: routeData.area
+      },
+      {
+        $pull: {
+          "lockRoute.$[route].listStore": { storeInfo: storeData._id }
+        }
+      },
+      {
+        arrayFilters: [
+          { 'route.id': routeId }
+        ]
+      }
+    )
+
+
 
     res.status(200).json({
       status: 200,
       message: 'success',
-      data: storeIdSet
+      // data: storeInfo
     })
   } catch (error) {
     console.error('❌ Error:', error)
