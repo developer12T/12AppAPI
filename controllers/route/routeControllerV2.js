@@ -689,6 +689,7 @@ exports.editLockRoute = async (req, res) => {
           period: period,
           area: area ?? 'all',
           editType: editType,
+          lock: lock,
           user: user
         }
 
@@ -892,7 +893,7 @@ exports.updateSaleOutRoute = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
     // const {} = req.query
-    const { saleOutRoute, area, period } = req.body
+    const { saleOutRoute, area, period, user } = req.body
 
     if (!area || !period) {
       return res.status(400).json({
@@ -908,7 +909,7 @@ exports.updateSaleOutRoute = async (req, res) => {
       })
     }
 
-    const { RouteSetting } = getModelsByChannel(channel, res, routeModel)
+    const { RouteSetting, RouteSettingLog } = getModelsByChannel(channel, res, routeModel)
 
     const updated = await RouteSetting.findOneAndUpdate(
       { area, period },
@@ -922,6 +923,16 @@ exports.updateSaleOutRoute = async (req, res) => {
         message: 'RouteSetting not found'
       })
     }
+
+    const routeSettingLog = {
+      period: period,
+      area: area,
+      editType: 'saleOutRoute',
+      lock: saleOutRoute,
+      user: user || ''
+    }
+
+    await RouteSettingLog.create(routeSettingLog)
 
     // 🔔 emit socket
     const io = getSocket()
