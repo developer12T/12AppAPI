@@ -8,7 +8,8 @@ const {
 const {
   period,
   previousPeriod,
-  toThaiTime
+  toThaiTime,
+  rangeDate
 } = require('../../utilities/datetime')
 const axios = require('axios')
 const dayjs = require('dayjs')
@@ -44,7 +45,6 @@ const {
 } = require('../../utilities/summary')
 // const { fn, col } = require('sequelize')
 const { sequelize, DataTypes } = require('../../config/m3db')
-const { rangeDate } = require('../../utilities/datetime')
 const { uploadFiles } = require('../../utilities/upload')
 const { checkInRoute, checkInSale } = require('../route/checkIn')
 const multer = require('multer')
@@ -6320,29 +6320,29 @@ exports.updateStatusOrderDistribution = async (req, res) => {
 
 exports.updateOrderDistribution = async (req, res) => {
   try {
-    const now = new Date()
-    const thailandOffset = 7 * 60 // นาที
-    const utc = now.getTime() + now.getTimezoneOffset() * 60000
-    const thailand = new Date(utc + thailandOffset * 60000)
+    const { period } = req.body
+    const channel = req.headers['x-channel']
 
-    const year = thailand.getFullYear()
-    const month = String(thailand.getMonth() + 1).padStart(2, '0')
-    const day = String(thailand.getDate() - 1).padStart(2, '0')
-    const nextDay = String(thailand.getDate()).padStart(2, '0')
+    const { startDate, endDate } = rangeDate(period)
 
-    const currentDate = `${year}${month}${day}`
-    // const startDate = `${year}${month}${day}`
-    const startDate = `20251120`
-    // const endDate = `${year}${month}${nextDay}`
-    const endDate = `20251123`
+    const yearStart = startDate.getFullYear()
+    const monthStart = String(startDate.getMonth() + 1).padStart(2, '0')
+    const dayStart = String(startDate.getDate()).padStart(2, '0')
+
+    const yearEnd = endDate.getFullYear()
+    const monthEnd = String(endDate.getMonth() + 1).padStart(2, '0')
+    const dayEnd = String(endDate.getDate()).padStart(2, '0')
+
+
+    const startDateTran = `${yearStart}${monthStart}${dayStart}`
+    const endDateTran = `${yearEnd}${monthEnd}${dayEnd}`
+
     const status = ''
-    const channel = 'cash'
-
     const allTransactions = await dataWithdraw(
       channel,
       status,
-      startDate,
-      endDate
+      startDateTran,
+      endDateTran
     )
     await dataWithdrawInsert(channel, allTransactions)
 

@@ -65,7 +65,7 @@ router.post('/checkOutSale', checkOutSale)
 router.post('/checkOutV2', checkOutV2)
 router.post('/addSlip', addSlip)
 router.get('/reflashOrder', reflashOrder)
-router.get('/updateOrderDistribution', updateOrderDistribution)
+router.post('/updateOrderDistribution', updateOrderDistribution)
 router.get('/updateStatusOrderDistribution', updateStatusOrderDistribution)
 
 router.post('/addSlip', addSlip)
