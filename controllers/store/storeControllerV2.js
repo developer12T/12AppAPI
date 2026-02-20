@@ -15,7 +15,7 @@ const {
 const { uploadFiles } = require('../../utilities/upload')
 const { sequelize, DataTypes } = require('../../config/m3db')
 // const { sequelize, DataTypes } = require('../../config/powerBi')
-const { Sequelize } = require('sequelize')
+const { Sequelize, where } = require('sequelize')
 const { Op } = require('sequelize')
 
 const { calculateSimilarity } = require('../../utilities/utility')
@@ -680,7 +680,7 @@ exports.addStorePcToCash = async (req, res) => {
 }
 
 
-exports.updateStoreRouteAreaFromM3 = async (req, res) => {
+exports.updateStoreRouteAreaFromM3All = async (req, res) => {
     try {
         const channel = req.headers['x-channel']
         const { Store } = getModelsByChannel(channel, res, storeModel)
@@ -725,6 +725,65 @@ exports.updateStoreRouteAreaFromM3 = async (req, res) => {
         res.status(500).json({ status: 500, message: error.message })
     }
 }
+
+
+exports.updateStoreRouteAreaFromM3One = async (req, res) => {
+    try {
+        const channel = req.headers['x-channel']
+        const { Store } = getModelsByChannel(channel, res, storeModel)
+        const { area } = req.body
+
+        if (!area) {
+            return res.status(400).json({
+                status: 400,
+                message: 'area is required'
+            })
+        }
+
+        const storeDataM3 = await Customer.findAll({
+            attributes: ['customerNo', 'OKCFC1', 'OKCFC3'],
+            where: {
+                OKCFC1: area
+            },
+            raw: true
+        })
+
+        const trimmedData = storeDataM3.map(row => ({
+            customerNo: row.customerNo?.trim(),
+            area: row.OKCFC1?.trim(),
+            zone: row.OKCFC1?.trim().slice(0, 2),
+            route: row.OKCFC3?.trim()
+        }))
+
+        const bulkOps = trimmedData.map(row => ({
+            updateMany: {
+                filter: { storeId: row.customerNo },
+                update: {
+                    $set: {
+                        area: row.area,
+                        zone: row.zone,
+                        route: row.route
+                    }
+                }
+            }
+        }))
+
+        await Store.bulkWrite(bulkOps)
+
+
+        res.status(200).json({
+            status: 200,
+            message: 'update success',
+            data: trimmedData
+        })
+
+    } catch (error) {
+        console.error(error)
+        res.status(500).json({ status: 500, message: error.message })
+    }
+}
+
+
 
 
 exports.requestStoreUpdate = async (req, res) => {
