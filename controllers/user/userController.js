@@ -1137,7 +1137,8 @@ exports.getArea = async (req, res) => {
             ]
           }
         }
-      }
+      },
+      { $sort: { area: 1 } }
     ])
 
     res.status(200).json({
@@ -1164,7 +1165,7 @@ exports.getZone = async (req, res) => {
     const { User } = getModelsByChannel(channel, res, userModel)
     let match = { role }
 
-    const userData = await User.aggregate([
+    let userData = await User.aggregate([
       { $match: match },
       {
         $group: {
@@ -1178,6 +1179,13 @@ exports.getZone = async (req, res) => {
         }
       }
     ])
+
+    userData.push({zone:'FT'})
+
+    userData.sort((a, b) =>
+  (a.zone || '').toUpperCase()
+    .localeCompare((b.zone || '').toUpperCase())
+);
 
     res.status(200).json({
       status: 200,

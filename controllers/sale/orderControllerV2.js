@@ -137,13 +137,13 @@ exports.checkOutV2 = async (req, res) => {
 
     const now = Date.now()
     const lastUpdate = orderTimestamps[storeId] || 0
-    const ONE_MINUTE = 3 * 1000
+    const ONE_MINUTE = 2 * 1000
 
     if (now - lastUpdate < ONE_MINUTE) {
       return res.status(429).json({
         status: 429,
         message:
-          'This order was updated less than 3 seconds ago. Please try again later!'
+          'This order was updated less than 2 seconds ago. Please try again later!'
       })
     }
     orderTimestamps[storeId] = now

@@ -2158,6 +2158,7 @@ exports.getRouteEffective = async (req, res) => {
     }
 
     let routes = await Route.find({
+      area: { $ne: 'IT211' },
       ...query
     }).populate(
       'listStore.storeInfo',
