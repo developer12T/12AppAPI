@@ -1137,7 +1137,8 @@ exports.getArea = async (req, res) => {
             ]
           }
         }
-      }
+      },
+      { $sort: { area: 1 } }
     ])
 
     res.status(200).json({
