@@ -1164,7 +1164,7 @@ exports.getZone = async (req, res) => {
     const { User } = getModelsByChannel(channel, res, userModel)
     let match = { role }
 
-    const userData = await User.aggregate([
+    let userData = await User.aggregate([
       { $match: match },
       {
         $group: {
@@ -1178,6 +1178,9 @@ exports.getZone = async (req, res) => {
         }
       }
     ])
+
+    userData.push({zone:'FT'})
+
 
     res.status(200).json({
       status: 200,
