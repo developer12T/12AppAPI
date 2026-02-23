@@ -1483,8 +1483,8 @@ async function updateOrderDistribution(channel) {
     // ใช้วันวันนี้เป็น start/end
     const nextDay = String(thailand.getDate()).padStart(2, '0')
 
-    const startDate = `${year}${month}${day}`
-    const endDate = `${year}${month}${diffDay}`
+    const startDate = `${year}${month}${diffDay}`
+    const endDate = `${year}${month}${day}`
     const status = ''
 
     const allTransactions = await dataWithdraw(

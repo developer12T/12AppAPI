@@ -689,6 +689,7 @@ exports.editLockRoute = async (req, res) => {
           period: period,
           area: area ?? 'all',
           editType: editType,
+          lock: lock,
           user: user
         }
 
@@ -892,7 +893,7 @@ exports.updateSaleOutRoute = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
     // const {} = req.query
-    const { saleOutRoute, area, period } = req.body
+    const { saleOutRoute, area, period, user } = req.body
 
     if (!area || !period) {
       return res.status(400).json({
@@ -908,7 +909,7 @@ exports.updateSaleOutRoute = async (req, res) => {
       })
     }
 
-    const { RouteSetting } = getModelsByChannel(channel, res, routeModel)
+    const { RouteSetting, RouteSettingLog } = getModelsByChannel(channel, res, routeModel)
 
     const updated = await RouteSetting.findOneAndUpdate(
       { area, period },
@@ -922,6 +923,16 @@ exports.updateSaleOutRoute = async (req, res) => {
         message: 'RouteSetting not found'
       })
     }
+
+    const routeSettingLog = {
+      period: period,
+      area: area,
+      editType: 'saleOutRoute',
+      lock: saleOutRoute,
+      user: user || ''
+    }
+
+    await RouteSettingLog.create(routeSettingLog)
 
     // 🔔 emit socket
     const io = getSocket()
@@ -1185,9 +1196,9 @@ exports.delStoreOneInRoute = async (req, res) => {
     const channel = req.headers['x-channel']
     const { Route, RouteSetting } = getModelsByChannel(channel, res, routeModel)
     const { Store } = getModelsByChannel(channel, res, storeModel)
-
+    const { Order } = getModelsByChannel(channel, res, orderModel)
     const routeData = await Route.findOne({ id: routeId })
-
+    const period = routeId.slice(0, 6)
     if (!routeData) {
       return res.status(404).json({
         status: 404,
@@ -1222,11 +1233,59 @@ exports.delStoreOneInRoute = async (req, res) => {
     }
 
 
+    const exitOrder = await Order.find({ period: period, routeId: routeId, 'store.storeId': storeId })
+
+    if (exitOrder.length > 0) {
+      return res.status(409).json({
+        status: 409,
+        message: 'Already have order'
+      })
+    }
+
+
+    const storeData = storeInRoute.find(item => item.storeId === storeId)
+
+    if (!storeData) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Store data not found'
+      })
+    }
+
+
+    await Route.updateOne(
+      { id: routeId },
+      {
+        $pull: {
+          listStore: { storeInfo: storeData._id }
+        }
+      }
+    )
+
+
+    await RouteSetting.updateOne(
+      {
+        period: routeData.period,
+        area: routeData.area
+      },
+      {
+        $pull: {
+          "lockRoute.$[route].listStore": { storeInfo: storeData._id }
+        }
+      },
+      {
+        arrayFilters: [
+          { 'route.id': routeId }
+        ]
+      }
+    )
+
+
 
     res.status(200).json({
       status: 200,
       message: 'success',
-      data: storeIdSet
+      // data: storeInfo
     })
   } catch (error) {
     console.error('❌ Error:', error)
@@ -1436,19 +1495,18 @@ exports.updateRouteToM3DBPRD_BK = async (req, res) => {
       return res.status(200).json({ message: 'No route data' })
     }
 
-    // -------------------------
-    // เวลาไทยวันนี้
-    // -------------------------
-    const now = new Date()
-    const utc = now.getTime() + now.getTimezoneOffset() * 60000
-    const thailand = new Date(utc + 7 * 60 * 60000)
+    const { startDate, endDate } = rangeDate(period)
 
-    const year = thailand.getFullYear()
-    const month = String(thailand.getMonth() + 1).padStart(2, '0')
-    const day = String(thailand.getDate()).padStart(2, '0')
+    const yearStart = startDate.getFullYear()
+    const monthStart = String(startDate.getMonth() + 1).padStart(2, '0')
+    const dayStart = String(startDate.getDate()).padStart(2, '0')
 
-    const startTH = new Date(`${year}-${month}-${day}T00:00:00+07:00`)
-    const endTH = new Date(`${year}-${month}-${day}T23:59:59.999+07:00`)
+    const yearEnd = endDate.getFullYear()
+    const monthEnd = String(endDate.getMonth() + 1).padStart(2, '0')
+    const dayEnd = String(endDate.getDate()).padStart(2, '0')
+
+    const startTH = new Date(`${yearStart}-${monthStart}-${dayStart}T00:00:00+07:00`)
+    const endTH = new Date(`${yearEnd}-${monthEnd}-${dayEnd}T23:59:59.999+07:00`)
 
     const routeIds = routeData.map(r => r.id)
 

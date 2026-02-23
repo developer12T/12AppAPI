@@ -78,7 +78,8 @@ const {
 const {
   updateStoreStatusV2,
   addStorePcToCash,
-  updateStoreRouteAreaFromM3,
+  updateStoreRouteAreaFromM3All,
+  updateStoreRouteAreaFromM3One,
   requestStoreUpdate,
   approveRequestStoreUpdate,
   getBk228OldStore
@@ -149,7 +150,8 @@ router.get('/checkRangeLatLong', checkRangeLatLong)
 router.get('/checkNewStoreLatLong', checkNewStoreLatLong)
 router.post('/updateAreaStore', updateAreaStore)
 
-router.post('/updateStoreRouteAreaFromM3', updateStoreRouteAreaFromM3)
+router.post('/updateStoreRouteAreaFromM3All', updateStoreRouteAreaFromM3All)
+router.post('/updateStoreRouteAreaFromM3One', updateStoreRouteAreaFromM3One)
 router.post('/areaStoreM3toMongo', areaStoreM3toMongo)
 router.post('/checkLatLongByStore', checkLatLongByStore)
 router.post('/moveStoreToCash', moveStoreToCash)
