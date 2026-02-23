@@ -1182,6 +1182,10 @@ exports.getZone = async (req, res) => {
 
     userData.push({zone:'FT'})
 
+    userData.sort((a, b) =>
+  (a.zone || '').toUpperCase()
+    .localeCompare((b.zone || '').toUpperCase())
+);
 
     res.status(200).json({
       status: 200,
