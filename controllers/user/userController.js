@@ -1180,7 +1180,7 @@ exports.getZone = async (req, res) => {
       }
     ])
 
-    userData.push({zone:'FT'})
+    // userData.push({zone:'FT'})
 
     userData.sort((a, b) =>
   (a.zone || '').toUpperCase()
