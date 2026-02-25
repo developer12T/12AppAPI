@@ -5882,15 +5882,18 @@ exports.getProductSKUReportByOrder = async (req, res) => {
     const startDate = new Date(Date.UTC(year, month - 1, 1))
     const endDate = new Date(Date.UTC(year, month, 1))
 
+    // สร้าง match stage ที่ไม่ filter area ถ้าไม่มีค่า
+    const matchStage = {
+      createdAt: { $gte: startDate, $lt: endDate }
+    }
+    if (area) matchStage['store.area'] = area
+
     const pipeline = [
       // --------------------------------------------------
       // 1️⃣ FILTER ORDER
       // --------------------------------------------------
       {
-        $match: {
-          'store.area': area,
-          createdAt: { $gte: startDate, $lt: endDate }
-        }
+        $match: matchStage
       },
 
       // --------------------------------------------------
