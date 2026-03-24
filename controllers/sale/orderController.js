@@ -6479,6 +6479,7 @@ exports.getTargetProduct = async (req, res) => {
         ).factor
         const groupM3 = productDetail.groupCodeM3
         const groupNameM3 = productDetail.groupM3
+        
         return {
           ...i,
           area: item.store.area,
@@ -6504,11 +6505,71 @@ exports.getTargetProduct = async (req, res) => {
       }, {})
     )
 
-    const orderSaleTranMergedCtn = orderSaleTranMerged.map(item => {
+    // ระบุกลุ่มที่ต้องปรับลอจิกการรวม (BAG+CTN ปนกัน)
+    const groupsToOptimize = new Set(['G15']) // เพิ่มกลุ่มตามต้องการ
+
+    // Apply logic based on whether group needs optimization
+    const orderSaleTranMergedCtn = Object.values(
+      orderSaleTranMerged.reduce((acc, cur) => {
+        if (groupsToOptimize.has(cur.groupM3)) {
+          // FIX: สำหรับกลุ่มที่ระบุ - merge by group FIRST
+          const key = `${cur.groupM3}_${cur.area}`
+          if (!acc[key]) {
+            acc[key] = {
+              ...cur,
+              qtyPcs: cur.qtyPcs,
+              subtotal: cur.subtotal,
+              isOptimized: true
+            }
+          } else {
+            acc[key].qtyPcs += cur.qtyPcs || 0
+            acc[key].subtotal += cur.subtotal || 0
+          }
+        } else {
+          // ตามเดิมสำหรับกลุ่มอื่นๆ - merge by product+area
+          const key = `${cur.id}_${cur.area}`
+          if (!acc[key]) {
+            acc[key] = { ...cur }
+          } else {
+            acc[key].qty += cur.qty || 0
+            acc[key].qtyPcs += cur.qtyPcs || 0
+            acc[key].subtotal += cur.subtotal || 0
+          }
+        }
+        return acc
+      }, {})
+    ).map(item => {
+      const qtyCtn = Math.floor(item.qtyPcs / item.factorCtn)
       return {
         ...item,
-        qtyCtn: Math.floor(item.qtyPcs / item.factorCtn)
+        qtyCtn: qtyCtn
       }
+    })
+
+    // สำหรับกลุ่มปกติ: merge by group หลังจากแปลง CTN เสร็จแล้ว
+    const orderSaleTranMergedCtnFinal = Object.values(
+      orderSaleTranMergedCtn.reduce((acc, cur) => {
+        if (!cur.isOptimized) {
+          // Merge regular groups by group+area
+          const key = `${cur.groupM3}_${cur.area}`
+          if (!acc[key]) {
+            acc[key] = { ...cur }
+          } else {
+            acc[key].qtyCtn += cur.qtyCtn || 0
+            acc[key].subtotal += cur.subtotal || 0
+          }
+        } else {
+          // Keep optimized groups as-is
+          const key = `${cur.groupM3}_${cur.area}`
+          acc[key] = cur
+        }
+        return acc
+      }, {})
+    )
+    
+    const orderSaleTranMergedCtnClean = orderSaleTranMergedCtnFinal.map(item => {
+      const { isOptimized, ...rest } = item
+      return rest
     })
 
     let areaList = []
@@ -6524,7 +6585,7 @@ exports.getTargetProduct = async (req, res) => {
     let data = []
     for (const i of areaList) {
       // console.log(i)
-      const orderArea = orderSaleTranMergedCtn.filter(item => item.area === i)
+      const orderArea = orderSaleTranMergedCtnClean.filter(item => item.area === i)
 
       for (const u of orderArea) {
         const targetDetail = targetProductData.find(
@@ -6533,7 +6594,6 @@ exports.getTargetProduct = async (req, res) => {
             item.period === period &&
             item.grp_target === u.groupM3
         )
-        // console.log(u.area)
         dataTran = {
           id: targetDetail.id,
           period: period,
@@ -6550,20 +6610,8 @@ exports.getTargetProduct = async (req, res) => {
       }
     }
 
-    const dataFinal = Object.values(
-      data.reduce((acc, cur) => {
-        const key = `${cur.groupCode}_${cur.area}` // ใช้ id + unit เป็น key
-        if (!acc[key]) {
-          acc[key] = { ...cur }
-        } else {
-          acc[key].actualCtn += cur.actualCtn || 0
-          acc[key].actual += cur.actual || 0
-        }
-        return acc
-      }, {})
-    )
-
-    const result = dataFinal.map(item => ({
+    // Data is already merged by group at orderSaleTranMergedCtn level, so just format output
+    const result = data.map(item => ({
       id: item.id,
       period: item.period,
       area: item.area,
