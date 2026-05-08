@@ -24,6 +24,16 @@ const { OP } = require('../../models/cash/master')
 const { PromotionStore } = require('../../models/cash/master')
 const { stat } = require('fs')
 
+// Helper function: Map channel name to M3 channel code
+const getChannelCode = (channel) => {
+  const channelMap = {
+    'cash': '103',
+    'credit': '104',
+    'pc': '105'
+  }
+  return channelMap[channel] || '103' // Default to cash
+}
+
 exports.addPromotion = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
@@ -192,7 +202,7 @@ exports.addPromotionM3 = async (req, res) => {
             const payload = {
               ...where,
               FBCUTP: 0,
-              customerChannel: '103',
+              customerChannel: getChannelCode(channel),
               saleCode: user.saleCode,
               orderType: '021',
               warehouse: user.warehouse,

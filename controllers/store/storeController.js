@@ -168,6 +168,16 @@ const store = require('../../models/cash/store')
 const QRCode = require('qrcode')
 const { encrypt, decrypt } = require('../../middleware/authen');
 
+// Helper function: Map channel name to M3 channel code
+const getChannelCode = (channel) => {
+  const channelMap = {
+    'cash': '103',
+    'credit': '104',
+    'pc': '105'
+  }
+  return channelMap[channel] || '103' // Default to cash
+}
+
 exports.getDetailStore = async (req, res) => {
   try {
     const { storeId } = req.params
@@ -1584,7 +1594,7 @@ exports.insertStoreToM3 = async (req, res) => {
       customerNo: store.storeId,
       customerStatus: store.status ?? '',
       customerName: name.substring(0, 35),
-      customerChannel: '103',
+      customerChannel: getChannelCode(channel),
       customerCoType: store.type ?? '',
       customerAddress1: seg35(fullAddr, 0),
       customerAddress2: seg35(fullAddr, 35),
@@ -1758,7 +1768,7 @@ exports.updateStoreStatus = async (req, res) => {
         customerNo: item.storeId,
         customerStatus: item.status ?? '',
         customerName: item.name ?? '',
-        customerChannel: '103',
+        customerChannel: getChannelCode(channel),
         customerCoType: item.type ?? '',
         customerAddress1: (
           item.address +
@@ -2567,7 +2577,7 @@ exports.insertStoreToErpOne = async (req, res) => {
       customerNo: item.storeId,
       customerStatus: item.status,
       customerName: item.name,
-      customerChannel: '103',
+      customerChannel: getChannelCode(channel),
       customerCoType: item.type,
       customerAddress1: item.address,
       customerAddress2: item.subDistrict,
@@ -4613,7 +4623,7 @@ exports.addStoreBk228ExcelToErp = async (req, res) => {
         customerNo: item.storeId,
         customerStatus: item.status ?? '',
         customerName: item.name.substring(0, 35) ?? '',
-        customerChannel: '103',
+        customerChannel: getChannelCode(channel),
         customerCoType: item.type ?? '',
         customerAddress1: fullAddress.substring(0, 35),
         customerAddress2: fullAddress.substring(35, 70),

@@ -73,6 +73,15 @@ const { rangeDate } = require('../../utilities/datetime')
 
 const storeTimestamps = {}
 
+// Helper function: Map channel name to M3 channel code
+const getChannelCode = (channel) => {
+  const channelMap = {
+    'cash': '103',
+    'credit': '104',
+    'pc': '105'
+  }
+  return channelMap[channel] || '103' // Default to cash
+}
 
 exports.updateStoreStatusV2 = async (req, res) => {
     try {
@@ -180,7 +189,7 @@ exports.updateStoreStatusV2 = async (req, res) => {
                 customerNo: item.storeId,
                 customerStatus: item.status ?? '',
                 customerName: item.name ?? '',
-                customerChannel: '103',
+                customerChannel: getChannelCode(channel),
                 customerCoType: item.type ?? '',
                 customerAddress1: (
                     item.address +
@@ -588,7 +597,7 @@ exports.addStorePcToCash = async (req, res) => {
             customerNo: dataToCash.storeId,
             customerStatus: dataToCash.status ?? '',
             customerName: dataToCash.name ?? '',
-            customerChannel: '103',
+            customerChannel: getChannelCode(channel),
             customerCoType: dataToCash.type ?? '',
             customerAddress1: (
                 dataToCash.address +
