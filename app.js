@@ -38,9 +38,10 @@ startCronJobAutoLockRouteChange()
 
 app.use(bodyParser.json({ limit: '50mb' }))
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }))
-app.use('/images', express.static('/var/www/12AppAPI/public/images'))
-app.use('/manual', express.static('/var/www/12AppAPI/public/manual'))
-app.use('/campaign', express.static('/var/www/12AppAPI/public/campaign'))
+const uploadPath = process.env.UPLOAD_PATH || '/var/www/12AppAPI/public'
+app.use('/images', express.static(uploadPath + '/images'))
+app.use('/manual', express.static(uploadPath + '/manual'))
+app.use('/campaign', express.static(uploadPath + '/campaign'))
 
 // =============================
 // API Metrics Middleware

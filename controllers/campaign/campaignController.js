@@ -15,7 +15,8 @@ async function saveFiles(req, folderName = '') {
   const imageFile = req.files['image'] ? req.files['image'][0] : null;
   const fileFile = req.files['file'] ? req.files['file'][0] : null;
 
-  const uploadDir = path.join(__dirname, '../../public/campaign');
+  const uploadPath = process.env.UPLOAD_PATH || path.join(__dirname, '../../public');
+  const uploadDir = path.join(uploadPath, 'campaign');
 
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
@@ -131,8 +132,8 @@ exports.addCampaign = [
         des: addCampaignDetail.des,
         aticle: addCampaignDetail.aticle,
         link: addCampaignDetail.link,
-        image: `https://apps.onetwotrading.co.th/campaign/${nameImage}`,
-        file: `https://apps.onetwotrading.co.th/campaign/${nameFile}`,
+        image: [nameImage ? `https://apps.onetwotrading.co.th/campaign/${nameImage}` : ''],
+        file: [nameFile ? `https://apps.onetwotrading.co.th/campaign/${nameFile}` : ''],
         createdAt: new Date()
       });
 
