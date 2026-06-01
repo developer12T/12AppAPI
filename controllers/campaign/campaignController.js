@@ -15,8 +15,7 @@ async function saveFiles(req, folderName = '') {
   const imageFile = req.files['image'] ? req.files['image'][0] : null;
   const fileFile = req.files['file'] ? req.files['file'][0] : null;
 
-  const uploadPath = process.env.UPLOAD_PATH || path.join(__dirname, '../../public');
-  const uploadDir = path.join(uploadPath, 'campaign');
+  const uploadDir = path.join(__dirname, '../../public/campaign');
 
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
@@ -123,8 +122,9 @@ exports.addCampaign = [
       }
 
       const savedPaths = await saveFiles(req, newCampaignId);
-      nameImage = savedPaths.imagePath.match(/CAM[-\w\d]*\.[\w\d]+/)?.[0] || ''
-      nameFile = savedPaths.filePath.match(/CAM[-\w\d]*\.[\w\d]+/)?.[0] || ''
+      // Extract filename from full path: /path/to/CAM-20260601-001-name.jpg → CAM-20260601-001-name.jpg
+      nameImage = savedPaths.imagePath ? path.basename(savedPaths.imagePath) : ''
+      nameFile = savedPaths.filePath ? path.basename(savedPaths.filePath) : ''
 
       const newCampaign = new Campaign({
         id: newCampaignId,
@@ -132,8 +132,8 @@ exports.addCampaign = [
         des: addCampaignDetail.des,
         aticle: addCampaignDetail.aticle,
         link: addCampaignDetail.link,
-        image: [nameImage ? `https://apps.onetwotrading.co.th/campaign/${nameImage}` : ''],
-        file: [nameFile ? `https://apps.onetwotrading.co.th/campaign/${nameFile}` : ''],
+        image: `https://apps.onetwotrading.co.th/campaign/${nameImage}`,
+        file: `https://apps.onetwotrading.co.th/campaign/${nameFile}`,
         createdAt: new Date()
       });
 
