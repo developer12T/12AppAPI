@@ -1849,7 +1849,7 @@ exports.OrderToExcel = async (req, res) => {
       let counterOrder = 0
       function formatDateToThaiYYYYMMDD(date) {
         const d = new Date(date)
-        d.setHours(d.getHours() ) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
+        d.setHours(d.getHours() + 7) // บวก 7 ชั่วโมงให้เป็นเวลาไทย (UTC+7)
 
         const yyyy = d.getFullYear()
         const mm = String(d.getMonth() + 1).padStart(2, '0')
