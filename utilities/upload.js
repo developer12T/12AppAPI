@@ -39,13 +39,19 @@ const uploadFilesCheckin = async (
   subFolder = '',
   name = ''
 ) => {
+  const resolvedBasePath = path.resolve(basePath)
+
+  if (!fs.existsSync(resolvedBasePath)) {
+    throw new Error(`Checkin NAS base path does not exist: ${resolvedBasePath}`)
+  }
+
   const uploadedFiles = await Promise.all(
     files.map(async file => {
       const imageName = `${Date.now()}-${timestamp()}-${name}${path.extname(
         file.originalname
       )}`
 
-      const targetDir = path.resolve(basePath, subFolder)
+      const targetDir = path.resolve(resolvedBasePath, subFolder)
       if (!fs.existsSync(targetDir)) {
         await fs.promises.mkdir(targetDir, { recursive: true })
       }

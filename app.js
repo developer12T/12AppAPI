@@ -37,11 +37,13 @@ startCronJobAutoLockRouteChange()
 // startCronJobUpdateSendmoney()
 // startCronJobUpdateStatusDistribution()
 
+const checkinImgPath = process.env.CHECKIN_IMG_PATH || '/mnt/nas/checkin_img'
+
 app.use(bodyParser.json({ limit: '50mb' }))
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }))
 app.use(
   '/images/stores/checkin',
-  express.static(path.resolve('/mnt/nas/checkin_img'))
+  express.static(path.resolve(checkinImgPath))
 )
 app.use('/images', express.static('/var/www/12AppAPI/public/images'))
 app.use('/manual', express.static('/var/www/12AppAPI/public/manual'))

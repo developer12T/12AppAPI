@@ -17,6 +17,7 @@ const upload = multer({ storage: multer.memoryStorage() }).array(
 const { to2 } = require('../../middleware/order')
 const mongoose = require('mongoose')
 const xlsx = require('xlsx')
+const CHECKIN_IMG_PATH = process.env.CHECKIN_IMG_PATH || '/mnt/nas/checkin_img'
 const sql = require('mssql')
 const {
   routeQuery,
@@ -932,7 +933,7 @@ exports.checkIn = async (req, res) => {
           const files = req.files
           const uploadedFile = await uploadFilesCheckin(
             files,
-            '/mnt/nas/checkin_img',
+            CHECKIN_IMG_PATH,
             store.area,
             storeId
           )
@@ -1066,7 +1067,7 @@ exports.checkInNotSale = async (req, res) => {
           const files = req.files
           const uploadedFile = await uploadFilesCheckin(
             files,
-            '/mnt/nas/checkin_img',
+            CHECKIN_IMG_PATH,
             store.area,
             storeId
           )
@@ -1200,7 +1201,7 @@ exports.checkInVisit = async (req, res) => {
           const files = req.files
           const uploadedFile = await uploadFilesCheckin(
             files,
-            '/mnt/nas/checkin_img',
+            CHECKIN_IMG_PATH,
             store.area,
             storeId
           )
@@ -1334,7 +1335,7 @@ exports.checkInVisitNew = async (req, res) => {
           const files = req.files
           const uploadedFile = await uploadFilesCheckin(
             files,
-            '/mnt/nas/checkin_img',
+            CHECKIN_IMG_PATH,
             store.area,
             storeId
           )
