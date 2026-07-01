@@ -932,13 +932,20 @@ exports.checkIn = async (req, res) => {
           const files = req.files
           const uploadedFile = await uploadFilesCheckin(
             files,
-            path.join(__dirname, '../../public/images/stores/checkin'),
+            '/mnt/nas/checkin_img',
             store.area,
             storeId
           )
 
           if (uploadedFile.length > 0) {
             image = uploadedFile[0].path
+            console.log(
+              '[route/checkIn] uploaded checkin image',
+              'routeId=', routeId,
+              'storeId=', storeId,
+              'fullPath=', uploadedFile[0].fullPath,
+              'publicPath=', uploadedFile[0].path
+            )
           }
         } catch (fileError) {
           return res.status(500).json({
@@ -1059,13 +1066,20 @@ exports.checkInNotSale = async (req, res) => {
           const files = req.files
           const uploadedFile = await uploadFilesCheckin(
             files,
-            path.join(__dirname, '../../public/images/stores/checkin'),
+            '/mnt/nas/checkin_img',
             store.area,
             storeId
           )
 
           if (uploadedFile.length > 0) {
             image = uploadedFile[0].path
+            console.log(
+              '[route/checkInNotSale] uploaded checkin image',
+              'routeId=', routeId,
+              'storeId=', storeId,
+              'fullPath=', uploadedFile[0].fullPath,
+              'publicPath=', uploadedFile[0].path
+            )
           }
         } catch (fileError) {
           return res.status(500).json({
@@ -1186,13 +1200,20 @@ exports.checkInVisit = async (req, res) => {
           const files = req.files
           const uploadedFile = await uploadFilesCheckin(
             files,
-            path.join(__dirname, '../../public/images/stores/checkin'),
+            '/mnt/nas/checkin_img',
             store.area,
             storeId
           )
 
           if (uploadedFile.length > 0) {
             image = uploadedFile[0].path
+            console.log(
+              '[route/checkInVisit] uploaded checkin image',
+              'routeId=', routeId,
+              'storeId=', storeId,
+              'fullPath=', uploadedFile[0].fullPath,
+              'publicPath=', uploadedFile[0].path
+            )
           }
         } catch (fileError) {
           return res.status(500).json({
@@ -1313,13 +1334,20 @@ exports.checkInVisitNew = async (req, res) => {
           const files = req.files
           const uploadedFile = await uploadFilesCheckin(
             files,
-            path.join(__dirname, '../../public/images/stores/checkin'),
+            '/mnt/nas/checkin_img',
             store.area,
             storeId
           )
 
           if (uploadedFile.length > 0) {
             image = uploadedFile[0].path
+            console.log(
+              '[route/checkInVisitNew] uploaded checkin image',
+              'routeId=', routeId,
+              'storeId=', storeId,
+              'fullPath=', uploadedFile[0].fullPath,
+              'publicPath=', uploadedFile[0].path
+            )
           }
         } catch (fileError) {
           return res.status(500).json({

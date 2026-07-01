@@ -45,15 +45,13 @@ const uploadFilesCheckin = async (
         file.originalname
       )}`
 
-      const targetDir = path.join(basePath, subFolder)
+      const targetDir = path.resolve(basePath, subFolder)
       if (!fs.existsSync(targetDir)) {
         await fs.promises.mkdir(targetDir, { recursive: true })
       }
 
       const filePath = path.join(targetDir, imageName)
-
-      // ✅ แก้ตรงนี้: ให้ publicPath มี 'stores/checkin' เสมอ
-      const publicPath = path.join(
+      const publicPath = path.posix.join(
         '/stores/checkin',
         subFolder,
         imageName
@@ -63,9 +61,7 @@ const uploadFilesCheckin = async (
 
       return {
         name: imageName,
-        path:
-          process.env.CA_IMG_URI +
-          publicPath.replace(/\\\\/g, '/').replace(/\\/g, '/'), // normalize path
+        path: process.env.CA_IMG_URI + publicPath,
         fullPath: filePath
       }
     })
