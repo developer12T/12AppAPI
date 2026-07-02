@@ -39,25 +39,21 @@ const uploadFilesCheckin = async (
   subFolder = '',
   name = ''
 ) => {
-  const resolvedBasePath = path.resolve(basePath)
-
-  if (!fs.existsSync(resolvedBasePath)) {
-    throw new Error(`Checkin NAS base path does not exist: ${resolvedBasePath}`)
-  }
-
   const uploadedFiles = await Promise.all(
     files.map(async file => {
       const imageName = `${Date.now()}-${timestamp()}-${name}${path.extname(
         file.originalname
       )}`
 
-      const targetDir = path.resolve(resolvedBasePath, subFolder)
+      const targetDir = path.join(basePath, subFolder)
       if (!fs.existsSync(targetDir)) {
         await fs.promises.mkdir(targetDir, { recursive: true })
       }
 
       const filePath = path.join(targetDir, imageName)
-      const publicPath = path.posix.join(
+
+      // ✅ แก้ตรงนี้: ให้ publicPath มี 'stores/checkin' เสมอ
+      const publicPath = path.join(
         '/stores/checkin',
         subFolder,
         imageName
@@ -67,7 +63,9 @@ const uploadFilesCheckin = async (
 
       return {
         name: imageName,
-        path: process.env.CA_IMG_URI + publicPath,
+        path:
+          process.env.CA_IMG_URI +
+          publicPath.replace(/\\\\/g, '/').replace(/\\/g, '/'), // normalize path
         fullPath: filePath
       }
     })
