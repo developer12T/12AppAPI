@@ -30,6 +30,7 @@ const {
   OrderZeroDiff,
   checkOrderCancelM3,
   getTarget,
+  getProductPigeon,
   orderPowerBI,
   updateCompletedOrder,
   getTargetProduct,
@@ -98,6 +99,7 @@ router.post('/reportCheckin', reportCheckin)
 router.post('/OrderZeroDiff', OrderZeroDiff)
 router.post('/checkOrderCancelM3', checkOrderCancelM3)
 router.get('/getTarget', getTarget)
+router.get('/getProductPigeon', getProductPigeon)
 router.get('/orderPowerBI', orderPowerBI)
 
 router.get('/getTargetProduct', getTargetProduct)

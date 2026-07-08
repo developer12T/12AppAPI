@@ -5676,13 +5676,15 @@ exports.getTarget = async (req, res) => {
         'store.area': area,
         createdAt: { $gte: startTH, $lte: endTH },
         type: 'sale',
-        status: { $nin: ['canceled', 'reject'] }
+        status: { $nin: ['canceled', 'reject'] },
+        listProduct: { $not: { $elemMatch: { brand: 'ตรานกพิราบ' } } }
       }),
       Order.find({
         'store.area': area,
         createdAt: { $gte: startTH, $lte: endTH },
         type: 'change',
-        status: { $nin: ['pending', 'canceled', 'reject'] }
+        status: { $nin: ['pending', 'canceled', 'reject'] },
+        listProduct: { $not: { $elemMatch: { brand: 'ตรานกพิราบ' } } }
       }),
       Giveaway.find({
         'store.area': area,
@@ -6080,6 +6082,197 @@ exports.getTarget = async (req, res) => {
       message: 'error from server',
       error: error.message || error.toString(), // ✅ ป้องกัน circular object
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined // ✅ แสดง stack เฉพาะตอน dev
+    })
+  }
+}
+
+exports.getProductPigeon = async (req, res) => {
+  try {
+    const { area, startDate, endDate } = req.query
+    const channel = req.headers['x-channel']
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Product } = getModelsByChannel(channel, res, productModel)
+
+    if (!area || !startDate || !endDate) {
+      return res.status(400).json({
+        status: 400,
+        message: 'area, startDate and endDate are required'
+      })
+    }
+
+    if (!/^\d{8}$/.test(startDate) || !/^\d{8}$/.test(endDate)) {
+      return res.status(400).json({
+        status: 400,
+        message: 'startDate and endDate must be in YYYYMMDD format'
+      })
+    }
+
+    const startTH = new Date(
+      `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(
+        6,
+        8
+      )}T00:00:00+07:00`
+    )
+    const endTH = new Date(
+      `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(
+        6,
+        8
+      )}T23:59:59.999+07:00`
+    )
+
+    const productList = await Product.find({ brand: 'ตรานกพิราบ' }).lean()
+    const productMap = new Map(productList.map(product => [product.id, product]))
+
+    const getUnitFactor = (product, unit) =>
+      Number(product?.listUnit?.find(u => u.unit === unit)?.factor ?? 0)
+
+    const buildQuantityBreakdown = (quantityPcs, product) => {
+      const units = Array.isArray(product?.listUnit) ? [...product.listUnit] : []
+      const unitsByFactor = units
+        .map(u => ({ ...u, factor: Number(u.factor) || 0 }))
+        .filter(u => u.factor > 0)
+        .sort((a, b) => b.factor - a.factor)
+
+      // Ensure we can always represent remainder in PCS if the product definition
+      // doesn't include a factor-1 unit.
+      if (!unitsByFactor.some(u => u.factor === 1)) {
+        unitsByFactor.push({ unit: 'PCS', name: 'PCS', factor: 1 })
+      }
+
+      let remain = Number(quantityPcs) || 0
+      const breakdown = []
+
+      for (const u of unitsByFactor) {
+        const qty = Math.floor(remain / u.factor)
+        if (qty > 0) {
+          breakdown.push({
+            unit: u.unit,
+            unitName: u.name || u.unit,
+            qty,
+            factor: u.factor
+          })
+          remain -= qty * u.factor
+        }
+      }
+
+      if (remain > 0) {
+        const smallest = unitsByFactor[unitsByFactor.length - 1]
+        const existing = breakdown.find(x => x.unit === smallest.unit)
+        if (existing) {
+          existing.qty += remain
+        } else {
+          breakdown.push({
+            unit: smallest.unit,
+            unitName: smallest.name || smallest.unit,
+            qty: remain,
+            factor: smallest.factor
+          })
+        }
+      }
+
+      return breakdown
+    }
+
+    const formatQuantityText = breakdown => {
+      if (!Array.isArray(breakdown) || breakdown.length === 0) return '0'
+      return breakdown
+        .map(item => `${item.qty} ${item.unitName || item.unit}`)
+        .join(' ')
+    }
+
+    const salesRaw = await Order.aggregate([
+      {
+        $match: {
+          'store.area': area,
+          createdAt: { $gte: startTH, $lte: endTH },
+          type: { $in: ['sale', 'saleNoodle'] },
+          status: { $nin: ['canceled', 'reject'] }
+        }
+      },
+      { $unwind: '$listProduct' },
+      {
+        $match: {
+          'listProduct.brand': 'ตรานกพิราบ'
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          productId: '$listProduct.id',
+          productName: '$listProduct.name',
+          unit: '$listProduct.unit',
+          unitName: '$listProduct.unitName',
+          qty: '$listProduct.qty',
+          subtotal: '$listProduct.subtotal'
+        }
+      }
+    ])
+
+    const salesMap = new Map()
+
+    for (const item of salesRaw) {
+      const product = productMap.get(item.productId)
+      const unitFactor =
+        product?.listUnit?.find(u => u.unit === item.unit)?.factor ?? 1
+      const ctnFactor =
+        product?.listUnit?.find(u => u.unit === 'CTN')?.factor ?? 0
+      const packFactor =
+        product?.listUnit?.find(u => u.unit === 'PAC')?.factor ?? 0
+      const qtyPcs = Number(item.qty) * Number(unitFactor)
+
+      if (!salesMap.has(item.productId)) {
+        salesMap.set(item.productId, {
+          productId: item.productId,
+          productName: item.productName,
+          quantityPcs: qtyPcs,
+          sales: Number(item.subtotal) || 0
+        })
+      } else {
+        const existing = salesMap.get(item.productId)
+        existing.quantityPcs += qtyPcs
+        existing.sales += Number(item.subtotal) || 0
+      }
+    }
+
+    const responseData = productList.map(product => {
+      const saleEntry = salesMap.get(product.id)
+      const unitData = product.listUnit?.find(u => ['PAC', 'BAG'].includes(u.unit)) ||
+        product.listUnit?.[0]
+      const quantityPcs = saleEntry?.quantityPcs ?? 0
+      const quantityBreakdown = buildQuantityBreakdown(quantityPcs, product)
+      const quantityText = formatQuantityText(quantityBreakdown)
+      const quantityCTN = quantityBreakdown.find(u => u.unit === 'CTN')?.qty ?? 0
+      const packUnit = product.listUnit?.find(u => ['PAC', 'BAG'].includes(u.unit))
+      const packFactor = Number(packUnit?.factor ?? 0)
+      const quantityPack = quantityBreakdown.find(u => u.unit === packUnit?.unit)?.qty ?? 0
+      const totalPack = packFactor > 0 ? Math.floor(quantityPcs / packFactor) : 0
+      const quantityPAC = quantityBreakdown.find(u => u.unit === 'PAC')?.qty ?? 0
+      const quantityBAG = quantityBreakdown.find(u => u.unit === 'BAG')?.qty ?? 0
+
+      return {
+        productId: product.id,
+        productName: product.name,
+        quantity: quantityText || '0',
+        quantityCTN,
+        quantityPAC,
+        quantityBAG,
+        quantityPack,
+        totalPack,
+        quantityPcs,
+        sales: saleEntry?.sales ?? 0,
+        unit: unitData?.unit ?? 'PAC',
+        unitName: unitData?.name ?? 'แพ็ค'
+      }
+    })
+
+    res.status(200).json({ status: 200, data: responseData })
+  } catch (error) {
+    console.error('❌ Error getProductPigeon:', error)
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(),
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     })
   }
 }
