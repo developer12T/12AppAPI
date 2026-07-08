@@ -5676,15 +5676,13 @@ exports.getTarget = async (req, res) => {
         'store.area': area,
         createdAt: { $gte: startTH, $lte: endTH },
         type: 'sale',
-        status: { $nin: ['canceled', 'reject'] },
-        listProduct: { $not: { $elemMatch: { brand: 'ตรานกพิราบ' } } }
+        status: { $nin: ['canceled', 'reject'] }
       }),
       Order.find({
         'store.area': area,
         createdAt: { $gte: startTH, $lte: endTH },
         type: 'change',
-        status: { $nin: ['pending', 'canceled', 'reject'] },
-        listProduct: { $not: { $elemMatch: { brand: 'ตรานกพิราบ' } } }
+        status: { $nin: ['pending', 'canceled', 'reject'] }
       }),
       Giveaway.find({
         'store.area': area,
