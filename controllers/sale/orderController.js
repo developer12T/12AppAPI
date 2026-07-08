@@ -5718,18 +5718,20 @@ exports.getTarget = async (req, res) => {
     const salePcs = Object.values(
       (dataOrderSale || [])
         .flatMap(order =>
-          (order.listProduct || []).map(i => {
-            const factor =
-              product
-                .find(u => u.id === i.id)
-                ?.listUnit.find(u => u.unit === i.unit)?.factor ?? 1
+          (order.listProduct || [])
+            .filter(i => i.brand !== 'ตรานกพิราบ')
+            .map(i => {
+              const factor =
+                product
+                  .find(u => u.id === i.id)
+                  ?.listUnit.find(u => u.unit === i.unit)?.factor ?? 1
 
-            return {
-              id: i.id,
-              qtyPcs: (i.qty || 0) * factor,
-              sale: i.netTotal || 0
-            }
-          })
+              return {
+                id: i.id,
+                qtyPcs: (i.qty || 0) * factor,
+                sale: i.netTotal || 0
+              }
+            })
         )
         .reduce((acc, cur) => {
           if (!acc[cur.id]) acc[cur.id] = { id: cur.id, qtyPcs: 0, sale: 0 }
@@ -5861,17 +5863,20 @@ exports.getTarget = async (req, res) => {
 
     const changePcs = Object.values(
       (dataOrderChange || [])
-        .flatMap(o => o.listProduct || [])
-        .map(i => {
-          const meta = (product || []).find(u => String(u.id) === String(i.id))
-          const factor =
-            meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
-          return {
-            id: i.id,
-            qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
-            sale: Number(i.netTotal) || 0
-          }
-        })
+        .flatMap(o =>
+          (o.listProduct || [])
+            .filter(i => i.brand !== 'ตรานกพิราบ')
+            .map(i => {
+              const meta = (product || []).find(u => String(u.id) === String(i.id))
+              const factor =
+                meta?.listUnit?.find(u => u.unit === i.unit)?.factor ?? 1
+              return {
+                id: i.id,
+                qtyPcs: (Number(i.qty) || 0) * (Number(factor) || 1),
+                sale: Number(i.netTotal) || 0
+              }
+            })
+        )
         .reduce((acc, cur) => {
           acc[cur.id] ??= { id: cur.id, qtyPcs: 0, sale: 0 }
           acc[cur.id].qtyPcs += cur.qtyPcs
