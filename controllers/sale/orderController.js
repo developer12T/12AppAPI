@@ -6580,9 +6580,15 @@ exports.getTargetProduct = async (req, res) => {
 
     const targetProductData = await targetProduct.find(query).lean()
 
-    // กันกรณี grp_target เป็น undefined/null แล้วทำ flatMap พัง
+    // กันกรณีกรณี grp_target เป็น undefined/null แล้วทำ flatMap พัง
     const listGroupM3 = [
-      ...new Set(targetProductData.flatMap(item => item.grp_target ?? []))
+      ...new Set(
+        targetProductData
+          .flatMap(item =>
+            item.grp_target == null ? [] : [String(item.grp_target).trim()]
+          )
+          .filter(Boolean)
+      )
     ]
 
     const productData = await Product.find().lean()
@@ -6664,28 +6670,36 @@ exports.getTargetProduct = async (req, res) => {
       ])
     ])
 
-    const orderSaleTran = [...dataOrderChange, ...dataOrderSale].flatMap(item =>
-      item.listProduct.map(i => {
-        const productDetail = productData.find(o => o.id === i.id)
-        const factor = productDetail.listUnit.find(
-          o => o.unit === i.unit
-        ).factor
-        const factorCtn = productDetail.listUnit.find(
-          o => o.unit === 'CTN'
-        ).factor
-        const groupM3 = productDetail.groupCodeM3
-        const groupNameM3 = productDetail.groupM3
-        
-        return {
-          ...i,
-          area: item.store.area,
-          groupM3,
-          groupNameM3,
-          qtyPcs: i.qty * factor,
-          factorCtn: factorCtn
-        }
-      })
-    )
+    const orderSaleTran = [...dataOrderChange, ...dataOrderSale]
+      .flatMap(item =>
+        item.listProduct
+          .map(i => {
+            const productDetail = productData.find(o => o.id === i.id)
+            if (!productDetail) return null
+
+            const unitFactor = productDetail.listUnit.find(
+              o => o.unit === i.unit
+            )
+            const ctnFactor = productDetail.listUnit.find(
+              o => o.unit === 'CTN'
+            )
+
+            if (!unitFactor || !ctnFactor) return null
+
+            const groupM3 = productDetail.groupCodeM3
+            const groupNameM3 = productDetail.groupM3
+
+            return {
+              ...i,
+              area: item.store.area,
+              groupM3,
+              groupNameM3,
+              qtyPcs: i.qty * unitFactor.factor,
+              factorCtn: ctnFactor.factor
+            }
+          })
+          .filter(Boolean)
+      )
 
     const orderSaleTranMerged = Object.values(
       orderSaleTran.reduce((acc, cur) => {
@@ -6790,7 +6804,11 @@ exports.getTargetProduct = async (req, res) => {
             item.period === period &&
             item.grp_target === u.groupM3
         )
-        dataTran = {
+        if (!targetDetail) {
+          continue
+        }
+
+        const dataTran = {
           id: targetDetail.id,
           period: period,
           area: i,
