@@ -1580,11 +1580,11 @@ exports.stockQuery = async function (channel, period, wereHouse) {
   let result = ''
   if (channel == 'cash') {
     if (wereHouse) {
-      ; `
+      result = await sql.query`
   SELECT WH, 
   ITEM_CODE, 
   SUM(ITEM_QTY) AS ITEM_QTY
-  FROM [dbo].[data_stock_van]
+  FROM [DATA_OMS].[dbo].[data_stock_van]
   WHERE Stock_Date LIKE ${formatted} AND
   WH = ${wereHouse}
   GROUP BY WH, ITEM_CODE`
@@ -1593,7 +1593,7 @@ exports.stockQuery = async function (channel, period, wereHouse) {
   SELECT WH, 
   ITEM_CODE, 
   SUM(ITEM_QTY) AS ITEM_QTY
-  FROM [dbo].[data_stock_van]
+  FROM [DATA_OMS].[dbo].[data_stock_van]
   WHERE Stock_Date LIKE ${formatted}
   GROUP BY WH, ITEM_CODE
 `
@@ -1791,11 +1791,11 @@ exports.stockPcQuery = async function (channel, period, wereHouse) {
   let result = ''
   if (channel === 'cash' || channel === 'pc') {
     if (wereHouse) {
-      ; `
+      result = await sql.query`
   SELECT WH, 
   ITEM_CODE, 
   SUM(ITEM_QTY) AS ITEM_QTY
-  FROM [dbo].[data_stock_pc]
+  FROM [DATA_OMS].[dbo].[data_stock_pc]
   WHERE Stock_Date LIKE ${formatted} AND
   WH = ${wereHouse}
   GROUP BY WH, ITEM_CODE`
@@ -1804,7 +1804,7 @@ exports.stockPcQuery = async function (channel, period, wereHouse) {
   SELECT WH, 
   ITEM_CODE, 
   SUM(ITEM_QTY) AS ITEM_QTY
-  FROM [dbo].[data_stock_pc]
+  FROM [DATA_OMS].[dbo].[data_stock_pc]
   WHERE Stock_Date LIKE ${formatted}
   GROUP BY WH, ITEM_CODE
 `
