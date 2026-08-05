@@ -7,6 +7,7 @@ const {
   getAllSendMoney,
   getSendMoneyForAcc,
   sendmoneyToExcel,
+  sendmoneyProductDetail,
   sendmoneySumByArea,
   updateSendmoneyOld,
   updateSendmoneyOld2,
@@ -49,6 +50,7 @@ router.post('/saveSendmoney', saveSendmoney)
 router.get('/getAllSendMoney', getAllSendMoney)
 router.get('/getSendMoneyForAcc', getSendMoneyForAcc)
 router.get('/sendmoneyToExcel', sendmoneyToExcel)
+router.get('/sendmoneyProductDetail', sendmoneyProductDetail)
 router.get('/sendmoneySumByArea', sendmoneySumByArea)
 router.patch('/updateSndmoneyAcc', updateSendmoneyAcc)
 // router.get('/sendmoneyToExcel', sendmoneyToExcel)

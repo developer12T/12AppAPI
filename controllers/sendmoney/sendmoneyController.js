@@ -1887,6 +1887,119 @@ exports.sendmoneyToExcel = async (req, res) => {
   }
 }
 
+// รายละเอียดยอดขายแยกตามสินค้า (ขาย + ยกเลิก) ของ area (รับได้ทั้งเขตเดียวหรือหลายเขตคั่นด้วย , )
+// ระบุ date (YYYYMMDD) สำหรับรายวัน หรือ period (YYYYMM) สำหรับรายเดือน อย่างใดอย่างหนึ่ง
+// ใช้เงื่อนไข match เดียวกับ sendmoneyToExcel เพื่อให้ยอดรวมตรงกับหน้าตาราง
+exports.sendmoneyProductDetail = async (req, res) => {
+  try {
+    const { channel, area, date, period } = req.query
+    const { Order } = getModelsByChannel(channel, res, orderModel)
+    const { Refund } = getModelsByChannel(channel, res, refundModel)
+
+    const areas = (area || '')
+      .split(',')
+      .map(a => a.trim())
+      .filter(Boolean)
+
+    if (!areas.length || (!date && !period)) {
+      return res.status(400).json({
+        status: 400,
+        message: 'area and (date or period) are required'
+      })
+    }
+
+    let startDate, endDate
+    if (period) {
+      const y = period.slice(0, 4)
+      const m = period.slice(4, 6)
+      startDate = new Date(`${y}-${m}-01T00:00:00+07:00`)
+      endDate = new Date(startDate)
+      endDate.setMonth(endDate.getMonth() + 1)
+    } else {
+      startDate = new Date(
+        `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T00:00:00+07:00`
+      )
+      endDate = new Date(
+        `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T23:59:59.999+07:00`
+      )
+    }
+    const matchMain = { createdAt: { $gte: startDate, $lt: endDate } }
+
+    const saleAgg = await Order.aggregate([
+      {
+        $match: {
+          type: { $in: ['saleNoodle', 'sale'] },
+          'store.area': { $in: areas },
+          status: { $nin: ['canceled', 'delete'] }
+        }
+      },
+      { $match: matchMain },
+      { $unwind: '$listProduct' },
+      {
+        $group: {
+          _id: '$listProduct.id',
+          name: { $first: '$listProduct.name' },
+          unitName: { $first: '$listProduct.unitName' },
+          qty: { $sum: '$listProduct.qty' },
+          amount: { $sum: '$listProduct.netTotal' }
+        }
+      }
+    ])
+
+    const cancelAgg = await Refund.aggregate([
+      {
+        $match: {
+          type: 'refund',
+          'store.area': { $in: areas },
+          status: { $nin: ['pending', 'canceled'] }
+        }
+      },
+      { $match: matchMain },
+      { $unwind: '$listProduct' },
+      {
+        $group: {
+          _id: '$listProduct.id',
+          name: { $first: '$listProduct.name' },
+          unitName: { $first: '$listProduct.unitName' },
+          qty: { $sum: '$listProduct.qty' },
+          amount: { $sum: '$listProduct.total' }
+        }
+      }
+    ])
+
+    const map = {}
+    const getRow = (id, name, unitName) => {
+      if (!map[id]) {
+        map[id] = { id, name, unitName, qty: 0, amount: 0, cancelQty: 0, cancelAmount: 0 }
+      }
+      return map[id]
+    }
+
+    saleAgg.forEach(r => {
+      const row = getRow(r._id, r.name, r.unitName)
+      row.qty = r.qty
+      row.amount = to2(r.amount)
+    })
+
+    cancelAgg.forEach(r => {
+      const row = getRow(r._id, r.name, r.unitName)
+      row.cancelQty = r.qty
+      row.cancelAmount = to2(r.amount)
+    })
+
+    const data = Object.values(map).sort((a, b) => b.amount - a.amount)
+
+    return res.status(200).json({
+      status: 200,
+      message: 'success',
+      data
+    })
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ status: 500, message: err.message })
+  }
+}
+
 exports.updateSendmoneyAcc = async (req, res) => {
   try {
     const channel = req.headers['x-channel']
