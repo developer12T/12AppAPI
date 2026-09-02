@@ -60,7 +60,8 @@ const {
   changeAreaStoreNew,
   changeRouteUseExcel,
   addQrCodeToStore,
-  getQrCodeStore
+  getQrCodeStore,
+  getAreaAllFromStore
   // test
 } = require('../../controllers/store/storeController')
 
@@ -90,6 +91,7 @@ const router = express.Router()
 router.get('/storeToExcel', storeToExcel)
 router.get('/getLatLongOrderPending', getLatLongOrderPending)
 router.get('/getStore', getStore)
+router.get('/getAreaAllFromStore', getAreaAllFromStore)
 router.get('/getTypeStore', getTypeStore)
 router.get('/check/:storeId', checkSimilarStores)
 router.get('/getLatLongOrder', getLatLongOrder)

@@ -551,6 +551,34 @@ exports.getStore = async (req, res) => {
   }
 }
 
+exports.getAreaAllFromStore = async (req, res) => {
+  try {
+    const channel = req.headers['x-channel']
+    const { Store } = getModelsByChannel(channel, res, storeModel)
+
+    const data = await Store.aggregate([
+      { $match: { area: { $ne: '' } } },
+      { $group: { _id: '$area' } },
+      { $project: { _id: 0, area: '$_id' } },
+      { $sort: { area: 1 } }
+    ])
+
+    res.status(200).json({
+      status: 200,
+      message: 'successfully',
+      data: data
+    })
+  } catch (error) {
+    console.error('❌ Error:', error)
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(),
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    })
+  }
+}
+
 exports.updateImage = async (req, res) => {
   const channel = req.headers['x-channel'] // 'credit' or 'cash'
 
