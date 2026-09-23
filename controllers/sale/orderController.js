@@ -75,6 +75,7 @@ const distributionModel = require('../../models/cash/distribution')
 const refundModel = require('../../models/cash/refund')
 const storeModel = require('../../models/cash/store')
 const targetProductModel = require('../../models/cash/targetProduct')
+const targetPigeonModel = require('../../models/cash/targetPigeon')
 const { getModelsByChannel } = require('../../middleware/channel')
 const {
   formatDateTimeToThai,
@@ -6271,6 +6272,36 @@ exports.getProductPigeon = async (req, res) => {
     res.status(200).json({ status: 200, data: responseData })
   } catch (error) {
     console.error('❌ Error getProductPigeon:', error)
+    res.status(500).json({
+      status: 500,
+      message: 'error from server',
+      error: error.message || error.toString(),
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    })
+  }
+}
+
+exports.getTargetPigeon = async (req, res) => {
+  try {
+    const { area, period } = req.query
+    const channel = req.headers['x-channel']
+    const { TargetPigeon } = getModelsByChannel(channel, res, targetPigeonModel)
+
+    if (!area || !period) {
+      return res.status(400).json({
+        status: 400,
+        message: 'area and period are required'
+      })
+    }
+
+    const targetDoc = await TargetPigeon.findOne({ area, period }).lean()
+
+    res.status(200).json({
+      status: 200,
+      data: targetDoc?.list_item || []
+    })
+  } catch (error) {
+    console.error('❌ Error getTargetPigeon:', error)
     res.status(500).json({
       status: 500,
       message: 'error from server',
