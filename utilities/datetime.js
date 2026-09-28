@@ -32,8 +32,19 @@ function rangeDate(period) {
     throw new Error('Invalid period format! Use YYYYMM')
   }
 
-  const startDate = moment(period, 'YYYYMM').startOf('month').toDate()
-  const endDate = moment(period, 'YYYYMM').endOf('month').toDate()
+  const year = parseInt(period.slice(0, 4), 10)
+  const month = parseInt(period.slice(4, 6), 10) // 1-12
+  const nextMonth = month === 12 ? 1 : month + 1
+  const nextYear = month === 12 ? year + 1 : year
+  const pad = n => String(n).padStart(2, '0')
+
+  // ผูก timezone +07:00 (เวลาไทย) ตรงๆ ไม่พึ่ง timezone ของเครื่อง/เซิร์ฟเวอร์ที่รันโค้ดนี้
+  // (เดิมใช้ moment().startOf/endOf('month') โดยไม่ระบุ timezone ทำให้ผลลัพธ์ต่างกัน
+  // ถ้า server ตั้ง timezone ไม่ใช่ Asia/Bangkok เช่น เอกสารของวันที่ 1 ของเดือน
+  // จะหลุดไปนับเป็นเดือนก่อนหน้า)
+  const startDate = new Date(`${year}-${pad(month)}-01T00:00:00+07:00`)
+  const endDate = new Date(`${nextYear}-${pad(nextMonth)}-01T00:00:00+07:00`)
+  endDate.setMilliseconds(endDate.getMilliseconds() - 1)
 
   return { startDate, endDate }
 }
