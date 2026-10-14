@@ -6818,37 +6818,50 @@ exports.getTargetProduct = async (req, res) => {
       areaList = [area]
     } else {
       areaList = [
-        ...new Set(targetProductData.flatMap(item => item.area ?? []))
-      ]
+        ...new Set(
+          targetProductData
+            .filter(item => !zone || item.zone === zone)
+            .flatMap(item => item.area ?? [])
+        )
+      ].filter(a => !team || `${a.slice(0, 2)}${a.slice(3, 4)}` === team)
     }
     // console.log(areaList)
 
+    // ชื่อกลุ่มจาก Product (ใช้กับกลุ่มที่มีเป้าแต่ยังไม่มียอดขาย)
+    const groupNameMap = new Map()
+    for (const p of productData) {
+      if (p.groupCodeM3 && !groupNameMap.has(p.groupCodeM3)) {
+        groupNameMap.set(p.groupCodeM3, p.groupM3)
+      }
+    }
+
     let data = []
     for (const i of areaList) {
-      // console.log(i)
-      const orderArea = orderSaleTranMergedCtnClean.filter(item => item.area === i)
+      // เริ่มจากเป้า แล้วค่อยจับคู่ยอดขาย เพื่อให้กลุ่มที่ยังไม่มียอดขายแสดงด้วย
+      const targetArea = targetProductData.filter(
+        item => item.area === i && item.period === period
+      )
 
-      for (const u of orderArea) {
-        const targetDetail = targetProductData.find(
-          item =>
-            item.area === i &&
-            item.period === period &&
-            item.grp_target === u.groupM3
+      for (const targetDetail of targetArea) {
+        const groupCode = String(targetDetail.grp_target ?? '').trim()
+        if (!groupCode) continue
+
+        const u = orderSaleTranMergedCtnClean.find(
+          item => item.area === i && item.groupM3 === groupCode
         )
-        if (!targetDetail) {
-          continue
-        }
+        // ไม่มีเป้าและไม่มียอดขาย ไม่ต้องแสดง
+        if (!Number(targetDetail.tg) && !u) continue
 
         const dataTran = {
           id: targetDetail.id,
           period: period,
           area: i,
-          groupCode: u.groupM3,
-          group: u.groupNameM3,
+          groupCode: groupCode,
+          group: u?.groupNameM3 ?? groupNameMap.get(groupCode) ?? groupCode,
           targetQty: targetDetail.tg,
           targetAll: targetDetail.all_amt_target,
-          actualCtn: u.qtyCtn,
-          actual: u.subtotal,
+          actualCtn: u?.qtyCtn ?? 0,
+          actual: u?.subtotal ?? 0,
           unit: 'THB'
         }
         data.push(dataTran)
